@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -141,13 +141,10 @@ export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
   if (screenshotNeeded) return true;
 
   const prPart = prNumber ? `pr-${escapeRegExp(String(prNumber))}` : 'pr-[0-9]+';
-  const generatedAsset = new RegExp(`(?:docs/assets/pr-screenshots/${prPart}/|/docs/assets/pr-screenshots/${prPart}/)[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)(?:\\?raw=1)?`, 'i');
-  if (generatedAsset.test(text)) return true;
-
   const testResultArtifact = /test-results\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
   if (testResultArtifact.test(text)) return true;
 
-  const uploadedArtifact = /codex-ui-evidence-[\w.-]+|actions\/runs\/[0-9]+\/artifacts\/[0-9]+/i;
+  const uploadedArtifact = /codex-ui-evidence-[\w.-]+|actions\/runs\/[0-9]+\/artifacts\/[0-9]+|github\.com\/user-attachments\/assets\/[0-9a-f-]+/i;
   return uploadedArtifact.test(text);
 }
 
@@ -155,7 +152,7 @@ export function explainScreenshotEvidenceFailure(files = [], body = '', options 
   if (!hasUiChanges(files)) return null;
   if (hasScreenshotEvidence(body, options)) return null;
   const views = mapChangedFilesToViews(files).map(recipe => recipe.label).join(', ') || 'changed UI views';
-  return `This PR changes UI files but has no generated screenshot evidence for: ${views}. Add docs/assets/pr-screenshots/pr-${options.prNumber || '<number>'}/ images, link uploaded screenshot artifacts, or add SCREENSHOTS_NEEDED: <reason>.`;
+  return `This PR changes UI files but has no generated screenshot evidence for: ${views}. Generate focused screenshots under tmp/pr-screenshots/${options.prNumber || '<number>'}/, attach or upload them to the PR, clean the tmp directory, and link the uploaded evidence in the PR body; or add SCREENSHOTS_NEEDED: <reason>.`;
 }
 
 export function collectScreenshotEvidence({
@@ -169,7 +166,7 @@ export function collectScreenshotEvidence({
   if (!prNumber) throw new Error('collect requires prNumber');
   const views = mapChangedFilesToViews(changedFiles);
   const sourceRoot = resolve(root, sourceDir);
-  const destinationRoot = resolve(root, outputDir || `docs/assets/pr-screenshots/pr-${prNumber}`);
+  const destinationRoot = resolve(root, outputDir || `tmp/pr-screenshots/${prNumber}`);
   const copied = [];
   const missing = [];
   const allImages = existsSync(sourceRoot) ? listImages(sourceRoot) : [];
@@ -203,7 +200,7 @@ export async function generateFocusedScreenshotEvidence({
   root = ROOT,
 } = {}) {
   const viewIds = focusedViewIdsFor({ changedFiles, requestedViews });
-  const destinationRoot = resolve(root, outputDir || (prNumber ? `docs/assets/pr-screenshots/pr-${prNumber}` : 'test-results/ui-pr-focused'));
+  const destinationRoot = resolve(root, outputDir || `tmp/pr-screenshots/${prNumber || 'local'}`);
   mkdirSync(destinationRoot, { recursive: true });
 
   const [{ chromium }, manifest] = await Promise.all([
@@ -228,6 +225,13 @@ export async function generateFocusedScreenshotEvidence({
     await browser.close();
   }
   return { generated, destinationRoot };
+}
+
+export function cleanPrScreenshotEvidence({ prNumber, root = ROOT } = {}) {
+  if (!prNumber) throw new Error('clean requires prNumber');
+  const destinationRoot = resolve(root, `tmp/pr-screenshots/${prNumber}`);
+  rmSync(destinationRoot, { recursive: true, force: true });
+  return destinationRoot;
 }
 
 export async function validateAssetManifest(manifestPath = 'tests/fixtures/ui-assets/manifest.js', { root = ROOT } = {}) {
@@ -913,6 +917,12 @@ async function main(argv = process.argv.slice(2)) {
     for (const item of result.generated) {
       console.log(relative(ROOT, item.path).replaceAll(sep, '/'));
     }
+    return;
+  }
+
+  if (command === 'clean') {
+    const destinationRoot = cleanPrScreenshotEvidence({ prNumber: args.pr });
+    console.log(`Removed ${relative(ROOT, destinationRoot).replaceAll(sep, '/')}`);
     return;
   }
 

@@ -7,8 +7,9 @@ The existing `.github/workflows/ci.yml` `check-screenshots` job remains the only
 Local agents use the same script:
 
 - `plan` lists the screenshot view recipes implied by changed UI files.
-- `generate` creates focused representative screenshots for the mapped views directly under `docs/assets/pr-screenshots/pr-<number>/`.
-- `collect` remains an explicit fallback that copies matching generated screenshots from `test-results/` into `docs/assets/pr-screenshots/pr-<number>/` when the user requested live Foundry or smoke-harness evidence.
+- `generate` creates focused representative screenshots for the mapped views directly under `tmp/pr-screenshots/<number>/`.
+- `collect` remains an explicit fallback that copies matching generated screenshots from `test-results/` into `tmp/pr-screenshots/<number>/` when the user requested live Foundry or smoke-harness evidence.
+- `clean` removes `tmp/pr-screenshots/<number>/` after the screenshots have been attached or uploaded to the PR.
 - `check` verifies that a PR body contains generated evidence or an explicit `SCREENSHOTS_NEEDED:` handoff.
 
 This keeps CI cheap, makes the normal local path fast and focused, and avoids coupling PR screenshots to the full Foundry smoke harness.
@@ -19,7 +20,6 @@ UI changes are files under `src/ui/`, `styles/`, or files ending in `.svelte` / 
 
 Accepted evidence:
 
-- markdown or HTML image/link references to `docs/assets/pr-screenshots/pr-<number>/...`
 - links or text naming uploaded `codex-ui-evidence-*` artifacts
 - `test-results/...png|jpg|jpeg|webp` artifact paths
 - `SCREENSHOTS_NEEDED: <non-empty reason>` when screenshots are genuinely blocked

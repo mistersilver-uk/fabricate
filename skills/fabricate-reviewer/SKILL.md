@@ -47,7 +47,7 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 - Validation results from the implementer or CI pass without warnings that matter.
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
-- UI PR screenshot evidence comes from `docs/assets/pr-screenshots/pr-<number>/`, uploaded artifacts, `test-results/` artifact paths, or a specific `SCREENSHOTS_NEEDED:` reason; unrelated image markdown is not enough.
+- UI PR screenshot evidence comes from uploaded/attached screenshot evidence, uploaded artifacts, `test-results/` artifact paths, or a specific `SCREENSHOTS_NEEDED:` reason; unrelated image markdown is not enough. PR-scoped screenshots should not be committed as repository assets.
 - Compact rails, headers, cards, buttons, and fact components are tested with long names or localized strings where overflow could move controls or break layout.
 - Card, overlay, menu, disabled-state, and icon-button workflows have live pointer hit-test coverage when rendered hit targets could differ from DOM structure.
 - Foundry/Playwright infrastructure failures are separated from app regressions in the residual risk notes.
