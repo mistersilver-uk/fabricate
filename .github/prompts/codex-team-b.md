@@ -63,15 +63,13 @@ Work through these phases:
 - Validate the final commit message with `npx commitlint --from HEAD~1 --to HEAD --verbose`
 
 6. Screenshots (UI changes only)
-- If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST generate relevant screenshots for the changed views before the PR is opened or updated.
+- If you changed any files matching `src/ui/**`, `styles/**`, `lang/**`, `*.svelte`, or `*.css`, you MUST produce real smoke-run screenshots for the changed views.
 - Run `npm run screenshots:ui:plan -- --base origin/main` to list expected screenshot views.
-- Run `npm run test:foundry` to produce real Foundry smoke screenshots under `test-results/`.
-- Collect the relevant smoke screenshots with `npm run screenshots:ui -- --base origin/main --pr <number>` so temporary evidence lands under `tmp/pr-screenshots/<number>/`.
-- Upload the temporary screenshots through GitHub's native attachment flow, update the PR body with visible `![pr-<number> ...](https://github.com/user-attachments/assets/...)` image embeds, then immediately clean them with `npm run screenshots:ui:clean -- --pr <number>`.
-- Do not install or use helper upload extensions unless the user explicitly approves that fallback. Artifact references are automation fallback evidence, not the normal visible screenshot handoff.
+- Run `npm run test:foundry` (the local default `full` profile) to produce real Foundry smoke screenshots under `test-results/`. Do NOT add a full smoke run to GitHub Actions.
+- The workflow performs collection, upload, and PR-body embedding automatically after it opens the PR (`collect` → `gh image` upload → `publish` → `clean`). You do not need a PR number; just leave `test-results/` in place so that step can consume it.
+- For a local or human-driven run where the PR already exists, do it yourself: `npm run screenshots:ui -- --base origin/main --pr <number>`, then `npm run screenshots:ui:publish -- --pr <number>` (uploads via the `gh image` extension and patches the managed screenshot block in the PR body), then `npm run screenshots:ui:clean -- --pr <number>`.
 - Smoke fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external image URLs.
-- If screenshots are produced, mention the embedded GitHub attachment image links and confirm `tmp/pr-screenshots/<number>/` was cleaned.
-- If you cannot capture screenshots, include exactly this line in your final output: `SCREENSHOTS_NEEDED: <short reason and visual change summary>`.
+- The `check-screenshots` gate cannot be self-satisfied. There is no `SCREENSHOTS_NEEDED:` escape hatch. If screenshot capture is genuinely impossible, report the reason in your summary; only a maintainer can apply the `screenshots-exempt` label, and an agent must never apply it.
 
 Rules:
 
@@ -85,5 +83,5 @@ Output a concise summary with:
 - `SUBAGENTS:` agents spawned and their outcome.
 - `FILES:` changed files.
 - `VALIDATION:` command results.
-- `SCREENSHOTS:` embedded GitHub attachment image links, or `SCREENSHOTS_NEEDED: ...` for UI changes without evidence.
+- `SCREENSHOTS:` confirm `npm run test:foundry` produced `test-results/` for the changed views (the workflow embeds them automatically), or explain why capture was impossible so a maintainer can decide whether to apply `screenshots-exempt`.
 - `FOLLOW_UP:` deferred work, or `none`.

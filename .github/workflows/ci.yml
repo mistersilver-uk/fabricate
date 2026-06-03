@@ -127,7 +127,15 @@ jobs:
             --name-only)
           printf '%s\n' "$CHANGED_FILES" > changed-files.txt
 
+          # Read the live label list. Only a maintainer-applied
+          # `screenshots-exempt` label can skip this check; agents cannot
+          # self-apply labels, so this cannot be no-op'd from the PR body.
+          PR_LABELS=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json labels --jq '.labels[].name')
+          printf '%s\n' "$PR_LABELS" > labels.txt
+
           node scripts/ui-pr-screenshot-evidence.mjs check \
             --changed-files changed-files.txt \
             --body-file pr-body.md \
+            --labels labels.txt \
+            --exempt-label screenshots-exempt \
             --pr "$PR_NUMBER"

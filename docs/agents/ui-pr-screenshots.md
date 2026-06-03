@@ -1,6 +1,6 @@
 # UI PR Screenshot Evidence
 
-UI changes must have smoke-run screenshot evidence in the PR body. The existing CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`.
+UI changes must have real smoke-run screenshot evidence embedded in the PR body. The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`.
 
 ## When It Applies
 
@@ -8,8 +8,14 @@ The rule applies when a PR changes any file under:
 
 - `src/ui/`
 - `styles/`
+- `lang/` (visible UI text)
 - any `*.svelte` file
 - any `*.css` file
+
+## Prerequisites
+
+- A `gh` CLI authenticated with a **user-scoped** token (the upload step creates GitHub attachments, which the default Actions `GITHUB_TOKEN` cannot do).
+- The `gh image` extension (`gh extension install <owner>/gh-image`) — used to upload local PNGs and return `https://github.com/user-attachments/assets/...` URLs.
 
 ## Local Workflow
 
@@ -19,7 +25,7 @@ The rule applies when a PR changes any file under:
    npm run screenshots:ui:plan -- --base origin/main
    ```
 
-2. Run the Foundry smoke harness to generate real UI screenshots:
+2. Run the Foundry smoke harness to generate real UI screenshots (local default is the `full` profile, which captures every per-view screen):
 
    ```sh
    npm run test:foundry
@@ -33,30 +39,31 @@ The rule applies when a PR changes any file under:
    npm run screenshots:ui -- --base origin/main --pr <number>
    ```
 
-   This copies relevant smoke artifacts from `test-results/` into `tmp/pr-screenshots/<number>/`. PR-scoped screenshots are temporary handoff files only.
+   This copies the relevant smoke artifacts from `test-results/` into `tmp/pr-screenshots/<number>/`. PR-scoped screenshots are temporary handoff files only.
 
-4. Upload the collected screenshots through GitHub's native PR/issue attachment flow and embed the returned image markdown in the `Screenshots (if applicable)` section of the PR description:
+4. Upload and embed automatically:
 
-   ```md
-   ![pr-123 manager environment editor](https://github.com/user-attachments/assets/<id>)
+   ```sh
+   npm run screenshots:ui:publish -- --pr <number>
    ```
 
-   The image alt text must include `pr-<number>` so the scoped CI check can verify the screenshot belongs to the current PR. The normal PR handoff should show rendered images in the PR description, not only artifact names or file lists.
+   This uploads each collected PNG with `gh image`, then patches the PR body via `gh pr edit --body-file`, inserting (or replacing, on re-run) a managed block:
 
-5. Clean the local PR-scoped screenshots immediately after the PR has been updated:
+   ```md
+   <!-- fabricate:screenshots:start -->
+   ![pr-123 Manager gathering environments](https://github.com/user-attachments/assets/<id>)
+   <!-- fabricate:screenshots:end -->
+   ```
+
+   The alt text includes `pr-<number>` so the scoped CI check can verify the screenshot belongs to the current PR. The block is idempotent — re-running `publish` replaces it in place rather than appending duplicates.
+
+5. Clean the local PR-scoped screenshots:
 
    ```sh
    npm run screenshots:ui:clean -- --pr <number>
    ```
 
    Do not commit files from `tmp/pr-screenshots/<number>/` or move them into `docs/`, `assets/`, or any other repository asset directory.
-   Do not install or use helper upload extensions unless the user explicitly approves that fallback; prefer the native GitHub attachment route.
-
-6. If smoke screenshot capture is genuinely blocked, add exactly one handoff line with a specific reason:
-
-   ```md
-SCREENSHOTS_NEEDED: Foundry smoke harness could not launch locally; changed Manager tools browser row spacing.
-   ```
 
 ## Screenshot Source
 
@@ -64,13 +71,14 @@ Screenshot evidence must come from real smoke-harness artifacts in `test-results
 
 ## CI Behavior
 
-CI accepts:
+CI runs only the lightweight `check` (no smoke run on the runner). It reads the live PR body, changed files, and labels, then accepts:
 
-- PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>`
-- PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>` for automation-only fallback runs
-- PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths
-- `SCREENSHOTS_NEEDED: <reason>` when capture is blocked
+- PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>` (the normal, expected evidence)
+- PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>` (automation fallback)
+- PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths (automation fallback)
 
-Artifact references and `test-results` paths are accepted for CI compatibility, but they are not the normal UI PR evidence format. Manual and agent-driven PR updates should embed visible GitHub attachment images in the PR description.
+CI does not accept unrelated image markdown, and there is **no `SCREENSHOTS_NEEDED:` text bypass** — that self-serve escape hatch has been removed.
 
-CI does not accept unrelated image markdown as UI evidence.
+## Bypass
+
+The only way to skip the check is the **`screenshots-exempt` label**, which only a maintainer can apply. An agent must never apply it. When the label is present, the check passes unconditionally. Use it only when screenshot capture is genuinely impossible (e.g. the smoke harness cannot boot for an unrelated reason).
