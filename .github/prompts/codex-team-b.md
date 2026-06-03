@@ -66,8 +66,8 @@ Work through these phases:
 - If you changed any files matching `src/ui/**`, `styles/**`, `lang/**`, `*.svelte`, or `*.css`, you MUST produce real smoke-run screenshots for the changed views.
 - Run `npm run screenshots:ui:plan -- --base origin/main` to list expected screenshot views.
 - Run `npm run test:foundry` (the local default `full` profile) to produce real Foundry smoke screenshots under `test-results/`. Do NOT add a full smoke run to GitHub Actions.
-- The workflow performs collection, upload, and PR-body embedding automatically after it opens the PR (`collect` → `gh attach --release` upload → `publish` → `clean`). You do not need a PR number; just leave `test-results/` in place so that step can consume it.
-- For a local or human-driven run where the PR already exists, do it yourself: `npm run screenshots:ui -- --base origin/main --pr <number>`, then `npm run screenshots:ui:publish -- --pr <number>` (uploads via the `gh attach` extension in release mode and patches the managed screenshot block in the PR body), then `npm run screenshots:ui:clean -- --pr <number>`.
+- The workflow performs collection, upload, and PR-body embedding automatically after it opens the PR (`collect` → S3 upload via `publish` → `clean`). You do not need a PR number; just leave `test-results/` in place so that step can consume it.
+- For a local or human-driven run where the PR already exists, do it yourself: `npm run screenshots:ui -- --base origin/main --pr <number>`, then `npm run screenshots:ui:publish -- --pr <number>` (uploads the screenshots to S3 and patches the managed screenshot block in the PR body), then `npm run screenshots:ui:clean -- --pr <number>`.
 - Smoke fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external image URLs.
 - The `check-screenshots` gate cannot be self-satisfied. There is no `SCREENSHOTS_NEEDED:` escape hatch. If screenshot capture is genuinely impossible, report the reason in your summary; only a maintainer can apply the `screenshots-exempt` label, and an agent must never apply it.
 

@@ -14,7 +14,6 @@ import {
   hasUiChanges,
   isExemptByLabel,
   mapChangedFilesToViews,
-  parseAttachmentUrl,
   publishScreenshotEvidence,
   readLabelList,
   upsertScreenshotsBlock,
@@ -107,7 +106,7 @@ describe('UI PR screenshot evidence', () => {
     assert.match(failure, /tmp\/pr-screenshots\/321/);
     assert.match(failure, /npm run test:foundry/);
     assert.match(failure, /npm run screenshots:ui:publish -- --pr 321/);
-    assert.match(failure, /gh attach/);
+    assert.match(failure, /to S3/);
     assert.match(failure, /!\[pr-321 \.\.\.\]/);
     assert.match(failure, /screenshots-exempt/);
   });
@@ -260,30 +259,18 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('parses both user-attachments and release-asset URLs from uploader output', () => {
-    assert.equal(
-      parseAttachmentUrl('Uploaded: https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000\n'),
-      'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000',
-    );
-    assert.equal(
-      parseAttachmentUrl('Creating release...\nhttps://github.com/owner/repo/releases/download/fabricate-pr-251/manager-tools.png\n'),
-      'https://github.com/owner/repo/releases/download/fabricate-pr-251/manager-tools.png',
-    );
-    assert.equal(parseAttachmentUrl('no url here'), '');
-  });
-
-  it('accepts a PR-scoped release-asset URL as evidence', () => {
+  it('accepts a PR-scoped S3 object URL as evidence', () => {
     assert.equal(
       hasScreenshotEvidence(
-        '![pr-251 tools](https://github.com/owner/repo/releases/download/fabricate-pr-251/manager-tools.png)',
+        '![pr-251 tools](https://fabricate-modules-088545273404-eu-west-2-an.s3.eu-west-2.amazonaws.com/pr-screenshots/251/manager-tools.png)',
         { prNumber: 251 },
       ),
       true,
     );
-    // A release asset scoped to a different PR must not satisfy PR 251.
+    // An S3 object scoped to a different PR must not satisfy PR 251.
     assert.equal(
       hasScreenshotEvidence(
-        '![tools](https://github.com/owner/repo/releases/download/fabricate-pr-999/manager-tools.png)',
+        '![tools](https://fabricate-modules-088545273404-eu-west-2-an.s3.eu-west-2.amazonaws.com/pr-screenshots/999/manager-tools.png)',
         { prNumber: 251 },
       ),
       false,
@@ -312,7 +299,14 @@ describe('UI PR screenshot evidence', () => {
     assert.match(second, /Body text\./);
   });
 
-  it('publishes collected screenshots: uploads via gh image and patches the PR body once', () => {
+  const S3_CONFIG = {
+    bucket: 'test-bucket',
+    baseUrl: 'https://test-bucket.s3.eu-west-2.amazonaws.com',
+    region: 'eu-west-2',
+    prefix: 'pr-screenshots',
+  };
+
+  it('publishes collected screenshots: uploads to S3 and patches the PR body once', async () => {
     const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-publish-'));
     try {
       const dir = join(root, 'tmp/pr-screenshots/251');
@@ -320,33 +314,34 @@ describe('UI PR screenshot evidence', () => {
       writeFileSync(join(dir, 'manager-environments.png'), 'a');
       writeFileSync(join(dir, 'manager-tools.png'), 'b');
 
+      const puts = [];
+      const putObject = async (obj) => { puts.push(obj); };
       const calls = [];
-      let uploadCount = 0;
       const runGh = (args) => {
         calls.push(args);
         if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
-        if (args[0] === 'attach' && args[1] === '--version') return { status: 0, stdout: 'gh-attach 1.0.0', stderr: '' };
-        if (args[0] === 'attach' && args.includes('--image')) {
-          uploadCount += 1;
-          const name = args[args.indexOf('--image') + 1].replace(/\\/g, '/').split('/').pop();
-          return { status: 0, stdout: `Creating release...\nhttps://github.com/o/r/releases/download/fabricate-pr-251/${name}\n`, stderr: '' };
-        }
         if (args[0] === 'pr' && args[1] === 'view') return { status: 0, stdout: '## Description\n\nOriginal.', stderr: '' };
         if (args[0] === 'pr' && args[1] === 'edit') return { status: 0, stdout: '', stderr: '' };
         return { status: 1, stdout: '', stderr: `unexpected ${args.join(' ')}` };
       };
 
-      const result = publishScreenshotEvidence({ prNumber: 251, root, runGh });
+      const result = await publishScreenshotEvidence({ prNumber: 251, root, runGh, putObject, config: S3_CONFIG });
       assert.equal(result.skipped, false);
       assert.equal(result.uploaded.length, 2);
-      assert.equal(uploadCount, 2);
+      assert.equal(puts.length, 2);
+      assert.deepEqual(puts.map(p => p.key).sort(), [
+        'pr-screenshots/251/manager-environments.png',
+        'pr-screenshots/251/manager-tools.png',
+      ]);
+      assert.equal(puts[0].bucket, 'test-bucket');
+      assert.equal(puts.every(p => p.contentType === 'image/png'), true);
 
       const editCalls = calls.filter(args => args[0] === 'pr' && args[1] === 'edit');
       assert.equal(editCalls.length, 1);
       const bodyFile = editCalls[0][editCalls[0].indexOf('--body-file') + 1];
       const written = readFileSync(bodyFile, 'utf8');
       assert.match(written, /Original\./);
-      assert.match(written, /!\[pr-251 Manager gathering environments\]/);
+      assert.match(written, /!\[pr-251 Manager gathering environments\]\(https:\/\/test-bucket\.s3\.eu-west-2\.amazonaws\.com\/pr-screenshots\/251\/manager-environments\.png\)/);
       assert.match(written, /!\[pr-251 Manager gathering tools\]/);
       assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
     } finally {
@@ -354,48 +349,42 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('publish throws clearly when gh is unauthenticated or the attach extension is missing', () => {
+  it('publish throws clearly when gh is unauthenticated', async () => {
     const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-publish-'));
     try {
       const dir = join(root, 'tmp/pr-screenshots/251');
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'manager-tools.png'), 'b');
 
-      assert.throws(() => publishScreenshotEvidence({
+      await assert.rejects(() => publishScreenshotEvidence({
         prNumber: 251,
         root,
+        config: S3_CONFIG,
+        putObject: async () => {},
         runGh: (args) => (args[0] === 'auth'
           ? { status: 1, stdout: '', stderr: 'not logged in' }
           : { status: 0, stdout: '', stderr: '' }),
       }), /not authenticated/);
-
-      assert.throws(() => publishScreenshotEvidence({
-        prNumber: 251,
-        root,
-        runGh: (args) => {
-          if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
-          if (args[0] === 'attach' && args[1] === '--version') return { status: 1, stdout: '', stderr: 'unknown command' };
-          return { status: 0, stdout: '', stderr: '' };
-        },
-      }), /gh attach extension is required/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('publish is a no-op when there are no collected screenshots', () => {
+  it('publish is a no-op when there are no collected screenshots', async () => {
     const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-publish-'));
     try {
+      const puts = [];
       const calls = [];
       const runGh = (args) => {
         calls.push(args);
         if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
-        if (args[0] === 'attach' && args[1] === '--version') return { status: 0, stdout: 'gh-attach 1.0.0', stderr: '' };
         return { status: 1, stdout: '', stderr: 'should not be called' };
       };
-      const result = publishScreenshotEvidence({ prNumber: 251, root, runGh });
+      const result = await publishScreenshotEvidence({
+        prNumber: 251, root, runGh, config: S3_CONFIG, putObject: async (o) => { puts.push(o); },
+      });
       assert.equal(result.skipped, true);
-      assert.equal(calls.filter(args => args[0] === 'attach' && args.includes('--image')).length, 0);
+      assert.equal(puts.length, 0);
       assert.equal(calls.filter(args => args[0] === 'pr').length, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });

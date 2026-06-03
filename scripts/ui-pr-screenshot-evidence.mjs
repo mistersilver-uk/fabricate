@@ -140,10 +140,9 @@ export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
     const prScopedArtifact = new RegExp(`codex-ui-evidence-${escapeRegExp(normalizedPrNumber)}(?:\\b|[-_.][\\w.-]*)|actions/runs/[0-9]+/artifacts/[0-9]+[^\\n]*${prPart}`, 'i');
     if (prScopedArtifact.test(text)) return true;
 
-    // PR-scoped GitHub release asset (gh attach --release writes to a tag that
-    // contains pr-<number>, e.g. fabricate-pr-251).
-    const prScopedReleaseAsset = new RegExp(`https://github\\.com/[^\\s)>"']+/releases/download/[^/\\s)>"']*${prPart}[^/\\s)>"']*/[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
-    if (prScopedReleaseAsset.test(text)) return true;
+    // PR-scoped S3 object (publish uploads to <prefix>/<pr>/<view>.png).
+    const prScopedS3 = new RegExp(`https://[^\\s)>"']*amazonaws\\.com/[^\\s)>"']*${escapeRegExp(screenshotPrefix())}/${escapeRegExp(normalizedPrNumber)}/[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
+    if (prScopedS3.test(text)) return true;
 
     const prScopedAttachment = new RegExp(`!\\[[^\\]]*${prPart}[^\\]]*\\]\\(https://github\\.com/user-attachments/assets/[0-9a-f-]+\\)`, 'i');
     return prScopedAttachment.test(text);
@@ -152,8 +151,8 @@ export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
   const testResultArtifact = /test-results\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
   if (testResultArtifact.test(text)) return true;
 
-  const releaseAsset = /https:\/\/github\.com\/[^\s)>"']+\/releases\/download\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
-  if (releaseAsset.test(text)) return true;
+  const s3Asset = new RegExp(`https://[^\\s)>"']*amazonaws\\.com/[^\\s)>"']*${escapeRegExp(screenshotPrefix())}/[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
+  if (s3Asset.test(text)) return true;
 
   const uploadedArtifact = /codex-ui-evidence-[\w.-]+|actions\/runs\/[0-9]+\/artifacts\/[0-9]+|github\.com\/user-attachments\/assets\/[0-9a-f-]+/i;
   return uploadedArtifact.test(text);
@@ -172,7 +171,7 @@ export function explainScreenshotEvidenceFailure(files = [], body = '', options 
   const prNumber = options.prNumber || '<number>';
   const exemptLabel = options.exemptLabel || DEFAULT_EXEMPT_LABEL;
   const views = mapChangedFilesToViews(files).map(recipe => recipe.label).join(', ') || 'changed UI views';
-  return `This PR changes UI files but has no smoke-run screenshot evidence for: ${views}. Run npm run test:foundry to produce real Foundry screenshots, then npm run screenshots:ui -- --base origin/main --pr ${prNumber} to collect the relevant smoke artifacts under tmp/pr-screenshots/${prNumber}/, then npm run screenshots:ui:publish -- --pr ${prNumber} to upload them with the gh attach extension and embed the returned ![pr-${prNumber} ...] image markdown in the PR body. If screenshot capture is genuinely impossible, a maintainer must add the '${exemptLabel}' label (it cannot be self-applied by an agent).`;
+  return `This PR changes UI files but has no smoke-run screenshot evidence for: ${views}. Run npm run test:foundry to produce real Foundry screenshots, then npm run screenshots:ui -- --base origin/main --pr ${prNumber} to collect the relevant smoke artifacts under tmp/pr-screenshots/${prNumber}/, then npm run screenshots:ui:publish -- --pr ${prNumber} to upload them to S3 and embed the returned ![pr-${prNumber} ...] image markdown in the PR body. If screenshot capture is genuinely impossible, a maintainer must add the '${exemptLabel}' label (it cannot be self-applied by an agent).`;
 }
 
 export function collectScreenshotEvidence({
@@ -250,12 +249,83 @@ export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
   return trimmed ? `${trimmed}\n\n${inner}\n` : `${inner}\n`;
 }
 
-export function parseAttachmentUrl(text = '') {
-  const value = String(text);
-  const attachment = value.match(/https:\/\/github\.com\/user-attachments\/assets\/[0-9a-fA-F-]+/);
-  if (attachment) return attachment[0];
-  const releaseAsset = value.match(/https:\/\/github\.com\/[^\s)>"']+\/releases\/download\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i);
-  return releaseAsset ? releaseAsset[0] : '';
+export function screenshotPrefix() {
+  return (process.env.S3_SCREENSHOT_PREFIX || 'pr-screenshots').replace(/^\/+|\/+$/g, '');
+}
+
+export function loadS3Config(root = ROOT) {
+  const configPath = resolve(root, 'release.s3.config.json');
+  let cfg = {};
+  if (existsSync(configPath)) {
+    try { cfg = JSON.parse(readFileSync(configPath, 'utf8')); } catch { cfg = {}; }
+  }
+  return {
+    bucket: process.env.S3_RELEASE_BUCKET || cfg.bucket || '',
+    baseUrl: (process.env.RELEASE_BASE_URL || cfg.baseUrl || '').replace(/\/+$/, ''),
+    region: process.env.AWS_REGION || undefined,
+    prefix: screenshotPrefix(),
+  };
+}
+
+function contentTypeFor(file) {
+  return ({
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+  })[extensionOf(file)] || 'application/octet-stream';
+}
+
+async function defaultS3PutFactory(region) {
+  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const client = new S3Client(region ? { region } : {});
+  return async ({ bucket, key, body, contentType }) => {
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }));
+  };
+}
+
+async function defaultS3ListAndDelete(region) {
+  const { S3Client, ListObjectsV2Command, DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+  const client = new S3Client(region ? { region } : {});
+  return async ({ bucket, prefix }) => {
+    const listed = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }));
+    const keys = (listed.Contents || []).map(item => ({ Key: item.Key }));
+    if (keys.length === 0) return { deleted: 0 };
+    await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys } }));
+    return { deleted: keys.length };
+  };
+}
+
+// Upload collected screenshots to S3 under <prefix>/<pr>/<view>.png. Headless,
+// no GitHub Releases/branches; the public-read object URL is embedded in the PR
+// body. `putObject` is injectable so tests never touch AWS.
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject } = {}) {
+  const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
+  const cfg = config || loadS3Config(root);
+  if (!cfg.bucket || !cfg.baseUrl) {
+    throw new Error('S3 is not configured. Set bucket/baseUrl in release.s3.config.json (or S3_RELEASE_BUCKET/RELEASE_BASE_URL).');
+  }
+  const put = putObject || await defaultS3PutFactory(cfg.region);
+  const uploaded = [];
+  for (const file of files) {
+    const name = basename(file);
+    const viewId = name.slice(0, name.length - extensionOf(file).length);
+    const key = `${cfg.prefix}/${normalizedPrNumber}/${name}`;
+    await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
+    const recipe = VIEW_RECIPES.find(item => item.id === viewId);
+    uploaded.push({ viewId, label: recipe ? recipe.label : viewId, url: `${cfg.baseUrl}/${key}`, key, file });
+  }
+  return uploaded;
+}
+
+export async function deletePrScreenshotsFromS3({ prNumber, root = ROOT, config, listAndDelete } = {}) {
+  const normalizedPrNumber = requirePrNumber(prNumber, 'clean');
+  const cfg = config || loadS3Config(root);
+  if (!cfg.bucket) return { deleted: 0, skipped: true };
+  const prefix = `${cfg.prefix}/${normalizedPrNumber}/`;
+  const impl = listAndDelete || await defaultS3ListAndDelete(cfg.region);
+  return impl({ bucket: cfg.bucket, prefix });
 }
 
 function defaultGhRunner(args, { input } = {}) {
@@ -268,12 +338,14 @@ function defaultGhRunner(args, { input } = {}) {
   return { status: result.status ?? 1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-export function publishScreenshotEvidence({
+export async function publishScreenshotEvidence({
   prNumber,
   repo,
   dir,
   root = ROOT,
   runGh = defaultGhRunner,
+  putObject,
+  config,
 } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const destinationRoot = resolve(root, dir || `tmp/pr-screenshots/${normalizedPrNumber}`);
@@ -281,10 +353,6 @@ export function publishScreenshotEvidence({
   const auth = runGh(['auth', 'status']);
   if (auth.status !== 0) {
     throw new Error(`gh is not authenticated. Run \`gh auth login\` first.\n${auth.stderr || ''}`.trim());
-  }
-  const ext = runGh(['attach', '--version']);
-  if (ext.status !== 0) {
-    throw new Error('The gh attach extension is required to upload screenshots. Install it with `gh extension install atani/gh-attach`.');
   }
 
   const files = existsSync(destinationRoot)
@@ -298,31 +366,9 @@ export function publishScreenshotEvidence({
     };
   }
 
-  // Upload to a per-PR GitHub release tag. This needs only gh auth (no browser),
-  // avoids cross-PR filename collisions, and yields PR-scoped asset URLs the
-  // `check` gate can verify. (Browser mode would produce user-attachments URLs
-  // but requires an interactive playwright-cli session.)
-  const repoArgs = repo ? ['--repo', repo] : [];
-  const releaseTag = `fabricate-pr-${normalizedPrNumber}`;
-  const uploaded = [];
-  for (const file of files) {
-    const upload = runGh([
-      'attach', '--release', '--release-tag', releaseTag, '--url-only',
-      '--issue', String(normalizedPrNumber), ...repoArgs, '--image', file,
-    ]);
-    if (upload.status !== 0) {
-      throw new Error(`gh attach upload failed for ${relative(root, file).replaceAll(sep, '/')}: ${upload.stderr || 'unknown error'}`);
-    }
-    const url = parseAttachmentUrl(upload.stdout);
-    if (!url) {
-      throw new Error(`Could not parse a GitHub asset URL from gh attach output for ${relative(root, file).replaceAll(sep, '/')}.`);
-    }
-    const name = basename(file);
-    const viewId = name.slice(0, name.length - extensionOf(file).length);
-    const recipe = VIEW_RECIPES.find(item => item.id === viewId);
-    uploaded.push({ viewId, label: recipe ? recipe.label : viewId, url, file });
-  }
+  const uploaded = await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject });
 
+  const repoArgs = repo ? ['--repo', repo] : [];
   const view = runGh(['pr', 'view', String(normalizedPrNumber), ...repoArgs, '--json', 'body', '--jq', '.body']);
   if (view.status !== 0) {
     throw new Error(`Failed to read PR #${normalizedPrNumber} body: ${view.stderr || 'unknown error'}`);
@@ -506,11 +552,19 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'clean') {
     const destinationRoot = cleanPrScreenshotEvidence({ prNumber: args.pr });
     console.log(`Removed ${relative(ROOT, destinationRoot).replaceAll(sep, '/')}`);
+    try {
+      const deletion = await deletePrScreenshotsFromS3({ prNumber: args.pr });
+      if (deletion && deletion.deleted) {
+        console.log(`Deleted ${deletion.deleted} S3 object(s) under ${screenshotPrefix()}/${normalizeOptionalPrNumber(args.pr)}/`);
+      }
+    } catch (error) {
+      console.warn(`::warning::Could not delete S3 screenshots (continuing): ${error.message}`);
+    }
     return;
   }
 
   if (command === 'publish') {
-    const result = publishScreenshotEvidence({
+    const result = await publishScreenshotEvidence({
       prNumber: args.pr,
       repo: args.repo,
       dir: args.outputDir,

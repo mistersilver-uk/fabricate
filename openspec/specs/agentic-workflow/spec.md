@@ -136,7 +136,7 @@ Pull requests that change UI files MUST include smoke-run screenshot evidence fo
 - **THEN** the agent runs the Foundry smoke harness locally (the `full` profile via `npm run test:foundry`) and collects the relevant smoke screenshots for the changed views
 - **AND** the full smoke profile is not run on a GitHub Actions runner
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
-- **AND** `npm run screenshots:ui:publish -- --pr <number>` uploads the collected screenshots with the `gh attach` extension (release mode, to a `fabricate-pr-<number>` release tag) and embeds the returned `![pr-<number> ...]` markdown into a managed block in the PR body
+- **AND** `npm run screenshots:ui:publish -- --pr <number>` uploads the collected screenshots to S3 (`pr-screenshots/<number>/`) and embeds the returned `![pr-<number> ...]` markdown into a managed block in the PR body
 - **AND** the agent cleans `tmp/pr-screenshots/<number>/` immediately after the evidence is added to the PR
 - **AND** generic unrelated image links are not sufficient evidence
 - **AND** uploaded artifact names or `test-results/` paths are treated as automation fallback evidence, not the normal visible PR screenshot handoff

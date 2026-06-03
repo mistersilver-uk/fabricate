@@ -20,6 +20,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write  # OIDC for AWS role assumption (S3 screenshot upload)
   issues: write
 
 env:
@@ -370,15 +371,25 @@ jobs:
             fi
           fi
 
+      # AWS auth for S3 screenshot upload via OIDC ONLY (never static keys).
+      # continue-on-error so a missing/misconfigured role doesn't fail the job:
+      # publish then warns and the required check fails closed.
+      - name: Configure AWS credentials (OIDC)
+        if: steps.validate.outputs.ui_changed == 'true' && steps.raise_pr.outputs.pr_created == 'true'
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-2' }}
+
       - name: Publish UI screenshots
         if: steps.validate.outputs.ui_changed == 'true' && steps.raise_pr.outputs.pr_created == 'true'
         env:
-          # `gh attach --release` uploads images as release assets and needs a
-          # token with `contents: write`. The default github.token may lack it;
-          # provide WORKFLOW_GH_TOKEN (a PAT with repo/contents write) to enable
-          # automatic publishing. Without it, this step warns and the required
-          # `check-screenshots` gate correctly fails until a maintainer publishes
-          # screenshots or applies `screenshots-exempt`.
+          # Body read/patch uses gh; image upload goes to S3 using the OIDC role
+          # configured above. Without the role (secrets.AWS_OIDC_ROLE_ARN) the S3
+          # upload fails, this step warns, and the required `check-screenshots`
+          # gate correctly fails until a maintainer publishes or applies
+          # `screenshots-exempt`.
           GH_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN != '' && secrets.WORKFLOW_GH_TOKEN || github.token }}
           PR_NUMBER: ${{ steps.raise_pr.outputs.pr_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
@@ -388,8 +399,6 @@ jobs:
             echo "::warning::No PR number captured; skipping automatic screenshot publish."
             exit 0
           fi
-
-          gh extension install atani/gh-attach || echo "::warning::Failed to install gh attach extension (atani/gh-attach)."
 
           node scripts/ui-pr-screenshot-evidence.mjs collect \
             --base "origin/${DEFAULT_BRANCH}" \
