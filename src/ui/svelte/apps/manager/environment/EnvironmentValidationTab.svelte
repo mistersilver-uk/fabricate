@@ -40,15 +40,30 @@
     taskNoDescription: ['IssueTaskNoDescription', 'Available task has no player-facing description.'],
     locallyExcluded: ['IssueLocallyExcluded', 'Some tasks or hazards are excluded locally.']
   };
+  const RECORD_ISSUE_LABELS = {
+    staleIncluded: {
+      task: ['IssueStaleIncludedTask', 'The task "{name}" no longer matches this environment.'],
+      hazard: ['IssueStaleIncludedHazard', 'The hazard "{name}" no longer matches this environment.']
+    },
+    taskNoDescription: {
+      task: ['IssueTaskNoDescriptionTask', 'The task "{name}" has no player-facing description.']
+    }
+  };
 
   function checkLabel(id) {
     const meta = CHECK_LABELS[id] || [id, id];
     return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
   }
   function issueTitle(issue) {
+    const recordKind = issue.recordKind === 'hazard' ? 'hazard' : 'task';
+    const recordMeta = issue.recordName ? RECORD_ISSUE_LABELS[issue.id]?.[recordKind] : null;
+    if (recordMeta) {
+      return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${recordMeta[0]}`, recordMeta[1])
+        .replace('{name}', issue.recordName);
+    }
     const meta = ISSUE_LABELS[issue.id] || [issue.id, issue.id];
     const base = text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
-    return issue.recordName ? `${base} (${issue.recordName})` : base;
+    return issue.recordName ? `${recordKind === 'hazard' ? 'Hazard' : 'Task'} "${issue.recordName}": ${base}` : base;
   }
 </script>
 

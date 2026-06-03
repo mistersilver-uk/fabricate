@@ -16,6 +16,31 @@
     { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
   ];
 
+  function badgeList(tab) {
+    const value = badges?.[tab.id];
+    const values = Array.isArray(value) ? value : (value ? [value] : []);
+    return values
+      .map(badge => {
+        if (badge && typeof badge === 'object') {
+          return {
+            label: badge.label ?? badge.value ?? '',
+            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral')
+          };
+        }
+        return {
+          label: badge,
+          tone: tab.id === 'validation' ? 'danger' : 'neutral'
+        };
+      })
+      .filter(badge => badge.label !== '' && badge.label !== 0);
+  }
+
+  function badgeClass(tone) {
+    if (tone === 'danger') return 'is-danger';
+    if (tone === 'warning') return 'is-warning';
+    return 'is-neutral';
+  }
+
   function onKeydown(event, index) {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
     event.preventDefault();
@@ -43,9 +68,9 @@
     >
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.${tab.key}`, tab.fallback)}</span>
-      {#if badges[tab.id]}
-        <span class={`manager-chip ${tab.id === 'validation' ? 'is-danger' : 'is-neutral'} manager-environment-tab-badge`}>{badges[tab.id]}</span>
-      {/if}
+      {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
+        <span class={`manager-chip ${badgeClass(badge.tone)} manager-environment-tab-badge`}>{badge.label}</span>
+      {/each}
     </button>
   {/each}
 </div>

@@ -20,6 +20,13 @@
   import EnvironmentRightInspector from './environment/EnvironmentRightInspector.svelte';
   import { evaluateEnvironmentReadiness } from './environment/environmentReadiness.js';
 
+  const INCLUDED_COMPOSITION_STATES = new Set([
+    'includedByMatch',
+    'explicitlyIncluded',
+    'forceIncluded',
+    'includedButUnavailable'
+  ]);
+
   let {
     environmentDraft = null,
     composition = { compositionMode: 'automatic', conditions: {}, tasks: [], hazards: [], counts: {} },
@@ -54,6 +61,12 @@
     activeTab = kind === 'hazard' ? 'hazards' : 'tasks';
   }
 
+  function countComposedRecords(records = []) {
+    return Array.isArray(records)
+      ? records.filter(entry => INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)).length
+      : 0;
+  }
+
   // On the Tasks/Hazards tabs, auto-select the first active (available) record of
   // that kind so the inspector is populated. A valid manual selection of the same
   // kind is never overridden; a stale cross-tab selection is replaced. When no
@@ -70,13 +83,19 @@
     if (firstActive) selectRecord(kind, firstActive.id);
   });
 
-  const counts = $derived(composition?.counts || {});
   const readiness = $derived(evaluateEnvironmentReadiness(environmentDraft || {}, composition || {}));
-  const criticalCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
+  const taskCompositionCount = $derived(countComposedRecords(composition?.tasks));
+  const hazardCompositionCount = $derived(countComposedRecords(composition?.hazards));
+  const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
+  const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+  const validationBadges = $derived([
+    ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
+    ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
+  ]);
   const badges = $derived({
-    tasks: counts.availableTasks || 0,
-    hazards: counts.availableHazards || 0,
-    validation: criticalCount || 0
+    tasks: taskCompositionCount || 0,
+    hazards: hazardCompositionCount || 0,
+    validation: validationBadges
   });
 </script>
 

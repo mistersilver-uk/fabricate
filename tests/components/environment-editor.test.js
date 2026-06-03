@@ -139,10 +139,23 @@ describe('environment editor localization', () => {
       validationSource.includes('hasRegion: [\'CheckRegion\', \'Has a region or is set to "any region"\']'),
       'CheckRegion dynamic fallback should match the English catalog'
     );
+    for (const snippet of [
+      'task: [\'IssueStaleIncludedTask\', \'The task "{name}" no longer matches this environment.\']',
+      'hazard: [\'IssueStaleIncludedHazard\', \'The hazard "{name}" no longer matches this environment.\']',
+      'task: [\'IssueTaskNoDescriptionTask\', \'The task "{name}" has no player-facing description.\']'
+    ]) {
+      assert.ok(validationSource.includes(snippet), `${snippet} should match the English catalog`);
+    }
     assert.ok(
       modeControlSource.includes("descFallback: 'Only explicitly included tasks and hazards are available; GMs can force add enabled non-matching tasks and hazards.'"),
       'ManualHint dynamic fallback should match the English catalog'
     );
+  });
+
+  it('formats validation issue record names as natural language instead of bracketed suffixes', () => {
+    assert.ok(validationSource.includes('RECORD_ISSUE_LABELS'), 'validation tab should define per-record message templates');
+    assert.ok(validationSource.includes(".replace('{name}', issue.recordName)"), 'record issue titles should inject the record name into a sentence template');
+    assert.ok(!validationSource.includes('`${base} (${issue.recordName})`'), 'validation tab should not append record names in parentheses');
   });
 
   it('no editor component falls back on the legacy Environment.* editor key prefixes', () => {
@@ -220,6 +233,10 @@ describe('environment composition editor structure', () => {
     for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-hazards', 'excluded-hazards', 'unavailable-included']) {
       assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
     }
+    assert.ok(summaryInspectorSource.includes('manager-fact-grid manager-environment-runtime-grid'), 'runtime preview uses the shared inspector fact grid');
+    assert.ok(!summaryInspectorSource.includes('manager-fact-grid-inline'), 'runtime preview should not use the compact inline fact grid');
+    assert.ok(summaryInspectorSource.includes('manager-fact-line'), 'runtime preview facts use the same text line styling as environment library details facts');
+    assert.ok(summaryInspectorSource.includes('manager-fact-label'), 'runtime preview facts use the shared fact label styling');
   });
 
   it('exposes blind-mode per-task weight UI but no per-environment strategy or reveal controls', () => {
@@ -412,6 +429,31 @@ describe('environment composition editor structure', () => {
     assert.ok(tabsSource.includes("'ArrowLeft'"), 'tabs should handle ArrowLeft');
     assert.ok(tabsSource.includes('onkeydown='), 'tabs should wire a keydown handler');
     assert.ok(tabsSource.includes('aria-selected'), 'tabs should expose aria-selected');
+  });
+
+  it('tab badges count composition membership and split validation severities', () => {
+    assert.ok(!shellSource.includes('tasks: counts.availableTasks || 0'), 'Tasks badge should not use runtime availableTasks');
+    assert.ok(!shellSource.includes('hazards: counts.availableHazards || 0'), 'Hazards badge should not use runtime availableHazards');
+    assert.ok(shellSource.includes('countComposedRecords(composition?.tasks)'), 'Tasks badge should derive from task composition records');
+    assert.ok(shellSource.includes('countComposedRecords(composition?.hazards)'), 'Hazards badge should derive from hazard composition records');
+    for (const state of ['includedByMatch', 'explicitlyIncluded', 'forceIncluded', 'includedButUnavailable']) {
+      assert.ok(shellSource.includes(`'${state}'`), `composition badge count should include ${state}`);
+    }
+    const includedStateSet = shellSource.match(/const INCLUDED_COMPOSITION_STATES = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
+    for (const state of ['excluded', 'candidate', 'notMatching', 'libraryDisabled']) {
+      assert.ok(!includedStateSet.includes(`'${state}'`), `composition badge count should not include ${state}`);
+    }
+    assert.ok(shellSource.includes("issue.severity === 'critical'"), 'validation error badge should count critical issues');
+    assert.ok(shellSource.includes("issue.severity === 'warning'"), 'validation warning badge should count warning issues');
+    assert.ok(shellSource.includes("tone: 'danger'"), 'validation errors should use danger badge tone');
+    assert.ok(shellSource.includes("tone: 'warning'"), 'validation warnings should use warning badge tone');
+    assert.ok(shellSource.includes('label: String(errorCount)'), 'validation error badge should render only the numeric count');
+    assert.ok(shellSource.includes('label: String(warningCount)'), 'validation warning badge should render only the numeric count');
+    assert.ok(!shellSource.includes('BadgeError'), 'validation error badge should not use severity text');
+    assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
+    assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
+    assert.ok(tabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
+    assert.ok(tabsSource.includes("if (tone === 'warning') return 'is-warning'"), 'tabs should render warning-toned badge chips');
   });
 });
 
