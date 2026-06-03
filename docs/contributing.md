@@ -217,7 +217,7 @@ Requirements:
   - **Workflows: Read and write** — *only* if agent implementations may modify files under `.github/workflows/`; without it, any push that touches a workflow file is rejected.
 
   The labels it applies (`agent-created`, `in-progress`, `agent-failed`, `screenshots-exempt`) must already exist in the repo. This token grants no AWS access — S3 screenshot uploads authenticate separately via OIDC (see below).
-- AWS for S3 screenshot publishing: in CI, **OIDC only** — repository secret `AWS_OIDC_ROLE_ARN` (an IAM role for GitHub OIDC with `s3:PutObject`/`s3:ListBucket`/`s3:DeleteObject` on the `pr-screenshots/*` prefix) plus `permissions: id-token: write`. Never use static AWS keys in CI. Local runs use the AWS default provider chain.
+- AWS for S3 screenshot publishing: in CI, **OIDC only** — reuses the same repository variables as the module-release workflow (`AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL`) plus `permissions: id-token: write`. No new secret is required. For screenshot uploads to succeed through that role, its IAM trust policy must allow the `team-b-backlog.yml` workflow context to assume it, and its permissions policy plus the bucket policy must cover the `pr-screenshots/*` prefix (`s3:PutObject`/`s3:DeleteObject`/`s3:ListBucket`, and public-read so GitHub can render the images). Never use static AWS keys in CI. Local runs use the AWS default provider chain.
 
 Behavior:
 - `team-a-research.yml`: manual research and audit workflow

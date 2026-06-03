@@ -379,20 +379,24 @@ jobs:
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION || 'eu-west-2' }}
+          # Reuse the same OIDC role + region as the module-release workflow.
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Publish UI screenshots
         if: steps.validate.outputs.ui_changed == 'true' && steps.raise_pr.outputs.pr_created == 'true'
         env:
           # Body read/patch uses gh; image upload goes to S3 using the OIDC role
-          # configured above. Without the role (secrets.AWS_OIDC_ROLE_ARN) the S3
-          # upload fails, this step warns, and the required `check-screenshots`
-          # gate correctly fails until a maintainer publishes or applies
+          # configured above (same role/bucket as module releases). If the role
+          # can't be assumed or lacks pr-screenshots/* access, the S3 upload
+          # fails, this step warns, and the required `check-screenshots` gate
+          # correctly fails until a maintainer publishes or applies
           # `screenshots-exempt`.
           GH_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN != '' && secrets.WORKFLOW_GH_TOKEN || github.token }}
           PR_NUMBER: ${{ steps.raise_pr.outputs.pr_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
         run: |
           set -u
           if [ -z "$PR_NUMBER" ]; then
