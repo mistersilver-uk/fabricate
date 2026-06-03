@@ -296,7 +296,7 @@ To tighten further (if team-b is only ever dispatched from `main`), replace the 
 }
 ```
 
-**Lifecycle rule** — expire the `pr-screenshots/` prefix after N days so PR screenshots never accumulate (the `clean` command also deletes them per-PR; the rule is the backstop).
+**Lifecycle rule** — expire the `pr-screenshots/` prefix after N days. This is the primary cleanup: `screenshots:ui:clean` removes only local temp files (the S3 objects must stay live while the PR is open), and `screenshots:ui:clean -- --s3` deletes them explicitly on PR close, but the lifecycle rule is the backstop so nothing accumulates regardless.
 
 These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots). Until the role/variable/bucket policy exist, the team-b publish step warns and the required `check-screenshots` gate fails closed until a maintainer publishes manually or applies the `screenshots-exempt` label.
 

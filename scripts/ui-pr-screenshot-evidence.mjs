@@ -454,8 +454,8 @@ function parseArgs(argv) {
     }
     const [rawKey, inlineValue] = arg.slice(2).split(/=(.*)/s, 2);
     const key = toCamelCase(rawKey);
-    if (key === 'allowMissing') {
-      args.allowMissing = inlineValue === undefined ? true : inlineValue !== 'false';
+    if (key === 'allowMissing' || key === 's3') {
+      args[key] = inlineValue === undefined ? true : inlineValue !== 'false';
       continue;
     }
     if (inlineValue !== undefined) {
@@ -550,15 +550,22 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'clean') {
+    // Local tmp only by default. S3 objects must stay live while the PR is open
+    // (they back the embedded image URLs); only remove them on PR close via
+    // `--s3` (or let the bucket lifecycle rule expire them).
     const destinationRoot = cleanPrScreenshotEvidence({ prNumber: args.pr });
     console.log(`Removed ${relative(ROOT, destinationRoot).replaceAll(sep, '/')}`);
-    try {
-      const deletion = await deletePrScreenshotsFromS3({ prNumber: args.pr });
-      if (deletion && deletion.deleted) {
-        console.log(`Deleted ${deletion.deleted} S3 object(s) under ${screenshotPrefix()}/${normalizeOptionalPrNumber(args.pr)}/`);
+    if (args.s3) {
+      try {
+        const deletion = await deletePrScreenshotsFromS3({ prNumber: args.pr });
+        if (deletion && deletion.deleted) {
+          console.log(`Deleted ${deletion.deleted} S3 object(s) under ${screenshotPrefix()}/${normalizeOptionalPrNumber(args.pr)}/`);
+        } else {
+          console.log('No S3 screenshots to delete.');
+        }
+      } catch (error) {
+        console.warn(`::warning::Could not delete S3 screenshots (continuing): ${error.message}`);
       }
-    } catch (error) {
-      console.warn(`::warning::Could not delete S3 screenshots (continuing): ${error.message}`);
     }
     return;
   }

@@ -63,9 +63,11 @@ The rule applies when a PR changes any file under:
    npm run screenshots:ui:clean -- --pr <number>
    ```
 
-   This removes the local `tmp/pr-screenshots/<number>/` and, best-effort, deletes the S3 objects under `pr-screenshots/<number>/` (a missing-credentials/permission failure only warns). Do not commit files from `tmp/pr-screenshots/<number>/` or move them into `docs/`, `assets/`, or any other repository asset directory.
+   This removes the local `tmp/pr-screenshots/<number>/` only. The uploaded S3 objects stay live so the embedded image URLs keep working while the PR is open. Do not commit files from `tmp/pr-screenshots/<number>/` or move them into `docs/`, `assets/`, or any other repository asset directory.
 
-   **Orphan prevention:** the S3 bucket should have a lifecycle rule expiring the `pr-screenshots/` prefix after N days as a backstop, so PR screenshots never accumulate even if `clean` is skipped.
+   **Removing the S3 objects** (e.g. when the PR closes): `npm run screenshots:ui:clean -- --pr <number> --s3` deletes them best-effort (a missing-credentials/permission failure only warns).
+
+   **Orphan prevention:** the S3 bucket has a lifecycle rule expiring the `pr-screenshots/` prefix after N days as a backstop, so PR screenshots never accumulate even if `--s3` cleanup is skipped.
 
 ## Screenshot Source
 
