@@ -66,6 +66,8 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 - `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
 - Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
+- UI-changing PRs (files under `src/ui/`, `styles/`, `lang/`, or any `*.svelte`/`*.css`) must include real smoke-run screenshot evidence for the relevant changed views before opening or updating the PR. Use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run `npm run test:foundry` (local default `full` profile) to produce real Foundry screenshots under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets. Do NOT run the full smoke profile on a GitHub Actions runner — generation is local. The `check-screenshots` gate cannot be self-satisfied: there is no `SCREENSHOTS_NEEDED:` bypass. If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
+- Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
 - The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text. When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done. See `docs/agents/smoke-harness.md`.
 
 ## Code Conventions
@@ -107,6 +109,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - [`docs/agents/manager-confirm-discard.md`](docs/agents/manager-confirm-discard.md) — the three-layer "discard unsaved draft?" guard (Svelte route-exit → store helper → `services.confirmDialog`) used by every editor in the Crafting System Manager.
 - [`docs/agents/gathering-environment-data-model.md`](docs/agents/gathering-environment-data-model.md) — environment objects carry both legacy embedded `tasks[]` and modern library refs (`enabledTaskIds` etc); names the canonical sources for composition counts and required-tool aggregation.
 - [`docs/agents/smoke-harness.md`](docs/agents/smoke-harness.md) — how `npm run test:foundry` is organized, where its outputs land, and which Phase D0 selectors routinely drift when manager markup changes.
+- [`docs/agents/ui-pr-screenshots.md`](docs/agents/ui-pr-screenshots.md) — how UI PR screenshot evidence is planned, collected from smoke artifacts, embedded in PR descriptions, and validated in CI.
 
 ## Git Conventions
 
@@ -117,6 +120,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - Review-only agents inspect the active branch and PR, and must not merge to `main`.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
+- For UI-touching PRs, `Screenshots (if applicable)` must embed the screenshot image markdown with `pr-<number>` in the alt text, produced by `npm run screenshots:ui:publish -- --pr <number>` (S3-hosted under `pr-screenshots/<number>/`). There is no `SCREENSHOTS_NEEDED:` bypass; if capture is genuinely impossible, a maintainer applies the `screenshots-exempt` label. Do not commit PR-scoped screenshots under docs or other asset directories.
 - Never commit directly to `main`.
 - Use Conventional Commits.
 - For `feat`, `fix`, and `perf`, use the format `<type>(#<issue>): <short description>`.

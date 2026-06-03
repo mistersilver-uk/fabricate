@@ -29,9 +29,10 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -40,6 +41,9 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
+const SMOKE_ACTOR_ASSET_DIR = join(ROOT, 'assets', 'img', 'actors');
+const SMOKE_ACTOR_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const LEGACY_SMOKE_ACTOR_NAMES = ['Brom the Blacksmith'];
 
 // Smoke profile selector. Three profiles:
 //   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
@@ -74,6 +78,27 @@ const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
 const consoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
+
+/**
+ * Load every raster actor portrait under assets/img/actors as a smoke actor.
+ * Actor names are intentionally derived from filenames so the Foundry smoke
+ * world mirrors the checked-in portrait fixture set.
+ * @returns {Promise<Array<{ name: string, img: string }>>}
+ */
+async function loadSmokeActorFixtures() {
+  const actorAssetFiles = (await readdir(SMOKE_ACTOR_ASSET_DIR))
+    .filter(file => SMOKE_ACTOR_IMAGE_EXTENSIONS.has(extname(file).toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, 'en'));
+
+  if (actorAssetFiles.length === 0) {
+    throw new Error('No smoke actor portrait assets found under assets/img/actors.');
+  }
+
+  return actorAssetFiles.map(file => ({
+    name: basename(file, extname(file)),
+    img: `modules/fabricate/assets/img/actors/${file}`
+  }));
+}
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
@@ -145,6 +170,37 @@ async function screenshot(page, label) {
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
   await page.screenshot({ path });
+}
+
+/**
+ * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
+ * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
+ * document element and every `.fabricate` root. This re-themes the real app via
+ * its own CSS tokens — not a mock — so the resulting screenshot is the genuine
+ * manager under that theme.
+ * @param {import('playwright').Page} page
+ * @param {string} themeId
+ */
+async function applyManagerTheme(page, themeId) {
+  await page.evaluate(({ id, attr }) => {
+    document.documentElement.setAttribute(attr, id);
+    for (const root of document.querySelectorAll('.fabricate')) root.setAttribute(attr, id);
+  }, { id: themeId, attr: FABRICATE_THEME_ATTRIBUTE });
+  await page.waitForTimeout(200);
+}
+
+/**
+ * Capture the currently-open manager view under every Fabricate theme, then
+ * restore the default theme so later Phase D0 captures stay unthemed. Labels:
+ * `manager-theme-<themeId>` (full profile only; this runs inside Phase D0).
+ * @param {import('playwright').Page} page
+ */
+async function captureManagerThemes(page) {
+  for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
+    await applyManagerTheme(page, themeId);
+    await screenshot(page, `manager-theme-${themeId}`);
+  }
+  await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
 }
 
 /**
@@ -722,6 +778,9 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-component-identity',
       '.manager-essence-row',
       '.manager-vocabulary-row',
+      '.manager-gathering-task-row',
+      '.manager-gathering-hazard-row',
+      '.manager-tools-row',
       '.manager-inspector-card',
       '.manager-system-edit-form',
       '.manager-edit-card',
@@ -730,6 +789,7 @@ async function assertManagerLayoutStable(page, label) {
       '.environment-draft-editor',
       '.manager-environment-edit-view',
       '.manager-gathering-task-edit-view',
+      '.manager-gathering-hazard-edit-view',
       '.manager-environment-workspace',
       '.environment-fields',
       '.environment-task-layout',
@@ -761,12 +821,16 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-component-row'
       || metric.selector === '.manager-essence-row'
       || metric.selector === '.manager-vocabulary-row'
+      || metric.selector === '.manager-gathering-task-row'
+      || metric.selector === '.manager-gathering-hazard-row'
+      || metric.selector === '.manager-tools-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-system-edit-form'
       || metric.selector === '.manager-environment-editor-shell'
       || metric.selector === '.manager-environment-edit-view'
       || metric.selector === '.manager-gathering-task-edit-view'
+      || metric.selector === '.manager-gathering-hazard-edit-view'
       || metric.selector === '.manager-essence-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
@@ -787,11 +851,16 @@ async function softClick(locator, options = {}) {
   await locator.first().click(options).catch(() => {});
 }
 
+function managerSystemRowSelector(systemId) {
+  return `.fabricate-manager .manager-system-row[data-system-id="${systemId}"]`;
+}
+
 /**
  * Exercise manager pointer targets without triggering destructive actions.
  * @param {import('playwright').Page} page
+ * @param {string} systemId
  */
-async function exerciseManagerPointerTargets(page) {
+async function exerciseManagerPointerTargets(page, systemId) {
   const search = page.locator('.fabricate-manager input[type="search"]').first();
   await search.fill('forge');
   await page.waitForTimeout(250);
@@ -802,7 +871,7 @@ async function exerciseManagerPointerTargets(page) {
   await page.waitForTimeout(250);
   await page.locator('.fabricate-manager .manager-filter select').first().selectOption('all');
 
-  await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
+  await page.locator(`${managerSystemRowSelector(systemId)} .manager-system-identity`).first().click();
   // Breadcrumb / scope / header pointer targets only exist in certain navigation
   // states (e.g. inside a system sub-view). Trial-click them when present so the
   // exercise never hangs on a missing target and never mutates navigation.
@@ -812,7 +881,7 @@ async function exerciseManagerPointerTargets(page) {
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create")'), { trial: true });
-  const rowActionButtons = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-icon-button');
+  const rowActionButtons = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`);
   for (let index = 0; index < await rowActionButtons.count(); index += 1) {
     await rowActionButtons.nth(index).click({ trial: true });
   }
@@ -821,9 +890,10 @@ async function exerciseManagerPointerTargets(page) {
 /**
  * Select the smoke test crafting system in Manager.
  * @param {import('playwright').Page} page
+ * @param {string} systemId
  */
-async function selectSmokeSystemInManager(page) {
-  const row = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")').first();
+async function selectSmokeSystemInManager(page, systemId) {
+  const row = page.locator(managerSystemRowSelector(systemId)).first();
   await row.waitFor({ state: 'visible', timeout: 10_000 });
   const alreadySelected = await row.evaluate(element => element.getAttribute('aria-selected') === 'true')
     .catch(() => false);
@@ -832,13 +902,84 @@ async function selectSmokeSystemInManager(page) {
   await page.waitForTimeout(750);
 }
 
+async function seedSmokeGatheringLibrary(page, craftingSetup) {
+  await page.evaluate(async ({ sysId, componentMap }) => {
+    const config = foundry.utils.deepClone(game.settings.get('fabricate', 'gatheringConfig') || {});
+    config.conditions = { ...(config.conditions || {}), weather: 'rain', timeOfDay: 'dusk' };
+    config.systems = config.systems || {};
+    const systemConfig = config.systems[sysId] || {};
+    const withoutIds = (entries, ids) => (Array.isArray(entries) ? entries : [])
+      .filter(entry => !ids.has(String(entry?.id || '')));
+    config.systems[sysId] = {
+      ...systemConfig,
+      vocabularies: {
+        ...(systemConfig.vocabularies || {}),
+        regions: { values: ['northreach'] }
+      },
+      tasks: [
+        ...withoutIds(systemConfig.tasks, new Set(['smoke-forage-library'])),
+        {
+          id: 'smoke-forage-library',
+          name: 'Smoke Reusable Forage',
+          description: 'Reusable library task for Manager gathering composition screenshots.',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          enabled: true,
+          region: 'northreach',
+          biomes: ['forest'],
+          weather: ['rain'],
+          timeOfDay: ['dusk'],
+          itemSelectionMode: 'highestRankedDrop',
+          toolIds: ['smoke-herbalist-sickle'],
+          dropRows: [{
+            id: 'smoke-drop-herb',
+            componentId: componentMap['Mystic Herb'],
+            quantity: 2,
+            dropRate: 80,
+            enabled: true
+          }]
+        }
+      ],
+      tools: [
+        ...withoutIds(systemConfig.tools, new Set(['smoke-herbalist-sickle'])),
+        {
+          id: 'smoke-herbalist-sickle',
+          label: 'Herbalist Sickle',
+          enabled: true,
+          componentId: componentMap['Iron Sword'],
+          requirement: { provider: 'dnd5e', formula: '@tools.herbalism.value', macroUuid: '' },
+          breakage: { mode: 'limitedUses', maxUses: 5 },
+          onBreak: { mode: 'flagBroken' }
+        }
+      ],
+      hazards: [
+        ...withoutIds(systemConfig.hazards, new Set(['smoke-bramble-hazard'])),
+        {
+          id: 'smoke-bramble-hazard',
+          name: 'Smoke Bramble Snare',
+          description: 'Reusable hazard for Manager gathering composition screenshots.',
+          img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
+          enabled: true,
+          dangerTags: ['hazardous'],
+          region: 'northreach',
+          biomes: ['forest'],
+          weather: ['rain'],
+          timeOfDay: ['dusk'],
+          dropRate: 35
+        }
+      ]
+    };
+    await game.settings.set('fabricate', 'gatheringConfig', config);
+  }, { sysId: craftingSetup.systemId, componentMap: craftingSetup.componentMap });
+}
+
 /**
  * Exercise manager system edit controls without saving destructive changes.
  * @param {import('playwright').Page} page
+ * @param {string} systemId
  */
-async function exerciseManagerSystemEditPointerTargets(page) {
+async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   if (await page.locator('.fabricate-manager #manager-system-name').count() === 0) {
-    let editButton = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-icon-button').nth(0);
+    let editButton = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`).nth(0);
     if (await editButton.count() === 0) {
       const systemsBreadcrumb = page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').first();
       if (await systemsBreadcrumb.count() > 0) {
@@ -850,8 +991,8 @@ async function exerciseManagerSystemEditPointerTargets(page) {
         await search.fill('');
         await page.waitForTimeout(250);
       }
-      await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")').first().waitFor({ state: 'visible', timeout: 5_000 });
-      editButton = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-icon-button').nth(0);
+      await page.locator(managerSystemRowSelector(systemId)).first().waitFor({ state: 'visible', timeout: 5_000 });
+      editButton = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`).nth(0);
     }
     await editButton.click();
   }
@@ -1087,6 +1228,7 @@ async function main() {
   // wants current-run output; nothing here is hand-authored.
   await rm(RESULTS_DIR, { recursive: true, force: true });
   await mkdir(RESULTS_DIR, { recursive: true });
+  const smokeActorFixtures = await loadSmokeActorFixtures();
 
   process.stdout.write(`Smoke profile: ${SMOKE_PROFILE}${RAW_SMOKE_PROFILE !== SMOKE_PROFILE ? ` (from FOUNDRY_SMOKE_PROFILE=${RAW_SMOKE_PROFILE})` : ''}\n`);
 
@@ -1234,7 +1376,7 @@ async function main() {
     startPhase('phase-B');
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
-      const createdDocs = await page.evaluate(async () => {
+      const createdDocs = await page.evaluate(async ({ smokeActorFixtures, legacySmokeActorNames }) => {
         // Clean up any stale test data from previous runs.
         // 1. Clean stale crafting systems and their recipes first.
         //    Filter by literal "Arcane Forge" name so we never delete user
@@ -1260,12 +1402,11 @@ async function main() {
         }
 
         // 2. Clean stale actors
-        const staleActors = game.actors.contents.filter(a =>
-          [
-            'Alara the Alchemist',
-            'Brom the Blacksmith'
-          ].includes(a.name)
-        );
+        const smokeActorNames = new Set([
+          ...smokeActorFixtures.map(actor => actor.name),
+          ...legacySmokeActorNames
+        ]);
+        const staleActors = game.actors.contents.filter(a => smokeActorNames.has(a.name));
         if (staleActors.length > 0) {
           console.log(`Cleaning ${staleActors.length} stale test actors`);
           await Actor.deleteDocuments(staleActors.map(a => a.id));
@@ -1336,16 +1477,24 @@ async function main() {
           itemsByName[item.name] = { id: item.id, uuid: item.uuid };
         }
 
-        // Create actors
-        const actors = await Actor.createDocuments([
-          { name: 'Alara the Alchemist', type: actorType, img: 'icons/svg/mystery-man.svg' },
-          { name: 'Brom the Blacksmith', type: actorType, img: 'icons/svg/combat.svg' }
-        ]);
+        // Create every actor represented by assets/img/actors portraits.
+        const actors = await Actor.createDocuments(
+          smokeActorFixtures.map(actor => ({
+            name: actor.name,
+            type: actorType,
+            img: actor.img
+          }))
+        );
         console.log(`Created ${actors.length} actors:`, actors.map(a => a.name).join(', '));
         const actorIds = actors.map(a => a.id);
 
-        const alara = actors.find(a => a.name === 'Alara the Alchemist');
-        const brom = actors.find(a => a.name === 'Brom the Blacksmith');
+        const requiredActor = (name) => {
+          const actor = actors.find(a => a.name === name);
+          if (!actor) throw new Error(`Smoke actor fixture "${name}" was not created.`);
+          return actor;
+        };
+        const alara = requiredActor('Alara the Alchemist');
+        const bromm = requiredActor('Bromm the Blacksmith');
         const testUserData = [
           { name: 'Fabricate Gatherer', role: CONST.USER_ROLES.PLAYER, password: '' },
           { name: 'Fabricate Observer', role: CONST.USER_ROLES.PLAYER, password: '' }
@@ -1363,7 +1512,7 @@ async function main() {
         const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
         await alara.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
-        await brom.update({ ownership: { default: noneLevel } });
+        await bromm.update({ ownership: { default: noneLevel } });
         const userIds = users.map(user => user.id);
 
         // Build inventory copies from world items
@@ -1389,14 +1538,22 @@ async function main() {
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        // Brom gets: 3x Iron Ore, 1x Dragon Scale
-        await brom.createEmbeddedDocuments('Item', [
+        // Bromm gets: 3x Iron Ore, 1x Dragon Scale
+        await bromm.createEmbeddedDocuments('Item', [
           ...copies(byName('Iron Ore'), 3),
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        return { itemIds, actorIds, userIds, gathererUserId: gathererUser.id, alaraId: alara.id, bromId: brom.id, itemsByName };
-      });
+        return {
+          itemIds,
+          actorIds,
+          userIds,
+          gathererUserId: gathererUser.id,
+          alaraId: alara.id,
+          bromId: bromm.id,
+          itemsByName
+        };
+      }, { smokeActorFixtures, legacySmokeActorNames: LEGACY_SMOKE_ACTOR_NAMES });
 
       cleanup.itemIds = createdDocs.itemIds;
       cleanup.actorIds = createdDocs.actorIds;
@@ -1775,7 +1932,7 @@ async function main() {
         playerGatheringFixtures.push(await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Crystal Thicket',
-          description: 'Requires a vial catalyst so Brom demonstrates a blocked task.',
+          description: 'Requires a vial catalyst so Bromm demonstrates a blocked task.',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
@@ -1894,11 +2051,20 @@ async function main() {
                   enabled: true
                 }]
               }],
+              tools: [{
+                id: 'smoke-herbalist-sickle',
+                label: 'Herbalist Sickle',
+                enabled: true,
+                componentId: componentMap['Iron Sword'],
+                requirement: { provider: 'dnd5e', formula: '@tools.herbalism.value', macroUuid: '' },
+                breakage: { mode: 'limitedUses', maxUses: 5 },
+                onBreak: { mode: 'flagBroken' }
+              }],
               hazards: [{
                 id: 'smoke-bramble-hazard',
                 name: 'Smoke Bramble Snare',
                 description: 'Reusable hazard for Manager gathering composition screenshots.',
-                img: 'icons/svg/hazard.svg',
+                img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
                 enabled: true,
                 dangerTags: ['hazardous'],
                 region: 'northreach',
@@ -1986,30 +2152,57 @@ async function main() {
       } else {
       startPhase('phase-D0');
       process.stdout.write('Phase D0: Opening Crafting System Manager...\n');
+      let previousExperimentalFeatures = false;
       try {
-        await page.evaluate(async (sysId) => {
+        previousExperimentalFeatures = await page.evaluate(async (sysId) => {
+          const previousExperimentalFeatures = game.settings.get('fabricate', 'experimentalFeatures') === true;
+          await game.settings.set('fabricate', 'experimentalFeatures', true);
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, {
             name: "The Herbalist's Compendium",
             description: 'Configure categories, item tags, essences, and crafting behaviour for this system.'
           });
+          return previousExperimentalFeatures;
         }, craftingSetup.systemId);
+        await seedSmokeGatheringLibrary(page, craftingSetup);
 
         await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await selectSmokeSystemInManager(page);
+        await selectSmokeSystemInManager(page, craftingSetup.systemId);
+        await page.evaluate(async () => {
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+        const smokeLibraryCounts = await page.evaluate((sysId) => {
+          const rawSystem = game.settings.get('fabricate', 'gatheringConfig')?.systems?.[sysId] || {};
+          const app = globalThis.__fabricateSmokeManagerApp;
+          let state = null;
+          const unsubscribe = app?._adminStore?.viewState?.subscribe?.(value => { state = value; });
+          if (typeof unsubscribe === 'function') unsubscribe();
+          const viewSystem = state?.gatheringConfig?.systems?.[sysId] || {};
+          return {
+            rawTasks: Array.isArray(rawSystem.tasks) ? rawSystem.tasks.length : 0,
+            rawHazards: Array.isArray(rawSystem.hazards) ? rawSystem.hazards.length : 0,
+            rawTools: Array.isArray(rawSystem.tools) ? rawSystem.tools.length : 0,
+            viewTasks: Array.isArray(viewSystem.tasks) ? viewSystem.tasks.length : 0,
+            viewHazards: Array.isArray(viewSystem.hazards) ? viewSystem.hazards.length : 0,
+            viewTools: Array.isArray(viewSystem.tools) ? viewSystem.tools.length : 0
+          };
+        }, craftingSetup.systemId);
+        if (smokeLibraryCounts.viewTasks < 1 || smokeLibraryCounts.viewHazards < 1 || smokeLibraryCounts.viewTools < 1) {
+          throw new Error(`Manager smoke gathering library was not loaded: ${JSON.stringify(smokeLibraryCounts)}`);
+        }
         let navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
         if (navLabels.at(0) !== 'System settings') {
           throw new Error(`Manager default selection should keep System settings first. Saw: ${navLabels.join(', ')}`);
         }
-        if (await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
+        if (await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-selected="true"]`).count() === 0) {
           throw new Error('Manager did not select the smoke test system.');
         }
         if (await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').count() === 0) {
@@ -2019,7 +2212,12 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-default-selection');
 
-        await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
+        // Capture the real system-library manager under every Fabricate theme
+        // (genuine Foundry-mounted DOM re-themed via the theme attribute), then
+        // restore the default theme before continuing the default-theme flow.
+        await captureManagerThemes(page);
+
+        await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
         await page.waitForTimeout(750);
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
@@ -2051,7 +2249,7 @@ async function main() {
           throw new Error('Manager inspector still shows duplicate Quick actions.');
         }
         await assertManagerLayoutStable(page, 'normal selected');
-        await exerciseManagerPointerTargets(page);
+        await exerciseManagerPointerTargets(page, craftingSetup.systemId);
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-selected-normal');
 
@@ -2066,10 +2264,10 @@ async function main() {
         if (await page.locator('.fabricate-manager .manager-scope-card').count() === 0) {
           throw new Error('Manager return to library should leave the rail scope visible.');
         }
-        if (await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")').count() === 0) {
+        if (await page.locator(managerSystemRowSelector(craftingSetup.systemId)).count() === 0) {
           throw new Error('Manager return to library did not return to the systems browser.');
         }
-        if (await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
+        if (await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-selected="true"]`).count() === 0) {
           throw new Error('Manager return to library should preserve the selected system row.');
         }
 
@@ -2083,7 +2281,7 @@ async function main() {
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
+        await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
         await page.waitForTimeout(750);
         const gatheringOffFact = await page.locator('.fabricate-manager [data-count-id="environments"]').first().evaluate(element => {
           const rect = element.getBoundingClientRect();
@@ -2121,13 +2319,17 @@ async function main() {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, { features: { essences: true, gathering: true } });
         }, craftingSetup.systemId);
+        await seedSmokeGatheringLibrary(page, craftingSetup);
         await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
+        await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
         await page.waitForTimeout(750);
+        await page.evaluate(async () => {
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
 
         await setManagerWindowSize(page, { width: 1000, height: 700 });
         await assertManagerLayoutStable(page, 'stacked selected');
@@ -2137,7 +2339,7 @@ async function main() {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("System settings")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await exerciseManagerSystemEditPointerTargets(page);
+        await exerciseManagerSystemEditPointerTargets(page, craftingSetup.systemId);
         if (await page.locator('.fabricate-manager[data-manager-view="system-edit"]').count() === 0) {
           throw new Error('Manager system Edit did not stay inside the v2 edit route.');
         }
@@ -2162,11 +2364,6 @@ async function main() {
         await screenshot(page, 'manager-system-edit-narrow');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        // The Recipes manager view is gated behind experimental features and is
-        // not in place for normal worlds yet (the nav button renders as
-        // "planned for a future release"). Until the new recipe UI exists,
-        // verify recipe data through the Foundry API rather than driving the
-        // disabled view.
         const recipeApiCount = await page.evaluate((sysId) => {
           const rm = game.fabricate?.getRecipeManager?.();
           return rm?.getRecipes?.({ craftingSystemId: sysId })?.length ?? 0;
@@ -2174,6 +2371,13 @@ async function main() {
         if (recipeApiCount < 2) {
           throw new Error(`Expected the smoke system to expose at least 2 recipes via the API; saw ${recipeApiCount}.`);
         }
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'recipes normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipes-normal');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
@@ -2255,8 +2459,10 @@ async function main() {
         if (await page.locator('.fabricate-manager .manager-environment-row.is-selected:has-text("Azure Grove")').count() === 0) {
           throw new Error('Manager environments browser did not show selected environment row state.');
         }
-        if (await page.locator('.fabricate-manager .manager-inspector:has-text("Linked scene")').count() === 0) {
-          throw new Error('Manager environments inspector did not show linked scene evidence.');
+        const sceneEvidenceCount = await page.locator('.fabricate-manager .manager-inspector [data-environment-fact="scene"]').count();
+        const sceneStatusCount = await page.locator('.fabricate-manager .manager-inspector:has-text("Linked scene"), .fabricate-manager .manager-inspector:has-text("Scene unresolved")').count();
+        if (sceneEvidenceCount === 0 || sceneStatusCount === 0) {
+          throw new Error('Manager environments inspector did not show scene evidence.');
         }
         await assertManagerLayoutStable(page, 'environments normal');
         await assertNoScreenshotOverlays(page);
@@ -2270,6 +2476,28 @@ async function main() {
         await screenshot(page, 'manager-environments-browse-stacked');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+        const preTaskLibraryCounts = await page.evaluate((sysId) => {
+          const rawSystem = game.settings.get('fabricate', 'gatheringConfig')?.systems?.[sysId] || {};
+          const app = globalThis.__fabricateSmokeManagerApp;
+          let state = null;
+          const unsubscribe = app?._adminStore?.viewState?.subscribe?.(value => { state = value; });
+          if (typeof unsubscribe === 'function') unsubscribe();
+          const selectedSystemId = state?.selectedSystem?.id || '';
+          const viewSystem = state?.gatheringConfig?.systems?.[selectedSystemId] || {};
+          return {
+            expectedSystemId: sysId,
+            selectedSystemId,
+            rawTasks: Array.isArray(rawSystem.tasks) ? rawSystem.tasks.length : 0,
+            rawHazards: Array.isArray(rawSystem.hazards) ? rawSystem.hazards.length : 0,
+            rawTools: Array.isArray(rawSystem.tools) ? rawSystem.tools.length : 0,
+            viewTasks: Array.isArray(viewSystem.tasks) ? viewSystem.tasks.length : 0,
+            viewHazards: Array.isArray(viewSystem.hazards) ? viewSystem.hazards.length : 0,
+            viewTools: Array.isArray(viewSystem.tools) ? viewSystem.tools.length : 0
+          };
+        }, craftingSetup.systemId);
+        if (preTaskLibraryCounts.viewTasks < 1 || preTaskLibraryCounts.viewHazards < 1 || preTaskLibraryCounts.viewTools < 1) {
+          throw new Error(`Manager smoke gathering library disappeared before task screenshot: ${JSON.stringify(preTaskLibraryCounts)}`);
+        }
         await page.locator('.fabricate-manager #manager-gathering-nav-tasks').first().click();
         await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
@@ -2324,6 +2552,33 @@ async function main() {
         await page.locator('.fabricate-manager[data-manager-view="environments"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
 
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager #manager-gathering-nav-encounters').first().click();
+        await page.locator('.fabricate-manager .manager-gathering-hazard-row:has-text("Smoke Bramble Snare")').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertManagerLayoutStable(page, 'gathering hazards normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-gathering-hazards-normal');
+
+        await page.locator('.fabricate-manager .manager-gathering-hazard-row:has-text("Smoke Bramble Snare") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="gathering-hazard-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        for (const expected of ['Hazard Identity', 'Hazard Matching']) {
+          if (await page.locator('.fabricate-manager').filter({ hasText: expected }).count() === 0) {
+            throw new Error(`Manager gathering hazard editor is missing "${expected}".`);
+          }
+        }
+        await assertManagerLayoutStable(page, 'gathering hazard editor normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-gathering-hazard-editor-normal');
+
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager .manager-tools-row:has-text("Herbalist Sickle")').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertManagerLayoutStable(page, 'tools normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-tools-normal');
+
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, {
@@ -2338,6 +2593,10 @@ async function main() {
       } catch (err) {
         results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
         throw err;
+      } finally {
+        await page.evaluate(async (previous) => {
+          await game.settings.set('fabricate', 'experimentalFeatures', previous === true);
+        }, previousExperimentalFeatures).catch(() => {});
       }
       }
 

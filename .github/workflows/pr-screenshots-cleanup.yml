@@ -1,0 +1,58 @@
+name: PR screenshots cleanup
+
+# When a PR closes (merged or not), delete its screenshots from S3 so the
+# pr-screenshots/<number>/ prefix doesn't accumulate. The bucket lifecycle rule
+# is the backstop; this is the prompt cleanup.
+#
+# Uses pull_request_target so OIDC + repo variables are available (incl. for
+# fork PRs) and the BASE branch's trusted copy of the script is run — PR head
+# code is never checked out or executed. The only PR-derived input is the
+# numeric PR number.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  id-token: write  # OIDC for AWS role assumption
+
+concurrency:
+  group: pr-screenshots-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout base (trusted) ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC)
+        # continue-on-error so a missing/misconfigured role never fails the run;
+        # the delete step then warns and the lifecycle rule remains the backstop.
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Delete PR screenshots from S3
+        env:
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node scripts/ui-pr-screenshot-evidence.mjs clean --pr "$PR_NUMBER" --s3 \
+            || echo "::warning::Screenshot S3 cleanup failed (continuing; lifecycle rule is the backstop)."

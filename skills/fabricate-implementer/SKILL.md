@@ -26,13 +26,14 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 7. Implement the minimum change that satisfies the plan.
 8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-9. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
-10. Run validation gates after each logical change set:
+9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`. There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if capture is genuinely impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
+10. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
+11. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`
-11. If either gate fails, fix the problem and rerun both gates.
-12. Commit to the task branch, push it, and open or update the PR targeting `main`.
-13. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
+12. If either gate fails, fix the problem and rerun both gates.
+13. Commit to the task branch, push it, and open or update the PR targeting `main`.
+14. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
 
 ## Implementation rules
 
@@ -52,12 +53,13 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - For Manager V2 feature routes, implement placeholder promotion as a complete route slice: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
 - When a Manager V2 feature button cannot be clicked, first inspect whether it is still rendered as a disabled placeholder or hidden by feature gates before changing event handlers.
 - In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
-- Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration, no dev server is available, or reproducible container-backed evidence is required.
+- Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration or the user explicitly asks for live Foundry evidence. It is not the normal PR screenshot generator.
 - `npm run test:foundry` defaults to host port `30100` so it coexists with a developer's local Foundry on `30000`. If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOUNDRY_URL` (e.g. `FOUNDRY_HOST_PORT=30101 FOUNDRY_URL=http://localhost:30101`).
 - Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
 - For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
+- Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
 
 ## Foundry V13 checks

@@ -12,7 +12,7 @@ This skill is the canonical definition of the Fabricate UX Designer persona. Bot
 - `openspec/specs/ui-integration/spec.md` first, then other UI-related specs as needed
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
-- existing screenshots in `test-results/` when no live dev session is available
+- embedded screenshot images in the PR description (S3-hosted, from `npm run screenshots:ui:publish`) and smoke screenshots when no live dev session is available
 
 ## Workflow
 
@@ -20,12 +20,13 @@ This skill is the canonical definition of the Fabricate UX Designer persona. Bot
 2. Verify the current branch is not `main`; create or switch to the task branch before editing UI specs, design docs, or workflow files.
 3. Inspect the current Svelte components, stores, styles, and localized strings.
 4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
-5. If no live dev session is available, check `test-results/` for recent screenshots before trying to generate fresh ones.
-6. Use container-backed Foundry validation only when the task depends on real runtime behavior or needs reproducible screenshots.
-7. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
-8. Compare the implementation against the spec and against Foundry-native interaction patterns.
-9. Turn confirmed problems into specific design guidance or backlog issues.
-10. Commit owned spec, design, or workflow changes to the task branch, push it, and open or update the PR targeting `main`.
+5. If no live dev session is available, check the PR body/comments/artifacts for recent smoke evidence before trying to generate fresh screenshots.
+6. Use container-backed Foundry validation when UI PR screenshot evidence must be created from real smoke artifacts.
+7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main`, run or inspect `npm run test:foundry` smoke output, collect evidence with `npm run screenshots:ui -- --base origin/main --pr <number>` under `tmp/pr-screenshots/<number>/`, upload and embed it with `npm run screenshots:ui:publish -- --pr <number>` (uploads to S3 and embeds the images in the PR body), and require local cleanup with `npm run screenshots:ui:clean -- --pr <number>`. There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
+8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+9. Compare the implementation against the spec and against Foundry-native interaction patterns.
+10. Turn confirmed problems into specific design guidance or backlog issues.
+11. Commit owned spec, design, or workflow changes to the task branch, push it, and open or update the PR targeting `main`.
 
 ## Review checklist
 
@@ -41,6 +42,7 @@ Check:
 - screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
 - rendered geometry in resizable Foundry windows, including CSS that overflows, compresses, or clips despite looking plausible in source
 - whether image-card screenshots prove linked imagery or only fallback artwork
+- whether smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths instead of invented SVG art or external URLs
 - action overlays and icon controls for crowding, clipping, target size, and visual hierarchy
 
 ## Rules
@@ -50,6 +52,7 @@ Check:
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
+- Treat unrelated image markdown, artifact names, and file lists in a PR as missing normal UI evidence; screenshots must be embedded images of the changed view (produced by `npm run screenshots:ui:publish`, S3-hosted). There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshots-exempt` label can waive the requirement.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## PR description template

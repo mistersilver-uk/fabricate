@@ -20,6 +20,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write  # OIDC for AWS role assumption (S3 screenshot upload)
   issues: write
 
 env:
@@ -241,7 +242,7 @@ jobs:
           npm run build
 
           CHANGED_FILES=$(git diff --name-only "origin/${{ github.event.repository.default_branch || 'main' }}..HEAD")
-          if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(src/ui/|styles/)|\.(svelte|css)$'; then
+          if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(src/ui/|styles/|lang/)|\.(svelte|css)$'; then
             echo "ui_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "ui_changed=false" >> "$GITHUB_OUTPUT"
@@ -287,16 +288,12 @@ jobs:
             PR_TITLE="chore(#${ISSUE_NUMBER}): ${ISSUE_TITLE}"
           fi
 
+          # Screenshots are uploaded and embedded automatically after the PR is
+          # created (see the "Publish UI screenshots" step). The body starts with
+          # a placeholder; the publish step replaces the managed block in place.
           SCREENSHOT_NOTE="_No UI files changed._"
           if [ "${{ steps.validate.outputs.ui_changed }}" = "true" ]; then
-            if find test-results -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) 2>/dev/null | grep -q .; then
-              SCREENSHOT_PATHS=$(find test-results -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) | sort)
-              SCREENSHOT_NOTE=$(printf 'Screenshot artifacts were uploaded as `codex-ui-evidence-%s-${{ github.run_number }}`.\n\n%s' "$ISSUE_NUMBER" "$SCREENSHOT_PATHS")
-            elif grep -q '^SCREENSHOTS_NEEDED:' codex-output.md 2>/dev/null; then
-              SCREENSHOT_NOTE="> $(grep '^SCREENSHOTS_NEEDED:' codex-output.md | head -1)"
-            else
-              SCREENSHOT_NOTE="> SCREENSHOTS_NEEDED: UI files changed, but no screenshot artifact was produced by the agent."
-            fi
+            SCREENSHOT_NOTE="_Screenshots pending automated publish._"
           fi
 
           {
@@ -338,15 +335,25 @@ jobs:
               --body-file pr-body.md >"$PR_OUTPUT" 2>&1
           }
 
+          emit_pr_number() {
+            local pr_number
+            pr_number="$(grep -oE '/pull/[0-9]+' "$PR_OUTPUT" | grep -oE '[0-9]+' | head -1)"
+            if [ -n "$pr_number" ]; then
+              echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
           if try_create_pr "$PRIMARY_PR_TOKEN"; then
             cat "$PR_OUTPUT"
             echo "pr_created=true" >> "$GITHUB_OUTPUT"
+            emit_pr_number
           else
             LAST_PR_ERROR="$(cat "$PR_OUTPUT")"
             if [ -n "$FALLBACK_PR_TOKEN" ] && [ "$FALLBACK_PR_TOKEN" != "$PRIMARY_PR_TOKEN" ]; then
               if try_create_pr "$FALLBACK_PR_TOKEN"; then
                 cat "$PR_OUTPUT"
                 echo "pr_created=true" >> "$GITHUB_OUTPUT"
+                emit_pr_number
                 exit 0
               fi
               LAST_PR_ERROR="$(cat "$PR_OUTPUT")"
@@ -363,6 +370,56 @@ jobs:
               exit 1
             fi
           fi
+
+      # AWS auth for S3 screenshot upload via OIDC ONLY (never static keys).
+      # continue-on-error so a missing/misconfigured role doesn't fail the job:
+      # publish then warns and the required check fails closed.
+      - name: Configure AWS credentials (OIDC)
+        if: steps.validate.outputs.ui_changed == 'true' && steps.raise_pr.outputs.pr_created == 'true'
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Dedicated least-privilege role (pr-screenshots/* only) — NOT the
+          # module-release role. See docs/contributing.md "Screenshot publishing
+          # infrastructure". Region/bucket vars are shared (not privileges).
+          role-to-assume: ${{ vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish UI screenshots
+        if: steps.validate.outputs.ui_changed == 'true' && steps.raise_pr.outputs.pr_created == 'true'
+        env:
+          # Body read/patch uses gh; image upload goes to S3 using the OIDC role
+          # configured above (same role/bucket as module releases). If the role
+          # can't be assumed or lacks pr-screenshots/* access, the S3 upload
+          # fails, this step warns, and the required `check-screenshots` gate
+          # correctly fails until a maintainer publishes or applies
+          # `screenshots-exempt`.
+          GH_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN != '' && secrets.WORKFLOW_GH_TOKEN || github.token }}
+          PR_NUMBER: ${{ steps.raise_pr.outputs.pr_number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+        run: |
+          set -u
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::No PR number captured; skipping automatic screenshot publish."
+            exit 0
+          fi
+
+          node scripts/ui-pr-screenshot-evidence.mjs collect \
+            --base "origin/${DEFAULT_BRANCH}" \
+            --pr "$PR_NUMBER" \
+            --allow-missing || echo "::warning::Screenshot collection produced no artifacts (smoke harness may not have run)."
+
+          if node scripts/ui-pr-screenshot-evidence.mjs publish \
+            --pr "$PR_NUMBER" \
+            --repo "${{ github.repository }}"; then
+            echo "Published UI screenshots to PR #${PR_NUMBER}."
+          else
+            echo "::warning::Automatic screenshot publish failed (often a token-scope limitation). A maintainer must publish manually or apply 'screenshots-exempt'."
+          fi
+
+          node scripts/ui-pr-screenshot-evidence.mjs clean --pr "$PR_NUMBER" || true
 
       - name: Comment manual PR handoff
         if: steps.validate.outputs.has_changes == 'true' && steps.raise_pr.outputs.pr_created == 'false'

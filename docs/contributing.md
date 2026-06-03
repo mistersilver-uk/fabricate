@@ -209,6 +209,15 @@ Files:
 
 Requirements:
 - Repository secret: `OPENAI_API_KEY`
+- Repository secret: `WORKFLOW_GH_TOKEN` — a GitHub token used by `team-b-backlog.yml` (and other agent workflows) to push the implementation branch, create the PR, manage issue/PR labels and comments, delete the branch on cleanup, and patch the PR body when publishing UI screenshots. The default `GITHUB_TOKEN` is insufficient because org policy blocks Actions from creating PRs. A **fine-grained, repo-scoped** token needs these repository permissions:
+  - **Contents: Read and write** — push commits/branches and delete refs.
+  - **Pull requests: Read and write** — create PRs, apply PR labels, read and patch the PR body.
+  - **Issues: Read and write** — edit issue labels and post issue comments.
+  - **Metadata: Read** — mandatory baseline (auto-selected).
+  - **Workflows: Read and write** — *only* if agent implementations may modify files under `.github/workflows/`; without it, any push that touches a workflow file is rejected.
+
+  The labels it applies (`agent-created`, `in-progress`, `agent-failed`, `screenshots-exempt`) must already exist in the repo. This token grants no AWS access — S3 screenshot uploads authenticate separately via OIDC (see below).
+- AWS for S3 screenshot publishing: in CI, **OIDC only** (never static keys), via a **dedicated, least-privilege role** distinct from the module-release role. Repository variable `AWS_SCREENSHOTS_ROLE_TO_ASSUME` (the role ARN) plus the shared `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` variables and `permissions: id-token: write`. Local runs use the AWS default provider chain. See [Screenshot publishing infrastructure](#screenshot-publishing-infrastructure) for the exact IAM and bucket policies.
 
 Behavior:
 - `team-a-research.yml`: manual research and audit workflow
@@ -216,6 +225,83 @@ Behavior:
 - `codex-code-review.yml`: manual PR review workflow, scoped to `workflow_dispatch.pr_number`
 
 Use these workflows only when you explicitly want a Codex run and have available usage for it.
+
+### Screenshot publishing infrastructure
+
+`npm run screenshots:ui:publish` uploads UI-PR screenshots to S3 under `pr-screenshots/<pr-number>/` and embeds the public object URLs in the PR body. In CI (`team-b-backlog.yml`) this authenticates via GitHub OIDC using a **dedicated, least-privilege IAM role** — deliberately separate from the module-release role so agent-driven workflows can never write or overwrite real release artifacts.
+
+Repository variables (role ARNs and bucket names are not secrets):
+
+- `AWS_SCREENSHOTS_ROLE_TO_ASSUME` — ARN of the dedicated screenshot role (below).
+- `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` — shared with the release workflow.
+
+**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the team-b backlog and PR-screenshots-cleanup workflows in this repo may assume it:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::088545273404:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:mistersilver-uk/fabricate-v2:*",
+          "token.actions.githubusercontent.com:job_workflow_ref": [
+            "mistersilver-uk/fabricate-v2/.github/workflows/team-b-backlog.yml@*",
+            "mistersilver-uk/fabricate-v2/.github/workflows/pr-screenshots-cleanup.yml@*"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+To tighten further (if team-b is only ever dispatched from `main`), replace the `sub` value with `repo:mistersilver-uk/fabricate-v2:ref:refs/heads/main`.
+
+**IAM role permission policy** (`PublishPrScreenshots`) — `pr-screenshots/*` only, including delete for cleanup:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListPrScreenshots",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::fabricate-modules-088545273404-eu-west-2-an",
+      "Condition": { "StringLike": { "s3:prefix": "pr-screenshots/*" } }
+    },
+    {
+      "Sid": "WritePrScreenshots",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::fabricate-modules-088545273404-eu-west-2-an/pr-screenshots/*"
+    }
+  ]
+}
+```
+
+**Bucket policy** — add public read for `pr-screenshots/*` so GitHub can render the images (alongside the existing `modules/*` / `testers/*` grant):
+
+```json
+{
+  "Sid": "PublicReadPrScreenshots",
+  "Effect": "Allow",
+  "Principal": "*",
+  "Action": "s3:GetObject",
+  "Resource": "arn:aws:s3:::fabricate-modules-088545273404-eu-west-2-an/pr-screenshots/*"
+}
+```
+
+**Cleanup** — `screenshots:ui:clean` removes only local temp files (the S3 objects must stay live while the PR is open). The `pr-screenshots-cleanup.yml` workflow runs `screenshots:ui:clean -- --pr <n> --s3` automatically when a PR closes (merged or not) to delete that PR's S3 objects. A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days is the backstop so nothing accumulates even if the cleanup workflow is skipped or fails. (Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
+
+These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots). Until the role/variable/bucket policy exist, the team-b publish step warns and the required `check-screenshots` gate fails closed until a maintainer publishes manually or applies the `screenshots-exempt` label.
 
 ## Release pipeline
 
