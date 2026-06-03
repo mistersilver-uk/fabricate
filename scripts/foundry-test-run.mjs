@@ -32,6 +32,7 @@ import { chromium } from 'playwright';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -169,6 +170,37 @@ async function screenshot(page, label) {
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
   await page.screenshot({ path });
+}
+
+/**
+ * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
+ * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
+ * document element and every `.fabricate` root. This re-themes the real app via
+ * its own CSS tokens — not a mock — so the resulting screenshot is the genuine
+ * manager under that theme.
+ * @param {import('playwright').Page} page
+ * @param {string} themeId
+ */
+async function applyManagerTheme(page, themeId) {
+  await page.evaluate(({ id, attr }) => {
+    document.documentElement.setAttribute(attr, id);
+    for (const root of document.querySelectorAll('.fabricate')) root.setAttribute(attr, id);
+  }, { id: themeId, attr: FABRICATE_THEME_ATTRIBUTE });
+  await page.waitForTimeout(200);
+}
+
+/**
+ * Capture the currently-open manager view under every Fabricate theme, then
+ * restore the default theme so later Phase D0 captures stay unthemed. Labels:
+ * `manager-theme-<themeId>` (full profile only; this runs inside Phase D0).
+ * @param {import('playwright').Page} page
+ */
+async function captureManagerThemes(page) {
+  for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
+    await applyManagerTheme(page, themeId);
+    await screenshot(page, `manager-theme-${themeId}`);
+  }
+  await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
 }
 
 /**
@@ -2179,6 +2211,11 @@ async function main() {
         await assertManagerLayoutStable(page, 'normal default selection');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-default-selection');
+
+        // Capture the real system-library manager under every Fabricate theme
+        // (genuine Foundry-mounted DOM re-themed via the theme attribute), then
+        // restore the default theme before continuing the default-theme flow.
+        await captureManagerThemes(page);
 
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
         await page.waitForTimeout(750);

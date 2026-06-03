@@ -20,7 +20,7 @@ The run walks several phases in order. If an earlier phase fails, later phases a
 - **boot-and-join** — health-poll the container, log in as Gamemaster.
 - **Phase B** — create test actors and items, screenshot sheets.
 - **Phase C** — create a crafting system + sample recipes.
-- **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step). **This is where most drift shows up** when manager markup changes.
+- **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step). **This is where most drift shows up** when manager markup changes. After the default-selection capture it also re-themes the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and captures `manager-theme-<themeId>` for every Fabricate theme, then restores the default. These are real, Foundry-rendered themed captures — theme fidelity is not validated via hand-authored mocks.
 - **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot).
 - **Phase F** — cleanup.
 

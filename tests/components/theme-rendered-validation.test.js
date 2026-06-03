@@ -1,21 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { FABRICATE_THEME_IDS } from '../../src/ui/theme.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-const screenshotDir = resolve(repoRoot, 'test-results');
 const themeIds = Object.values(FABRICATE_THEME_IDS);
-const newThemeIds = new Set([
-  FABRICATE_THEME_IDS.IRONBLOOD_FORGE,
-  FABRICATE_THEME_IDS.HEARTH_HERB,
-  FABRICATE_THEME_IDS.STARGLASS_ARCANA,
-  FABRICATE_THEME_IDS.FOUNDRY_NATIVE
-]);
 // The player Crafting/Gathering apps and the standalone Recipe Editor were
 // removed; the Crafting System Manager is the remaining themed surface. The new
 // unified Fabricate shell is an empty placeholder whose focus/contrast styling
@@ -337,7 +330,6 @@ function liveUpdateFixture(origin) {
 }
 
 test('renders all Fabricate themes across representative surfaces with readable, unclipped controls', { timeout: 60_000 }, async () => {
-  mkdirSync(screenshotDir, { recursive: true });
   const browser = await chromium.launch();
 
   try {
@@ -351,10 +343,6 @@ test('renders all Fabricate themes across representative surfaces with readable,
 
           const result = await inspectRenderedSurface(page);
           assertRenderedResult(result, theme, surface.id, width);
-
-          if (newThemeIds.has(theme) && width === surface.widths[0]) {
-            await page.screenshot({ path: resolve(screenshotDir, `theme-${theme}-${surface.id}-${width}.png`), fullPage: true });
-          }
         }
       }
     }
@@ -364,7 +352,6 @@ test('renders all Fabricate themes across representative surfaces with readable,
 });
 
 test('updates an already-mounted Fabricate surface through the registered theme onChange behavior', { timeout: 30_000 }, async () => {
-  mkdirSync(screenshotDir, { recursive: true });
   const server = await startStaticServer();
   const browser = await chromium.launch();
 
@@ -407,8 +394,6 @@ test('updates an already-mounted Fabricate surface through the registered theme 
     assert.equal(after.rootCount, 1);
     assert.notEqual(after.background, before.background, 'mounted surface background should visibly update');
     assert.notEqual(after.accent, before.accent, 'mounted surface theme tokens should update live');
-
-    await page.screenshot({ path: resolve(screenshotDir, 'theme-live-update-mounted-surface.png'), fullPage: true });
   } finally {
     await browser.close();
     await server.close();
