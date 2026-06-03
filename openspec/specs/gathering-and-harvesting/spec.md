@@ -142,7 +142,7 @@ GatheringEnvironment = {
 5. `img` is an optional player-facing environment image independent of any linked scene.
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 7. Scene linkage is optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
-8. Disabled environments are never attemptable by non-GM users and are hidden from normal player gathering flows.
+8. Disabled environments are never attemptable by non-GM users and surface no task content to them. Disabled environments are surfaced as **locked identity-only listings to all viewers** in the player listing (players and GMs alike): a **locked identity-only teaser** (`locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, and no `tasks` or composition internals); it must never expose task identity, weights, drop data, or other composition internals. See *Player Environment Listing*.
 9. `region` and `dangerLevel` are single-select tag values; `biomes` is a multi-select tag list.
 10. `dangerLevel` is the canonical environment danger ceiling used for reusable hazard matching. Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs when `dangerLevel` is absent; canonical writes should use `dangerLevel`.
 10a. `risk` may remain as optional player-facing risk evidence for older data, but new matching behavior must not depend on `risk` when `dangerLevel` is present.
@@ -914,6 +914,24 @@ For a given `viewer`, `actor`, and `environment`:
 
 In `blind` environments, if no task is visible, revealable, or selectable by configured blind-selection logic for an actor, that actor cannot gather from the environment.
 For non-GM users, unrevealed blind tasks remain opaque in listing output: generic localized labels replace task identity, images, visibility diagnostics, resolution metadata, and catalyst details. GMs may inspect the real blind task metadata.
+
+A disabled environment returns no player-visible tasks (requirement 1 above), but is surfaced as a locked identity-only listing to all viewers (players and GMs alike), carrying zero tasks. See *Player Environment Listing*.
+
+## Player Environment Listing
+
+### Purpose
+
+Define the redaction-safe per-environment fields the player listing API surfaces to a non-GM actor, alongside the existing visibility/attemptability/blocked-reason output.
+
+### Requirements
+
+1. Each environment entry in a non-GM listing carries identity and player-facing metadata (name, description, image, region, biome(s), danger/risk, selection mode, scene linkage) plus `visible`, `attemptable`, and localized `blockedReasons`, in addition to the fields below.
+2. `locked` (boolean) marks an entry that is a disabled-environment teaser. Disabled environments are surfaced as locked identity-only listings to all viewers in the player listing (players and GMs alike). A locked entry is `attemptable: false`, carries an `ENVIRONMENT_DISABLED` blocked reason, exposes no `tasks` and no composition internals (weights, drop data, hidden task identity), and is non-interactive for the player.
+3. `revealPolicy` is the **effective system-level** reveal policy (`never` | `onSuccess` | `onAttempt`) resolved from the system Gathering Rules. It is system-level only; environments never override it (see *System Gathering Rules* requirement 10).
+4. `composedTaskCount` is the size of the environment's total composed task pool — the denominator (`y`) for a blind `(x/y)` discovery display. It is a pool size and is distinct from any GM-runtime "available right now" count, which additionally excludes condition-blocked records. A locked entry reports `0`.
+5. `discoveredTaskCount` is the count of tasks the requesting actor has revealed at the effective reveal scope — the numerator (`x`). It is `0` when the entry is locked or when the effective `revealPolicy === 'never'`.
+6. `biomeTags` carries resolved biome display metadata (id, label, icon, and color token/custom color) so player biome chips render consistently with GM authoring. The per-system biome vocabulary takes precedence over the global vocabulary, then defaults.
+7. These listing fields are additive and redaction-safe: they must not leak hidden task identity, hidden result details, weights, provider diagnostics, or GM-only notes. Computing reveal/biome metadata is best-effort and must degrade to safe defaults (`0` / empty) rather than failing the listing.
 
 ## Catalyst Semantics
 

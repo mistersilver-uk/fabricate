@@ -483,6 +483,41 @@ export class GatheringEngine {
     });
   }
 
+  /**
+   * Build the player-facing gathering listing for the selected actor: the
+   * environments the actor can see (or is teased about), plus active runs,
+   * recent history, and the gathering-system filter options.
+   *
+   * Each entry in the returned `environments` array carries the environment
+   * identity (`id`, `name`, `img`, `region`, `biome(s)`, `dangerTags`, `risk`,
+   * `economyMode`, `conditions`, `selectionMode`, `sceneUuid`), interaction
+   * state (`visible`, `attemptable`, `blockedReasons`, `tasks`), and the shared
+   * player-listing fields produced by {@link GatheringEngine#_playerListingFields}:
+   *
+   * - `locked` — `true` for disabled environments surfaced to every viewer
+   *   (players and GMs alike) as non-interactive teasers (identity fields only;
+   *   empty `tasks`, an `ENVIRONMENT_DISABLED` blocked reason, and
+   *   `attemptable: false`).
+   * - `revealPolicy` — the effective system-level reveal policy
+   *   (`always`/`onCompletion`/`never`); when `never`, `discoveredTaskCount`
+   *   stays `0`.
+   * - `composedTaskCount` — size of the composed task pool. This is the
+   *   blind-reveal denominator (the "/y" in a player chip) and is intentionally
+   *   distinct from the GM admin `availableTaskCount`: it counts the full
+   *   composed pool the actor could discover, not the GM-side available-task
+   *   tally surfaced in the manager.
+   * - `discoveredTaskCount` — distinct task ids the actor has revealed at the
+   *   effective reveal scope (the "x/" numerator); `0` for locked or
+   *   `never`-policy environments.
+   * - `biomeTags` — resolved biome display metadata (`{ id, label, icon,
+   *   colorToken, customColor }`) so player chips match the GM editor.
+   *
+   * @param {object} [args]
+   * @param {object|null} [args.viewer] Foundry user requesting the listing.
+   * @param {object|null} [args.actor] Explicitly selected actor, if any.
+   * @param {string|null} [args.rememberedActorId] Previously selected actor id.
+   * @returns {Promise<object>} The gathering listing model.
+   */
   async listForActor({ viewer = null, actor = null, rememberedActorId = null } = {}) {
     const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
     if (selectableActors.length === 0) {
@@ -762,7 +797,6 @@ export class GatheringEngine {
     const environments = normalizeList(this.environmentStore?.list?.());
     return environments.filter(environment => {
       if (!systems.has(environment?.craftingSystemId)) return false;
-      if (environment.enabled === false && !viewer?.isGM) return false;
       return true;
     }).map(environment => this._composeEnvironment(environment, systems.get(environment.craftingSystemId)));
   }
@@ -775,6 +809,15 @@ export class GatheringEngine {
   }
 
   async _buildEnvironmentListing({ environment, system, viewer, actor }) {
+    // Disabled environments surface to every viewer (players and GMs alike) as
+    // non-interactive "locked" teasers. Build them before any task-visibility
+    // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
+    // NO_VISIBLE_TARGETED_TASKS, and carry identity fields only — no tasks,
+    // weights, or composition internals leak.
+    if (environment.enabled === false) {
+      return this._lockedEnvironmentListing({ environment, system });
+    }
+
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
     if (visibleTasks.length === 0) {
       return {
@@ -834,8 +877,83 @@ export class GatheringEngine {
       visible: true,
       attemptable,
       blockedReasons,
-      tasks: taskModels
+      tasks: taskModels,
+      ...this._playerListingFields({ environment, actor, locked: false })
     };
+  }
+
+  /**
+   * Build the lightweight locked listing for a disabled environment shown to
+   * every viewer (players and GMs alike) in the player listing. Carries
+   * identity fields only — no tasks, weights, or composition internals — plus
+   * the existing ENVIRONMENT_DISABLED reason.
+   */
+  _lockedEnvironmentListing({ environment, system }) {
+    const biomes = normalizeStringList(environment.biomes ?? environment.biome);
+    const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
+    return {
+      id: stringOrNull(environment.id),
+      craftingSystemId: stringOrNull(environment.craftingSystemId),
+      craftingSystemName: stringOrEmpty(system?.name),
+      name: stringOrEmpty(environment.name),
+      description: stringOrEmpty(environment.description),
+      img: stringOrNull(environment.img),
+      region: stringOrEmpty(environment.region),
+      biome: stringOrEmpty(environment.biome) || biomes[0] || '',
+      biomes,
+      dangerTags,
+      risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
+      economyMode: stringOrNull(environment.economyMode) || 'time',
+      conditions: plainObjectOrNull(environment.conditions) || {},
+      selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
+      sceneUuid: stringOrNull(environment.sceneUuid),
+      visible: true,
+      attemptable: false,
+      blockedReasons: [this._blockedReason('ENVIRONMENT_DISABLED')],
+      tasks: [],
+      ...this._playerListingFields({ environment, actor: null, locked: true })
+    };
+  }
+
+  /**
+   * The shared player-listing fields added to both locked and normal listings:
+   * `locked`, the effective system-level `revealPolicy`, the composed task pool
+   * size (`composedTaskCount`, the blind-reveal denominator), the actor's
+   * `discoveredTaskCount` at the same effective reveal scope, and resolved
+   * `biomeTags` display metadata.
+   */
+  _playerListingFields({ environment, actor, locked }) {
+    const { policy: revealPolicy, scope } = this._resolveRevealPolicy(environment);
+    const composedTaskCount = locked ? 0 : normalizeList(environment.tasks).length;
+    const discoveredTaskCount = (locked || revealPolicy === 'never')
+      ? 0
+      : this._countRevealedTasks({ actor, environmentId: environment.id, scope });
+    return {
+      locked: locked === true,
+      revealPolicy,
+      composedTaskCount,
+      discoveredTaskCount,
+      biomeTags: this._resolveBiomeTags(environment)
+    };
+  }
+
+  _countRevealedTasks({ actor, environmentId, scope }) {
+    if (typeof this.richState?.countRevealedTasks !== 'function') return 0;
+    try {
+      return this.richState.countRevealedTasks({ actor, environmentId, scope }) || 0;
+    } catch (_err) {
+      return 0;
+    }
+  }
+
+  _resolveBiomeTags(environment) {
+    if (typeof this.richState?.resolveBiomeTags !== 'function') return [];
+    const biomes = normalizeStringList(environment.biomes ?? environment.biome);
+    try {
+      return this.richState.resolveBiomeTags(biomes, environment.craftingSystemId) || [];
+    } catch (_err) {
+      return [];
+    }
   }
 
   async _visibleTaskListings({ environment, system, viewer, actor }) {

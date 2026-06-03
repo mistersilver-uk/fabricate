@@ -20,6 +20,7 @@ function makeEngine({
   activeRuns = new Map(),
   history = [],
   catalystAvailability = null,
+  richState = null,
   calls = {}
 } = {}) {
   calls.visibility = [];
@@ -28,6 +29,7 @@ function makeEngine({
   calls.activeRuns = [];
 
   return new GatheringEngine({
+    richState,
     environmentStore: {
       list: () => environments
     },
@@ -678,4 +680,187 @@ test('non-GM blind active and history rows do not expose task identity or termin
   assert.equal(serialized.includes('secret-mooncap'), false);
   assert.equal(serialized.includes('silver-sickle'), false);
   assert.equal(serialized.includes('macro'), false);
+});
+
+function stubRichState({ revealCount = 0, biomeTags = [] } = {}) {
+  return {
+    countRevealedTasks: () => revealCount,
+    resolveBiomeTags: () => biomeTags
+  };
+}
+
+test('listForActor surfaces a disabled environment to players as an identity-only locked listing', async () => {
+  const engine = makeEngine({
+    // Real composed tasks + a richState that WOULD report a non-zero reveal on a
+    // non-locked path; the locked teaser must still pin both counts to 0 so a
+    // regression leaking real composition through the teaser would fail here.
+    environments: [environment({
+      id: 'env-locked',
+      name: 'Sealed Vault',
+      enabled: false,
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
+    })],
+    richState: stubRichState({ revealCount: 2 })
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.equal(listing.environments.length, 1);
+  const locked = listing.environments[0];
+  assert.equal(locked.id, 'env-locked');
+  assert.equal(locked.name, 'Sealed Vault');
+  assert.equal(locked.locked, true);
+  assert.equal(locked.visible, true);
+  assert.equal(locked.attemptable, false);
+  assert.deepEqual(locked.tasks, []);
+  assert.deepEqual(reasonCodes(locked), ['ENVIRONMENT_DISABLED']);
+  // Counts are pinned to 0 on the locked teaser even though the env has 2 real
+  // tasks and richState reports 2 reveals; no real composition leaks through.
+  assert.equal(locked.composedTaskCount, 0);
+  assert.equal(locked.discoveredTaskCount, 0);
+  // No GM-internal composition data leaks through the locked teaser.
+  const serialized = JSON.stringify(locked);
+  assert.equal(serialized.includes('task-a'), false);
+  assert.equal(serialized.includes('Gather Iron'), false);
+});
+
+test('listForActor still locks a disabled blind environment whose sole task is hidden', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind-locked',
+      enabled: false,
+      selectionMode: 'blind',
+      tasks: [task({ id: 'task-hidden' })]
+    })],
+    visibility: new Map([['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]])
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.equal(listing.environments.length, 1);
+  assert.equal(listing.environments[0].id, 'env-blind-locked');
+  assert.equal(listing.environments[0].locked, true);
+  assert.deepEqual(reasonCodes(listing.environments[0]), ['ENVIRONMENT_DISABLED']);
+});
+
+test('listForActor surfaces a disabled environment to a GM as the same identity-only locked listing', async () => {
+  const gmViewer = { id: 'gm-1', isGM: true };
+  const engine = makeEngine({
+    // Same real-composition + non-zero richState setup as the player test: the
+    // GM locked teaser must NOT leak real counts either. A regression that let
+    // a non-locked path report through the GM teaser would surface non-zero
+    // counts here and fail.
+    environments: [environment({
+      id: 'env-gm-disabled',
+      name: 'Sealed Vault',
+      enabled: false,
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
+    })],
+    richState: stubRichState({ revealCount: 2 })
+  });
+
+  const listing = await engine.listForActor({ viewer: gmViewer, actor });
+
+  assert.equal(listing.environments.length, 1);
+  const entry = listing.environments[0];
+  assert.equal(entry.id, 'env-gm-disabled');
+  assert.equal(entry.locked, true);
+  assert.equal(entry.visible, true);
+  assert.equal(entry.attemptable, false);
+  assert.deepEqual(entry.tasks, []);
+  assert.deepEqual(reasonCodes(entry), ['ENVIRONMENT_DISABLED']);
+  // Counts pinned to 0 for a GM viewer too, despite 2 real tasks + 2 reveals.
+  assert.equal(entry.composedTaskCount, 0);
+  assert.equal(entry.discoveredTaskCount, 0);
+  // No GM-internal composition data leaks through the locked teaser even for a GM.
+  const serialized = JSON.stringify(entry);
+  assert.equal(serialized.includes('task-a'), false);
+  assert.equal(serialized.includes('Gather Iron'), false);
+});
+
+test('listForActor adds reveal/composition/biome fields to an enabled listing from system rules', async () => {
+  const biomeTags = [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }];
+  const engine = makeEngine({
+    environments: [environment({
+      biomes: ['forest'],
+      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+      tasks: [task({ id: 'task-1' }), task({ id: 'task-2' })]
+    })],
+    richState: stubRichState({ revealCount: 1, biomeTags })
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const entry = listing.environments[0];
+
+  assert.equal(entry.locked, false);
+  assert.equal(entry.revealPolicy, 'onAttempt');
+  assert.equal(entry.composedTaskCount, 2);
+  assert.equal(entry.discoveredTaskCount, 1);
+  assert.deepEqual(entry.biomeTags, biomeTags);
+});
+
+test('listForActor ignores an environment.reveal override when resolving revealPolicy', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      // System-level rules say never; a stray environment.reveal must not win.
+      rules: { revealPolicy: 'never' },
+      reveal: { policy: 'onSuccess', scope: 'global' }
+    })],
+    richState: stubRichState({ revealCount: 9 })
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const entry = listing.environments[0];
+
+  assert.equal(entry.revealPolicy, 'never');
+  // revealPolicy 'never' forces discoveredTaskCount to 0 regardless of stored reveals.
+  assert.equal(entry.discoveredTaskCount, 0);
+});
+
+test('listForActor drops an enabled composed-empty environment but pins a locked one to 0 counts', async () => {
+  // Two distinct paths, NOT the same outcome:
+  //  - ENABLED + composed-empty  -> no visible tasks -> the env is DROPPED from
+  //    the listing entirely (model.visible === false), so it never surfaces a
+  //    pinned count; we assert it resolves to [] below.
+  //  - LOCKED (enabled === false) -> the env IS surfaced as a teaser, and its
+  //    composedTaskCount / discoveredTaskCount are pinned to 0 regardless of
+  //    stored reveals; that pinning is what we assert via the locked path.
+  const emptyEngine = makeEngine({
+    environments: [environment({
+      id: 'env-empty',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: []
+    })],
+    richState: stubRichState({ revealCount: 4 })
+  });
+
+  // Locked env carries a real task; locking (not an empty pool) is what forces
+  // the pinned 0 counts on the surfaced teaser.
+  const lockedEngine = makeEngine({
+    environments: [environment({
+      id: 'env-locked-counts',
+      enabled: false,
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: [task({ id: 'task-x' })]
+    })],
+    richState: stubRichState({ revealCount: 7 })
+  });
+
+  const lockedListing = await lockedEngine.listForActor({ viewer, actor });
+  const lockedEntry = lockedListing.environments[0];
+  assert.equal(lockedEntry.locked, true);
+  assert.equal(lockedEntry.composedTaskCount, 0);
+  assert.equal(lockedEntry.discoveredTaskCount, 0);
+
+  // The enabled composed-empty env is DROPPED (visible:false), so the listing is
+  // empty — there is no enabled count-0 entry to pin. (Confirms the engine also
+  // does not throw while resolving an empty-pool blind environment.)
+  const emptyListing = await emptyEngine.listForActor({ viewer, actor });
+  assert.deepEqual(emptyListing.environments, []);
 });

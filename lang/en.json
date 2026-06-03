@@ -13,6 +13,21 @@
         "Gathering": "Gathering",
         "Journal": "Journal",
         "Inventory": "Inventory"
+      },
+      "Gathering": {
+        "Loading": "Loading gathering environments…",
+        "Error": "Couldn't load gathering environments.",
+        "Environments": {
+          "Title": "Environments",
+          "Hint": "Choose a place to gather. Locked environments are unavailable until your GM enables them.",
+          "Empty": "No gathering environments are available for this character yet.",
+          "BlindChip": "Blind",
+          "LockedAria": "{name} (locked)",
+          "Discovered": "{x} of {y} tasks discovered",
+          "SearchPlaceholder": "Search environments…",
+          "SearchLabel": "Search environments",
+          "NoMatches": "No environments match your search."
+        }
       }
     },
     "Settings": {
