@@ -139,10 +139,23 @@ describe('environment editor localization', () => {
       validationSource.includes('hasRegion: [\'CheckRegion\', \'Has a region or is set to "any region"\']'),
       'CheckRegion dynamic fallback should match the English catalog'
     );
+    for (const snippet of [
+      'task: [\'IssueStaleIncludedTask\', \'The task "{name}" no longer matches this environment.\']',
+      'hazard: [\'IssueStaleIncludedHazard\', \'The hazard "{name}" no longer matches this environment.\']',
+      'task: [\'IssueTaskNoDescriptionTask\', \'The task "{name}" has no player-facing description.\']'
+    ]) {
+      assert.ok(validationSource.includes(snippet), `${snippet} should match the English catalog`);
+    }
     assert.ok(
       modeControlSource.includes("descFallback: 'Only explicitly included tasks and hazards are available; GMs can force add enabled non-matching tasks and hazards.'"),
       'ManualHint dynamic fallback should match the English catalog'
     );
+  });
+
+  it('formats validation issue record names as natural language instead of bracketed suffixes', () => {
+    assert.ok(validationSource.includes('RECORD_ISSUE_LABELS'), 'validation tab should define per-record message templates');
+    assert.ok(validationSource.includes(".replace('{name}', issue.recordName)"), 'record issue titles should inject the record name into a sentence template');
+    assert.ok(!validationSource.includes('`${base} (${issue.recordName})`'), 'validation tab should not append record names in parentheses');
   });
 
   it('no editor component falls back on the legacy Environment.* editor key prefixes', () => {
