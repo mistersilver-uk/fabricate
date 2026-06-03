@@ -4931,6 +4931,87 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-record-inspector="task"]').textContent.includes('Gather Moon Herbs'));
   });
 
+  it('counts editor tab badges from composition membership and splits validation counts', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'dangerous',
+          sceneUuid: ''
+        },
+        composition: {
+          compositionMode: 'automatic',
+          counts: { availableTasks: 0, availableHazards: 0, unavailableHazards: 1 },
+          tasks: [
+            {
+              id: 'task-rain-herbs',
+              kind: 'task',
+              record: { name: 'Gather Rain Herbs', description: 'Gather herbs that only bloom in rain.', img: 'icons/svg/item-bag.svg' },
+              compositionState: 'includedByMatch',
+              runtimeState: 'unavailable',
+              evidence: {}
+            },
+            {
+              id: 'task-excluded',
+              kind: 'task',
+              record: { name: 'Excluded Task', description: 'Locally excluded.', img: 'icons/svg/item-bag.svg' },
+              compositionState: 'excluded',
+              runtimeState: 'unavailable',
+              evidence: {}
+            }
+          ],
+          hazards: [
+            {
+              id: 'hazard-force',
+              kind: 'hazard',
+              record: { name: 'Forced Hazard', description: 'Added despite matching state.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+              compositionState: 'forceIncluded',
+              runtimeState: 'available',
+              evidence: {}
+            },
+            {
+              id: 'hazard-stale',
+              kind: 'hazard',
+              record: { name: 'Stale Hazard', description: 'No longer matches.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+              compositionState: 'includedButUnavailable',
+              runtimeState: 'unavailable',
+              evidence: {}
+            },
+            {
+              id: 'hazard-disabled',
+              kind: 'hazard',
+              record: { name: 'Disabled Hazard', description: 'Disabled globally.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+              compositionState: 'libraryDisabled',
+              runtimeState: 'unavailable',
+              evidence: {}
+            }
+          ]
+        }
+      }
+    });
+    flushSync();
+
+    const taskBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="tasks"] .manager-environment-tab-badge'));
+    const hazardBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="hazards"] .manager-environment-tab-badge'));
+    const validationBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="validation"] .manager-environment-tab-badge'));
+
+    assert.deepEqual(taskBadges.map(node => node.textContent.trim()), ['1'], 'runtime-unavailable included task should count, excluded task should not');
+    assert.deepEqual(hazardBadges.map(node => node.textContent.trim()), ['2'], 'force-included and stale included hazards should count, library-disabled hazard should not');
+    assert.deepEqual(validationBadges.map(node => node.textContent.trim()), ['3 errors', '2 warnings']);
+    assert.equal(validationBadges[0].classList.contains('is-danger'), true, 'error validation badge should use danger tone');
+    assert.equal(validationBadges[1].classList.contains('is-warning'), true, 'warning validation badge should use warning tone');
+  });
+
   it('uses configured danger choices while preserving stale current danger values', async () => {
     target = document.createElement('div');
     document.body.appendChild(target);

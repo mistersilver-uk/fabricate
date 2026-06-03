@@ -108,6 +108,10 @@ describe('environment editor localization', () => {
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
+      ['Validation.BadgeErrorOne', '1 error'],
+      ['Validation.BadgeErrorMany', '{count} errors'],
+      ['Validation.BadgeWarningOne', '1 warning'],
+      ['Validation.BadgeWarningMany', '{count} warnings'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
       ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.'],
       ['Validation.CheckRegion', 'Has a region or is set to "any region"']
@@ -425,6 +429,27 @@ describe('environment composition editor structure', () => {
     assert.ok(tabsSource.includes("'ArrowLeft'"), 'tabs should handle ArrowLeft');
     assert.ok(tabsSource.includes('onkeydown='), 'tabs should wire a keydown handler');
     assert.ok(tabsSource.includes('aria-selected'), 'tabs should expose aria-selected');
+  });
+
+  it('tab badges count composition membership and split validation severities', () => {
+    assert.ok(!shellSource.includes('tasks: counts.availableTasks || 0'), 'Tasks badge should not use runtime availableTasks');
+    assert.ok(!shellSource.includes('hazards: counts.availableHazards || 0'), 'Hazards badge should not use runtime availableHazards');
+    assert.ok(shellSource.includes('countComposedRecords(composition?.tasks)'), 'Tasks badge should derive from task composition records');
+    assert.ok(shellSource.includes('countComposedRecords(composition?.hazards)'), 'Hazards badge should derive from hazard composition records');
+    for (const state of ['includedByMatch', 'explicitlyIncluded', 'forceIncluded', 'includedButUnavailable']) {
+      assert.ok(shellSource.includes(`'${state}'`), `composition badge count should include ${state}`);
+    }
+    const includedStateSet = shellSource.match(/const INCLUDED_COMPOSITION_STATES = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
+    for (const state of ['excluded', 'candidate', 'notMatching', 'libraryDisabled']) {
+      assert.ok(!includedStateSet.includes(`'${state}'`), `composition badge count should not include ${state}`);
+    }
+    assert.ok(shellSource.includes("issue.severity === 'critical'"), 'validation error badge should count critical issues');
+    assert.ok(shellSource.includes("issue.severity === 'warning'"), 'validation warning badge should count warning issues');
+    assert.ok(shellSource.includes("tone: 'danger'"), 'validation errors should use danger badge tone');
+    assert.ok(shellSource.includes("tone: 'warning'"), 'validation warnings should use warning badge tone');
+    assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
+    assert.ok(tabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
+    assert.ok(tabsSource.includes("if (tone === 'warning') return 'is-warning'"), 'tabs should render warning-toned badge chips');
   });
 });
 
