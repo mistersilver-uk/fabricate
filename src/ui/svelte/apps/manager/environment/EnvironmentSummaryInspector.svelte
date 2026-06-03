@@ -99,12 +99,12 @@
 
 <section class="manager-inspector-card">
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.RuntimePreview', 'Runtime preview')}</h3>
-  <div class="manager-fact-grid manager-environment-runtime-grid manager-fact-grid-inline">
-    <div class="manager-fact" data-runtime-fact="available-tasks"><strong>{counts.availableTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableTasks', 'Available tasks')}</span></div>
-    <div class="manager-fact" data-runtime-fact="excluded-tasks"><strong>{counts.excludedTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ExcludedTasks', 'Excluded tasks')}</span></div>
-    <div class="manager-fact" data-runtime-fact="candidate-tasks"><strong>{counts.candidateTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.CandidateTasks', 'Task candidates')}</span></div>
-    <div class="manager-fact" data-runtime-fact="available-hazards"><strong>{counts.availableHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableHazards', 'Available hazards')}</span></div>
-    <div class="manager-fact" data-runtime-fact="excluded-hazards"><strong>{counts.excludedHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ExcludedHazards', 'Excluded hazards')}</span></div>
-    <div class="manager-fact" data-runtime-fact="unavailable-included"><strong>{(counts.unavailableTasks || 0) + (counts.unavailableHazards || 0)}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnavailableIncluded', 'Included but unavailable')}</span></div>
+  <div class="manager-fact-grid manager-environment-runtime-grid">
+    <div class="manager-fact" data-runtime-fact="available-tasks"><span class="manager-fact-line"><strong>{counts.availableTasks || 0}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableTasks', 'Available tasks')}</span></span></div>
+    <div class="manager-fact" data-runtime-fact="excluded-tasks"><span class="manager-fact-line"><strong>{counts.excludedTasks || 0}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ExcludedTasks', 'Excluded tasks')}</span></span></div>
+    <div class="manager-fact" data-runtime-fact="candidate-tasks"><span class="manager-fact-line"><strong>{counts.candidateTasks || 0}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.CandidateTasks', 'Task candidates')}</span></span></div>
+    <div class="manager-fact" data-runtime-fact="available-hazards"><span class="manager-fact-line"><strong>{counts.availableHazards || 0}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableHazards', 'Available hazards')}</span></span></div>
+    <div class="manager-fact" data-runtime-fact="excluded-hazards"><span class="manager-fact-line"><strong>{counts.excludedHazards || 0}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ExcludedHazards', 'Excluded hazards')}</span></span></div>
+    <div class="manager-fact" data-runtime-fact="unavailable-included"><span class="manager-fact-line"><strong>{(counts.unavailableTasks || 0) + (counts.unavailableHazards || 0)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnavailableIncluded', 'Included but unavailable')}</span></span></div>
   </div>
 </section>

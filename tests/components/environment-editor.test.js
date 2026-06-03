@@ -233,6 +233,10 @@ describe('environment composition editor structure', () => {
     for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-hazards', 'excluded-hazards', 'unavailable-included']) {
       assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
     }
+    assert.ok(summaryInspectorSource.includes('manager-fact-grid manager-environment-runtime-grid'), 'runtime preview uses the shared inspector fact grid');
+    assert.ok(!summaryInspectorSource.includes('manager-fact-grid-inline'), 'runtime preview should not use the compact inline fact grid');
+    assert.ok(summaryInspectorSource.includes('manager-fact-line'), 'runtime preview facts use the same text line styling as environment library details facts');
+    assert.ok(summaryInspectorSource.includes('manager-fact-label'), 'runtime preview facts use the shared fact label styling');
   });
 
   it('exposes blind-mode per-task weight UI but no per-environment strategy or reveal controls', () => {
