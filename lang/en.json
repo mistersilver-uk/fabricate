@@ -1376,10 +1376,6 @@
             "IssueTaskNoDescription": "Available task has no player-facing description.",
             "IssueTaskNoDescriptionTask": "The task \"{name}\" has no player-facing description.",
             "IssueLocallyExcluded": "Some tasks or hazards are excluded locally.",
-            "BadgeErrorOne": "1 error",
-            "BadgeErrorMany": "{count} errors",
-            "BadgeWarningOne": "1 warning",
-            "BadgeWarningMany": "{count} warnings",
             "ViewTask": "View task",
             "ViewHazard": "View hazard",
             "Severity": {

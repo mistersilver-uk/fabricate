@@ -19,7 +19,6 @@
   import EnvironmentValidationTab from './environment/EnvironmentValidationTab.svelte';
   import EnvironmentRightInspector from './environment/EnvironmentRightInspector.svelte';
   import { evaluateEnvironmentReadiness } from './environment/environmentReadiness.js';
-  import { localize } from '../../util/foundryBridge.js';
 
   const INCLUDED_COMPOSITION_STATES = new Set([
     'includedByMatch',
@@ -62,26 +61,10 @@
     activeTab = kind === 'hazard' ? 'hazards' : 'tasks';
   }
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   function countComposedRecords(records = []) {
     return Array.isArray(records)
       ? records.filter(entry => INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)).length
       : 0;
-  }
-
-  function validationCountLabel(kind, count) {
-    if (kind === 'warning') {
-      return count === 1
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.BadgeWarningOne', '1 warning')
-        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.BadgeWarningMany', '{count} warnings').replace('{count}', count);
-    }
-    return count === 1
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.BadgeErrorOne', '1 error')
-      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.BadgeErrorMany', '{count} errors').replace('{count}', count);
   }
 
   // On the Tasks/Hazards tabs, auto-select the first active (available) record of
@@ -106,8 +89,8 @@
   const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
   const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
   const validationBadges = $derived([
-    ...(errorCount > 0 ? [{ label: validationCountLabel('error', errorCount), tone: 'danger' }] : []),
-    ...(warningCount > 0 ? [{ label: validationCountLabel('warning', warningCount), tone: 'warning' }] : [])
+    ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
+    ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
   ]);
   const badges = $derived({
     tasks: taskCompositionCount || 0,

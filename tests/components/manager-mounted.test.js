@@ -5007,7 +5007,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.deepEqual(taskBadges.map(node => node.textContent.trim()), ['1'], 'runtime-unavailable included task should count, excluded task should not');
     assert.deepEqual(hazardBadges.map(node => node.textContent.trim()), ['2'], 'force-included and stale included hazards should count, library-disabled hazard should not');
-    assert.deepEqual(validationBadges.map(node => node.textContent.trim()), ['3 errors', '2 warnings']);
+    assert.deepEqual(validationBadges.map(node => node.textContent.trim()), ['3', '2'], 'validation badges should show counts only');
+    assert.equal(target.querySelector('[data-environment-tab-button="validation"]').textContent.includes('errors'), false, 'validation badge should not spell out error status');
+    assert.equal(target.querySelector('[data-environment-tab-button="validation"]').textContent.includes('warnings'), false, 'validation badge should not spell out warning status');
     assert.equal(validationBadges[0].classList.contains('is-danger'), true, 'error validation badge should use danger tone');
     assert.equal(validationBadges[1].classList.contains('is-warning'), true, 'warning validation badge should use warning tone');
   });

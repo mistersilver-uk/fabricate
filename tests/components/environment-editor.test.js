@@ -108,10 +108,6 @@ describe('environment editor localization', () => {
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
-      ['Validation.BadgeErrorOne', '1 error'],
-      ['Validation.BadgeErrorMany', '{count} errors'],
-      ['Validation.BadgeWarningOne', '1 warning'],
-      ['Validation.BadgeWarningMany', '{count} warnings'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
       ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.'],
       ['Validation.CheckRegion', 'Has a region or is set to "any region"']
@@ -447,6 +443,10 @@ describe('environment composition editor structure', () => {
     assert.ok(shellSource.includes("issue.severity === 'warning'"), 'validation warning badge should count warning issues');
     assert.ok(shellSource.includes("tone: 'danger'"), 'validation errors should use danger badge tone');
     assert.ok(shellSource.includes("tone: 'warning'"), 'validation warnings should use warning badge tone');
+    assert.ok(shellSource.includes('label: String(errorCount)'), 'validation error badge should render only the numeric count');
+    assert.ok(shellSource.includes('label: String(warningCount)'), 'validation warning badge should render only the numeric count');
+    assert.ok(!shellSource.includes('BadgeError'), 'validation error badge should not use severity text');
+    assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
     assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
     assert.ok(tabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
     assert.ok(tabsSource.includes("if (tone === 'warning') return 'is-warning'"), 'tabs should render warning-toned badge chips');
