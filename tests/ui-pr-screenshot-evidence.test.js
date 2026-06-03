@@ -107,8 +107,8 @@ describe('UI PR screenshot evidence', () => {
     assert.match(failure, /tmp\/pr-screenshots\/321/);
     assert.match(failure, /npm run test:foundry/);
     assert.match(failure, /npm run screenshots:ui:publish -- --pr 321/);
-    assert.match(failure, /gh image/);
-    assert.match(failure, /!\[pr-321 \.\.\.\]\(https:\/\/github\.com\/user-attachments\/assets\/\.\.\.\)/);
+    assert.match(failure, /gh attach/);
+    assert.match(failure, /!\[pr-321 \.\.\.\]/);
     assert.match(failure, /screenshots-exempt/);
   });
 
@@ -260,12 +260,34 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('parses a user-attachments URL from gh image output', () => {
+  it('parses both user-attachments and release-asset URLs from uploader output', () => {
     assert.equal(
       parseAttachmentUrl('Uploaded: https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000\n'),
       'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000',
     );
+    assert.equal(
+      parseAttachmentUrl('Creating release...\nhttps://github.com/owner/repo/releases/download/fabricate-pr-251/manager-tools.png\n'),
+      'https://github.com/owner/repo/releases/download/fabricate-pr-251/manager-tools.png',
+    );
     assert.equal(parseAttachmentUrl('no url here'), '');
+  });
+
+  it('accepts a PR-scoped release-asset URL as evidence', () => {
+    assert.equal(
+      hasScreenshotEvidence(
+        '![pr-251 tools](https://github.com/owner/repo/releases/download/fabricate-pr-251/manager-tools.png)',
+        { prNumber: 251 },
+      ),
+      true,
+    );
+    // A release asset scoped to a different PR must not satisfy PR 251.
+    assert.equal(
+      hasScreenshotEvidence(
+        '![tools](https://github.com/owner/repo/releases/download/fabricate-pr-999/manager-tools.png)',
+        { prNumber: 251 },
+      ),
+      false,
+    );
   });
 
   it('builds pr-scoped attachment markdown that satisfies the scoped check', () => {
@@ -303,10 +325,11 @@ describe('UI PR screenshot evidence', () => {
       const runGh = (args) => {
         calls.push(args);
         if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
-        if (args[0] === 'image' && args[1] === '--help') return { status: 0, stdout: 'help', stderr: '' };
-        if (args[0] === 'image' && args[1] === 'upload') {
+        if (args[0] === 'attach' && args[1] === '--version') return { status: 0, stdout: 'gh-attach 1.0.0', stderr: '' };
+        if (args[0] === 'attach' && args.includes('--image')) {
           uploadCount += 1;
-          return { status: 0, stdout: `https://github.com/user-attachments/assets/0000000${uploadCount}-0000-0000-0000-000000000000\n`, stderr: '' };
+          const name = args[args.indexOf('--image') + 1].replace(/\\/g, '/').split('/').pop();
+          return { status: 0, stdout: `Creating release...\nhttps://github.com/o/r/releases/download/fabricate-pr-251/${name}\n`, stderr: '' };
         }
         if (args[0] === 'pr' && args[1] === 'view') return { status: 0, stdout: '## Description\n\nOriginal.', stderr: '' };
         if (args[0] === 'pr' && args[1] === 'edit') return { status: 0, stdout: '', stderr: '' };
@@ -331,7 +354,7 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('publish throws clearly when gh is unauthenticated or the image extension is missing', () => {
+  it('publish throws clearly when gh is unauthenticated or the attach extension is missing', () => {
     const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-publish-'));
     try {
       const dir = join(root, 'tmp/pr-screenshots/251');
@@ -351,10 +374,10 @@ describe('UI PR screenshot evidence', () => {
         root,
         runGh: (args) => {
           if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
-          if (args[0] === 'image' && args[1] === '--help') return { status: 1, stdout: '', stderr: 'unknown command' };
+          if (args[0] === 'attach' && args[1] === '--version') return { status: 1, stdout: '', stderr: 'unknown command' };
           return { status: 0, stdout: '', stderr: '' };
         },
-      }), /gh image extension is required/);
+      }), /gh attach extension is required/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -367,12 +390,12 @@ describe('UI PR screenshot evidence', () => {
       const runGh = (args) => {
         calls.push(args);
         if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
-        if (args[0] === 'image' && args[1] === '--help') return { status: 0, stdout: 'help', stderr: '' };
+        if (args[0] === 'attach' && args[1] === '--version') return { status: 0, stdout: 'gh-attach 1.0.0', stderr: '' };
         return { status: 1, stdout: '', stderr: 'should not be called' };
       };
       const result = publishScreenshotEvidence({ prNumber: 251, root, runGh });
       assert.equal(result.skipped, true);
-      assert.equal(calls.filter(args => args[0] === 'image' && args[1] === 'upload').length, 0);
+      assert.equal(calls.filter(args => args[0] === 'attach' && args.includes('--image')).length, 0);
       assert.equal(calls.filter(args => args[0] === 'pr').length, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });

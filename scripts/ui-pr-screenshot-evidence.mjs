@@ -140,12 +140,20 @@ export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
     const prScopedArtifact = new RegExp(`codex-ui-evidence-${escapeRegExp(normalizedPrNumber)}(?:\\b|[-_.][\\w.-]*)|actions/runs/[0-9]+/artifacts/[0-9]+[^\\n]*${prPart}`, 'i');
     if (prScopedArtifact.test(text)) return true;
 
+    // PR-scoped GitHub release asset (gh attach --release writes to a tag that
+    // contains pr-<number>, e.g. fabricate-pr-251).
+    const prScopedReleaseAsset = new RegExp(`https://github\\.com/[^\\s)>"']+/releases/download/[^/\\s)>"']*${prPart}[^/\\s)>"']*/[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
+    if (prScopedReleaseAsset.test(text)) return true;
+
     const prScopedAttachment = new RegExp(`!\\[[^\\]]*${prPart}[^\\]]*\\]\\(https://github\\.com/user-attachments/assets/[0-9a-f-]+\\)`, 'i');
     return prScopedAttachment.test(text);
   }
 
   const testResultArtifact = /test-results\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
   if (testResultArtifact.test(text)) return true;
+
+  const releaseAsset = /https:\/\/github\.com\/[^\s)>"']+\/releases\/download\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
+  if (releaseAsset.test(text)) return true;
 
   const uploadedArtifact = /codex-ui-evidence-[\w.-]+|actions\/runs\/[0-9]+\/artifacts\/[0-9]+|github\.com\/user-attachments\/assets\/[0-9a-f-]+/i;
   return uploadedArtifact.test(text);
@@ -164,7 +172,7 @@ export function explainScreenshotEvidenceFailure(files = [], body = '', options 
   const prNumber = options.prNumber || '<number>';
   const exemptLabel = options.exemptLabel || DEFAULT_EXEMPT_LABEL;
   const views = mapChangedFilesToViews(files).map(recipe => recipe.label).join(', ') || 'changed UI views';
-  return `This PR changes UI files but has no smoke-run screenshot evidence for: ${views}. Run npm run test:foundry to produce real Foundry screenshots, then npm run screenshots:ui -- --base origin/main --pr ${prNumber} to collect the relevant smoke artifacts under tmp/pr-screenshots/${prNumber}/, then npm run screenshots:ui:publish -- --pr ${prNumber} to upload them with gh image and embed the returned ![pr-${prNumber} ...](https://github.com/user-attachments/assets/...) image markdown in the PR body. If screenshot capture is genuinely impossible, a maintainer must add the '${exemptLabel}' label (it cannot be self-applied by an agent).`;
+  return `This PR changes UI files but has no smoke-run screenshot evidence for: ${views}. Run npm run test:foundry to produce real Foundry screenshots, then npm run screenshots:ui -- --base origin/main --pr ${prNumber} to collect the relevant smoke artifacts under tmp/pr-screenshots/${prNumber}/, then npm run screenshots:ui:publish -- --pr ${prNumber} to upload them with the gh attach extension and embed the returned ![pr-${prNumber} ...] image markdown in the PR body. If screenshot capture is genuinely impossible, a maintainer must add the '${exemptLabel}' label (it cannot be self-applied by an agent).`;
 }
 
 export function collectScreenshotEvidence({
@@ -243,8 +251,11 @@ export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
 }
 
 export function parseAttachmentUrl(text = '') {
-  const match = String(text).match(/https:\/\/github\.com\/user-attachments\/assets\/[0-9a-fA-F-]+/);
-  return match ? match[0] : '';
+  const value = String(text);
+  const attachment = value.match(/https:\/\/github\.com\/user-attachments\/assets\/[0-9a-fA-F-]+/);
+  if (attachment) return attachment[0];
+  const releaseAsset = value.match(/https:\/\/github\.com\/[^\s)>"']+\/releases\/download\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i);
+  return releaseAsset ? releaseAsset[0] : '';
 }
 
 function defaultGhRunner(args, { input } = {}) {
@@ -271,9 +282,9 @@ export function publishScreenshotEvidence({
   if (auth.status !== 0) {
     throw new Error(`gh is not authenticated. Run \`gh auth login\` first.\n${auth.stderr || ''}`.trim());
   }
-  const ext = runGh(['image', '--help']);
+  const ext = runGh(['attach', '--version']);
   if (ext.status !== 0) {
-    throw new Error('The gh image extension is required to upload screenshots. Install it with `gh extension install <owner>/gh-image`.');
+    throw new Error('The gh attach extension is required to upload screenshots. Install it with `gh extension install atani/gh-attach`.');
   }
 
   const files = existsSync(destinationRoot)
@@ -287,16 +298,24 @@ export function publishScreenshotEvidence({
     };
   }
 
+  // Upload to a per-PR GitHub release tag. This needs only gh auth (no browser),
+  // avoids cross-PR filename collisions, and yields PR-scoped asset URLs the
+  // `check` gate can verify. (Browser mode would produce user-attachments URLs
+  // but requires an interactive playwright-cli session.)
   const repoArgs = repo ? ['--repo', repo] : [];
+  const releaseTag = `fabricate-pr-${normalizedPrNumber}`;
   const uploaded = [];
   for (const file of files) {
-    const upload = runGh(['image', 'upload', file]);
+    const upload = runGh([
+      'attach', '--release', '--release-tag', releaseTag, '--url-only',
+      '--issue', String(normalizedPrNumber), ...repoArgs, '--image', file,
+    ]);
     if (upload.status !== 0) {
-      throw new Error(`gh image upload failed for ${relative(root, file).replaceAll(sep, '/')}: ${upload.stderr || 'unknown error'}`);
+      throw new Error(`gh attach upload failed for ${relative(root, file).replaceAll(sep, '/')}: ${upload.stderr || 'unknown error'}`);
     }
     const url = parseAttachmentUrl(upload.stdout);
     if (!url) {
-      throw new Error(`Could not parse a user-attachments URL from gh image output for ${relative(root, file).replaceAll(sep, '/')}.`);
+      throw new Error(`Could not parse a GitHub asset URL from gh attach output for ${relative(root, file).replaceAll(sep, '/')}.`);
     }
     const name = basename(file);
     const viewId = name.slice(0, name.length - extensionOf(file).length);

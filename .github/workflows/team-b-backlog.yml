@@ -373,28 +373,23 @@ jobs:
       - name: Publish UI screenshots
         if: steps.validate.outputs.ui_changed == 'true' && steps.raise_pr.outputs.pr_created == 'true'
         env:
-          # `gh image upload` requires a USER-scoped token; the default github.token
-          # cannot create user-attachments. Provide WORKFLOW_GH_TOKEN (a PAT with
-          # attachment scope) to enable automatic publishing. Without it, this step
-          # warns and the required `check-screenshots` gate correctly fails until a
-          # maintainer publishes screenshots or applies `screenshots-exempt`.
+          # `gh attach --release` uploads images as release assets and needs a
+          # token with `contents: write`. The default github.token may lack it;
+          # provide WORKFLOW_GH_TOKEN (a PAT with repo/contents write) to enable
+          # automatic publishing. Without it, this step warns and the required
+          # `check-screenshots` gate correctly fails until a maintainer publishes
+          # screenshots or applies `screenshots-exempt`.
           GH_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN != '' && secrets.WORKFLOW_GH_TOKEN || github.token }}
           PR_NUMBER: ${{ steps.raise_pr.outputs.pr_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
-          # Repo variable naming the gh image extension to install (e.g. owner/gh-image).
-          GH_IMAGE_EXTENSION: ${{ vars.GH_IMAGE_EXTENSION }}
         run: |
           set -u
           if [ -z "$PR_NUMBER" ]; then
             echo "::warning::No PR number captured; skipping automatic screenshot publish."
             exit 0
           fi
-          if [ -z "${GH_IMAGE_EXTENSION}" ]; then
-            echo "::warning::GH_IMAGE_EXTENSION repo variable is not set; cannot upload screenshots automatically. The check-screenshots gate will fail until a maintainer publishes them or applies 'screenshots-exempt'."
-            exit 0
-          fi
 
-          gh extension install "$GH_IMAGE_EXTENSION" || echo "::warning::Failed to install gh image extension ($GH_IMAGE_EXTENSION)."
+          gh extension install atani/gh-attach || echo "::warning::Failed to install gh attach extension (atani/gh-attach)."
 
           node scripts/ui-pr-screenshot-evidence.mjs collect \
             --base "origin/${DEFAULT_BRANCH}" \

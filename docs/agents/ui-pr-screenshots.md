@@ -14,8 +14,8 @@ The rule applies when a PR changes any file under:
 
 ## Prerequisites
 
-- A `gh` CLI authenticated with a **user-scoped** token (the upload step creates GitHub attachments, which the default Actions `GITHUB_TOKEN` cannot do).
-- The `gh image` extension (`gh extension install <owner>/gh-image`) — used to upload local PNGs and return `https://github.com/user-attachments/assets/...` URLs.
+- A `gh` CLI authenticated with a token that can create releases in the repo (`contents: write`).
+- The `gh attach` extension (`gh extension install atani/gh-attach`). `publish` uses its **release mode** (`gh attach --release`), which uploads images as assets on a per-PR release tag (`fabricate-pr-<number>`) and needs only `gh` auth — no browser. (`gh attach`'s default browser mode produces `user-attachments/assets/...` URLs but requires an interactive `playwright-cli` session, so it is not used for automation.)
 
 ## Local Workflow
 
@@ -47,15 +47,15 @@ The rule applies when a PR changes any file under:
    npm run screenshots:ui:publish -- --pr <number>
    ```
 
-   This uploads each collected PNG with `gh image`, then patches the PR body via `gh pr edit --body-file`, inserting (or replacing, on re-run) a managed block:
+   This uploads each collected PNG with `gh attach --release` (to the `fabricate-pr-<number>` release tag), then patches the PR body via `gh pr edit --body-file`, inserting (or replacing, on re-run) a managed block:
 
    ```md
    <!-- fabricate:screenshots:start -->
-   ![pr-123 Manager gathering environments](https://github.com/user-attachments/assets/<id>)
+   ![pr-123 Manager gathering environments](https://github.com/<owner>/<repo>/releases/download/fabricate-pr-123/manager-environments.png)
    <!-- fabricate:screenshots:end -->
    ```
 
-   The alt text includes `pr-<number>` so the scoped CI check can verify the screenshot belongs to the current PR. The block is idempotent — re-running `publish` replaces it in place rather than appending duplicates.
+   The release tag is PR-scoped (`fabricate-pr-<number>`), so the asset URL itself identifies the PR and the block alt text also includes `pr-<number>`. The block is idempotent — re-running `publish` replaces it in place rather than appending duplicates. Delete the `fabricate-pr-<number>` release when the PR is closed/merged.
 
 5. Clean the local PR-scoped screenshots:
 
@@ -73,7 +73,8 @@ Screenshot evidence must come from real smoke-harness artifacts in `test-results
 
 CI runs only the lightweight `check` (no smoke run on the runner). It reads the live PR body, changed files, and labels, then accepts:
 
-- PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>` (the normal, expected evidence)
+- PR-scoped GitHub release-asset URLs under `releases/download/fabricate-pr-<pr-number>/...` (the normal evidence produced by `publish`)
+- PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>` (browser-mode `user-attachments` uploads)
 - PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>` (automation fallback)
 - PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths (automation fallback)
 
