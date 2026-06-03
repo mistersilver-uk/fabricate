@@ -11,8 +11,9 @@
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
+  import GatheringView from './gathering/GatheringView.svelte';
 
-  let { activeTab = 'crafting', showAlchemy = false, onSelectTab = null } = $props();
+  let { activeTab = 'crafting', showAlchemy = false, onSelectTab = null, services = null } = $props();
 
   // The Alchemy tab is only shown when an enabled alchemy system has recipes.
   const ALL_TABS = [
@@ -46,11 +47,15 @@
   <section class="fabricate-app-content" role="tabpanel">
     {#each tabs as tab (tab.id)}
       {#if activeTab === tab.id}
-        <div class="fabricate-app-placeholder">
-          <i class="fas {tab.icon}" aria-hidden="true"></i>
-          <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
-          <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
-        </div>
+        {#if tab.id === 'gathering'}
+          <GatheringView {services} />
+        {:else}
+          <div class="fabricate-app-placeholder">
+            <i class="fas {tab.icon}" aria-hidden="true"></i>
+            <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
+            <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
+          </div>
+        {/if}
       {/if}
     {/each}
   </section>

@@ -55,7 +55,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _buildServices() {
     return {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
-      getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null
+      getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
+      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null
     };
   }
 
@@ -66,7 +67,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     return {
       activeTab: this._activeTab,
       showAlchemy: isAlchemyTabAvailable(this._services),
-      onSelectTab: (tab) => this._selectTab(tab)
+      onSelectTab: (tab) => this._selectTab(tab),
+      services: this._services
     };
   }
 
