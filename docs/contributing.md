@@ -235,7 +235,7 @@ Repository variables (role ARNs and bucket names are not secrets):
 - `AWS_SCREENSHOTS_ROLE_TO_ASSUME` — ARN of the dedicated screenshot role (below).
 - `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` — shared with the release workflow.
 
-**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the team-b workflow in this repo may assume it:
+**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the team-b backlog and PR-screenshots-cleanup workflows in this repo may assume it:
 
 ```json
 {
@@ -251,7 +251,10 @@ Repository variables (role ARNs and bucket names are not secrets):
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": "repo:mistersilver-uk/fabricate-v2:*",
-          "token.actions.githubusercontent.com:job_workflow_ref": "mistersilver-uk/fabricate-v2/.github/workflows/team-b-backlog.yml@*"
+          "token.actions.githubusercontent.com:job_workflow_ref": [
+            "mistersilver-uk/fabricate-v2/.github/workflows/team-b-backlog.yml@*",
+            "mistersilver-uk/fabricate-v2/.github/workflows/pr-screenshots-cleanup.yml@*"
+          ]
         }
       }
     }
@@ -296,7 +299,7 @@ To tighten further (if team-b is only ever dispatched from `main`), replace the 
 }
 ```
 
-**Lifecycle rule** — expire the `pr-screenshots/` prefix after N days. This is the primary cleanup: `screenshots:ui:clean` removes only local temp files (the S3 objects must stay live while the PR is open), and `screenshots:ui:clean -- --s3` deletes them explicitly on PR close, but the lifecycle rule is the backstop so nothing accumulates regardless.
+**Cleanup** — `screenshots:ui:clean` removes only local temp files (the S3 objects must stay live while the PR is open). The `pr-screenshots-cleanup.yml` workflow runs `screenshots:ui:clean -- --pr <n> --s3` automatically when a PR closes (merged or not) to delete that PR's S3 objects. A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days is the backstop so nothing accumulates even if the cleanup workflow is skipped or fails. (Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
 
 These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots). Until the role/variable/bucket policy exist, the team-b publish step warns and the required `check-screenshots` gate fails closed until a maintainer publishes manually or applies the `screenshots-exempt` label.
 
