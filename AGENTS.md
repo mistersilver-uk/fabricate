@@ -114,7 +114,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 ## Git Conventions
 
 - All implementation, documentation, and workflow-file changes must happen on a non-`main` branch.
-- Before editing, verify the current branch. If it is `main`, create or switch to a task branch first.
+- Before editing, verify the current branch (`git branch --show-current`). If it is `main`, create or switch to a task branch first. Re-check after any merge — merging a PR can move the local checkout to `main`, so a branch you were on earlier may no longer be current.
 - When the work is complete, commit to that branch, push it, and open a PR targeting `main`.
 - Respond to review feedback by updating the same branch and PR; do not open replacement PRs unless the user asks.
 - Review-only agents inspect the active branch and PR, and must not merge to `main`.
@@ -166,3 +166,4 @@ as agents:
 - Change `module.json` id or module name.
 - Add npm dependencies without a plan entry that explains why they are needed.
 - Patch dead UI / config / code branches as a workaround. When a control has nothing useful to configure or a code path has no remaining purpose, propose wholesale removal first.
+- Add static cloud credentials (e.g. AWS access keys) to CI. Automation/agent workflows authenticate to cloud via OIDC role assumption (`aws-actions/configure-aws-credentials` + `id-token: write`) using a dedicated least-privilege role scoped to the task — never the release/production role. `pull_request_target` jobs must check out only the base ref and never execute PR-head code. See `docs/contributing.md` for the screenshot-publishing role/policy example.

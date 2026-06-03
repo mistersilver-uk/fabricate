@@ -17,7 +17,7 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 
 ## Review workflow
 
-1. Review the diff with a findings-first mindset.
+1. Review the diff with a findings-first mindset, judging the change against its stated goal: does it actually achieve its purpose, and is any output or evidence it produces faithful to the real system? A clean, well-tested implementation of the wrong thing still fails review.
 2. Review the active branch and PR against `main`; do not commit, push, or merge from this skill.
 3. Check the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf` when an issue exists.
 4. Check the PR description uses H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
@@ -35,6 +35,8 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 
 ## Review checklist
 
+- The change achieves its stated goal, and any artifact it produces is faithful to the real system. A synthetic, mocked, or hand-authored stand-in presented as real output or evidence (e.g. a fabricated "screenshot" that does not depict the running app) is a finding, not a convenience — judge the artifact against reality, not just the diff against style.
+- Hand-maintained mirrors of other parts of the repo (selectors, labels, path/recipe maps, fixture lists) are guarded by a test that fails when they drift; flag an unguarded mirror as a finding.
 - Types are explicit and defensible.
 - Dependencies are explicit; the code does not dig through `context`, `manager`, or similar grab-bag collaborators.
 - Constructors and factories do not hide real work or environment-sensitive setup.
