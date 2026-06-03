@@ -5210,15 +5210,6 @@ export function createAdminStore(services) {
 
   // --- Recipe operations ---
 
-  async function createRecipe() {
-    const sysId = get(selectedSystemId);
-    if (!sysId) {
-      services.notify.warn('Create or select a crafting system first.');
-      return;
-    }
-    services.openRecipeEditor(null, null, sysId);
-  }
-
   async function deleteRecipe(recipeId) {
     const recipeManager = services.getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
@@ -5500,7 +5491,6 @@ export function createAdminStore(services) {
     saveAlchemyConfig,
     saveVisibilityConfig,
     saveTeaserConfig,
-    createRecipe,
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,

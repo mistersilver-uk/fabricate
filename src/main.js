@@ -36,10 +36,8 @@ import {
   matchGatheringTools
 } from './gatheringToolRuntime.js';
 import {
-  getCraftingAppClass,
-  getGatheringAppClass,
-  getCraftingSystemManagerAppClass,
-  getRecipeEditorAppClass
+  getFabricateAppClass,
+  getCraftingSystemManagerAppClass
 } from './ui/appFactory.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
@@ -51,10 +49,8 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
-import './ui/SvelteCraftingApp.svelte.js';
-import './ui/SvelteGatheringApp.svelte.js';
+import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
-import './ui/SvelteRecipeEditorApp.svelte.js';
 
 let gatheringEngine = null;
 
@@ -1017,10 +1013,8 @@ Hooks.once('init', async () => {
     Catalyst,
     RecipeManager,
     CraftingEngine,
-    getCraftingAppClass,
-    getGatheringAppClass,
+    getFabricateAppClass,
     getCraftingSystemManagerAppClass,
-    getRecipeEditorAppClass,
     CraftingSystemManager,
     CraftingRunManager,
     SalvageRunManager,
@@ -1126,14 +1120,14 @@ function addModuleButtonsToItemsDirectory() {
       btn.textContent?.includes('Craft Item')
     );
   if (!craftExists) {
-    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => getCraftingAppClass().show());
+    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => getFabricateAppClass().show('crafting'));
     actionsContainer.insertBefore(craftButton, actionsContainer.firstChild);
   }
 
   syncGatheringDirectoryButton({
     itemsDirectory: itemsDir,
     enabled: hasGatheringEnabledSystems(),
-    createButton: () => createHeaderButton('Gathering', 'fas fa-leaf', 'gathering', () => getGatheringAppClass().show()),
+    createButton: () => createHeaderButton('Gathering', 'fas fa-leaf', 'gathering', () => getFabricateAppClass().show('gathering')),
     documentRef: document
   });
 

@@ -12,8 +12,6 @@
     selectedSystemName = '',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
-    onCreateRecipe = () => {},
-    onEditRecipe = () => {},
     onDuplicateRecipe = () => {},
     onDeleteRecipe = () => {},
     onToggleEnabled = () => {}
@@ -190,10 +188,6 @@
           <i class="fas fa-scroll" aria-hidden="true"></i>
           <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}</h3>
           <p>{text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}</p>
-          <button type="button" class="manager-button is-primary" onclick={onCreateRecipe}>
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create Recipe')}</span>
-          </button>
         </div>
       </div>
     {:else if filteredRecipes.length === 0}
@@ -264,9 +258,6 @@
               </button>
             </span>
             <span role="cell" class="manager-action-group manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')} onclick={() => onEditRecipe(recipe.id)}>
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </button>
               <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.DuplicateNamed', 'Duplicate {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')} onclick={() => onDuplicateRecipe(recipe.id)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
               </button>

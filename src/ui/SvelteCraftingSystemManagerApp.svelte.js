@@ -3,7 +3,7 @@ import CraftingSystemManagerRoot from './svelte/apps/manager/CraftingSystemManag
 import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting } from '../config/settings.js';
 import { confirmDialog, renderDialog, choiceDialog } from './foundryCompat.js';
-import { getRecipeEditorAppClass, registerCraftingSystemManagerApp } from './appFactory.js';
+import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
@@ -189,9 +189,6 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       localize: (key, data) => localize(key, data),
       confirmDialog: (options) => confirmDialog(options),
       choiceDialog: (options) => choiceDialog(options),
-      openRecipeEditor: (recipe, actorId, systemId) => {
-        getRecipeEditorAppClass().show(recipe, this, systemId);
-      },
       renderImportDialog: async (systemId) => {
         if (!systemId) {
           ui.notifications.warn('Create or select a crafting system first.');
@@ -501,11 +498,6 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           } catch (err) {
             ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Items.SourceNotFound'));
           }
-        },
-        onEditRecipe: (recipeId) => {
-          const recipe = game.fabricate.getRecipeManager().getRecipe(recipeId);
-          if (!recipe) return;
-          getRecipeEditorAppClass().show(recipe, this, recipe.craftingSystemId);
         },
         onEditComponent: async (itemId) => {
           const systemId = get(this._adminStore.selectedSystemId) || '';
