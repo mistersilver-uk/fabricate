@@ -989,7 +989,7 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
       const search = page.locator('.fabricate-manager input[type="search"]').first();
       if (await search.count() > 0) {
         await search.fill('');
-          await page.waitForTimeout(250);
+        await page.waitForTimeout(250);
       }
       await page.locator(managerSystemRowSelector(systemId)).first().waitFor({ state: 'visible', timeout: 5_000 });
       editButton = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`).nth(0);

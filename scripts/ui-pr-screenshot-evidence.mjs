@@ -133,7 +133,9 @@ export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
   const text = String(body || '');
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   if (normalizedPrNumber) {
-    const prPart = `pr-${escapeRegExp(normalizedPrNumber)}`;
+    // `(?![0-9])` after the PR number prevents a longer PR's reference from
+    // satisfying a shorter PR's gate (e.g. pr-251 must not match pr-25).
+    const prPart = `pr-${escapeRegExp(normalizedPrNumber)}(?![0-9])`;
     const prScopedTestResultArtifact = new RegExp(`test-results/[^\\s)>"']*${prPart}[^\\s)>"']*\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
     if (prScopedTestResultArtifact.test(text)) return true;
 

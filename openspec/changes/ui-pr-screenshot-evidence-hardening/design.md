@@ -62,8 +62,8 @@ orphans.
 ### Credentials
 
 Local: AWS default provider chain (env or `aws` CLI profile). CI: **OIDC role assumption only**
-(`aws-actions/configure-aws-credentials` + `id-token: write` + `secrets.AWS_OIDC_ROLE_ARN`); never
-static AWS keys. Until the role exists, the team-b publish step warns and the required check fails
+(`aws-actions/configure-aws-credentials` + `id-token: write` + the repository variable
+`vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME`, a dedicated least-privilege role); never static AWS keys. Until the role exists, the team-b publish step warns and the required check fails
 closed until a maintainer publishes manually or applies `screenshots-exempt`.
 
 ## Anti-Rot Guards

@@ -1,5 +1,11 @@
 # UI PR Screenshot Evidence
 
+> **Superseded by `ui-pr-screenshot-evidence-hardening`.** This change's hosting
+> (GitHub attachments / `SCREENSHOTS_NEEDED:` bypass) was replaced by S3-hosted
+> embeds, a maintainer-only `screenshots-exempt` label, and `lang/` detection.
+> See the hardening change and `openspec/specs/agentic-workflow/spec.md` for the
+> current design; this folder is retained as history.
+
 ## Problem
 
 UI-touching pull requests already have a CI screenshot check, but the check accepts broad image-like links and the agent guidance does not consistently require generated screenshots for the changed views. This lets UI PRs pass with weak or unrelated visual evidence.

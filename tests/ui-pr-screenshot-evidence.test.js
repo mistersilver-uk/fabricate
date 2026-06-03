@@ -9,6 +9,7 @@ import {
   buildScreenshotMarkdown,
   cleanPrScreenshotEvidence,
   collectScreenshotEvidence,
+  deletePrScreenshotsFromS3,
   explainScreenshotEvidenceFailure,
   hasScreenshotEvidence,
   hasUiChanges,
@@ -257,6 +258,42 @@ describe('UI PR screenshot evidence', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('does not let a longer PR number satisfy a shorter PR gate (prefix collision)', () => {
+    // PR 25 must not be satisfied by evidence scoped to PR 251.
+    assert.equal(
+      hasScreenshotEvidence('See `test-results/pr-251/screenshot-manager.png`.', { prNumber: 25 }),
+      false,
+    );
+    assert.equal(
+      hasScreenshotEvidence('Artifact `codex-ui-evidence-251-abc`.', { prNumber: 25 }),
+      false,
+    );
+    // The exact PR still passes.
+    assert.equal(
+      hasScreenshotEvidence('See `test-results/pr-25/screenshot-manager.png`.', { prNumber: 25 }),
+      true,
+    );
+  });
+
+  it('deletes only the PR-scoped S3 prefix via an injected list-and-delete seam', async () => {
+    const config = { bucket: 'test-bucket', baseUrl: 'https://test-bucket.s3.eu-west-2.amazonaws.com', region: 'eu-west-2', prefix: 'pr-screenshots' };
+    const calls = [];
+    const listAndDelete = async ({ bucket, prefix }) => { calls.push({ bucket, prefix }); return { deleted: 2 }; };
+
+    const result = await deletePrScreenshotsFromS3({ prNumber: 251, config, listAndDelete });
+    assert.deepEqual(result, { deleted: 2 });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].bucket, 'test-bucket');
+    assert.equal(calls[0].prefix, 'pr-screenshots/251/'); // trailing slash → no cross-PR deletion
+
+    // No bucket configured → no-op (never calls the deleter).
+    const noop = await deletePrScreenshotsFromS3({ prNumber: 251, config: { bucket: '', prefix: 'pr-screenshots' }, listAndDelete });
+    assert.equal(noop.skipped, true);
+
+    // Invalid PR number throws before any deletion.
+    await assert.rejects(() => deletePrScreenshotsFromS3({ prNumber: '../../251', config, listAndDelete }), /Invalid PR number/);
   });
 
   it('accepts a PR-scoped S3 object URL as evidence', () => {
