@@ -209,6 +209,15 @@ Files:
 
 Requirements:
 - Repository secret: `OPENAI_API_KEY`
+- Repository secret: `WORKFLOW_GH_TOKEN` — a GitHub token used by `team-b-backlog.yml` (and other agent workflows) to push the implementation branch, create the PR, manage issue/PR labels and comments, delete the branch on cleanup, and patch the PR body when publishing UI screenshots. The default `GITHUB_TOKEN` is insufficient because org policy blocks Actions from creating PRs. A **fine-grained, repo-scoped** token needs these repository permissions:
+  - **Contents: Read and write** — push commits/branches and delete refs.
+  - **Pull requests: Read and write** — create PRs, apply PR labels, read and patch the PR body.
+  - **Issues: Read and write** — edit issue labels and post issue comments.
+  - **Metadata: Read** — mandatory baseline (auto-selected).
+  - **Workflows: Read and write** — *only* if agent implementations may modify files under `.github/workflows/`; without it, any push that touches a workflow file is rejected.
+
+  The labels it applies (`agent-created`, `in-progress`, `agent-failed`, `screenshots-exempt`) must already exist in the repo. This token grants no AWS access — S3 screenshot uploads authenticate separately via OIDC (see below).
+- AWS for S3 screenshot publishing: in CI, **OIDC only** — repository secret `AWS_OIDC_ROLE_ARN` (an IAM role for GitHub OIDC with `s3:PutObject`/`s3:ListBucket`/`s3:DeleteObject` on the `pr-screenshots/*` prefix) plus `permissions: id-token: write`. Never use static AWS keys in CI. Local runs use the AWS default provider chain.
 
 Behavior:
 - `team-a-research.yml`: manual research and audit workflow
