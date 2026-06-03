@@ -26,7 +26,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 7. Implement the minimum change that satisfies the plan.
 8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main` and generate focused representative evidence with `npm run screenshots:ui -- --base origin/main --pr <number>` once a PR number exists. Upload the generated `tmp/pr-screenshots/<number>/` files through GitHub's native attachment flow, embed the returned `![pr-<number> ...](https://github.com/user-attachments/assets/...)` image markdown in the PR body, then run `npm run screenshots:ui:clean -- --pr <number>`. Do not use artifact names or file lists as the normal visible screenshot handoff, and do not install helper upload extensions unless the user explicitly approves that fallback. Do not run the full Foundry smoke harness just to create PR screenshots. If capture is blocked, add `SCREENSHOTS_NEEDED: <specific reason and visual change summary>` to the PR body.
+9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry`, then collect relevant smoke evidence with `npm run screenshots:ui -- --base origin/main --pr <number>` once a PR number exists. Upload the collected `tmp/pr-screenshots/<number>/` files through GitHub's native attachment flow, embed the returned `![pr-<number> ...](https://github.com/user-attachments/assets/...)` image markdown in the PR body, then run `npm run screenshots:ui:clean -- --pr <number>`. Do not use artifact names or file lists as the normal visible screenshot handoff, and do not install helper upload extensions unless the user explicitly approves that fallback. If capture is blocked, add `SCREENSHOTS_NEEDED: <specific reason and visual change summary>` to the PR body.
 10. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
 11. Run validation gates after each logical change set:
    - `npm test`
@@ -59,7 +59,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
-- Mock UI screenshot fixtures must import copied non-SVG Foundry VTT core/dnd5e raster image paths from `tests/fixtures/ui-assets/manifest.js`; do not invent SVG preview art or hard-code external URLs.
+- Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
 
 ## Foundry V13 checks

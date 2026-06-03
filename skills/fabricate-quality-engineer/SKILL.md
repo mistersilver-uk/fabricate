@@ -37,7 +37,7 @@ This skill is the canonical definition of the Fabricate Quality Engineer persona
 - For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
 - Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
 - For UI-changing PRs, treat unrelated image markdown, artifact names, and file lists as missing normal evidence. Expected evidence is visible GitHub attachment image markdown in the PR description with `pr-<number>` in alt text, or a specific `SCREENSHOTS_NEEDED:` handoff. Uploaded screenshot artifacts and `test-results/` paths are automation fallback evidence. PR-scoped screenshots should be generated under `tmp/pr-screenshots/<number>/` and cleaned after upload, not committed as assets.
-- Mock screenshot fixture data should use copied non-SVG Foundry VTT core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; invented SVG preview art should be flagged.
+- Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be flagged.
 - Prefer pointer hit-testing over DOM presence for overlays, menus, disabled states, card bodies, and icon-only controls.
 - Treat port conflicts, Docker container-name conflicts, and Foundry launch reconnects as validation infrastructure unless a loaded app surface violates the spec.
 - If confidence is low, file a clarification or investigation issue instead of overstating the defect.

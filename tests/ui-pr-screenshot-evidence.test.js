@@ -1,21 +1,18 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import {
   cleanPrScreenshotEvidence,
   collectScreenshotEvidence,
   explainScreenshotEvidenceFailure,
-  focusedViewIdsFor,
-  buildAssetData,
   hasScreenshotEvidence,
   hasUiChanges,
   mapChangedFilesToViews,
-  renderFocusedScreenshotHtml,
+  VIEW_RECIPES,
   validateChangedFilesForCheck,
-  validateAssetManifest,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 
 describe('UI PR screenshot evidence', () => {
@@ -32,8 +29,16 @@ describe('UI PR screenshot evidence', () => {
     ]);
 
     assert.deepEqual(views.map(view => view.id), ['manager-environments']);
-    assert.ok(views[0].focusedScreenshots.includes('manager-environments'));
-    assert.ok(views[0].focusedScreenshots.includes('manager-environment-editor'));
+    assert.ok(views[0].smokeLabels.includes('manager-environments-browse-normal'));
+    assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
+  });
+
+  it('keeps every screenshot recipe backed by real smoke labels', () => {
+    for (const recipe of VIEW_RECIPES) {
+      assert.ok(Array.isArray(recipe.smokeLabels), `${recipe.id} should declare smokeLabels`);
+      assert.ok(recipe.smokeLabels.length > 0, `${recipe.id} should map to at least one smoke artifact`);
+      assert.equal('focusedScreenshots' in recipe, false, `${recipe.id} should not use synthetic focused screenshots`);
+    }
   });
 
   it('rejects committed PR screenshot asset markdown and unrelated image markdown', () => {
@@ -90,6 +95,7 @@ describe('UI PR screenshot evidence', () => {
 
     assert.match(failure, /Manager gathering tools/);
     assert.match(failure, /tmp\/pr-screenshots\/321/);
+    assert.match(failure, /npm run test:foundry/);
     assert.match(failure, /GitHub's native attachment flow/);
     assert.match(failure, /!\[pr-321 \.\.\.\]\(https:\/\/github\.com\/user-attachments\/assets\/\.\.\.\)/);
     assert.match(failure, /clean the tmp directory/);
@@ -148,40 +154,24 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('validates the screenshot asset manifest and all referenced files', async () => {
-    const assets = await validateAssetManifest('tests/fixtures/ui-assets/manifest.js', { root: resolve('.') });
+  it('does not expose the removed synthetic screenshot generator path', () => {
+    const source = readFileSync('scripts/ui-pr-screenshot-evidence.mjs', 'utf8');
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 
-    assert.ok(assets.length >= 20);
-    assert.ok(assets.some(([key]) => key === 'gathering.forest'));
-    assert.ok(assets.some(([key]) => key === 'fallbacks.placeholderEnvironment'));
-    assert.ok(assets.some(([, assetPath]) => assetPath === 'tests/fixtures/ui-assets/copied/hazards/hostile.webp'));
-    assert.ok(assets.every(([, assetPath]) => assetPath.startsWith('tests/fixtures/ui-assets/copied/')));
-    assert.ok(assets.every(([, assetPath]) => !assetPath.endsWith('.svg')));
-  });
-
-  it('renders HTML for every reachable focused screenshot view id', () => {
-    const asset = 'data:image/webp;base64,AA==';
-    const fakeAssets = {
-      components: { ore: asset, hardwood: asset, hide: asset, gemstone: asset, essence: asset, potion: asset, weapon: asset, armor: asset, tool: asset },
-      gathering: { forest: asset, mine: asset, ruins: asset, battlefield: asset, planar: asset, dragonLair: asset },
-      hazards: { weather: asset, terrain: asset, hostile: asset, surge: asset },
-      fallbacks: { missingItem: asset },
-    };
-
-    for (const viewId of focusedViewIdsFor({ requestedViews: 'all' })) {
-      const html = renderFocusedScreenshotHtml(viewId, fakeAssets);
-      assert.match(html, /focused-screenshot-frame/);
-      assert.equal(html.includes('undefined'), false);
+    for (const removed of [
+      'renderFocusedScreenshotHtml',
+      'generateFocusedScreenshotEvidence',
+      'focusedScreenshotCss',
+      'renderManagerShell',
+      'renderFabricateAppShell',
+      'page.setContent',
+      'tests/fixtures/ui-assets/manifest.js',
+    ]) {
+      assert.equal(source.includes(removed), false, `script should not contain ${removed}`);
     }
-  });
-
-  it('builds data URIs for every manifest asset used by focused screenshots', async () => {
-    const imported = await import('../tests/fixtures/ui-assets/manifest.js');
-    const assets = buildAssetData(imported.UI_SCREENSHOT_ASSETS, resolve('.'));
-
-    assert.match(assets.gathering.battlefield, /^data:image\/webp;base64,/);
-    assert.match(assets.gathering.planar, /^data:image\/webp;base64,/);
-    assert.match(assets.hazards.hostile, /^data:image\/webp;base64,/);
+    assert.equal(packageJson.scripts['screenshots:ui'], 'node scripts/ui-pr-screenshot-evidence.mjs collect');
+    assert.equal('screenshots:ui:assets' in packageJson.scripts, false);
+    assert.equal(packageJson.scripts['screenshots:ui'].includes('generate'), false);
   });
 
   it('cleans PR-scoped temporary screenshot evidence', () => {

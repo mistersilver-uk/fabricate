@@ -65,11 +65,11 @@ Work through these phases:
 6. Screenshots (UI changes only)
 - If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST generate relevant screenshots for the changed views before the PR is opened or updated.
 - Run `npm run screenshots:ui:plan -- --base origin/main` to list expected screenshot views.
-- Generate focused representative screenshots with `npm run screenshots:ui -- --base origin/main --pr <number>` so temporary evidence lands under `tmp/pr-screenshots/<number>/`.
+- Run `npm run test:foundry` to produce real Foundry smoke screenshots under `test-results/`.
+- Collect the relevant smoke screenshots with `npm run screenshots:ui -- --base origin/main --pr <number>` so temporary evidence lands under `tmp/pr-screenshots/<number>/`.
 - Upload the temporary screenshots through GitHub's native attachment flow, update the PR body with visible `![pr-<number> ...](https://github.com/user-attachments/assets/...)` image embeds, then immediately clean them with `npm run screenshots:ui:clean -- --pr <number>`.
 - Do not install or use helper upload extensions unless the user explicitly approves that fallback. Artifact references are automation fallback evidence, not the normal visible screenshot handoff.
-- Do not run the full Foundry smoke harness just to produce PR screenshots. Use `npm run test:foundry` only when the user asks for live Foundry evidence or the visual behavior cannot be represented by focused fixtures.
-- Mock screenshot fixture data must import copied non-SVG Foundry VTT core/dnd5e raster image paths from `tests/fixtures/ui-assets/manifest.js`; do not invent SVG preview art or hard-code external image URLs.
+- Smoke fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external image URLs.
 - If screenshots are produced, mention the embedded GitHub attachment image links and confirm `tmp/pr-screenshots/<number>/` was cleaned.
 - If you cannot capture screenshots, include exactly this line in your final output: `SCREENSHOTS_NEEDED: <short reason and visual change summary>`.
 

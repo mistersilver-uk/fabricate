@@ -52,8 +52,8 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 - Card, overlay, menu, disabled-state, and icon-button workflows have live pointer hit-test coverage when rendered hit targets could differ from DOM structure.
 - Foundry/Playwright infrastructure failures are separated from app regressions in the residual risk notes.
 - Foundry UI CSS avoids unscoped generic state classes such as `.disabled`, `.active`, and `.selected` where global styles could interfere.
-- Image UI tests or fixtures prove linked-image priority, or the remaining screenshot gap is explicitly called out.
-- Mock screenshot fixtures use copied non-SVG Foundry VTT core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; invented SVG preview art should be treated as a finding.
+- Image UI tests or smoke screenshots prove linked-image priority, or the remaining screenshot gap is explicitly called out.
+- Smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be treated as a finding.
 
 ## Foundry V13 checks
 
