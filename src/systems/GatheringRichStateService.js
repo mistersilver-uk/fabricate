@@ -691,6 +691,76 @@ export class GatheringRichStateService {
     return true;
   }
 
+  /**
+   * Count the distinct task ids an actor has revealed for one environment at a
+   * given reveal scope. Reuses the same {@link revealKey} prefix builder as the
+   * writer ({@link GatheringRichStateService#revealTask}) so the read stays in
+   * lockstep with how reveals are stored. The `party` scope has no dedicated
+   * key today and therefore collapses onto the `actor:` key, matching the
+   * writer. Returns `0` on missing/inaccessible state and never throws.
+   *
+   * @param {object} args
+   * @param {object} args.actor Foundry actor holding the reveal flag state.
+   * @param {string} args.environmentId Environment whose reveals are counted.
+   * @param {string} [args.scope='actor'] Reveal scope (`actor`/`user`/`party`/`global`).
+   * @returns {number} Count of distinct revealed task ids.
+   */
+  countRevealedTasks({ actor, environmentId, scope = 'actor' } = {}) {
+    const envId = stringOrFallback(environmentId, '');
+    if (!envId) return 0;
+    let reveals;
+    try {
+      reveals = readState(actor)?.reveals;
+    } catch (_err) {
+      return 0;
+    }
+    if (!reveals || typeof reveals !== 'object') return 0;
+    // Build the scope-specific prefix once via revealKey (with a sentinel task
+    // id) so the matching format always mirrors the writer's key format.
+    const sentinel = ' ';
+    const sampleKey = revealKey({
+      environmentId: envId,
+      taskId: sentinel,
+      scope,
+      actor,
+      userId: this.getUserId()
+    });
+    const prefix = sampleKey.slice(0, sampleKey.length - sentinel.length);
+    const taskIds = new Set();
+    for (const key of Object.keys(reveals)) {
+      if (!key.startsWith(prefix)) continue;
+      const taskId = key.slice(prefix.length);
+      if (taskId) taskIds.add(taskId);
+    }
+    return taskIds.size;
+  }
+
+  /**
+   * Resolve biome ids into display metadata so player chips render identically
+   * to the GM editor. The per-system biome vocabulary wins, then the global
+   * vocabulary, then {@link DEFAULT_BIOME_METADATA}. Reuses the shared
+   * vocabulary-option normalizer so labels, icons, color tokens, and custom
+   * colors match the manager surface.
+   *
+   * @param {Array<string>|string} biomeIds Biome ids to resolve.
+   * @param {string} systemId Crafting system id for per-system vocabulary.
+   * @returns {Array<{id: string, label: string, icon: string, colorToken: string, customColor: string}>}
+   */
+  resolveBiomeTags(biomeIds, systemId) {
+    const ids = normalizeTagList(biomeIds);
+    if (ids.length === 0) return [];
+    const config = this._config();
+    const optionsById = new Map();
+    const systemBiomes = config.systems?.[String(systemId)]?.vocabularies?.biomes;
+    for (const option of normalizeVocabularyOptions('biomes', systemBiomes?.values ?? systemBiomes)) {
+      optionsById.set(option.id, option);
+    }
+    for (const option of normalizeVocabularyOptions('biomes', config.vocabularies?.biomes)) {
+      if (!optionsById.has(option.id)) optionsById.set(option.id, option);
+    }
+    return ids.map(id => optionsById.get(id) ?? normalizeVocabularyOption('biomes', id));
+  }
+
   async evaluateStart({ actor, system, environment, task, viewer } = {}) {
     const blockedReasons = [];
     const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
