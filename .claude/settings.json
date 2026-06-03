@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(AWS_PROFILE=fabricate-screenshots AWS_REGION=eu-west-2 npm run screenshots:ui:publish *)",
+      "Bash(AWS_PROFILE=fabricate-screenshots AWS_REGION=eu-west-2 npm run screenshots:ui:clean *)",
+      "Bash(AWS_PROFILE=fabricate-screenshots npm run screenshots:ui:publish *)",
+      "Bash(AWS_PROFILE=fabricate-screenshots npm run screenshots:ui:clean *)"
+    ]
+  }
+}
