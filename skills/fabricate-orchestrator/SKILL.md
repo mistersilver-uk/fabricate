@@ -36,7 +36,7 @@ The orchestrator role drives a `plan → plan-review → implement → review �
    - verification plan
    - acceptance criteria
    - the spec or design document that owns any durable product behavior
-   - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, a UX review gate, expected focused generated screenshot evidence from `npm run screenshots:ui:plan -- --base main` and `npm run screenshots:ui -- --base main --pr <number>`, and whether fixture images must use copied non-SVG Foundry/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`
+   - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, a UX review gate, expected focused generated screenshot evidence from `npm run screenshots:ui:plan -- --base origin/main` and `npm run screenshots:ui -- --base origin/main --pr <number>`, and whether fixture images must use copied non-SVG Foundry/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`
    - the resolved agent roster from step 4, including which roles will review the plan and which will review the implementation and docs
 7. **Plan review loop.** The driver runs the plan-review agents resolved in step 4 in parallel against the change docs. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED`. The driver revises the change docs in response to `NEEDS_CHANGES` and re-runs the affected reviewers. Treat any `BLOCKED` verdict as a stop condition. Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once all plan reviewers approve.

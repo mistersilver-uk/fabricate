@@ -124,7 +124,7 @@ jobs:
           # Get changed files
           CHANGED_FILES=$(gh pr diff "$PR_NUMBER" \
             --repo "${{ github.repository }}" \
-            --name-only 2>/dev/null || echo "")
+            --name-only)
           printf '%s\n' "$CHANGED_FILES" > changed-files.txt
 
           node scripts/ui-pr-screenshot-evidence.mjs check \

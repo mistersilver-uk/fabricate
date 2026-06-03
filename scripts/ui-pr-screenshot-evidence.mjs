@@ -140,12 +140,31 @@ export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
   const screenshotNeeded = text.match(/^SCREENSHOTS_NEEDED:\s*(\S.*)$/im);
   if (screenshotNeeded) return true;
 
-  const prPart = prNumber ? `pr-${escapeRegExp(String(prNumber))}` : 'pr-[0-9]+';
+  const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
+  if (normalizedPrNumber) {
+    const prPart = `pr-${escapeRegExp(normalizedPrNumber)}`;
+    const prScopedTestResultArtifact = new RegExp(`test-results/[^\\s)>"']*${prPart}[^\\s)>"']*\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
+    if (prScopedTestResultArtifact.test(text)) return true;
+
+    const prScopedArtifact = new RegExp(`codex-ui-evidence-${escapeRegExp(normalizedPrNumber)}(?:\\b|[-_.][\\w.-]*)|actions/runs/[0-9]+/artifacts/[0-9]+[^\\n]*${prPart}`, 'i');
+    if (prScopedArtifact.test(text)) return true;
+
+    const prScopedAttachment = new RegExp(`!\\[[^\\]]*${prPart}[^\\]]*\\]\\(https://github\\.com/user-attachments/assets/[0-9a-f-]+\\)`, 'i');
+    return prScopedAttachment.test(text);
+  }
+
   const testResultArtifact = /test-results\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
   if (testResultArtifact.test(text)) return true;
 
   const uploadedArtifact = /codex-ui-evidence-[\w.-]+|actions\/runs\/[0-9]+\/artifacts\/[0-9]+|github\.com\/user-attachments\/assets\/[0-9a-f-]+/i;
   return uploadedArtifact.test(text);
+}
+
+export function validateChangedFilesForCheck(changedFiles = [], { required = false } = {}) {
+  if (required && changedFiles.length === 0) {
+    return 'Changed-files input is empty; cannot determine whether this PR changes UI files.';
+  }
+  return '';
 }
 
 export function explainScreenshotEvidenceFailure(files = [], body = '', options = {}) {
@@ -163,17 +182,17 @@ export function collectScreenshotEvidence({
   allowMissing = false,
   root = ROOT,
 } = {}) {
-  if (!prNumber) throw new Error('collect requires prNumber');
+  const normalizedPrNumber = requirePrNumber(prNumber, 'collect');
   const views = mapChangedFilesToViews(changedFiles);
   const sourceRoot = resolve(root, sourceDir);
-  const destinationRoot = resolve(root, outputDir || `tmp/pr-screenshots/${prNumber}`);
+  const destinationRoot = resolve(root, outputDir || `tmp/pr-screenshots/${normalizedPrNumber}`);
   const copied = [];
   const missing = [];
-  const allImages = existsSync(sourceRoot) ? listImages(sourceRoot) : [];
+  const allImages = existsSync(sourceRoot) ? listImages(sourceRoot).sort((a, b) => a.localeCompare(b)) : [];
 
   mkdirSync(destinationRoot, { recursive: true });
   for (const view of views) {
-    const candidates = allImages.filter(file => view.smokeLabels.some(label => basename(file).includes(label)));
+    const candidates = allImages.filter(file => view.smokeLabels.some(label => matchesSmokeLabel(file, label)));
     if (candidates.length === 0) {
       missing.push(view);
       continue;
@@ -199,8 +218,9 @@ export async function generateFocusedScreenshotEvidence({
   views: requestedViews,
   root = ROOT,
 } = {}) {
+  const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const viewIds = focusedViewIdsFor({ changedFiles, requestedViews });
-  const destinationRoot = resolve(root, outputDir || `tmp/pr-screenshots/${prNumber || 'local'}`);
+  const destinationRoot = resolve(root, outputDir || `tmp/pr-screenshots/${normalizedPrNumber || 'local'}`);
   mkdirSync(destinationRoot, { recursive: true });
 
   const [{ chromium }, manifest] = await Promise.all([
@@ -228,8 +248,8 @@ export async function generateFocusedScreenshotEvidence({
 }
 
 export function cleanPrScreenshotEvidence({ prNumber, root = ROOT } = {}) {
-  if (!prNumber) throw new Error('clean requires prNumber');
-  const destinationRoot = resolve(root, `tmp/pr-screenshots/${prNumber}`);
+  const normalizedPrNumber = requirePrNumber(prNumber, 'clean');
+  const destinationRoot = resolve(root, `tmp/pr-screenshots/${normalizedPrNumber}`);
   rmSync(destinationRoot, { recursive: true, force: true });
   return destinationRoot;
 }
@@ -282,7 +302,28 @@ function listImages(dir) {
   return files;
 }
 
-function focusedViewIdsFor({ changedFiles = [], requestedViews } = {}) {
+function matchesSmokeLabel(filePath, label) {
+  const name = basename(filePath).toLowerCase();
+  const escaped = escapeRegExp(label.toLowerCase());
+  return new RegExp(`(?:^|-)${escaped}\\.(?:png|jpg|jpeg|webp|gif)$`).test(name);
+}
+
+function normalizeOptionalPrNumber(prNumber) {
+  if (prNumber === undefined || prNumber === null || prNumber === '') return '';
+  const normalized = String(prNumber).trim();
+  if (!/^[0-9]+$/.test(normalized)) {
+    throw new Error(`Invalid PR number: ${prNumber}`);
+  }
+  return normalized;
+}
+
+function requirePrNumber(prNumber, command) {
+  const normalized = normalizeOptionalPrNumber(prNumber);
+  if (!normalized) throw new Error(`${command} requires prNumber`);
+  return normalized;
+}
+
+export function focusedViewIdsFor({ changedFiles = [], requestedViews } = {}) {
   const requested = String(requestedViews || '').trim();
   if (requested === 'all') {
     return [...new Set(VIEW_RECIPES.flatMap(recipe => recipe.focusedScreenshots || []))];
@@ -298,7 +339,7 @@ function focusedViewIdsFor({ changedFiles = [], requestedViews } = {}) {
   return [...DEFAULT_FOCUSED_VIEW_IDS];
 }
 
-function buildAssetData(assets, root) {
+export function buildAssetData(assets, root) {
   return {
     components: {
       ore: assetDataUri(assets.components.ore, root),
@@ -315,6 +356,8 @@ function buildAssetData(assets, root) {
       forest: assetDataUri(assets.gathering.forest, root),
       mine: assetDataUri(assets.gathering.mine, root),
       ruins: assetDataUri(assets.gathering.ruins, root),
+      battlefield: assetDataUri(assets.gathering.battlefield, root),
+      planar: assetDataUri(assets.gathering.planar, root),
       dragonLair: assetDataUri(assets.gathering.dragonLair, root),
     },
     hazards: {
@@ -332,11 +375,12 @@ function buildAssetData(assets, root) {
 function assetDataUri(assetPath, root) {
   const normalized = normalizePath(assetPath);
   const absolute = resolve(root, normalized);
-  const ext = extensionOf(normalized).slice(1).replace('jpg', 'jpeg');
+  const extension = extensionOf(normalized).slice(1);
+  const ext = extension === 'jpg' ? 'jpeg' : extension;
   return `data:image/${ext};base64,${readFileSync(absolute).toString('base64')}`;
 }
 
-function renderFocusedScreenshotHtml(viewId, assets) {
+export function renderFocusedScreenshotHtml(viewId, assets) {
   const renderers = {
     'manager-systems': renderManagerSystems,
     'manager-system-edit': renderManagerSystemEdit,
@@ -708,6 +752,8 @@ function renderManagerEnvironments(assets) {
     ['Moonlit Forest', assets.gathering.forest, 'Targeted', '4', 'Active'],
     ['Crystal Mine', assets.gathering.mine, 'Blind', '3', 'Active'],
     ['Sunken Ruins', assets.gathering.ruins, 'Targeted', '2', 'Draft'],
+    ['Battlefield Salvage', assets.gathering.battlefield, 'Blind', '2', 'Active'],
+    ['Planar Scar', assets.gathering.planar, 'Targeted', '2', 'Dangerous'],
     ['Dragon Aerie', assets.gathering.dragonLair, 'Targeted', '1', 'Dangerous'],
   ];
   return renderManagerShell({
@@ -878,6 +924,12 @@ async function main(argv = process.argv.slice(2)) {
 
   if (command === 'check') {
     const body = args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '';
+    const changedFilesFailure = validateChangedFilesForCheck(changedFiles, { required: Boolean(args.changedFiles) });
+    if (changedFilesFailure) {
+      console.error(`::error::${changedFilesFailure}`);
+      process.exitCode = 1;
+      return;
+    }
     const failure = explainScreenshotEvidenceFailure(changedFiles, body, { prNumber: args.pr });
     if (failure) {
       console.error(`::error::${failure}`);

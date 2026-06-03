@@ -16,13 +16,13 @@ The rule applies when a PR changes any file under:
 1. Plan the required screenshot views:
 
    ```sh
-   npm run screenshots:ui:plan -- --base main
+   npm run screenshots:ui:plan -- --base origin/main
    ```
 
 2. Generate focused screenshots for the mapped views:
 
    ```sh
-   npm run screenshots:ui -- --base main --pr <number>
+   npm run screenshots:ui -- --base origin/main --pr <number>
    ```
 
    This writes only the mapped focused views into `tmp/pr-screenshots/<number>/`. The focused generator uses deterministic representative fixtures and copied Foundry core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; it does not boot Foundry and does not run the smoke harness.
@@ -44,7 +44,7 @@ The rule applies when a PR changes any file under:
 5. Optional fallback: collect screenshots from an explicit smoke-harness run:
 
    ```sh
-   npm run screenshots:ui:collect -- --base main --pr <number>
+   npm run screenshots:ui:collect -- --base origin/main --pr <number>
    ```
 
    Use this only when live Foundry behavior is the evidence being requested. The full smoke harness is intentionally not part of the normal UI screenshot path because it is slower and produces many unrelated images.
@@ -76,8 +76,9 @@ Focused Playwright previews must use these copied manifest entries. Live Foundry
 
 CI accepts:
 
-- uploaded artifact references such as `codex-ui-evidence-*`
-- `test-results/...png` artifact paths
+- PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>`
+- PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>`
+- PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths
 - `SCREENSHOTS_NEEDED: <reason>` when capture is blocked
 
 CI does not accept unrelated image markdown as UI evidence.

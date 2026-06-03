@@ -20,8 +20,9 @@ UI changes are files under `src/ui/`, `styles/`, or files ending in `.svelte` / 
 
 Accepted evidence:
 
-- links or text naming uploaded `codex-ui-evidence-*` artifacts
-- `test-results/...png|jpg|jpeg|webp` artifact paths
+- links or text naming PR-scoped uploaded `codex-ui-evidence-<pr-number>` artifacts
+- GitHub attachment markdown whose alt text includes `pr-<pr-number>`
+- PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths
 - `SCREENSHOTS_NEEDED: <non-empty reason>` when screenshots are genuinely blocked
 
 Generic unrelated image markdown is not sufficient.

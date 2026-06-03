@@ -22,7 +22,7 @@ This skill is the canonical definition of the Fabricate UX Designer persona. Bot
 4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
 5. If no live dev session is available, check the PR body/comments/artifacts for recent focused evidence before trying to generate fresh screenshots.
 6. Use container-backed Foundry validation only when the task depends on real runtime behavior or the user explicitly asks for live Foundry evidence.
-7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base main`, generate focused evidence with `npm run screenshots:ui -- --base main --pr <number>` under `tmp/pr-screenshots/<number>/`, require uploaded/attached evidence links or `SCREENSHOTS_NEEDED: <specific reason>`, and require local cleanup with `npm run screenshots:ui:clean -- --pr <number>`.
+7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main`, generate focused evidence with `npm run screenshots:ui -- --base origin/main --pr <number>` under `tmp/pr-screenshots/<number>/`, require uploaded/attached evidence links or `SCREENSHOTS_NEEDED: <specific reason>`, and require local cleanup with `npm run screenshots:ui:clean -- --pr <number>`.
 8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
 9. Compare the implementation against the spec and against Foundry-native interaction patterns.
 10. Turn confirmed problems into specific design guidance or backlog issues.
