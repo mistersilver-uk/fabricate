@@ -27,11 +27,13 @@ The rule applies when a PR changes any file under:
 
    This writes only the mapped focused views into `tmp/pr-screenshots/<number>/`. The focused generator uses deterministic representative fixtures and copied Foundry core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; it does not boot Foundry and does not run the smoke harness.
 
-3. Attach or upload the generated screenshots to the PR and reference the uploaded evidence in the `Screenshots (if applicable)` section:
+3. Upload the generated screenshots through GitHub's native PR/issue attachment flow and embed the returned image markdown in the `Screenshots (if applicable)` section of the PR description:
 
    ```md
-   Screenshot artifacts: codex-ui-evidence-123
+   ![pr-123 manager environment editor](https://github.com/user-attachments/assets/<id>)
    ```
+
+   The image alt text must include `pr-<number>` so the scoped CI check can verify the screenshot belongs to the current PR. The normal PR handoff should show rendered images in the PR description, not only artifact names or file lists.
 
 4. Clean the local PR-scoped screenshots immediately after the PR has been updated:
 
@@ -40,6 +42,7 @@ The rule applies when a PR changes any file under:
    ```
 
    Do not commit files from `tmp/pr-screenshots/<number>/` or move them into `docs/`, `assets/`, or any other repository asset directory.
+   Do not install or use helper upload extensions unless the user explicitly approves that fallback; prefer the native GitHub attachment route.
 
 5. Optional fallback: collect screenshots from an explicit smoke-harness run:
 
@@ -76,9 +79,11 @@ Focused Playwright previews must use these copied manifest entries. Live Foundry
 
 CI accepts:
 
-- PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>`
 - PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>`
+- PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>` for automation-only fallback runs
 - PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths
 - `SCREENSHOTS_NEEDED: <reason>` when capture is blocked
+
+Artifact references and `test-results` paths are accepted for CI compatibility, but they are not the normal UI PR evidence format. Manual and agent-driven PR updates should embed visible GitHub attachment images in the PR description.
 
 CI does not accept unrelated image markdown as UI evidence.

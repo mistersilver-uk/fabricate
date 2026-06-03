@@ -8,3 +8,4 @@
 - [x] Update AGENTS.md, shared role skills, and Team B prompt guidance.
 - [x] Add automated tests for UI evidence detection, view mapping, collection, and asset manifest validation.
 - [x] Run validation gates.
+- [x] Clarify that normal UI PR evidence must be visible GitHub attachment images in the PR description, with artifact references only as automation fallback evidence.

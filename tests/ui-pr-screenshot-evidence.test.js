@@ -47,7 +47,7 @@ describe('UI PR screenshot evidence', () => {
     assert.equal(hasScreenshotEvidence('![Unrelated](https://example.com/mock.png)', { prNumber: 123 }), false);
   });
 
-  it('accepts uploaded artifacts, test-results artifact paths, and specific handoff markers', () => {
+  it('accepts GitHub attachment images, automation fallback artifacts, and specific handoff markers', () => {
     assert.equal(hasScreenshotEvidence('Screenshot artifacts were uploaded as `codex-ui-evidence-42-99`.'), true);
     assert.equal(hasScreenshotEvidence('![Environment](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)'), true);
     assert.equal(hasScreenshotEvidence('See `test-results/screenshot-01-manager-components-normal.png`.'), true);
@@ -90,6 +90,8 @@ describe('UI PR screenshot evidence', () => {
 
     assert.match(failure, /Manager gathering tools/);
     assert.match(failure, /tmp\/pr-screenshots\/321/);
+    assert.match(failure, /GitHub's native attachment flow/);
+    assert.match(failure, /!\[pr-321 \.\.\.\]\(https:\/\/github\.com\/user-attachments\/assets\/\.\.\.\)/);
     assert.match(failure, /clean the tmp directory/);
   });
 

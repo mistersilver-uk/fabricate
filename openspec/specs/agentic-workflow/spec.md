@@ -135,10 +135,11 @@ Pull requests that change UI files MUST include focused generated screenshot evi
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, or files ending in `.svelte` or `.css`
 - **THEN** the agent generates focused representative screenshots for the changed views
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
-- **AND** the PR body references uploaded or attached screenshot evidence
+- **AND** the PR body embeds uploaded GitHub attachment image markdown with `pr-<number>` in the image alt text
 - **AND** the agent cleans `tmp/pr-screenshots/<number>/` immediately after the evidence is added to the PR
 - **AND** generic unrelated image links are not sufficient evidence
 - **AND** the full Foundry smoke harness is not required merely to produce PR screenshot evidence
+- **AND** uploaded artifact names or `test-results/` paths are treated as automation fallback evidence, not the normal visible PR screenshot handoff
 
 #### Scenario: screenshot capture is blocked
 

@@ -171,7 +171,7 @@ export function explainScreenshotEvidenceFailure(files = [], body = '', options 
   if (!hasUiChanges(files)) return null;
   if (hasScreenshotEvidence(body, options)) return null;
   const views = mapChangedFilesToViews(files).map(recipe => recipe.label).join(', ') || 'changed UI views';
-  return `This PR changes UI files but has no generated screenshot evidence for: ${views}. Generate focused screenshots under tmp/pr-screenshots/${options.prNumber || '<number>'}/, attach or upload them to the PR, clean the tmp directory, and link the uploaded evidence in the PR body; or add SCREENSHOTS_NEEDED: <reason>.`;
+  return `This PR changes UI files but has no generated screenshot evidence for: ${views}. Generate focused screenshots under tmp/pr-screenshots/${options.prNumber || '<number>'}/, upload them through GitHub's native attachment flow, embed the returned ![pr-${options.prNumber || '<number>'} ...](https://github.com/user-attachments/assets/...) image markdown in the PR body, clean the tmp directory, or add SCREENSHOTS_NEEDED: <reason>.`;
 }
 
 export function collectScreenshotEvidence({

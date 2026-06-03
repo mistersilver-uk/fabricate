@@ -9,7 +9,7 @@ Local agents use the same script:
 - `plan` lists the screenshot view recipes implied by changed UI files.
 - `generate` creates focused representative screenshots for the mapped views directly under `tmp/pr-screenshots/<number>/`.
 - `collect` remains an explicit fallback that copies matching generated screenshots from `test-results/` into `tmp/pr-screenshots/<number>/` when the user requested live Foundry or smoke-harness evidence.
-- `clean` removes `tmp/pr-screenshots/<number>/` after the screenshots have been attached or uploaded to the PR.
+- `clean` removes `tmp/pr-screenshots/<number>/` after the screenshots have been uploaded through GitHub's native attachment flow and embedded in the PR description.
 - `check` verifies that a PR body contains generated evidence or an explicit `SCREENSHOTS_NEEDED:` handoff.
 
 This keeps CI cheap, makes the normal local path fast and focused, and avoids coupling PR screenshots to the full Foundry smoke harness.
@@ -18,12 +18,17 @@ This keeps CI cheap, makes the normal local path fast and focused, and avoids co
 
 UI changes are files under `src/ui/`, `styles/`, or files ending in `.svelte` / `.css`.
 
-Accepted evidence:
+Normal evidence:
+
+- GitHub attachment markdown whose alt text includes `pr-<pr-number>`
+- `SCREENSHOTS_NEEDED: <non-empty reason>` when screenshots are genuinely blocked
+
+Automation fallback evidence:
 
 - links or text naming PR-scoped uploaded `codex-ui-evidence-<pr-number>` artifacts
-- GitHub attachment markdown whose alt text includes `pr-<pr-number>`
 - PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths
-- `SCREENSHOTS_NEEDED: <non-empty reason>` when screenshots are genuinely blocked
+
+Artifact references are accepted for CI compatibility with automation-only runs, but they are not the normal UI PR handoff. Manual and agent-driven PR updates should embed visible `github.com/user-attachments/assets/...` images in the PR description.
 
 Generic unrelated image markdown is not sufficient.
 

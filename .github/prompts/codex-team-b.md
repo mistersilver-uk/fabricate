@@ -66,10 +66,11 @@ Work through these phases:
 - If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST generate relevant screenshots for the changed views before the PR is opened or updated.
 - Run `npm run screenshots:ui:plan -- --base origin/main` to list expected screenshot views.
 - Generate focused representative screenshots with `npm run screenshots:ui -- --base origin/main --pr <number>` so temporary evidence lands under `tmp/pr-screenshots/<number>/`.
-- Attach or upload the temporary screenshots to the PR, update the PR body with uploaded evidence links or artifact references, then immediately clean them with `npm run screenshots:ui:clean -- --pr <number>`.
+- Upload the temporary screenshots through GitHub's native attachment flow, update the PR body with visible `![pr-<number> ...](https://github.com/user-attachments/assets/...)` image embeds, then immediately clean them with `npm run screenshots:ui:clean -- --pr <number>`.
+- Do not install or use helper upload extensions unless the user explicitly approves that fallback. Artifact references are automation fallback evidence, not the normal visible screenshot handoff.
 - Do not run the full Foundry smoke harness just to produce PR screenshots. Use `npm run test:foundry` only when the user asks for live Foundry evidence or the visual behavior cannot be represented by focused fixtures.
 - Mock screenshot fixture data must import copied non-SVG Foundry VTT core/dnd5e raster image paths from `tests/fixtures/ui-assets/manifest.js`; do not invent SVG preview art or hard-code external image URLs.
-- If screenshots are produced, mention the uploaded evidence links/artifact references and confirm `tmp/pr-screenshots/<number>/` was cleaned.
+- If screenshots are produced, mention the embedded GitHub attachment image links and confirm `tmp/pr-screenshots/<number>/` was cleaned.
 - If you cannot capture screenshots, include exactly this line in your final output: `SCREENSHOTS_NEEDED: <short reason and visual change summary>`.
 
 Rules:
@@ -84,5 +85,5 @@ Output a concise summary with:
 - `SUBAGENTS:` agents spawned and their outcome.
 - `FILES:` changed files.
 - `VALIDATION:` command results.
-- `SCREENSHOTS:` artifact paths or `SCREENSHOTS_NEEDED: ...` for UI changes without evidence.
+- `SCREENSHOTS:` embedded GitHub attachment image links, or `SCREENSHOTS_NEEDED: ...` for UI changes without evidence.
 - `FOLLOW_UP:` deferred work, or `none`.
