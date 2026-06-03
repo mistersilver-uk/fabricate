@@ -379,8 +379,10 @@ jobs:
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Reuse the same OIDC role + region as the module-release workflow.
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          # Dedicated least-privilege role (pr-screenshots/* only) — NOT the
+          # module-release role. See docs/contributing.md "Screenshot publishing
+          # infrastructure". Region/bucket vars are shared (not privileges).
+          role-to-assume: ${{ vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Publish UI screenshots
