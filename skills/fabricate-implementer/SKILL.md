@@ -26,13 +26,14 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 7. Implement the minimum change that satisfies the plan.
 8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-9. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
-10. Run validation gates after each logical change set:
+9. For UI changes, run `npm run screenshots:ui:plan -- --base main`, generate relevant screenshots with focused Vite/Playwright or `npm run test:foundry`, and collect generated evidence with `npm run screenshots:ui -- --base main --pr <number>` once a PR number exists. If capture is blocked, add `SCREENSHOTS_NEEDED: <specific reason and visual change summary>` to the PR body.
+10. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
+11. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`
-11. If either gate fails, fix the problem and rerun both gates.
-12. Commit to the task branch, push it, and open or update the PR targeting `main`.
-13. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
+12. If either gate fails, fix the problem and rerun both gates.
+13. Commit to the task branch, push it, and open or update the PR targeting `main`.
+14. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
 
 ## Implementation rules
 
@@ -58,6 +59,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
+- Mock UI screenshot fixtures must import copied non-SVG Foundry VTT core/dnd5e raster image paths from `tests/fixtures/ui-assets/manifest.js`; do not invent SVG preview art or hard-code external URLs.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
 
 ## Foundry V13 checks

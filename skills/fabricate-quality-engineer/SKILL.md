@@ -36,6 +36,8 @@ This skill is the canonical definition of the Fabricate Quality Engineer persona
 - File enhancement or test-gap work when structural smells materially reduce readability, change safety, or testability even if no runtime bug is proven yet.
 - For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
 - Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
+- For UI-changing PRs, treat unrelated image markdown as missing evidence. Accepted evidence is committed generated screenshots under `docs/assets/pr-screenshots/pr-<number>/`, uploaded screenshot artifacts, `test-results/` artifact paths, or a specific `SCREENSHOTS_NEEDED:` handoff.
+- Mock screenshot fixture data should use copied non-SVG Foundry VTT core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; invented SVG preview art should be flagged.
 - Prefer pointer hit-testing over DOM presence for overlays, menus, disabled states, card bodies, and icon-only controls.
 - Treat port conflicts, Docker container-name conflicts, and Foundry launch reconnects as validation infrastructure unless a loaded app surface violates the spec.
 - If confidence is low, file a clarification or investigation issue instead of overstating the defect.

@@ -63,9 +63,12 @@ Work through these phases:
 - Validate the final commit message with `npx commitlint --from HEAD~1 --to HEAD --verbose`
 
 6. Screenshots (UI changes only)
-- If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST attach before/after screenshots to the PR description.
-- Prefer existing `test-results/` screenshots or `npm run test:foundry` when runtime evidence is required.
-- If screenshots are produced, leave them under `test-results/` and mention the paths in your final output.
+- If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST generate relevant screenshots for the changed views before the PR is opened or updated.
+- Run `npm run screenshots:ui:plan -- --base origin/main` to list expected screenshot views.
+- Prefer focused Vite/Playwright screenshots for narrow changes. Use `npm run test:foundry` when runtime evidence is required or when the smoke harness already captures the changed Manager route.
+- Keep raw generated screenshots under `test-results/`. When a PR number is known, collect matching generated screenshots with `npm run screenshots:ui -- --base origin/main --pr <number>` so committed evidence lands under `docs/assets/pr-screenshots/pr-<number>/`.
+- Mock screenshot fixture data must import copied non-SVG Foundry VTT core/dnd5e raster image paths from `tests/fixtures/ui-assets/manifest.js`; do not invent SVG preview art or hard-code external image URLs.
+- If screenshots are produced, mention the committed `docs/assets/pr-screenshots/pr-<number>/` paths or uploaded artifact paths in your final output.
 - If you cannot capture screenshots, include exactly this line in your final output: `SCREENSHOTS_NEEDED: <short reason and visual change summary>`.
 
 Rules:

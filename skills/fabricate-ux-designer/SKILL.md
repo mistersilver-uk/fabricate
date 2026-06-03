@@ -22,10 +22,11 @@ This skill is the canonical definition of the Fabricate UX Designer persona. Bot
 4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
 5. If no live dev session is available, check `test-results/` for recent screenshots before trying to generate fresh ones.
 6. Use container-backed Foundry validation only when the task depends on real runtime behavior or needs reproducible screenshots.
-7. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
-8. Compare the implementation against the spec and against Foundry-native interaction patterns.
-9. Turn confirmed problems into specific design guidance or backlog issues.
-10. Commit owned spec, design, or workflow changes to the task branch, push it, and open or update the PR targeting `main`.
+7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base main` and require generated screenshots embedded from `docs/assets/pr-screenshots/pr-<number>/`, linked artifacts, or `SCREENSHOTS_NEEDED: <specific reason>`.
+8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+9. Compare the implementation against the spec and against Foundry-native interaction patterns.
+10. Turn confirmed problems into specific design guidance or backlog issues.
+11. Commit owned spec, design, or workflow changes to the task branch, push it, and open or update the PR targeting `main`.
 
 ## Review checklist
 
@@ -41,6 +42,7 @@ Check:
 - screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
 - rendered geometry in resizable Foundry windows, including CSS that overflows, compresses, or clips despite looking plausible in source
 - whether image-card screenshots prove linked imagery or only fallback artwork
+- whether mock screenshot data uses copied non-SVG Foundry VTT core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js` instead of invented SVG art or external URLs
 - action overlays and icon controls for crowding, clipping, target size, and visual hierarchy
 
 ## Rules
@@ -50,6 +52,7 @@ Check:
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
+- Treat unrelated image markdown in a PR as missing UI evidence; screenshots must correspond to the changed view or have a clear `SCREENSHOTS_NEEDED:` handoff.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## PR description template

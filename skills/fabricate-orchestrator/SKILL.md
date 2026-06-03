@@ -36,7 +36,7 @@ The orchestrator role drives a `plan → plan-review → implement → review �
    - verification plan
    - acceptance criteria
    - the spec or design document that owns any durable product behavior
-   - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, and a UX review gate
+   - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, a UX review gate, expected generated screenshot evidence from `npm run screenshots:ui:plan -- --base main`, and whether fixture images must use copied non-SVG Foundry/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`
    - the resolved agent roster from step 4, including which roles will review the plan and which will review the implementation and docs
 7. **Plan review loop.** The driver runs the plan-review agents resolved in step 4 in parallel against the change docs. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED`. The driver revises the change docs in response to `NEEDS_CHANGES` and re-runs the affected reviewers. Treat any `BLOCKED` verdict as a stop condition. Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once all plan reviewers approve.
@@ -58,6 +58,8 @@ The orchestrator role drives a `plan → plan-review → implement → review �
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
 - For UI work, do not let “screenshot captured” stand as acceptance. Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
 - Keep screen-specific UI behavior in canonical specs or active design docs. Skills and agents should point to those documents instead of carrying detailed product contracts.
+- For UI-changing PRs, plan generated screenshot evidence before PR creation or update. The PR body must embed committed `docs/assets/pr-screenshots/pr-<number>/` images, link uploaded screenshot artifacts, or include `SCREENSHOTS_NEEDED: <specific reason and visual change summary>` when capture is blocked.
+- For mock screenshot data, require copied non-SVG Foundry VTT core/dnd5e raster images from `tests/fixtures/ui-assets/manifest.js`; do not invent SVG preview art.
 - For Manager V2 feature routes, plan placeholder promotion explicitly: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
 - For an unclickable Manager V2 feature nav item, check placeholder/deferred-view rendering and feature gates before planning event-handler or pointer-overlay work.
 - For card grids, overlays, disabled states, menus, and icon-button workflows, plan real browser pointer hit-tests when feasible.

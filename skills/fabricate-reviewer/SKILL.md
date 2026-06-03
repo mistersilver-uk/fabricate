@@ -25,7 +25,7 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.
-9. For UI changes, verify screenshots are evaluated against acceptance criteria, not just generated.
+9. For UI changes, verify generated screenshots are present for the changed views, embedded or linked from the PR `Screenshots (if applicable)` section, and evaluated against acceptance criteria rather than merely attached.
 10. Check durable product behavior is documented in canonical specs or active design docs, not only in tests, agent prompts, or conversation history.
 11. If validation is missing, stale, or suspicious, flag it as a finding for the driver or implementer to run `npm test` / `npm run build`; do not run validation or other commands from this read-only role.
 12. Return one gate status on the first line:
@@ -47,11 +47,13 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 - Validation results from the implementer or CI pass without warnings that matter.
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
+- UI PR screenshot evidence comes from `docs/assets/pr-screenshots/pr-<number>/`, uploaded artifacts, `test-results/` artifact paths, or a specific `SCREENSHOTS_NEEDED:` reason; unrelated image markdown is not enough.
 - Compact rails, headers, cards, buttons, and fact components are tested with long names or localized strings where overflow could move controls or break layout.
 - Card, overlay, menu, disabled-state, and icon-button workflows have live pointer hit-test coverage when rendered hit targets could differ from DOM structure.
 - Foundry/Playwright infrastructure failures are separated from app regressions in the residual risk notes.
 - Foundry UI CSS avoids unscoped generic state classes such as `.disabled`, `.active`, and `.selected` where global styles could interfere.
 - Image UI tests or fixtures prove linked-image priority, or the remaining screenshot gap is explicitly called out.
+- Mock screenshot fixtures use copied non-SVG Foundry VTT core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; invented SVG preview art should be treated as a finding.
 
 ## Foundry V13 checks
 

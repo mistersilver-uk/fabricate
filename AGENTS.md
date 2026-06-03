@@ -66,6 +66,8 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 - `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
 - Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
+- UI-changing PRs must include generated screenshot evidence for the relevant changed views before opening or updating the PR. Use `npm run screenshots:ui:plan -- --base main` to identify expected views, generate screenshots with Vite/Playwright or `npm run test:foundry`, then use `npm run screenshots:ui -- --base main --pr <number>` to collect matching `test-results/` screenshots into `docs/assets/pr-screenshots/pr-<number>/`. If capture is blocked, put `SCREENSHOTS_NEEDED: <specific reason and visual change summary>` in the PR body.
+- Mock UI screenshot fixtures must use non-SVG raster icons copied from Foundry VTT core and dnd5e via `tests/fixtures/ui-assets/manifest.js`; do not invent or check in custom SVG preview art. Live Foundry smoke data may keep direct Foundry core/dnd5e raster paths when it already runs inside Foundry.
 - The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text. When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done. See `docs/agents/smoke-harness.md`.
 
 ## Code Conventions
@@ -107,6 +109,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - [`docs/agents/manager-confirm-discard.md`](docs/agents/manager-confirm-discard.md) — the three-layer "discard unsaved draft?" guard (Svelte route-exit → store helper → `services.confirmDialog`) used by every editor in the Crafting System Manager.
 - [`docs/agents/gathering-environment-data-model.md`](docs/agents/gathering-environment-data-model.md) — environment objects carry both legacy embedded `tasks[]` and modern library refs (`enabledTaskIds` etc); names the canonical sources for composition counts and required-tool aggregation.
 - [`docs/agents/smoke-harness.md`](docs/agents/smoke-harness.md) — how `npm run test:foundry` is organized, where its outputs land, and which Phase D0 selectors routinely drift when manager markup changes.
+- [`docs/agents/ui-pr-screenshots.md`](docs/agents/ui-pr-screenshots.md) — how UI PR screenshot evidence is planned, generated, collected, embedded in PR descriptions, and validated in CI.
 
 ## Git Conventions
 
@@ -117,6 +120,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - Review-only agents inspect the active branch and PR, and must not merge to `main`.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
+- For UI-touching PRs, `Screenshots (if applicable)` must embed generated evidence from `docs/assets/pr-screenshots/pr-<number>/`, link uploaded screenshot artifacts, or include `SCREENSHOTS_NEEDED: <specific reason>`.
 - Never commit directly to `main`.
 - Use Conventional Commits.
 - For `feat`, `fix`, and `perf`, use the format `<type>(#<issue>): <short description>`.
