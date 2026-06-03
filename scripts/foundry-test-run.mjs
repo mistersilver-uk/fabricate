@@ -912,6 +912,13 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
       .filter(entry => !ids.has(String(entry?.id || '')));
     config.systems[sysId] = {
       ...systemConfig,
+      // System-level GatheringRules: a non-'never' reveal policy is required for
+      // the blind environment card to surface the "(x/y)" discovered teaser.
+      // There is no environment-level reveal override — reveal is system-scoped.
+      rules: {
+        ...(systemConfig.rules || {}),
+        revealPolicy: 'onAttempt'
+      },
       vocabularies: {
         ...(systemConfig.vocabularies || {}),
         regions: { values: ['northreach'] }
@@ -969,6 +976,50 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
       ]
     };
     await game.settings.set('fabricate', 'gatheringConfig', config);
+
+    // Seed two environment-store fixtures so the player Gathering tab frame
+    // exercises both the locked teaser path and the blind chip + "(x/y)"
+    // discovered suffix:
+    //  - smoke-blind-grove   : enabled + selectionMode 'blind'. With the
+    //    system rules.revealPolicy === 'onAttempt' above, its card shows the
+    //    mask chip and the "(discovered/total)" suffix.
+    //  - smoke-locked-hollow : enabled === false. For non-GM players this would
+    //    render as a greyed locked teaser; the smoke run is GM, so it renders as
+    //    a full listing (locked teasers are player-only and unit-test-covered).
+    // Idempotent: the function runs twice in Phase D0, so skip ids already
+    // present in the store. Imagery uses Foundry-core raster (.webp) icons only.
+    const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
+    if (environmentStore) {
+      const existingIds = new Set((environmentStore.list?.() || []).map(env => String(env?.id || '')));
+      if (!existingIds.has('smoke-blind-grove')) {
+        await environmentStore.create({
+          id: 'smoke-blind-grove',
+          craftingSystemId: sysId,
+          name: 'Smoke Blind Grove',
+          description: 'Blind gathering site for the player Gathering tab screenshot (mask chip + discovered suffix).',
+          img: 'icons/magic/nature/tree-elm-gold-green.webp',
+          enabled: true,
+          selectionMode: 'blind',
+          region: 'northreach',
+          biomes: ['forest'],
+          enabledTaskIds: ['smoke-forage-library']
+        });
+      }
+      if (!existingIds.has('smoke-locked-hollow')) {
+        await environmentStore.create({
+          id: 'smoke-locked-hollow',
+          craftingSystemId: sysId,
+          name: 'Smoke Sealed Hollow',
+          description: 'Disabled environment for the player Gathering tab screenshot (locked teaser for non-GM viewers).',
+          img: 'icons/environment/wilderness/cave-entrance-dwarven.webp',
+          enabled: false,
+          selectionMode: 'targeted',
+          region: 'northreach',
+          biomes: ['forest', 'ruins'],
+          enabledTaskIds: ['smoke-forage-library']
+        });
+      }
+    }
   }, { sysId: craftingSetup.systemId, componentMap: craftingSetup.componentMap });
 }
 
@@ -2650,6 +2701,14 @@ async function main() {
         if (await appShell.locator('.fabricate-app-nav-item.active:has-text("Crafting")').count() !== 0) {
           throw new Error('Shared Fabricate app did not switch off the Crafting tab after "Gathering".');
         }
+
+        // The nav switch above only proves the Gathering tab is active; GatheringView
+        // then fires an async services.listGatheringForActor() fetch and renders a
+        // [data-gathering-state] container ("loading" -> "populated"/"empty"/"error").
+        // Wait for that container to settle off "loading" so the captured frame shows
+        // the resolved environment cards (or empty state) instead of the spinner.
+        await appShell.locator('[data-gathering-state]:not([data-gathering-state="loading"])')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
 
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'fabricate-app-shell');
