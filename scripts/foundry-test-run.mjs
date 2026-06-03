@@ -1252,7 +1252,7 @@ async function main() {
         for (const sys of staleSystems) {
           console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
           try { await environmentStore?.cleanupByCraftingSystem?.(sys.id); } catch { /* ok */ }
-          const recipes = rm.getRecipesForSystem?.(sys.id) ?? [];
+          const recipes = rm.getRecipes?.({ craftingSystemId: sys.id }) ?? [];
           for (const r of recipes) {
             try { await rm.deleteRecipe(r.id); } catch { /* ok */ }
           }
@@ -2169,7 +2169,7 @@ async function main() {
         // disabled view.
         const recipeApiCount = await page.evaluate((sysId) => {
           const rm = game.fabricate?.getRecipeManager?.();
-          return rm?.getRecipesForSystem?.(sysId)?.length ?? 0;
+          return rm?.getRecipes?.({ craftingSystemId: sysId })?.length ?? 0;
         }, craftingSetup.systemId);
         if (recipeApiCount < 2) {
           throw new Error(`Expected the smoke system to expose at least 2 recipes via the API; saw ${recipeApiCount}.`);
