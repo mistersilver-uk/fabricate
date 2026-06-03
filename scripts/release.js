@@ -261,6 +261,7 @@ async function main() {
   await mkdir(join(distDir, 'lang'), { recursive: true });
   await cp(join(ROOT, 'lang', 'en.json'), join(distDir, 'lang', 'en.json'));
 
+  await copyIfExists(join(ROOT, 'assets'), join(distDir, 'assets'));
   await copyIfExists(join(ROOT, 'LICENSE'), join(distDir, 'LICENSE'));
   await copyIfExists(join(ROOT, 'README.md'), join(distDir, 'README.md'));
 

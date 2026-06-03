@@ -29,8 +29,8 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,6 +40,9 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
+const SMOKE_ACTOR_ASSET_DIR = join(ROOT, 'assets', 'img', 'actors');
+const SMOKE_ACTOR_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const LEGACY_SMOKE_ACTOR_NAMES = ['Brom the Blacksmith'];
 
 // Smoke profile selector. Three profiles:
 //   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
@@ -74,6 +77,27 @@ const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
 const consoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
+
+/**
+ * Load every raster actor portrait under assets/img/actors as a smoke actor.
+ * Actor names are intentionally derived from filenames so the Foundry smoke
+ * world mirrors the checked-in portrait fixture set.
+ * @returns {Promise<Array<{ name: string, img: string }>>}
+ */
+async function loadSmokeActorFixtures() {
+  const actorAssetFiles = (await readdir(SMOKE_ACTOR_ASSET_DIR))
+    .filter(file => SMOKE_ACTOR_IMAGE_EXTENSIONS.has(extname(file).toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, 'en'));
+
+  if (actorAssetFiles.length === 0) {
+    throw new Error('No smoke actor portrait assets found under assets/img/actors.');
+  }
+
+  return actorAssetFiles.map(file => ({
+    name: basename(file, extname(file)),
+    img: `modules/fabricate/assets/img/actors/${file}`
+  }));
+}
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
@@ -1172,6 +1196,7 @@ async function main() {
   // wants current-run output; nothing here is hand-authored.
   await rm(RESULTS_DIR, { recursive: true, force: true });
   await mkdir(RESULTS_DIR, { recursive: true });
+  const smokeActorFixtures = await loadSmokeActorFixtures();
 
   process.stdout.write(`Smoke profile: ${SMOKE_PROFILE}${RAW_SMOKE_PROFILE !== SMOKE_PROFILE ? ` (from FOUNDRY_SMOKE_PROFILE=${RAW_SMOKE_PROFILE})` : ''}\n`);
 
@@ -1319,7 +1344,7 @@ async function main() {
     startPhase('phase-B');
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
-      const createdDocs = await page.evaluate(async () => {
+      const createdDocs = await page.evaluate(async ({ smokeActorFixtures, legacySmokeActorNames }) => {
         // Clean up any stale test data from previous runs.
         // 1. Clean stale crafting systems and their recipes first.
         //    Filter by literal "Arcane Forge" name so we never delete user
@@ -1345,12 +1370,11 @@ async function main() {
         }
 
         // 2. Clean stale actors
-        const staleActors = game.actors.contents.filter(a =>
-          [
-            'Alara the Alchemist',
-            'Brom the Blacksmith'
-          ].includes(a.name)
-        );
+        const smokeActorNames = new Set([
+          ...smokeActorFixtures.map(actor => actor.name),
+          ...legacySmokeActorNames
+        ]);
+        const staleActors = game.actors.contents.filter(a => smokeActorNames.has(a.name));
         if (staleActors.length > 0) {
           console.log(`Cleaning ${staleActors.length} stale test actors`);
           await Actor.deleteDocuments(staleActors.map(a => a.id));
@@ -1421,16 +1445,24 @@ async function main() {
           itemsByName[item.name] = { id: item.id, uuid: item.uuid };
         }
 
-        // Create actors
-        const actors = await Actor.createDocuments([
-          { name: 'Alara the Alchemist', type: actorType, img: 'icons/svg/mystery-man.svg' },
-          { name: 'Brom the Blacksmith', type: actorType, img: 'icons/svg/combat.svg' }
-        ]);
+        // Create every actor represented by assets/img/actors portraits.
+        const actors = await Actor.createDocuments(
+          smokeActorFixtures.map(actor => ({
+            name: actor.name,
+            type: actorType,
+            img: actor.img
+          }))
+        );
         console.log(`Created ${actors.length} actors:`, actors.map(a => a.name).join(', '));
         const actorIds = actors.map(a => a.id);
 
-        const alara = actors.find(a => a.name === 'Alara the Alchemist');
-        const brom = actors.find(a => a.name === 'Brom the Blacksmith');
+        const requiredActor = (name) => {
+          const actor = actors.find(a => a.name === name);
+          if (!actor) throw new Error(`Smoke actor fixture "${name}" was not created.`);
+          return actor;
+        };
+        const alara = requiredActor('Alara the Alchemist');
+        const bromm = requiredActor('Bromm the Blacksmith');
         const testUserData = [
           { name: 'Fabricate Gatherer', role: CONST.USER_ROLES.PLAYER, password: '' },
           { name: 'Fabricate Observer', role: CONST.USER_ROLES.PLAYER, password: '' }
@@ -1448,7 +1480,7 @@ async function main() {
         const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
         await alara.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
-        await brom.update({ ownership: { default: noneLevel } });
+        await bromm.update({ ownership: { default: noneLevel } });
         const userIds = users.map(user => user.id);
 
         // Build inventory copies from world items
@@ -1474,14 +1506,22 @@ async function main() {
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        // Brom gets: 3x Iron Ore, 1x Dragon Scale
-        await brom.createEmbeddedDocuments('Item', [
+        // Bromm gets: 3x Iron Ore, 1x Dragon Scale
+        await bromm.createEmbeddedDocuments('Item', [
           ...copies(byName('Iron Ore'), 3),
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        return { itemIds, actorIds, userIds, gathererUserId: gathererUser.id, alaraId: alara.id, bromId: brom.id, itemsByName };
-      });
+        return {
+          itemIds,
+          actorIds,
+          userIds,
+          gathererUserId: gathererUser.id,
+          alaraId: alara.id,
+          bromId: bromm.id,
+          itemsByName
+        };
+      }, { smokeActorFixtures, legacySmokeActorNames: LEGACY_SMOKE_ACTOR_NAMES });
 
       cleanup.itemIds = createdDocs.itemIds;
       cleanup.actorIds = createdDocs.actorIds;
@@ -1860,7 +1900,7 @@ async function main() {
         playerGatheringFixtures.push(await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Crystal Thicket',
-          description: 'Requires a vial catalyst so Brom demonstrates a blocked task.',
+          description: 'Requires a vial catalyst so Bromm demonstrates a blocked task.',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
