@@ -276,7 +276,8 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.Weather.clear'), 'weather value label');
     assert.ok(right.querySelector('.actor-bar-time i.fa-clock'), 'fixed time-of-day category icon renders');
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.dusk'), 'time-of-day value label');
-    assert.ok(right.textContent.includes('Greenvale'), 'region shown');
+    assert.ok(right.querySelector('.actor-bar-region i.fa-map-location-dot'), 'region uses the map icon (not a text label)');
+    assert.ok(right.textContent.includes('Greenvale'), 'region value shown');
   });
 
   it('falls back to the clock + Unknown label when timeOfDay is missing', async () => {

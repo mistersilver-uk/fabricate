@@ -200,11 +200,12 @@ overflowing a short button). Option rows also set `width: 100%` so they fill the
 shrinking to content.
 
 Left side: portrait + caret trigger. Right side (gathering tab only, gated on `activeTab ===
-'gathering'`): weather and time-of-day (each a **fixed category icon** + the current value label)
-plus the region label. The icons match the GM gathering-settings UI exactly — `fas fa-cloud-sun`
-for weather and `fas fa-clock` for time of day (the shared `WEATHER_FALLBACK_ICON` /
-`TIME_OF_DAY_FALLBACK_ICON`, equal to the manager's `defaultConditionIcon(kind)`), **not** per-value
-icons. The value label remains dynamic (e.g. "Clear", "Dusk", or the `Unknown` fallback). Scoped
+'gathering'`): weather, time-of-day, and region, each a **fixed icon** + value (no text category
+labels). The icons match the GM gathering-settings UI exactly — `fas fa-cloud-sun` for weather,
+`fas fa-clock` for time of day (the shared `WEATHER_FALLBACK_ICON` / `TIME_OF_DAY_FALLBACK_ICON`,
+equal to the manager's `defaultConditionIcon(kind)`), and `fas fa-map-location-dot` for region —
+**not** per-value icons. The value label remains dynamic (e.g. "Clear", "Dusk", the region name, or
+the relevant `Unknown` / `None` fallback). Scoped
 `<style>` uses only base `--fab-*`
 tokens and supports both themes (no `.fabricate-manager`-scoped `--fab-mv2-*` tokens — the player app
 is `.fabricate-app`-scoped).

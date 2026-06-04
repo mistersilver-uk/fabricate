@@ -28,10 +28,11 @@ Requirements:
    options; selecting an option updates the shared selection and persists it. The bar list MUST narrow
    the ownership-selectable set by the player-character concept.
 5. The bar's right side carries tab-specific context. For the `Gathering` tab only, it shows the
-   current weather (icon + label), the current time-of-day (icon + label), and the current region.
-   For other tabs the right-side context is empty. The weather and time-of-day icons MUST be the
-   fixed category icons used by the GM gathering-settings UI (`fas fa-cloud-sun` for weather,
-   `fas fa-clock` for time of day) rather than per-value icons; the label shows the current value.
+   current weather (icon + value), the current time-of-day (icon + value), and the current region
+   (icon + value). For other tabs the right-side context is empty. The condition icons MUST be the
+   fixed icons used by the GM gathering-settings UI — `fas fa-cloud-sun` for weather, `fas fa-clock`
+   for time of day, and `fas fa-map-location-dot` for region — rather than per-value or text labels;
+   the value text shows the current weather/time/region.
 6. "Current region" on the gathering tab is the `region` string of the gathering tab's currently
    selected environment; when no environment is selected, a neutral placeholder is shown and no
    region name is fabricated.

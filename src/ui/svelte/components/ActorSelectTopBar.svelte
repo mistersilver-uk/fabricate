@@ -183,7 +183,11 @@
         <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
       </span>
       <span class="actor-bar-condition actor-bar-region">
-        <span class="actor-bar-condition-key">{localize('FABRICATE.App.ActorBar.Region.Label')}</span>
+        <i
+          class="fas fa-map-location-dot"
+          aria-hidden="true"
+          title={localize('FABRICATE.App.ActorBar.Region.Label')}
+        ></i>
         <span class="actor-bar-condition-label" title={store?.region || ''}>{regionLabel}</span>
       </span>
     </div>
@@ -298,11 +302,6 @@
     color: var(--fab-text-muted);
   }
 
-  .actor-bar-condition-key {
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 11px;
-  }
 
   .actor-bar-condition-label {
     min-width: 0;
