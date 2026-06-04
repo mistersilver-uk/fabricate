@@ -38,6 +38,15 @@ After any run (success or failure):
 
 When debugging a smoke failure, read `summary.json` first: the failing step's `error` field plus the surrounding successful steps usually point straight at the broken selector.
 
+## Interpreting `passed: false`
+
+`summary.json.passed` is false if **either** a phase step fails **or** `consoleErrors[]` is non-empty. These are very different signals:
+
+- A failed **step** (an entry in `steps[]` with an `error`) is a real regression — a broken selector, a thrown assertion, a surface that didn't render.
+- A non-empty **`consoleErrors[]`** can be benign. The fixture world routinely emits browser `404 (Not Found)` loads for missing tiles, portraits, or sounds, and any such console error flips `passed` to false even when every step passed.
+
+So before treating a run as broken — or discarding its captured screenshots — confirm whether `steps[]` contains an actual failing step. A `passed: false` driven purely by `404` console noise with zero failed steps means the walk succeeded and the `screenshot-*.png` artifacts are valid evidence. (Example seen in practice: all phases B–F passed and `fabricate-app-shell` captured correctly, but `passed: false` came solely from 12 generic `404` console errors.)
+
 ## Known drift pattern: Phase D0 selectors
 
 `exerciseManagerEnvironmentPointerTargets` (~line 905 in `foundry-test-run.mjs`) and the env-edit checks (~line 2490) pin many selectors by class, child index (`.nth(N)`), and visible button text. When the manager UI evolves, these go stale silently — the harness only fails when the next smoke run hits the broken locator.

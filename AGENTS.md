@@ -61,7 +61,8 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 - Docker Desktop only required for `npm run test:foundry`. Not required for `npm test`, `npm run build`, or `npm run dev`.
 - No extra shell tools required. `npm run release:build` uses Windows' built-in `tar.exe` for zip creation; on Ubuntu it uses `zip`.
 
-- `npm test` — required validation gate for implementation changes.
+- `npm test` — required validation gate for implementation changes. Its glob enumerates a fixed set of test directories (see the `test` script in `package.json`). A test placed in a directory the glob does not list is NOT gated, even though it passes when run directly with `node --test <file>`. When adding a test in a new directory, add that directory to the `test` script and confirm the total count rises under `npm test`.
+- Reading a smoke result: `test-results/summary.json` reports `passed: false` if any phase step fails OR if `consoleErrors[]` is non-empty. Benign browser `404 (Not Found)` asset misses in the fixture world populate `consoleErrors` and flip `passed` to false even when every `steps[]` entry passed. Check `steps[]` for an actual failing step before treating a run as broken or discarding its screenshots — see `docs/agents/smoke-harness.md`.
 - `npm run build` — required build gate for implementation changes.
 - `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
@@ -98,6 +99,7 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
 - Use `sheet.changeTab(tabName, groupName)` for ApplicationV2 tab switches.
+- Foundry's global `button` styles win over scoped Svelte component CSS: buttons center their content (`justify-content: center`) and pin a fixed height. A Svelte component rendering a `<button>` with custom content (icon+label triggers, portrait+name option rows) must set `justify-content: flex-start`, `height: auto`, and a `min-height` explicitly, or content centers and taller children (portraits) clip. Test layout in real Foundry, not just compiled source.
 - Preserve `flags.core.sourceId` when embedded items must map back to a world item.
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
 - Update compatibility metadata if new Foundry API requirements are introduced.
@@ -125,6 +127,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - Use Conventional Commits.
 - For `feat`, `fix`, and `perf`, use the format `<type>(#<issue>): <short description>`.
 - Validate commit messages with `npx commitlint` before pushing when a commit is part of the task.
+- Merge commits are linted too. A `merge:` prefix fails `commitlint` (`merge` is not an allowed type); `commitlint`'s default ignore only skips the standard capitalized `Merge branch …` / `Merge pull request …` messages. For a `--no-ff` integration merge, title it `chore: merge <x> into <y>` (or keep the default `Merge branch …` message). `git commit --amend -m "chore: …"` preserves both parents if a merge message needs fixing; re-run `npx commitlint --from=main --to=HEAD`, then `git push --force-with-lease`.
 - Prefer one logical change per commit; align commit boundaries with reviewable user-facing changes. Bundling is acceptable when changes overlap on the same files such that hunk-splitting would be fragile, but separate commits are the default.
 
 ## Agent Roles & Bindings
