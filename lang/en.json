@@ -96,7 +96,7 @@
           "SceneWait": "Wait until the GM activates the linked scene.",
           "ToolState": {
             "present": "Available",
-            "damaged": "Damaged",
+            "damaged": "Broken",
             "missing": "Missing"
           },
           "ToolHint": {
