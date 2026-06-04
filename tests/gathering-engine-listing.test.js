@@ -21,6 +21,7 @@ function makeEngine({
   history = [],
   catalystAvailability = null,
   richState = null,
+  systemManager = null,
   calls = {}
 } = {}) {
   calls.visibility = [];
@@ -30,6 +31,7 @@ function makeEngine({
 
   return new GatheringEngine({
     richState,
+    systemManager,
     environmentStore: {
       list: () => environments
     },
@@ -863,4 +865,318 @@ test('listForActor drops an enabled composed-empty environment but pins a locked
   // does not throw while resolving an empty-pool blind environment.)
   const emptyListing = await emptyEngine.listForActor({ viewer, actor });
   assert.deepEqual(emptyListing.environments, []);
+});
+
+function richStateWithReveals(revealedTaskIds = [], biomeTags = []) {
+  return {
+    countRevealedTasks: () => revealedTaskIds.length,
+    listRevealedTaskIds: () => [...revealedTaskIds],
+    resolveBiomeTags: () => biomeTags
+  };
+}
+
+test('targeted d100 task listing exposes a static successChance from enabled drop rows', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({
+        id: 'd100-task',
+        resolutionMode: 'd100',
+        dropRows: [
+          { id: 'r1', dropRate: 50, enabled: true },
+          { id: 'r2', dropRate: 50, enabled: true }
+        ]
+      })]
+    })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  // 1 − (1−0.5)(1−0.5) = 0.75
+  assert.ok(Math.abs(listing.environments[0].tasks[0].successChance - 0.75) < 1e-9);
+});
+
+test('successChance is null for a non-d100 task', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({
+        id: 'routed-task',
+        resolutionMode: 'routed',
+        dropRows: [{ id: 'r', dropRate: 80, enabled: true }]
+      })]
+    })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.environments[0].tasks[0].successChance, null);
+});
+
+test('successChance ignores disabled drop rows', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({
+        id: 'd100-task',
+        resolutionMode: 'd100',
+        dropRows: [
+          { id: 'r1', dropRate: 100, enabled: false },
+          { id: 'r2', dropRate: 50, enabled: true }
+        ]
+      })]
+    })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.ok(Math.abs(listing.environments[0].tasks[0].successChance - 0.5) < 1e-9);
+});
+
+test('successChance clamps out-of-range drop rates', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [
+        task({ id: 'over', resolutionMode: 'd100', dropRows: [{ id: 'r', dropRate: 150, enabled: true }] }),
+        task({ id: 'mixed', resolutionMode: 'd100', dropRows: [
+          { id: 'a', dropRate: -10, enabled: true },
+          { id: 'b', dropRate: 50, enabled: true }
+        ] })
+      ]
+    })]
+  });
+
+  const tasks = (await engine.listForActor({ viewer, actor })).environments[0].tasks;
+  const byId = Object.fromEntries(tasks.map(entry => [entry.id, entry]));
+  // 150 clamps to 100 -> certain.
+  assert.equal(byId.over.successChance, 1);
+  // -10 clamps to 0 (contributes nothing) -> only the 50% row counts.
+  assert.ok(Math.abs(byId.mixed.successChance - 0.5) < 1e-9);
+});
+
+test('successChance is null when a d100 task has no enabled drop rows', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({
+        id: 'd100-empty',
+        resolutionMode: 'd100',
+        dropRows: [{ id: 'r', dropRate: 80, enabled: false }]
+      })]
+    })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.environments[0].tasks[0].successChance, null);
+});
+
+test('blind environment surfaces revealed tasks as discovered models and one opaque action', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+      tasks: [
+        task({ id: 'task-a', name: 'Hidden A' }),
+        task({
+          id: 'task-b',
+          name: 'Revealed B',
+          description: 'Found it',
+          resolutionMode: 'd100',
+          dropRows: [{ id: 'r', dropRate: 50, enabled: true }]
+        })
+      ]
+    })],
+    richState: richStateWithReveals(['task-b'])
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const entry = listing.environments[0];
+
+  // The non-GM blind listing collapses to a single opaque "Attempt gathering"
+  // action that leaks no task identity or aggregate drop info.
+  assert.equal(entry.tasks.length, 1);
+  assert.equal(entry.tasks[0].action, 'blindGather');
+  assert.equal(Object.hasOwn(entry.tasks[0], 'id'), false);
+  assert.equal(Object.hasOwn(entry.tasks[0], 'successChance'), false);
+
+  // The revealed task is surfaced transparently in discoveredTasks.
+  assert.equal(entry.discoveredTasks.length, 1);
+  assert.equal(entry.discoveredTasks[0].id, 'task-b');
+  assert.equal(entry.discoveredTasks[0].name, 'Revealed B');
+  assert.equal(entry.discoveredTasks[0].discovered, true);
+  assert.ok(Math.abs(entry.discoveredTasks[0].successChance - 0.5) < 1e-9);
+  assert.equal(entry.discoveredTasks.length, entry.discoveredTaskCount);
+
+  // The unrevealed task never leaks into the listing.
+  const serialized = JSON.stringify(entry);
+  assert.equal(serialized.includes('Hidden A'), false);
+  assert.equal(serialized.includes('task-a'), false);
+});
+
+test('discovered blind tasks carry real blocked-reason data while the opaque action stays redacted', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind-tools',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+      tasks: [
+        task({ id: 'task-a', name: 'Hidden A', toolIds: ['missing-tool'] }),
+        task({ id: 'task-b', name: 'Revealed B', toolIds: ['missing-tool'] })
+      ]
+    })],
+    richState: richStateWithReveals(['task-b'])
+  });
+
+  const entry = (await engine.listForActor({ viewer, actor })).environments[0];
+
+  // The opaque blind action surfaces the TOOL_BLOCKED code but redacts its data.
+  const opaqueTool = entry.tasks[0].blockedReasons.find(reason => reason.code === 'TOOL_BLOCKED');
+  assert.ok(opaqueTool, 'opaque blind action still reports the blocked code');
+  assert.equal(opaqueTool.data, null, 'opaque blind action redacts the blocked-reason data');
+
+  // The discovered (transparent) task carries the real tool details.
+  const discoveredTool = entry.discoveredTasks[0].blockedReasons.find(reason => reason.code === 'TOOL_BLOCKED');
+  assert.ok(discoveredTool, 'discovered task reports the blocked code');
+  assert.ok(discoveredTool.data, 'discovered task carries real blocked-reason data');
+  assert.deepEqual(discoveredTool.data.missingToolIds, ['missing-tool']);
+});
+
+test('blind environment with revealPolicy never exposes no discovered tasks', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind-never',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'never' },
+      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
+    })],
+    richState: richStateWithReveals(['task-b'])
+  });
+
+  const entry = (await engine.listForActor({ viewer, actor })).environments[0];
+  assert.deepEqual(entry.discoveredTasks, []);
+});
+
+test('GM viewer of a blind environment gets the full task list and no separate discovered list', async () => {
+  const gmViewer = { id: 'gm-1', isGM: true };
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind-gm',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
+    })],
+    richState: richStateWithReveals(['task-b'])
+  });
+
+  const entry = (await engine.listForActor({ viewer: gmViewer, actor })).environments[0];
+  assert.equal(entry.tasks.length, 2);
+  assert.equal(entry.tasks[0].id, 'task-a');
+  assert.deepEqual(entry.discoveredTasks, []);
+});
+
+function toolItem({ componentId, broken = false }) {
+  return {
+    componentId,
+    getFlag: (ns, key) => (ns === 'fabricate' && key === 'toolBroken' ? broken : undefined)
+  };
+}
+
+function systemManagerMock(components = []) {
+  return {
+    getItems: () => components,
+    catalystMatchesItem: (_recipe, tool, candidate) =>
+      Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
+  };
+}
+
+function actorWithItems(items) {
+  return { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Gatherer', items };
+}
+
+test('task model exposes required tools with present / missing state and display metadata', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({
+        id: 'tooled',
+        tools: [{ componentId: 'c-axe' }, { componentId: 'c-lantern' }]
+      })]
+    })],
+    systemManager: systemManagerMock([
+      { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' },
+      { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp' }
+    ])
+  });
+
+  const tools = (await engine.listForActor({
+    viewer,
+    actor: actorWithItems([toolItem({ componentId: 'c-axe' })])
+  })).environments[0].tasks[0].tools;
+
+  assert.deepEqual(tools, [
+    { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp', state: 'present', required: true },
+    { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp', state: 'missing', required: true }
+  ]);
+});
+
+test('a matching but broken tool item is reported as damaged, not missing', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe' }] })]
+    })],
+    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+  });
+
+  const tools = (await engine.listForActor({
+    viewer,
+    actor: actorWithItems([toolItem({ componentId: 'c-axe', broken: true })])
+  })).environments[0].tasks[0].tools;
+
+  assert.equal(tools[0].state, 'damaged');
+});
+
+test('an unresolved library tool reference surfaces as a missing tool entry', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'tooled', toolIds: ['ghost-tool'] })]
+    })],
+    systemManager: systemManagerMock([])
+  });
+
+  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0].tasks[0].tools;
+  assert.deepEqual(tools, [
+    { id: 'ghost-tool', name: 'ghost-tool', img: 'icons/svg/item-bag.svg', state: 'missing', required: true }
+  ]);
+});
+
+test('a tool label overrides the component name', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe', label: 'Masterwork Pick' }] })]
+    })],
+    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+  });
+
+  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0].tasks[0].tools;
+  assert.equal(tools[0].name, 'Masterwork Pick');
+});
+
+test('a task with no tools exposes an empty tools array', async () => {
+  const engine = makeEngine({ systemManager: systemManagerMock([]) });
+  const tools = (await engine.listForActor({ viewer, actor })).environments[0].tasks[0].tools;
+  assert.deepEqual(tools, []);
+});
+
+test('the opaque blind action carries no tools while a discovered task does', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind-tooled',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+      tasks: [
+        task({ id: 'task-a', tools: [{ componentId: 'c-axe' }] }),
+        task({ id: 'task-b', tools: [{ componentId: 'c-axe' }] })
+      ]
+    })],
+    richState: richStateWithReveals(['task-b']),
+    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+  });
+
+  const entry = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0];
+  assert.equal(Object.hasOwn(entry.tasks[0], 'tools'), false, 'opaque blind action leaks no tools');
+  assert.equal(entry.discoveredTasks[0].tools.length, 1, 'discovered task carries its tools');
+  assert.equal(entry.discoveredTasks[0].tools[0].state, 'missing');
 });

@@ -12,6 +12,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
+  import GatheringDetail from './GatheringDetail.svelte';
   import { resolveDefaultSelection } from './selectionDefault.js';
 
   let { services = null } = $props();
@@ -28,6 +29,11 @@
   const environments = $derived(Array.isArray(listing?.environments) ? listing.environments : []);
   const isEmpty = $derived(
     !listing || listing.visible === false || !hasActor || environments.length === 0
+  );
+  // The environment whose detail the center column renders; null until the
+  // player picks a selectable card (or when the prior selection drops out).
+  const selectedEnvironment = $derived(
+    environments.find(environment => environment?.id === selectedId) ?? null
   );
 
   async function load() {
@@ -79,7 +85,9 @@
     <div class="gathering-view-column gathering-view-column-left">
       <GatheringEnvironmentList {environments} {selectedId} {onSelect} />
     </div>
-    <section class="gathering-view-column gathering-view-column-center" aria-hidden="true"></section>
+    <section class="gathering-view-column gathering-view-column-center" data-gathering-detail>
+      <GatheringDetail environment={selectedEnvironment} {services} onAttempted={load} />
+    </section>
     <section class="gathering-view-column gathering-view-column-right" aria-hidden="true"></section>
   </div>
 {/if}

@@ -261,6 +261,17 @@ Visible environments and tasks remain listed even when they are blocked by attem
 
 Targeted task rows can show task labels, task descriptions, active-run timing, terminal status, result counts, catalyst counts, and check-derived history metadata returned by the runtime. For non-GM users, blind rows and missing-environment history remain redacted: the app uses a generic localized label and does not expose task IDs, result details, catalyst details, diagnostics, or check internals. GMs can inspect real blind task names through GM-facing surfaces.
 
+### Detail Column
+
+Selecting an environment fills the center **detail** column. It opens with an environment header — the name, a short description, and info pips for any present biome, region, and danger level — plus a mode hint describing how that environment is gathered.
+
+How the rest of the column reads depends on the selection mode:
+
+- **Targeted environments** show a list of task rows. Each row carries the task name, description, a **success-chance bar**, and an **Attempt** button. A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline and its Attempt button disabled.
+- **Blind environments** show a single **Attempt gathering** button that resolves one hidden task at random. When the system's reveal policy is not `never`, a **Discovered Tasks (x/y)** section lists the tasks this actor has already revealed as their own transparent rows — each with its own success-chance bar and Attempt button — where `x` is the discovered count and `y` is the full composed task pool. Before anything has been revealed the section reads as nothing discovered yet.
+
+The success-chance bar reflects the listing's per-task `successChance` field: a static d100 drop-rate approximation (the chance at least one item drops), not a whole-attempt success probability, so it can read high while an attempt is still blocked or fails a skill check. Tasks that are not d100 (or have no enabled drop rows) carry no bar. The transparent blind rows come from the listing's `discoveredTasks` field; the opaque blind action never exposes per-task success chances.
+
 Current player-app scope covers actor selection, visible/blocked listing, blind task labels, runtime-backed starts, last-attempt feedback, active timed runs, recent terminal history, blind redaction, and one-column active/history layout when the app container narrows. Runtime integration coverage includes scene-linked gathering through the production environment store, run manager, evaluator, and a scene adapter, plus hook-driven timed completion and a regression guard confirming harvesting has no standalone runtime/app/store/settings path.
 
 ## Catalyst Rows

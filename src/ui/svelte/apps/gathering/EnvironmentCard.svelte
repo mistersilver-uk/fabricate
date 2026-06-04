@@ -22,6 +22,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { sceneDocumentImage } from '../../util/sceneImages.js';
 
   let {
     environment = null,
@@ -33,6 +34,26 @@
   const id = $derived(String(environment?.id ?? ''));
   const name = $derived(String(environment?.name ?? ''));
   const img = $derived(String(environment?.img ?? ''));
+  const sceneUuid = $derived(String(environment?.sceneUuid ?? ''));
+
+  // When the environment links a scene, show that scene's thumbnail instead of
+  // the environment image (resolved client-side via fromUuid, mirroring
+  // LinkedScene). Falls back to the environment image when there's no linked
+  // scene or its thumbnail can't be resolved.
+  let sceneThumb = $state('');
+  $effect(() => {
+    const uuid = sceneUuid;
+    sceneThumb = '';
+    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
+    let cancelled = false;
+    Promise.resolve(globalThis.fromUuid(uuid))
+      .then(doc => {
+        if (!cancelled && doc) sceneThumb = sceneDocumentImage(doc) || '';
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  });
+  const displayImg = $derived(sceneThumb || img);
   const description = $derived(String(environment?.description ?? ''));
   const locked = $derived(environment?.locked === true);
   const blind = $derived(environment?.selectionMode === 'blind');
@@ -55,6 +76,19 @@
     localize('FABRICATE.App.Gathering.Environments.LockedAria', { name })
   );
 
+  // Danger pill: always shown, icon-only, coloured by the environment's risk
+  // tier with the full danger level in a tooltip. The engine always provides a
+  // risk (defaulting to 'safe'), so this renders for every card.
+  const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
+  const risk = $derived(String(environment?.risk ?? 'safe') || 'safe');
+  const dangerLabel = $derived(
+    KNOWN_RISKS.has(risk) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${risk}`) : risk
+  );
+  const riskClass = $derived(KNOWN_RISKS.has(risk) ? `risk-${risk}` : '');
+  const dangerAria = $derived(
+    localize('FABRICATE.App.Gathering.Detail.Pips.Danger', { value: dangerLabel })
+  );
+
   function biomeChipStyle(tag) {
     const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
     const token = String(tag?.colorToken || 'sage').replace(/^--fab-tag-/, '');
@@ -68,12 +102,24 @@
 </script>
 
 {#snippet identity()}
+  <span class="gathering-env-card-header">
+    {#if blind}
+      <span class="gathering-env-card-blind" title={localize('FABRICATE.App.Gathering.Environments.BlindChip')}>
+        <i class="fas fa-mask" aria-hidden="true"></i>
+        <span class="gathering-env-card-blind-label">{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span>
+      </span>
+    {/if}
+    <span class={`gathering-env-card-hazard ${riskClass}`} aria-label={dangerAria}>
+      <i class="fas fa-skull" aria-hidden="true"></i>
+      <span class="gathering-env-card-hazard-label">{dangerLabel}</span>
+    </span>
+  </span>
   <span class="gathering-env-card-main">
     <span class="gathering-env-card-thumb-wrap">
       <img
         class="gathering-env-card-thumb"
-        class:is-fallback={!img}
-        src={img || 'icons/svg/door-closed.svg'}
+        class:is-fallback={!displayImg}
+        src={displayImg || 'icons/svg/door-closed.svg'}
         alt=""
       />
       {#if locked}
@@ -91,12 +137,6 @@
             aria-label={discoveredLabel}
             title={discoveredLabel}
           >({discoveredTaskCount}/{composedTaskCount})</span>
-        {/if}
-        {#if blind}
-          <span class="gathering-env-card-blind" title={localize('FABRICATE.App.Gathering.Environments.BlindChip')}>
-            <i class="fas fa-mask" aria-hidden="true"></i>
-            <span class="gathering-env-card-blind-label">{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span>
-          </span>
         {/if}
       </span>
       {#if biomeTags.length > 0}
@@ -355,9 +395,27 @@
     opacity: 0.85;
   }
 
+  /*
+    A short header bar at the top of the card holding the blind + danger chips,
+    separated from the body by a soft divider. The negative margins make it
+    full-bleed (cancelling the card's 10px top/side padding) so the divider spans
+    the full card width; its own 6px vertical padding gives the chips a little
+    breathing room above and below. Right-aligned so the chips stay top-right.
+    Being in flow (not an overlay), it no longer steals width from the biome-chip
+    row below.
+  */
+  .gathering-env-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin: -10px -10px 0;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--fab-border);
+  }
+
   .gathering-env-card-blind {
     flex: 0 0 auto;
-    margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -371,5 +429,59 @@
 
   .gathering-env-card-blind i {
     font-size: 11px;
+  }
+
+  /*
+    Danger pill: an icon + level-name chip (mirrors the blind chip metrics). The
+    skull icon escalates in colour with the environment's risk tier
+    (success -> warning -> danger) via the risk-* rules below; the label keeps
+    readable text colour. The base icon rule is the fallback for any unmapped
+    risk value.
+  */
+  .gathering-env-card-hazard {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: var(--fab-surface-raised);
+    border: 1px solid var(--fab-border);
+  }
+
+  .gathering-env-card-hazard-label {
+    color: var(--fab-text);
+  }
+
+  .gathering-env-card.is-locked .gathering-env-card-hazard-label {
+    color: var(--fab-text-muted);
+    opacity: 0.85;
+  }
+
+  .gathering-env-card-hazard i {
+    font-size: 11px;
+    color: var(--fab-danger);
+  }
+
+  .gathering-env-card-hazard.risk-safe i {
+    color: var(--fab-success);
+  }
+
+  .gathering-env-card-hazard.risk-unsafe i {
+    color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
+  }
+
+  .gathering-env-card-hazard.risk-hazardous i {
+    color: var(--fab-warning);
+  }
+
+  .gathering-env-card-hazard.risk-dangerous i {
+    color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
+  }
+
+  .gathering-env-card-hazard.risk-deadly i,
+  .gathering-env-card-hazard.risk-extreme i {
+    color: var(--fab-danger);
   }
 </style>
