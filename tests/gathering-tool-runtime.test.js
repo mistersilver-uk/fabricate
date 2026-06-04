@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { classifyGatheringToolStates, isToolBroken, matchGatheringTools } from '../src/gatheringToolRuntime.js';
 
 function makeRunManager() {
   let createdTerminal = null;
@@ -408,4 +409,63 @@ test('legacy task without tools is unaffected', async () => {
   assert.equal(breakage.calls.plan, 0, 'no tools means no breakage planning');
   assert.equal(breakage.calls.apply, 0);
   assert.deepEqual(result.usedTools, []);
+});
+
+// ---------------------------------------------------------------------------
+// isToolBroken / classifyGatheringToolStates (display-state helpers)
+// ---------------------------------------------------------------------------
+
+function brokenViaGetFlag(key) {
+  return { getFlag: (ns, flag) => ns === 'fabricate' && flag === key };
+}
+
+test('isToolBroken detects every supported flag form and is false otherwise', () => {
+  assert.equal(isToolBroken(brokenViaGetFlag('toolBroken')), true);
+  assert.equal(isToolBroken(brokenViaGetFlag('fabricate.toolBroken')), true);
+  globalThis.foundry = { utils: { getProperty: (obj, path) => obj?.[path] === true } };
+  assert.equal(isToolBroken({ 'flags.fabricate.toolBroken': true }), true);
+  assert.equal(isToolBroken({ 'flags.fabricate.fabricate.toolBroken': true }), true);
+  delete globalThis.foundry;
+  assert.equal(isToolBroken({ getFlag: () => false }), false);
+  assert.equal(isToolBroken(null), false);
+});
+
+const matcher = {
+  catalystMatchesItem: (_recipe, tool, candidate) => Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
+};
+
+function inventoryItem(componentId, broken = false) {
+  return { componentId, getFlag: (ns, flag) => ns === 'fabricate' && flag === 'toolBroken' && broken };
+}
+
+test('classifyGatheringToolStates reports present / damaged / missing per tool', () => {
+  const tools = [{ componentId: 'c-axe' }, { componentId: 'c-saw' }, { componentId: 'c-net' }];
+  const actor = { items: [inventoryItem('c-axe'), inventoryItem('c-saw', true)] };
+  const states = classifyGatheringToolStates({ actor, system: { id: 's' }, task: { id: 't' }, tools, craftingSystemManager: matcher });
+  assert.deepEqual(states.map(s => s.state), ['present', 'damaged', 'missing']);
+});
+
+test('classifyGatheringToolStates prefers a non-broken duplicate (present over damaged)', () => {
+  const actor = { items: [inventoryItem('c-axe', true), inventoryItem('c-axe', false)] };
+  const states = classifyGatheringToolStates({ actor, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: matcher });
+  assert.equal(states[0].state, 'present');
+});
+
+test('classifyGatheringToolStates treats a null actor as all-missing without throwing', () => {
+  const states = classifyGatheringToolStates({ actor: null, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: matcher });
+  assert.deepEqual(states.map(s => s.state), ['missing']);
+});
+
+test('the matcher falls back to craftingSystemManager.recipeManager when the manager has none', () => {
+  const viaRecipeManager = { recipeManager: matcher };
+  const actor = { items: [inventoryItem('c-axe')] };
+  const states = classifyGatheringToolStates({ actor, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: viaRecipeManager });
+  assert.equal(states[0].state, 'present');
+});
+
+test('matchGatheringTools still collapses a broken matching tool into missing (attempt validation unchanged)', () => {
+  const actor = { items: [inventoryItem('c-axe', true)] };
+  const result = matchGatheringTools({ actor, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: matcher });
+  assert.equal(result.items.length, 0);
+  assert.equal(result.missing.length, 1);
 });

@@ -21,6 +21,7 @@ function makeEngine({
   history = [],
   catalystAvailability = null,
   richState = null,
+  systemManager = null,
   calls = {}
 } = {}) {
   calls.visibility = [];
@@ -30,6 +31,7 @@ function makeEngine({
 
   return new GatheringEngine({
     richState,
+    systemManager,
     environmentStore: {
       list: () => environments
     },
@@ -1064,4 +1066,117 @@ test('GM viewer of a blind environment gets the full task list and no separate d
   assert.equal(entry.tasks.length, 2);
   assert.equal(entry.tasks[0].id, 'task-a');
   assert.deepEqual(entry.discoveredTasks, []);
+});
+
+function toolItem({ componentId, broken = false }) {
+  return {
+    componentId,
+    getFlag: (ns, key) => (ns === 'fabricate' && key === 'toolBroken' ? broken : undefined)
+  };
+}
+
+function systemManagerMock(components = []) {
+  return {
+    getItems: () => components,
+    catalystMatchesItem: (_recipe, tool, candidate) =>
+      Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
+  };
+}
+
+function actorWithItems(items) {
+  return { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Gatherer', items };
+}
+
+test('task model exposes required tools with present / missing state and display metadata', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({
+        id: 'tooled',
+        tools: [{ componentId: 'c-axe' }, { componentId: 'c-lantern' }]
+      })]
+    })],
+    systemManager: systemManagerMock([
+      { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' },
+      { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp' }
+    ])
+  });
+
+  const tools = (await engine.listForActor({
+    viewer,
+    actor: actorWithItems([toolItem({ componentId: 'c-axe' })])
+  })).environments[0].tasks[0].tools;
+
+  assert.deepEqual(tools, [
+    { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp', state: 'present', required: true },
+    { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp', state: 'missing', required: true }
+  ]);
+});
+
+test('a matching but broken tool item is reported as damaged, not missing', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe' }] })]
+    })],
+    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+  });
+
+  const tools = (await engine.listForActor({
+    viewer,
+    actor: actorWithItems([toolItem({ componentId: 'c-axe', broken: true })])
+  })).environments[0].tasks[0].tools;
+
+  assert.equal(tools[0].state, 'damaged');
+});
+
+test('an unresolved library tool reference surfaces as a missing tool entry', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'tooled', toolIds: ['ghost-tool'] })]
+    })],
+    systemManager: systemManagerMock([])
+  });
+
+  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0].tasks[0].tools;
+  assert.deepEqual(tools, [
+    { id: 'ghost-tool', name: 'ghost-tool', img: 'icons/svg/item-bag.svg', state: 'missing', required: true }
+  ]);
+});
+
+test('a tool label overrides the component name', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe', label: 'Masterwork Pick' }] })]
+    })],
+    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+  });
+
+  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0].tasks[0].tools;
+  assert.equal(tools[0].name, 'Masterwork Pick');
+});
+
+test('a task with no tools exposes an empty tools array', async () => {
+  const engine = makeEngine({ systemManager: systemManagerMock([]) });
+  const tools = (await engine.listForActor({ viewer, actor })).environments[0].tasks[0].tools;
+  assert.deepEqual(tools, []);
+});
+
+test('the opaque blind action carries no tools while a discovered task does', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-blind-tooled',
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+      tasks: [
+        task({ id: 'task-a', tools: [{ componentId: 'c-axe' }] }),
+        task({ id: 'task-b', tools: [{ componentId: 'c-axe' }] })
+      ]
+    })],
+    richState: richStateWithReveals(['task-b']),
+    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+  });
+
+  const entry = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0];
+  assert.equal(Object.hasOwn(entry.tasks[0], 'tools'), false, 'opaque blind action leaks no tools');
+  assert.equal(entry.discoveredTasks[0].tools.length, 1, 'discovered task carries its tools');
+  assert.equal(entry.discoveredTasks[0].tools[0].state, 'missing');
 });

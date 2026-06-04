@@ -133,10 +133,16 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js'), 'utf8')
     );
 
+    // LinkedScene imports the scene-image helper; copy it into the temp tree.
+    const sceneImagesDestination = join(tempRoot, 'src/ui/svelte/util/sceneImages.js');
+    mkdirSync(dirname(sceneImagesDestination), { recursive: true });
+    writeFileSync(sceneImagesDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
@@ -199,7 +205,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(attemptBtn && !attemptBtn.disabled, 'attempt button enabled on an attemptable task');
   });
 
-  it('renders a blocked task row with a lock overlay, blocked detail, and a disabled attempt button', async () => {
+  it('shows a blocked task with a lock overlay, a header callout, and conditions detail on expand', async () => {
     const blockedTask = taskModel({
       id: 'task-blocked',
       attemptable: false,
@@ -218,12 +224,72 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const row = target.querySelector('[data-task-id="task-blocked"]');
     assert.equal(row.getAttribute('data-blocked'), 'true');
     assert.ok(row.querySelector('.gathering-task-lock-overlay'), 'blocked row shows the lock overlay');
-    const blocked = row.querySelector('[data-gathering-blocked]');
-    assert.ok(blocked, 'blocked detail list present');
-    assert.ok(blocked.textContent.includes('night'), 'required time-of-day surfaced');
-    assert.ok(blocked.textContent.includes('rain'), 'required weather surfaced');
+    // Blocking issue appears as a header callout.
+    const callouts = row.querySelector('[data-gathering-callouts]');
+    assert.ok(callouts, 'header callout bar present');
+    assert.ok(callouts.textContent.includes('Conditions'), 'a conditions callout is shown');
     assert.equal(row.querySelector('[data-gathering-success-value]'), null, 'no success bar when successChance is null');
     assert.ok(row.querySelector('[data-gathering-attempt]').disabled, 'attempt button disabled on a blocked task');
+
+    // Detail is hidden until expanded; clicking the summary reveals it.
+    assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'detail hidden before expand');
+    row.querySelector('.gathering-task-summary').click();
+    flushSync();
+    const blocked = row.querySelector('[data-gathering-blocked]');
+    assert.ok(blocked, 'blocked detail list present after expand');
+    assert.ok(blocked.textContent.includes('night'), 'required time-of-day surfaced');
+    assert.ok(blocked.textContent.includes('rain'), 'required weather surfaced');
+  });
+
+  it('expands a task with required tools and lists each tool with its state, without toggling on Attempt click', async () => {
+    const tooledTask = taskModel({
+      id: 'task-tools',
+      attemptable: false,
+      successChance: null,
+      blockedReasons: [{ code: 'TOOL_BLOCKED', message: 'Missing tools', data: {} }],
+      tools: [
+        { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp', state: 'present', required: true },
+        { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp', state: 'missing', required: true }
+      ]
+    });
+    const { services } = makeServices(listing([environment({ tasks: [tooledTask] })]));
+    await mountView(services);
+
+    const row = target.querySelector('[data-task-id="task-tools"]');
+    assert.ok(row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.MissingTools'), 'missing-tools callout shown');
+
+    // Attempt is disabled; clicking it must NOT expand the card.
+    row.querySelector('[data-gathering-attempt]').click();
+    flushSync();
+    assert.equal(row.querySelector('[data-gathering-tools]'), null, 'attempt click did not expand the card');
+
+    row.querySelector('.gathering-task-summary').click();
+    flushSync();
+    const toolRows = row.querySelectorAll('[data-gathering-tool]');
+    assert.equal(toolRows.length, 2, 'both required tools listed');
+    assert.equal(toolRows[0].getAttribute('data-tool-state'), 'present');
+    assert.equal(toolRows[1].getAttribute('data-tool-state'), 'missing');
+    assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
+  });
+
+  it('shows a linked-scene panel (with the wait hint when the player cannot view) on expand', async () => {
+    // No global fromUuid -> LinkedScene resolves nothing and cannot view -> wait hint.
+    const sceneTask = taskModel({
+      id: 'task-scene',
+      attemptable: false,
+      successChance: null,
+      blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
+    });
+    const { services } = makeServices(listing([environment({ sceneUuid: 'Scene.abc', tasks: [sceneTask] })]));
+    await mountView(services);
+
+    const row = target.querySelector('[data-task-id="task-scene"]');
+    assert.ok(row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.VisitScene'), 'scene callout shown');
+    row.querySelector('.gathering-task-summary').click();
+    flushSync();
+    const scene = row.querySelector('[data-gathering-scene]');
+    assert.ok(scene, 'linked-scene panel renders on expand');
+    assert.ok(row.querySelector('[data-gathering-scene-wait]'), 'shows the wait hint when the player cannot navigate');
   });
 
   it('renders the blind attempt button and the Discovered Tasks section', async () => {

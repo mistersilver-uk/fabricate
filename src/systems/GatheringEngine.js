@@ -1,4 +1,5 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+import { classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -29,6 +30,8 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
+const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
+const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
 const FAILURE_KEYWORDS = new Set([
   'f',
   'fail',
@@ -870,7 +873,8 @@ export class GatheringEngine {
       actor,
       viewer,
       visibility: entry.visibility,
-      blockedReasons: entry.blockedReasons
+      blockedReasons: entry.blockedReasons,
+      tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
     }));
 
     const attemptable = taskModels.some(task => task.attemptable);
@@ -966,7 +970,8 @@ export class GatheringEngine {
         viewer,
         visibility: entry.visibility,
         blockedReasons,
-        forceVisible: true
+        forceVisible: true,
+        tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
       });
       discovered.push({ ...model, discovered: true });
     }
@@ -1283,6 +1288,81 @@ export class GatheringEngine {
     return { tools, missingToolIds, disabledToolIds };
   }
 
+  /**
+   * Build the player-facing required-tools list for a task, each entry tagged
+   * with the actor's per-tool state for display:
+   * `{ id, name, img, state: 'present'|'damaged'|'missing', required: true }`.
+   *
+   * Resolved tools are classified via {@link classifyGatheringToolStates} (the
+   * same matcher attempt validation uses, so the state agrees with whether the
+   * attempt is blocked); unresolved/disabled library tool refs are surfaced as
+   * `missing`. Display `name`/`img` come from the tool's `componentId` resolved
+   * against the crafting system's components (tool `label` wins when set), with
+   * a safe fallback. Tolerant of a null actor/system.
+   *
+   * @returns {Array<{id: string|null, name: string, img: string,
+   *                  state: 'present'|'damaged'|'missing', required: boolean}>}
+   */
+  _resolveTaskToolStates({ actor, system, environment, task }) {
+    const { tools, missingToolIds, disabledToolIds } = this._resolveTaskTools({ environment, task });
+    const componentsById = this._componentsById(system);
+    const states = classifyGatheringToolStates({
+      actor,
+      system,
+      task,
+      tools,
+      craftingSystemManager: this.systemManager
+    });
+
+    const resolved = states.map(({ tool, state }) => {
+      const component = componentsById.get(stringOrNull(tool?.componentId)) ?? null;
+      const name = stringOrNull(tool?.label)
+        || stringOrEmpty(component?.name)
+        || this.localize(UNKNOWN_TOOL_LABEL_KEY);
+      const img = stringOrNull(component?.img) || DEFAULT_TOOL_IMG;
+      return {
+        id: stringOrNull(tool?.id) || stringOrNull(tool?.componentId),
+        name,
+        img,
+        state,
+        required: true
+      };
+    });
+
+    // Unresolved (missing) and disabled library tool references can't be matched
+    // against actor inventory; surface them as missing so the player still sees
+    // an entry. Their display falls back to the raw id.
+    for (const toolId of [...normalizeList(missingToolIds), ...normalizeList(disabledToolIds)]) {
+      const id = stringOrNull(toolId);
+      if (!id) continue;
+      resolved.push({
+        id,
+        name: id,
+        img: DEFAULT_TOOL_IMG,
+        state: 'missing',
+        required: true
+      });
+    }
+
+    return resolved;
+  }
+
+  _componentsById(system) {
+    const map = new Map();
+    if (!system?.id || typeof this.systemManager?.getItems !== 'function') return map;
+    let components = [];
+    try {
+      components = normalizeList(this.systemManager.getItems(system.id));
+    } catch (_err) {
+      return map;
+    }
+    for (const component of components) {
+      const id = stringOrNull(component?.id);
+      if (id) map.set(id, component);
+    }
+    return map;
+  }
+
   _hasBlockedToolReferences(resolvedTools) {
     return normalizeList(resolvedTools?.missingToolIds).length > 0
       || normalizeList(resolvedTools?.disabledToolIds).length > 0;
@@ -1336,7 +1416,7 @@ export class GatheringEngine {
    *   key is safe.
    * @returns {object} The task model.
    */
-  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons, forceVisible = false }) {
+  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons, forceVisible = false, tools = null }) {
     const blind = environment.selectionMode === 'blind';
     // `forceVisible` builds a transparent model for an already-revealed blind
     // task (the "Discovered Tasks" list) — it bypasses the opaque collapse that
@@ -1382,6 +1462,7 @@ export class GatheringEngine {
       hasTimeRequirement: Boolean(task.timeRequirement),
       catalystCount: normalizeList(task.catalysts).length,
       successChance: this._taskSuccessChance(task),
+      tools: Array.isArray(tools) ? tools : [],
       rich
     };
   }

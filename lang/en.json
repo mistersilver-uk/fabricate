@@ -54,6 +54,31 @@
             "dangerous": "Dangerous",
             "deadly": "Deadly",
             "extreme": "Extreme"
+          },
+          "RequirementsHeading": "Requirements",
+          "RequirementsHeadingReady": "Requirements",
+          "RequiredToolsHeading": "Required tools",
+          "UnknownTool": "Unknown tool",
+          "LinkedSceneHeading": "Visit linked scene",
+          "SceneVisit": "View Scene",
+          "SceneWait": "Wait until the GM activates the linked scene.",
+          "ToolState": {
+            "present": "Available",
+            "damaged": "Damaged",
+            "missing": "Missing"
+          },
+          "ToolHint": {
+            "present": "You have this tool.",
+            "damaged": "This tool is broken.",
+            "missing": "You don't have this tool."
+          },
+          "Callout": {
+            "MissingTools": "Missing tool(s)",
+            "VisitScene": "Visit linked scene",
+            "Conditions": "Wrong conditions",
+            "Catalyst": "Missing catalyst(s)",
+            "Paused": "Game paused",
+            "DuplicateRun": "Already in progress"
           }
         }
       }

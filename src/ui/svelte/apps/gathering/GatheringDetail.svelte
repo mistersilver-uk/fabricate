@@ -31,6 +31,7 @@
   const name = $derived(String(env?.name ?? ''));
   const description = $derived(String(env?.description ?? ''));
   const isBlind = $derived(env?.selectionMode === 'blind');
+  const sceneUuid = $derived(String(env?.sceneUuid ?? ''));
   const revealPolicy = $derived(String(env?.revealPolicy ?? 'never'));
   const tasks = $derived(Array.isArray(env?.tasks) ? env.tasks : []);
   const discoveredTasks = $derived(Array.isArray(env?.discoveredTasks) ? env.discoveredTasks : []);
@@ -50,6 +51,10 @@
       ? ''
       : (KNOWN_RISKS.has(danger) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${danger}`) : danger)
   );
+  // Tier class so the danger pip's icon can escalate in colour with the risk
+  // level (success -> warning -> danger); unmapped values fall back to the
+  // base danger colour.
+  const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
 
   // The list the center column paginates: discovered tasks for blind sites,
   // the full task list for targeted ones.
@@ -131,7 +136,7 @@
           {/if}
           {#if dangerLabel !== ''}
             <li
-              class="gathering-detail-pip is-danger"
+              class={`gathering-detail-pip is-danger ${dangerRiskClass}`}
               aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Danger', { value: dangerLabel })}
             >
               <i class="fas fa-skull" aria-hidden="true"></i>
@@ -182,6 +187,8 @@
                 <GatheringTaskRow
                   task={discoveredTask}
                   environmentId={envId}
+                  sceneUuid={sceneUuid}
+                  {services}
                   onAttempt={attempt}
                   {busy}
                 />
@@ -197,6 +204,8 @@
             <GatheringTaskRow
               task={gatheringTask}
               environmentId={envId}
+              sceneUuid={sceneUuid}
+              {services}
               onAttempt={attempt}
               {busy}
             />
@@ -306,8 +315,34 @@
     color: var(--fab-chip-color);
   }
 
+  /*
+    The danger pip's icon escalates in colour with the environment's risk tier,
+    success -> warning -> danger. The base rule is the fallback for any unmapped
+    risk value; the per-tier rules below override it.
+  */
   .gathering-detail-pip.is-danger i {
     color: var(--fab-danger, var(--fab-text-muted));
+  }
+
+  .gathering-detail-pip.is-danger.risk-safe i {
+    color: var(--fab-success);
+  }
+
+  .gathering-detail-pip.is-danger.risk-unsafe i {
+    color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
+  }
+
+  .gathering-detail-pip.is-danger.risk-hazardous i {
+    color: var(--fab-warning);
+  }
+
+  .gathering-detail-pip.is-danger.risk-dangerous i {
+    color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
+  }
+
+  .gathering-detail-pip.is-danger.risk-deadly i,
+  .gathering-detail-pip.is-danger.risk-extreme i {
+    color: var(--fab-danger);
   }
 
   .gathering-detail-description {
