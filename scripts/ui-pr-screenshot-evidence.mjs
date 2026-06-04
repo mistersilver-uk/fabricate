@@ -78,6 +78,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
   },
   {
+    id: 'player-gathering',
+    label: 'Player gathering tab',
+    smokeLabels: ['player-gathering-environments'],
+    matches: [/^src\/ui\/svelte\/apps\/gathering\//],
+  },
+  {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],

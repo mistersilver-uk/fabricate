@@ -40,6 +40,16 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
+  it('maps player gathering app files to the dedicated player-gathering recipe', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/gathering/GatheringView.svelte',
+      'src/ui/svelte/apps/gathering/GatheringDetail.svelte',
+    ]);
+
+    assert.deepEqual(views.map(view => view.id), ['player-gathering']);
+    assert.deepEqual(views[0].smokeLabels, ['player-gathering-environments']);
+  });
+
   it('keeps every screenshot recipe backed by real smoke labels', () => {
     for (const recipe of VIEW_RECIPES) {
       assert.ok(Array.isArray(recipe.smokeLabels), `${recipe.id} should declare smokeLabels`);

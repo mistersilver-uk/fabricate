@@ -2731,6 +2731,11 @@ async function main() {
         }
 
         await assertNoScreenshotOverlays(page);
+        // Dedicated player Gathering tab evidence: the same populated/selected
+        // state, captured under its own label so changes under
+        // src/ui/svelte/apps/gathering/ map to a real screenshot (see the
+        // 'player-gathering' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
+        await screenshot(page, 'player-gathering-environments');
         await screenshot(page, 'fabricate-app-shell');
 
         await closeOpenApplications(page);
