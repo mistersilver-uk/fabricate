@@ -7,6 +7,9 @@
  *   3. _catalystMatchesItem matches item with only _stats.compendiumSource
  *   4. _catalystMatchesItem still matches item with only flags.core.sourceId (legacy)
  *   5. "Craftable only" filtering includes recipe when actor has items matched via _stats.compendiumSource
+ *   T7. ingredientMatchesItem matches canonical sourceItemUuid when the live sourceUuid differs
+ *   T8. _catalystMatchesItem matches an item linked only by _stats.duplicateSource (drag-copied world item)
+ *   T9. _catalystMatchesItem does NOT match on flags.fabricate.mythwrightId alone
  */
 
 import test from 'node:test';
@@ -222,6 +225,61 @@ test('T6 - _catalystMatchesItem: no match when compendiumSource differs from com
     _stats: { compendiumSource: 'Compendium.world.items.wrong' },
     flags: {},
     name: 'Wrong Catalyst'
+  };
+
+  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), false);
+});
+
+// ---------------------------------------------------------------------------
+// Test 8 — duplicate-source-only item matches a catalyst via sourceItemUuid
+// ---------------------------------------------------------------------------
+
+test('T8 - catalystMatchesItem: matches item linked only by _stats.duplicateSource', () => {
+  const system = makeSystemWithComponent({
+    id: 'cat-8',
+    sourceUuid: 'Compendium.world.items.pick-live',
+    sourceItemUuid: 'Item.world-pick',
+    name: 'Mining Pick'
+  });
+  globalThis.game = makeFakeGame({ system });
+
+  const manager = new RecipeManager();
+  const recipe = makeRecipe();
+  const catalyst = makeCatalyst('cat-8');
+
+  // Drag-copied world item: compendiumSource null, link only in duplicateSource.
+  const item = {
+    uuid: 'Item.actor-drag-copy',
+    _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
+    flags: {},
+    name: 'Mining Pick'
+  };
+
+  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), true);
+});
+
+// ---------------------------------------------------------------------------
+// Test 9 — mythwrightId-only item does NOT match
+// ---------------------------------------------------------------------------
+
+test('T9 - catalystMatchesItem: does NOT match on flags.fabricate.mythwrightId alone', () => {
+  const system = makeSystemWithComponent({
+    id: 'cat-9',
+    sourceUuid: 'Compendium.world.items.pick-live',
+    sourceItemUuid: 'Item.world-pick',
+    name: 'Mining Pick'
+  });
+  globalThis.game = makeFakeGame({ system });
+
+  const manager = new RecipeManager();
+  const recipe = makeRecipe();
+  const catalyst = makeCatalyst('cat-9');
+
+  const item = {
+    uuid: 'Item.actor-seeded',
+    _stats: {},
+    flags: { fabricate: { mythwrightId: 'mw-pick' } },
+    name: 'Mining Pick'
   };
 
   assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), false);

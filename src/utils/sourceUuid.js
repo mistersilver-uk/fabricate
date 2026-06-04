@@ -22,6 +22,26 @@ export function getSourceUuid(item) {
   return item.flags?.core?.sourceId || null;
 }
 
+/**
+ * Resolve the world-duplicate source UUID of a Foundry item document.
+ *
+ * When a world Item is duplicated (for example dragged) into an actor, Foundry
+ * records the origin world document UUID in `_stats.duplicateSource` — distinct
+ * from the compendium-source chain read by {@link getSourceUuid} (in that case
+ * `_stats.compendiumSource` is typically `null` and there is no
+ * `flags.core.sourceId`). This helper mirrors the dual-location pattern of
+ * {@link getSourceUuid}, checking `_stats` then `system._stats`.
+ *
+ * @param {Item|object|null} item - A Foundry item document (or item-like object)
+ * @returns {string|null} The world-duplicate source UUID, or null if unset
+ */
+export function getDuplicateSourceUuid(item) {
+  if (!item) return null;
+  return item._stats?.duplicateSource
+    || item.system?._stats?.duplicateSource
+    || null;
+}
+
 function pushUnique(target, value) {
   if (typeof value !== 'string') return;
   const trimmed = value.trim();
@@ -32,14 +52,21 @@ function pushUnique(target, value) {
 /**
  * Collect the UUIDs that may identify a Foundry item instance and its canonical source.
  *
+ * Contributes three references: the item's live `uuid`, its compendium-source
+ * UUID ({@link getSourceUuid}), and its world-duplicate source UUID
+ * ({@link getDuplicateSourceUuid}). The duplicate-source reference recognizes
+ * items duplicated (for example dragged) from a component's source world item,
+ * which carry the link only in `_stats.duplicateSource`.
+ *
  * @param {Item|object|null} item - Item-like object that may expose `uuid` and source metadata
- * @returns {string[]} Unique UUID references, ordered as [item.uuid, canonical source UUID]
+ * @returns {string[]} Unique UUID references, ordered as [item.uuid, compendium source UUID, world-duplicate source UUID]
  */
 export function getItemSourceReferences(item) {
   const refs = [];
   if (!item || typeof item !== 'object') return refs;
   pushUnique(refs, item.uuid);
   pushUnique(refs, getSourceUuid(item));
+  pushUnique(refs, getDuplicateSourceUuid(item));
   return refs;
 }
 

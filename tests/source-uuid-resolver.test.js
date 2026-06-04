@@ -19,6 +19,7 @@ if (typeof globalThis.foundry !== 'undefined') {
 
 const {
   getSourceUuid,
+  getDuplicateSourceUuid,
   getItemSourceReferences,
   getComponentSourceReferences,
   itemMatchesComponentSource
@@ -109,4 +110,69 @@ test('11 - itemMatchesComponentSource matches canonical sourceItemUuid when live
     fallbackItemIds: []
   };
   assert.equal(itemMatchesComponentSource(item, component), true);
+});
+
+test('12 - getDuplicateSourceUuid reads item._stats.duplicateSource', () => {
+  const item = { _stats: { duplicateSource: 'Item.world-pick' }, flags: {} };
+  assert.equal(getDuplicateSourceUuid(item), 'Item.world-pick');
+});
+
+test('13 - getDuplicateSourceUuid reads system._stats.duplicateSource (second OR-branch)', () => {
+  const item = { system: { _stats: { duplicateSource: 'Item.world-pick-sys' } }, flags: {} };
+  assert.equal(getDuplicateSourceUuid(item), 'Item.world-pick-sys');
+});
+
+test('14 - getDuplicateSourceUuid returns null when unset / null item', () => {
+  assert.equal(getDuplicateSourceUuid({ _stats: {}, flags: {} }), null);
+  assert.equal(getDuplicateSourceUuid(null), null);
+});
+
+test('15 - getSourceUuid stays null for a duplicate-source-only item (compendium contract separate)', () => {
+  const item = {
+    uuid: 'Item.actor-drag-copy',
+    _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
+    flags: {}
+  };
+  assert.equal(getSourceUuid(item), null);
+});
+
+test('16 - getItemSourceReferences includes duplicateSource as a third reference', () => {
+  const item = {
+    uuid: 'Item.actor-drag-copy',
+    _stats: { compendiumSource: 'Compendium.world.items.pick', duplicateSource: 'Item.world-pick' },
+    flags: {}
+  };
+  assert.deepEqual(getItemSourceReferences(item), [
+    'Item.actor-drag-copy',
+    'Compendium.world.items.pick',
+    'Item.world-pick'
+  ]);
+});
+
+test('17 - itemMatchesComponentSource matches a duplicate-source-only item via sourceItemUuid', () => {
+  const item = {
+    uuid: 'Item.actor-drag-copy',
+    _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
+    flags: {}
+  };
+  const component = {
+    sourceUuid: 'Compendium.world.items.pick-live',
+    sourceItemUuid: 'Item.world-pick',
+    fallbackItemIds: []
+  };
+  assert.equal(itemMatchesComponentSource(item, component), true);
+});
+
+test('18 - itemMatchesComponentSource does NOT match on flags.fabricate.mythwrightId alone', () => {
+  const item = {
+    uuid: 'Item.actor-seeded',
+    _stats: {},
+    flags: { fabricate: { mythwrightId: 'mw-pick' } }
+  };
+  const component = {
+    sourceUuid: 'Compendium.world.items.pick-live',
+    sourceItemUuid: 'Item.world-pick',
+    fallbackItemIds: []
+  };
+  assert.equal(itemMatchesComponentSource(item, component), false);
 });
