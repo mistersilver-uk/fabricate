@@ -47,12 +47,25 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
 
 /**
  * Classify each required tool's per-actor state for display: `present` (the
- * actor has a matching, non-broken item), `damaged` (matching item(s) exist but
- * all are flagged broken), or `missing` (no matching item). Uses the SAME
- * matcher as {@link matchGatheringTools} so the UI state stays consistent with
- * attempt validation; the only difference is that this splits broken matches
- * into a `damaged` tier instead of collapsing them into `missing`. Tolerant of
- * a null/empty actor (all `missing`); never throws.
+ * actor has a matching, non-broken item), `damaged` (rendered as "Broken"), or
+ * `missing` (no matching item). Uses the SAME matcher as
+ * {@link matchGatheringTools} so the UI state stays consistent with attempt
+ * validation; the only difference is that this splits broken matches into a
+ * `damaged` tier instead of collapsing them into `missing`.
+ *
+ * The `damaged` tier has two sources, checked only when no working item matched
+ * (working-item precedence — holding both the working tool and a broken variant
+ * yields `present`):
+ *   1. The matched item(s) for the tool's OWN component all carry the
+ *      `flags.fabricate.toolBroken` flag (the `flagBroken` breakage form).
+ *   2. The tool's `onBreak.mode === 'replaceWith'` with a non-empty
+ *      `replacementComponentId`, and the actor holds an item matching that
+ *      separate replacement component (the `replaceWith` repair-stock broken
+ *      variant). This recognition is display-only and does NOT change attempt
+ *      validation in {@link matchGatheringTools}.
+ *
+ * Tolerant of a null/empty actor (all `missing`); never throws. A null/empty/
+ * missing `replacementComponentId` never produces a synthetic probe.
  *
  * @returns {Array<{ tool: object, state: 'present'|'damaged'|'missing' }>}
  */
@@ -67,6 +80,21 @@ export function classifyGatheringToolStates({ actor, system, task, tools = [], c
     if (matches.length > 0) {
       state = matches.some(candidate => !isToolBroken(candidate)) ? 'present' : 'damaged';
     }
+
+    // Fallback: a held `replaceWith` broken-variant component is a separate
+    // managed component (no toolBroken flag), so it never matches the tool's own
+    // component above. When no working item matched, probe for it via the same
+    // matcher and surface it as `damaged` (display-only).
+    if (state === 'missing' && tool?.onBreak?.mode === 'replaceWith') {
+      const replacementComponentId = tool.onBreak.replacementComponentId;
+      if (typeof replacementComponentId === 'string' && replacementComponentId.trim()) {
+        const replacementTool = { componentId: replacementComponentId };
+        if (items.some(candidate => matcher(syntheticRecipe, replacementTool, candidate))) {
+          state = 'damaged';
+        }
+      }
+    }
+
     return { tool, state };
   });
 }

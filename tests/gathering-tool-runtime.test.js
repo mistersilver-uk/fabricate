@@ -469,3 +469,72 @@ test('matchGatheringTools still collapses a broken matching tool into missing (a
   assert.equal(result.items.length, 0);
   assert.equal(result.missing.length, 1);
 });
+
+// ---------------------------------------------------------------------------
+// classifyGatheringToolStates: replaceWith broken-variant recognition (display)
+// ---------------------------------------------------------------------------
+
+function replaceWithTool() {
+  return { componentId: 'c-pick', onBreak: { mode: 'replaceWith', replacementComponentId: 'c-pick-broken' } };
+}
+
+function classifyOne(actor, tool) {
+  return classifyGatheringToolStates({
+    actor,
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [tool],
+    craftingSystemManager: matcher
+  })[0].state;
+}
+
+test('classifyGatheringToolStates: replaceWith variant only → damaged; working → present; neither → missing', () => {
+  assert.equal(classifyOne({ items: [inventoryItem('c-pick-broken')] }, replaceWithTool()), 'damaged');
+  assert.equal(classifyOne({ items: [inventoryItem('c-pick')] }, replaceWithTool()), 'present');
+  assert.equal(classifyOne({ items: [inventoryItem('c-other')] }, replaceWithTool()), 'missing');
+});
+
+test('classifyGatheringToolStates: holding both working tool and broken variant → present (working wins)', () => {
+  const actor = { items: [inventoryItem('c-pick'), inventoryItem('c-pick-broken')] };
+  assert.equal(classifyOne(actor, replaceWithTool()), 'present');
+});
+
+test('classifyGatheringToolStates: destroy/flagBroken onBreak does not trigger the broken-variant fallback', () => {
+  const actor = { items: [inventoryItem('c-pick-broken')] };
+  const destroyTool = { componentId: 'c-pick', onBreak: { mode: 'destroy', replacementComponentId: 'c-pick-broken' } };
+  const flagTool = { componentId: 'c-pick', onBreak: { mode: 'flagBroken', replacementComponentId: 'c-pick-broken' } };
+  assert.equal(classifyOne(actor, destroyTool), 'missing');
+  assert.equal(classifyOne(actor, flagTool), 'missing');
+});
+
+test('classifyGatheringToolStates: null/empty/missing replacementComponentId is missing, no throw, no false-match', () => {
+  // An inventory item whose componentId is undefined must NOT be matched by a
+  // synthetic { componentId: undefined } probe.
+  const actor = { items: [{ componentId: undefined, getFlag: () => false }] };
+  const nullRepl = { componentId: 'c-pick', onBreak: { mode: 'replaceWith', replacementComponentId: null } };
+  const emptyRepl = { componentId: 'c-pick', onBreak: { mode: 'replaceWith', replacementComponentId: '   ' } };
+  const missingRepl = { componentId: 'c-pick', onBreak: { mode: 'replaceWith' } };
+  assert.equal(classifyOne(actor, nullRepl), 'missing');
+  assert.equal(classifyOne(actor, emptyRepl), 'missing');
+  assert.equal(classifyOne(actor, missingRepl), 'missing');
+});
+
+test('classifyGatheringToolStates: existing toolBroken-flag damaged path still works under replaceWith', () => {
+  // Item matches the tool's OWN component and is flagged broken → damaged via flag,
+  // independent of the replaceWith fallback.
+  const actor = { items: [inventoryItem('c-pick', true)] };
+  assert.equal(classifyOne(actor, replaceWithTool()), 'damaged');
+});
+
+test('matchGatheringTools: holding only the replaceWith broken variant stays missing (attempt blocked)', () => {
+  const actor = { items: [inventoryItem('c-pick-broken')] };
+  const result = matchGatheringTools({
+    actor,
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [replaceWithTool()],
+    craftingSystemManager: matcher
+  });
+  assert.equal(result.items.length, 0);
+  assert.equal(result.missing.length, 1);
+});
