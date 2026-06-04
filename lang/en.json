@@ -34,6 +34,7 @@
           "TargetedHint": "Choose a task below to attempt.",
           "SceneGateHint": "You can't gather here until you visit the linked scene below.",
           "BlindAttempt": "Attempt gathering",
+          "BlindAttemptPrompt": "Wonder what you'll find?",
           "Attempt": "Attempt",
           "DiscoveredHeading": "Discovered Tasks ({x}/{y})",
           "NothingDiscovered": "Nothing discovered here yet.",

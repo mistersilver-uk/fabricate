@@ -173,16 +173,25 @@
     {/if}
 
     {#if isBlind}
-      <button
-        type="button"
-        class="gathering-detail-blind-attempt"
-        data-gathering-blind-attempt
-        disabled={!blindAttemptable || busy}
-        onclick={() => attempt({ environmentId: envId, taskId: null })}
-      >
-        <i class="fas fa-dice" aria-hidden="true"></i>
-        {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
-      </button>
+      <div class="gathering-detail-blind-card" data-gathering-blind-card>
+        <div class="gathering-detail-blind-card-lead">
+          <i class="fas fa-mask" aria-hidden="true"></i>
+          <span>{localize('FABRICATE.App.Gathering.Detail.BlindAttemptPrompt')}</span>
+        </div>
+        <span class="gathering-detail-blind-card-divider" aria-hidden="true"></span>
+        <div class="gathering-detail-blind-card-action">
+          <button
+            type="button"
+            class="gathering-detail-blind-attempt"
+            data-gathering-blind-attempt
+            disabled={!blindAttemptable || busy}
+            onclick={() => attempt({ environmentId: envId, taskId: null })}
+          >
+            <i class="fas fa-dice" aria-hidden="true"></i>
+            {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
+          </button>
+        </div>
+      </div>
 
       {#if showDiscovered}
         <section class="gathering-detail-section" data-gathering-discovered>
@@ -369,9 +378,56 @@
     color: var(--fab-text-muted);
   }
 
+  /* Blind call-to-action card: a flavour lead (icon + prompt) on the left, a
+     faint partial-height divider, then the centered attempt button. */
+  .gathering-detail-blind-card {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+  }
+
+  .gathering-detail-blind-card-lead {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 var(--fab-space-3);
+    text-align: center;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-detail-blind-card-lead i {
+    font-size: 30px;
+  }
+
+  .gathering-detail-blind-card-lead span {
+    font-size: 13px;
+  }
+
+  .gathering-detail-blind-card-divider {
+    flex: 0 0 auto;
+    width: 1px;
+    align-self: stretch;
+    margin: var(--fab-space-2) 0;
+    background: var(--fab-border);
+  }
+
+  .gathering-detail-blind-card-action {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .gathering-detail-blind-attempt {
     flex: 0 0 auto;
-    align-self: flex-start;
     appearance: none;
     -webkit-appearance: none;
     display: inline-flex;

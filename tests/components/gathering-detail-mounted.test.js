@@ -328,7 +328,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const { services } = makeServices(listing([blindEnv]));
     await mountView(services);
 
-    assert.ok(target.querySelector('[data-gathering-blind-attempt]'), 'blind attempt button present');
+    const blindCard = target.querySelector('[data-gathering-blind-card]');
+    assert.ok(blindCard, 'blind attempt is wrapped in a call-to-action card');
+    assert.ok(blindCard.querySelector('[data-gathering-blind-attempt]'), 'attempt button lives in the card');
+    assert.ok(blindCard.textContent.includes('BlindAttemptPrompt'), 'card shows the blind prompt');
+    assert.ok(blindCard.querySelector('.gathering-detail-blind-card-divider'), 'card has the divider');
     const discovered = target.querySelector('[data-gathering-discovered]');
     assert.ok(discovered, 'discovered section present for blind + reveal != never');
     assert.ok(discovered.textContent.includes('1/3') || discovered.textContent.includes('"x":1'), 'discovered heading carries the counts');
