@@ -56,7 +56,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     return {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
-      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null
+      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null,
+      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.(opts) ?? null
     };
   }
 

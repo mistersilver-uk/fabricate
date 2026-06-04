@@ -491,15 +491,29 @@ export class GatheringEngine {
    * Each entry in the returned `environments` array carries the environment
    * identity (`id`, `name`, `img`, `region`, `biome(s)`, `dangerTags`, `risk`,
    * `economyMode`, `conditions`, `selectionMode`, `sceneUuid`), interaction
-   * state (`visible`, `attemptable`, `blockedReasons`, `tasks`), and the shared
-   * player-listing fields produced by {@link GatheringEngine#_playerListingFields}:
+   * state (`visible`, `attemptable`, `blockedReasons`, `tasks`,
+   * `discoveredTasks`), and the shared player-listing fields produced by
+   * {@link GatheringEngine#_playerListingFields}:
    *
+   * - `tasks` — visible task models. For a targeted environment, the full
+   *   transparent list; for a non-GM viewer of a blind environment, a single
+   *   opaque "Attempt gathering" entry (the collapsed task list); a GM viewer
+   *   of a blind environment sees the full transparent list. Each transparent
+   *   task model carries a `successChance` — a 0–1 static drop-rate
+   *   approximation from {@link GatheringEngine#_taskSuccessChance} (find
+   *   chance, not whole-attempt success), or `null` for non-d100 tasks; the
+   *   opaque blind entry never carries one.
+   * - `discoveredTasks` — for a non-GM viewer of a blind environment, the
+   *   transparent, individually-attemptable models for tasks this actor has
+   *   already revealed (the "Discovered Tasks" list); `[]` for targeted
+   *   environments, GM viewers, locked environments, and `never`-policy
+   *   environments. See {@link GatheringEngine#_discoveredTaskModels}.
    * - `locked` — `true` for disabled environments surfaced to every viewer
    *   (players and GMs alike) as non-interactive teasers (identity fields only;
-   *   empty `tasks`, an `ENVIRONMENT_DISABLED` blocked reason, and
-   *   `attemptable: false`).
+   *   empty `tasks`, empty `discoveredTasks`, an `ENVIRONMENT_DISABLED` blocked
+   *   reason, and `attemptable: false`).
    * - `revealPolicy` — the effective system-level reveal policy
-   *   (`always`/`onCompletion`/`never`); when `never`, `discoveredTaskCount`
+   *   (`never`/`onSuccess`/`onAttempt`); when `never`, `discoveredTaskCount`
    *   stays `0`.
    * - `composedTaskCount` — size of the composed task pool. This is the
    *   blind-reveal denominator (the "/y" in a player chip) and is intentionally
@@ -829,7 +843,10 @@ export class GatheringEngine {
     }
 
     const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, viewer, actor });
-    const taskModels = [];
+    // Stash each visible task's blocked reasons so both the player task models
+    // and the blind "discovered tasks" list draw from one computation — no
+    // extra visibility pass that could surface unrevealed tasks.
+    const taskEntries = [];
     for (const visibleTask of visibleTasks) {
       const taskBlockedReasons = [
         ...environmentBlockedReasons,
@@ -841,20 +858,37 @@ export class GatheringEngine {
           viewer
         })
       ];
-      taskModels.push(this._taskModel({
+      taskEntries.push({
         task: visibleTask.task,
-        environment,
-        actor,
-        viewer,
         visibility: visibleTask.visibility,
         blockedReasons: taskBlockedReasons
-      }));
+      });
     }
+    const taskModels = taskEntries.map(entry => this._taskModel({
+      task: entry.task,
+      environment,
+      actor,
+      viewer,
+      visibility: entry.visibility,
+      blockedReasons: entry.blockedReasons
+    }));
 
     const attemptable = taskModels.some(task => task.attemptable);
     const blockedReasons = environmentBlockedReasons.length > 0
       ? environmentBlockedReasons
       : (attemptable ? [] : uniqueReasons(taskModels.flatMap(task => task.blockedReasons)));
+
+    // A non-GM viewer of a blind environment sees one opaque "Attempt gathering"
+    // action (the collapsed task list) plus the transparent rows for tasks they
+    // have already discovered. Targeted environments and GM viewers expose the
+    // full task list and no separate discovered list.
+    const blindForViewer = environment.selectionMode === 'blind' && viewer?.isGM !== true;
+    const listedTasks = blindForViewer
+      ? (taskModels.length > 0 ? [taskModels[0]] : [])
+      : taskModels;
+    const discoveredTasks = blindForViewer
+      ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons })
+      : [];
 
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
@@ -877,9 +911,66 @@ export class GatheringEngine {
       visible: true,
       attemptable,
       blockedReasons,
-      tasks: taskModels,
+      tasks: listedTasks,
+      discoveredTasks,
       ...this._playerListingFields({ environment, actor, locked: false })
     };
+  }
+
+  /**
+   * Build transparent, individually-attemptable task models for the tasks a
+   * non-GM viewer has already revealed in a blind environment (the "Discovered
+   * Tasks" list). Returns `[]` when the effective reveal policy is `never` or
+   * nothing has been revealed.
+   *
+   * Models are built only from `taskEntries` — the already-computed visible
+   * tasks — intersected with the revealed task ids, so an unrevealed (or
+   * never-visible) task can never leak into the discovered list. Blocked reasons
+   * are recomputed with `transparent: true` so each row carries its real
+   * required weather/time and missing-tool details.
+   *
+   * @param {object} args
+   * @param {object} args.environment Composed blind environment.
+   * @param {object} args.system Owning crafting system.
+   * @param {object} args.viewer Foundry user requesting the listing.
+   * @param {object} args.actor Selected actor whose reveals are read.
+   * @param {Array<{task: object, visibility: object, blockedReasons: object[]}>} args.taskEntries
+   *   The environment's visible-task entries.
+   * @param {object[]} args.environmentBlockedReasons Shared environment-level reasons.
+   * @returns {Promise<object[]>} Transparent discovered task models (each with `discovered: true`).
+   */
+  async _discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons }) {
+    const { policy, scope } = this._resolveRevealPolicy(environment);
+    if (policy === 'never') return [];
+    const revealedIds = new Set(this._listRevealedTaskIds({ actor, environmentId: environment.id, scope }));
+    if (revealedIds.size === 0) return [];
+
+    const discovered = [];
+    for (const entry of taskEntries) {
+      if (!revealedIds.has(stringOrNull(entry.task.id))) continue;
+      const blockedReasons = [
+        ...environmentBlockedReasons,
+        ...await this._taskBlockedReasons({
+          environment,
+          system,
+          task: entry.task,
+          actor,
+          viewer,
+          transparent: true
+        })
+      ];
+      const model = this._taskModel({
+        task: entry.task,
+        environment,
+        actor,
+        viewer,
+        visibility: entry.visibility,
+        blockedReasons,
+        forceVisible: true
+      });
+      discovered.push({ ...model, discovered: true });
+    }
+    return discovered;
   }
 
   /**
@@ -911,6 +1002,7 @@ export class GatheringEngine {
       attemptable: false,
       blockedReasons: [this._blockedReason('ENVIRONMENT_DISABLED')],
       tasks: [],
+      discoveredTasks: [],
       ...this._playerListingFields({ environment, actor: null, locked: true })
     };
   }
@@ -944,6 +1036,45 @@ export class GatheringEngine {
     } catch (_err) {
       return 0;
     }
+  }
+
+  /**
+   * Null-safe wrapper over {@link GatheringRichStateService#listRevealedTaskIds}.
+   * Returns the distinct task ids the actor has revealed for an environment at
+   * the given reveal scope, or `[]` when the service is absent or throws. Used
+   * to surface individually-discovered tasks in blind environments.
+   */
+  _listRevealedTaskIds({ actor, environmentId, scope }) {
+    if (typeof this.richState?.listRevealedTaskIds !== 'function') return [];
+    try {
+      return normalizeList(this.richState.listRevealedTaskIds({ actor, environmentId, scope }));
+    } catch (_err) {
+      return [];
+    }
+  }
+
+  /**
+   * A static, drop-rate-only approximation of the chance a d100 task yields at
+   * least one item: `1 − ∏(1 − dropRate_i/100)` over enabled drop rows.
+   *
+   * This deliberately ignores actor/condition/character modifiers, attempt
+   * limits, node depletion, stamina, catalysts, and the d100 success threshold,
+   * so it represents "chance at least one drop rolls", not whole-attempt
+   * success. Returns `null` for non-d100 tasks or when there are no enabled drop
+   * rows, so the UI can hide the success-chance bar.
+   *
+   * @param {object} task A composed/normalized gathering task.
+   * @returns {number|null} A 0–1 fraction, or `null` when not applicable.
+   */
+  _taskSuccessChance(task) {
+    if (task?.resolutionMode !== 'd100') return null;
+    const rows = normalizeList(task.dropRows).filter(row => row?.enabled !== false);
+    if (rows.length === 0) return null;
+    const missAll = rows.reduce((product, row) => {
+      const rate = Math.min(100, Math.max(0, Number(row?.dropRate) || 0));
+      return product * (1 - rate / 100);
+    }, 1);
+    return 1 - missAll;
   }
 
   _resolveBiomeTags(environment) {
@@ -1011,15 +1142,36 @@ export class GatheringEngine {
     return { allowed: false, code: 'SCENE_TOKEN_BLOCKED' };
   }
 
-  async _taskBlockedReasons({ environment, system, task, actor, viewer }) {
+  /**
+   * Collect the blocked-reason list for a single task (game-paused, duplicate
+   * run, catalyst, tool, conditions, scene, and rich-attempt gates).
+   *
+   * @param {object} args
+   * @param {object} args.environment Composed environment.
+   * @param {object} args.system Owning crafting system.
+   * @param {object} args.task Composed/normalized task.
+   * @param {object} args.actor Selected actor.
+   * @param {object} args.viewer Foundry user requesting the listing.
+   * @param {boolean} [args.transparent=false] When `true`, bypass the
+   *   `_isOpaqueBlindTask` data redaction so a revealed/discovered blind task's
+   *   row keeps its real required-weather/time and missing-tool details. No
+   *   other behavior changes. Targeted tasks and GM viewers are already
+   *   transparent regardless of this flag.
+   * @returns {Promise<object[]>} The task's blocked reasons.
+   */
+  async _taskBlockedReasons({ environment, system, task, actor, viewer, transparent = false }) {
     const blockedReasons = [];
+    // For a revealed/discovered blind task (`transparent`), keep the real
+    // blocked-reason data — the row needs the actual required weather/time and
+    // missing-tool details. For an opaque blind task, the data stays nulled.
+    const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     if (this._gamePaused()) {
       blockedReasons.push(this._blockedReason('GAME_PAUSED'));
     }
 
     if (this.runManager?.findActiveRunForTask?.(actor, task.id)) {
       blockedReasons.push(this._blockedReason('DUPLICATE_ACTIVE_RUN', {
-        data: this._isOpaqueBlindTask({ environment, viewer }) ? null : { taskId: task.id }
+        data: redact ? null : { taskId: task.id }
       }));
     }
 
@@ -1035,7 +1187,7 @@ export class GatheringEngine {
       });
       if (catalystResult.available !== true) {
         blockedReasons.push(this._blockedReason('CATALYST_BLOCKED', {
-          data: this._isOpaqueBlindTask({ environment, viewer })
+          data: redact
             ? null
             : {
                 taskId: task.id,
@@ -1048,7 +1200,7 @@ export class GatheringEngine {
     const taskTools = this._resolveTaskTools({ environment, task });
     if (this._hasBlockedToolReferences(taskTools)) {
       blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
-        data: this._isOpaqueBlindTask({ environment, viewer })
+        data: redact
           ? null
           : this._toolBlockedData({ task, resolvedTools: taskTools })
       }));
@@ -1063,7 +1215,7 @@ export class GatheringEngine {
       });
       if (toolResult.available !== true) {
         blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
-          data: this._isOpaqueBlindTask({ environment, viewer })
+          data: redact
             ? null
             : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult })
         }));
@@ -1076,7 +1228,7 @@ export class GatheringEngine {
     const conditionsResult = evaluateEnvironmentMatch(task, environment, environment?.conditions || {}, { includeDanger: false });
     if (conditionsResult.conditionsMet === false) {
       blockedReasons.push(this._blockedReason('CONDITIONS_BLOCKED', {
-        data: this._isOpaqueBlindTask({ environment, viewer })
+        data: redact
           ? null
           : {
               taskId: task.id,
@@ -1086,7 +1238,7 @@ export class GatheringEngine {
       }));
     }
 
-    const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task });
+    const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task, transparent });
     blockedReasons.push(...richAttempt.blockedReasons);
 
     return blockedReasons;
@@ -1162,9 +1314,34 @@ export class GatheringEngine {
       : { available: false, missing: tools, failedRequirements: [] };
   }
 
-  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons }) {
+  /**
+   * Build the per-task model surfaced in the player listing. For an opaque
+   * blind task (non-GM viewer of a blind environment) it returns the collapsed
+   * `blindGather` action with task identity redacted; otherwise it returns the
+   * full transparent model, including a `successChance` (see
+   * {@link GatheringEngine#_taskSuccessChance}). The opaque branch never carries
+   * `successChance`, so aggregate drop info cannot leak.
+   *
+   * @param {object} args
+   * @param {object} args.task Composed/normalized task.
+   * @param {object} args.environment Composed environment.
+   * @param {object|null} [args.actor=null] Selected actor.
+   * @param {object} args.viewer Foundry user requesting the listing.
+   * @param {object} args.visibility Resolved task visibility metadata.
+   * @param {object[]} args.blockedReasons Precomputed blocked reasons for the task.
+   * @param {boolean} [args.forceVisible=false] When `true`, skip the opaque
+   *   blind collapse and build the transparent model even for a non-GM viewer
+   *   of a blind environment — used for already-revealed tasks in the
+   *   "Discovered Tasks" list. All callers use the object form, so the added
+   *   key is safe.
+   * @returns {object} The task model.
+   */
+  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons, forceVisible = false }) {
     const blind = environment.selectionMode === 'blind';
-    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    // `forceVisible` builds a transparent model for an already-revealed blind
+    // task (the "Discovered Tasks" list) — it bypasses the opaque collapse that
+    // otherwise hides task identity from non-GM viewers of a blind environment.
+    const opaqueBlind = !forceVisible && this._isOpaqueBlindTask({ environment, viewer });
     const rich = this._richListingMetadata({ environment, task, actor, viewer });
 
     if (opaqueBlind) {
@@ -1204,6 +1381,7 @@ export class GatheringEngine {
       resolutionMode: stringOrNull(task.resolutionMode),
       hasTimeRequirement: Boolean(task.timeRequirement),
       catalystCount: normalizeList(task.catalysts).length,
+      successChance: this._taskSuccessChance(task),
       rich
     };
   }
@@ -1226,16 +1404,33 @@ export class GatheringEngine {
     };
   }
 
-  async _evaluateRichAttempt({ actor, viewer, system, environment, task }) {
+  /**
+   * Evaluate the rich-state attempt gate for a task and map its blocked reasons
+   * into the listing's blocked-reason shape.
+   *
+   * @param {object} args
+   * @param {object} args.actor Selected actor.
+   * @param {object} args.viewer Foundry user requesting the listing.
+   * @param {object} args.system Owning crafting system.
+   * @param {object} args.environment Composed environment.
+   * @param {object} args.task Composed/normalized task.
+   * @param {boolean} [args.transparent=false] When `true`, keep the real
+   *   per-reason `data` for a revealed/discovered blind task instead of nulling
+   *   it via the `_isOpaqueBlindTask` redaction.
+   * @returns {Promise<{blockedReasons: object[], evidence: object}>} Mapped
+   *   blocked reasons and the rich-listing evidence.
+   */
+  async _evaluateRichAttempt({ actor, viewer, system, environment, task, transparent = false }) {
     if (typeof this.richState?.evaluateStart !== 'function') {
       return { blockedReasons: [], evidence: this._richListingMetadata({ environment, task, actor, viewer }) };
     }
     const result = await this.richState.evaluateStart({ actor, viewer, system, environment, task });
+    const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     return {
       blockedReasons: normalizeList(result?.blockedReasons).map(reason => this._blockedReason(reason.code || 'BLOCKED', {
         messageKey: reason.messageKey,
         message: reason.message,
-        data: this._isOpaqueBlindTask({ environment, viewer }) ? null : reason.data
+        data: redact ? null : reason.data
       })),
       evidence: plainObjectOrNull(result?.evidence) || {}
     };

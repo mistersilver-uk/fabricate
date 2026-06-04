@@ -17,15 +17,22 @@ The actual composed-task set is `enabled ∪ forced − disabled`, then filtered
 
 ### Player listing counts are a separate, engine-owned surface
 
-The player-facing environment listing is produced by `GatheringEngine.listForActor` / `_buildEnvironmentListing` (`src/systems/GatheringEngine.js:486`, `:776`), not by the admin store. Each player environment listing carries its own count and policy fields via `_playerListingFields` (`GatheringEngine.js:888`):
+The player-facing environment listing is produced by `GatheringEngine.listForActor` / `_buildEnvironmentListing` (`src/systems/GatheringEngine.js:535`, `:825`), not by the admin store. Each player environment listing carries its own count and policy fields via `_playerListingFields` (`GatheringEngine.js:1017`):
 
 - `composedTaskCount` — the size of the **total composed task pool** for the environment (`normalizeList(environment.tasks).length`; `0` when the listing is locked). This is the **blind-reveal denominator** — the `y` in a `(x/y)` "tasks discovered" suffix. It is a pool size, distinct from the admin `availableTaskCount` (which subtracts condition-blocked records).
-- `discoveredTaskCount` — the `x`: how many tasks this actor has revealed at the effective reveal scope (`GatheringRichStateService.countRevealedTasks`). It is `0` when the listing is locked or when the effective `revealPolicy === 'never'`.
-- `revealPolicy` — the **effective system-level** policy (`never` | `onSuccess` | `onAttempt`), resolved by `GatheringEngine._resolveRevealPolicy` (`GatheringEngine.js:2043`) from the composed system Gathering Rules. Reveal is system-level only; environments do **not** override it.
+- `discoveredTaskCount` — the `x`: how many tasks this actor has revealed at the effective reveal scope (`GatheringRichStateService.countRevealedTasks`, which now delegates to `listRevealedTaskIds`). It is `0` when the listing is locked or when the effective `revealPolicy === 'never'`.
+- `revealPolicy` — the **effective system-level** policy (`never` | `onSuccess` | `onAttempt`), resolved by `GatheringEngine._resolveRevealPolicy` (`GatheringEngine.js:2275`) from the composed system Gathering Rules. Reveal is system-level only; environments do **not** override it.
 - `locked` — `true` for a disabled environment, surfaced as a locked identity-only listing to all viewers (players and GMs alike).
 - `biomeTags` — resolved biome display metadata (`{ id, label, icon, colorToken, customColor }`) from `GatheringRichStateService.resolveBiomeTags`, so player biome chips render identically to the GM editor.
 
-**Disabled environments are surfaced as locked identity-only listings to all viewers** (players and GMs alike) in the player listing (`_lockedEnvironmentListing`, `GatheringEngine.js:854`): `locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, and identity fields only — no `tasks`, weights, or composition internals leak. They were previously filtered out entirely for non-GMs and (earlier still) shown as the full listing to GMs.
+Beyond the shared `_playerListingFields`, `_buildEnvironmentListing` also surfaces two task-shaped fields per environment:
+
+- `tasks[]` — the visible task models. A **targeted** environment lists every visible task transparently; a **non-GM viewer of a blind** environment gets a single opaque `blindGather` entry (the collapsed task list); a **GM viewer of a blind** environment gets the full transparent list. Each transparent task model carries a `successChance` (see below); the opaque blind entry never does.
+- `discoveredTasks[]` — for a **non-GM viewer of a blind** environment only, the transparent, individually-attemptable models for the tasks this actor has already revealed (the player "Discovered Tasks" list), each tagged `discovered: true`. It is `[]` for targeted environments, GM viewers, locked environments, and `never`-policy environments. Built by `GatheringEngine._discoveredTaskModels` (`GatheringEngine.js:942`) only from the already-computed visible tasks intersected with the revealed-id set (via `_listRevealedTaskIds`), so an unrevealed or never-visible task can never leak into it. Its length tracks `discoveredTaskCount` but may legitimately diverge if a revealed task later becomes invisible/disabled.
+
+Per-task `successChance` (on transparent task models) is a 0–1 fraction from `GatheringEngine._taskSuccessChance`: a **static drop-rate approximation** `1 − ∏(1 − dropRate_i/100)` over enabled d100 drop rows. It is `null` for non-d100 tasks and when there are no enabled drop rows. It is a **find-chance** ("chance at least one drop rolls"), **not** whole-attempt success — it ignores actor/condition/character modifiers, attempt limits, node depletion, stamina, catalysts, and the d100 success threshold.
+
+**Disabled environments are surfaced as locked identity-only listings to all viewers** (players and GMs alike) in the player listing (`_lockedEnvironmentListing`, `GatheringEngine.js:982`): `locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, empty `tasks` and `discoveredTasks`, and identity fields only — no `tasks`, weights, or composition internals leak. They were previously filtered out entirely for non-GMs and (earlier still) shown as the full listing to GMs.
 
 Use the admin `environmentTaskCounts` only for GM manager surfaces. Use the engine listing fields (`composedTaskCount` / `discoveredTaskCount`) for anything a player sees.
 
@@ -51,6 +58,8 @@ UI strings that say "Catalysts" at the environment scope are a sign of stale cod
 | GM manager: how many hazards? | `$viewState.environmentTaskCounts[id]?.availableHazardCount` |
 | Player listing: total composed task pool (blind-reveal denominator `y`) | `listing.composedTaskCount` (from `GatheringEngine.listForActor`) |
 | Player listing: tasks this actor has discovered (`x`) | `listing.discoveredTaskCount` |
+| Player listing: the discovered blind-task rows (non-GM blind only) | `listing.discoveredTasks[]` (`[]` for targeted, GM, locked, or `never`-policy) |
+| Player listing: a task's find-chance bar value | `task.successChance` (0–1 d100 drop approximation; `null` when N/A; not attempt-success) |
 | Player listing: effective reveal policy (system-level) | `listing.revealPolicy` |
 | Player listing: is this a locked (disabled) teaser? | `listing.locked` |
 | Which task ids? | `enabled ∪ forced − disabled` from the env object |

@@ -27,6 +27,34 @@
           "SearchPlaceholder": "Search environments…",
           "SearchLabel": "Search environments",
           "NoMatches": "No environments match your search."
+        },
+        "Detail": {
+          "SelectHint": "Select an available environment from the left menu.",
+          "BlindHint": "This is a blind gathering site. Attempt a gather to discover what it yields.",
+          "TargetedHint": "Choose a task below to attempt.",
+          "BlindAttempt": "Attempt gathering",
+          "Attempt": "Attempt",
+          "DiscoveredHeading": "Discovered Tasks ({x}/{y})",
+          "NothingDiscovered": "Nothing discovered here yet.",
+          "SuccessChance": "Success chance: {x}%",
+          "SuccessChanceLabel": "Success chance",
+          "RequiresTimeOfDay": "Requires time of day: {values}",
+          "RequiresWeather": "Requires weather: {values}",
+          "MissingTools": "Missing tools: {tools}",
+          "Blocked": "Currently unavailable.",
+          "Pips": {
+            "Biome": "Biome: {value}",
+            "Region": "Region: {value}",
+            "Danger": "Danger: {value}"
+          },
+          "Risk": {
+            "safe": "Safe",
+            "unsafe": "Unsafe",
+            "hazardous": "Hazardous",
+            "dangerous": "Dangerous",
+            "deadly": "Deadly",
+            "extreme": "Extreme"
+          }
         }
       }
     },

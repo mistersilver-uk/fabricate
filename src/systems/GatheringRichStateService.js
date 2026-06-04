@@ -693,11 +693,12 @@ export class GatheringRichStateService {
 
   /**
    * Count the distinct task ids an actor has revealed for one environment at a
-   * given reveal scope. Reuses the same {@link revealKey} prefix builder as the
-   * writer ({@link GatheringRichStateService#revealTask}) so the read stays in
-   * lockstep with how reveals are stored. The `party` scope has no dedicated
-   * key today and therefore collapses onto the `actor:` key, matching the
-   * writer. Returns `0` on missing/inaccessible state and never throws.
+   * given reveal scope. Delegates to
+   * {@link GatheringRichStateService#listRevealedTaskIds} and returns its
+   * length, so the count and the list share one read path and never drift. The
+   * `party` scope has no dedicated key today and therefore collapses onto the
+   * `actor:` key, matching the writer. Returns `0` on missing/inaccessible
+   * state and never throws.
    *
    * @param {object} args
    * @param {object} args.actor Foundry actor holding the reveal flag state.
@@ -706,15 +707,34 @@ export class GatheringRichStateService {
    * @returns {number} Count of distinct revealed task ids.
    */
   countRevealedTasks({ actor, environmentId, scope = 'actor' } = {}) {
+    return this.listRevealedTaskIds({ actor, environmentId, scope }).length;
+  }
+
+  /**
+   * List the distinct task ids the actor has revealed for an environment at the
+   * given reveal scope. Shares the read path and `revealKey` prefix matching
+   * with {@link GatheringRichStateService#countRevealedTasks} (which delegates
+   * here) so the list and the count never drift from the `revealTask` writer.
+   *
+   * `party` collapses onto the `actor:` key (there is no party branch in
+   * `revealKey`), matching how reveals are written.
+   *
+   * @param {object} args
+   * @param {object} args.actor Foundry actor holding the reveal flag state.
+   * @param {string} args.environmentId Environment whose reveals are listed.
+   * @param {string} [args.scope='actor'] Reveal scope (`actor`/`user`/`party`/`global`).
+   * @returns {string[]} Distinct revealed task ids; `[]` on missing/inaccessible state.
+   */
+  listRevealedTaskIds({ actor, environmentId, scope = 'actor' } = {}) {
     const envId = stringOrFallback(environmentId, '');
-    if (!envId) return 0;
+    if (!envId) return [];
     let reveals;
     try {
       reveals = readState(actor)?.reveals;
     } catch (_err) {
-      return 0;
+      return [];
     }
-    if (!reveals || typeof reveals !== 'object') return 0;
+    if (!reveals || typeof reveals !== 'object') return [];
     // Build the scope-specific prefix once via revealKey (with a sentinel task
     // id) so the matching format always mirrors the writer's key format.
     const sentinel = ' ';
@@ -732,7 +752,7 @@ export class GatheringRichStateService {
       const taskId = key.slice(prefix.length);
       if (taskId) taskIds.add(taskId);
     }
-    return taskIds.size;
+    return Array.from(taskIds);
   }
 
   /**

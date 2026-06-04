@@ -2710,6 +2710,18 @@ async function main() {
         await appShell.locator('[data-gathering-state]:not([data-gathering-state="loading"])')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
 
+        // The populated layout now fills the center column with the environment
+        // detail (GatheringDetail). A selectable environment auto-selects, so
+        // wait for the detail to render its selected view ([data-gathering-detail]
+        // → [data-gathering-detail-state="selected"]) before capturing, so the
+        // frame shows the populated detail panel (header, pips, attempt area)
+        // rather than the select-an-environment hint. The seeded fixtures
+        // guarantee at least one non-locked environment to select.
+        if (await appShell.locator('[data-gathering-state="populated"]').count() > 0) {
+          await appShell.locator('[data-gathering-detail] [data-gathering-detail-state="selected"]')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+        }
+
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'fabricate-app-shell');
 

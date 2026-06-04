@@ -105,6 +105,11 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
+    // GatheringView now renders the center-column detail tree; compile it too so
+    // the compiled view can resolve its imports at mount time.
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(

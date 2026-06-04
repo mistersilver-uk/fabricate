@@ -390,6 +390,25 @@ Runtime integration coverage now includes scene-linked gathering, hook-driven ti
 boundary regression guard. Validation/accessibility polish is implemented; live Foundry validation remains conditional
 for future runtime-specific or screenshot-required work.
 
+Player gathering detail-column checkpoint: the player app's center column now renders the selected environment's detail
+panel, and the player listing carries two additional per-task/per-environment concepts. **`successChance`** is a per-task
+`0`–`1` fraction (or `null`) used to render the success-chance bar. It is a deliberate drop-only static approximation —
+`1 − ∏(1 − dropRate_i/100)` over the task's enabled drop rows, defined only for `resolutionMode === 'd100'` (and `null`
+for progressive/routed modes or when no drop rows are enabled). It means "chance at least one drop row rolls" (the chance
+the attempt finds something), NOT whole-attempt success: it ignores the d100 threshold, condition/character modifiers, the
+attempt/node/stamina/catalyst gates, and hazard policy, so the bar can read high while the attempt is still blocked or
+fails its check. It is never attached to the opaque `blindGather` entry, so it leaks no aggregate drop information.
+**`discoveredTasks`** is the transparent, individually-attemptable set of revealed-task models shown on a non-GM viewer's
+`blind`-environment listing: each carries `discovered: true` and the same real task identity, blocked reasons, and
+`successChance` as a targeted row. The non-GM blind `tasks` array stays collapsed to a single opaque `blindGather` action,
+so the discovered rows live only in `discoveredTasks`. The distinction between *discovered* and *visible/attemptable* on
+the player surface matters here: `discoveredTaskCount` counts every task revealed at the effective reveal scope, whereas
+`discoveredTasks` is built only from the intersection of those reveals with the entry's currently-visible tasks (never a
+fresh visibility pass, so no unrevealed task can leak). The two may legitimately diverge — `discoveredTasks.length` can be
+smaller than `discoveredTaskCount` when a revealed task is currently invisible or disabled. `discoveredTasks` is always
+empty for targeted environments, locked entries, GM viewers (who already get the full transparent `tasks`), and when the
+effective `revealPolicy === 'never'`.
+
 ## Bounded Contexts
 
 ### 1. Module Configuration
