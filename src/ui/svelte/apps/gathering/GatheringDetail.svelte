@@ -19,6 +19,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
+  import LinkedScene from './LinkedScene.svelte';
 
   let {
     environment = null,
@@ -32,6 +33,10 @@
   const description = $derived(String(env?.description ?? ''));
   const isBlind = $derived(env?.selectionMode === 'blind');
   const sceneUuid = $derived(String(env?.sceneUuid ?? ''));
+  // The linked scene is an environment-level restriction: show its banner once,
+  // above the task list, exactly when the environment is scene-gated.
+  const envBlockedReasons = $derived(Array.isArray(env?.blockedReasons) ? env.blockedReasons : []);
+  const sceneBlocked = $derived(sceneUuid !== '' && envBlockedReasons.some(reason => reason?.code === 'SCENE_TOKEN_BLOCKED'));
   const revealPolicy = $derived(String(env?.revealPolicy ?? 'never'));
   const tasks = $derived(Array.isArray(env?.tasks) ? env.tasks : []);
   const discoveredTasks = $derived(Array.isArray(env?.discoveredTasks) ? env.discoveredTasks : []);
@@ -151,11 +156,21 @@
       {/if}
 
       <p class="gathering-detail-mode-hint" data-gathering-mode-hint>
-        {localize(isBlind
-          ? 'FABRICATE.App.Gathering.Detail.BlindHint'
-          : 'FABRICATE.App.Gathering.Detail.TargetedHint')}
+        {#if sceneBlocked}
+          {localize('FABRICATE.App.Gathering.Detail.SceneGateHint')}
+        {:else}
+          {localize(isBlind
+            ? 'FABRICATE.App.Gathering.Detail.BlindHint'
+            : 'FABRICATE.App.Gathering.Detail.TargetedHint')}
+        {/if}
       </p>
     </header>
+
+    {#if sceneBlocked}
+      <section class="gathering-detail-scene" data-gathering-scene-banner>
+        <LinkedScene {sceneUuid} {services} />
+      </section>
+    {/if}
 
     {#if isBlind}
       <button
@@ -187,8 +202,6 @@
                 <GatheringTaskRow
                   task={discoveredTask}
                   environmentId={envId}
-                  sceneUuid={sceneUuid}
-                  {services}
                   onAttempt={attempt}
                   {busy}
                 />
@@ -204,8 +217,6 @@
             <GatheringTaskRow
               task={gatheringTask}
               environmentId={envId}
-              sceneUuid={sceneUuid}
-              {services}
               onAttempt={attempt}
               {busy}
             />
@@ -404,8 +415,19 @@
 
   .gathering-detail-section-title {
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 14px;
     font-weight: 600;
+  }
+
+  /* Environment-level linked-scene banner, shown once above the task list. */
+  .gathering-detail-scene {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
   }
 
   .gathering-detail-task-list {

@@ -32,6 +32,7 @@
           "SelectHint": "Select an available environment from the left menu.",
           "BlindHint": "This is a blind gathering site. Attempt a gather to discover what it yields.",
           "TargetedHint": "Choose a task below to attempt.",
+          "SceneGateHint": "You can't gather here until you visit the linked scene below.",
           "BlindAttempt": "Attempt gathering",
           "Attempt": "Attempt",
           "DiscoveredHeading": "Discovered Tasks ({x}/{y})",

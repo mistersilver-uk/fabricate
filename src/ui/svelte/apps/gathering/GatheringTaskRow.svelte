@@ -17,13 +17,10 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import SuccessChanceBar from './SuccessChanceBar.svelte';
-  import LinkedScene from './LinkedScene.svelte';
 
   let {
     task = null,
     environmentId = '',
-    sceneUuid = '',
-    services = null,
     onAttempt = null,
     busy = false
   } = $props();
@@ -38,11 +35,11 @@
   const successChance = $derived(task?.successChance ?? null);
   const tools = $derived(Array.isArray(task?.tools) ? task.tools : []);
 
-  // Each blocking issue becomes a header callout chip. Codes with dedicated
-  // detail (tools, scene) still get a callout; the expanded section details them.
+  // Each blocking issue becomes a header callout chip. The linked-scene gate is
+  // an environment-level restriction, surfaced once above the task list by
+  // GatheringDetail — never as a per-task callout here.
   const CALLOUTS = {
     TOOL_BLOCKED: { icon: 'fa-screwdriver-wrench', key: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools', tone: 'warning' },
-    SCENE_TOKEN_BLOCKED: { icon: 'fa-location-dot', key: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene', tone: 'info' },
     CONDITIONS_BLOCKED: { icon: 'fa-cloud-sun', key: 'FABRICATE.App.Gathering.Detail.Callout.Conditions', tone: 'warning' },
     CATALYST_BLOCKED: { icon: 'fa-flask', key: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst', tone: 'warning' },
     GAME_PAUSED: { icon: 'fa-pause', key: 'FABRICATE.App.Gathering.Detail.Callout.Paused', tone: 'neutral' },
@@ -54,7 +51,7 @@
     const out = [];
     for (const reason of blockedReasons) {
       const code = reason?.code;
-      if (!code || seen.has(code)) continue;
+      if (!code || code === 'SCENE_TOKEN_BLOCKED' || seen.has(code)) continue;
       seen.add(code);
       const def = CALLOUTS[code];
       out.push(def
@@ -64,10 +61,8 @@
     return out;
   });
 
-  const hasScene = $derived(Boolean(sceneUuid) && blockedReasons.some(reason => reason?.code === 'SCENE_TOKEN_BLOCKED'));
-
-  // Remaining blocking reasons (not tools or scene, which have their own panels)
-  // rendered as text lines in the expanded section.
+  // Remaining blocking reasons (not tools, which have their own panel, nor the
+  // environment-level scene gate) rendered as text lines in the expanded section.
   function blockedLines(reason) {
     const data = reason?.data ?? null;
     if (reason?.code === 'CONDITIONS_BLOCKED' && data) {
@@ -87,7 +82,7 @@
       .flatMap(blockedLines)
   );
 
-  const expandable = $derived(tools.length > 0 || hasScene || detailLines.length > 0);
+  const expandable = $derived(tools.length > 0 || detailLines.length > 0);
 
   let expanded = $state(false);
   function toggle() {
@@ -214,16 +209,6 @@
                 </li>
               {/each}
             </ul>
-          </section>
-        {/if}
-
-        {#if hasScene}
-          <section class="gathering-task-scene" data-gathering-scene-section>
-            <h4 class="gathering-task-subheading">
-              <i class="fas fa-location-dot" aria-hidden="true"></i>
-              {localize('FABRICATE.App.Gathering.Detail.LinkedSceneHeading')}
-            </h4>
-            <LinkedScene {sceneUuid} {services} />
           </section>
         {/if}
       </div>

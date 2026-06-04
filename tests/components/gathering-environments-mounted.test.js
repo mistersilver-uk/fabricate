@@ -531,6 +531,32 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(hazard.classList.contains('risk-deadly'), 'deadly tier class applied');
   });
 
+  it('uses the linked-scene thumbnail for the card image when the environment links a scene', async () => {
+    globalThis.fromUuid = async (uuid) => (uuid === 'Scene.cave'
+      ? { name: 'Collapsed Tunnel', thumb: 'scenes/cave-thumb.webp' }
+      : null);
+    try {
+      await mountView(makeServices(listing([
+        environment({ id: 'env-scene', name: 'Mines', img: 'icons/svg/sun.svg', sceneUuid: 'Scene.cave', biomeTags: [] }),
+        environment({ id: 'env-plain', name: 'Open Field', img: 'icons/svg/sun.svg', biomeTags: [] })
+      ])));
+      // Let the async fromUuid resolution settle and flush.
+      await tick();
+      await tick();
+      flushSync();
+
+      const sceneThumb = target.querySelector('[data-environment-id="env-scene"] .gathering-env-card-thumb');
+      assert.equal(sceneThumb.getAttribute('src'), 'scenes/cave-thumb.webp', 'linked-scene thumbnail used');
+      assert.equal(sceneThumb.classList.contains('is-fallback'), false, 'a resolved thumbnail is not a fallback');
+
+      // An environment without a linked scene keeps its own image.
+      const plainThumb = target.querySelector('[data-environment-id="env-plain"] .gathering-env-card-thumb');
+      assert.equal(plainThumb.getAttribute('src'), 'icons/svg/sun.svg', 'no linked scene keeps the environment image');
+    } finally {
+      delete globalThis.fromUuid;
+    }
+  });
+
   function typeSearch(value) {
     const input = target.querySelector('.gathering-env-search input');
     input.value = value;

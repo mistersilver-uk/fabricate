@@ -22,6 +22,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { sceneDocumentImage } from '../../util/sceneImages.js';
 
   let {
     environment = null,
@@ -33,6 +34,26 @@
   const id = $derived(String(environment?.id ?? ''));
   const name = $derived(String(environment?.name ?? ''));
   const img = $derived(String(environment?.img ?? ''));
+  const sceneUuid = $derived(String(environment?.sceneUuid ?? ''));
+
+  // When the environment links a scene, show that scene's thumbnail instead of
+  // the environment image (resolved client-side via fromUuid, mirroring
+  // LinkedScene). Falls back to the environment image when there's no linked
+  // scene or its thumbnail can't be resolved.
+  let sceneThumb = $state('');
+  $effect(() => {
+    const uuid = sceneUuid;
+    sceneThumb = '';
+    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
+    let cancelled = false;
+    Promise.resolve(globalThis.fromUuid(uuid))
+      .then(doc => {
+        if (!cancelled && doc) sceneThumb = sceneDocumentImage(doc) || '';
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  });
+  const displayImg = $derived(sceneThumb || img);
   const description = $derived(String(environment?.description ?? ''));
   const locked = $derived(environment?.locked === true);
   const blind = $derived(environment?.selectionMode === 'blind');
@@ -97,8 +118,8 @@
     <span class="gathering-env-card-thumb-wrap">
       <img
         class="gathering-env-card-thumb"
-        class:is-fallback={!img}
-        src={img || 'icons/svg/door-closed.svg'}
+        class:is-fallback={!displayImg}
+        src={displayImg || 'icons/svg/door-closed.svg'}
         alt=""
       />
       {#if locked}

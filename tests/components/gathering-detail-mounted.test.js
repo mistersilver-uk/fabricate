@@ -272,7 +272,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
   });
 
-  it('shows a linked-scene panel (with the wait hint when the player cannot view) on expand', async () => {
+  it('shows the linked-scene banner once above the task list when the environment is scene-gated', async () => {
     // No global fromUuid -> LinkedScene resolves nothing and cannot view -> wait hint.
     const sceneTask = taskModel({
       id: 'task-scene',
@@ -280,16 +280,39 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       successChance: null,
       blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
     });
-    const { services } = makeServices(listing([environment({ sceneUuid: 'Scene.abc', tasks: [sceneTask] })]));
+    const { services } = makeServices(listing([environment({
+      sceneUuid: 'Scene.abc',
+      blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }],
+      tasks: [sceneTask]
+    })]));
     await mountView(services);
 
+    // The mode hint explains the scene gate instead of the usual "choose a task".
+    const hint = target.querySelector('[data-gathering-mode-hint]');
+    assert.ok(hint.textContent.includes('SceneGateHint'), 'mode hint explains the scene gate');
+    assert.ok(!hint.textContent.includes('TargetedHint'), 'the usual targeted hint is replaced');
+
+    // Environment-level banner renders once, before the task list.
+    const banner = target.querySelector('[data-gathering-scene-banner]');
+    assert.ok(banner, 'env-level linked-scene banner renders');
+    const scene = banner.querySelector('[data-gathering-scene]');
+    assert.ok(scene, 'banner contains the LinkedScene panel');
+    assert.ok(banner.querySelector('[data-gathering-scene-wait]'), 'shows the wait hint when the player cannot navigate');
+
+    const list = target.querySelector('.gathering-detail-task-list');
+    assert.ok(list, 'task list renders');
+    const kids = Array.from(target.querySelector('[data-gathering-detail-state="selected"]').children);
+    assert.ok(
+      kids.findIndex(el => el.matches('[data-gathering-scene-banner]')) <
+        kids.findIndex(el => el.contains(list) || el.matches('.gathering-detail-section')),
+      'the scene banner precedes the task-list section'
+    );
+
+    // The task card no longer carries a scene callout or panel.
     const row = target.querySelector('[data-task-id="task-scene"]');
-    assert.ok(row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.VisitScene'), 'scene callout shown');
-    row.querySelector('.gathering-task-summary').click();
-    flushSync();
-    const scene = row.querySelector('[data-gathering-scene]');
-    assert.ok(scene, 'linked-scene panel renders on expand');
-    assert.ok(row.querySelector('[data-gathering-scene-wait]'), 'shows the wait hint when the player cannot navigate');
+    const callouts = row.querySelector('[data-gathering-callouts]');
+    assert.ok(!callouts || !callouts.textContent.includes('VisitScene'), 'no scene callout on the task card');
+    assert.equal(row.querySelector('[data-gathering-scene]'), null, 'no linked-scene panel inside the task card');
   });
 
   it('renders the blind attempt button and the Discovered Tasks section', async () => {

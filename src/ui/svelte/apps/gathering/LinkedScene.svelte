@@ -74,20 +74,23 @@
 </script>
 
 <div class="gathering-linked-scene" data-gathering-scene>
-  <div class="gathering-linked-scene-body">
-    <span class="gathering-linked-scene-thumb-wrap">
-      {#if sceneThumb}
-        <img class="gathering-linked-scene-thumb" src={sceneThumb} alt="" />
-      {:else}
-        <span class="gathering-linked-scene-thumb is-fallback" aria-hidden="true">
-          <i class="fas fa-map"></i>
-        </span>
-      {/if}
+  <span class="gathering-linked-scene-thumb-wrap">
+    {#if sceneThumb}
+      <img class="gathering-linked-scene-thumb" src={sceneThumb} alt="" />
+    {:else}
+      <span class="gathering-linked-scene-thumb is-fallback" aria-hidden="true">
+        <i class="fas fa-map"></i>
+      </span>
+    {/if}
+  </span>
+
+  <span class="gathering-linked-scene-copy">
+    <span class="gathering-linked-scene-label">
+      <i class="fas fa-location-dot" aria-hidden="true"></i>
+      {localize('FABRICATE.App.Gathering.Detail.LinkedSceneHeading')}
     </span>
-    <span class="gathering-linked-scene-name" title={sceneName}>
-      {sceneName || localize('FABRICATE.App.Gathering.Detail.LinkedSceneHeading')}
-    </span>
-  </div>
+    <span class="gathering-linked-scene-name" title={sceneName}>{sceneName}</span>
+  </span>
 
   {#if canView}
     <button type="button" class="gathering-linked-scene-visit" data-gathering-scene-visit onclick={(event) => { event.stopPropagation(); handleView(); }}>
@@ -104,7 +107,7 @@
 <style>
   .gathering-linked-scene {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
@@ -112,15 +115,31 @@
     background: var(--fab-surface-soft);
   }
 
-  .gathering-linked-scene-body {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
   .gathering-linked-scene-thumb-wrap {
     flex: 0 0 auto;
+  }
+
+  .gathering-linked-scene-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .gathering-linked-scene-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-linked-scene-label i {
+    font-size: 10px;
   }
 
   .gathering-linked-scene-thumb {
@@ -148,7 +167,8 @@
   }
 
   .gathering-linked-scene-visit {
-    align-self: flex-start;
+    flex: 0 0 auto;
+    margin-left: auto;
     appearance: none;
     -webkit-appearance: none;
     display: inline-flex;
@@ -175,7 +195,10 @@
   }
 
   .gathering-linked-scene-wait {
-    margin: 0;
+    flex: 0 1 auto;
+    margin: 0 0 0 auto;
+    max-width: 45%;
+    text-align: right;
     font-size: 12px;
     color: var(--fab-text-muted);
     font-style: italic;
