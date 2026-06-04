@@ -25,6 +25,7 @@
 import { writable, get } from 'svelte/store';
 import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
+import { TIME_OF_DAY_ICONS, WEATHER_ICONS, WEATHER_FALLBACK_ICON } from '../util/gatheringConditionIcons.js';
 import {
   buildExportPayload,
   validateImportData,
@@ -105,24 +106,11 @@ const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({
   wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' })
 });
 const DEFAULT_GATHERING_CONDITION_ICONS = Object.freeze({
-  weather: Object.freeze({
-    clear: 'fas fa-sun',
-    cloudy: 'fas fa-cloud',
-    rain: 'fas fa-cloud-rain',
-    storm: 'fas fa-bolt',
-    snow: 'fas fa-snowflake',
-    fog: 'fas fa-smog',
-    wind: 'fas fa-wind'
-  }),
-  timeOfDay: Object.freeze({
-    dawn: 'fas fa-cloud-sun',
-    day: 'fas fa-sun',
-    dusk: 'fas fa-cloud-moon',
-    night: 'fas fa-moon'
-  })
+  weather: WEATHER_ICONS,
+  timeOfDay: TIME_OF_DAY_ICONS
 });
 const FALLBACK_GATHERING_CONDITION_ICONS = Object.freeze({
-  weather: 'fas fa-cloud-sun',
+  weather: WEATHER_FALLBACK_ICON,
   timeOfDay: 'fas fa-clock'
 });
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
