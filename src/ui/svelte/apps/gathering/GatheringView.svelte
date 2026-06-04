@@ -10,7 +10,7 @@
   highlight-only — no center-column wiring yet.
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import { localize, subscribeSceneChange } from '../../util/foundryBridge.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import { resolveDefaultSelection } from './selectionDefault.js';
@@ -45,8 +45,11 @@
     environments.find(environment => environment?.id === selectedId) ?? null
   );
 
-  async function load() {
-    loading = true;
+  // `quiet` refreshes (e.g. on scene change) keep the populated grid on screen
+  // instead of flashing the loading spinner, and preserve prior content if the
+  // re-fetch errors.
+  async function load(quiet = false) {
+    if (!quiet) loading = true;
     error = false;
     try {
       // Pass the live shared-store selection so a selection change re-drives the
@@ -77,8 +80,12 @@
         }
       }
     } catch (_err) {
-      error = true;
-      listing = null;
+      // On a quiet refresh keep the current content rather than dropping to the
+      // error state; a foreground load surfaces the failure as before.
+      if (!quiet) {
+        error = true;
+        listing = null;
+      }
     } finally {
       loading = false;
     }
@@ -94,6 +101,11 @@
     void store?.selectedActorId;
     load();
   });
+
+  // Scene-linked environments unlock when the player navigates to the linked
+  // scene; re-fetch (quietly) when Foundry redraws the canvas so the gate clears
+  // without reopening the app. No-ops outside the Foundry runtime.
+  $effect(() => subscribeSceneChange(() => load(true)));
 
   // Report the selected environment's region up to the shared store so the bar
   // can render it; `''` clears the region when no environment is selected.

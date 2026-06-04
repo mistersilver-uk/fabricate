@@ -22,6 +22,63 @@ export function createGatheringSelectableActorsGetter({
 }
 
 /**
+ * Resolve the scene UUID from Foundry token shapes seen across V13 adapters.
+ *
+ * Production TokenDocument instances expose the scene through `parent`; tests
+ * and compatibility callers may still provide `token.scene` or
+ * `token.document.parent`.
+ *
+ * @param {object} token Active token or token-like adapter.
+ * @returns {string|null} Scene UUID for the token, when available.
+ */
+export function getTokenSceneUuid(token) {
+  return token?.parent?.uuid
+    ?? token?.scene?.uuid
+    ?? token?.document?.parent?.uuid
+    ?? null;
+}
+
+/**
+ * Build the scene-link access gate used by GatheringEngine.
+ *
+ * Scene links are attemptability gates rather than listing filters: failures
+ * return a blocked result so the player app can show a localized reason. Per
+ * the gathering spec, GM viewers are exempt; non-GM users may only attempt
+ * gathering while viewing the linked scene with at least one token present on
+ * it.
+ *
+ * @param {object} adapters
+ * @param {Function} adapters.getCurrentUser Current Foundry user getter.
+ * @param {Function} adapters.getCurrentScene Currently viewed/active scene getter.
+ * @returns {{canAttempt: Function}} Scene-access handler for the engine.
+ */
+export function createGatheringSceneAccess({ getCurrentUser, getCurrentScene } = {}) {
+  return {
+    canAttempt({ environment, actor, viewer } = {}) {
+      const sceneUuid = environment?.sceneUuid;
+      if (!sceneUuid) return { allowed: true };
+
+      const user = viewer ?? getCurrentUser?.() ?? null;
+      if (user?.isGM === true) return { allowed: true };
+
+      const currentScene = getCurrentScene?.() ?? null;
+      if (!currentScene || currentScene.uuid !== sceneUuid) {
+        return { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.SceneMissing' };
+      }
+
+      const token = actor?.getActiveTokens?.(false, true)?.find(token =>
+        getTokenSceneUuid(token) === sceneUuid
+      ) ?? null;
+      if (!token) {
+        return { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.TokenMissing' };
+      }
+
+      return { allowed: true };
+    }
+  };
+}
+
+/**
  * Evaluate a gathering formula through Foundry's Roll API when available.
  *
  * This adapter intentionally stays generic: dnd5e and pf2e expression details

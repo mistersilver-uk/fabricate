@@ -17,8 +17,10 @@ import { GatheringGateAndCheckEvaluator } from '../src/systems/GatheringGateAndC
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainPath = resolve(__dirname, '../src/main.js');
 const toolRuntimePath = resolve(__dirname, '../src/gatheringToolRuntime.js');
+const adaptersPath = resolve(__dirname, '../src/gatheringBootstrapAdapters.js');
 const mainSource = readFileSync(mainPath, 'utf8');
 const toolRuntimeSource = readFileSync(toolRuntimePath, 'utf8');
+const adaptersSource = readFileSync(adaptersPath, 'utf8');
 
 test('Fabricate exposes gathering runtime getters and API methods', () => {
   for (const expected of [
@@ -219,7 +221,7 @@ test('bootstrap constructs gathering collaborators after systems load with expli
     'systemManager: this.craftingSystemManager',
     'getSelectableActors: getGatheringSelectableActors',
     'isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer)',
-    'sceneAccess: { canAttempt: canAttemptGatheringInScene }',
+    'sceneAccess: createGatheringSceneAccess({',
     'catalystAvailability: createGatheringCatalystAvailability(this.craftingSystemManager)',
     'resultResolver: createGatheringResultResolver(this.resolutionModeService)',
     'resultCreator: createGatheringResultCreator(this.craftingSystemManager)',
@@ -367,14 +369,19 @@ test('awaited startup settlement delays fabricate.ready until all guarded proces
 
 test('scene access adapter accepts Foundry V13 TokenDocument parent scene shape', () => {
   assert.match(
-    mainSource,
+    adaptersSource,
     /getActiveTokens\?\.\(false, true\)\?\.find/,
     'scene access should request TokenDocument results from Actor#getActiveTokens'
   );
   assert.match(
-    mainSource,
+    adaptersSource,
     /token\?\.parent\?\.uuid[\s\S]*token\?\.scene\?\.uuid[\s\S]*token\?\.document\?\.parent\?\.uuid/,
     'scene access should accept V13 TokenDocument parent UUID and legacy fake/placeable shapes'
+  );
+  assert.match(
+    adaptersSource,
+    /user\?\.isGM === true/,
+    'scene access should exempt GM viewers from the scene gate'
   );
 });
 
