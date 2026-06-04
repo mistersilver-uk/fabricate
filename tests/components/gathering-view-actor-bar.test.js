@@ -245,6 +245,43 @@ describe('GatheringView ↔ actor bar wiring', () => {
     assert.equal(store.selectedActorId, '', 'an out-of-list (owned non-PC) id is not adopted');
   });
 
+  it('subscribes to scene changes and quietly re-fetches the listing on canvasReady', async () => {
+    let registered = null;
+    const offCalls = [];
+    globalThis.Hooks = {
+      on: (event, fn) => { registered = { event, fn }; return 'hook-canvas'; },
+      off: (event, id) => { offCalls.push({ event, id }); }
+    };
+    try {
+      const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+      store.loadSelectableActors();
+      flushSync();
+      const { services, calls } = makeGatheringServices(listing([environment()]));
+      services.actorBar = store;
+
+      await mountView(services);
+      assert.equal(calls.list.length, 1);
+      assert.ok(registered, 'a Foundry hook was registered on mount');
+      assert.equal(registered.event, 'canvasReady', 'subscribes to canvasReady');
+
+      // Simulate the player navigating to / the GM activating a scene.
+      registered.fn();
+      await settle();
+      assert.equal(calls.list.length, 2, 'canvasReady triggers a listing re-fetch');
+      // The populated grid stays mounted across the quiet refresh (no spinner swap).
+      assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'keeps the populated layout');
+
+      unmount(mounted);
+      mounted = null;
+      assert.ok(
+        offCalls.some(({ event, id }) => event === 'canvasReady' && id === 'hook-canvas'),
+        'unsubscribes the canvasReady hook on destroy'
+      );
+    } finally {
+      delete globalThis.Hooks;
+    }
+  });
+
   it('REGRESSION: mounts and fetches unmodified when services has no actorBar', async () => {
     const { services, calls } = makeGatheringServices(listing([environment()]));
     // No services.actorBar at all.

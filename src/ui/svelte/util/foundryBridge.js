@@ -114,6 +114,23 @@ export async function viewScene(uuid) {
   return false;
 }
 
+/**
+ * Subscribe to scene navigation/activation so callers can refresh when the
+ * player's viewed scene changes. Foundry fires `canvasReady` after it draws a
+ * scene on the canvas, which is the signal that `game.scenes.current` now points
+ * at a different scene. Returns an unsubscribe function; no-ops gracefully when
+ * the Foundry `Hooks` global is absent (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked (no args) on each scene change.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeSceneChange(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const id = hooks.on('canvasReady', () => handler());
+  return () => { hooks.off?.('canvasReady', id); };
+}
+
 export function notifyInfo(msg) {
   globalThis.ui?.notifications?.info(msg);
 }

@@ -27,6 +27,7 @@ import { Tool } from './models/Tool.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
+  createGatheringSceneAccess,
   createGatheringSelectableActorsGetter,
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
@@ -140,53 +141,6 @@ function isCurrentWorldPaused() {
  */
 async function runGatheringMacro(macroUuid, context = {}) {
   return MacroExecutor.run(macroUuid, context);
-}
-
-/**
- * Enforce scene-linked gathering access.
- *
- * Scene links are attemptability gates rather than listing filters: failures
- * return a blocked result so the player app can show a localized reason.
- *
- * @param {object} payload
- * @param {object} payload.environment Gathering environment.
- * @param {Actor} payload.actor Acting actor.
- * @returns {Promise<{allowed: boolean, code?: string, messageKey?: string}>}
- */
-async function canAttemptGatheringInScene({ environment, actor }) {
-  const sceneUuid = environment?.sceneUuid;
-  if (!sceneUuid) return { allowed: true };
-
-  const currentScene = game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null;
-  if (!currentScene || currentScene.uuid !== sceneUuid) {
-    return { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.SceneMissing' };
-  }
-
-  const token = actor?.getActiveTokens?.(false, true)?.find(token =>
-    getTokenSceneUuid(token) === sceneUuid
-  ) ?? null;
-  if (!token) {
-    return { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.TokenMissing' };
-  }
-
-  return { allowed: true };
-}
-
-/**
- * Resolve the scene UUID from Foundry token shapes seen across V13 adapters.
- *
- * Production TokenDocument instances expose the scene through `parent`; tests
- * and compatibility callers may still provide `token.scene` or
- * `token.document.parent`.
- *
- * @param {object} token Active token or token-like adapter.
- * @returns {string|null} Scene UUID for the token, when available.
- */
-function getTokenSceneUuid(token) {
-  return token?.parent?.uuid
-    ?? token?.scene?.uuid
-    ?? token?.document?.parent?.uuid
-    ?? null;
 }
 
 function createGatheringCatalystAvailability(craftingSystemManager) {
@@ -697,7 +651,10 @@ class Fabricate {
       getSelectableActors: getGatheringSelectableActors,
       isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer),
       isGamePaused: isCurrentWorldPaused,
-      sceneAccess: { canAttempt: canAttemptGatheringInScene },
+      sceneAccess: createGatheringSceneAccess({
+        getCurrentUser: () => game.user,
+        getCurrentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
+      }),
       catalystAvailability: createGatheringCatalystAvailability(this.craftingSystemManager),
       toolAvailability: createGatheringToolAvailability({
         craftingSystemManager: this.craftingSystemManager,
