@@ -307,6 +307,10 @@ The system-level Gathering Rules setting **Tool breakage outcome** controls what
 
 Missing or disabled library references block with `TOOL_BLOCKED`, as do missing actor-owned tools, owned tools with `flags.fabricate.toolBroken === true`, and failed tool requirements.
 
+A tool (like a catalyst or ingredient) is recognised whether the actor owns the tool component's source world item directly or owns a copy dragged or duplicated from it. Fabricate matches the owned item's live UUID, its compendium-source UUID, and its world-duplicate source UUID against the tool's component, so dropping a copy of the source item onto the actor still satisfies the requirement.
+
+In the player app, a tool whose component is missing from inventory shows as **Missing**. A tool the actor holds but cannot use shows as **Broken** — this covers both an owned tool already flagged `flags.fabricate.toolBroken === true` and an owned `Replace with...` broken-variant component for that tool. The **Broken** state is display-only; the attempt stays blocked with `TOOL_BLOCKED` either way, and holding a working copy of the tool alongside a broken one still reads as available.
+
 See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
 
 ## Save Validation
