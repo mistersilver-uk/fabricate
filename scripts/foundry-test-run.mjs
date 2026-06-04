@@ -2674,6 +2674,14 @@ async function main() {
 
         const navItems = appShell.locator('.fabricate-app-nav-item');
         await navItems.first().waitFor({ state: 'visible', timeout: 10_000 });
+
+        // The shared actor-selection top bar mounts with the shell and flips
+        // [data-actor-bar-state] from "loading" to "ready" once its selectable
+        // actor list and gathering conditions have loaded. Wait on the ready
+        // state so captured player-app frames show the mounted, conditions-loaded
+        // bar rather than its loading placeholder.
+        await appShell.locator('[data-actor-bar-state="ready"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
         // Crafting/Gathering/Journal/Inventory are always present; the Alchemy
         // tab is conditional (shown only when an enabled alchemy system has recipes).
         for (const label of ['Crafting', 'Gathering', 'Journal', 'Inventory']) {

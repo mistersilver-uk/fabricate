@@ -2,6 +2,7 @@ import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
 import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
+import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -53,12 +54,20 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   }
 
   _buildServices() {
-    return {
+    const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null,
-      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.(opts) ?? null
+      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.(opts) ?? null,
+      listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
+      getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
+      setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
+      getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null
     };
+    // One shared actor-bar store instance, reused across renders, so the shell
+    // and the gathering tab read/write the same reactive selection state.
+    services.actorBar = createActorBarStore({ services });
+    return services;
   }
 
   _prepareSvelteProps() {

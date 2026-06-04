@@ -12,8 +12,16 @@
 <script>
   import { localize } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
+  import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
   let { activeTab = 'crafting', showAlchemy = false, onSelectTab = null, services = null } = $props();
+
+  // Load the shared actor-selection state and current gathering conditions once
+  // the shell mounts. The store guards its own one-time load (re-entry guard).
+  $effect(() => {
+    services?.actorBar?.loadSelectableActors();
+    services?.actorBar?.refreshConditions();
+  });
 
   // The Alchemy tab is only shown when an enabled alchemy system has recipes.
   const ALL_TABS = [
@@ -44,21 +52,25 @@
     {/each}
   </nav>
 
-  <section class="fabricate-app-content" role="tabpanel">
-    {#each tabs as tab (tab.id)}
-      {#if activeTab === tab.id}
-        {#if tab.id === 'gathering'}
-          <GatheringView {services} />
-        {:else}
-          <div class="fabricate-app-placeholder">
-            <i class="fas {tab.icon}" aria-hidden="true"></i>
-            <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
-            <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
-          </div>
+  <div class="fabricate-app-main">
+    <ActorSelectTopBar store={services?.actorBar} {activeTab} />
+
+    <section class="fabricate-app-content" role="tabpanel">
+      {#each tabs as tab (tab.id)}
+        {#if activeTab === tab.id}
+          {#if tab.id === 'gathering'}
+            <GatheringView {services} />
+          {:else}
+            <div class="fabricate-app-placeholder">
+              <i class="fas {tab.icon}" aria-hidden="true"></i>
+              <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
+              <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
+            </div>
+          {/if}
         {/if}
-      {/if}
-    {/each}
-  </section>
+      {/each}
+    </section>
+  </div>
 </div>
 
 <style>
@@ -127,6 +139,18 @@
   .fabricate-app-nav-item:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  .fabricate-app-main {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .fabricate-app-main :global(.fabricate-app-actor-bar) {
+    flex: 0 0 auto;
   }
 
   .fabricate-app-content {

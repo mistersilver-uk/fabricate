@@ -17,10 +17,19 @@
 
   let { services = null } = $props();
 
+  // The shared actor-selection store (services.actorBar). Existing tests mount
+  // GatheringView with a `services` bag that has no `actorBar`, so EVERY access
+  // goes through `store?.` optional chaining to stay green unmodified.
+  const store = services?.actorBar ?? null;
+
   let loading = $state(true);
   let error = $state(false);
   let listing = $state(null);
   let selectedId = $state(null);
+  // First-load backstop guard: the view adopts the listing's resolved actor at
+  // most once, and only when the store seed is still empty AND the resolved id
+  // is a player character present in the bar's selectable list.
+  let backstopApplied = $state(false);
 
   // A listing is "populated" only when an actor is selected and at least one
   // environment is present. Missing listing / no selected actor / no
@@ -40,7 +49,12 @@
     loading = true;
     error = false;
     try {
-      const result = await services?.listGatheringForActor?.({});
+      // Pass the live shared-store selection so a selection change re-drives the
+      // listing; `null` lets `listGatheringForActor` fall back to the persisted
+      // default for fresh loads.
+      const result = await services?.listGatheringForActor?.({
+        rememberedActorId: store?.selectedActorId ?? null
+      });
       listing = result ?? null;
       // Keep a still-valid (non-locked) user selection across re-fetches;
       // otherwise default to the first selectable env, or null when all locked.
@@ -48,6 +62,20 @@
         Array.isArray(listing?.environments) ? listing.environments : [],
         selectedId
       );
+
+      // First-load backstop: when the shared selection is still empty, adopt the
+      // listing's resolved actor AT MOST ONCE and ONLY when it is a player
+      // character present in the bar's selectable list. Otherwise leave the
+      // store's own fallback in place (no ping-pong).
+      if (store && !backstopApplied && !store.selectedActorId) {
+        const resolvedId = listing?.selectedActorId ?? null;
+        const isPlayerCharacter = Boolean(resolvedId)
+          && store.selectableActors.some((actor) => actor?.id === resolvedId);
+        if (isPlayerCharacter) {
+          backstopApplied = true;
+          store.selectActor(resolvedId);
+        }
+      }
     } catch (_err) {
       error = true;
       listing = null;
@@ -60,8 +88,17 @@
     selectedId = id;
   }
 
+  // Re-fetch the listing on mount and whenever the shared selected actor changes.
   $effect(() => {
+    // Track the shared selection so a change re-runs this effect.
+    void store?.selectedActorId;
     load();
+  });
+
+  // Report the selected environment's region up to the shared store so the bar
+  // can render it; `''` clears the region when no environment is selected.
+  $effect(() => {
+    store?.setRegion(selectedEnvironment?.region ?? '');
   });
 </script>
 

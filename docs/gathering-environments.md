@@ -247,9 +247,17 @@ The player Gathering store does not add a second generic warning for terminal fa
 
 ## Player Gathering App
 
-The player app opens from the Items Directory **Gathering** action and uses its own `lastGatheringActor` client preference. Actor selection starts from the remembered actor when it still resolves and is selectable, otherwise Fabricate clears the stale preference and falls back to the user's character or the first selectable actor. Selectability is based on GM access or owner permission; the store does not exclude actors by actor type.
+The player gathering experience opens from the Items Directory **Gathering** action and is presented as the **Gathering** tab of the unified Fabricate window.
 
-The app lists gathering options through `game.fabricate.listGatheringForActor({ actor })` and starts attempts through `game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Those public runtime methods enforce the current Foundry user as the viewer before delegating to the internal gathering engine.
+### Actor Selection Bar
+
+A shared **actor-selection bar** sits above all of the window's tabs. Its left side is a character portrait with a caret that opens a searchable popover listing the actors you can gather as; type to filter the list by name, then pick a character to select it. The bar persists your choice in the `lastGatheringActor` client preference and reuses it the next time the window opens.
+
+The bar lists your selectable **player characters** — the actors a system designates as player characters (the current dnd5e/pf2e implementation is the `character` actor type), owned actors for players and all of them for GMs. This is a selection-list restriction only: it does **not** change which actors are authorized to gather. An owned non-player-character actor (such as an `npc`) can still be listed and attempted through the API, but it does not appear in the bar. If your remembered character is missing from the list, the bar falls back to the first available player character and remembers that instead.
+
+The bar's right side carries gathering context: on the **Gathering** tab it shows the current **weather** and **time of day** (each an icon and label) and the selected environment's **region**, or a neutral placeholder when no environment is selected. On other tabs the right side is empty.
+
+The window lists gathering options through `game.fabricate.listGatheringForActor({ actor })` and starts attempts through `game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Those public runtime methods enforce the current Foundry user as the viewer before delegating to the internal gathering engine.
 
 ### Environments Column
 
@@ -306,6 +314,10 @@ Gathering tasks may declare one or more required tools by referencing the select
 The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks: `failureOnBreak` (default) overrides the attempt to `failed` and clears drops; `successDespiteBreak` preserves the success state. Either way, the on-break action always commits.
 
 Missing or disabled library references block with `TOOL_BLOCKED`, as do missing actor-owned tools, owned tools with `flags.fabricate.toolBroken === true`, and failed tool requirements.
+
+A tool (like a catalyst or ingredient) is recognised whether the actor owns the tool component's source world item directly or owns a copy dragged or duplicated from it. Fabricate matches the owned item's live UUID, its compendium-source UUID, and its world-duplicate source UUID against the tool's component, so dropping a copy of the source item onto the actor still satisfies the requirement.
+
+In the player app, a tool whose component is missing from inventory shows as **Missing**. A tool the actor holds but cannot use shows as **Broken** — this covers both an owned tool already flagged `flags.fabricate.toolBroken === true` and an owned `Replace with...` broken-variant component for that tool. The **Broken** state is display-only; the attempt stays blocked with `TOOL_BLOCKED` either way, and holding a working copy of the tool alongside a broken one still reads as available.
 
 See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
 
