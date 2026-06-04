@@ -80,6 +80,48 @@ const getGatheringSelectableActors = createGatheringSelectableActorsGetter({
   isSelectable: isGatheringActorSelectableByUser
 });
 
+/**
+ * The current dnd5e/pf2e implementation of the **player-character concept**.
+ *
+ * "Player character" is a concept: the actor type(s) a system designates as
+ * player characters. This predicate is the documented seam for future
+ * per-system extension/configuration. `'character'` is the dnd5e/pf2e actor
+ * type and is NOT asserted as a universal truth — systems whose player-character
+ * actor type differs are a known limitation of this iteration (their PCs will not
+ * appear in the actor-selection bar), and re-pointing this predicate is the
+ * intended extension point.
+ *
+ * @param {Actor} actor Candidate actor.
+ * @returns {boolean} True when the actor is a player character.
+ */
+function isPlayerCharacterActor(actor) {
+  return actor?.type === 'character';
+}
+
+/**
+ * Selection predicate for the actor-selection top bar.
+ *
+ * Combines the ownership rule reused for gathering attempt authorization
+ * (`isGatheringActorSelectableByUser`: player owns / GM sees all) AND the
+ * player-character concept (`isPlayerCharacterActor`). This narrows the bar's
+ * list to player characters WITHOUT modifying attempt authorization — an owned
+ * non-player-character actor stays attempt-authorized but is absent from the bar.
+ *
+ * @param {object} payload
+ * @param {Actor} payload.actor Candidate actor.
+ * @param {User} payload.viewer Foundry user the selection is for.
+ * @returns {boolean} True when the actor is a selectable player character.
+ */
+function isSelectableBarActor({ actor, viewer } = {}) {
+  return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);
+}
+
+const getBarSelectableActors = createGatheringSelectableActorsGetter({
+  getActors: () => game.actors,
+  getCurrentUser: () => game.user,
+  isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })
+});
+
 function getGatheringRunViewer({ run } = {}) {
   const userId = run?.userId;
   return game.users?.get?.(userId) ?? { id: userId ?? null, isGM: false };
@@ -810,7 +852,19 @@ class Fabricate {
    * The internal GatheringEngine receives the current Foundry user as viewer,
    * regardless of any viewer supplied by the caller.
    *
-   * @param {object} options Gathering listing options.
+   * When `options.rememberedActorId` is omitted (or otherwise absent), it
+   * defaults to the persisted last-gathering selection
+   * ({@link Fabricate#getSelectedGatheringActorId}) so a fresh listing honors
+   * the remembered actor. An explicit `rememberedActorId` in `options` always
+   * overrides that default (including an explicit `null`, which forces no
+   * remembered actor). The engine resolves the id against its OWNERSHIP
+   * selectable list, not the narrower player-character list used by the actor
+   * selection bar, so a legacy persisted owned non-player-character id is still
+   * honored for that fetch.
+   *
+   * @param {object} [options] Gathering listing options.
+   * @param {string|null} [options.rememberedActorId] Actor id to list for;
+   *   defaults to the persisted last-gathering selection when omitted.
    * @returns {*} Gathering listing result with attemptability metadata.
    */
   listGatheringForActor(options = {}) {
@@ -818,7 +872,66 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'listForActor', options, () => game.user);
+    // Default the remembered actor to the persisted last-gathering selection so
+    // a fresh listing honors it; an explicit `rememberedActorId` in `options`
+    // still overrides the persisted default. The engine resolves this id against
+    // its OWNERSHIP selectable list (not the player-character list), so a legacy
+    // persisted owned non-PC id is honored by the engine for that fetch; the bar
+    // store converges it to a player character (see design convergence contract).
+    const withRememberedActor = {
+      rememberedActorId: this.getSelectedGatheringActorId() || null,
+      ...options
+    };
+
+    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'listForActor', withRememberedActor, () => game.user);
+  }
+
+  /**
+   * List the actors the current user may select as a gathering actor in the
+   * unified-window actor selection bar.
+   *
+   * Returns the user's selectable **player characters** — owned for non-GM
+   * users, all for GMs, narrowed by the player-character concept
+   * ({@link isPlayerCharacterActor}). The result is redaction-safe display data:
+   * each record contains ONLY `{ id, uuid, name, img }` and no other actor
+   * internals. This selection predicate is distinct from gathering attempt
+   * authorization and does not expand it.
+   *
+   * @returns {Array<{id: string|null, uuid: string|null, name: string, img: string|null}>}
+   */
+  listSelectableActors() {
+    this._requireReady();
+    return getBarSelectableActors({ viewer: game.user }).map((actor) => ({
+      id: actor?.id ?? actor?.uuid ?? null,
+      uuid: actor?.uuid ?? null,
+      name: actor?.name ?? '',
+      img: actor?.img ?? null
+    }));
+  }
+
+  /**
+   * Read the persisted remembered gathering-actor selection.
+   *
+   * Reads the existing `LAST_GATHERING_ACTOR` client setting; no new key is
+   * introduced. Returns an empty string when unset.
+   *
+   * @returns {string} The persisted actor id, or '' when unset.
+   */
+  getSelectedGatheringActorId() {
+    return getSetting(SETTING_KEYS.LAST_GATHERING_ACTOR) || '';
+  }
+
+  /**
+   * Persist the remembered gathering-actor selection.
+   *
+   * Writes the existing `LAST_GATHERING_ACTOR` client setting; no new key is
+   * introduced.
+   *
+   * @param {string} id Actor id to persist.
+   * @returns {*} The setSetting result.
+   */
+  setSelectedGatheringActorId(id) {
+    return setSetting(SETTING_KEYS.LAST_GATHERING_ACTOR, id ?? '');
   }
 
   /**

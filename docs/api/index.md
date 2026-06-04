@@ -41,6 +41,9 @@ game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
 game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering listing
 game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
+game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
+game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering actor id
+game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
 game.fabricate.getResolutionModeService()   // Mode validation and resolution
 ```
@@ -95,6 +98,27 @@ Hooks.once('fabricate.ready', async () => {
 ```
 
 `listGatheringForActor` returns the current browsing state plus `activeRuns` and recent `history` for the selected actor. Those run lists are retained even when no environment/task rows are currently browseable because the actor is blocked, the environment list is empty, or visibility gates hide all tasks. For non-GM blind or missing-environment rows, the runtime redacts task IDs, result details, catalyst details, diagnostics, and check internals.
+
+When `rememberedActorId` is omitted from `listGatheringForActor` options, it defaults to the persisted last-gathering selection (`getSelectedGatheringActorId()`), so a fresh listing honors the remembered actor. Passing an explicit `rememberedActorId` always overrides that default — including an explicit `null`, which forces no remembered actor.
+
+### Actor Selection
+
+These methods back the unified Fabricate window's actor-selection bar and persist the remembered gathering actor:
+
+```javascript
+Hooks.once('fabricate.ready', () => {
+  // Player-safe display data for the actor-selection bar.
+  const actors = game.fabricate.listSelectableActors();
+  // -> [{ id, uuid, name, img }, …]
+
+  const current = game.fabricate.getSelectedGatheringActorId(); // '' when unset
+  game.fabricate.setSelectedGatheringActorId(actors[0]?.id ?? '');
+});
+```
+
+- `listSelectableActors()` returns the current user's selectable **player characters** (`actor.type === 'character'`) — owned actors for players, all for GMs. Each record is redaction-safe display data containing only `{ id, uuid, name, img }`; no other actor internals are exposed. This selection list is narrower than gathering attempt authorization: an owned non-player-character actor stays attempt-authorized through `listGatheringForActor` / `startGatheringAttempt` but does not appear in the bar.
+- `getSelectedGatheringActorId()` reads the persisted remembered selection from the `fabricate.lastGatheringActor` client setting, returning `''` when unset.
+- `setSelectedGatheringActorId(id)` persists the remembered selection to that same client setting.
 
 ## Data Persistence
 

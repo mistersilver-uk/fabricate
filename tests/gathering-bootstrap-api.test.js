@@ -44,13 +44,42 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
 
   assert.match(
     mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'listForActor', options, \(\) => game\.user\);/,
-    'listGatheringForActor should delegate through current-user viewer enforcement'
+    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'listForActor', withRememberedActor, \(\) => game\.user\);/,
+    'listGatheringForActor should delegate through current-user viewer enforcement (with the remembered-actor default)'
+  );
+  assert.match(
+    mainSource,
+    /rememberedActorId: this\.getSelectedGatheringActorId\(\) \|\| null,\s*\.\.\.options/,
+    'listGatheringForActor should default rememberedActorId to the persisted selection while letting options override it'
   );
   assert.match(
     mainSource,
     /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'startAttempt', options, \(\) => game\.user\);/,
     'startGatheringAttempt should delegate through current-user viewer enforcement'
+  );
+});
+
+test('actor-selection bar wiring filters to player characters and returns redaction-safe records', () => {
+  // Guard the hand-maintained predicate so a future change to the PC concept or
+  // the ownership-AND-type composition fails here rather than silently widening
+  // the bar's actor list (the unit test re-states this logic on the DI boundary).
+  assert.ok(
+    mainSource.includes("return actor?.type === 'character';"),
+    "isPlayerCharacterActor should realise the player-character concept as type === 'character'"
+  );
+  assert.ok(
+    mainSource.includes('return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);'),
+    'isSelectableBarActor should compose ownership authorization AND the player-character concept'
+  );
+  assert.ok(
+    mainSource.includes('isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })'),
+    'getBarSelectableActors should be wired through the shared selectable-actors getter'
+  );
+  // Guard the redacted shape: exactly { id, uuid, name, img }, nothing else.
+  assert.match(
+    mainSource,
+    /getBarSelectableActors\(\{ viewer: game\.user \}\)\.map\(\(actor\) => \(\{\s*id: actor\?\.id \?\? actor\?\.uuid \?\? null,\s*uuid: actor\?\.uuid \?\? null,\s*name: actor\?\.name \?\? '',\s*img: actor\?\.img \?\? null,?\s*\}\)\)/,
+    'listSelectableActors should map to only the redaction-safe { id, uuid, name, img } record shape'
   );
 });
 

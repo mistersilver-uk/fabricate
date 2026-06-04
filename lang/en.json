@@ -14,6 +14,36 @@
         "Journal": "Journal",
         "Inventory": "Inventory"
       },
+      "ActorBar": {
+        "Trigger": "Select a character",
+        "SearchPlaceholder": "Search characters…",
+        "SearchLabel": "Search characters",
+        "NoActors": "No selectable characters.",
+        "DialogLabel": "Select a character",
+        "Region": {
+          "Label": "Region",
+          "None": "No region selected"
+        },
+        "TimeOfDay": {
+          "Label": "Time of day",
+          "dawn": "Dawn",
+          "day": "Day",
+          "dusk": "Dusk",
+          "night": "Night",
+          "Unknown": "Unknown time of day"
+        },
+        "Weather": {
+          "Label": "Weather",
+          "clear": "Clear",
+          "cloudy": "Cloudy",
+          "rain": "Rain",
+          "storm": "Storm",
+          "snow": "Snow",
+          "fog": "Fog",
+          "wind": "Wind",
+          "Unknown": "Unknown weather"
+        }
+      },
       "Gathering": {
         "Loading": "Loading gathering environments…",
         "Error": "Couldn't load gathering environments.",
