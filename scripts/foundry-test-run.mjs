@@ -987,7 +987,9 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
     //    render as a greyed locked teaser; the smoke run is GM, so it renders as
     //    a full listing (locked teasers are player-only and unit-test-covered).
     // Idempotent: the function runs twice in Phase D0, so skip ids already
-    // present in the store. Imagery uses Foundry-core raster (.webp) icons only.
+    // present in the store. Imagery MUST use Foundry-core icon paths that exist
+    // in the smoke Foundry version — a missing path 404s on every render and
+    // trips the console-error gate (these reuse icons proven to load in-run).
     const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
     if (environmentStore) {
       const existingIds = new Set((environmentStore.list?.() || []).map(env => String(env?.id || '')));
@@ -997,7 +999,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           craftingSystemId: sysId,
           name: 'Smoke Blind Grove',
           description: 'Blind gathering site for the player Gathering tab screenshot (mask chip + discovered suffix).',
-          img: 'icons/magic/nature/tree-elm-gold-green.webp',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
           enabled: true,
           selectionMode: 'blind',
           region: 'northreach',
@@ -1011,7 +1013,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           craftingSystemId: sysId,
           name: 'Smoke Sealed Hollow',
           description: 'Disabled environment for the player Gathering tab screenshot (locked teaser for non-GM viewers).',
-          img: 'icons/environment/wilderness/cave-entrance-dwarven.webp',
+          img: 'icons/svg/door-closed.svg',
           enabled: false,
           selectionMode: 'targeted',
           region: 'northreach',
@@ -1219,10 +1221,14 @@ async function closeOpenApplications(page) {
  */
 function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('console', msg => {
-    const entry = `[${msg.type()}] ${msg.text()}`;
-    consoleLog.push(entry);
+    // Browser "Failed to load resource" console errors carry no URL in their
+    // text; the resource path lives in msg.location(). Append it so a bare 404
+    // can be traced to the exact asset in both console.log and the gate's
+    // consoleErrors list.
+    const location = msg.type() === 'error' ? (msg.location()?.url || '') : '';
+    const text = location ? `${msg.text()} (${location})` : msg.text();
+    consoleLog.push(`[${msg.type()}] ${text}`);
     if (msg.type() === 'error') {
-      const text = msg.text();
       const isIgnored = ignoredErrorPatterns.some(p => p.test(text));
       if (!isIgnored) {
         consoleErrors.push(text);
@@ -1237,6 +1243,24 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
     if (!isIgnored) {
       consoleErrors.push(`pageerror: ${err.message}`);
     }
+  });
+
+  // Diagnostic only: a console 'error' is logged for failed resource loads but
+  // is not always paired with a usable URL. Record every failing HTTP response
+  // (4xx/5xx) and every network-level request failure with its URL into
+  // console.log so the source of a "Failed to load resource" is always
+  // traceable. These do NOT push to consoleErrors, so they never change the
+  // run's pass/fail — the console 'error' above remains the gate.
+  page.on('response', response => {
+    const status = response.status();
+    if (status >= 400) {
+      consoleLog.push(`[response ${status}] ${response.url()}`);
+    }
+  });
+
+  page.on('requestfailed', request => {
+    const failure = request.failure();
+    consoleLog.push(`[requestfailed ${failure?.errorText || 'unknown'}] ${request.url()}`);
   });
 }
 
