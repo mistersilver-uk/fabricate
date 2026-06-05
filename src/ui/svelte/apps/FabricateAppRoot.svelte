@@ -136,17 +136,9 @@
     border-color: var(--fab-accent);
   }
 
-  /* Suppress Foundry core's orange focus glow on mouse click; the keyboard
-     focus ring (:focus-visible, below) is preserved. */
-  .fabricate-app-nav-item:focus {
-    outline: none;
-    box-shadow: none;
-  }
-
-  .fabricate-app-nav-item:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
+  /* Focus rings (Foundry orange suppressed on :focus, accent ring on
+     :focus-visible) are handled globally for the .fabricate-app area in
+     styles/fabricate.css. */
 
   .fabricate-app-main {
     flex: 1 1 auto;
