@@ -497,8 +497,9 @@
   /* The trailing action column (bulk Save in the header, roll/reset per row).
      Slightly more compact than a default button, with slightly larger label. */
   .manager-economy-bulk-save {
-    width: 100%;
-    padding: 3px 6px;
+    width: auto;
+    justify-self: center;
+    padding: 3px 10px;
     justify-content: center;
     font-size: 0.82rem;
     line-height: 1.1;
