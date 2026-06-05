@@ -213,6 +213,23 @@ describe('gathering economy — cost modifiers and mode gating', () => {
     assert.equal(floored, 0); // never negative
   });
 
+  it('exposes the per-actor effective cost for the player listing (not the base)', async () => {
+    const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 2 });
+    const env = environment();
+    const taskWithMod = task({ staminaCost: 6, staminaCostModifiers: [{ modifierId: 'str', operator: '-' }] });
+
+    const cost = await service.listingStaminaCost({
+      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: taskWithMod
+    });
+    assert.equal(cost, 4); // 6 - 2 (the base would be 6)
+
+    // No actor still resolves (modifier evaluates), but a non-stamina system or a
+    // zero-cost task yields null (nothing to refine).
+    const { service: nodesMode } = makeRichState({ config: costConfig('nodes'), evaluateExpression: () => 2 });
+    assert.equal(await nodesMode.listingStaminaCost({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: taskWithMod }), null);
+    assert.equal(await service.listingStaminaCost({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: task({ staminaCost: 0 }) }), null);
+  });
+
   it('blocks on insufficient stamina only in stamina mode, and the gate equals the spend', async () => {
     const { service } = makeRichState({ config: costConfig('stamina'), evaluateExpression: () => 0 });
     const env = environment();

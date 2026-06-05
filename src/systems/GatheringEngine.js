@@ -1014,6 +1014,11 @@ export class GatheringEngine {
       blockedReasons: entry.blockedReasons,
       tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
     }));
+    // Refine the displayed stamina cost to the viewing character's effective
+    // cost (base + per-actor modifiers); the sync model carries the base.
+    for (let i = 0; i < taskModels.length; i++) {
+      await this._applyListingStaminaCost(taskModels[i], { system, environment, actor, viewer, task: taskEntries[i].task });
+    }
 
     const attemptable = taskModels.some(task => task.attemptable);
     const blockedReasons = environmentBlockedReasons.length > 0
@@ -1115,9 +1120,26 @@ export class GatheringEngine {
         forceVisible: true,
         tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
       });
+      await this._applyListingStaminaCost(model, { system, environment, actor, viewer, task: entry.task });
       discovered.push({ ...model, discovered: true });
     }
     return discovered;
+  }
+
+  /**
+   * Replace a listing model's displayed stamina cost with the viewing
+   * character's effective cost (base + per-actor cost modifiers). No-ops without
+   * an actor, without a stamina block (e.g. opaque-blind collapsed models), or
+   * when the rich state cannot resolve a cost.
+   *
+   * @param {object} model The task listing model (mutated in place).
+   * @param {object} payload
+   * @returns {Promise<void>}
+   */
+  async _applyListingStaminaCost(model, { system, environment, actor, viewer, task }) {
+    if (!actor || !model?.rich?.stamina || typeof this.richState?.listingStaminaCost !== 'function') return;
+    const cost = await this.richState.listingStaminaCost({ actor, system, environment, task, viewer });
+    if (cost != null) model.rich.stamina.cost = cost;
   }
 
   /**

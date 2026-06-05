@@ -1444,6 +1444,22 @@ export class GatheringRichStateService {
   }
 
   /**
+   * The effective per-actor stamina cost to surface in a player listing, or
+   * `null` when there is nothing to refine (the system is not in stamina mode,
+   * or the task has no base cost). The synchronous listing build shows the base
+   * cost; callers use this to replace it with the modifier-adjusted value for
+   * the viewing character.
+   *
+   * @param {object} payload
+   * @returns {Promise<number|null>}
+   */
+  async listingStaminaCost({ actor, system = null, environment, task, viewer = null } = {}) {
+    if (this._economyMode(environment?.craftingSystemId) !== 'stamina') return null;
+    if (!(Number(task?.staminaCost || 0) > 0)) return null;
+    return this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+  }
+
+  /**
    * The stamina an actor regenerates per elapsed `regen.unit`: a fixed
    * `regen.amount` or a `regen.formula` (which wins when set), adjusted by the
    * regen `characterModifiers`. Floored at 0 and rounded to an integer so
