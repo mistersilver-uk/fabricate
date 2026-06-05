@@ -63,7 +63,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
-      getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null
+      getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
+      // GM economy authoring + manual state controls (Manager app).
+      getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
+      setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
+      getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
+      setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
+      adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
+      restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts)
     };
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.

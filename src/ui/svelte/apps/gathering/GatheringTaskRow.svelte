@@ -38,6 +38,14 @@
   const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
   const successChance = $derived(task?.successChance ?? null);
 
+  // Economy badges: a node "current/max" count and/or a stamina cost, present
+  // only when the system runs that mode and (for blind tasks) the count is not
+  // redacted — the runtime nulls those fields when they must stay hidden.
+  const richNodes = $derived(task?.rich?.nodes ?? null);
+  const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
+    ? `${richNodes.current}/${richNodes.max}` : null);
+  const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
+
   // Each blocking issue becomes a header callout chip. The linked-scene gate is
   // an environment-level restriction, surfaced once above the task list by
   // GatheringDetail — never as a per-task callout here.
@@ -46,7 +54,9 @@
     CONDITIONS_BLOCKED: { icon: 'fa-cloud-sun', key: 'FABRICATE.App.Gathering.Detail.Callout.Conditions', tone: 'warning' },
     CATALYST_BLOCKED: { icon: 'fa-flask', key: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst', tone: 'warning' },
     GAME_PAUSED: { icon: 'fa-pause', key: 'FABRICATE.App.Gathering.Detail.Callout.Paused', tone: 'neutral' },
-    DUPLICATE_ACTIVE_RUN: { icon: 'fa-hourglass-half', key: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun', tone: 'neutral' }
+    DUPLICATE_ACTIVE_RUN: { icon: 'fa-hourglass-half', key: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun', tone: 'neutral' },
+    NODE_DEPLETED: { icon: 'fa-mountain', key: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted', tone: 'warning' },
+    STAMINA_BLOCKED: { icon: 'fa-bolt', key: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked', tone: 'warning' }
   };
 
   const callouts = $derived.by(() => {
@@ -116,6 +126,22 @@
 
       <span class="gathering-task-copy">
         <span class="gathering-task-name" title={name}>{name}</span>
+        {#if nodeCount != null || staminaCost != null}
+          <span class="gathering-task-economy" data-gathering-economy>
+            {#if nodeCount != null}
+              <span class="gathering-economy-chip" data-gathering-node-count title={localize('FABRICATE.App.Gathering.Detail.NodesRemaining')}>
+                <i class="fas fa-mountain" aria-hidden="true"></i>
+                <span>{nodeCount}</span>
+              </span>
+            {/if}
+            {#if staminaCost != null}
+              <span class="gathering-economy-chip" data-gathering-stamina-cost title={localize('FABRICATE.App.Gathering.Detail.StaminaCost')}>
+                <i class="fas fa-bolt" aria-hidden="true"></i>
+                <span>{staminaCost}</span>
+              </span>
+            {/if}
+          </span>
+        {/if}
       </span>
 
       {#if successChance != null}
@@ -273,6 +299,30 @@
 
   .gathering-task-chance {
     flex: 0 0 auto;
+  }
+
+  /* Economy badges (node count / stamina cost) under the task name. */
+  .gathering-task-economy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .gathering-economy-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--fab-surface-raised);
+    border: 1px solid var(--fab-border);
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-economy-chip i {
+    font-size: 10px;
   }
 
   /* Short, always-visible description beneath the main row — occupies the slot

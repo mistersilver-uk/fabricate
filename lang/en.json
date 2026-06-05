@@ -138,8 +138,18 @@
             "Conditions": "Wrong conditions",
             "Catalyst": "Missing catalyst(s)",
             "Paused": "Game paused",
-            "DuplicateRun": "Already in progress"
-          }
+            "DuplicateRun": "Already in progress",
+            "NodeDepleted": "Depleted",
+            "StaminaBlocked": "Not enough stamina"
+          },
+          "NodesRemaining": "Nodes remaining",
+          "NodesAvailable": "Nodes available: {count}",
+          "NodesLegend": "This area's resources are limited and replenish over time.",
+          "StaminaCost": "Stamina cost",
+          "StaminaCostOnly": "Costs {cost} stamina",
+          "StaminaCostWithPool": "Costs {cost} stamina (you have {current}/{max})",
+          "StaminaPool": "Stamina: {current}/{max}",
+          "StaminaPoolNone": "No stamina pool set"
         }
       }
     },

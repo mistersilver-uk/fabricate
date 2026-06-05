@@ -423,7 +423,6 @@ test('rich gathering metadata and task economy fields normalize and validate add
     region: 'Elderglen Valley',
     biome: 'Forest',
     risk: 'hazardous',
-    economyMode: 'hybrid',
     conditions: {
       timeOfDay: 'Dawn',
       weather: 'Light rain'
@@ -436,8 +435,8 @@ test('rich gathering metadata and task economy fields normalize and validate add
         respawn: { policy: 'probability', intervalSeconds: 86400, chance: 0.5 }
       },
       staminaCost: 3,
+      staminaCostModifiers: [{ modifierId: 'strength', operator: '-', min: 0, max: 2 }],
       riskOverride: 'unsafe',
-      attemptLimit: { scope: 'actor', max: 2, windowSeconds: 86400 },
       reveal: { enabled: true, scope: 'actor', triggers: ['success'] }
     })]
   });
@@ -450,12 +449,15 @@ test('rich gathering metadata and task economy fields normalize and validate add
   assert.equal(saved.region, 'Elderglen Valley');
   assert.equal(saved.biome, 'Forest');
   assert.equal(saved.risk, 'hazardous');
-  assert.equal(saved.economyMode, 'hybrid');
+  // The legacy per-environment economyMode field is removed; mode is per system.
+  assert.equal('economyMode' in saved, false);
   assert.deepEqual(saved.conditions, { timeOfDay: 'Dawn', weather: 'Light rain', visibility: '', notes: '' });
   assert.equal(saved.tasks[0].nodes.current, 2);
   assert.equal(saved.tasks[0].nodes.max, 4);
   assert.equal(saved.tasks[0].staminaCost, 3);
-  assert.equal(saved.tasks[0].attemptLimit.max, 2);
+  assert.equal('attemptLimit' in saved.tasks[0], false);
+  assert.equal(saved.tasks[0].staminaCostModifiers[0].modifierId, 'strength');
+  assert.equal(saved.tasks[0].staminaCostModifiers[0].operator, '-');
 });
 
 test('validation permits disabled draft placeholder tasks but blocks enabled missing outcome providers', async () => {

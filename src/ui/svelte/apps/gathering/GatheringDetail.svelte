@@ -51,6 +51,15 @@
   const composedTaskCount = $derived(Number(env?.composedTaskCount ?? 0));
   const blindAttemptable = $derived(env?.attemptable === true);
 
+  // System limitation mode + (stamina mode) the actor's pool, surfaced as a
+  // strip beneath the header. `none` shows nothing; blind environments keep the
+  // node legend generic (per-task counts are redacted in the rows themselves).
+  const economyMode = $derived(String(env?.economyMode ?? 'none'));
+  const staminaPool = $derived(env?.staminaPool ?? null);
+  const hasStaminaPool = $derived(
+    economyMode === 'stamina' && staminaPool && staminaPool.current != null && staminaPool.max != null
+  );
+
   const biomeTags = $derived(Array.isArray(env?.biomeTags) ? env.biomeTags : []);
   const region = $derived(String(env?.region ?? ''));
   const danger = $derived(String(env?.risk ?? (Array.isArray(env?.dangerTags) ? env.dangerTags[0] : '') ?? ''));
@@ -164,6 +173,26 @@
         {/if}
       </p>
     </header>
+
+    {#if economyMode === 'stamina' || economyMode === 'nodes'}
+      <section class="gathering-detail-economy" data-gathering-economy-strip data-economy-mode={economyMode}>
+        {#if economyMode === 'stamina'}
+          <span class="gathering-detail-economy-item">
+            <i class="fas fa-bolt" aria-hidden="true"></i>
+            {#if hasStaminaPool}
+              <span data-gathering-stamina-pool>{localize('FABRICATE.App.Gathering.Detail.StaminaPool', { current: staminaPool.current, max: staminaPool.max })}</span>
+            {:else}
+              <span data-gathering-stamina-pool="none">{localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone')}</span>
+            {/if}
+          </span>
+        {:else}
+          <span class="gathering-detail-economy-item">
+            <i class="fas fa-mountain" aria-hidden="true"></i>
+            <span>{localize('FABRICATE.App.Gathering.Detail.NodesLegend')}</span>
+          </span>
+        {/if}
+      </section>
+    {/if}
 
     <section class="gathering-detail-hazard" data-gathering-hazard-section>
       <div class="gathering-detail-hazard-danger">
@@ -396,6 +425,29 @@
 
   /* Environment safety readout: highest danger level + hazard-chance bar (or a
      "safe" hint when there is no hazard chance). */
+  .gathering-detail-economy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+  }
+
+  .gathering-detail-economy-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fab-text);
+  }
+
+  .gathering-detail-economy-item i {
+    color: var(--fab-text-muted);
+  }
+
   .gathering-detail-hazard {
     flex: 0 0 auto;
     display: flex;

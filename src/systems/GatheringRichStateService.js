@@ -57,6 +57,12 @@ const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
+// System-level gathering limitation mode (per crafting system).
+const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
+// Stamina regeneration over world time.
+const STAMINA_REGEN_POLICIES = new Set(['none', 'elapsedTime']);
+const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
+const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86400, weeks: 604800 });
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
@@ -73,7 +79,6 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
 
 const BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
-  ATTEMPT_LIMIT_EXHAUSTED: 'FABRICATE.Gathering.Blocked.AttemptLimitExhausted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked'
 });
 
@@ -683,21 +688,21 @@ export class GatheringRichStateService {
 
   buildListingMetadata({ environment, task, actor, viewer }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
-    const nodes = task?.nodes ? {
+    const mode = this._economyMode(environment?.craftingSystemId);
+    const showNodeCounts = task?.nodes?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
+    const nodes = mode === 'nodes' && task?.nodes ? {
       enabled: true,
       available: Number(task.nodes.current || 0) > 0,
-      current: task.nodes.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind ? Number(task.nodes.current || 0) : null,
-      max: task.nodes.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind ? Number(task.nodes.max || 0) : null
+      current: showNodeCounts ? Number(task.nodes.current || 0) : null,
+      max: showNodeCounts ? Number(task.nodes.max || 0) : null
     } : null;
-    const stamina = Number(task?.staminaCost || 0) > 0 ? {
+    const stamina = mode === 'stamina' && Number(task?.staminaCost || 0) > 0 ? {
       cost: Number(task.staminaCost || 0),
       state: this.getActorStamina(actor, environment?.craftingSystemId)
     } : null;
-    const attemptLimit = task?.attemptLimit ? this._attemptLimitEvidence({ actor, environment, task, viewer }) : null;
     return {
       nodes,
       stamina,
-      attemptLimit,
       risk: task?.riskOverride || environment?.risk || 'safe',
       conditions: this.getConditions().weather ? cloneJson(this._config().conditions) : cloneJson(environment?.conditions || {}),
       hazards: opaqueBlind
@@ -726,11 +731,23 @@ export class GatheringRichStateService {
     const state = readState(actor);
     const key = systemId || 'default';
     const previous = state.stamina?.[key] || {};
+    const effectiveProvider = provider || previous.provider || 'fabricate';
+    const priorMax = Number.isFinite(Number(previous.max)) ? Number(previous.max) : null;
+    // Fabricate-owned pools accept a max freely; an external provider's maximum
+    // is read-only once established (the prior value is preserved), but an as-yet
+    // unset external pool may still be initialized.
+    const maxValue = (effectiveProvider === 'fabricate' || priorMax === null)
+      ? nonNegativeNumber(max, priorMax ?? current ?? 0)
+      : priorMax;
+    let currentValue = nonNegativeNumber(current, previous.current ?? 0);
+    if (Number.isFinite(Number(maxValue))) currentValue = Math.min(currentValue, Number(maxValue));
     const next = {
-      provider: provider || previous.provider || 'fabricate',
+      provider: effectiveProvider,
       regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
-      current: nonNegativeNumber(current, previous.current ?? 0),
-      max: nonNegativeNumber(max, previous.max ?? current ?? 0)
+      current: currentValue,
+      max: maxValue,
+      // Preserve the regen anchor so a manual GM set does not reset the clock.
+      ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
     };
     state.stamina = { ...(state.stamina || {}), [key]: next };
     state.history = [
@@ -774,6 +791,141 @@ export class GatheringRichStateService {
     const updated = await this.environmentStore.update(environmentId, { tasks });
     this._callHook('fabricate.gathering.nodeRestocked', { environmentId, taskId, current, max });
     return updated;
+  }
+
+  /**
+   * Regenerate one actor's stamina for a stamina-mode system as world time
+   * passes. Adds the configured per-interval amount once for each whole
+   * `regen.unit` elapsed since the last evaluation, clamps to the pool max, and
+   * advances the persisted anchor by exactly the consumed intervals so the
+   * fractional remainder accrues toward the next tick. No-ops when the system
+   * is not in stamina mode, regen is off, the pool has no max, or world time
+   * has not advanced a full interval (re-anchoring on backwards jumps).
+   *
+   * @param {object} payload
+   * @returns {Promise<object|null>} The updated stamina entry, or null on no-op.
+   */
+  async regenerateActorStamina({ actor, systemId, system = null, environment = null, worldTime } = {}) {
+    const key = systemId || 'default';
+    const econ = this._systemEconomy(key);
+    if (econ.mode !== 'stamina') return null;
+    const regen = econ.stamina?.regen || {};
+    if (regen.policy !== 'elapsedTime') return null;
+    const interval = durationToSeconds(1, regen.unit);
+    if (!(interval > 0)) return null;
+
+    const state = readState(actor);
+    const entry = state.stamina?.[key];
+    if (!entry || !Number.isFinite(Number(entry.max))) return null;
+    const now = Number(worldTime);
+    if (!Number.isFinite(now)) return null;
+    const last = Number.isFinite(Number(entry.lastRegenWorldTime)) ? Number(entry.lastRegenWorldTime) : now;
+
+    // World time stood still or ran backwards: re-anchor, never regenerate.
+    if (now <= last) {
+      if (entry.lastRegenWorldTime !== now) {
+        state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: now } };
+        await writeState(actor, state);
+      }
+      return null;
+    }
+
+    const intervals = Math.floor((now - last) / interval);
+    if (intervals <= 0) return null; // keep the anchor so the remainder accrues
+
+    const max = Number(entry.max);
+    const before = Number(entry.current || 0);
+    const advancedAnchor = last + intervals * interval;
+    if (before >= max) {
+      state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: advancedAnchor } };
+      await writeState(actor, state);
+      return null;
+    }
+
+    const perInterval = await this._regenAmountPerInterval({ actor, systemId: key, system, environment, regen });
+    const nextCurrent = perInterval > 0 ? Math.min(max, before + perInterval * intervals) : before;
+    const next = { ...entry, current: nextCurrent, lastRegenWorldTime: advancedAnchor };
+    state.stamina = { ...(state.stamina || {}), [key]: next };
+    state.history = [
+      this._historyEvent('stamina.regen', { systemId: key, amount: nextCurrent - before, current: nextCurrent, max }),
+      ...normalizeList(state.history)
+    ].slice(0, 50);
+    await writeState(actor, state);
+    this._callHook('fabricate.gathering.staminaRegenerated', { actor, systemId: key, amount: nextCurrent - before, stamina: cloneJson(next) });
+    return cloneJson(next);
+  }
+
+  /**
+   * Respawn finite resource nodes for one environment as world time passes
+   * (nodes-mode systems only). For each task with a timed/probabilistic respawn
+   * policy, restores one node per elapsed interval (`elapsedTime`) or one
+   * persisted d100 roll per interval (`probability`/`manualAndElapsedTime`),
+   * clamped to the task max. Advances each task's `respawn.lastEvaluatedWorldTime`
+   * with the consumed intervals (persisting `lastRoll`) so a same-tick refresh
+   * never rerolls. Writes the environment once when any task changed.
+   *
+   * @param {object} payload
+   * @returns {Promise<object|null>} The updated environment, or null on no-op.
+   */
+  async respawnNodes({ environment, worldTime } = {}) {
+    if (!environment) return null;
+    if (this._economyMode(environment.craftingSystemId) !== 'nodes') return null;
+    const now = Number(worldTime);
+    if (!Number.isFinite(now)) return null;
+
+    let changed = false;
+    const tasks = normalizeList(environment.tasks).map(task => {
+      const respawn = task?.nodes?.respawn;
+      if (!task?.nodes || !respawn || !['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(respawn.policy)) return task;
+      const interval = Number(respawn.intervalSeconds || 0);
+      if (!(interval > 0)) return task;
+      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
+
+      if (now <= last) {
+        if (respawn.lastEvaluatedWorldTime !== now) {
+          changed = true;
+          return { ...task, nodes: { ...task.nodes, respawn: { ...respawn, lastEvaluatedWorldTime: now } } };
+        }
+        return task;
+      }
+
+      const max = Number(task.nodes.max || 0);
+      const before = Number(task.nodes.current || 0);
+      let intervals = Math.floor((now - last) / interval);
+      if (intervals <= 0) return task;
+      const room = Math.max(0, max - before);
+      const advancedAnchor = last + intervals * interval;
+      if (room === 0) {
+        changed = true;
+        return { ...task, nodes: { ...task.nodes, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } } };
+      }
+      intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
+
+      let gain = 0;
+      let lastRoll = respawn.lastRoll;
+      if (respawn.policy === 'elapsedTime') {
+        gain = intervals;
+      } else {
+        const chance = Math.max(0, Math.min(1, Number(respawn.chance || 0)));
+        const rolls = [];
+        for (let i = 0; i < intervals; i++) {
+          const roll = Number(this.rollD100());
+          rolls.push(roll);
+          if (roll <= chance * 100) gain += 1;
+        }
+        lastRoll = { worldTime: now, chance, rolls };
+      }
+      const nextCurrent = Math.min(max, before + gain);
+      changed = true;
+      this._callHook('fabricate.gathering.nodeRespawned', { environmentId: environment.id, taskId: task.id, amount: nextCurrent - before, current: nextCurrent, max });
+      return {
+        ...task,
+        nodes: { ...task.nodes, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
+      };
+    });
+
+    if (!changed) return null;
+    return this.environmentStore.update(environment.id, { tasks });
   }
 
   async updateConditions({ environmentId, conditions = {} } = {}) {
@@ -902,27 +1054,21 @@ export class GatheringRichStateService {
   async evaluateStart({ actor, system, environment, task, viewer } = {}) {
     const blockedReasons = [];
     const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
+    const systemId = system?.id || environment?.craftingSystemId;
+    const mode = this._economyMode(systemId);
 
-    if (task?.nodes && Number(task.nodes.current || 0) <= 0 && viewer?.isGM !== true) {
+    if (mode === 'nodes' && task?.nodes && Number(task.nodes.current || 0) <= 0 && viewer?.isGM !== true) {
       blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
     }
 
-    if (task?.attemptLimit) {
-      const attempt = this._attemptLimitEvidence({ actor, environment, task, viewer });
-      evidence.attemptLimit = attempt;
-      if (attempt.remaining !== null && attempt.remaining <= 0 && viewer?.isGM !== true) {
-        blockedReasons.push(this._blockedReason('ATTEMPT_LIMIT_EXHAUSTED', { taskId: task.id }));
-      }
-    }
-
-    const staminaCost = Number(task?.staminaCost || 0);
-    if (staminaCost > 0 && viewer?.isGM !== true) {
-      const stamina = this.getActorStamina(actor, system?.id || environment?.craftingSystemId);
-      evidence.stamina = { cost: staminaCost, state: stamina };
-      if (Number(stamina.current ?? 0) < staminaCost) {
+    if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+      const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+      const stamina = this.getActorStamina(actor, systemId);
+      evidence.stamina = { cost, base: Number(task.staminaCost || 0), state: stamina };
+      if (cost > 0 && viewer?.isGM !== true && Number(stamina.current ?? 0) < cost) {
         blockedReasons.push(this._blockedReason('STAMINA_BLOCKED', {
           taskId: task.id,
-          required: staminaCost,
+          required: cost,
           current: stamina.current ?? 0
         }));
       }
@@ -931,13 +1077,12 @@ export class GatheringRichStateService {
     return { blockedReasons, evidence };
   }
 
-  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null } = {}) {
+  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
       risk: task?.riskOverride || environment?.risk || 'safe',
       node: null,
       stamina: null,
-      attemptLimit: null,
       characterModifierSnapshot: cloneJson(
         outcome?.characterModifierSnapshot
           ?? outcome?.checkResult?.characterModifierSnapshot
@@ -945,29 +1090,28 @@ export class GatheringRichStateService {
       )
     };
 
-    if (task?.nodes && shouldDepleteNode(task, outcome)) {
+    // A GM acting as a viewer bypasses the economy, so the attempt must not
+    // consume the actor's stamina or the environment's nodes.
+    if (viewer?.isGM === true) {
+      this._callHook('fabricate.gathering.richAttemptCommitted', { actor, system, environment, task, outcome, evidence });
+      return evidence;
+    }
+
+    const systemId = system?.id || environment?.craftingSystemId;
+    const mode = this._economyMode(systemId);
+
+    if (mode === 'nodes' && task?.nodes && shouldDepleteNode(task, outcome)) {
       const current = Math.max(0, Number(task.nodes.current || 0) - 1);
       await this.restockNode({ environmentId: environment.id, taskId: task.id, current, max: task.nodes.max });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
 
-    const staminaCost = Number(task?.staminaCost || 0);
-    if (staminaCost > 0) {
-      await this.adjustActorStamina(actor, { systemId: system?.id || environment?.craftingSystemId, delta: -staminaCost });
-      evidence.stamina = { spent: staminaCost };
-    }
-
-    if (task?.attemptLimit) {
-      const state = readState(actor);
-      const key = attemptKey({ actor, environment, task, userId: this.getUserId() });
-      const previous = state.attempts?.[key] || { count: 0 };
-      const next = {
-        count: Number(previous.count || 0) + 1,
-        updatedAtWorldTime: this._now()
-      };
-      state.attempts = { ...(state.attempts || {}), [key]: next };
-      await writeState(actor, state);
-      evidence.attemptLimit = { key, count: next.count, max: task.attemptLimit.max };
+    if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+      const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+      if (cost > 0) {
+        await this.adjustActorStamina(actor, { systemId, delta: -cost });
+        evidence.stamina = { spent: cost, base: Number(task.staminaCost || 0) };
+      }
     }
 
     this._callHook('fabricate.gathering.richAttemptCommitted', { actor, system, environment, task, outcome, evidence });
@@ -1044,6 +1188,7 @@ export class GatheringRichStateService {
       itemSelectionMode: normalized.itemSelectionMode,
       dropRows: normalized.dropRows.map(row => applyDropRateAdjustment(row, rowAdjustments[row.id])),
       staminaCost: normalized.staminaCost,
+      staminaCostModifiers: Array.isArray(normalized.staminaCostModifiers) ? cloneJson(normalized.staminaCostModifiers) : [],
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
       resultSelection: { provider: 'd100Rows' },
@@ -1086,19 +1231,146 @@ export class GatheringRichStateService {
     return this.setSetting(this.settingKey, cloneJson(config));
   }
 
-  _attemptLimitEvidence({ actor, environment, task }) {
-    if (!task?.attemptLimit) return null;
-    const state = readState(actor);
-    const key = attemptKey({ actor, environment, task, userId: this.getUserId() });
-    const current = Number(state.attempts?.[key]?.count || 0);
-    const max = Number(task.attemptLimit.max || 1);
-    return {
-      key,
-      scope: task.attemptLimit.scope || 'actor',
-      count: current,
-      max,
-      remaining: Math.max(0, max - current)
-    };
+  /**
+   * Persist a crafting system's gathering economy block (mode + stamina regen)
+   * into the raw config, merging beside the system's other library state.
+   *
+   * @param {{systemId: string, economy: object}} payload
+   * @returns {Promise<object|null>} The normalized economy block, or null.
+   */
+  async setSystemEconomy({ systemId, economy } = {}) {
+    if (!systemId || typeof this.setSetting !== 'function') return null;
+    const target = String(systemId);
+    const raw = (typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : null) || {};
+    const systems = { ...(raw.systems || {}) };
+    const normalized = normalizeGatheringEconomy(economy);
+    systems[target] = { ...(systems[target] || {}), economy: cloneJson(normalized) };
+    await this.setSetting(this.settingKey, { ...raw, systems });
+    this._callHook('fabricate.gathering.economyUpdated', { systemId: target, economy: cloneJson(normalized) });
+    return normalized;
+  }
+
+  /**
+   * The normalized economy block for a crafting system (mode + stamina regen).
+   * Always returns a fully-defaulted block so callers never branch on absence.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {{mode: string, stamina: {regen: object}}}
+   */
+  _systemEconomy(systemId) {
+    return this._config().systems?.[String(systemId || '')]?.economy || normalizeGatheringEconomy(null);
+  }
+
+  /**
+   * The active limitation mode for a crafting system: `none`, `stamina`, or
+   * `nodes`.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {string}
+   */
+  _economyMode(systemId) {
+    return this._systemEconomy(systemId).mode || 'none';
+  }
+
+  /**
+   * Public accessor for a system's limitation mode (`none`/`stamina`/`nodes`),
+   * used by the engine's world-time drivers and the service layer.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {string}
+   */
+  economyMode(systemId) {
+    return this._economyMode(systemId);
+  }
+
+  /**
+   * Public accessor for a system's normalized economy block.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {{mode: string, stamina: {regen: object}}}
+   */
+  systemEconomy(systemId) {
+    return cloneJson(this._systemEconomy(systemId));
+  }
+
+  /**
+   * Resolve the character-modifier library for an attempt: prefer the
+   * per-environment map populated at composition time, falling back to the
+   * crafting system's library (needed for stamina regen, which has no
+   * environment context).
+   *
+   * @param {object} payload
+   * @returns {Map<string, object>}
+   */
+  _modifierLibrary({ environment = null, systemId = null } = {}) {
+    if (environment?.__libraryCharacterModifiers instanceof Map && environment.__libraryCharacterModifiers.size > 0) {
+      return environment.__libraryCharacterModifiers;
+    }
+    const entries = this._config().systems?.[String(systemId || environment?.craftingSystemId || '')]?.characterModifiers || [];
+    return new Map(entries.map(entry => [String(entry.id), entry]));
+  }
+
+  /**
+   * Resolve a task's stamina cost for one actor: the base `task.staminaCost`
+   * adjusted by the task's `staminaCostModifiers` (resolved against the
+   * per-environment character modifier library, the same path drop chances
+   * use). Floored at 0 so a strong character can make a task free. Used by both
+   * the start gate and the spend so they always agree.
+   *
+   * @param {object} payload
+   * @returns {Promise<number>} Non-negative integer stamina cost.
+   */
+  async _effectiveStaminaCost({ actor, system, environment, task, viewer = null } = {}) {
+    const base = Number(task?.staminaCost || 0);
+    if (base <= 0) return 0;
+    const references = normalizeList(task?.staminaCostModifiers);
+    if (references.length === 0) return Math.max(0, Math.round(base));
+    const library = this._modifierLibrary({ environment, systemId: system?.id || environment?.craftingSystemId });
+    let total = base;
+    for (const reference of references) {
+      const entry = library.get(String(reference.modifierId)) || null;
+      const resolved = await this._resolveCharacterModifierContribution({
+        reference, libraryEntry: entry, actor, environment, task, row: null, hazard: null, viewer, system
+      });
+      if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
+    }
+    return Math.max(0, Math.round(total));
+  }
+
+  /**
+   * The stamina an actor regenerates per elapsed `regen.unit`: a fixed
+   * `regen.amount` or a `regen.formula` (which wins when set), adjusted by the
+   * regen `characterModifiers`. Floored at 0 and rounded to an integer so
+   * multi-interval catch-up is deterministic.
+   *
+   * @param {object} payload
+   * @returns {Promise<number>} Non-negative integer amount per interval.
+   */
+  async _regenAmountPerInterval({ actor, systemId, system = null, environment = null, regen } = {}) {
+    let base = 0;
+    if (regen?.formula && typeof this.evaluateExpression === 'function') {
+      const value = await this.evaluateExpression({
+        expression: regen.formula,
+        provider: null,
+        actor,
+        kind: 'staminaRegen',
+        system,
+        environment
+      });
+      base = Number.isFinite(Number(value)) ? Number(value) : 0;
+    } else {
+      base = Number(regen?.amount || 0);
+    }
+    let total = base;
+    const library = this._modifierLibrary({ environment, systemId });
+    for (const reference of normalizeList(regen?.characterModifiers)) {
+      const entry = library.get(String(reference.modifierId)) || null;
+      const resolved = await this._resolveCharacterModifierContribution({
+        reference, libraryEntry: entry, actor, environment, task: null, row: null, hazard: null, viewer: null, system
+      });
+      if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
+    }
+    return Math.max(0, Math.round(total));
   }
 
   _blockedReason(code, data = null) {
@@ -1138,6 +1410,47 @@ function shouldDepleteNode(task, outcome) {
   return true;
 }
 
+/**
+ * Convert a count of whole world-time units into seconds. Mirrors
+ * CraftingRunManager's duration math and adds `weeks`. Unknown units fall back
+ * to hours.
+ *
+ * @param {number} count
+ * @param {string} unit One of minutes|hours|days|weeks.
+ * @returns {number} Non-negative seconds.
+ */
+function durationToSeconds(count, unit) {
+  const seconds = SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
+  return Math.max(0, Number(count || 0) * seconds);
+}
+
+/**
+ * Normalize a per-system gathering economy block. The `mode` selects the
+ * limitation model (`none` legacy behaviour, `stamina` actor pools, `nodes`
+ * finite resource nodes). Stamina regen is system-level: a fixed `amount` or a
+ * `formula` (which wins when set), optionally adjusted by character modifiers,
+ * applied once per `unit` of elapsed world time when `policy === 'elapsedTime'`.
+ *
+ * @param {object} raw Raw economy block.
+ * @returns {{mode: string, stamina: {regen: object}}}
+ */
+function normalizeGatheringEconomy(raw = {}) {
+  const regen = raw?.stamina?.regen || {};
+  return {
+    mode: ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none',
+    stamina: {
+      regen: {
+        policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : 'none',
+        unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
+        amount: numberOrNull(regen.amount),
+        formula: stringOrFallback(regen.formula, ''),
+        characterModifiers: normalizeCharacterModifierReferenceList(regen.characterModifiers),
+        lastRoll: regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null
+      }
+    }
+  };
+}
+
 function normalizeGatheringConfig(raw = {}) {
   const vocabularies = {
     regions: seedVocabulary(raw?.vocabularies?.regions, DEFAULT_VOCABULARIES.regions),
@@ -1159,7 +1472,8 @@ function normalizeGatheringConfig(raw = {}) {
       hazards: normalizeList(config?.hazards).map(normalizeHazard),
       characterModifiers: normalizeList(config?.characterModifiers)
         .map(entry => normalizeCharacterModifierLibraryEntry(entry))
-        .filter(Boolean)
+        .filter(Boolean),
+      economy: normalizeGatheringEconomy(config?.economy)
     };
   }
   return {
@@ -1233,6 +1547,7 @@ function normalizeLibraryTask(task = {}) {
     itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
+    staminaCostModifiers: normalizeCharacterModifierReferenceList(task.staminaCostModifiers),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
     timeRequirement: plainObjectOrNull(task.timeRequirement),
     toolIds: Array.isArray(task.toolIds)
@@ -1798,15 +2113,6 @@ function numberOrNull(value) {
 function plainObjectOrNull(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return cloneJson(value);
-}
-
-function attemptKey({ actor, environment, task, userId }) {
-  const scope = task?.attemptLimit?.scope || 'actor';
-  if (scope === 'global') return `global:${task?.id}`;
-  if (scope === 'environment') return `environment:${environment?.id}:${task?.id}`;
-  if (scope === 'user') return `user:${userId || 'unknown'}:${task?.id}`;
-  if (scope === 'task') return `task:${task?.id}`;
-  return `actor:${actor?.uuid || actor?.id || 'unknown'}:${task?.id}`;
 }
 
 function revealKey({ environmentId, taskId, scope, actor, userId }) {

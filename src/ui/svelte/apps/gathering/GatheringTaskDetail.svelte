@@ -48,8 +48,20 @@
     CATALYST_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst',
     GAME_PAUSED: 'FABRICATE.App.Gathering.Detail.Callout.Paused',
     DUPLICATE_ACTIVE_RUN: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun',
-    SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene'
+    SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene',
+    NODE_DEPLETED: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted',
+    STAMINA_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked'
   };
+
+  // Economy summary shown above the Attempt button: the per-task stamina cost
+  // against the actor's pool, or the remaining node count. Present only when the
+  // active system runs that mode (the runtime supplies task.rich.{stamina,nodes}).
+  const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
+  const staminaState = $derived(task?.rich?.stamina?.state ?? null);
+  const richNodes = $derived(task?.rich?.nodes ?? null);
+  const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
+    ? `${richNodes.current}/${richNodes.max}` : null);
+  const nodeDepleted = $derived(richNodes != null && richNodes.available === false);
   const blockReason = $derived.by(() => {
     if (!blocked) return '';
     const seen = new Set();
@@ -140,6 +152,32 @@
     </header>
 
     <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
+
+    {#if staminaCost != null || nodeCount != null}
+      <div class="gathering-task-detail-economy" data-gathering-economy-summary>
+        {#if staminaCost != null}
+          <span class="gathering-economy-line" data-gathering-stamina-cost>
+            <i class="fas fa-bolt" aria-hidden="true"></i>
+            <span>
+              {#if staminaState && staminaState.current != null && staminaState.max != null}
+                {localize('FABRICATE.App.Gathering.Detail.StaminaCostWithPool', { cost: staminaCost, current: staminaState.current, max: staminaState.max })}
+              {:else}
+                {localize('FABRICATE.App.Gathering.Detail.StaminaCostOnly', { cost: staminaCost })}
+              {/if}
+            </span>
+          </span>
+        {/if}
+        {#if nodeCount != null}
+          <span class="gathering-economy-line" class:is-depleted={nodeDepleted} data-gathering-node-count>
+            <i class="fas fa-mountain" aria-hidden="true"></i>
+            <span>{localize('FABRICATE.App.Gathering.Detail.NodesAvailable', { count: nodeCount })}</span>
+            {#if nodeDepleted}
+              <span class="gathering-economy-depleted">{localize('FABRICATE.App.Gathering.Detail.Callout.NodeDepleted')}</span>
+            {/if}
+          </span>
+        {/if}
+      </div>
+    {/if}
 
     <div class="gathering-task-detail-action" class:has-chance={successChance != null}>
       {#if successChance != null}
@@ -257,6 +295,33 @@
   .gathering-task-detail-description.is-fallback {
     font-style: italic;
     color: var(--fab-text-muted);
+  }
+
+  /* Economy summary (stamina cost vs pool / node count) above the Attempt row. */
+  .gathering-task-detail-economy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .gathering-economy-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-economy-line.is-depleted {
+    color: var(--fab-warning-text);
+  }
+
+  .gathering-economy-depleted {
+    padding: 0 6px;
+    border-radius: 999px;
+    font-weight: 600;
+    background: var(--fab-warning-soft);
+    border: 1px solid var(--fab-warning-border);
   }
 
   /* Single column (full-width Attempt) by default; two equal columns with

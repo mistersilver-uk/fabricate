@@ -1005,13 +1005,60 @@ class Fabricate {
   setGatheringStamina(options = {}) {
     this._requireReady();
     this._requireGM();
-    return this.gatheringRichStateService?.setActorStamina(options.actor, options);
+    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
+    return this.gatheringRichStateService?.setActorStamina(actor, options);
   }
 
   adjustGatheringStamina(options = {}) {
     this._requireReady();
     this._requireGM();
-    return this.gatheringRichStateService?.adjustActorStamina(options.actor, options);
+    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
+    return this.gatheringRichStateService?.adjustActorStamina(actor, options);
+  }
+
+  /**
+   * Read a crafting system's gathering economy block (mode + stamina regen).
+   * Player-safe — the mode and regen cadence are surfaced in the player UI.
+   *
+   * @param {{systemId: string}} options
+   * @returns {{mode: string, stamina: {regen: object}}|null}
+   */
+  getGatheringEconomy(options = {}) {
+    this._requireReady();
+    return this.gatheringRichStateService?.systemEconomy(options.systemId) ?? null;
+  }
+
+  /**
+   * Set a crafting system's gathering economy block. GM-only.
+   *
+   * @param {{systemId: string, economy: object}} options
+   * @returns {Promise<object|null>} The normalized economy block.
+   */
+  setGatheringEconomy(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.setSystemEconomy(options);
+  }
+
+  /**
+   * List the stamina pools of player-owned actors for one crafting system, for
+   * the GM "Gathering State" panel. GM-only.
+   *
+   * @param {{systemId: string}} options
+   * @returns {Array<{actorId: string, name: string, img: string, current: number|null, max: number|null, provider: string}>}
+   */
+  getGatheringStaminaState(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    const systemId = options.systemId;
+    const service = this.gatheringRichStateService;
+    if (!service || !systemId) return [];
+    return Array.from(game.actors?.contents ?? [])
+      .filter(actor => actor?.hasPlayerOwner)
+      .map(actor => {
+        const stamina = service.getActorStamina(actor, systemId);
+        return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
+      });
   }
 
   revealGatheringTask(options = {}) {

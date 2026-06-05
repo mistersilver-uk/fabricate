@@ -9,6 +9,7 @@
 
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
+import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,13 @@ const MIGRATIONS = [
         gatheringConfig: migrateGatheringConfig(data.gatheringConfig)
       };
     }
+  },
+  {
+    version: '0.3.0',
+    label: 'System-level gathering economy modes (remove attemptLimit/economyMode)',
+    migrate(data) {
+      return migrateGatheringEconomy(data.gatheringConfig, data.environments);
+    }
   }
   // Future migrations added here in version order
 ];
@@ -94,15 +102,18 @@ export class MigrationRunner {
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
     const rawSystems = this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [];
     const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
+    const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
     const originalGatheringConfigJson = JSON.stringify(rawGatheringConfig);
+    const originalEnvironmentsJson = JSON.stringify(rawEnvironments);
 
     let data = {
       recipes: rawRecipes,
       systems: rawSystems,
-      gatheringConfig: rawGatheringConfig
+      gatheringConfig: rawGatheringConfig,
+      environments: rawEnvironments
     };
     let highestVersion = lastRunVersion;
 
@@ -124,6 +135,7 @@ export class MigrationRunner {
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged = JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
+    const environmentsChanged = JSON.stringify(data.environments) !== originalEnvironmentsJson;
 
     if (recipesChanged) {
       await this._setSetting(SETTING_KEYS.RECIPES, data.recipes);
@@ -133,6 +145,9 @@ export class MigrationRunner {
     }
     if (gatheringConfigChanged) {
       await this._setSetting(SETTING_KEYS.GATHERING_CONFIG, data.gatheringConfig);
+    }
+    if (environmentsChanged) {
+      await this._setSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS, data.environments);
     }
 
     await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);

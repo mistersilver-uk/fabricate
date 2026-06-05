@@ -10,11 +10,9 @@ const VALID_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutc
 const VALID_CHECK_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const VALID_PROGRESSIVE_AWARD_MODES = new Set(['partial', 'equal', 'exceed']);
 const VALID_RISK_LEVELS = new Set(['safe', 'hazardous', 'unsafe', 'extreme']);
-const VALID_ECONOMY_MODES = new Set(['time', 'nodes', 'stamina', 'hybrid']);
 const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
 const VALID_RESPAWN_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
-const VALID_ATTEMPT_LIMIT_SCOPES = new Set(['actor', 'user', 'task', 'environment', 'global']);
-const VALID_RECHARGE_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
+const VALID_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const VALID_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 
@@ -293,7 +291,6 @@ export class GatheringEnvironmentStore {
       dangerTags: normalizeStringList(data?.dangerTags ?? data?.risk),
       dangerLevel: resolveEnvironmentDangerLevel(data),
       risk: VALID_RISK_LEVELS.has(data?.risk) ? data.risk : 'safe',
-      economyMode: VALID_ECONOMY_MODES.has(data?.economyMode) ? data.economyMode : 'time',
       conditions: normalizeConditions(data?.conditions),
       chatMessages: normalizeChatMessages(data?.chatMessages),
       enabled: data?.enabled !== false,
@@ -343,13 +340,13 @@ export class GatheringEnvironmentStore {
     };
 
     const nodes = normalizeNodeConfig(data?.nodes);
-    const attemptLimit = normalizeAttemptLimit(data?.attemptLimit);
     const reveal = normalizeRevealConfig(data?.reveal);
     const encounters = normalizeEncounterConfig(data?.encounters);
     const chatMessages = normalizeChatMessages(data?.chatMessages);
+    const staminaCostModifiers = normalizeStaminaCostModifiers(data?.staminaCostModifiers);
     if (nodes) task.nodes = nodes;
-    if (attemptLimit) task.attemptLimit = attemptLimit;
     if (Number.isFinite(Number(data?.staminaCost)) && Number(data.staminaCost) > 0) task.staminaCost = Number(data.staminaCost);
+    if (staminaCostModifiers.length > 0) task.staminaCostModifiers = staminaCostModifiers;
     if (VALID_RISK_LEVELS.has(data?.riskOverride)) task.riskOverride = data.riskOverride;
     if (reveal) task.reveal = reveal;
     if (encounters) task.encounters = encounters;
@@ -463,9 +460,6 @@ export class GatheringEnvironmentStore {
     if (!VALID_RISK_LEVELS.has(original?.risk ?? normalized.risk)) {
       errors.push(`Environment "${label}" risk must be safe, hazardous, unsafe, or extreme`);
     }
-    if (!VALID_ECONOMY_MODES.has(original?.economyMode ?? normalized.economyMode)) {
-      errors.push(`Environment "${label}" economyMode must be time, nodes, stamina, or hybrid`);
-    }
     errors.push(...validateConditions(normalized.conditions, `Environment "${label}" conditions`));
 
     normalized.tasks.forEach((task, index) => {
@@ -511,13 +505,13 @@ export class GatheringEnvironmentStore {
       errors.push(...validateFailureOutcome(task.failureOutcome, `Task "${label}" failureOutcome`));
     }
     errors.push(...validateNodeConfig(task.nodes, `Task "${label}" nodes`));
-    errors.push(...validateAttemptLimit(task.attemptLimit, `Task "${label}" attemptLimit`));
     if (hasOwn(originalTask, 'staminaCost')) {
       const staminaCost = Number(originalTask?.staminaCost);
       if (!Number.isFinite(staminaCost) || staminaCost < 0) {
         errors.push(`Task "${label}" staminaCost must be a non-negative number`);
       }
     }
+    errors.push(...validateStaminaCostModifiers(task.staminaCostModifiers, `Task "${label}" staminaCostModifiers`));
     if (task.riskOverride && !VALID_RISK_LEVELS.has(task.riskOverride)) {
       errors.push(`Task "${label}" riskOverride must be safe, hazardous, unsafe, or extreme`);
     }
@@ -1070,49 +1064,42 @@ function validateNodeConfig(nodes, label) {
   return errors;
 }
 
-function normalizeAttemptLimit(data = null) {
-  if (!data || typeof data !== 'object') return null;
-  const max = numberOrNull(data.max ?? data.maxAttempts);
-  const enabled = data.enabled === true || max !== null;
-  if (!enabled) return null;
-  return {
-    enabled: true,
-    scope: VALID_ATTEMPT_LIMIT_SCOPES.has(data.scope) ? data.scope : 'actor',
-    max: max ?? 1,
-    windowSeconds: numberOrNull(data.windowSeconds) ?? 0,
-    recharge: normalizeRecharge(data.recharge)
-  };
+// Per-actor stamina-cost modifier references. Same shape as drop-row character
+// modifier references (resolved against the per-system character modifier
+// library at attempt time): { id, modifierId, operator, min, max,
+// expressionOverride }. Entries without a modifierId are dropped.
+function normalizeStaminaCostModifiers(refs) {
+  return (Array.isArray(refs) ? refs : [])
+    .map((ref, index) => {
+      if (!ref || typeof ref !== 'object') return null;
+      const modifierId = normalizeOptionalString(ref.modifierId);
+      if (!modifierId) return null;
+      return {
+        id: normalizeOptionalString(ref.id) || `char-mod-${modifierId}-${index + 1}`,
+        modifierId,
+        operator: VALID_CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
+        min: numberOrNull(ref.min),
+        max: numberOrNull(ref.max),
+        expressionOverride: normalizeOptionalString(ref.expressionOverride) || ''
+      };
+    })
+    .filter(Boolean);
 }
 
-function normalizeRecharge(data = null) {
-  if (!data || typeof data !== 'object') return { policy: 'none' };
-  return {
-    policy: VALID_RECHARGE_POLICIES.has(data.policy) ? data.policy : 'none',
-    intervalSeconds: numberOrNull(data.intervalSeconds) ?? 0,
-    chance: numberOrNull(data.chance) ?? 0,
-    lastEvaluatedWorldTime: numberOrNull(data.lastEvaluatedWorldTime),
-    lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null
-  };
-}
-
-function validateAttemptLimit(limit, label) {
-  if (!limit) return [];
+function validateStaminaCostModifiers(refs, label) {
+  if (!Array.isArray(refs) || refs.length === 0) return [];
   const errors = [];
-  if (!VALID_ATTEMPT_LIMIT_SCOPES.has(limit.scope)) {
-    errors.push(`${label}.scope must be actor, user, task, environment, or global`);
-  }
-  if (!Number.isInteger(Number(limit.max)) || Number(limit.max) < 1) {
-    errors.push(`${label}.max must be a positive integer`);
-  }
-  if (Number(limit.windowSeconds) < 0) {
-    errors.push(`${label}.windowSeconds must be non-negative`);
-  }
-  if (!VALID_RECHARGE_POLICIES.has(limit.recharge?.policy)) {
-    errors.push(`${label}.recharge.policy is invalid`);
-  }
-  if (['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(limit.recharge?.policy) && Number(limit.recharge?.intervalSeconds || 0) <= 0) {
-    errors.push(`${label}.recharge.intervalSeconds must be positive for timed recharge`);
-  }
+  refs.forEach((ref, index) => {
+    if (!ref?.modifierId) {
+      errors.push(`${label}[${index}] requires a modifierId`);
+    }
+    if (!VALID_CHARACTER_MODIFIER_OPERATORS.has(ref?.operator)) {
+      errors.push(`${label}[${index}].operator must be + or -`);
+    }
+    if (ref?.min !== null && ref?.max !== null && Number(ref.min) > Number(ref.max)) {
+      errors.push(`${label}[${index}] min must not exceed max`);
+    }
+  });
   return errors;
 }
 
