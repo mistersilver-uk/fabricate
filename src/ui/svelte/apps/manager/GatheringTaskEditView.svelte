@@ -8,6 +8,7 @@
 
   let {
     task = null,
+    economyMode = 'none',
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -365,6 +366,48 @@
   }
   function numericFieldValue(value) {
     return value === null || value === undefined ? '' : value;
+  }
+
+  // Resource-node authoring (enforced only when the system uses nodes mode).
+  const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none', intervalSeconds: 0, chance: 0 } };
+  const RESPAWN_UNITS = { minutes: 60, hours: 3600, days: 86400, weeks: 604800 };
+  const TIMED_RESPAWN = ['elapsedTime', 'probability', 'manualAndElapsedTime'];
+  const CHANCE_RESPAWN = ['probability', 'manualAndElapsedTime'];
+
+  const nodes = $derived(task?.nodes || DEFAULT_NODES);
+  const respawn = $derived(nodes.respawn || DEFAULT_NODES.respawn);
+  const respawnIsTimed = $derived(TIMED_RESPAWN.includes(respawn.policy));
+  const respawnHasChance = $derived(CHANCE_RESPAWN.includes(respawn.policy));
+  // Largest whole unit that divides the interval evenly, else hours.
+  const intervalParts = $derived((() => {
+    const seconds = Number(respawn.intervalSeconds) || 0;
+    for (const unit of ['weeks', 'days', 'hours', 'minutes']) {
+      const size = RESPAWN_UNITS[unit];
+      if (seconds > 0 && seconds % size === 0) return { value: seconds / size, unit };
+    }
+    return { value: seconds ? seconds / RESPAWN_UNITS.hours : 0, unit: 'hours' };
+  })());
+
+  function updateNodes(patch) {
+    onUpdateTask({ nodes: { ...nodes, enabled: true, ...patch } });
+  }
+  function updateRespawn(patch) {
+    updateNodes({ respawn: { ...respawn, ...patch } });
+  }
+  function setNodeCount(value) {
+    const next = Number(value);
+    if (!Number.isFinite(next) || next <= 0) { onUpdateTask({ nodes: null }); return; }
+    const max = Math.floor(next);
+    updateNodes({ max, current: max });
+  }
+  function setRespawnInterval(value, unit) {
+    const next = Number(value);
+    const size = RESPAWN_UNITS[unit] || RESPAWN_UNITS.hours;
+    updateRespawn({ intervalSeconds: Number.isFinite(next) && next > 0 ? Math.round(next * size) : 0 });
+  }
+  function setRespawnChance(percent) {
+    const next = Number(percent);
+    updateRespawn({ chance: Number.isFinite(next) ? Math.min(1, Math.max(0, next / 100)) : 0 });
   }
 
   function modifierEntries(row) {
@@ -787,6 +830,7 @@
       {/if}
     </section>
 
+    {#if economyMode === 'stamina'}
     <section class="manager-task-stamina-card" data-gathering-task-stamina>
       <div class="manager-task-card-header">
         <div class="manager-task-drop-header-copy">
@@ -836,6 +880,84 @@
         </div>
       {/if}
     </section>
+    {/if}
+
+    {#if economyMode === 'nodes'}
+    <section class="manager-task-nodes-card" data-gathering-task-nodes>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskNodesHint', 'Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.')}</p>
+        </div>
+      </div>
+
+      <div class="manager-task-nodes-grid">
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
+          <input
+            type="number" min="0" step="1" placeholder="—"
+            value={nodes.max > 0 ? nodes.max : ''}
+            oninput={(event) => setNodeCount(event.currentTarget.value)}
+            data-gathering-task-node-count
+          />
+        </label>
+
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
+          <select value={nodes.depletionTiming} onchange={(event) => updateNodes({ depletionTiming: event.currentTarget.value })} data-gathering-task-node-deplete>
+            <option value="onStart">{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option>
+            <option value="onSuccess">{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option>
+          </select>
+        </label>
+
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
+          <select value={respawn.policy} onchange={(event) => updateRespawn({ policy: event.currentTarget.value })} data-gathering-task-node-respawn>
+            <option value="none">{text('FABRICATE.Admin.Manager.Economy.RespawnNone', 'None')}</option>
+            <option value="manual">{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option>
+            <option value="elapsedTime">{text('FABRICATE.Admin.Manager.Economy.RespawnElapsed', 'Over world time')}</option>
+            <option value="probability">{text('FABRICATE.Admin.Manager.Economy.RespawnProbability', 'Probability')}</option>
+            <option value="manualAndElapsedTime">{text('FABRICATE.Admin.Manager.Economy.RespawnManualElapsed', 'Manual + over time')}</option>
+          </select>
+        </label>
+
+        {#if respawnIsTimed}
+          <label class="manager-field manager-task-node-interval">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
+            <div class="manager-task-node-interval-row">
+              <input
+                type="number" min="0" step="1"
+                value={intervalParts.value || ''}
+                oninput={(event) => setRespawnInterval(event.currentTarget.value, intervalParts.unit)}
+                data-gathering-task-node-interval
+              />
+              <select value={intervalParts.unit} onchange={(event) => setRespawnInterval(intervalParts.value, event.currentTarget.value)} data-gathering-task-node-interval-unit>
+                <option value="minutes">{text('FABRICATE.Admin.Manager.Economy.Unit.minutes', 'minutes')}</option>
+                <option value="hours">{text('FABRICATE.Admin.Manager.Economy.Unit.hours', 'hours')}</option>
+                <option value="days">{text('FABRICATE.Admin.Manager.Economy.Unit.days', 'days')}</option>
+                <option value="weeks">{text('FABRICATE.Admin.Manager.Economy.Unit.weeks', 'weeks')}</option>
+              </select>
+            </div>
+          </label>
+        {/if}
+
+        {#if respawnHasChance}
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
+            <div class="manager-task-node-chance-row">
+              <input
+                type="number" min="0" max="100" step="1"
+                value={Math.round((Number(respawn.chance) || 0) * 100) || ''}
+                oninput={(event) => setRespawnChance(event.currentTarget.value)}
+                data-gathering-task-node-chance
+              />
+              <span class="manager-muted">%</span>
+            </div>
+          </label>
+        {/if}
+      </div>
+    </section>
+    {/if}
 
     <section class="manager-task-component-browser-card" data-gathering-task-component-browser>
       <div class="manager-task-card-header">
@@ -1121,6 +1243,39 @@
 </main>
 
 <style>
+  /* Card chrome matching the other task-editor cards. */
+  .manager-task-stamina-card,
+  .manager-task-nodes-card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    padding: 13px 16px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 8px;
+    background: var(--fab-mv2-surface-2);
+    box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
+  }
+
+  .manager-task-nodes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--fab-space-3);
+    align-items: end;
+  }
+
+  .manager-task-node-interval-row,
+  .manager-task-node-chance-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-task-node-interval-row input,
+  .manager-task-node-chance-row input {
+    min-width: 0;
+  }
+
   .manager-task-stamina-cost-field {
     max-width: 240px;
   }

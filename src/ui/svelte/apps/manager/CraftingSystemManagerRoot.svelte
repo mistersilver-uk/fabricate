@@ -512,6 +512,7 @@
     biomeModifierAggregation: 'strongestOfEach'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
+  const selectedGatheringTaskEconomyMode = $derived(selectedGatheringSystemConfig.economy?.mode || 'none');
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
   const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
   const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
@@ -3130,6 +3131,7 @@
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={editingGatheringTask}
+        economyMode={selectedGatheringTaskEconomyMode}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
