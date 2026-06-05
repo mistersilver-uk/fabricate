@@ -217,6 +217,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // The attempt action lives in the right-column inspector for the auto-selected task.
     const inspectorAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
     assert.ok(inspectorAttempt && !inspectorAttempt.disabled, 'right-column attempt enabled for the attemptable task');
+    assert.equal(inspectorAttempt.querySelector('.fa-ban'), null, 'no ban icon on an attemptable task');
+    assert.equal(inspectorAttempt.getAttribute('data-gathering-attempt-blocked'), 'false');
   });
 
   it('shows a fallback description (center row + inspector) when a task has none', async () => {
@@ -363,10 +365,12 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(blocked, 'blocked detail appears in the right-column inspector');
     assert.ok(blocked.textContent.includes('night'), 'required time-of-day surfaced');
     assert.ok(blocked.textContent.includes('rain'), 'required weather surfaced');
-    assert.ok(
-      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled,
-      'inspector attempt button disabled on a blocked task'
-    );
+    const blockedAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
+    assert.ok(blockedAttempt.disabled, 'inspector attempt button disabled on a blocked task');
+    assert.equal(blockedAttempt.getAttribute('data-gathering-attempt-blocked'), 'true');
+    assert.ok(blockedAttempt.querySelector('.fa-ban'), 'blocked attempt shows the ban icon');
+    const attemptWrap = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-attempt-wrap');
+    assert.ok((attemptWrap.getAttribute('title') || '').includes('Conditions'), 'tooltip explains the block reason');
   });
 
   it('lists a selected task\'s required tools in the right inspector, not inline in the center row', async () => {

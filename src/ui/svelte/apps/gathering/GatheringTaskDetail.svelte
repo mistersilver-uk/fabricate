@@ -38,6 +38,33 @@
   const img = $derived(String(task?.img ?? ''));
   const attemptable = $derived(task?.attemptable === true);
 
+  // A blocked task (not merely an in-flight `busy` attempt) gets a ban icon + a
+  // tooltip naming the reason. Reuse the center-row callout vocabulary.
+  const blocked = $derived(task != null && !attemptable);
+  const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
+  const BLOCK_LABEL_KEYS = {
+    TOOL_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools',
+    CONDITIONS_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Conditions',
+    CATALYST_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst',
+    GAME_PAUSED: 'FABRICATE.App.Gathering.Detail.Callout.Paused',
+    DUPLICATE_ACTIVE_RUN: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun',
+    SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene'
+  };
+  const blockReason = $derived.by(() => {
+    if (!blocked) return '';
+    const seen = new Set();
+    const labels = [];
+    for (const reason of blockedReasons) {
+      const code = reason?.code;
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      const key = BLOCK_LABEL_KEYS[code];
+      labels.push(key ? localize(key) : (reason?.message || localize('FABRICATE.App.Gathering.Detail.Blocked')));
+    }
+    if (labels.length === 0) return localize('FABRICATE.App.Gathering.Detail.Blocked');
+    return localize('FABRICATE.App.Gathering.Detail.CannotAttempt', { reason: labels.join(', ') });
+  });
+
   const titleId = 'gathering-task-detail-title';
 
   // Lazily resolve the per-drop "What you might find" breakdown for the selected
@@ -118,15 +145,22 @@
       {#if successChance != null}
         <SuccessChanceBar value={successChance} />
       {/if}
-      <button
-        type="button"
-        class="gathering-task-detail-attempt"
-        data-gathering-attempt
-        disabled={!attemptable || busy}
-        onclick={handleAttempt}
-      >
-        {localize('FABRICATE.App.Gathering.Detail.Attempt')}
-      </button>
+      <span class="gathering-task-detail-attempt-wrap" title={blocked ? blockReason : null}>
+        <button
+          type="button"
+          class="gathering-task-detail-attempt"
+          data-gathering-attempt
+          data-gathering-attempt-blocked={blocked ? 'true' : 'false'}
+          disabled={!attemptable || busy}
+          aria-label={blocked ? blockReason : null}
+          onclick={handleAttempt}
+        >
+          {#if blocked}
+            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+          {/if}
+          {localize('FABRICATE.App.Gathering.Detail.Attempt')}
+        </button>
+      </span>
     </div>
 
     <GatheringTaskRequirements {task} />
@@ -239,10 +273,20 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  /* Wrapper (not the disabled button) carries the block tooltip so hover is
+     reliable; it fills its grid column. */
+  .gathering-task-detail-attempt-wrap {
+    display: flex;
+  }
+
   .gathering-task-detail-attempt {
     width: 100%;
     appearance: none;
     -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     height: 38px;
     padding: 0 18px;
     border: 1px solid var(--fab-accent);
