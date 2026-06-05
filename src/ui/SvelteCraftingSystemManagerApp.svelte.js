@@ -546,7 +546,17 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         },
         // Gathering economy authoring + manual state controls (GM-only).
         getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
-        setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
+        // The economy panel persists straight to the gathering-config setting, so
+        // after a limitation-MODE change refresh the store's reactive copy — the
+        // task editor derives its economy mode from viewState.gatheringConfig and
+        // would otherwise stay stale until the app reopens. Skipped when only the
+        // stamina expressions change (mode unchanged) to avoid per-keystroke churn.
+        setGatheringEconomy: async (opts = {}) => {
+          const prevMode = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[opts?.systemId]?.economy?.mode ?? 'none';
+          const result = await game?.fabricate?.setGatheringEconomy?.(opts);
+          if ((opts?.economy?.mode ?? 'none') !== prevMode) this._adminStore?.refreshGatheringConfig?.();
+          return result;
+        },
         getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
         rollGatheringStamina: (opts = {}) => game?.fabricate?.rollGatheringStamina?.(opts),
         setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),

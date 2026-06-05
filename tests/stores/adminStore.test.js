@@ -4093,4 +4093,19 @@ describe('createAdminStore — gathering economy', () => {
     assert.equal(vs.gatheringConfig.systems.sys1.economy.mode, 'stamina');
     assert.equal(vs.gatheringConfig.systems.sys1.economy.stamina.max, '40');
   });
+
+  it('refreshGatheringConfig re-reads the setting so a mode change reflects without reopening', async () => {
+    // The economy panel persists via the game service, not the store, so the
+    // store's viewState would otherwise stay stale until the app reopens.
+    let gatheringConfig = { systems: { sys1: { economy: { mode: 'stamina', stamina: { regen: { policy: 'none', unit: 'hours', amount: '' } } } } } };
+    const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
+    const store = createAdminStore(services);
+    await store.refresh();
+    assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.mode, 'stamina');
+
+    // External write changes the persisted mode; refresh pulls it into viewState.
+    gatheringConfig = { systems: { sys1: { economy: { mode: 'none', stamina: { regen: { policy: 'none', unit: 'hours', amount: '' } } } } } };
+    store.refreshGatheringConfig();
+    assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.mode, 'none');
+  });
 });

@@ -2020,6 +2020,16 @@ export function createAdminStore(services) {
     return _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}, _randomID);
   }
 
+  /**
+   * Re-read the persisted gathering config into viewState. Used when an external
+   * surface (the economy Settings panel persists via the game service, not the
+   * store) changes the config and dependent reactive derivations — e.g. the task
+   * editor's economy mode — must update without reopening the app.
+   */
+  function refreshGatheringConfig() {
+    viewState.update(state => ({ ...state, gatheringConfig: _clonePlain(_currentGatheringConfig()) }));
+  }
+
   async function _saveGatheringConfig(config) {
     const normalized = _normalizeGatheringConfig(config, _randomID);
     await services.setSetting?.(GATHERING_CONFIG_SETTING, normalized);
@@ -5496,6 +5506,7 @@ export function createAdminStore(services) {
     setItemSearch,
     setGraphSearch,
     refresh,
+    refreshGatheringConfig,
     destroy
   };
 }
