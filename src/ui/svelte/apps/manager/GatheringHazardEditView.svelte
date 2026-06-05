@@ -429,9 +429,14 @@
         </div>
       </div>
       {#if linkedSceneUuid}
+        <!-- Right-click-to-unlink and mousedown-drag are enhancements; the
+             visible Open/Unlink buttons inside provide the accessible path. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <div
           class="manager-gathering-hazard-scene-linked"
           data-gathering-hazard-scene-linked
+          role="group"
+          aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.SceneLink', 'Linked scene')}
           title={text('FABRICATE.Admin.Manager.Environment.Hazards.SceneRemoveTooltip', 'Right-click to remove the linked scene')}
           oncontextmenu={(event) => { event.preventDefault(); unlinkScene(); }}
           onmousedown={onLinkedSceneMouseDown}

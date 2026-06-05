@@ -65,9 +65,14 @@
 <section class="manager-inspector-card" data-environment-summary-scene>
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}</h3>
   {#if sceneUuid}
+    <!-- Drop-to-replace and right-click-to-unlink are enhancements; the visible
+         Open/Unlink buttons inside provide the accessible path. -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="manager-environment-scene-linked"
       data-overview-scene-linked
+      role="group"
+      aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}
       title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneReplaceTooltip', 'Drop a scene to replace it, or right-click to unlink.')}
       use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}
       oncontextmenu={(event) => { event.preventDefault(); unlinkScene(); }}

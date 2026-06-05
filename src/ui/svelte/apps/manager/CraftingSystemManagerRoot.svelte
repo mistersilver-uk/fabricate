@@ -2796,6 +2796,7 @@
           <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
         </button>
       {:else if currentView === 'components'}
+        <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
         {#if componentEditDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}</span>
@@ -2809,6 +2810,7 @@
           <span>{componentEditSaveLabel()}</span>
         </button>
       {:else if currentView === 'tags'}
+        <!-- no header actions for the tags view -->
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
