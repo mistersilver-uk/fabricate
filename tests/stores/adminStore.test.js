@@ -4080,3 +4080,17 @@ describe('createAdminStore', () => {
   });
 
 });
+
+describe('createAdminStore — gathering economy', () => {
+  it('preserves the per-system economy block in the normalized gathering config', async () => {
+    // Regression: the normalizer used to drop systems[id].economy, so the task
+    // editor (which reads economy.mode reactively) lost its limitation mode.
+    const gatheringConfig = { systems: { sys1: { economy: { mode: 'stamina', stamina: { max: '40', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } } } } } };
+    const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
+    const store = createAdminStore(services);
+    await store.refresh();
+    const vs = get(store.viewState);
+    assert.equal(vs.gatheringConfig.systems.sys1.economy.mode, 'stamina');
+    assert.equal(vs.gatheringConfig.systems.sys1.economy.stamina.max, '40');
+  });
+});
