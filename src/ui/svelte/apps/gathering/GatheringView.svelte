@@ -31,6 +31,9 @@
   // accordion (the selected row is the expanded one) and the right-column task
   // inspector. Resolved to the first attemptable task by default.
   let selectedTaskId = $state(null);
+  // Shared "an attempt is in flight" guard for both the blind attempt button
+  // (center) and the right-column task inspector's Attempt button.
+  let busy = $state(false);
   // First-load backstop guard: the view adopts the listing's resolved actor at
   // most once, and only when the store seed is still empty AND the resolved id
   // is a player character present in the bar's selectable list.
@@ -123,6 +126,20 @@
     selectedTaskId = id;
   }
 
+  // The shared attempt handler, used by the right-column inspector (targeted +
+  // discovered tasks) and the center blind-attempt button. Lifted here because
+  // those buttons live in sibling columns; refreshes the listing on success.
+  async function attempt({ environmentId, taskId = null }) {
+    if (busy || !environmentId) return;
+    busy = true;
+    try {
+      await services?.startGatheringAttempt?.({ environmentId, taskId });
+      await load();
+    } finally {
+      busy = false;
+    }
+  }
+
   // Re-fetch the listing on mount and whenever the shared selected actor changes.
   $effect(() => {
     // Track the shared selection so a change re-runs this effect.
@@ -166,13 +183,20 @@
       <GatheringDetail
         environment={selectedEnvironment}
         {services}
-        onAttempted={load}
+        onAttempt={attempt}
+        {busy}
         {selectedTaskId}
         {onSelectTask}
       />
     </section>
     <section class="gathering-view-column gathering-view-column-right" data-gathering-task-detail-column>
-      <GatheringTaskDetail task={selectedTask} hasTasks={visibleTasks.length > 0} />
+      <GatheringTaskDetail
+        task={selectedTask}
+        hasTasks={visibleTasks.length > 0}
+        environmentId={selectedId}
+        onAttempt={attempt}
+        {busy}
+      />
     </section>
   </div>
 {/if}

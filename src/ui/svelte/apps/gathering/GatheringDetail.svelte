@@ -7,13 +7,15 @@
 
    - Blind environments: an "Attempt gathering" button (a blind gather omits the
      task id so the engine picks a candidate), and — when the effective reveal
-     policy is not `never` — a paginated "Discovered Tasks (x/y)" list of tasks
-     the player has already revealed and can attempt directly.
-   - Targeted environments: the task list shown prominently, with no discovered
-     heading.
+     policy is not `never` — a paginated "Discovered Tasks (x/y)" list of
+     selectable task rows.
+   - Targeted environments: the selectable task list, with no discovered heading.
 
-  Attempt buttons call services.startGatheringAttempt and then re-fetch the
-  listing via onAttempted so counts and attemptability refresh.
+  Task rows are read-only and selectable: clicking one drives the right-column
+  inspector (which carries the per-task Attempt action). The blind "Attempt
+  gathering" button and the inspector's Attempt both call the `onAttempt` handler
+  (lifted to GatheringView), which runs services.startGatheringAttempt and
+  re-fetches the listing; `busy` guards against double-submits.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -24,7 +26,8 @@
   let {
     environment = null,
     services = null,
-    onAttempted = null,
+    onAttempt = null,
+    busy = false,
     selectedTaskId = null,
     onSelectTask = null
   } = $props();
@@ -82,18 +85,6 @@
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= activeTasks.length) pageIndex = 0;
   });
-
-  let busy = $state(false);
-  async function attempt({ environmentId, taskId = null }) {
-    if (busy || !environmentId) return;
-    busy = true;
-    try {
-      await services?.startGatheringAttempt?.({ environmentId, taskId });
-      await onAttempted?.();
-    } finally {
-      busy = false;
-    }
-  }
 
   function biomeChipStyle(tag) {
     const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
@@ -187,7 +178,7 @@
             class="gathering-detail-blind-attempt"
             data-gathering-blind-attempt
             disabled={!blindAttemptable || busy}
-            onclick={() => attempt({ environmentId: envId, taskId: null })}
+            onclick={() => onAttempt?.({ environmentId: envId, taskId: null })}
           >
             <i class="fas fa-dice" aria-hidden="true"></i>
             {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
@@ -212,9 +203,6 @@
               {#each paginated as discoveredTask (discoveredTask.id)}
                 <GatheringTaskRow
                   task={discoveredTask}
-                  environmentId={envId}
-                  onAttempt={attempt}
-                  {busy}
                   selected={String(discoveredTask.id) === String(selectedTaskId)}
                   onSelect={onSelectTask}
                 />
@@ -229,9 +217,6 @@
           {#each paginated as gatheringTask (gatheringTask.id)}
             <GatheringTaskRow
               task={gatheringTask}
-              environmentId={envId}
-              onAttempt={attempt}
-              {busy}
               selected={String(gatheringTask.id) === String(selectedTaskId)}
               onSelect={onSelectTask}
             />

@@ -15,13 +15,30 @@
   import { localize } from '../../util/foundryBridge.js';
   import GatheringTaskRequirements from './GatheringTaskRequirements.svelte';
 
-  let { task = null, hasTasks = false } = $props();
+  let {
+    task = null,
+    hasTasks = false,
+    environmentId = '',
+    onAttempt = null,
+    busy = false
+  } = $props();
 
+  const id = $derived(String(task?.id ?? ''));
   const name = $derived(String(task?.name ?? task?.label ?? ''));
   const description = $derived(String(task?.description ?? ''));
+  const hasDescription = $derived(description !== '');
+  const descriptionText = $derived(
+    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoTaskDescription')
+  );
   const img = $derived(String(task?.img ?? ''));
+  const attemptable = $derived(task?.attemptable === true);
 
   const titleId = 'gathering-task-detail-title';
+
+  function handleAttempt() {
+    if (!attemptable || busy) return;
+    onAttempt?.({ environmentId, taskId: id });
+  }
 </script>
 
 {#if task == null}
@@ -50,9 +67,19 @@
       </span>
     </header>
 
-    {#if description !== ''}
-      <p class="gathering-task-detail-description">{description}</p>
-    {/if}
+    <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
+
+    <div class="gathering-task-detail-action">
+      <button
+        type="button"
+        class="gathering-task-detail-attempt"
+        data-gathering-attempt
+        disabled={!attemptable || busy}
+        onclick={handleAttempt}
+      >
+        {localize('FABRICATE.App.Gathering.Detail.Attempt')}
+      </button>
+    </div>
 
     <GatheringTaskRequirements {task} />
   </section>
@@ -140,6 +167,49 @@
     font-size: 13px;
     line-height: 1.5;
     color: var(--fab-text);
+  }
+
+  /* Placeholder shown when a task has no authored description. */
+  .gathering-task-detail-description.is-fallback {
+    font-style: italic;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-task-detail-action {
+    flex: 0 0 auto;
+    display: flex;
+  }
+
+  .gathering-task-detail-attempt {
+    flex: 1 1 auto;
+    appearance: none;
+    -webkit-appearance: none;
+    height: 38px;
+    padding: 0 18px;
+    border: 1px solid var(--fab-accent);
+    border-radius: 6px;
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .gathering-task-detail-attempt:hover:not(:disabled) {
+    background: var(--fab-accent-hover);
+  }
+
+  .gathering-task-detail-attempt:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .gathering-task-detail-attempt:disabled {
+    opacity: 0.5;
+    cursor: default;
+    background: var(--fab-surface-raised);
+    border-color: var(--fab-border);
+    color: var(--fab-text-muted);
   }
 
   /* The shared requirements block renders as a bordered card in this column. */

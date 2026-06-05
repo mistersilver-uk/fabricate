@@ -203,11 +203,31 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.getAttribute('data-attemptable'), 'true');
     assert.equal(row.getAttribute('data-blocked'), 'false');
     assert.ok(row.querySelector('[data-gathering-success-value]'), 'success-chance bar present for d100 task');
-    const attemptBtn = row.querySelector('[data-gathering-attempt]');
-    assert.ok(attemptBtn && !attemptBtn.disabled, 'attempt button enabled on an attemptable task');
+    // The center row is now read-only: no attempt button, and the description is
+    // shown in the always-visible underneath section.
+    assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
+    const desc = row.querySelector('[data-gathering-task-description]');
+    assert.ok(desc && desc.textContent.includes('Dig for ore.'), 'description renders underneath the row');
+    // The attempt action lives in the right-column inspector for the auto-selected task.
+    const inspectorAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
+    assert.ok(inspectorAttempt && !inspectorAttempt.disabled, 'right-column attempt enabled for the attemptable task');
   });
 
-  it('shows a blocked task with a lock overlay, a header callout, and conditions detail on expand', async () => {
+  it('shows a fallback description (center row + inspector) when a task has none', async () => {
+    const { services } = makeServices(listing([environment({ tasks: [taskModel({ id: 'task-nodesc', description: '' })] })]));
+    await mountView(services);
+
+    const desc = target.querySelector('[data-task-id="task-nodesc"] [data-gathering-task-description]');
+    assert.ok(desc, 'the description line is always present');
+    assert.ok(desc.classList.contains('is-fallback'), 'center row marks the placeholder as a fallback');
+    assert.ok(desc.textContent.includes('NoTaskDescription'), 'center row shows the localized fallback');
+
+    const panelDesc = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-description');
+    assert.ok(panelDesc.classList.contains('is-fallback'), 'inspector marks the placeholder as a fallback');
+    assert.ok(panelDesc.textContent.includes('NoTaskDescription'), 'inspector shows the localized fallback');
+  });
+
+  it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
     const blockedTask = taskModel({
       id: 'task-blocked',
       attemptable: false,
@@ -231,19 +251,24 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callouts, 'header callout bar present');
     assert.ok(callouts.textContent.includes('Conditions'), 'a conditions callout is shown');
     assert.equal(row.querySelector('[data-gathering-success-value]'), null, 'no success bar when successChance is null');
-    assert.ok(row.querySelector('[data-gathering-attempt]').disabled, 'attempt button disabled on a blocked task');
+    assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
+    assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'no inline blocked detail in the center row');
 
-    // Detail is hidden until expanded; clicking the summary reveals it.
-    assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'detail hidden before expand');
+    // Nothing is attemptable, so no task is auto-selected; selecting the blocked
+    // task surfaces its conditions detail in the right-column inspector.
     row.querySelector('.gathering-task-summary').click();
     flushSync();
-    const blocked = row.querySelector('[data-gathering-blocked]');
-    assert.ok(blocked, 'blocked detail list present after expand');
+    const blocked = target.querySelector('[data-gathering-task-detail] [data-gathering-blocked]');
+    assert.ok(blocked, 'blocked detail appears in the right-column inspector');
     assert.ok(blocked.textContent.includes('night'), 'required time-of-day surfaced');
     assert.ok(blocked.textContent.includes('rain'), 'required weather surfaced');
+    assert.ok(
+      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled,
+      'inspector attempt button disabled on a blocked task'
+    );
   });
 
-  it('expands a task with required tools and lists each tool with its state, without toggling on Attempt click', async () => {
+  it('lists a selected task\'s required tools in the right inspector, not inline in the center row', async () => {
     const tooledTask = taskModel({
       id: 'task-tools',
       attemptable: false,
@@ -259,16 +284,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     const row = target.querySelector('[data-task-id="task-tools"]');
     assert.ok(row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.MissingTools'), 'missing-tools callout shown');
+    assert.equal(row.querySelector('[data-gathering-tools]'), null, 'center row does not render the tools inline');
 
-    // Attempt is disabled; clicking it must NOT expand the card.
-    row.querySelector('[data-gathering-attempt]').click();
-    flushSync();
-    assert.equal(row.querySelector('[data-gathering-tools]'), null, 'attempt click did not expand the card');
-
+    // Select the task -> its tools list appears in the right-column inspector.
     row.querySelector('.gathering-task-summary').click();
     flushSync();
-    const toolRows = row.querySelectorAll('[data-gathering-tool]');
-    assert.equal(toolRows.length, 2, 'both required tools listed');
+    const toolRows = target.querySelectorAll('[data-gathering-task-detail] [data-gathering-tool]');
+    assert.equal(toolRows.length, 2, 'both required tools listed in the inspector');
     assert.equal(toolRows[0].getAttribute('data-tool-state'), 'present');
     assert.equal(toolRows[1].getAttribute('data-tool-state'), 'missing');
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
@@ -356,12 +378,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-discovered]'), null, 'no discovered section when reveal is never');
   });
 
-  it('wires a task Attempt click to startGatheringAttempt and re-fetches the listing', async () => {
+  it('wires the right-column Attempt to startGatheringAttempt and re-fetches the listing', async () => {
     const { services, calls } = makeServices(listing([environment()]));
     await mountView(services);
     assert.equal(calls.list, 1, 'listing fetched once on mount');
 
-    target.querySelector('[data-gathering-attempt]').click();
+    // task-1 is auto-selected; the Attempt button lives in the right-column inspector.
+    target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
     await settle();
 
     assert.equal(calls.attempts.length, 1, 'startGatheringAttempt called once');
@@ -385,13 +408,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     };
     await mountView(services);
 
-    const attemptBtn = target.querySelector('[data-gathering-attempt]');
+    const attemptBtn = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
     attemptBtn.click();
     await tick();
     flushSync();
     // While in flight the button is disabled and a second click is ignored.
-    assert.ok(target.querySelector('[data-gathering-attempt]').disabled, 'button disabled during the round-trip');
-    target.querySelector('[data-gathering-attempt]').click();
+    assert.ok(target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled, 'button disabled during the round-trip');
+    target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
     await tick();
     flushSync();
     assert.equal(calls.attempts.length, 1, 'second click is a no-op while busy');
@@ -443,10 +466,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(panel.getAttribute('data-detail-task-id'), 'task-2');
     assert.ok(panel.querySelector('[data-gathering-tool]'), 'inspector lists the selected task tools');
 
-    // Accordion moved: task-2 selected + expanded, task-1 deselected.
+    // Selection moved: task-2 selected, task-1 deselected — and the center row
+    // never renders requirements inline (they live only in the right column).
     assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'true');
     assert.equal(target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'), 'false');
-    assert.ok(target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'), 'selected expandable row shows inline requirements');
+    assert.equal(target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'), null, 'center row has no inline requirements');
   });
 
   it('shows the "select a gathering task" hint when tasks exist but none is attemptable', async () => {

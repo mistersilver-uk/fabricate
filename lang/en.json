@@ -63,6 +63,7 @@
           "SelectTaskHint": "Select a gathering task",
           "NoAvailableTasks": "No available tasks",
           "NoRequirements": "No special requirements.",
+          "NoTaskDescription": "No description provided.",
           "TaskInspectorLabel": "Selected gathering task",
           "BlindHint": "This is a blind gathering site. Attempt a gather to discover what it yields.",
           "TargetedHint": "Choose a task below to attempt.",
