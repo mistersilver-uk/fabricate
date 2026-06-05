@@ -114,10 +114,10 @@
 </script>
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
-  <section class="manager-card" data-economy-mode-card>
-    <header class="manager-card-head">
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}</h3>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.ModeHint', 'How this system limits how often tasks can be attempted.')}</p>
+  <section class="manager-economy-card" data-economy-mode-card>
+    <header class="manager-economy-card-head">
+      <h3 class="manager-economy-card-title"><i class="fas fa-scale-balanced" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}</span></h3>
+      <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ModeHint', 'How this system limits how often tasks can be attempted.')}</p>
     </header>
     <div class="manager-economy-mode-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}>
       {#each MODE_OPTIONS as option (option.id)}
@@ -137,10 +137,10 @@
   </section>
 
   {#if economy.mode === 'stamina'}
-    <section class="manager-card" data-economy-regen-card>
-      <header class="manager-card-head">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</h3>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
+    <section class="manager-economy-card" data-economy-regen-card>
+      <header class="manager-economy-card-head">
+        <h3 class="manager-economy-card-title"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h3>
+        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
       </header>
 
       <label class="manager-field">
@@ -187,10 +187,10 @@
   {/if}
 
   {#if economy.mode === 'stamina'}
-    <section class="manager-card" data-economy-stamina-actors>
-      <header class="manager-card-head">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Economy.ActorsTitle', 'Actor stamina pools')}</h3>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.ActorsHint', 'Set or adjust each gatherer’s stamina pool.')}</p>
+    <section class="manager-economy-card" data-economy-stamina-actors>
+      <header class="manager-economy-card-head">
+        <h3 class="manager-economy-card-title"><i class="fas fa-users" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ActorsTitle', 'Actor stamina pools')}</span></h3>
+        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ActorsHint', 'Set or adjust each gatherer’s stamina pool.')}</p>
       </header>
       {#if staminaActors.length === 0}
         <p class="manager-muted" data-economy-no-actors>{text('FABRICATE.Admin.Manager.Economy.NoActors', 'No player-owned actors found.')}</p>
@@ -225,17 +225,61 @@
   {/if}
 
   {#if economy.mode === 'nodes'}
-    <section class="manager-card" data-economy-nodes-note>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'In nodes mode, set each task’s node count and respawn on the environment’s task inspector.')}</p>
+    <section class="manager-economy-card" data-economy-nodes-note>
+      <h3 class="manager-economy-card-title"><i class="fas fa-mountain" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.Mode.Nodes', 'Resource nodes')}</span></h3>
+      <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'In nodes mode, set each task’s node count and respawn on the environment’s task inspector.')}</p>
     </section>
   {/if}
 </div>
 
 <style>
+  /* Span the full settings grid (2 columns) and stack the economy cards above
+     the Times-of-day / Weather / Regions panels. */
   .manager-gathering-economy {
+    grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-3);
+    gap: 12px;
+  }
+
+  /* Card chrome mirrors the sibling .manager-condition-panel so the economy
+     sections read as proper cards. */
+  .manager-economy-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 8px;
+    background: var(--fab-overlay-light-035);
+  }
+
+  .manager-economy-card-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .manager-economy-card-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--fab-mv2-text);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .manager-economy-card-title i {
+    color: var(--fab-mv2-accent);
+  }
+
+  .manager-economy-card-hint {
+    margin: -2px 0 0;
+    color: var(--fab-mv2-text-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
   }
 
   .manager-economy-mode-options {
