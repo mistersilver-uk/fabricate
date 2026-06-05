@@ -272,7 +272,7 @@ async function main() {
   // Pin manifest and download URLs to the specific version tag
   if (releaseVersion) {
     const tag = `v${releaseVersion}`;
-    const baseUrl = `https://github.com/misterpotts/fabricate/releases/download/${tag}`;
+    const baseUrl = `https://github.com/mistersilver-uk/fabricate/releases/download/${tag}`;
     distManifest.manifest = `${baseUrl}/module.json`;
     distManifest.download = `${baseUrl}/fabricate-${tag}.zip`;
   }

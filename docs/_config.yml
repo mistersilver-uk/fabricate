@@ -2,12 +2,12 @@ title: Fabricate
 description: A system-agnostic crafting module for Foundry Virtual Tabletop
 theme: just-the-docs
 
-url: https://misterpotts.github.io
-baseurl: /fabricate-v2
+url: https://mistersilver-uk.github.io
+baseurl: /fabricate
 
 aux_links:
   "GitHub":
-    - https://github.com/misterpotts/fabricate-v2
+    - https://github.com/mistersilver-uk/fabricate
 
 nav_sort: order
 

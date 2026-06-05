@@ -21,7 +21,7 @@ claims that normal workflows provide and AWS supports for GitHub OIDC:
 - `aud` is `sts.amazonaws.com`.
 - `sub` is restricted to the expected `main` branch subject for manual
   publishing and the expected pull-request subject for cleanup.
-- `repository` is restricted to `mistersilver-uk/fabricate-v2`.
+- `repository` is restricted to `mistersilver-uk/fabricate`.
 - `ref` is restricted to the trusted `main` branch.
 - `workflow` is restricted to the two workflow names that publish or clean PR screenshots.
 

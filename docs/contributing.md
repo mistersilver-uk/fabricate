@@ -248,7 +248,7 @@ Repository variables (role ARNs and bucket names are not secrets):
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:repository": "mistersilver-uk/fabricate-v2",
+          "token.actions.githubusercontent.com:repository": "mistersilver-uk/fabricate",
           "token.actions.githubusercontent.com:ref": "refs/heads/main",
           "token.actions.githubusercontent.com:workflow": [
             "Team B: Codex Backlog Processing Manual Only",
@@ -257,8 +257,8 @@ Repository variables (role ARNs and bucket names are not secrets):
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
-            "repo:mistersilver-uk/fabricate-v2:ref:refs/heads/main",
-            "repo:mistersilver-uk/fabricate-v2:pull_request"
+            "repo:mistersilver-uk/fabricate:ref:refs/heads/main",
+            "repo:mistersilver-uk/fabricate:pull_request"
           ]
         }
       }
@@ -271,7 +271,7 @@ Do not use `token.actions.githubusercontent.com:job_workflow_ref` for these jobs
 GitHub emits that claim for reusable workflow jobs, while both screenshot workflows
 here are normal repository workflows. The cleanup workflow uses `pull_request_target`,
 so its default `sub` is the pull-request subject
-(`repo:mistersilver-uk/fabricate-v2:pull_request`) rather than the branch subject.
+(`repo:mistersilver-uk/fabricate:pull_request`) rather than the branch subject.
 
 **IAM role permission policy** (`PublishPrScreenshots`) — `pr-screenshots/*` only, including delete for cleanup:
 
