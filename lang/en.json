@@ -229,6 +229,8 @@
           },
           "RegenTitle": "Stamina regeneration",
           "RegenHint": "How much stamina actors recover as world time passes.",
+          "MaxStamina": "Default maximum stamina",
+          "MaxStaminaPlaceholder": "No global limit",
           "RegenPolicy": "Regeneration",
           "RegenPolicyNone": "Manual only",
           "RegenPolicyElapsed": "Over world time",

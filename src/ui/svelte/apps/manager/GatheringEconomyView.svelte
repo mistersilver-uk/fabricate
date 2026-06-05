@@ -33,7 +33,7 @@
   let actorPageSize = $state(6);
 
   function defaultEconomy() {
-    return { mode: 'none', stamina: { regen: { policy: 'none', unit: 'hours', amount: null, formula: '', characterModifiers: [] } } };
+    return { mode: 'none', stamina: { max: null, regen: { policy: 'none', unit: 'hours', amount: null, formula: '', characterModifiers: [] } } };
   }
 
   // Reload economy + actor stamina whenever the selected system changes.
@@ -69,6 +69,7 @@
     return {
       mode: ['none', 'stamina', 'nodes'].includes(raw.mode) ? raw.mode : 'none',
       stamina: {
+        max: raw.stamina?.max ?? null,
         regen: {
           policy: ['none', 'elapsedTime'].includes(regen.policy) ? regen.policy : 'none',
           unit: UNITS.includes(regen.unit) ? regen.unit : 'hours',
@@ -99,6 +100,11 @@
 
   function updateRegen(patch) {
     economy.stamina.regen = { ...economy.stamina.regen, ...patch };
+    void persistEconomy();
+  }
+
+  function updateStaminaMax(value) {
+    economy.stamina = { ...economy.stamina, max: value === '' ? null : Math.max(0, Number(value) || 0) };
     void persistEconomy();
   }
 
@@ -154,6 +160,17 @@
         <div class="manager-economy-subsection" data-economy-regen-card>
           <h4 class="manager-economy-subtitle"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h4>
           <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
+
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina (default for all characters)')}</span>
+            <input
+              type="number" min="0" step="1"
+              placeholder={text('FABRICATE.Admin.Manager.Economy.MaxStaminaPlaceholder', 'No global limit')}
+              value={economy.stamina.max ?? ''}
+              oninput={(e) => updateStaminaMax(e.currentTarget.value)}
+              data-economy-stamina-max
+            />
+          </label>
 
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>

@@ -300,3 +300,34 @@ describe('gathering economy — processWorldTime drives regen under the primary-
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 0);
   });
 });
+
+describe('gathering economy — system-level default (global) stamina max', () => {
+  it('normalizes a system default stamina max (null by default)', () => {
+    const set = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 12 } } } } } });
+    assert.equal(set.service.systemEconomy(SYSTEM).stamina.max, 12);
+    const unset = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina' } } } } });
+    assert.equal(unset.service.systemEconomy(SYSTEM).stamina.max, null);
+  });
+
+  it('falls back to the global max and starts characters full when they have no stored pool', () => {
+    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 15 } } } } } });
+    const eff = service.getActorStamina(makeFakeActor(), SYSTEM);
+    assert.equal(eff.max, 15);
+    assert.equal(eff.current, 15); // a fresh character starts full at the effective max
+  });
+
+  it('regenerates up to the global max without baking it into the per-actor entry', async () => {
+    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 20, regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const { service } = makeRichState({ config });
+    const actor = makeFakeActor();
+
+    // Spend from the (defaulted) full pool — creates an entry below max with a null stored max.
+    await service.adjustActorStamina(actor, { systemId: SYSTEM, delta: -8 });
+    assert.equal(service.getActorStamina(actor, SYSTEM).current, 12);
+
+    await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 0 }); // anchor
+    const after = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 2 * HOUR });
+    assert.equal(after.current, 20); // 12 + 5*2 = 22, clamped to the global max 20
+    assert.equal(after.max, null); // the global max is not baked into the entry
+  });
+});

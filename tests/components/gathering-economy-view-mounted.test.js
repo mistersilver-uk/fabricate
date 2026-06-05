@@ -98,6 +98,14 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.ok(target.querySelector('[data-economy-regen-amount]'));
     assert.equal(target.querySelectorAll('[data-economy-actor-id]').length, 1);
 
+    // The global max field is present and persists.
+    const maxInput = target.querySelector('[data-economy-stamina-max]');
+    assert.ok(maxInput);
+    maxInput.value = '14';
+    maxInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.max, 14);
+
     // Switching mode calls setGatheringEconomy with the new mode.
     target.querySelector('[data-economy-mode-option="nodes"]').click();
     flushSync();

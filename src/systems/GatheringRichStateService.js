@@ -719,9 +719,18 @@ export class GatheringRichStateService {
     const state = readState(actor);
     const key = systemId || 'default';
     const stamina = state.stamina?.[key] || {};
+    // The system-level default max (economy.stamina.max) applies to any actor
+    // that has not been given an explicit per-actor max, so every character
+    // shares one pool size unless individually overridden.
+    const globalMax = numberOrNullStrict(this._systemEconomy(key)?.stamina?.max);
+    const storedMax = numberOrNullStrict(stamina.max);
+    const max = storedMax != null ? storedMax : globalMax;
+    // A character with no stored current starts full at the effective max.
+    const storedCurrent = numberOrNullStrict(stamina.current);
+    const current = storedCurrent != null ? storedCurrent : (max != null ? max : null);
     return {
-      current: Number.isFinite(Number(stamina.current)) ? Number(stamina.current) : null,
-      max: Number.isFinite(Number(stamina.max)) ? Number(stamina.max) : null,
+      current,
+      max,
       provider: stamina.provider || 'fabricate',
       regenerationMode: stamina.regenerationMode || 'manual'
     };
@@ -732,7 +741,7 @@ export class GatheringRichStateService {
     const key = systemId || 'default';
     const previous = state.stamina?.[key] || {};
     const effectiveProvider = provider || previous.provider || 'fabricate';
-    const priorMax = Number.isFinite(Number(previous.max)) ? Number(previous.max) : null;
+    const priorMax = numberOrNullStrict(previous.max);
     // Fabricate-owned pools accept a max freely; an external provider's maximum
     // is read-only once established (the prior value is preserved), but an as-yet
     // unset external pool may still be initialized.
@@ -760,15 +769,29 @@ export class GatheringRichStateService {
   }
 
   async adjustActorStamina(actor, { systemId = 'default', delta = 0 } = {}) {
-    const current = this.getActorStamina(actor, systemId);
-    const nextCurrent = Math.max(0, Number(current.current || 0) + Number(delta || 0));
-    return this.setActorStamina(actor, {
-      systemId,
-      current: current.max !== null ? Math.min(nextCurrent, current.max) : nextCurrent,
-      max: current.max ?? nextCurrent,
-      provider: current.provider,
-      regenerationMode: current.regenerationMode
-    });
+    const key = systemId || 'default';
+    const effective = this.getActorStamina(actor, key);
+    const next = Math.max(0, Number(effective.current || 0) + Number(delta || 0));
+    const clamped = effective.max !== null ? Math.min(next, effective.max) : next;
+    const state = readState(actor);
+    const previous = state.stamina?.[key] || {};
+    // Preserve the stored max verbatim (null stays null) so the system default
+    // max stays authoritative when no per-actor override exists.
+    const entry = {
+      provider: previous.provider || effective.provider || 'fabricate',
+      regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
+      current: clamped,
+      max: numberOrNullStrict(previous.max),
+      ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
+    };
+    state.stamina = { ...(state.stamina || {}), [key]: entry };
+    state.history = [
+      this._historyEvent('stamina.adjust', { systemId: key, delta: Number(delta || 0), current: clamped }),
+      ...normalizeList(state.history)
+    ].slice(0, 50);
+    await writeState(actor, state);
+    this._callHook('fabricate.gathering.staminaAdjusted', { actor, systemId: key, stamina: cloneJson(entry) });
+    return cloneJson(entry);
   }
 
   async restockNode({ environmentId, taskId, current = null, max = null } = {}) {
@@ -816,7 +839,11 @@ export class GatheringRichStateService {
 
     const state = readState(actor);
     const entry = state.stamina?.[key];
-    if (!entry || !Number.isFinite(Number(entry.max))) return null;
+    if (!entry) return null;
+    // Effective max: the per-actor override, else the system default max.
+    const storedMax = numberOrNullStrict(entry.max);
+    const max = storedMax != null ? storedMax : numberOrNullStrict(econ.stamina?.max);
+    if (max == null) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
     const last = Number.isFinite(Number(entry.lastRegenWorldTime)) ? Number(entry.lastRegenWorldTime) : now;
@@ -833,7 +860,6 @@ export class GatheringRichStateService {
     const intervals = Math.floor((now - last) / interval);
     if (intervals <= 0) return null; // keep the anchor so the remainder accrues
 
-    const max = Number(entry.max);
     const before = Number(entry.current || 0);
     const advancedAnchor = last + intervals * interval;
     if (before >= max) {
@@ -1439,6 +1465,7 @@ function normalizeGatheringEconomy(raw = {}) {
   return {
     mode: ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none',
     stamina: {
+      max: numberOrNullStrict(raw?.stamina?.max),
       regen: {
         policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : 'none',
         unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
