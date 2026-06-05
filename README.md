@@ -14,7 +14,7 @@
 
 # Fabricate - Universal Crafting System
 
-A system-agnostic, flexible crafting module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.
+A system-agnostic, flexible crafting and gathering module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.
 
 ## Features
 
@@ -22,14 +22,19 @@ A system-agnostic, flexible crafting module for Foundry Virtual Tabletop that su
 - **Recipes** — Simple or multi-step recipes with ingredient sets, catalysts, and result groups.
 - **Resolution Modes** — Simple, mapped, tiered, and progressive crafting modes.
 - **Visibility and Knowledge** — Control which recipes players can see via player lists or knowledge-based discovery.
-- **Essences** — Tag items with abstract essences for flexible ingredient matching.
-- **Catalysts** — Non-consumable tools and workstations with optional usage tracking.
+- **Essences** — Infuse items with abstract essences for flexible ingredient matching.
+- **Tools** — Tools and workstations with optional usage tracking and breakage mechanics.
 - **Active Effect Transfer** — Transfer effects from ingredients to crafted items.
 - **Macro Integration** — Hook into success and failure outcomes with custom macros.
 - **Time and Currency Requirements** — Optional time or currency costs per crafting system.
 - **Salvage** — Break down managed items into components.
+- ***Gathering** — Explore environments, attempt gathering tasks, avoid or encounter hazards and harvest resources.
 
 ## Installation
+
+### Official Module List
+
+Fabricate isn't on the official module list yet, but when it is, you only need to follow the steps below to install it:
 
 1. In Foundry VTT, go to **Add-on Modules**
 2. Click **Install Module**
@@ -43,132 +48,7 @@ See [docs/quickstart.md](docs/quickstart.md) for a step-by-step guide.
 
 ## Documentation
 
-Full API reference and user guides are available in the [docs site](docs/).
-
-## API Reference
-
-The module exposes `game.fabricate` after the `ready` hook. Constructors and data shapes are available via `game.fabricate.api`.
-
-### Crafting Systems
-
-```js
-// List all crafting systems
-const systems = game.fabricate.getCraftingSystemManager().getSystems();
-
-// Create a crafting system (GM only)
-const system = await game.fabricate.getCraftingSystemManager().createSystem({
-  name: 'Blacksmithing',
-  resolutionMode: 'simple', // 'simple' | 'mapped' | 'tiered' | 'progressive'
-  features: {
-    essences: false,
-    multiStepRecipes: false,
-    effectTransfer: false,
-    salvage: false
-  }
-});
-```
-
-### Recipes
-
-Recipes reference managed items by `componentId`:
-
-```js
-const recipe = new game.fabricate.api.Recipe({
-  name: 'Iron Sword',
-  craftingSystemId: system.id,
-  ingredientSets: [
-    {
-      ingredients: [
-        { componentId: 'iron-ingot-id', quantity: 2 },
-        { componentId: 'wood-id', quantity: 1 }
-      ],
-      catalysts: [
-        { componentId: 'anvil-id', degradesOnUse: false }
-      ]
-    }
-  ],
-  resultGroups: [
-    {
-      results: [
-        { componentId: 'iron-sword-id', quantity: 1 }
-      ]
-    }
-  ]
-});
-
-await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-```
-
-### Crafting
-
-```js
-// Craft a recipe for an actor
-const result = await game.fabricate.craft(actor, recipeId);
-
-if (result.success) {
-  console.log(`Crafting succeeded: ${result.message}`);
-} else {
-  console.log(`Crafting failed: ${result.message}`);
-}
-
-// With component source actors (e.g. a shared party loot actor)
-const result = await game.fabricate.craft(actor, recipeId, {
-  componentSourceActors: [actor, partyLootActor]
-});
-```
-
-### Macro Helpers
-
-The following are available as `globalThis.fabricate` for use in macros:
-
-```js
-fabricate.listRecipes();                        // List all recipes
-fabricate.craft(game.user.character, 'id');     // Craft a recipe
-fabricate.openRecipeManager();                  // Open GM recipe manager
-fabricate.listCraftingSystems();                // List crafting systems
-```
-
-## Data Models
-
-### Ingredient
-
-```js
-{ componentId: string, quantity: number }
-```
-
-### Catalyst
-
-```js
-{ componentId: string, degradesOnUse: boolean, maxUses: number|null, destroyWhenExhausted: boolean }
-```
-
-### Result
-
-```js
-{ componentId: string, quantity: number }
-```
-
-### Crafting System shape
-
-```js
-{
-  id: string,
-  name: string,
-  resolutionMode: 'simple' | 'mapped' | 'tiered' | 'progressive',
-  features: {
-    essences: boolean,
-    multiStepRecipes: boolean,
-    effectTransfer: boolean,
-    salvage: boolean,
-    itemTags: boolean,
-    recipeCategories: boolean,
-    craftingChecks: boolean
-  },
-  recipeVisibility: {
-    listMode: 'global' | 'player' | 'knowledge'
-  }
-}
-```
+Check out the [docs site](docs/).
 
 ## Development
 
@@ -182,7 +62,7 @@ Canonical specifications live under `openspec/specs/`. Non-trivial implementatio
 
 ### Live Foundry Smoke Test
 
-Fabricate now includes a minimal end-to-end smoke harness against a real Foundry instance.
+Fabricate now includes a full and lightweight end-to-end smoke harness against a real Foundry instance.
 
 ```bash
 # 1) Install browser binary once
@@ -227,8 +107,9 @@ See [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [openspec/RE
 ## License
 
 Licensed under the **Fabricate Community License v1.0** (`LicenseRef-Fabricate-Community-1.0`).
-Commercial use requires a separate commercial license. See `LICENSE`.
+Commercial use requires a separate commercial license.
+See `LICENSE`.
 
 ## Credits
 
-Created by MisterPotts.
+Created by MisterSilver.
