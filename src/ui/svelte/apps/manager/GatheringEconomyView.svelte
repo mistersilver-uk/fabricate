@@ -203,23 +203,27 @@
           </div>
           <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.MaxStaminaHint', 'A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full.')}</p>
 
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
-            <select value={economy.stamina.regen.policy} onchange={(e) => updateRegen({ policy: e.currentTarget.value })} data-economy-regen-policy>
-              <option value="none">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option>
-              <option value="elapsedTime">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time')}</option>
-            </select>
-          </label>
-
-          {#if economy.stamina.regen.policy === 'elapsedTime'}
+          <div class="manager-economy-regen-grid">
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
-              <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
-                {#each UNITS as unit (unit)}
-                  <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
-                {/each}
+              <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
+              <select value={economy.stamina.regen.policy} onchange={(e) => updateRegen({ policy: e.currentTarget.value })} data-economy-regen-policy>
+                <option value="none">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option>
+                <option value="elapsedTime">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time')}</option>
               </select>
             </label>
+            {#if economy.stamina.regen.policy === 'elapsedTime'}
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
+                <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
+                  {#each UNITS as unit (unit)}
+                    <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
+          </div>
+
+          {#if economy.stamina.regen.policy === 'elapsedTime'}
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span>
               <input
