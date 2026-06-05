@@ -1053,8 +1053,9 @@ class Fabricate {
     const systemId = options.systemId;
     const service = this.gatheringRichStateService;
     if (!service || !systemId) return [];
+    // Characters only — exclude NPCs (and other non-character actor types).
     return Array.from(game.actors?.contents ?? [])
-      .filter(actor => actor?.hasPlayerOwner)
+      .filter(actor => actor?.type === 'character')
       .map(actor => {
         const stamina = service.getActorStamina(actor, systemId);
         return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };

@@ -1,19 +1,21 @@
 <!-- Svelte 5 runes mode -->
 <!--
   GatheringEconomyView is the GM authoring surface for a crafting system's
-  gathering limitation economy. It lives in the gathering "Settings" tab and:
+  gathering limitation economy, shown in the gathering "Settings" tab as a single
+  card:
    - selects the system limitation mode (none / stamina / nodes);
-   - configures stamina regeneration over world time (fixed amount or formula,
-     per minute/hour/day/week) when in stamina mode;
-   - lists player-owned actors with editable stamina pools (current/max) plus
-     quick +/- adjustments, for manual GM control.
+   - in stamina mode, a 2-column layout shows the stamina regeneration config on
+     the left and a searchable, paginated, scrollable list of player characters
+     (non-NPCs) with editable stamina pools (image, name, current, max, save) on
+     the right.
 
-  All persistence goes through the GM-only game.fabricate endpoints exposed on
-  the injected `services` bag (getGatheringEconomy/setGatheringEconomy,
-  getGatheringStaminaState/setGatheringStamina/adjustGatheringStamina).
+  All persistence goes through the GM-only game.fabricate endpoints exposed on the
+  injected `services` bag (getGatheringEconomy/setGatheringEconomy,
+  getGatheringStaminaState/setGatheringStamina).
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Pagination from '../../components/Pagination.svelte';
 
   let { services = null, systemId = '' } = $props();
 
@@ -26,7 +28,9 @@
 
   let economy = $state(defaultEconomy());
   let staminaActors = $state([]);
-  let loaded = $state(false);
+  let actorSearch = $state('');
+  let actorPageIndex = $state(0);
+  let actorPageSize = $state(6);
 
   function defaultEconomy() {
     return { mode: 'none', stamina: { regen: { policy: 'none', unit: 'hours', amount: null, formula: '', characterModifiers: [] } } };
@@ -35,17 +39,27 @@
   // Reload economy + actor stamina whenever the selected system changes.
   $effect(() => {
     const id = systemId;
-    loaded = false;
     if (!id || !services) {
       economy = defaultEconomy();
       staminaActors = [];
-      loaded = true;
       return;
     }
-    const econ = services.getGatheringEconomy?.({ systemId: id });
-    economy = normalizeEconomy(econ);
+    economy = normalizeEconomy(services.getGatheringEconomy?.({ systemId: id }));
     refreshStaminaActors(id);
-    loaded = true;
+  });
+
+  // The characters matching the search box, and the current page of them.
+  const filteredActors = $derived.by(() => {
+    const term = actorSearch.trim().toLowerCase();
+    if (!term) return staminaActors;
+    return staminaActors.filter(actor => String(actor.name || '').toLowerCase().includes(term));
+  });
+  const pagedActors = $derived(filteredActors.slice(actorPageIndex * actorPageSize, (actorPageIndex + 1) * actorPageSize));
+
+  // Keep the page index in range as the search term or list size changes.
+  $effect(() => {
+    const maxIndex = Math.max(0, Math.ceil(filteredActors.length / actorPageSize) - 1);
+    if (actorPageIndex > maxIndex) actorPageIndex = maxIndex;
   });
 
   function normalizeEconomy(raw) {
@@ -100,10 +114,9 @@
     refreshStaminaActors();
   }
 
-  async function adjustActor(actor, delta) {
-    if (!services) return;
-    await services.adjustGatheringStamina?.({ systemId, actorId: actor.actorId, delta });
-    refreshStaminaActors();
+  function onActorSearchInput(event) {
+    actorSearch = event.currentTarget.value;
+    actorPageIndex = 0;
   }
 
   const MODE_OPTIONS = [
@@ -119,6 +132,7 @@
       <h3 class="manager-economy-card-title"><i class="fas fa-scale-balanced" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}</span></h3>
       <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ModeHint', 'How this system limits how often tasks can be attempted.')}</p>
     </header>
+
     <div class="manager-economy-mode-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}>
       {#each MODE_OPTIONS as option (option.id)}
         <button
@@ -134,120 +148,124 @@
         </button>
       {/each}
     </div>
-  </section>
 
-  {#if economy.mode === 'stamina'}
-    <section class="manager-economy-card" data-economy-regen-card>
-      <header class="manager-economy-card-head">
-        <h3 class="manager-economy-card-title"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h3>
-        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
-      </header>
+    {#if economy.mode === 'stamina'}
+      <div class="manager-economy-stamina-grid">
+        <div class="manager-economy-subsection" data-economy-regen-card>
+          <h4 class="manager-economy-subtitle"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h4>
+          <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
 
-      <label class="manager-field">
-        <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
-        <select value={economy.stamina.regen.policy} onchange={(e) => updateRegen({ policy: e.currentTarget.value })} data-economy-regen-policy>
-          <option value="none">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option>
-          <option value="elapsedTime">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time')}</option>
-        </select>
-      </label>
-
-      {#if economy.stamina.regen.policy === 'elapsedTime'}
-        <div class="manager-economy-regen-grid">
           <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
-            <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
-              {#each UNITS as unit (unit)}
-                <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
-              {/each}
+            <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
+            <select value={economy.stamina.regen.policy} onchange={(e) => updateRegen({ policy: e.currentTarget.value })} data-economy-regen-policy>
+              <option value="none">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option>
+              <option value="elapsedTime">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time')}</option>
             </select>
           </label>
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Fixed amount')}</span>
-            <input
-              type="number" min="0" step="1"
-              value={economy.stamina.regen.amount ?? ''}
-              oninput={(e) => updateRegen({ amount: e.currentTarget.value === '' ? null : Number(e.currentTarget.value) })}
-              data-economy-regen-amount
-            />
-          </label>
+
+          {#if economy.stamina.regen.policy === 'elapsedTime'}
+            <div class="manager-economy-regen-grid">
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
+                <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
+                  {#each UNITS as unit (unit)}
+                    <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Fixed amount')}</span>
+                <input
+                  type="number" min="0" step="1"
+                  value={economy.stamina.regen.amount ?? ''}
+                  oninput={(e) => updateRegen({ amount: e.currentTarget.value === '' ? null : Number(e.currentTarget.value) })}
+                  data-economy-regen-amount
+                />
+              </label>
+            </div>
+            <label class="manager-field">
+              <span>{text('FABRICATE.Admin.Manager.Economy.RegenFormula', 'Formula (overrides fixed amount)')}</span>
+              <input
+                type="text"
+                placeholder="@abilities.con.mod"
+                value={economy.stamina.regen.formula}
+                oninput={(e) => updateRegen({ formula: e.currentTarget.value })}
+                data-economy-regen-formula
+              />
+            </label>
+            <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenModifiersNote', 'Character-modifier adjustments to regeneration can be configured via the API.')}</p>
+          {/if}
         </div>
-        <label class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Economy.RegenFormula', 'Formula (overrides fixed amount)')}</span>
+
+        <div class="manager-economy-subsection" data-economy-stamina-actors>
+          <h4 class="manager-economy-subtitle"><i class="fas fa-users" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ActorsTitle', 'Actor stamina pools')}</span></h4>
+          <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ActorsHint', 'Set each gatherer’s stamina pool.')}</p>
+
           <input
-            type="text"
-            placeholder="@abilities.con.mod"
-            value={economy.stamina.regen.formula}
-            oninput={(e) => updateRegen({ formula: e.currentTarget.value })}
-            data-economy-regen-formula
+            type="search"
+            class="manager-economy-actor-search"
+            placeholder={text('FABRICATE.Admin.Manager.Economy.SearchActors', 'Search characters…')}
+            value={actorSearch}
+            oninput={onActorSearchInput}
+            data-economy-actor-search
           />
-        </label>
-        <p class="manager-muted manager-economy-regen-note">{text('FABRICATE.Admin.Manager.Economy.RegenModifiersNote', 'Character-modifier adjustments to regeneration can be configured via the API.')}</p>
-      {/if}
-    </section>
-  {/if}
 
-  {#if economy.mode === 'stamina'}
-    <section class="manager-economy-card" data-economy-stamina-actors>
-      <header class="manager-economy-card-head">
-        <h3 class="manager-economy-card-title"><i class="fas fa-users" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ActorsTitle', 'Actor stamina pools')}</span></h3>
-        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ActorsHint', 'Set or adjust each gatherer’s stamina pool.')}</p>
-      </header>
-      {#if staminaActors.length === 0}
-        <p class="manager-muted" data-economy-no-actors>{text('FABRICATE.Admin.Manager.Economy.NoActors', 'No player-owned actors found.')}</p>
-      {:else}
-        <ul class="manager-economy-actor-list">
-          {#each staminaActors as actor (actor.actorId)}
-            <li class="manager-economy-actor-row" data-economy-actor-id={actor.actorId}>
-              <span class="manager-economy-actor-identity">
-                <img class="manager-economy-actor-thumb" src={actor.img || 'icons/svg/mystery-man.svg'} alt="" />
-                <span class="manager-economy-actor-name">{actor.name}</span>
-              </span>
-              <span class="manager-economy-actor-fields">
-                <label class="manager-field is-compact">
-                  <span>{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span>
-                  <input type="number" min="0" step="1" bind:value={actor.draftCurrent} data-economy-actor-current />
-                </label>
-                <label class="manager-field is-compact">
-                  <span>{text('FABRICATE.Admin.Manager.Economy.Max', 'Max')}</span>
-                  <input type="number" min="0" step="1" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} data-economy-actor-max />
-                </label>
-                <span class="manager-economy-actor-actions">
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Economy.Decrease', 'Decrease')} onclick={() => adjustActor(actor, -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Economy.Increase', 'Increase')} onclick={() => adjustActor(actor, 1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
-                  <button type="button" class="manager-button is-primary" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
-                </span>
-              </span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-  {/if}
-
-  {#if economy.mode === 'nodes'}
-    <section class="manager-economy-card" data-economy-nodes-note>
-      <h3 class="manager-economy-card-title"><i class="fas fa-mountain" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.Mode.Nodes', 'Resource nodes')}</span></h3>
-      <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'In nodes mode, set each task’s node count and respawn on the environment’s task inspector.')}</p>
-    </section>
-  {/if}
+          {#if filteredActors.length === 0}
+            <p class="manager-muted" data-economy-no-actors>{text('FABRICATE.Admin.Manager.Economy.NoActors', 'No characters found.')}</p>
+          {:else}
+            <ul class="manager-economy-actor-list" data-economy-actor-list>
+              {#each pagedActors as actor (actor.actorId)}
+                <li class="manager-economy-actor-row" data-economy-actor-id={actor.actorId}>
+                  <span class="manager-economy-actor-identity">
+                    <img class="manager-economy-actor-thumb" src={actor.img || 'icons/svg/mystery-man.svg'} alt="" />
+                    <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
+                  </span>
+                  <span class="manager-economy-actor-fields">
+                    <label class="manager-field is-compact">
+                      <span>{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span>
+                      <input type="number" min="0" step="1" bind:value={actor.draftCurrent} data-economy-actor-current />
+                    </label>
+                    <label class="manager-field is-compact">
+                      <span>{text('FABRICATE.Admin.Manager.Economy.Max', 'Max')}</span>
+                      <input type="number" min="0" step="1" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} data-economy-actor-max />
+                    </label>
+                    <button type="button" class="manager-button is-primary manager-economy-actor-save" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
+                  </span>
+                </li>
+              {/each}
+            </ul>
+            <Pagination
+              totalCount={filteredActors.length}
+              pageSize={actorPageSize}
+              pageIndex={actorPageIndex}
+              pageSizeOptions={[6, 12, 24]}
+              onPageChange={(index) => actorPageIndex = index}
+              onPageSizeChange={(size) => { actorPageSize = size; actorPageIndex = 0; }}
+            />
+          {/if}
+        </div>
+      </div>
+    {:else if economy.mode === 'nodes'}
+      <div class="manager-economy-subsection" data-economy-nodes-note>
+        <h4 class="manager-economy-subtitle"><i class="fas fa-mountain" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.Mode.Nodes', 'Resource nodes')}</span></h4>
+        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'In nodes mode, set each task’s node count and respawn on the environment’s task inspector.')}</p>
+      </div>
+    {/if}
+  </section>
 </div>
 
 <style>
-  /* Span the full settings grid (2 columns) and stack the economy cards above
-     the Times-of-day / Weather / Regions panels. */
+  /* Span the full settings grid (2 columns) so the economy reads as one card
+     above the Times-of-day / Weather / Regions panels. */
   .manager-gathering-economy {
     grid-column: 1 / -1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
   }
 
-  /* Card chrome mirrors the sibling .manager-condition-panel so the economy
-     sections read as proper cards. */
+  /* Card chrome mirrors the sibling .manager-condition-panel. */
   .manager-economy-card {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
     padding: 14px;
     border: 1px solid var(--fab-mv2-border);
     border-radius: 8px;
@@ -271,7 +289,8 @@
     line-height: 1.2;
   }
 
-  .manager-economy-card-title i {
+  .manager-economy-card-title i,
+  .manager-economy-subtitle i {
     color: var(--fab-mv2-accent);
   }
 
@@ -285,7 +304,7 @@
   .manager-economy-mode-options {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--fab-space-2);
+    gap: 8px;
   }
 
   .manager-economy-mode-option {
@@ -294,47 +313,76 @@
     gap: 8px;
     padding: 8px 14px;
     border-radius: 8px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
+    border: 1px solid var(--fab-mv2-border);
+    background: var(--fab-overlay-light-035);
+    color: var(--fab-mv2-text);
     cursor: pointer;
     font-weight: 600;
   }
 
   .manager-economy-mode-option.is-active {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
+    border-color: var(--fab-mv2-accent);
+    background: var(--fab-mv2-accent-soft, var(--fab-overlay-light-035));
+    color: var(--fab-mv2-text);
+  }
+
+  /* Stamina mode: regen on the left, actor pools on the right. */
+  .manager-economy-stamina-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+
+  .manager-economy-subsection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .manager-economy-subtitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--fab-mv2-text);
+    font-size: 0.85rem;
+    font-weight: 700;
   }
 
   .manager-economy-regen-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--fab-space-2);
+    gap: 8px;
   }
 
-  .manager-economy-regen-note {
-    margin-top: 4px;
-    font-size: 11px;
+  .manager-economy-actor-search {
+    width: 100%;
+    box-sizing: border-box;
   }
 
+  /* Scrollable character list (paginated above 6). */
   .manager-economy-actor-list {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
   }
 
   .manager-economy-actor-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
+    gap: 12px;
+    padding: 8px;
+    border: 1px solid var(--fab-mv2-border);
     border-radius: 8px;
-    background: var(--fab-surface-soft);
+    background: var(--fab-overlay-light-035);
     flex-wrap: wrap;
   }
 
@@ -343,6 +391,7 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+    flex: 1 1 120px;
   }
 
   .manager-economy-actor-thumb {
@@ -350,26 +399,35 @@
     height: 32px;
     border-radius: 6px;
     object-fit: cover;
+    flex: 0 0 auto;
   }
 
   .manager-economy-actor-name {
     font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .manager-economy-actor-fields {
     display: inline-flex;
     align-items: flex-end;
-    gap: var(--fab-space-2);
+    gap: 8px;
     flex-wrap: wrap;
   }
 
   .manager-field.is-compact {
-    width: 84px;
+    width: 72px;
   }
 
-  .manager-economy-actor-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+  .manager-economy-actor-save {
+    align-self: flex-end;
+  }
+
+  @media (max-width: 880px) {
+    .manager-economy-stamina-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

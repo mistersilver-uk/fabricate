@@ -65,6 +65,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     mkdirSync(dirname(util), { recursive: true });
     writeFileSync(util, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
 
+    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js')).href);
     GatheringEconomyView = mod.default;
@@ -104,20 +105,36 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     unmount(mounted); mounted = null; target.remove();
   });
 
-  it('saves and adjusts an actor stamina pool through the services', async () => {
+  it('saves an actor stamina pool through the services', async () => {
     const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, provider: 'fabricate' }];
     const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
-    target.querySelector('[data-economy-actor-id="a1"] .manager-button').click();
+    target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save').click();
     flushSync();
     assert.equal(calls.setStamina.at(-1).actorId, 'a1');
     assert.equal(calls.setStamina.at(-1).systemId, 'sys-1');
+    // The +/- adjust controls were removed.
+    assert.equal(target.querySelector('[data-economy-actor-id="a1"] .manager-icon-button'), null);
+    unmount(mounted); mounted = null; target.remove();
+  });
 
-    const buttons = target.querySelectorAll('[data-economy-actor-id="a1"] .manager-icon-button');
-    buttons[0].click(); // decrease
+  it('filters the character list by the search box', async () => {
+    const actors = [
+      { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, provider: 'fabricate' },
+      { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, provider: 'fabricate' }
+    ];
+    const { services } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
+    await mountView({ services, systemId: 'sys-1' });
+    assert.equal(target.querySelectorAll('[data-economy-actor-id]').length, 2);
+
+    const search = target.querySelector('[data-economy-actor-search]');
+    search.value = 'bor';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
-    assert.equal(calls.adjustStamina.at(-1).delta, -1);
+    const rows = target.querySelectorAll('[data-economy-actor-id]');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].getAttribute('data-economy-actor-id'), 'a2');
     unmount(mounted); mounted = null; target.remove();
   });
 });
