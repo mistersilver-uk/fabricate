@@ -19,12 +19,13 @@
 - [x] Per-task node count + stamina cost chips; attempt-cost summary in the detail inspector.
 - [x] Mode-aware economy strip (stamina pool / node legend) in the center header, blind-redaction safe.
 
-## GM UI (pending)
+## GM UI
 
-- [ ] Economy control (mode + stamina regen config) bound to get/set economy.
-- [ ] Task editor: stamina cost + stamina-cost modifiers; node max / depletion timing / respawn config.
-- [ ] Per-environment node-count editor in the environment task inspector.
-- [ ] New "Gathering State" panel + routing for manual actor stamina editing.
+- [x] Economy control (mode + stamina regen config) in the gathering Settings tab (`GatheringEconomyView`).
+- [x] Actor stamina pool editor (current/max + adjust) in the same panel.
+- [x] Task editor: stamina cost + per-actor stamina-cost modifiers.
+- [ ] Per-environment node-count editor — deferred; use `game.fabricate.restockGatheringNode` (draft-vs-persisted and composed-vs-inline-task friction warrants its own change).
+- [x] Component test for `GatheringEconomyView`.
 
 ## Migration, spec & tests
 

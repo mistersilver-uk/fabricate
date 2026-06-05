@@ -3073,6 +3073,7 @@
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedHazardId={selectedGatheringHazard?.id || selectedGatheringHazardId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
+        {services}
         onSelectGatheringTab={selectGatheringTab}
         onSelectGatheringTask={selectGatheringTask}
         onCreateGatheringTask={createGatheringTask}

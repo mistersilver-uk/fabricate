@@ -339,6 +339,34 @@
     return (characterModifierLibrary || []).find(entry => entry.id === modifierId) || null;
   }
 
+  // Stamina cost authoring (enforced only when the system uses stamina mode).
+  const staminaCostValue = $derived(Number(task?.staminaCost ?? 0));
+  const staminaCostModifiers = $derived(Array.isArray(task?.staminaCostModifiers) ? task.staminaCostModifiers : []);
+
+  function updateStaminaCost(value) {
+    const next = Number(value);
+    onUpdateTask({ staminaCost: Number.isFinite(next) && next > 0 ? Math.floor(next) : 0 });
+  }
+  function addStaminaCostModifier() {
+    const first = (characterModifierLibrary || [])[0];
+    if (!first) return;
+    onUpdateTask({
+      staminaCostModifiers: [
+        ...staminaCostModifiers,
+        { id: `scm-${first.id}-${staminaCostModifiers.length + 1}`, modifierId: first.id, operator: '-', min: null, max: null, expressionOverride: '' }
+      ]
+    });
+  }
+  function updateStaminaCostModifier(index, patch) {
+    onUpdateTask({ staminaCostModifiers: staminaCostModifiers.map((ref, i) => (i === index ? { ...ref, ...patch } : ref)) });
+  }
+  function removeStaminaCostModifier(index) {
+    onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
+  }
+  function numericFieldValue(value) {
+    return value === null || value === undefined ? '' : value;
+  }
+
   function modifierEntries(row) {
     const modifiers = row?.conditionModifiers || {};
     const characterRefs = Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
@@ -759,6 +787,56 @@
       {/if}
     </section>
 
+    <section class="manager-task-stamina-card" data-gathering-task-stamina>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskStaminaHint', 'Stamina spent per attempt when this system uses stamina mode.')}</p>
+        </div>
+      </div>
+
+      <label class="manager-field manager-task-stamina-cost-field">
+        <span>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span>
+        <input
+          type="number" min="0" step="1"
+          value={staminaCostValue > 0 ? staminaCostValue : ''}
+          oninput={(event) => updateStaminaCost(event.currentTarget.value)}
+          data-gathering-task-stamina-cost
+        />
+      </label>
+
+      {#if staminaCostValue > 0}
+        <div class="manager-task-stamina-modifiers">
+          <div class="manager-task-drop-header-copy">
+            <h4>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifiers', 'Per-actor cost modifiers')}</h4>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifiersHint', 'Adjust the cost for an actor (e.g. a strong character mines for less).')}</p>
+          </div>
+
+          {#each staminaCostModifiers as ref, index (ref.id)}
+            <div class="manager-task-stamina-modifier-row" data-gathering-stamina-modifier={ref.id}>
+              <select value={ref.modifierId} onchange={(event) => updateStaminaCostModifier(index, { modifierId: event.currentTarget.value })} aria-label={text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifiers', 'Per-actor cost modifiers')}>
+                {#each characterModifierLibrary as entry (entry.id)}
+                  <option value={entry.id}>{entry.label || entry.id}</option>
+                {/each}
+              </select>
+              <select value={ref.operator} onchange={(event) => updateStaminaCostModifier(index, { operator: event.currentTarget.value })} aria-label="operator">
+                <option value="-">−</option>
+                <option value="+">+</option>
+              </select>
+              <input type="number" step="1" placeholder="min" value={numericFieldValue(ref.min)} oninput={(event) => updateStaminaCostModifier(index, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} aria-label="min" />
+              <input type="number" step="1" placeholder="max" value={numericFieldValue(ref.max)} oninput={(event) => updateStaminaCostModifier(index, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} aria-label="max" />
+              <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')} onclick={() => removeStaminaCostModifier(index)}><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+          {/each}
+
+          <button type="button" class="manager-button" disabled={(characterModifierLibrary || []).length === 0} onclick={addStaminaCostModifier} data-gathering-add-stamina-modifier>
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Economy.AddModifier', 'Add modifier')}</span>
+          </button>
+        </div>
+      {/if}
+    </section>
+
     <section class="manager-task-component-browser-card" data-gathering-task-component-browser>
       <div class="manager-task-card-header">
         <div class="manager-task-drop-header-copy">
@@ -1041,3 +1119,32 @@
     </div>
   {/if}
 </main>
+
+<style>
+  .manager-task-stamina-cost-field {
+    max-width: 240px;
+  }
+
+  .manager-task-stamina-modifiers {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-3);
+  }
+
+  .manager-task-stamina-modifier-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    flex-wrap: wrap;
+  }
+
+  .manager-task-stamina-modifier-row select,
+  .manager-task-stamina-modifier-row input {
+    min-width: 0;
+  }
+
+  .manager-task-stamina-modifier-row input[type="number"] {
+    width: 80px;
+  }
+</style>

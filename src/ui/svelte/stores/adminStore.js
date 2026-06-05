@@ -621,6 +621,7 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     dropRows: (Array.isArray(task.dropRows ?? task.itemDrops) ? (task.dropRows ?? task.itemDrops) : [])
       .map(row => _normalizeGatheringDropRow(row, randomID)),
     staminaCost: Number.isFinite(Number(task.staminaCost)) && Number(task.staminaCost) > 0 ? Number(task.staminaCost) : 0,
+    staminaCostModifiers: _normalizeGatheringCharacterModifierReferences(task.staminaCostModifiers, randomID),
     gatheringModifier: task.gatheringModifier && typeof task.gatheringModifier === 'object' ? _clonePlain(task.gatheringModifier) : null,
     timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null,
     toolIds: Array.isArray(task.toolIds)

@@ -38,6 +38,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');

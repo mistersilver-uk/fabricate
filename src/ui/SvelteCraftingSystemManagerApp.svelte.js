@@ -543,7 +543,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         },
         registerEssenceDirtyGuard: (guard) => {
           this._confirmDiscardDirtyEssenceDraft = typeof guard === 'function' ? guard : null;
-        }
+        },
+        // Gathering economy authoring + manual state controls (GM-only).
+        getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
+        setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
+        getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
+        setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
+        adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
+        restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts)
       }
     };
   }

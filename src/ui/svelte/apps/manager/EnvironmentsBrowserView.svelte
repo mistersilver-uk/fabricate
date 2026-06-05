@@ -8,6 +8,7 @@
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
+  import GatheringEconomyView from './GatheringEconomyView.svelte';
 
   let {
     environments = [],
@@ -24,6 +25,7 @@
     environmentTaskCounts = {},
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
+    services = null,
     selectedTaskId = '',
     selectedHazardId = '',
     managedItemOptions = [],
@@ -831,6 +833,8 @@
       role="tabpanel"
       aria-labelledby="manager-gathering-nav-settings"
     >
+      <GatheringEconomyView {services} systemId={selectedSystemId} />
+
       {#each [
         { kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition },
         { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }
