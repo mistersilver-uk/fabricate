@@ -1043,6 +1043,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'mine-ore',
         name: 'Extract Ore',
+        description: 'Work the seams and tailings for raw ore, the occasional smelted ingot, and the gemstones hiding in the rock.',
         img: MYTHWRIGHT_ICONS.gatheringMineOre,
         enabled: true,
         biomes: ['cave', 'mountain'],
@@ -1058,6 +1059,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'wild-hardwood',
         name: 'Cut Hardwood',
+        description: 'Fell and split seasoned hardwood, keeping the cleanest grain for staves and crafting timber.',
         img: MYTHWRIGHT_ICONS.gatheringWildHardwood,
         enabled: true,
         biomes: ['forest', 'grassland'],
@@ -1072,6 +1074,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'wild-hide',
         name: 'Dress Hides and Trophies',
+        description: 'Skin and cure hides from felled beasts, salvaging the finest pelts and trophies intact.',
         img: MYTHWRIGHT_ICONS.gatheringWildHide,
         enabled: true,
         biomes: ['forest', 'grassland'],
@@ -1086,6 +1089,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'ruin-relics',
         name: 'Excavate Ruin Relics',
+        description: 'Sift collapsed halls and buried foundations for ancient fragments and the rare intact relic.',
         img: MYTHWRIGHT_ICONS.gatheringRuinRelics,
         enabled: true,
         biomes: ['ruins', 'urban'],
@@ -1101,6 +1105,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'battlefield-salvage',
         name: 'Salvage Battlefield Gear',
+        description: 'Pick over the fallen for armour plates, trophies, and weapons still worth carrying home.',
         img: MYTHWRIGHT_ICONS.gatheringBattlefieldSalvage,
         enabled: true,
         biomes: ['wasteland', 'grassland'],
@@ -1117,6 +1122,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'planar-essence',
         name: 'Bind Planar Essence',
+        description: 'Channel a binding rod to draw raw planar energy into stable, carryable motes of essence.',
         img: MYTHWRIGHT_ICONS.gatheringPlanarEssence,
         enabled: true,
         toolIds: ['mythwright-tool-planar-binding-rod'],
@@ -1132,6 +1138,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'dragon-scale',
         name: 'Harvest Dragon Scale',
+        description: 'Pry scales and render essence from a slain dragon — careful, deliberate work with the right tongs.',
         img: MYTHWRIGHT_ICONS.gatheringDragonScale,
         enabled: true,
         toolIds: ['mythwright-tool-dragon-tongs'],
