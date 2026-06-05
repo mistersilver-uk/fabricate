@@ -249,7 +249,7 @@
           "SearchActors": "Search characters…",
           "NoActors": "No characters found.",
           "Current": "Current",
-          "Max": "Max",
+          "Max": "Max (override)",
           "Save": "Save",
           "NodesNote": "In nodes mode, set each task's node count and respawn on the environment's task inspector.",
           "NodeStockTitle": "Gathering node stock",
