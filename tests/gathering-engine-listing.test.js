@@ -1180,3 +1180,82 @@ test('the opaque blind action carries no tools while a discovered task does', as
   assert.equal(entry.discoveredTasks[0].tools.length, 1, 'discovered task carries its tools');
   assert.equal(entry.discoveredTasks[0].tools[0].state, 'missing');
 });
+
+test('listForActor exposes an environment hazardChance derived from its hazards', async () => {
+  const engine = makeEngine({
+    environments: [environment({ hazards: [{ id: 'h1', dropRate: 50 }, { id: 'h2', dropRate: 50, enabled: true }] })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = listing.environments.find(entry => entry.id === 'env-a');
+  assert.ok(env, 'environment is listed');
+  // 1 - (1 - 0.5)(1 - 0.5) = 0.75
+  assert.ok(Math.abs(env.hazardChance - 0.75) < 1e-9, 'hazardChance is 1 - product of per-hazard misses');
+});
+
+test('listForActor reports hazardChance 0 for an environment with no hazards', async () => {
+  const engine = makeEngine({ environments: [environment()] });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = listing.environments.find(entry => entry.id === 'env-a');
+  assert.equal(env.hazardChance, 0);
+});
+
+test('listForActor ignores disabled hazards and clamps out-of-range dropRates for hazardChance', async () => {
+  const engine = makeEngine({
+    environments: [environment({ hazards: [{ id: 'h1', dropRate: 150 }, { id: 'h2', dropRate: 80, enabled: false }] })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = listing.environments.find(entry => entry.id === 'env-a');
+  // h1 clamps to 100% (-> certain), h2 disabled and excluded.
+  assert.equal(env.hazardChance, 1);
+});
+
+test('getTaskDropBreakdown returns award/hazard info + per-drop chances with component images', async () => {
+  const previewCalls = [];
+  const richState = {
+    composeEnvironment: (env) => env,
+    previewDropBreakdown: async (args) => {
+      previewCalls.push(args);
+      return {
+        drops: [{
+          id: 'd1', name: 'Iron', componentId: 'iron', quantity: 2,
+          baseChance: 0.4, finalChance: 0.53,
+          modifiers: { weather: { value: 10 }, timeOfDay: { value: -5 }, biome: { value: 3 }, character: [] }
+        }],
+        successChance: 0.53,
+        awardMode: 'allDrops', awardLimit: 1, hazardPolicy: 'successWithHazard'
+      };
+    }
+  };
+  const systemManager = { getItems: () => [{ id: 'iron', name: 'Iron', img: 'icons/iron.webp' }] };
+  const engine = makeEngine({
+    environments: [environment({ tasks: [task({ id: 'task-a', resolutionMode: 'd100', dropRows: [{ id: 'd1', dropRate: 40 }] })] })],
+    richState,
+    systemManager
+  });
+
+  const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-a', rememberedActorId: 'actor-1' });
+  assert.equal(result.resolutionMode, 'd100');
+  assert.equal(result.successChance, 0.53, 'aggregate success chance passes through from the preview');
+  assert.equal(result.awardMode, 'allDrops');
+  assert.equal(result.hazardPolicy, 'successWithHazard');
+  assert.equal(result.drops.length, 1);
+  assert.equal(result.drops[0].img, 'icons/iron.webp', 'drop image resolved from the component');
+  assert.equal(previewCalls.length, 1, 'delegated to richState.previewDropBreakdown once');
+});
+
+test('getTaskDropBreakdown returns empty drops for an unknown or hidden task', async () => {
+  const richState = { composeEnvironment: (env) => env, previewDropBreakdown: async () => ({ drops: [] }) };
+  const engine = makeEngine({ environments: [environment()], richState });
+
+  const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-missing', rememberedActorId: 'actor-1' });
+  assert.deepEqual(result.drops, []);
+});
+
+test('getTaskDropBreakdown returns empty drops when richState has no previewDropBreakdown', async () => {
+  const engine = makeEngine({ environments: [environment()] });
+  const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-a', rememberedActorId: 'actor-1' });
+  assert.deepEqual(result.drops, []);
+});

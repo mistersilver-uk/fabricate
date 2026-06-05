@@ -19,3 +19,31 @@ export function resolveDefaultSelection(environments, selectedId) {
   if (stillValid) return selectedId;
   return list.find(environment => environment?.locked !== true)?.id ?? null;
 }
+
+// The tasks the player can see (and therefore select) for an environment:
+// a blind site's revealed `discoveredTasks`, a targeted site's full `tasks`.
+// Mirrors GatheringDetail's `activeTasks` derivation so the view's default
+// task-selection and the right-column inspector agree on the list.
+export function visibleTasksFor(environment) {
+  if (!environment) return [];
+  const list = environment.selectionMode === 'blind'
+    ? environment.discoveredTasks
+    : environment.tasks;
+  return Array.isArray(list) ? list : [];
+}
+
+// Pure default task-selection for the right-column task inspector, the task
+// analogue of resolveDefaultSelection:
+//   - preserve `selectedTaskId` when a task with that id is still present (any
+//     task — a deliberately-picked blocked task survives a re-fetch so the
+//     player keeps viewing its requirements);
+//   - otherwise default to the first attemptable task's `.id`;
+//   - otherwise `null` (no tasks, or none currently attemptable).
+export function resolveDefaultTaskSelection(tasks, selectedTaskId) {
+  const list = Array.isArray(tasks) ? tasks : [];
+  const stillValid = selectedTaskId !== null
+    && selectedTaskId !== undefined
+    && list.some(task => String(task?.id) === String(selectedTaskId));
+  if (stillValid) return selectedTaskId;
+  return list.find(task => task?.attemptable === true)?.id ?? null;
+}

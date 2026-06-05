@@ -7,24 +7,30 @@
 
    - Blind environments: an "Attempt gathering" button (a blind gather omits the
      task id so the engine picks a candidate), and — when the effective reveal
-     policy is not `never` — a paginated "Discovered Tasks (x/y)" list of tasks
-     the player has already revealed and can attempt directly.
-   - Targeted environments: the task list shown prominently, with no discovered
-     heading.
+     policy is not `never` — a paginated "Discovered Tasks (x/y)" list of
+     selectable task rows.
+   - Targeted environments: the selectable task list, with no discovered heading.
 
-  Attempt buttons call services.startGatheringAttempt and then re-fetch the
-  listing via onAttempted so counts and attemptability refresh.
+  Task rows are read-only and selectable: clicking one drives the right-column
+  inspector (which carries the per-task Attempt action). The blind "Attempt
+  gathering" button and the inspector's Attempt both call the `onAttempt` handler
+  (lifted to GatheringView), which runs services.startGatheringAttempt and
+  re-fetches the listing; `busy` guards against double-submits.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
+  import HazardChanceBar from './HazardChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
 
   let {
     environment = null,
     services = null,
-    onAttempted = null
+    onAttempt = null,
+    busy = false,
+    selectedTaskId = null,
+    onSelectTask = null
   } = $props();
 
   const env = $derived(environment);
@@ -61,6 +67,11 @@
   // base danger colour.
   const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
 
+  // Environment-level "chance of encountering a hazard" (0..1) the engine carries
+  // on the listing. > 0 shows the hazard bar; 0 shows the "safe" hint instead.
+  const hazardChance = $derived(Math.max(0, Math.min(1, Number(env?.hazardChance ?? 0))));
+  const hasHazard = $derived(hazardChance > 0);
+
   // The list the center column paginates: discovered tasks for blind sites,
   // the full task list for targeted ones.
   const activeTasks = $derived(isBlind ? discoveredTasks : tasks);
@@ -80,18 +91,6 @@
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= activeTasks.length) pageIndex = 0;
   });
-
-  let busy = $state(false);
-  async function attempt({ environmentId, taskId = null }) {
-    if (busy || !environmentId) return;
-    busy = true;
-    try {
-      await services?.startGatheringAttempt?.({ environmentId, taskId });
-      await onAttempted?.();
-    } finally {
-      busy = false;
-    }
-  }
 
   function biomeChipStyle(tag) {
     const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
@@ -166,6 +165,25 @@
       </p>
     </header>
 
+    <section class="gathering-detail-hazard" data-gathering-hazard-section>
+      <div class="gathering-detail-hazard-danger">
+        <span class="gathering-detail-hazard-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
+        <span class={`gathering-detail-hazard-level is-danger ${dangerRiskClass}`}>
+          <i class="fas fa-skull" aria-hidden="true"></i>
+          <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
+        </span>
+      </div>
+
+      {#if hasHazard}
+        <HazardChanceBar value={hazardChance} />
+        <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
+      {:else}
+        <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
+          {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+        </p>
+      {/if}
+    </section>
+
     {#if sceneBlocked}
       <section class="gathering-detail-scene" data-gathering-scene-banner>
         <LinkedScene {sceneUuid} {services} />
@@ -185,7 +203,7 @@
             class="gathering-detail-blind-attempt"
             data-gathering-blind-attempt
             disabled={!blindAttemptable || busy}
-            onclick={() => attempt({ environmentId: envId, taskId: null })}
+            onclick={() => onAttempt?.({ environmentId: envId, taskId: null })}
           >
             <i class="fas fa-dice" aria-hidden="true"></i>
             {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
@@ -210,9 +228,8 @@
               {#each paginated as discoveredTask (discoveredTask.id)}
                 <GatheringTaskRow
                   task={discoveredTask}
-                  environmentId={envId}
-                  onAttempt={attempt}
-                  {busy}
+                  selected={String(discoveredTask.id) === String(selectedTaskId)}
+                  onSelect={onSelectTask}
                 />
               {/each}
             </div>
@@ -225,9 +242,8 @@
           {#each paginated as gatheringTask (gatheringTask.id)}
             <GatheringTaskRow
               task={gatheringTask}
-              environmentId={envId}
-              onAttempt={attempt}
-              {busy}
+              selected={String(gatheringTask.id) === String(selectedTaskId)}
+              onSelect={onSelectTask}
             />
           {/each}
         </div>
@@ -373,6 +389,74 @@
   }
 
   .gathering-detail-mode-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fab-text-muted);
+  }
+
+  /* Environment safety readout: highest danger level + hazard-chance bar (or a
+     "safe" hint when there is no hazard chance). */
+  .gathering-detail-hazard {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+  }
+
+  .gathering-detail-hazard-danger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+  }
+
+  .gathering-detail-hazard-caption {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-detail-hazard-level {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fab-text);
+  }
+
+  /* Danger-tier icon colour, mirroring the header danger pip. */
+  .gathering-detail-hazard-level.is-danger i {
+    color: var(--fab-danger, var(--fab-text-muted));
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-safe i {
+    color: var(--fab-success);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-unsafe i {
+    color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-hazardous i {
+    color: var(--fab-warning);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-dangerous i {
+    color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-deadly i,
+  .gathering-detail-hazard-level.is-danger.risk-extreme i {
+    color: var(--fab-danger);
+  }
+
+  .gathering-detail-hazard-hint {
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);

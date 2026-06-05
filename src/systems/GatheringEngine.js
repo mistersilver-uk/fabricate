@@ -624,6 +624,70 @@ export class GatheringEngine {
     };
   }
 
+  /**
+   * Lazily compute the per-drop chance breakdown for ONE task the player has
+   * opened in the right-column inspector ("What you might find"). Resolves the
+   * selected actor like `listForActor`, recomposes the environment, gates the
+   * task to what the viewer may actually see (so a blind/undiscovered task's
+   * drops never leak), then delegates the per-drop math to
+   * `richState.previewDropBreakdown` and attaches each drop's component image.
+   *
+   * Returns `{ resolutionMode, awardMode, awardLimit, hazardPolicy, drops }`;
+   * `drops` is empty when not applicable (no richState, unknown/hidden task,
+   * non-d100 task, or no drops).
+   *
+   * @param {object} options
+   * @param {string} options.environmentId
+   * @param {string} options.taskId
+   * @param {string|null} [options.rememberedActorId]
+   * @param {object|null} [options.viewer]
+   * @returns {Promise<object>}
+   */
+  async getTaskDropBreakdown({ environmentId, taskId, rememberedActorId = null, viewer = null } = {}) {
+    const empty = { resolutionMode: null, awardMode: null, awardLimit: null, hazardPolicy: null, drops: [] };
+    if (!environmentId || !taskId || typeof this.richState?.previewDropBreakdown !== 'function') return empty;
+
+    const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
+    if (selectableActors.length === 0) return empty;
+    const selected = this._resolveSelectedActor({ actor: null, rememberedActorId, selectableActors, viewer });
+    if (selected.blockedReason) return empty;
+    const actor = selected.actor;
+
+    const systems = this._enabledGatheringSystems();
+    const environment = this._playerCandidateEnvironments(systems, viewer)
+      .find(candidate => stringOrNull(candidate?.id) === String(environmentId));
+    if (!environment || environment.enabled === false) return empty;
+    const system = systems.get(environment.craftingSystemId);
+
+    // Gate to what the viewer can actually see: only task ids the player listing
+    // would render (targeted tasks, or revealed blind "discovered" tasks).
+    const model = await this._buildEnvironmentListing({ environment, system, viewer, actor });
+    if (model.visible !== true) return empty;
+    const visibleIds = new Set([
+      ...normalizeList(model.tasks),
+      ...normalizeList(model.discoveredTasks)
+    ].map(taskModel => stringOrNull(taskModel?.id)).filter(Boolean));
+    if (!visibleIds.has(String(taskId))) return empty;
+
+    const task = normalizeList(environment.tasks).find(entry => stringOrNull(entry?.id) === String(taskId)) ?? null;
+    if (!task || task.resolutionMode !== 'd100') return { ...empty, resolutionMode: stringOrNull(task?.resolutionMode) };
+
+    const preview = await this.richState.previewDropBreakdown({ environment, task, actor, viewer, system });
+    const componentsById = this._componentsById(system);
+    const drops = normalizeList(preview?.drops).map(drop => ({
+      ...drop,
+      img: stringOrNull(componentsById.get(stringOrNull(drop?.componentId))?.img) || 'icons/svg/item-bag.svg'
+    }));
+    return {
+      resolutionMode: 'd100',
+      successChance: preview?.successChance ?? null,
+      awardMode: stringOrNull(preview?.awardMode),
+      awardLimit: Number(preview?.awardLimit ?? 1),
+      hazardPolicy: stringOrNull(preview?.hazardPolicy),
+      drops
+    };
+  }
+
   _activeRunModels({ actor, viewer }) {
     return normalizeList(this.runManager?.getActiveRuns?.(actor))
       .filter(run => run?.status === 'waitingTime')
@@ -914,6 +978,7 @@ export class GatheringEngine {
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
       attemptable,
+      hazardChance: this._environmentHazardChance(environment),
       blockedReasons,
       tasks: listedTasks,
       discoveredTasks,
@@ -1077,6 +1142,30 @@ export class GatheringEngine {
     if (rows.length === 0) return null;
     const missAll = rows.reduce((product, row) => {
       const rate = Math.min(100, Math.max(0, Number(row?.dropRate) || 0));
+      return product * (1 - rate / 100);
+    }, 1);
+    return 1 - missAll;
+  }
+
+  /**
+   * Static "chance of encountering a hazard" for an environment: the probability
+   * that at least one eligible hazard triggers on an attempt, derived from the
+   * composed hazards' `dropRate`s as `1 - ∏(1 - dropRate/100)`.
+   *
+   * Like `_taskSuccessChance` this ignores actor/condition/character modifiers
+   * and hazard selection-mode/limit (those only affect which triggered hazards
+   * are applied, not whether any trigger). Returns `0` when the environment has
+   * no enabled hazards, so the player UI can show the "safe" hint instead of a
+   * bar.
+   *
+   * @param {object} environment A composed gathering environment.
+   * @returns {number} A 0–1 fraction (0 when there are no hazards).
+   */
+  _environmentHazardChance(environment) {
+    const hazards = normalizeList(environment?.hazards).filter(hazard => hazard?.enabled !== false);
+    if (hazards.length === 0) return 0;
+    const missAll = hazards.reduce((product, hazard) => {
+      const rate = Math.min(100, Math.max(0, Number(hazard?.dropRate) || 0));
       return product * (1 - rate / 100);
     }, 1);
     return 1 - missAll;
@@ -1461,7 +1550,9 @@ export class GatheringEngine {
       resolutionMode: stringOrNull(task.resolutionMode),
       hasTimeRequirement: Boolean(task.timeRequirement),
       catalystCount: normalizeList(task.catalysts).length,
-      successChance: this._taskSuccessChance(task),
+      successChance: typeof this.richState?.taskSuccessChance === 'function'
+        ? this.richState.taskSuccessChance(task, environment)
+        : this._taskSuccessChance(task),
       tools: Array.isArray(tools) ? tools : [],
       rich
     };

@@ -1,10 +1,18 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveDefaultSelection } from '../../src/ui/svelte/apps/gathering/selectionDefault.js';
+import {
+  resolveDefaultSelection,
+  resolveDefaultTaskSelection,
+  visibleTasksFor
+} from '../../src/ui/svelte/apps/gathering/selectionDefault.js';
 
 function env(overrides = {}) {
   return { id: 'env-a', locked: false, ...overrides };
+}
+
+function task(overrides = {}) {
+  return { id: 'task-a', attemptable: true, ...overrides };
 }
 
 describe('resolveDefaultSelection', () => {
@@ -69,5 +77,55 @@ describe('resolveDefaultSelection', () => {
       env({ id: 'env-2', locked: true })
     ];
     assert.equal(resolveDefaultSelection(list, 'env-gone'), null);
+  });
+});
+
+describe('visibleTasksFor', () => {
+  it('returns the full task list for a targeted environment', () => {
+    const environment = { selectionMode: 'targeted', tasks: [task({ id: 't1' })], discoveredTasks: [task({ id: 'd1' })] };
+    assert.deepEqual(visibleTasksFor(environment).map(t => t.id), ['t1']);
+  });
+
+  it('returns discovered tasks for a blind environment', () => {
+    const environment = { selectionMode: 'blind', tasks: [task({ id: 't1' })], discoveredTasks: [task({ id: 'd1' })] };
+    assert.deepEqual(visibleTasksFor(environment).map(t => t.id), ['d1']);
+  });
+
+  it('returns an empty array for null or missing lists', () => {
+    assert.deepEqual(visibleTasksFor(null), []);
+    assert.deepEqual(visibleTasksFor({ selectionMode: 'targeted' }), []);
+    assert.deepEqual(visibleTasksFor({ selectionMode: 'blind' }), []);
+  });
+});
+
+describe('resolveDefaultTaskSelection', () => {
+  it('defaults to the first attemptable task when selection is null', () => {
+    const list = [task({ id: 't1' }), task({ id: 't2' })];
+    assert.equal(resolveDefaultTaskSelection(list, null), 't1');
+  });
+
+  it('skips leading blocked tasks and selects the first attemptable one', () => {
+    const list = [task({ id: 't1', attemptable: false }), task({ id: 't2', attemptable: true })];
+    assert.equal(resolveDefaultTaskSelection(list, null), 't2');
+  });
+
+  it('returns null when no task is attemptable', () => {
+    const list = [task({ id: 't1', attemptable: false }), task({ id: 't2', attemptable: false })];
+    assert.equal(resolveDefaultTaskSelection(list, null), null);
+  });
+
+  it('returns null for an empty or non-array list', () => {
+    assert.equal(resolveDefaultTaskSelection([], 't1'), null);
+    assert.equal(resolveDefaultTaskSelection(null, 't1'), null);
+  });
+
+  it('preserves a still-present selection even when it is blocked (manual pick survives a refresh)', () => {
+    const list = [task({ id: 't1', attemptable: true }), task({ id: 't2', attemptable: false })];
+    assert.equal(resolveDefaultTaskSelection(list, 't2'), 't2');
+  });
+
+  it('falls through to the first attemptable task when the prior selection is gone', () => {
+    const list = [task({ id: 't1', attemptable: false }), task({ id: 't2', attemptable: true })];
+    assert.equal(resolveDefaultTaskSelection(list, 'gone'), 't2');
   });
 });

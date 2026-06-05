@@ -76,8 +76,8 @@ function listing(environments) {
   };
 }
 
-function makeServices(result) {
-  const calls = { list: 0, attempts: [] };
+function makeServices(result, dropBreakdown = null) {
+  const calls = { list: 0, attempts: [], dropBreakdown: [] };
   const services = {
     listGatheringForActor: () => {
       calls.list += 1;
@@ -86,6 +86,10 @@ function makeServices(result) {
     startGatheringAttempt: (opts) => {
       calls.attempts.push(opts);
       return Promise.resolve({ accepted: true });
+    },
+    getGatheringDropBreakdown: (opts) => {
+      calls.dropBreakdown.push(opts);
+      return Promise.resolve(dropBreakdown ?? { drops: [], awardMode: null, awardLimit: 1, hazardPolicy: null });
     }
   };
   return { services, calls };
@@ -142,9 +146,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/HazardChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -201,11 +209,128 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.getAttribute('data-attemptable'), 'true');
     assert.equal(row.getAttribute('data-blocked'), 'false');
     assert.ok(row.querySelector('[data-gathering-success-value]'), 'success-chance bar present for d100 task');
-    const attemptBtn = row.querySelector('[data-gathering-attempt]');
-    assert.ok(attemptBtn && !attemptBtn.disabled, 'attempt button enabled on an attemptable task');
+    // The center row is now read-only: no attempt button, and the description is
+    // shown in the always-visible underneath section.
+    assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
+    const desc = row.querySelector('[data-gathering-task-description]');
+    assert.ok(desc && desc.textContent.includes('Dig for ore.'), 'description renders underneath the row');
+    // The attempt action lives in the right-column inspector for the auto-selected task.
+    const inspectorAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
+    assert.ok(inspectorAttempt && !inspectorAttempt.disabled, 'right-column attempt enabled for the attemptable task');
+    assert.equal(inspectorAttempt.querySelector('.fa-ban'), null, 'no ban icon on an attemptable task');
+    assert.equal(inspectorAttempt.getAttribute('data-gathering-attempt-blocked'), 'false');
   });
 
-  it('shows a blocked task with a lock overlay, a header callout, and conditions detail on expand', async () => {
+  it('shows a fallback description (center row + inspector) when a task has none', async () => {
+    const { services } = makeServices(listing([environment({ tasks: [taskModel({ id: 'task-nodesc', description: '' })] })]));
+    await mountView(services);
+
+    const desc = target.querySelector('[data-task-id="task-nodesc"] [data-gathering-task-description]');
+    assert.ok(desc, 'the description line is always present');
+    assert.ok(desc.classList.contains('is-fallback'), 'center row marks the placeholder as a fallback');
+    assert.ok(desc.textContent.includes('NoTaskDescription'), 'center row shows the localized fallback');
+
+    const panelDesc = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-description');
+    assert.ok(panelDesc.classList.contains('is-fallback'), 'inspector marks the placeholder as a fallback');
+    assert.ok(panelDesc.textContent.includes('NoTaskDescription'), 'inspector shows the localized fallback');
+  });
+
+  it('renders the success-chance bar in-line with the right-column Attempt button', async () => {
+    const { services } = makeServices(listing([environment()]));
+    await mountView(services);
+
+    const action = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action');
+    assert.ok(action, 'the inspector action row renders');
+    assert.ok(action.querySelector('[data-gathering-success-value]'), 'success-chance bar sits in the action row');
+    assert.ok(action.querySelector('[data-gathering-attempt]'), 'attempt button sits in the same action row');
+  });
+
+  it('renders "What you might find" with per-drop mini bars, award/hazard hints, and expandable modifiers', async () => {
+    const dropBreakdown = {
+      successChance: 1,
+      awardMode: 'allDrops',
+      awardLimit: 1,
+      hazardPolicy: 'successWithHazard',
+      drops: [{
+        id: 'd-ore',
+        name: 'Raw Ore',
+        img: 'icons/ore.webp',
+        componentId: 'ore',
+        quantity: 2,
+        baseChance: 0.4,
+        finalChance: 0.53,
+        modifiers: {
+          weather: { conditionId: 'rain', value: 10 },
+          timeOfDay: { conditionId: 'night', value: -5 },
+          biome: { value: 0 },
+          character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }]
+        }
+      }]
+    };
+    const { services, calls } = makeServices(listing([environment()]), dropBreakdown);
+    await mountView(services);
+    await settle();
+
+    // The selected task triggered a lazy breakdown fetch.
+    assert.ok(calls.dropBreakdown.length >= 1, 'breakdown fetched for the selected task');
+
+    // The inspector success bar adopts the personalized aggregate from the
+    // breakdown (1.0) rather than the listing's base value (0.5).
+    const successBar = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action [data-gathering-success-value]');
+    assert.equal(successBar.getAttribute('data-gathering-success-value'), '100', 'success chance reflects the modifier-adjusted aggregate');
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.ok(section, '"What you might find" section renders');
+    const hints = section.querySelector('[data-gathering-drops-hints]');
+    assert.ok(hints.textContent.includes('AwardModeAll'), 'award-mode hint shown');
+    assert.ok(hints.textContent.includes('HazardImpactSuccess'), 'hazard-impact hint shown');
+
+    const drop = section.querySelector('[data-gathering-drop]');
+    assert.ok(drop, 'a drop row renders');
+    assert.equal(drop.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'), '53');
+    assert.equal(drop.querySelector('[data-gathering-drop-modifiers]'), null, 'modifiers hidden until expanded');
+
+    drop.querySelector('.gathering-task-drop-summary').click();
+    flushSync();
+    const modifiers = drop.querySelector('[data-gathering-drop-modifiers]');
+    assert.ok(modifiers, 'modifiers reveal on expand');
+    assert.ok(modifiers.textContent.includes('Dexterity'), 'character ability contribution listed');
+    assert.ok(modifiers.textContent.includes('ModifierWeather'), 'weather contribution listed');
+    assert.ok(modifiers.textContent.includes('+10%'), 'weather delta shown signed');
+  });
+
+  it('shows the hazard-chance bar (with tier) above the tasks when hazard chance > 0', async () => {
+    const { services } = makeServices(listing([environment({ risk: 'hazardous', hazardChance: 0.5 })]));
+    await mountView(services);
+
+    const section = target.querySelector('[data-gathering-hazard-section]');
+    assert.ok(section, 'hazard section renders above the task list');
+    // Highest danger level shown (localized risk key via the i18n stub).
+    assert.ok(section.textContent.includes('Risk.hazardous'), 'section shows the highest danger level');
+    // Hazard bar present, with the percent + reversed-scale tier (50% -> amber).
+    const bar = section.querySelector('[data-gathering-hazard-value]');
+    assert.ok(bar, 'hazard-chance bar renders when chance > 0');
+    assert.equal(bar.getAttribute('data-gathering-hazard-value'), '50');
+    assert.equal(bar.getAttribute('data-gathering-hazard-tier'), 'amber');
+    // Explanatory hint shown; the "safe" hint is not.
+    assert.ok(section.textContent.includes('HazardChanceHint'), 'explanatory hazard hint shown');
+    assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
+  });
+
+  it('shows the "safe environment" hint (no bar) when hazard chance is zero', async () => {
+    const { services } = makeServices(listing([environment({ hazardChance: 0 })]));
+    await mountView(services);
+
+    const section = target.querySelector('[data-gathering-hazard-section]');
+    assert.ok(section, 'hazard section still renders');
+    assert.ok(section.textContent.includes('Risk.safe'), 'danger level still shown for a safe environment');
+    assert.equal(section.querySelector('[data-gathering-hazard-value]'), null, 'no hazard bar when chance is zero');
+    const safe = section.querySelector('[data-gathering-safe-hint]');
+    assert.ok(safe, 'safe hint shown when chance is zero');
+    assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
+  });
+
+  it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
     const blockedTask = taskModel({
       id: 'task-blocked',
       attemptable: false,
@@ -229,19 +354,26 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callouts, 'header callout bar present');
     assert.ok(callouts.textContent.includes('Conditions'), 'a conditions callout is shown');
     assert.equal(row.querySelector('[data-gathering-success-value]'), null, 'no success bar when successChance is null');
-    assert.ok(row.querySelector('[data-gathering-attempt]').disabled, 'attempt button disabled on a blocked task');
+    assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
+    assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'no inline blocked detail in the center row');
 
-    // Detail is hidden until expanded; clicking the summary reveals it.
-    assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'detail hidden before expand');
+    // Nothing is attemptable, so no task is auto-selected; selecting the blocked
+    // task surfaces its conditions detail in the right-column inspector.
     row.querySelector('.gathering-task-summary').click();
     flushSync();
-    const blocked = row.querySelector('[data-gathering-blocked]');
-    assert.ok(blocked, 'blocked detail list present after expand');
+    const blocked = target.querySelector('[data-gathering-task-detail] [data-gathering-blocked]');
+    assert.ok(blocked, 'blocked detail appears in the right-column inspector');
     assert.ok(blocked.textContent.includes('night'), 'required time-of-day surfaced');
     assert.ok(blocked.textContent.includes('rain'), 'required weather surfaced');
+    const blockedAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
+    assert.ok(blockedAttempt.disabled, 'inspector attempt button disabled on a blocked task');
+    assert.equal(blockedAttempt.getAttribute('data-gathering-attempt-blocked'), 'true');
+    assert.ok(blockedAttempt.querySelector('.fa-ban'), 'blocked attempt shows the ban icon');
+    const attemptWrap = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-attempt-wrap');
+    assert.ok((attemptWrap.getAttribute('title') || '').includes('Conditions'), 'tooltip explains the block reason');
   });
 
-  it('expands a task with required tools and lists each tool with its state, without toggling on Attempt click', async () => {
+  it('lists a selected task\'s required tools in the right inspector, not inline in the center row', async () => {
     const tooledTask = taskModel({
       id: 'task-tools',
       attemptable: false,
@@ -257,16 +389,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     const row = target.querySelector('[data-task-id="task-tools"]');
     assert.ok(row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.MissingTools'), 'missing-tools callout shown');
+    assert.equal(row.querySelector('[data-gathering-tools]'), null, 'center row does not render the tools inline');
 
-    // Attempt is disabled; clicking it must NOT expand the card.
-    row.querySelector('[data-gathering-attempt]').click();
-    flushSync();
-    assert.equal(row.querySelector('[data-gathering-tools]'), null, 'attempt click did not expand the card');
-
+    // Select the task -> its tools list appears in the right-column inspector.
     row.querySelector('.gathering-task-summary').click();
     flushSync();
-    const toolRows = row.querySelectorAll('[data-gathering-tool]');
-    assert.equal(toolRows.length, 2, 'both required tools listed');
+    const toolRows = target.querySelectorAll('[data-gathering-task-detail] [data-gathering-tool]');
+    assert.equal(toolRows.length, 2, 'both required tools listed in the inspector');
     assert.equal(toolRows[0].getAttribute('data-tool-state'), 'present');
     assert.equal(toolRows[1].getAttribute('data-tool-state'), 'missing');
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
@@ -354,12 +483,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-discovered]'), null, 'no discovered section when reveal is never');
   });
 
-  it('wires a task Attempt click to startGatheringAttempt and re-fetches the listing', async () => {
+  it('wires the right-column Attempt to startGatheringAttempt and re-fetches the listing', async () => {
     const { services, calls } = makeServices(listing([environment()]));
     await mountView(services);
     assert.equal(calls.list, 1, 'listing fetched once on mount');
 
-    target.querySelector('[data-gathering-attempt]').click();
+    // task-1 is auto-selected; the Attempt button lives in the right-column inspector.
+    target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
     await settle();
 
     assert.equal(calls.attempts.length, 1, 'startGatheringAttempt called once');
@@ -383,13 +513,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     };
     await mountView(services);
 
-    const attemptBtn = target.querySelector('[data-gathering-attempt]');
+    const attemptBtn = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
     attemptBtn.click();
     await tick();
     flushSync();
     // While in flight the button is disabled and a second click is ignored.
-    assert.ok(target.querySelector('[data-gathering-attempt]').disabled, 'button disabled during the round-trip');
-    target.querySelector('[data-gathering-attempt]').click();
+    assert.ok(target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled, 'button disabled during the round-trip');
+    target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
     await tick();
     flushSync();
     assert.equal(calls.attempts.length, 1, 'second click is a no-op while busy');
@@ -398,6 +528,75 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await settle();
     assert.equal(calls.attempts.length, 1, 'still exactly one attempt after settle');
     assert.equal(calls.list, 2, 'listing re-fetched once after the attempt resolves');
+  });
+
+  it('auto-selects the first attemptable task and shows it in the right-column inspector', async () => {
+    const { services } = makeServices(listing([environment()]));
+    await mountView(services);
+
+    // Right column shows the selected-task inspector for task-1 (the only,
+    // attemptable, task), with its name and a "no requirements" note.
+    const panel = target.querySelector('[data-gathering-task-detail]');
+    assert.ok(panel, 'right-column task inspector renders for the auto-selected task');
+    assert.equal(panel.getAttribute('data-detail-task-id'), 'task-1');
+    assert.ok(panel.textContent.includes('Gather Iron'), 'inspector header shows the task name');
+    assert.ok(panel.querySelector('[data-gathering-no-requirements]'), 'a task with no tools/blocks shows the no-requirements note');
+
+    // The matching center row is the selected one.
+    const row = target.querySelector('[data-task-id="task-1"]');
+    assert.equal(row.getAttribute('data-selected'), 'true', 'the center row reflects the selection');
+  });
+
+  it('selecting a task updates the inspector and moves the center accordion (single expanded row)', async () => {
+    const tooled = taskModel({
+      id: 'task-2',
+      name: 'Chop Wood',
+      attemptable: true,
+      blockedReasons: [],
+      tools: [{ id: 'c-axe', name: 'Axe', img: 'icons/axe.webp', state: 'present', required: true }]
+    });
+    const { services } = makeServices(listing([environment({ tasks: [taskModel(), tooled] })]));
+    await mountView(services);
+
+    // Defaults to the first attemptable task (task-1); task-2 is not selected.
+    assert.equal(target.querySelector('[data-gathering-task-detail]').getAttribute('data-detail-task-id'), 'task-1');
+    assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'false');
+
+    // Select task-2 by clicking its summary.
+    target.querySelector('[data-task-id="task-2"] .gathering-task-summary').click();
+    flushSync();
+
+    // Right column now shows task-2, including its required tool.
+    const panel = target.querySelector('[data-gathering-task-detail]');
+    assert.equal(panel.getAttribute('data-detail-task-id'), 'task-2');
+    assert.ok(panel.querySelector('[data-gathering-tool]'), 'inspector lists the selected task tools');
+
+    // Selection moved: task-2 selected, task-1 deselected — and the center row
+    // never renders requirements inline (they live only in the right column).
+    assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'true');
+    assert.equal(target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'), 'false');
+    assert.equal(target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'), null, 'center row has no inline requirements');
+  });
+
+  it('shows the "select a gathering task" hint when tasks exist but none is attemptable', async () => {
+    const blocked = taskModel({ id: 'task-x', attemptable: false, successChance: null, blockedReasons: [{ code: 'CONDITIONS_BLOCKED', message: 'no', data: {} }] });
+    const { services } = makeServices(listing([environment({ tasks: [blocked] })]));
+    await mountView(services);
+
+    const column = target.querySelector('[data-gathering-task-detail-column]');
+    const state = column.querySelector('[data-gathering-task-detail-state]');
+    assert.ok(state, 'right column shows a hint state');
+    assert.equal(state.getAttribute('data-gathering-task-detail-state'), 'empty');
+    assert.ok(state.textContent.includes('SelectTaskHint'), 'shows the select-a-task hint');
+  });
+
+  it('shows the "no available tasks" hint when the environment has no visible tasks', async () => {
+    const { services } = makeServices(listing([environment({ tasks: [] })]));
+    await mountView(services);
+
+    const state = target.querySelector('[data-gathering-task-detail-column] [data-gathering-task-detail-state]');
+    assert.equal(state.getAttribute('data-gathering-task-detail-state'), 'none');
+    assert.ok(state.textContent.includes('NoAvailableTasks'), 'shows the no-available-tasks hint');
   });
 
   it('wires the blind Attempt to startGatheringAttempt with a null task id', async () => {

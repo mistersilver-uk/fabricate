@@ -28,7 +28,8 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
     'getGatheringRunManager()',
     'getGatheringGateAndCheckEvaluator()',
     'listGatheringForActor(options = {})',
-    'startGatheringAttempt(options = {})'
+    'startGatheringAttempt(options = {})',
+    'getGatheringDropBreakdown(options = {})'
   ]) {
     assert.ok(mainSource.includes(expected), `src/main.js should expose ${expected}`);
   }
@@ -58,6 +59,11 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
     mainSource,
     /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'startAttempt', options, \(\) => game\.user\);/,
     'startGatheringAttempt should delegate through current-user viewer enforcement'
+  );
+  assert.match(
+    mainSource,
+    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'getTaskDropBreakdown', withRememberedActor, \(\) => game\.user\);/,
+    'getGatheringDropBreakdown should delegate through current-user viewer enforcement (with the remembered-actor default)'
   );
 });
 

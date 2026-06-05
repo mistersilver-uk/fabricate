@@ -1,18 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringTaskRow renders one attemptable gathering task in the center column —
-  used for both a targeted environment's task list and a blind environment's
-  "Discovered Tasks" list.
+  GatheringTaskRow renders one gathering task in the center column — used for both
+  a targeted environment's task list and a blind environment's "Discovered Tasks"
+  list. It is a compact, selectable row: clicking it selects the task, which
+  drives the right-column inspector (the canonical place for the full task detail
+  and the Attempt action) and highlights the row.
 
   Layout: a top HEADER bar (only when the task is blocked) surfaces each blocking
-  issue as a callout chip ("Missing tool(s)", "Visit linked scene", wrong
-  conditions, …), mirroring the environment-card header idiom. Below it the
-  summary row shows the task image (with a lock overlay + desaturation when
-  blocked), name + description, a SuccessChanceBar, and the Attempt button. When
-  the task has required tools, a linked scene that gates it, or other blocking
-  detail, the summary is clickable (chevron) and expands a "Requirements" section
-  listing every required tool with its present/damaged/missing state, the linked
-  scene panel, and any remaining blocking reasons as text.
+  issue as a callout chip ("Missing tool(s)", wrong conditions, …). Below it the
+  main row shows the task image (with a lock overlay + desaturation when blocked),
+  the name, and a SuccessChanceBar. A short, always-visible description sits
+  underneath. The row has no Attempt button and no expand toggle — those live in
+  the right-column inspector.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -20,20 +19,24 @@
 
   let {
     task = null,
-    environmentId = '',
-    onAttempt = null,
-    busy = false
+    selected = false,
+    onSelect = null
   } = $props();
 
   const id = $derived(String(task?.id ?? ''));
   const name = $derived(String(task?.name ?? task?.label ?? ''));
   const description = $derived(String(task?.description ?? ''));
+  // Always show a description line; fall back to a sensible placeholder when the
+  // task carries none, so the underneath section stays present and aligned.
+  const hasDescription = $derived(description !== '');
+  const descriptionText = $derived(
+    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoTaskDescription')
+  );
   const img = $derived(String(task?.img ?? ''));
   const attemptable = $derived(task?.attemptable === true);
   const blocked = $derived(!attemptable);
   const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
   const successChance = $derived(task?.successChance ?? null);
-  const tools = $derived(Array.isArray(task?.tools) ? task.tools : []);
 
   // Each blocking issue becomes a header callout chip. The linked-scene gate is
   // an environment-level restriction, surfaced once above the task list by
@@ -61,78 +64,33 @@
     return out;
   });
 
-  // Remaining blocking reasons (not tools, which have their own panel, nor the
-  // environment-level scene gate) rendered as text lines in the expanded section.
-  function blockedLines(reason) {
-    const data = reason?.data ?? null;
-    if (reason?.code === 'CONDITIONS_BLOCKED' && data) {
-      const lines = [];
-      const timeOfDay = Array.isArray(data.requiredTimeOfDay) ? data.requiredTimeOfDay : [];
-      const weather = Array.isArray(data.requiredWeather) ? data.requiredWeather : [];
-      if (timeOfDay.length > 0) lines.push(localize('FABRICATE.App.Gathering.Detail.RequiresTimeOfDay', { values: timeOfDay.join(', ') }));
-      if (weather.length > 0) lines.push(localize('FABRICATE.App.Gathering.Detail.RequiresWeather', { values: weather.join(', ') }));
-      if (lines.length > 0) return lines;
-    }
-    return [reason?.message || localize('FABRICATE.App.Gathering.Detail.Blocked')];
-  }
-
-  const detailLines = $derived(
-    blockedReasons
-      .filter(reason => reason?.code !== 'TOOL_BLOCKED' && reason?.code !== 'SCENE_TOKEN_BLOCKED')
-      .flatMap(blockedLines)
-  );
-
-  const expandable = $derived(tools.length > 0 || detailLines.length > 0);
-
-  let expanded = $state(false);
-  function toggle() {
-    if (expandable) expanded = !expanded;
+  function select() {
+    onSelect?.(id);
   }
   function onSummaryKey(event) {
-    if (!expandable) return;
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
       event.preventDefault();
-      toggle();
+      select();
     }
   }
-
-  function handleAttempt(event) {
-    event?.stopPropagation?.();
-    if (!attemptable || busy) return;
-    onAttempt?.({ environmentId, taskId: id });
-  }
-
-  function toolStateLabel(state) {
-    return localize(`FABRICATE.App.Gathering.Detail.ToolState.${state}`);
-  }
-  function toolHint(state) {
-    return localize(`FABRICATE.App.Gathering.Detail.ToolHint.${state}`);
-  }
-
-  const requirementsHeading = $derived(
-    localize(blocked
-      ? 'FABRICATE.App.Gathering.Detail.RequirementsHeading'
-      : 'FABRICATE.App.Gathering.Detail.RequirementsHeadingReady')
-  );
 </script>
 
 <div
   class="gathering-task-row"
   class:is-blocked={blocked}
-  class:is-expanded={expanded}
+  class:is-selected={selected}
   role="listitem"
   data-task-id={id}
   data-attemptable={attemptable ? 'true' : 'false'}
   data-blocked={blocked ? 'true' : 'false'}
+  data-selected={selected ? 'true' : 'false'}
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="gathering-task-summary"
-    class:is-toggle={expandable}
-    role={expandable ? 'button' : undefined}
-    tabindex={expandable ? 0 : undefined}
-    aria-expanded={expandable ? expanded : undefined}
-    onclick={toggle}
+    class="gathering-task-summary is-toggle"
+    role="button"
+    tabindex="0"
+    onclick={select}
     onkeydown={onSummaryKey}
   >
     {#if callouts.length > 0}
@@ -158,9 +116,6 @@
 
       <span class="gathering-task-copy">
         <span class="gathering-task-name" title={name}>{name}</span>
-        {#if description !== ''}
-          <span class="gathering-task-description">{description}</span>
-        {/if}
       </span>
 
       {#if successChance != null}
@@ -168,60 +123,14 @@
           <SuccessChanceBar value={successChance} />
         </span>
       {/if}
-
-      <button
-        type="button"
-        class="gathering-task-attempt"
-        data-gathering-attempt
-        disabled={!attemptable || busy}
-        onclick={handleAttempt}
-      >
-        {localize('FABRICATE.App.Gathering.Detail.Attempt')}
-      </button>
-
-      {#if expandable}
-        <span class="gathering-task-chevron" aria-hidden="true">
-          <i class={`fas ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-        </span>
-      {/if}
     </div>
+
+    <p
+      class="gathering-task-description"
+      class:is-fallback={!hasDescription}
+      data-gathering-task-description
+    >{descriptionText}</p>
   </div>
-
-  {#if expandable && expanded}
-    <div class="gathering-task-details" data-gathering-details>
-      <p class="gathering-task-details-heading">{requirementsHeading}</p>
-      <div class="gathering-task-details-grid">
-        {#if tools.length > 0}
-          <section class="gathering-task-tools" data-gathering-tools>
-            <h4 class="gathering-task-subheading">
-              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-              {localize('FABRICATE.App.Gathering.Detail.RequiredToolsHeading')}
-            </h4>
-            <ul class="gathering-task-tool-list">
-              {#each tools as tool, index (tool.id ?? index)}
-                <li class={`gathering-task-tool is-${tool.state}`} data-gathering-tool data-tool-state={tool.state}>
-                  <img class="gathering-task-tool-thumb" src={tool.img || 'icons/svg/item-bag.svg'} alt="" />
-                  <span class="gathering-task-tool-copy">
-                    <span class="gathering-task-tool-name" title={tool.name}>{tool.name}</span>
-                    <span class="gathering-task-tool-state">{toolStateLabel(tool.state)}</span>
-                    <span class="gathering-task-tool-hint">{toolHint(tool.state)}</span>
-                  </span>
-                </li>
-              {/each}
-            </ul>
-          </section>
-        {/if}
-      </div>
-
-      {#if detailLines.length > 0}
-        <ul class="gathering-task-blocked" data-gathering-blocked>
-          {#each detailLines as line, index (index)}
-            <li><i class="fas fa-triangle-exclamation" aria-hidden="true"></i>{line}</li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -235,6 +144,12 @@
     background: var(--fab-surface-soft);
     color: var(--fab-text);
     overflow: hidden;
+  }
+
+  /* Selection highlight mirrors the environment card's selected state. */
+  .gathering-task-row.is-selected {
+    border-color: var(--fab-accent);
+    background: var(--fab-success-soft);
   }
 
   .gathering-task-summary {
@@ -356,7 +271,15 @@
     font-weight: 600;
   }
 
+  .gathering-task-chance {
+    flex: 0 0 auto;
+  }
+
+  /* Short, always-visible description beneath the main row — occupies the slot
+     the requirements drop-down used, but compact and never toggled. */
   .gathering-task-description {
+    margin: 0;
+    padding: 0 var(--fab-space-2) var(--fab-space-2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -366,170 +289,9 @@
     color: var(--fab-text-muted);
   }
 
-  .gathering-task-chance {
-    flex: 0 0 auto;
-  }
-
-  .gathering-task-attempt {
-    flex: 0 0 auto;
-    appearance: none;
-    -webkit-appearance: none;
-    height: 34px;
-    padding: 0 14px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 6px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .gathering-task-attempt:hover:not(:disabled) {
-    background: var(--fab-accent-hover);
-  }
-
-  .gathering-task-attempt:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .gathering-task-attempt:disabled {
-    opacity: 0.5;
-    cursor: default;
-    background: var(--fab-surface-raised);
-    border-color: var(--fab-border);
-    color: var(--fab-text-muted);
-  }
-
-  .gathering-task-chevron {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    color: var(--fab-text-muted);
-  }
-
-  /* Expanded requirements section. */
-  .gathering-task-details {
-    padding: var(--fab-space-3);
-    border-top: 1px solid var(--fab-border);
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    background: var(--fab-surface);
-  }
-
-  .gathering-task-details-heading {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .gathering-task-details-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--fab-space-3);
-  }
-
-  .gathering-task-subheading {
-    margin: 0 0 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text);
-  }
-
-  .gathering-task-tool-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
-
-  .gathering-task-tool {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-  }
-
-  .gathering-task-tool-thumb {
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
-  }
-
-  .gathering-task-tool-copy {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .gathering-task-tool-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .gathering-task-tool-state {
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .gathering-task-tool.is-present .gathering-task-tool-state {
-    color: var(--fab-success-text);
-  }
-
-  .gathering-task-tool.is-damaged .gathering-task-tool-state {
-    color: var(--fab-warning-text);
-  }
-
-  .gathering-task-tool.is-missing .gathering-task-tool-state {
-    color: var(--fab-danger-text);
-  }
-
-  .gathering-task-tool-hint {
-    font-size: 11px;
-    color: var(--fab-text-muted);
-  }
-
-  .gathering-task-blocked {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 11px;
-    color: var(--fab-warning-text);
-  }
-
-  .gathering-task-blocked li {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-  }
-
-  .gathering-task-blocked i {
-    font-size: 10px;
+  /* Placeholder shown when a task has no authored description. */
+  .gathering-task-description.is-fallback {
+    font-style: italic;
+    opacity: 0.85;
   }
 </style>

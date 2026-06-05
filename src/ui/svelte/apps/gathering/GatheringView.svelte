@@ -13,7 +13,8 @@
   import { localize, subscribeSceneChange } from '../../util/foundryBridge.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
-  import { resolveDefaultSelection } from './selectionDefault.js';
+  import GatheringTaskDetail from './GatheringTaskDetail.svelte';
+  import { resolveDefaultSelection, resolveDefaultTaskSelection, visibleTasksFor } from './selectionDefault.js';
 
   let { services = null } = $props();
 
@@ -26,6 +27,13 @@
   let error = $state(false);
   let listing = $state(null);
   let selectedId = $state(null);
+  // The selected task within the selected environment; drives both the center
+  // accordion (the selected row is the expanded one) and the right-column task
+  // inspector. Resolved to the first attemptable task by default.
+  let selectedTaskId = $state(null);
+  // Shared "an attempt is in flight" guard for both the blind attempt button
+  // (center) and the right-column task inspector's Attempt button.
+  let busy = $state(false);
   // First-load backstop guard: the view adopts the listing's resolved actor at
   // most once, and only when the store seed is still empty AND the resolved id
   // is a player character present in the bar's selectable list.
@@ -43,6 +51,12 @@
   // player picks a selectable card (or when the prior selection drops out).
   const selectedEnvironment = $derived(
     environments.find(environment => environment?.id === selectedId) ?? null
+  );
+  // The tasks the player can pick for the selected environment (blind →
+  // discovered, targeted → full list), and the currently selected task object.
+  const visibleTasks = $derived(visibleTasksFor(selectedEnvironment));
+  const selectedTask = $derived(
+    visibleTasks.find(task => String(task?.id) === String(selectedTaskId)) ?? null
   );
 
   // `quiet` refreshes (e.g. on scene change) keep the populated grid on screen
@@ -65,6 +79,14 @@
         Array.isArray(listing?.environments) ? listing.environments : [],
         selectedId
       );
+
+      // Resolve the task selection against the (possibly changed) selected
+      // environment's visible tasks: preserve a still-present pick, else default
+      // to the first attemptable task. Mirrors the env selection's explicit
+      // resolution and avoids an $effect write-loop.
+      const resolvedEnvironment = (Array.isArray(listing?.environments) ? listing.environments : [])
+        .find(environment => environment?.id === selectedId) ?? null;
+      selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(resolvedEnvironment), selectedTaskId);
 
       // First-load backstop: when the shared selection is still empty, adopt the
       // listing's resolved actor AT MOST ONCE and ONLY when it is a player
@@ -92,7 +114,30 @@
   }
 
   function onSelect(id) {
+    if (id === selectedId) return;
     selectedId = id;
+    // A new environment starts with its own default task selection (first
+    // attemptable), rather than carrying over the previous env's task.
+    const nextEnvironment = environments.find(environment => environment?.id === id) ?? null;
+    selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(nextEnvironment), null);
+  }
+
+  function onSelectTask(id) {
+    selectedTaskId = id;
+  }
+
+  // The shared attempt handler, used by the right-column inspector (targeted +
+  // discovered tasks) and the center blind-attempt button. Lifted here because
+  // those buttons live in sibling columns; refreshes the listing on success.
+  async function attempt({ environmentId, taskId = null }) {
+    if (busy || !environmentId) return;
+    busy = true;
+    try {
+      await services?.startGatheringAttempt?.({ environmentId, taskId });
+      await load();
+    } finally {
+      busy = false;
+    }
   }
 
   // Re-fetch the listing on mount and whenever the shared selected actor changes.
@@ -135,9 +180,26 @@
       <GatheringEnvironmentList {environments} {selectedId} {onSelect} />
     </div>
     <section class="gathering-view-column gathering-view-column-center" data-gathering-detail>
-      <GatheringDetail environment={selectedEnvironment} {services} onAttempted={load} />
+      <GatheringDetail
+        environment={selectedEnvironment}
+        {services}
+        onAttempt={attempt}
+        {busy}
+        {selectedTaskId}
+        {onSelectTask}
+      />
     </section>
-    <section class="gathering-view-column gathering-view-column-right" aria-hidden="true"></section>
+    <section class="gathering-view-column gathering-view-column-right" data-gathering-task-detail-column>
+      <GatheringTaskDetail
+        task={selectedTask}
+        hasTasks={visibleTasks.length > 0}
+        environmentId={selectedId}
+        onAttempt={attempt}
+        {busy}
+        {services}
+        rememberedActorId={store?.selectedActorId ?? null}
+      />
+    </section>
   </div>
 {/if}
 

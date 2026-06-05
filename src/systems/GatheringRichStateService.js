@@ -407,6 +407,124 @@ export class GatheringRichStateService {
   }
 
   /**
+   * Build a no-dice preview of each drop row's chance for the player "What you
+   * might find" inspector. Mirrors the per-row math in `resolveD100Attempt`
+   * (condition + character modifiers) WITHOUT rolling, returning the base and
+   * modifier-adjusted chance plus a recoverable breakdown (weather, time-of-day,
+   * biome, and per-ability character contributions) so the UI can explain how
+   * each contributor moves the chance.
+   *
+   * Async because character-ability modifiers resolve game-system expressions
+   * (and optionally macros) against the actor. Unresolvable character modifiers
+   * are omitted from the preview (no diagnostics surfaced to players).
+   *
+   * @param {object} options
+   * @param {object} options.environment Composed environment (conditions/biomes/rules).
+   * @param {object} options.task Composed/normalized task with `dropRows`.
+   * @param {object} [options.actor] Selected actor for character modifiers.
+   * @param {object} [options.viewer] Active viewer payload.
+   * @param {object} [options.system] Crafting system.
+   * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, hazardPolicy: string}>}
+   */
+  async previewDropBreakdown({ environment, task, actor = null, viewer = null, system = null } = {}) {
+    const rules = resolveRulesForAttempt(task, environment);
+    const empty = {
+      drops: [],
+      successChance: null,
+      awardMode: rules.rewardSelectionMode,
+      awardLimit: rules.rewardLimit,
+      hazardPolicy: rules.hazardPolicy
+    };
+    if (task?.resolutionMode !== 'd100') return empty;
+    const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
+      .filter(row => row?.enabled !== false)
+      .map(row => normalizeItemDrop(row));
+    if (rows.length === 0) return empty;
+
+    const conditions = environment?.conditions || {};
+    const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
+    const biomeAggregation = rules.biomeModifierAggregation;
+    const library = environment?.__libraryCharacterModifiers instanceof Map
+      ? environment.__libraryCharacterModifiers
+      : new Map();
+
+    const drops = [];
+    for (const row of rows) {
+      const character = [];
+      for (const reference of normalizeList(row.characterModifiers)) {
+        const entry = library.get(String(reference.modifierId)) || null;
+        const resolved = await this._resolveCharacterModifierContribution({
+          reference, libraryEntry: entry, actor, environment, task, row, hazard: null, viewer, system
+        });
+        if (resolved.ok) {
+          character.push({
+            label: resolved.evidence.label,
+            icon: resolved.evidence.icon,
+            contribution: resolved.evidence.contribution
+          });
+        }
+      }
+      const characterTotal = character.reduce((sum, entry) => sum + Number(entry.contribution || 0), 0);
+      const weather = conditionModifierForKind(row.conditionModifiers, 'weather', conditions);
+      const timeOfDay = conditionModifierForKind(row.conditionModifiers, 'timeOfDay', conditions);
+      const biome = matchingBiomeModifier(row.conditionModifiers?.biome, biomes, biomeAggregation);
+      const base = clampDropRate(row.dropRate);
+      const finalRate = Math.min(100, Math.max(0, base + weather + timeOfDay + biome + characterTotal));
+      drops.push({
+        id: row.id,
+        name: row.name,
+        componentId: row.componentId,
+        itemUuid: row.itemUuid,
+        quantity: row.quantity,
+        baseChance: base / 100,
+        finalChance: finalRate / 100,
+        modifiers: {
+          weather: { conditionId: normalizeConditionId(conditions?.weather), value: weather },
+          timeOfDay: { conditionId: normalizeConditionId(conditions?.timeOfDay), value: timeOfDay },
+          biome: { value: biome },
+          character
+        }
+      });
+    }
+    // Aggregate "at least one find" chance from the modifier-adjusted per-drop
+    // chances (NOT the base rates), so the success bar matches the drop rows.
+    const missAll = drops.reduce((product, drop) => product * (1 - Math.max(0, Math.min(1, Number(drop.finalChance) || 0))), 1);
+    return { ...empty, drops, successChance: 1 - missAll };
+  }
+
+  /**
+   * The condition-adjusted "at least one find" success chance for a task — the
+   * eager (sync, no-actor) counterpart to previewDropBreakdown's aggregate. It
+   * applies the current weather/time-of-day/biome modifiers to each drop's base
+   * rate so the listing's success bar reflects conditions (character-ability
+   * modifiers are layered on later by the lazy inspector breakdown). Returns
+   * `null` for non-d100 tasks or when there are no enabled drop rows.
+   *
+   * @param {object} task Composed/normalized task.
+   * @param {object} environment Composed environment (conditions/biomes/rules).
+   * @returns {number|null} A 0–1 fraction, or `null` when not applicable.
+   */
+  taskSuccessChance(task, environment) {
+    if (task?.resolutionMode !== 'd100') return null;
+    const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
+      .filter(row => row?.enabled !== false)
+      .map(row => normalizeItemDrop(row));
+    if (rows.length === 0) return null;
+    const conditions = environment?.conditions || {};
+    const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
+    const biomeAggregation = resolveRulesForAttempt(task, environment).biomeModifierAggregation;
+    const missAll = rows.reduce((product, row) => {
+      const base = clampDropRate(row.dropRate);
+      const weather = conditionModifierForKind(row.conditionModifiers, 'weather', conditions);
+      const timeOfDay = conditionModifierForKind(row.conditionModifiers, 'timeOfDay', conditions);
+      const biome = matchingBiomeModifier(row.conditionModifiers?.biome, biomes, biomeAggregation);
+      const finalRate = Math.min(100, Math.max(0, base + weather + timeOfDay + biome));
+      return product * (1 - finalRate / 100);
+    }, 1);
+    return 1 - missAll;
+  }
+
+  /**
    * Resolve a single character modifier reference against the actor.
    *
    * Applies override-first inheritance (provider, expression, macroUuid),
@@ -1423,6 +1541,18 @@ function matchingConditionModifier(modifiers = {}, conditions = {}, biomes = [],
       .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
   }, 0);
   return conditionTotal + matchingBiomeModifier(modifiers?.biome, biomes, biomeAggregation);
+}
+
+// The signed condition-modifier total for a single kind ('weather'|'timeOfDay')
+// under the current conditions — the per-kind split of matchingConditionModifier,
+// used by previewDropBreakdown so the player UI can show weather and time-of-day
+// contributions separately.
+function conditionModifierForKind(modifiers = {}, kind, conditions = {}) {
+  const current = normalizeConditionId(conditions?.[kind]);
+  if (!current) return 0;
+  return normalizeDropConditionModifierList(modifiers?.[kind])
+    .filter(modifier => modifier.conditionId === current)
+    .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
 }
 
 function matchingBiomeModifier(biomeModifiers = [], biomes = [], aggregation = 'strongestOfEach') {

@@ -908,6 +908,28 @@ class Fabricate {
     return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', options, () => game.user);
   }
 
+  /**
+   * Lazily compute the per-drop "What you might find" breakdown for one task the
+   * player has opened in the gathering inspector. Defaults the remembered actor
+   * to the persisted selection (explicit `rememberedActorId` overrides) and
+   * enforces the current Foundry user as the viewer.
+   *
+   * @param {object} options { environmentId, taskId, rememberedActorId? }
+   * @returns {*} Drop-breakdown result ({ resolutionMode, awardMode, awardLimit, hazardPolicy, drops }).
+   */
+  getGatheringDropBreakdown(options = {}) {
+    if (!this.ready) {
+      throw new Error('Fabricate not initialized');
+    }
+
+    const withRememberedActor = {
+      rememberedActorId: this.getSelectedGatheringActorId() || null,
+      ...options
+    };
+
+    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'getTaskDropBreakdown', withRememberedActor, () => game.user);
+  }
+
   inspectGatheringEnvironmentState(options = {}) {
     this._requireReady();
     this._requireGM();
