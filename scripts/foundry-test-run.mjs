@@ -987,7 +987,9 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
     //    render as a greyed locked teaser; the smoke run is GM, so it renders as
     //    a full listing (locked teasers are player-only and unit-test-covered).
     // Idempotent: the function runs twice in Phase D0, so skip ids already
-    // present in the store. Imagery uses Foundry-core raster (.webp) icons only.
+    // present in the store. Imagery MUST use Foundry-core icon paths that exist
+    // in the smoke Foundry version — a missing path 404s on every render and
+    // trips the console-error gate (these reuse icons proven to load in-run).
     const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
     if (environmentStore) {
       const existingIds = new Set((environmentStore.list?.() || []).map(env => String(env?.id || '')));
@@ -997,7 +999,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           craftingSystemId: sysId,
           name: 'Smoke Blind Grove',
           description: 'Blind gathering site for the player Gathering tab screenshot (mask chip + discovered suffix).',
-          img: 'icons/magic/nature/tree-elm-gold-green.webp',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
           enabled: true,
           selectionMode: 'blind',
           region: 'northreach',
@@ -1011,7 +1013,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           craftingSystemId: sysId,
           name: 'Smoke Sealed Hollow',
           description: 'Disabled environment for the player Gathering tab screenshot (locked teaser for non-GM viewers).',
-          img: 'icons/environment/wilderness/cave-entrance-dwarven.webp',
+          img: 'icons/svg/door-closed.svg',
           enabled: false,
           selectionMode: 'targeted',
           region: 'northreach',
