@@ -7100,16 +7100,15 @@
 
 .fabricate-manager .manager-gathering-task-edit-view {
   display: grid;
-  grid-template-rows: auto auto 340px 340px 410px auto;
+  /* Rows size to each card (cards that need a fixed height — required-tools,
+     component-browser, drops — set their own `height`). This keeps the stack
+     order free: sections can be reordered without breaking heights. */
+  grid-auto-rows: auto;
   gap: 12px;
   min-height: 0;
   min-width: 0;
   padding: 14px;
   overflow: auto;
-}
-
-.fabricate-manager .manager-gathering-task-edit-view.has-reward-rule-notice {
-  grid-template-rows: auto auto 340px 340px auto 410px auto;
 }
 
 .fabricate-manager .manager-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
