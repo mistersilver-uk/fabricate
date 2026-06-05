@@ -38,7 +38,7 @@ describe('gathering economy — config normalization', () => {
     const econ = service.systemEconomy(SYSTEM);
     assert.equal(econ.mode, 'none'); // 'hybrid' is no longer valid
     assert.equal(econ.stamina.regen.unit, 'hours'); // unknown unit falls back
-    assert.equal(econ.stamina.regen.amount, 2);
+    assert.equal(econ.stamina.regen.amount, '2'); // amount is a number-or-formula string
   });
 
   it('persists a system economy via setSystemEconomy', async () => {
@@ -104,25 +104,25 @@ describe('gathering economy — stamina regeneration over world time', () => {
     assert.equal(await nodesMode.service.regenerateActorStamina({ actor: a2, systemId: SYSTEM, worldTime: 9 * HOUR }), null);
   });
 
-  it('resolves a regen formula and applies character modifiers', async () => {
+  it('evaluates the regen amount as an in-game expression (number or formula)', async () => {
     const config = {
       systems: {
         [SYSTEM]: {
-          characterModifiers: [{ id: 'con', label: 'Con', provider: 'dnd5e', expression: '@abilities.con.mod' }],
           economy: {
             mode: 'stamina',
-            stamina: { regen: { policy: 'elapsedTime', unit: 'hours', formula: '2', characterModifiers: [{ modifierId: 'con' }] } }
+            stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: '1 + @abilities.con.mod' } }
           }
         }
       }
     };
-    const { service } = makeRichState({ config, evaluateExpression: (payload) => (payload.kind === 'staminaRegen' ? 2 : 3) });
+    const calls = [];
+    const { service } = makeRichState({ config, evaluateExpression: (payload) => { calls.push(payload.expression); return 5; } });
     const actor = makeFakeActor();
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 0, max: 100 });
     await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 0 });
     const after = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: HOUR });
-    // formula 2 + con modifier 3 = 5 per interval.
-    assert.equal(after.current, 5);
+    assert.equal(after.current, 5); // the single expression resolves to 5 per interval
+    assert.equal(calls.at(-1), '1 + @abilities.con.mod'); // the raw expression is evaluated in-game
   });
 });
 

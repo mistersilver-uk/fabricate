@@ -33,7 +33,7 @@
   let actorPageSize = $state(6);
 
   function defaultEconomy() {
-    return { mode: 'none', stamina: { max: null, regen: { policy: 'none', unit: 'hours', amount: null, formula: '', characterModifiers: [] } } };
+    return { mode: 'none', stamina: { max: null, regen: { policy: 'none', unit: 'hours', amount: '' } } };
   }
 
   // Reload economy + actor stamina whenever the selected system changes.
@@ -73,9 +73,7 @@
         regen: {
           policy: ['none', 'elapsedTime'].includes(regen.policy) ? regen.policy : 'none',
           unit: UNITS.includes(regen.unit) ? regen.unit : 'hours',
-          amount: regen.amount ?? null,
-          formula: String(regen.formula ?? ''),
-          characterModifiers: Array.isArray(regen.characterModifiers) ? regen.characterModifiers : []
+          amount: regen.amount == null ? '' : String(regen.amount)
         }
       }
     };
@@ -181,36 +179,25 @@
           </label>
 
           {#if economy.stamina.regen.policy === 'elapsedTime'}
-            <div class="manager-economy-regen-grid">
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
-                <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
-                  {#each UNITS as unit (unit)}
-                    <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Fixed amount')}</span>
-                <input
-                  type="number" min="0" step="1"
-                  value={economy.stamina.regen.amount ?? ''}
-                  oninput={(e) => updateRegen({ amount: e.currentTarget.value === '' ? null : Number(e.currentTarget.value) })}
-                  data-economy-regen-amount
-                />
-              </label>
-            </div>
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Economy.RegenFormula', 'Formula (overrides fixed amount)')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
+              <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
+                {#each UNITS as unit (unit)}
+                  <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="manager-field">
+              <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span>
               <input
                 type="text"
-                placeholder="@abilities.con.mod"
-                value={economy.stamina.regen.formula}
-                oninput={(e) => updateRegen({ formula: e.currentTarget.value })}
-                data-economy-regen-formula
+                placeholder={text('FABRICATE.Admin.Manager.Economy.RegenAmountPlaceholder', '1 or 1 + @abilities.con.mod')}
+                value={economy.stamina.regen.amount}
+                oninput={(e) => updateRegen({ amount: e.currentTarget.value })}
+                data-economy-regen-amount
               />
             </label>
-            <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenModifiersNote', 'Character-modifier adjustments to regeneration can be configured via the API.')}</p>
+            <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenAmountHint', 'A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod).')}</p>
           {/if}
         </div>
 

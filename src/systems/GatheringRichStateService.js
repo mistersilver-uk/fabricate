@@ -1373,30 +1373,24 @@ export class GatheringRichStateService {
    * @returns {Promise<number>} Non-negative integer amount per interval.
    */
   async _regenAmountPerInterval({ actor, systemId, system = null, environment = null, regen } = {}) {
-    let base = 0;
-    if (regen?.formula && typeof this.evaluateExpression === 'function') {
-      const value = await this.evaluateExpression({
-        expression: regen.formula,
+    const expression = regen?.amount;
+    if (expression === null || expression === undefined || expression === '') return 0;
+    let value;
+    if (typeof this.evaluateExpression === 'function') {
+      value = await this.evaluateExpression({
+        expression: String(expression),
         provider: null,
         actor,
         kind: 'staminaRegen',
         system,
         environment
       });
-      base = Number.isFinite(Number(value)) ? Number(value) : 0;
     } else {
-      base = Number(regen?.amount || 0);
+      // No Roll available (e.g. headless): a plain number still resolves.
+      value = Number(expression);
     }
-    let total = base;
-    const library = this._modifierLibrary({ environment, systemId });
-    for (const reference of normalizeList(regen?.characterModifiers)) {
-      const entry = library.get(String(reference.modifierId)) || null;
-      const resolved = await this._resolveCharacterModifierContribution({
-        reference, libraryEntry: entry, actor, environment, task: null, row: null, hazard: null, viewer: null, system
-      });
-      if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
-    }
-    return Math.max(0, Math.round(total));
+    const numeric = Number(value);
+    return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
   }
 
   _blockedReason(code, data = null) {
@@ -1469,9 +1463,9 @@ function normalizeGatheringEconomy(raw = {}) {
       regen: {
         policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : 'none',
         unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
-        amount: numberOrNull(regen.amount),
-        formula: stringOrFallback(regen.formula, ''),
-        characterModifiers: normalizeCharacterModifierReferenceList(regen.characterModifiers),
+        // A single expression: a plain number ("1") or a formula with character
+        // references ("1 + @abilities.con.mod"), evaluated per actor in-game.
+        amount: stringOrFallback(regen.amount, ''),
         lastRoll: regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null
       }
     }

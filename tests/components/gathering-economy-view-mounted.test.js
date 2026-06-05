@@ -90,13 +90,22 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('persists a mode change and reveals regen + actor controls in stamina mode', async () => {
     const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, provider: 'fabricate' }];
-    const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: 2, formula: '' } } }, actors);
+    const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: '2' } } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
     // Stamina mode reveals the regen card and the actor list.
     assert.ok(target.querySelector('[data-economy-regen-card]'));
-    assert.ok(target.querySelector('[data-economy-regen-amount]'));
+    const amountInput = target.querySelector('[data-economy-regen-amount]');
+    assert.ok(amountInput);
+    assert.equal(amountInput.getAttribute('type'), 'text'); // single number-or-formula expression
+    assert.equal(target.querySelector('[data-economy-regen-formula]'), null); // separate formula field removed
     assert.equal(target.querySelectorAll('[data-economy-actor-id]').length, 1);
+
+    // The amount field accepts a formula expression and persists it verbatim.
+    amountInput.value = '1 + @abilities.con.mod';
+    amountInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.regen.amount, '1 + @abilities.con.mod');
 
     // The global max field is present and persists.
     const maxInput = target.querySelector('[data-economy-stamina-max]');

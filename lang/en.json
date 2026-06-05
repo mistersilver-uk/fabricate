@@ -235,9 +235,9 @@
           "RegenPolicyNone": "Manual only",
           "RegenPolicyElapsed": "Over world time",
           "RegenPer": "Per",
-          "RegenAmount": "Fixed amount",
-          "RegenFormula": "Formula (overrides fixed amount)",
-          "RegenModifiersNote": "Character-modifier adjustments to regeneration can be configured via the API.",
+          "RegenAmount": "Amount per interval",
+          "RegenAmountPlaceholder": "1 or 1 + @abilities.con.mod",
+          "RegenAmountHint": "A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod).",
           "Unit": {
             "minutes": "Minute",
             "hours": "Hour",
