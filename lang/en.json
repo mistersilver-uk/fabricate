@@ -231,7 +231,7 @@
           "RegenHint": "How much stamina actors recover as world time passes.",
           "MaxStamina": "Maximum stamina",
           "MaxStaminaPlaceholder": "40 or 4 * @abilities.con.mod",
-          "MaxStaminaHint": "A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full.",
+          "MaxStaminaHint": "A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full. See the Gathering Formulas help page for examples.",
           "StartStamina": "Starting stamina",
           "StartStaminaPlaceholder": "blank = full",
           "Roll": "Roll",
@@ -242,7 +242,7 @@
           "RegenPer": "Per",
           "RegenAmount": "Amount per interval",
           "RegenAmountPlaceholder": "1 or 1 + @abilities.con.mod",
-          "RegenAmountHint": "A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod).",
+          "RegenAmountHint": "A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod). See the Gathering Formulas help page for examples.",
           "Unit": {
             "minutes": "Minute",
             "hours": "Hour",

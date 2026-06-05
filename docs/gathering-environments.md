@@ -128,6 +128,9 @@ Gathering Task records support:
 | **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
 | **Required tools** | Optional references to the selected system's Gathering Tools library. All referenced tools are required. |
 
+{: .note }
+> Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more). See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use D&D 5e and Pathfinder 2e examples.
+
 Reusable hazard records support:
 
 | Field | Description |
