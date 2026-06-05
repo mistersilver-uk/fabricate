@@ -22,6 +22,10 @@ describe('Fabricate app wiring for the gathering tab', () => {
       appSource.includes('listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null'),
       'app should add the listGatheringForActor service'
     );
+    assert.ok(
+      appSource.includes('getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null'),
+      'app should add the getGatheringDropBreakdown service'
+    );
     assert.ok(appSource.includes('services: this._services'), 'app should pass the services prop');
   });
 

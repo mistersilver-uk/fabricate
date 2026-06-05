@@ -21,6 +21,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
+  import HazardChanceBar from './HazardChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
 
   let {
@@ -65,6 +66,11 @@
   // level (success -> warning -> danger); unmapped values fall back to the
   // base danger colour.
   const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
+
+  // Environment-level "chance of encountering a hazard" (0..1) the engine carries
+  // on the listing. > 0 shows the hazard bar; 0 shows the "safe" hint instead.
+  const hazardChance = $derived(Math.max(0, Math.min(1, Number(env?.hazardChance ?? 0))));
+  const hasHazard = $derived(hazardChance > 0);
 
   // The list the center column paginates: discovered tasks for blind sites,
   // the full task list for targeted ones.
@@ -158,6 +164,25 @@
         {/if}
       </p>
     </header>
+
+    <section class="gathering-detail-hazard" data-gathering-hazard-section>
+      <div class="gathering-detail-hazard-danger">
+        <span class="gathering-detail-hazard-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
+        <span class={`gathering-detail-hazard-level is-danger ${dangerRiskClass}`}>
+          <i class="fas fa-skull" aria-hidden="true"></i>
+          <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
+        </span>
+      </div>
+
+      {#if hasHazard}
+        <HazardChanceBar value={hazardChance} />
+        <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
+      {:else}
+        <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
+          {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+        </p>
+      {/if}
+    </section>
 
     {#if sceneBlocked}
       <section class="gathering-detail-scene" data-gathering-scene-banner>
@@ -364,6 +389,74 @@
   }
 
   .gathering-detail-mode-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fab-text-muted);
+  }
+
+  /* Environment safety readout: highest danger level + hazard-chance bar (or a
+     "safe" hint when there is no hazard chance). */
+  .gathering-detail-hazard {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+  }
+
+  .gathering-detail-hazard-danger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+  }
+
+  .gathering-detail-hazard-caption {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-detail-hazard-level {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fab-text);
+  }
+
+  /* Danger-tier icon colour, mirroring the header danger pip. */
+  .gathering-detail-hazard-level.is-danger i {
+    color: var(--fab-danger, var(--fab-text-muted));
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-safe i {
+    color: var(--fab-success);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-unsafe i {
+    color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-hazardous i {
+    color: var(--fab-warning);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-dangerous i {
+    color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
+  }
+
+  .gathering-detail-hazard-level.is-danger.risk-deadly i,
+  .gathering-detail-hazard-level.is-danger.risk-extreme i {
+    color: var(--fab-danger);
+  }
+
+  .gathering-detail-hazard-hint {
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);

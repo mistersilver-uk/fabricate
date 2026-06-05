@@ -196,6 +196,8 @@
         environmentId={selectedId}
         onAttempt={attempt}
         {busy}
+        {services}
+        rememberedActorId={store?.selectedActorId ?? null}
       />
     </section>
   </div>

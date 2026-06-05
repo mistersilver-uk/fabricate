@@ -76,8 +76,8 @@ function listing(environments) {
   };
 }
 
-function makeServices(result) {
-  const calls = { list: 0, attempts: [] };
+function makeServices(result, dropBreakdown = null) {
+  const calls = { list: 0, attempts: [], dropBreakdown: [] };
   const services = {
     listGatheringForActor: () => {
       calls.list += 1;
@@ -86,6 +86,10 @@ function makeServices(result) {
     startGatheringAttempt: (opts) => {
       calls.attempts.push(opts);
       return Promise.resolve({ accepted: true });
+    },
+    getGatheringDropBreakdown: (opts) => {
+      calls.dropBreakdown.push(opts);
+      return Promise.resolve(dropBreakdown ?? { drops: [], awardMode: null, awardLimit: 1, hazardPolicy: null });
     }
   };
   return { services, calls };
@@ -142,10 +146,12 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/HazardChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
@@ -225,6 +231,101 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const panelDesc = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-description');
     assert.ok(panelDesc.classList.contains('is-fallback'), 'inspector marks the placeholder as a fallback');
     assert.ok(panelDesc.textContent.includes('NoTaskDescription'), 'inspector shows the localized fallback');
+  });
+
+  it('renders the success-chance bar in-line with the right-column Attempt button', async () => {
+    const { services } = makeServices(listing([environment()]));
+    await mountView(services);
+
+    const action = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action');
+    assert.ok(action, 'the inspector action row renders');
+    assert.ok(action.querySelector('[data-gathering-success-value]'), 'success-chance bar sits in the action row');
+    assert.ok(action.querySelector('[data-gathering-attempt]'), 'attempt button sits in the same action row');
+  });
+
+  it('renders "What you might find" with per-drop mini bars, award/hazard hints, and expandable modifiers', async () => {
+    const dropBreakdown = {
+      successChance: 1,
+      awardMode: 'allDrops',
+      awardLimit: 1,
+      hazardPolicy: 'successWithHazard',
+      drops: [{
+        id: 'd-ore',
+        name: 'Raw Ore',
+        img: 'icons/ore.webp',
+        componentId: 'ore',
+        quantity: 2,
+        baseChance: 0.4,
+        finalChance: 0.53,
+        modifiers: {
+          weather: { conditionId: 'rain', value: 10 },
+          timeOfDay: { conditionId: 'night', value: -5 },
+          biome: { value: 0 },
+          character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }]
+        }
+      }]
+    };
+    const { services, calls } = makeServices(listing([environment()]), dropBreakdown);
+    await mountView(services);
+    await settle();
+
+    // The selected task triggered a lazy breakdown fetch.
+    assert.ok(calls.dropBreakdown.length >= 1, 'breakdown fetched for the selected task');
+
+    // The inspector success bar adopts the personalized aggregate from the
+    // breakdown (1.0) rather than the listing's base value (0.5).
+    const successBar = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action [data-gathering-success-value]');
+    assert.equal(successBar.getAttribute('data-gathering-success-value'), '100', 'success chance reflects the modifier-adjusted aggregate');
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.ok(section, '"What you might find" section renders');
+    const hints = section.querySelector('[data-gathering-drops-hints]');
+    assert.ok(hints.textContent.includes('AwardModeAll'), 'award-mode hint shown');
+    assert.ok(hints.textContent.includes('HazardImpactSuccess'), 'hazard-impact hint shown');
+
+    const drop = section.querySelector('[data-gathering-drop]');
+    assert.ok(drop, 'a drop row renders');
+    assert.equal(drop.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'), '53');
+    assert.equal(drop.querySelector('[data-gathering-drop-modifiers]'), null, 'modifiers hidden until expanded');
+
+    drop.querySelector('.gathering-task-drop-summary').click();
+    flushSync();
+    const modifiers = drop.querySelector('[data-gathering-drop-modifiers]');
+    assert.ok(modifiers, 'modifiers reveal on expand');
+    assert.ok(modifiers.textContent.includes('Dexterity'), 'character ability contribution listed');
+    assert.ok(modifiers.textContent.includes('ModifierWeather'), 'weather contribution listed');
+    assert.ok(modifiers.textContent.includes('+10%'), 'weather delta shown signed');
+  });
+
+  it('shows the hazard-chance bar (with tier) above the tasks when hazard chance > 0', async () => {
+    const { services } = makeServices(listing([environment({ risk: 'hazardous', hazardChance: 0.5 })]));
+    await mountView(services);
+
+    const section = target.querySelector('[data-gathering-hazard-section]');
+    assert.ok(section, 'hazard section renders above the task list');
+    // Highest danger level shown (localized risk key via the i18n stub).
+    assert.ok(section.textContent.includes('Risk.hazardous'), 'section shows the highest danger level');
+    // Hazard bar present, with the percent + reversed-scale tier (50% -> amber).
+    const bar = section.querySelector('[data-gathering-hazard-value]');
+    assert.ok(bar, 'hazard-chance bar renders when chance > 0');
+    assert.equal(bar.getAttribute('data-gathering-hazard-value'), '50');
+    assert.equal(bar.getAttribute('data-gathering-hazard-tier'), 'amber');
+    // Explanatory hint shown; the "safe" hint is not.
+    assert.ok(section.textContent.includes('HazardChanceHint'), 'explanatory hazard hint shown');
+    assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
+  });
+
+  it('shows the "safe environment" hint (no bar) when hazard chance is zero', async () => {
+    const { services } = makeServices(listing([environment({ hazardChance: 0 })]));
+    await mountView(services);
+
+    const section = target.querySelector('[data-gathering-hazard-section]');
+    assert.ok(section, 'hazard section still renders');
+    assert.ok(section.textContent.includes('Risk.safe'), 'danger level still shown for a safe environment');
+    assert.equal(section.querySelector('[data-gathering-hazard-value]'), null, 'no hazard bar when chance is zero');
+    const safe = section.querySelector('[data-gathering-safe-hint]');
+    assert.ok(safe, 'safe hint shown when chance is zero');
+    assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
   });
 
   it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
