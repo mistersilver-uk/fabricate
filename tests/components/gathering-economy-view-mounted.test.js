@@ -90,7 +90,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
   });
 
   it('persists a mode change and reveals regen + actor controls in stamina mode', async () => {
-    const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, provider: 'fabricate' }];
+    const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }];
     const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: '2' } } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
@@ -137,25 +137,60 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     unmount(mounted); mounted = null; target.remove();
   });
 
-  it('saves an actor stamina pool through the services', async () => {
-    const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, provider: 'fabricate' }];
+  it('bulk-saves rolled characters (current + max override) from the header Save', async () => {
+    const actors = [
+      { actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' },
+      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, provider: 'fabricate' } // un-rolled
+    ];
     const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
-    target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save').click();
+    // Set an override on the rolled character, then bulk-save from the header.
+    const override = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-max]');
+    override.value = '15';
+    override.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
-    assert.equal(calls.setStamina.at(-1).actorId, 'a1');
-    assert.equal(calls.setStamina.at(-1).systemId, 'sys-1');
-    // The row carries a Roll control and a Save, but no +/- adjust buttons.
-    assert.ok(target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-roll]'));
-    assert.equal(target.querySelector('[data-economy-actor-id="a1"] [aria-label^="Decrease"]'), null);
+
+    target.querySelector('[data-economy-bulk-save]').click();
+    flushSync();
+    // Only the rolled character is persisted; the un-rolled one is skipped.
+    assert.equal(calls.setStamina.length, 1);
+    assert.equal(calls.setStamina[0].actorId, 'a1');
+    assert.equal(calls.setStamina[0].maxOverride, 15);
+    assert.equal(calls.setStamina[0].current, 3);
+    // No per-row save buttons remain.
+    assert.equal(target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save'), null);
+    unmount(mounted); mounted = null; target.remove();
+  });
+
+  it('shows un-rolled characters as disabled with an emphasised dice button; rolled get a reset button', async () => {
+    const actors = [
+      { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }, // rolled
+      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, provider: 'fabricate' } // un-rolled
+    ];
+    const { services } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
+    await mountView({ services, systemId: 'sys-1' });
+
+    // Un-rolled: inputs disabled, dice button emphasised.
+    const unrolledCurrent = target.querySelector('[data-economy-actor-id="a2"] [data-economy-actor-current]');
+    assert.equal(unrolledCurrent.disabled, true);
+    const unrolledRoll = target.querySelector('[data-economy-actor-id="a2"] [data-economy-actor-roll]');
+    assert.ok(unrolledRoll.classList.contains('is-roll-needed'));
+    assert.ok(unrolledRoll.querySelector('.fa-dice-d20'));
+
+    // Rolled: inputs enabled, the button is a reset (arrows-rotate), not emphasised.
+    const rolledCurrent = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-current]');
+    assert.equal(rolledCurrent.disabled, false);
+    const rolledRoll = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-roll]');
+    assert.equal(rolledRoll.classList.contains('is-roll-needed'), false);
+    assert.ok(rolledRoll.querySelector('.fa-arrows-rotate'));
     unmount(mounted); mounted = null; target.remove();
   });
 
   it('filters the character list by the search box', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, provider: 'fabricate' },
-      { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, provider: 'fabricate' }
+      { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, rolledMax: 5, maxOverride: null, provider: 'fabricate' },
+      { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, rolledMax: 8, maxOverride: null, provider: 'fabricate' }
     ];
     const { services } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
     await mountView({ services, systemId: 'sys-1' });

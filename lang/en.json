@@ -236,6 +236,8 @@
           "StartStaminaPlaceholder": "blank = full",
           "Roll": "Roll",
           "RollHint": "Roll this character's pool from the max/start expressions",
+          "Reset": "Reset",
+          "ResetHint": "Re-roll this character's pool from the max/start expressions",
           "RegenPolicy": "Regeneration",
           "RegenPolicyNone": "Manual only",
           "RegenPolicyElapsed": "Over world time",

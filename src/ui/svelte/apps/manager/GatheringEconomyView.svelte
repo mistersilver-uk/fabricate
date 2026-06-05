@@ -83,7 +83,12 @@
   function refreshStaminaActors(id = systemId) {
     const list = services?.getGatheringStaminaState?.({ systemId: id }) ?? [];
     staminaActors = Array.isArray(list)
-      ? list.map(actor => ({ ...actor, draftCurrent: actor.current ?? 0, draftMax: actor.max ?? 0 }))
+      ? list.map(actor => ({
+          ...actor,
+          rolled: actor.rolledMax != null,
+          draftCurrent: actor.current ?? '',
+          draftMaxOverride: actor.maxOverride ?? ''
+        }))
       : [];
   }
 
@@ -109,15 +114,20 @@
     void persistEconomy();
   }
 
-  async function saveActor(actor) {
+  // Bulk save: persist current + max override for every rolled character.
+  // Un-rolled characters have no pool to write — they need Roll first.
+  async function saveAll() {
     if (!services) return;
-    await services.setGatheringStamina?.({
-      systemId,
-      actorId: actor.actorId,
-      current: Number(actor.draftCurrent) || 0,
-      max: Number(actor.draftMax) || 0,
-      provider: actor.provider
-    });
+    for (const actor of staminaActors) {
+      if (!actor.rolled) continue;
+      await services.setGatheringStamina?.({
+        systemId,
+        actorId: actor.actorId,
+        current: Number(actor.draftCurrent) || 0,
+        maxOverride: actor.draftMaxOverride === '' || actor.draftMaxOverride == null ? null : Number(actor.draftMaxOverride),
+        provider: actor.provider
+      });
+    }
     refreshStaminaActors();
   }
 
@@ -241,24 +251,25 @@
             <p class="manager-muted" data-economy-no-actors>{text('FABRICATE.Admin.Manager.Economy.NoActors', 'No characters found.')}</p>
           {:else}
             <ul class="manager-economy-actor-list" data-economy-actor-list>
-              <li class="manager-economy-actor-row is-head" aria-hidden="true">
+              <li class="manager-economy-actor-row is-head">
                 <span class="manager-economy-actor-identity"></span>
                 <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span>
-                <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Max', 'Max')}</span>
-                <span class="manager-economy-actor-save-spacer"></span>
+                <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span>
+                <button type="button" class="manager-button is-primary manager-economy-bulk-save" onclick={saveAll} data-economy-bulk-save>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
               </li>
               {#each pagedActors as actor (actor.actorId)}
-                <li class="manager-economy-actor-row" data-economy-actor-id={actor.actorId}>
+                <li class="manager-economy-actor-row" data-economy-actor-id={actor.actorId} data-economy-actor-rolled={actor.rolled ? 'true' : 'false'}>
                   <span class="manager-economy-actor-identity">
                     <img class="manager-economy-actor-thumb" src={actor.img || 'icons/svg/mystery-man.svg'} alt="" />
                     <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
                   </span>
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftCurrent} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max')} — ${actor.name}`} data-economy-actor-max />
-                  <span class="manager-economy-actor-actions">
-                    <button type="button" class="manager-icon-button manager-economy-actor-roll" title={text('FABRICATE.Admin.Manager.Economy.RollHint', 'Roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-dice-d20" aria-hidden="true"></i></button>
-                    <button type="button" class="manager-button is-primary manager-economy-actor-save" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
-                  </span>
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftCurrent} disabled={!actor.rolled} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftMaxOverride} disabled={!actor.rolled || (actor.provider && actor.provider !== 'fabricate')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`} data-economy-actor-max />
+                  {#if actor.rolled}
+                    <button type="button" class="manager-icon-button manager-economy-actor-roll" title={text('FABRICATE.Admin.Manager.Economy.ResetHint', 'Re-roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-arrows-rotate" aria-hidden="true"></i></button>
+                  {:else}
+                    <button type="button" class="manager-icon-button manager-economy-actor-roll is-roll-needed" title={text('FABRICATE.Admin.Manager.Economy.RollHint', 'Roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-dice-d20" aria-hidden="true"></i></button>
+                  {/if}
                 </li>
               {/each}
             </ul>
@@ -397,7 +408,8 @@
     background: var(--fab-mv2-bg);
   }
 
-  /* Scrollable character list (paginated above 6). */
+  /* Scrollable character list (paginated above 6). A stable scrollbar gutter
+     keeps the bar off the rows and keeps the sticky header aligned with them. */
   .manager-economy-actor-list {
     list-style: none;
     margin: 0;
@@ -407,28 +419,31 @@
     gap: 6px;
     max-height: 320px;
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
-  /* One row per character: image, name, current, max, save — all on one line.
-     Fixed-width number/save cells align under the sticky column header. */
+  /* One grid per row, shared by the header, so Current / Max (override) labels
+     and the trailing action (save / roll) line up in the same columns. */
   .manager-economy-actor-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px 56px 64px;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
     padding: 6px 8px;
     border: 1px solid var(--fab-mv2-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-035);
   }
 
+  /* Sticky, opaque header so scrolled rows never show through it. */
   .manager-economy-actor-row.is-head {
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 2px 8px;
+    padding: 4px 8px;
     border: 0;
-    background: var(--fab-overlay-light-035);
+    border-radius: 0;
+    background: var(--fab-mv2-surface-2);
     color: var(--fab-mv2-text-muted);
     font-size: 0.7rem;
     text-transform: uppercase;
@@ -440,7 +455,6 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    flex: 1 1 auto;
   }
 
   .manager-economy-actor-thumb {
@@ -459,47 +473,44 @@
     white-space: nowrap;
   }
 
-  .manager-economy-actor-cell,
   .manager-economy-actor-col-label {
-    flex: 0 0 auto;
-    width: 58px;
-    box-sizing: border-box;
     text-align: center;
+    min-width: 0;
   }
 
   .manager-economy-actor-cell {
+    width: 100%;
+    box-sizing: border-box;
     height: 30px;
     padding: 0 6px;
     border: 1px solid var(--fab-mv2-border);
     border-radius: 6px;
     color: var(--fab-mv2-text);
     background: var(--fab-mv2-bg);
+    text-align: center;
   }
 
-  .manager-economy-actor-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 auto;
+  .manager-economy-actor-cell:disabled {
+    opacity: 0.55;
   }
 
-  .manager-economy-actor-roll {
-    flex: 0 0 auto;
-  }
-
-  .manager-economy-actor-save {
-    flex: 0 0 auto;
-    width: 60px;
+  /* The trailing action column (bulk Save in the header, roll/reset per row). */
+  .manager-economy-bulk-save {
+    width: 100%;
     padding-left: 0;
     padding-right: 0;
     justify-content: center;
   }
 
-  /* Header spacer matches the trailing actions group (roll icon + save) so the
-     Current/Max captions stay aligned over their input cells. */
-  .manager-economy-actor-save-spacer {
-    flex: 0 0 auto;
-    width: 104px;
+  .manager-economy-actor-roll {
+    justify-self: center;
+  }
+
+  /* Emphasise the dice button on characters that have not been rolled yet. */
+  .manager-economy-actor-roll.is-roll-needed {
+    color: var(--fab-mv2-accent);
+    border-color: var(--fab-mv2-accent);
+    background: var(--fab-mv2-accent-soft, var(--fab-overlay-light-035));
   }
 
   /* Keep the actor-list pagination compact and on a single line. */

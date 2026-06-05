@@ -366,3 +366,43 @@ describe('gathering economy — expression-based max/start (seed once per charac
     assert.equal(after.max, 20);
   });
 });
+
+describe('gathering economy — per-character max override', () => {
+  it('layers an override over the rolled max and falls back when cleared', async () => {
+    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '20' } } } } } });
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 18, max: 20 }); // rolled pool
+
+    // Set an override below the rolled max → effective max is the override, current clamps.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 18, maxOverride: 12 });
+    let s = service.getActorStamina(actor, SYSTEM);
+    assert.equal(s.max, 12);        // effective
+    assert.equal(s.rolledMax, 20);  // rolled preserved
+    assert.equal(s.maxOverride, 12);
+    assert.equal(s.current, 12);    // clamped to the override
+
+    // Clearing the override falls back to the rolled max.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 12, maxOverride: null });
+    s = service.getActorStamina(actor, SYSTEM);
+    assert.equal(s.max, 20);
+    assert.equal(s.maxOverride, null);
+  });
+
+  it('regenerates up to the override, and a force reroll clears it', async () => {
+    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '50', start: '50', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? 50 : p.kind === 'staminaStart' ? 50 : 5) });
+    const actor = makeFakeActor();
+    await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }); // 50/50
+
+    // Override the cap to 15 and drop current below it.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 10, maxOverride: 15 });
+    await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 0 }); // anchor
+    const after = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 2 * HOUR });
+    assert.equal(after.current, 15); // 10 + 5*2 = 20, clamped to the override 15
+
+    // A force reroll resets the pool and clears the override.
+    const rerolled = await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM, force: true });
+    assert.equal(rerolled.current, 50);
+    assert.equal(service.getActorStamina(actor, SYSTEM).maxOverride, null);
+  });
+});

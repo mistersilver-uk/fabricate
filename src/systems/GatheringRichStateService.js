@@ -722,12 +722,17 @@ export class GatheringRichStateService {
     // Pools are materialized per character at seed time (the system max/start
     // expressions are rolled once into numbers), so this stays synchronous and
     // simply reads the stored values. A character with no pool reads `null`.
-    const max = numberOrNullStrict(stamina.max);
+    // `max` is the rolled value; an optional GM `maxOverride` layers over it.
+    const rolledMax = numberOrNullStrict(stamina.max);
+    const maxOverride = numberOrNullStrict(stamina.maxOverride);
+    const max = maxOverride != null ? maxOverride : rolledMax; // effective cap
     const storedCurrent = numberOrNullStrict(stamina.current);
     const current = storedCurrent != null ? storedCurrent : (max != null ? max : null);
     return {
       current,
       max,
+      rolledMax,
+      maxOverride,
       provider: stamina.provider || 'fabricate',
       regenerationMode: stamina.regenerationMode || 'manual'
     };
@@ -795,31 +800,40 @@ export class GatheringRichStateService {
     return Number.isFinite(numeric) ? numeric : null;
   }
 
-  async setActorStamina(actor, { systemId = 'default', current = null, max = null, provider = 'fabricate', regenerationMode = 'manual' } = {}) {
+  async setActorStamina(actor, { systemId = 'default', current = null, max = null, maxOverride = undefined, provider = 'fabricate', regenerationMode = 'manual' } = {}) {
     const state = readState(actor);
     const key = systemId || 'default';
     const previous = state.stamina?.[key] || {};
     const effectiveProvider = provider || previous.provider || 'fabricate';
     const priorMax = numberOrNullStrict(previous.max);
-    // Fabricate-owned pools accept a max freely; an external provider's maximum
-    // is read-only once established (the prior value is preserved), but an as-yet
-    // unset external pool may still be initialized.
-    const maxValue = (effectiveProvider === 'fabricate' || priorMax === null)
-      ? nonNegativeNumber(max, priorMax ?? current ?? 0)
+    const providedMax = numberOrNullStrict(max);
+    // `max` is the rolled cap. When omitted, the prior rolled max is preserved
+    // (the panel only edits current + override). When provided: Fabricate-owned
+    // pools accept it freely; an external provider's maximum is read-only once
+    // established, but an as-yet unset external pool may still be initialized.
+    const rolledMax = providedMax != null
+      ? ((effectiveProvider === 'fabricate' || priorMax == null) ? providedMax : priorMax)
       : priorMax;
+    // `maxOverride`: undefined preserves the prior override; a finite number
+    // sets it; null/'' clears it. The effective cap is the override, else rolled.
+    const override = maxOverride === undefined
+      ? numberOrNullStrict(previous.maxOverride)
+      : (maxOverride === null || maxOverride === '' ? null : nonNegativeNumber(maxOverride, 0));
+    const effectiveMax = override != null ? override : rolledMax;
     let currentValue = nonNegativeNumber(current, previous.current ?? 0);
-    if (Number.isFinite(Number(maxValue))) currentValue = Math.min(currentValue, Number(maxValue));
+    if (Number.isFinite(Number(effectiveMax))) currentValue = Math.min(currentValue, Number(effectiveMax));
     const next = {
       provider: effectiveProvider,
       regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
       current: currentValue,
-      max: maxValue,
+      max: rolledMax,
+      ...(override != null ? { maxOverride: override } : {}),
       // Preserve the regen anchor so a manual GM set does not reset the clock.
       ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
     };
     state.stamina = { ...(state.stamina || {}), [key]: next };
     state.history = [
-      this._historyEvent('stamina.set', { systemId: key, current: next.current, max: next.max }),
+      this._historyEvent('stamina.set', { systemId: key, current: next.current, max: next.max, maxOverride: override }),
       ...normalizeList(state.history)
     ].slice(0, 50);
     await writeState(actor, state);
@@ -836,11 +850,13 @@ export class GatheringRichStateService {
     const previous = state.stamina?.[key] || {};
     // Preserve the stored max verbatim (null stays null) so the system default
     // max stays authoritative when no per-actor override exists.
+    const previousOverride = numberOrNullStrict(previous.maxOverride);
     const entry = {
       provider: previous.provider || effective.provider || 'fabricate',
       regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
       current: clamped,
       max: numberOrNullStrict(previous.max),
+      ...(previousOverride != null ? { maxOverride: previousOverride } : {}),
       ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
     };
     state.stamina = { ...(state.stamina || {}), [key]: entry };
@@ -899,8 +915,8 @@ export class GatheringRichStateService {
     const state = readState(actor);
     const entry = state.stamina?.[key];
     if (!entry) return null; // regen only tops up materialized pools, never creates them
-    // The max is materialized on the pool (the system template is an expression).
-    const max = numberOrNullStrict(entry.max);
+    // Effective cap: the GM override if set, else the rolled max.
+    const max = numberOrNullStrict(entry.maxOverride) ?? numberOrNullStrict(entry.max);
     if (max == null) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
