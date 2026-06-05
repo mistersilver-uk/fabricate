@@ -30,14 +30,15 @@ function writeCompiledSvelte(sourcePath) {
 }
 
 function makeServices(initialEconomy, actors = []) {
-  const calls = { setEconomy: [], setStamina: [], adjustStamina: [], getStamina: 0 };
+  const calls = { setEconomy: [], setStamina: [], adjustStamina: [], roll: [], getStamina: 0 };
   let economy = initialEconomy;
   const services = {
     getGatheringEconomy: () => economy,
     setGatheringEconomy: (opts) => { calls.setEconomy.push(opts); economy = opts.economy; return Promise.resolve(opts.economy); },
     getGatheringStaminaState: () => { calls.getStamina += 1; return actors; },
     setGatheringStamina: (opts) => { calls.setStamina.push(opts); return Promise.resolve({}); },
-    adjustGatheringStamina: (opts) => { calls.adjustStamina.push(opts); return Promise.resolve({}); }
+    adjustGatheringStamina: (opts) => { calls.adjustStamina.push(opts); return Promise.resolve({}); },
+    rollGatheringStamina: (opts) => { calls.roll.push(opts); return Promise.resolve({}); }
   };
   return { services, calls };
 }
@@ -107,13 +108,27 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     flushSync();
     assert.equal(calls.setEconomy.at(-1).economy.stamina.regen.amount, '1 + @abilities.con.mod');
 
-    // The global max field is present and persists.
+    // Max + starting stamina are expression text fields that persist verbatim.
     const maxInput = target.querySelector('[data-economy-stamina-max]');
     assert.ok(maxInput);
-    maxInput.value = '14';
+    assert.equal(maxInput.getAttribute('type'), 'text');
+    maxInput.value = '4 * @abilities.con.mod';
     maxInput.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
-    assert.equal(calls.setEconomy.at(-1).economy.stamina.max, 14);
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.max, '4 * @abilities.con.mod');
+
+    const startInput = target.querySelector('[data-economy-stamina-start]');
+    assert.ok(startInput);
+    startInput.value = '@abilities.con.mod';
+    startInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.start, '@abilities.con.mod');
+
+    // The per-character Roll button (re)rolls that character's pool.
+    target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-roll]').click();
+    flushSync();
+    assert.equal(calls.roll.at(-1).actorId, 'a1');
+    assert.equal(calls.roll.at(-1).systemId, 'sys-1');
 
     // Switching mode calls setGatheringEconomy with the new mode.
     target.querySelector('[data-economy-mode-option="nodes"]').click();
@@ -131,8 +146,9 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     flushSync();
     assert.equal(calls.setStamina.at(-1).actorId, 'a1');
     assert.equal(calls.setStamina.at(-1).systemId, 'sys-1');
-    // The +/- adjust controls were removed.
-    assert.equal(target.querySelector('[data-economy-actor-id="a1"] .manager-icon-button'), null);
+    // The row carries a Roll control and a Save, but no +/- adjust buttons.
+    assert.ok(target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-roll]'));
+    assert.equal(target.querySelector('[data-economy-actor-id="a1"] [aria-label^="Decrease"]'), null);
     unmount(mounted); mounted = null; target.remove();
   });
 

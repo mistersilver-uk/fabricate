@@ -719,13 +719,10 @@ export class GatheringRichStateService {
     const state = readState(actor);
     const key = systemId || 'default';
     const stamina = state.stamina?.[key] || {};
-    // The system-level default max (economy.stamina.max) applies to any actor
-    // that has not been given an explicit per-actor max, so every character
-    // shares one pool size unless individually overridden.
-    const globalMax = numberOrNullStrict(this._systemEconomy(key)?.stamina?.max);
-    const storedMax = numberOrNullStrict(stamina.max);
-    const max = storedMax != null ? storedMax : globalMax;
-    // A character with no stored current starts full at the effective max.
+    // Pools are materialized per character at seed time (the system max/start
+    // expressions are rolled once into numbers), so this stays synchronous and
+    // simply reads the stored values. A character with no pool reads `null`.
+    const max = numberOrNullStrict(stamina.max);
     const storedCurrent = numberOrNullStrict(stamina.current);
     const current = storedCurrent != null ? storedCurrent : (max != null ? max : null);
     return {
@@ -734,6 +731,68 @@ export class GatheringRichStateService {
       provider: stamina.provider || 'fabricate',
       regenerationMode: stamina.regenerationMode || 'manual'
     };
+  }
+
+  /**
+   * Materialize a character's stamina pool from the system `max`/`start`
+   * expression templates, rolling them once and persisting the resulting
+   * numbers. Idempotent: a character that already has a pool keeps it unless
+   * `force` is set (the GM Roll/Reset path). No-ops outside stamina mode or when
+   * the max template is blank/non-finite (⇒ no pool, stamina unenforced).
+   *
+   * @param {object} payload
+   * @returns {Promise<object|null>} The materialized pool, or null on no-op.
+   */
+  async seedActorStaminaIfNeeded({ actor, systemId, system = null, environment = null, force = false } = {}) {
+    const key = systemId || 'default';
+    const econ = this._systemEconomy(key);
+    if (econ.mode !== 'stamina') return null;
+
+    const state = readState(actor);
+    const existing = state.stamina?.[key];
+    if (!force && existing && numberOrNullStrict(existing.max) != null) {
+      return cloneJson(existing);
+    }
+
+    const maxValue = await this._evaluateStaminaExpression({ expression: econ.stamina?.max, actor, system, environment, kind: 'staminaMax' });
+    if (maxValue == null) return null; // no max configured ⇒ leave unseeded (stamina unenforced)
+    const max = Math.max(0, Math.round(maxValue));
+
+    const startRaw = await this._evaluateStaminaExpression({ expression: econ.stamina?.start, actor, system, environment, kind: 'staminaStart' });
+    const start = startRaw == null ? max : Math.max(0, Math.round(startRaw)); // blank start ⇒ full
+
+    const entry = {
+      provider: 'fabricate',
+      regenerationMode: econ.stamina?.regen?.policy === 'elapsedTime' ? 'auto' : 'manual',
+      current: Math.min(start, max),
+      max,
+      lastRegenWorldTime: this._now()
+    };
+    state.stamina = { ...(state.stamina || {}), [key]: entry };
+    state.history = [
+      this._historyEvent('stamina.seed', { systemId: key, current: entry.current, max }),
+      ...normalizeList(state.history)
+    ].slice(0, 50);
+    await writeState(actor, state);
+    this._callHook('fabricate.gathering.staminaSeeded', { actor, systemId: key, stamina: cloneJson(entry) });
+    return cloneJson(entry);
+  }
+
+  /**
+   * Evaluate a stamina expression template against an actor, returning a finite
+   * number or null when the template is blank/unresolvable. Reuses the same
+   * Roll-backed `evaluateExpression` seam regen uses.
+   */
+  async _evaluateStaminaExpression({ expression, actor, system = null, environment = null, kind = 'stamina' } = {}) {
+    if (expression === null || expression === undefined || expression === '') return null;
+    let value;
+    if (typeof this.evaluateExpression === 'function') {
+      value = await this.evaluateExpression({ expression: String(expression), provider: null, actor, kind, system, environment });
+    } else {
+      value = Number(expression);
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
   }
 
   async setActorStamina(actor, { systemId = 'default', current = null, max = null, provider = 'fabricate', regenerationMode = 'manual' } = {}) {
@@ -839,10 +898,9 @@ export class GatheringRichStateService {
 
     const state = readState(actor);
     const entry = state.stamina?.[key];
-    if (!entry) return null;
-    // Effective max: the per-actor override, else the system default max.
-    const storedMax = numberOrNullStrict(entry.max);
-    const max = storedMax != null ? storedMax : numberOrNullStrict(econ.stamina?.max);
+    if (!entry) return null; // regen only tops up materialized pools, never creates them
+    // The max is materialized on the pool (the system template is an expression).
+    const max = numberOrNullStrict(entry.max);
     if (max == null) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
@@ -1088,10 +1146,12 @@ export class GatheringRichStateService {
     }
 
     if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+      await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
       const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
       const stamina = this.getActorStamina(actor, systemId);
       evidence.stamina = { cost, base: Number(task.staminaCost || 0), state: stamina };
-      if (cost > 0 && viewer?.isGM !== true && Number(stamina.current ?? 0) < cost) {
+      // Only enforce when a pool exists (max configured); no max ⇒ no stamina limit.
+      if (cost > 0 && viewer?.isGM !== true && stamina.max != null && Number(stamina.current ?? 0) < cost) {
         blockedReasons.push(this._blockedReason('STAMINA_BLOCKED', {
           taskId: task.id,
           required: cost,
@@ -1133,10 +1193,14 @@ export class GatheringRichStateService {
     }
 
     if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
-      const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
-      if (cost > 0) {
-        await this.adjustActorStamina(actor, { systemId, delta: -cost });
-        evidence.stamina = { spent: cost, base: Number(task.staminaCost || 0) };
+      await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
+      // Only spend when a pool exists (max configured); no max ⇒ no stamina limit.
+      if (this.getActorStamina(actor, systemId).max != null) {
+        const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+        if (cost > 0) {
+          await this.adjustActorStamina(actor, { systemId, delta: -cost });
+          evidence.stamina = { spent: cost, base: Number(task.staminaCost || 0) };
+        }
       }
     }
 
@@ -1459,7 +1523,10 @@ function normalizeGatheringEconomy(raw = {}) {
   return {
     mode: ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none',
     stamina: {
-      max: numberOrNullStrict(raw?.stamina?.max),
+      // Expression templates (number or formula, e.g. "40" or "4 * @abilities.con.mod"),
+      // rolled once per character at seed time. `start` blank ⇒ start full at max.
+      max: stringOrFallback(raw?.stamina?.max, ''),
+      start: stringOrFallback(raw?.stamina?.start, ''),
       regen: {
         policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : 'none',
         unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',

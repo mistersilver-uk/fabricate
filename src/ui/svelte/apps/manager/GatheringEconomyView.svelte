@@ -33,7 +33,7 @@
   let actorPageSize = $state(6);
 
   function defaultEconomy() {
-    return { mode: 'none', stamina: { max: null, regen: { policy: 'none', unit: 'hours', amount: '' } } };
+    return { mode: 'none', stamina: { max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } } };
   }
 
   // Reload economy + actor stamina whenever the selected system changes.
@@ -69,7 +69,8 @@
     return {
       mode: ['none', 'stamina', 'nodes'].includes(raw.mode) ? raw.mode : 'none',
       stamina: {
-        max: raw.stamina?.max ?? null,
+        max: raw.stamina?.max == null ? '' : String(raw.stamina.max),
+        start: raw.stamina?.start == null ? '' : String(raw.stamina.start),
         regen: {
           policy: ['none', 'elapsedTime'].includes(regen.policy) ? regen.policy : 'none',
           unit: UNITS.includes(regen.unit) ? regen.unit : 'hours',
@@ -101,8 +102,10 @@
     void persistEconomy();
   }
 
-  function updateStaminaMax(value) {
-    economy.stamina = { ...economy.stamina, max: value === '' ? null : Math.max(0, Number(value) || 0) };
+  // Max / starting stamina are expression templates (number or formula), rolled
+  // once per character at seed time.
+  function updateStamina(patch) {
+    economy.stamina = { ...economy.stamina, ...patch };
     void persistEconomy();
   }
 
@@ -115,6 +118,13 @@
       max: Number(actor.draftMax) || 0,
       provider: actor.provider
     });
+    refreshStaminaActors();
+  }
+
+  // (Re)roll a character's pool from the system max/start expressions.
+  async function rollActor(actor) {
+    if (!services) return;
+    await services.rollGatheringStamina?.({ systemId, actorId: actor.actorId });
     refreshStaminaActors();
   }
 
@@ -159,16 +169,29 @@
           <h4 class="manager-economy-subtitle"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h4>
           <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
 
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina (default for all characters)')}</span>
-            <input
-              type="number" min="0" step="1"
-              placeholder={text('FABRICATE.Admin.Manager.Economy.MaxStaminaPlaceholder', 'No global limit')}
-              value={economy.stamina.max ?? ''}
-              oninput={(e) => updateStaminaMax(e.currentTarget.value)}
-              data-economy-stamina-max
-            />
-          </label>
+          <div class="manager-economy-regen-grid">
+            <label class="manager-field">
+              <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina')}</span>
+              <input
+                type="text"
+                placeholder={text('FABRICATE.Admin.Manager.Economy.MaxStaminaPlaceholder', '40 or 4 * @abilities.con.mod')}
+                value={economy.stamina.max}
+                oninput={(e) => updateStamina({ max: e.currentTarget.value })}
+                data-economy-stamina-max
+              />
+            </label>
+            <label class="manager-field">
+              <span>{text('FABRICATE.Admin.Manager.Economy.StartStamina', 'Starting stamina')}</span>
+              <input
+                type="text"
+                placeholder={text('FABRICATE.Admin.Manager.Economy.StartStaminaPlaceholder', 'blank = full')}
+                value={economy.stamina.start}
+                oninput={(e) => updateStamina({ start: e.currentTarget.value })}
+                data-economy-stamina-start
+              />
+            </label>
+          </div>
+          <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.MaxStaminaHint', 'A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full.')}</p>
 
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
@@ -230,9 +253,12 @@
                     <img class="manager-economy-actor-thumb" src={actor.img || 'icons/svg/mystery-man.svg'} alt="" />
                     <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
                   </span>
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" bind:value={actor.draftCurrent} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max')} — ${actor.name}`} data-economy-actor-max />
-                  <button type="button" class="manager-button is-primary manager-economy-actor-save" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftCurrent} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max')} — ${actor.name}`} data-economy-actor-max />
+                  <span class="manager-economy-actor-actions">
+                    <button type="button" class="manager-icon-button manager-economy-actor-roll" title={text('FABRICATE.Admin.Manager.Economy.RollHint', 'Roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-dice-d20" aria-hidden="true"></i></button>
+                    <button type="button" class="manager-button is-primary manager-economy-actor-save" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
+                  </span>
                 </li>
               {/each}
             </ul>
@@ -450,13 +476,30 @@
     background: var(--fab-mv2-bg);
   }
 
-  .manager-economy-actor-save,
-  .manager-economy-actor-save-spacer {
+  .manager-economy-actor-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .manager-economy-actor-roll {
+    flex: 0 0 auto;
+  }
+
+  .manager-economy-actor-save {
     flex: 0 0 auto;
     width: 60px;
     padding-left: 0;
     padding-right: 0;
     justify-content: center;
+  }
+
+  /* Header spacer matches the trailing actions group (roll icon + save) so the
+     Current/Max captions stay aligned over their input cells. */
+  .manager-economy-actor-save-spacer {
+    flex: 0 0 auto;
+    width: 104px;
   }
 
   /* Keep the actor-list pagination compact and on a single line. */

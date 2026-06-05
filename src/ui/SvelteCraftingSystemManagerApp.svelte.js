@@ -548,6 +548,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
         setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
         getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
+        rollGatheringStamina: (opts = {}) => game?.fabricate?.rollGatheringStamina?.(opts),
         setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
         adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
         restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts)

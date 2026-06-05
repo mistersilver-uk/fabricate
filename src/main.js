@@ -1053,13 +1053,29 @@ class Fabricate {
     const systemId = options.systemId;
     const service = this.gatheringRichStateService;
     if (!service || !systemId) return [];
-    // Characters only — exclude NPCs (and other non-character actor types).
+    // Characters only — exclude NPCs (and other non-character actor types). A
+    // character with no rolled pool yet reports max: null (the panel offers Roll).
     return Array.from(game.actors?.contents ?? [])
       .filter(actor => actor?.type === 'character')
       .map(actor => {
         const stamina = service.getActorStamina(actor, systemId);
         return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
       });
+  }
+
+  /**
+   * (Re)roll a character's stamina pool from the system max/start expression
+   * templates and persist it. GM-only; used by the panel's Roll/Reset control.
+   *
+   * @param {{systemId: string, actorId: string}} options
+   * @returns {Promise<object|null>} The materialized pool, or null.
+   */
+  rollGatheringStamina(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
+    if (!actor) return null;
+    return this.gatheringRichStateService?.seedActorStaminaIfNeeded({ actor, systemId: options.systemId, force: true });
   }
 
   revealGatheringTask(options = {}) {

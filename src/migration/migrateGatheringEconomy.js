@@ -18,7 +18,7 @@ const LEGACY_MODE_MAP = Object.freeze({ time: 'none', nodes: 'nodes', stamina: '
 function defaultEconomy(mode = 'none') {
   return {
     mode,
-    stamina: { max: null, regen: { policy: 'none', unit: 'hours', amount: '', lastRoll: null } }
+    stamina: { max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '', lastRoll: null } }
   };
 }
 

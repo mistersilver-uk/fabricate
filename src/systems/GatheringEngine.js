@@ -964,6 +964,15 @@ export class GatheringEngine {
       return this._lockedEnvironmentListing({ environment, system });
     }
 
+    // Auto-seed the acting character's stamina pool on first sight of a stamina
+    // system (e.g. opening the gathering tab), so the displayed pool reflects the
+    // rolled max/start. Idempotent — the dice roll persists once.
+    if (actor && this.richState?.economyMode?.(environment.craftingSystemId) === 'stamina') {
+      try {
+        await this.richState?.seedActorStaminaIfNeeded?.({ actor, systemId: environment.craftingSystemId, system });
+      } catch (error) { /* display-only: never block the listing on a seed failure */ }
+    }
+
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
     if (visibleTasks.length === 0) {
       return {

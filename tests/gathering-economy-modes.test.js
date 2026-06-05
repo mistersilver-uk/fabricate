@@ -301,33 +301,68 @@ describe('gathering economy — processWorldTime drives regen under the primary-
   });
 });
 
-describe('gathering economy — system-level default (global) stamina max', () => {
-  it('normalizes a system default stamina max (null by default)', () => {
-    const set = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 12 } } } } } });
-    assert.equal(set.service.systemEconomy(SYSTEM).stamina.max, 12);
+describe('gathering economy — expression-based max/start (seed once per character)', () => {
+  it('normalizes max and start as expression strings (empty by default)', () => {
+    const set = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 12, start: '@abilities.con.mod' } } } } } });
+    assert.equal(set.service.systemEconomy(SYSTEM).stamina.max, '12'); // numbers stringify
+    assert.equal(set.service.systemEconomy(SYSTEM).stamina.start, '@abilities.con.mod');
     const unset = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina' } } } } });
-    assert.equal(unset.service.systemEconomy(SYSTEM).stamina.max, null);
+    assert.equal(unset.service.systemEconomy(SYSTEM).stamina.max, '');
+    assert.equal(unset.service.systemEconomy(SYSTEM).stamina.start, '');
   });
 
-  it('falls back to the global max and starts characters full when they have no stored pool', () => {
-    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 15 } } } } } });
-    const eff = service.getActorStamina(makeFakeActor(), SYSTEM);
-    assert.equal(eff.max, 15);
-    assert.equal(eff.current, 15); // a fresh character starts full at the effective max
-  });
-
-  it('regenerates up to the global max without baking it into the per-actor entry', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 20, regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
-    const { service } = makeRichState({ config });
+  it('seeds a character pool by rolling max & start once; blank start starts full', async () => {
+    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '4 * @abilities.con.mod' } } } } };
+    let rolls = 0;
+    const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? (++rolls, 16) : null) });
     const actor = makeFakeActor();
 
-    // Spend from the (defaulted) full pool — creates an entry below max with a null stored max.
-    await service.adjustActorStamina(actor, { systemId: SYSTEM, delta: -8 });
-    assert.equal(service.getActorStamina(actor, SYSTEM).current, 12);
+    const seeded = await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM });
+    assert.equal(seeded.max, 16);
+    assert.equal(seeded.current, 16); // blank start ⇒ full
+    assert.equal(rolls, 1);
 
-    await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 0 }); // anchor
+    // Idempotent: a second call does not reroll.
+    const again = await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM });
+    assert.equal(again.max, 16);
+    assert.equal(rolls, 1);
+
+    // getActorStamina reads the materialized numbers synchronously.
+    assert.deepEqual(
+      { current: service.getActorStamina(actor, SYSTEM).current, max: service.getActorStamina(actor, SYSTEM).max },
+      { current: 16, max: 16 }
+    );
+  });
+
+  it('starts at the rolled starting value when one is configured, and force re-rolls', async () => {
+    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '20', start: '@abilities.con.mod' } } } } };
+    const seq = { staminaMax: [20, 30], staminaStart: [7, 9] };
+    const { service } = makeRichState({ config, evaluateExpression: (p) => seq[p.kind].shift() });
+    const actor = makeFakeActor();
+
+    const seeded = await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM });
+    assert.deepEqual({ current: seeded.current, max: seeded.max }, { current: 7, max: 20 });
+
+    const rerolled = await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM, force: true });
+    assert.deepEqual({ current: rerolled.current, max: rerolled.max }, { current: 9, max: 30 });
+  });
+
+  it('does not seed when the max expression is blank (stamina then unenforced)', async () => {
+    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina' } } } } });
+    const actor = makeFakeActor();
+    assert.equal(await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }), null);
+    assert.equal(service.getActorStamina(actor, SYSTEM).max, null);
+  });
+
+  it('regenerates up to the rolled max once the pool is seeded', async () => {
+    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '20', start: '12', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? 20 : p.kind === 'staminaStart' ? 12 : 5) });
+    const actor = makeFakeActor();
+    await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }); // current 12 / max 20
+
+    await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 0 }); // re-anchor
     const after = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 2 * HOUR });
-    assert.equal(after.current, 20); // 12 + 5*2 = 22, clamped to the global max 20
-    assert.equal(after.max, null); // the global max is not baked into the entry
+    assert.equal(after.current, 20); // 12 + 5*2 = 22, clamped to the rolled max 20
+    assert.equal(after.max, 20);
   });
 });
