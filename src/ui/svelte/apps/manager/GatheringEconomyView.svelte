@@ -203,7 +203,7 @@
           </div>
           <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.MaxStaminaHint', 'A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full.')}</p>
 
-          <div class="manager-economy-regen-grid">
+          <div class="manager-economy-regen-grid" class:is-single={economy.stamina.regen.policy !== 'elapsedTime'}>
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
               <select value={economy.stamina.regen.policy} onchange={(e) => updateRegen({ policy: e.currentTarget.value })} data-economy-regen-policy>
@@ -398,6 +398,11 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+
+  /* Manual-only regen hides the Per select, so Regeneration spans full width. */
+  .manager-economy-regen-grid.is-single {
+    grid-template-columns: 1fr;
   }
 
   /* Search box themed to match the manager's other text inputs. */
