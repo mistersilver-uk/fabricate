@@ -417,18 +417,19 @@
     background: var(--fab-mv2-bg);
   }
 
-  /* Scrollable character list (paginated above 6). A stable scrollbar gutter
-     keeps the bar off the rows and keeps the sticky header aligned with them. */
+  /* Scrollable character list (paginated above 6). Right padding insets the rows
+     and the sticky header from the right edge so the (overlay) scrollbar never
+     sits over the row content. Both header and rows share the inset, so columns
+     stay aligned. */
   .manager-economy-actor-list {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 0 12px 0 0;
     display: flex;
     flex-direction: column;
     gap: 6px;
     max-height: 320px;
     overflow-y: auto;
-    scrollbar-gutter: stable;
   }
 
   /* One grid per row, shared by the header, so Current / Max (override) labels
