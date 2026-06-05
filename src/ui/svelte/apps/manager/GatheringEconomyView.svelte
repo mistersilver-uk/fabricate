@@ -214,23 +214,21 @@
             <p class="manager-muted" data-economy-no-actors>{text('FABRICATE.Admin.Manager.Economy.NoActors', 'No characters found.')}</p>
           {:else}
             <ul class="manager-economy-actor-list" data-economy-actor-list>
+              <li class="manager-economy-actor-row is-head" aria-hidden="true">
+                <span class="manager-economy-actor-identity"></span>
+                <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span>
+                <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Max', 'Max')}</span>
+                <span class="manager-economy-actor-save-spacer"></span>
+              </li>
               {#each pagedActors as actor (actor.actorId)}
                 <li class="manager-economy-actor-row" data-economy-actor-id={actor.actorId}>
                   <span class="manager-economy-actor-identity">
                     <img class="manager-economy-actor-thumb" src={actor.img || 'icons/svg/mystery-man.svg'} alt="" />
                     <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
                   </span>
-                  <span class="manager-economy-actor-fields">
-                    <label class="manager-field is-compact">
-                      <span>{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span>
-                      <input type="number" min="0" step="1" bind:value={actor.draftCurrent} data-economy-actor-current />
-                    </label>
-                    <label class="manager-field is-compact">
-                      <span>{text('FABRICATE.Admin.Manager.Economy.Max', 'Max')}</span>
-                      <input type="number" min="0" step="1" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} data-economy-actor-max />
-                    </label>
-                    <button type="button" class="manager-button is-primary manager-economy-actor-save" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
-                  </span>
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" bind:value={actor.draftCurrent} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" bind:value={actor.draftMax} disabled={actor.provider && actor.provider !== 'fabricate'} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max')} — ${actor.name}`} data-economy-actor-max />
+                  <button type="button" class="manager-button is-primary manager-economy-actor-save" onclick={() => saveActor(actor)}>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
                 </li>
               {/each}
             </ul>
@@ -326,10 +324,10 @@
     color: var(--fab-mv2-text);
   }
 
-  /* Stamina mode: regen on the left, actor pools on the right. */
+  /* Stamina mode: regen on the left, the (wider) actor pools on the right. */
   .manager-economy-stamina-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
     gap: 16px;
     align-items: start;
   }
@@ -357,9 +355,16 @@
     gap: 8px;
   }
 
+  /* Search box themed to match the manager's other text inputs. */
   .manager-economy-actor-search {
     width: 100%;
     box-sizing: border-box;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 6px;
+    color: var(--fab-mv2-text);
+    background: var(--fab-mv2-bg);
   }
 
   /* Scrollable character list (paginated above 6). */
@@ -369,21 +374,35 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     max-height: 320px;
     overflow-y: auto;
   }
 
+  /* One row per character: image, name, current, max, save — all on one line.
+     Fixed-width number/save cells align under the sticky column header. */
   .manager-economy-actor-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px;
+    gap: 8px;
+    flex-wrap: nowrap;
+    padding: 6px 8px;
     border: 1px solid var(--fab-mv2-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-035);
-    flex-wrap: wrap;
+  }
+
+  .manager-economy-actor-row.is-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 2px 8px;
+    border: 0;
+    background: var(--fab-overlay-light-035);
+    color: var(--fab-mv2-text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    font-weight: 700;
   }
 
   .manager-economy-actor-identity {
@@ -391,12 +410,12 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    flex: 1 1 120px;
+    flex: 1 1 auto;
   }
 
   .manager-economy-actor-thumb {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 6px;
     object-fit: cover;
     flex: 0 0 auto;
@@ -410,22 +429,52 @@
     white-space: nowrap;
   }
 
-  .manager-economy-actor-fields {
-    display: inline-flex;
-    align-items: flex-end;
+  .manager-economy-actor-cell,
+  .manager-economy-actor-col-label {
+    flex: 0 0 auto;
+    width: 58px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .manager-economy-actor-cell {
+    height: 30px;
+    padding: 0 6px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 6px;
+    color: var(--fab-mv2-text);
+    background: var(--fab-mv2-bg);
+  }
+
+  .manager-economy-actor-save,
+  .manager-economy-actor-save-spacer {
+    flex: 0 0 auto;
+    width: 60px;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+  }
+
+  /* Keep the actor-list pagination compact and on a single line. */
+  .manager-economy-subsection :global(.manager-pagination) {
+    flex-wrap: nowrap;
     gap: 8px;
-    flex-wrap: wrap;
+    padding: 8px 0 0;
+    border-top: 0;
+    background: transparent;
   }
 
-  .manager-field.is-compact {
-    width: 72px;
+  .manager-economy-subsection :global(.manager-pagination-page) {
+    min-width: auto;
   }
 
-  .manager-economy-actor-save {
-    align-self: flex-end;
+  .manager-economy-subsection :global(.manager-pagination-summary) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  @media (max-width: 880px) {
+  @media (max-width: 980px) {
     .manager-economy-stamina-grid {
       grid-template-columns: 1fr;
     }
