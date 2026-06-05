@@ -826,3 +826,25 @@ test('stale sceneUuid is preserved without scene resolution', async () => {
   await store.save();
   assert.equal(settings.get(SETTING_KEYS.GATHERING_ENVIRONMENTS)[0].sceneUuid, 'Scene.no-longer-exists');
 });
+
+test('preserves a per-environment nodeRuntime map through update and resets it on duplicate', () => {
+  const { store } = makeMemoryStore({
+    saved: [environment({ id: 'env-nodes', name: 'Mines' })],
+    ids: ['env-copy', 'task-copy-1']
+  });
+  store.load();
+
+  // Default environments have an empty nodeRuntime.
+  assert.deepEqual(store.get('env-nodes').nodeRuntime, {});
+
+  // A runtime pool survives update with its current preserved (not reset to max).
+  return store.update('env-nodes', {
+    nodeRuntime: { 'lib-1': { enabled: true, max: 4, current: 1, depletionTiming: 'onStart', respawn: { policy: 'none' } } }
+  }).then(async (updated) => {
+    assert.equal(updated.nodeRuntime['lib-1'].current, 1);
+    assert.equal(updated.nodeRuntime['lib-1'].max, 4);
+
+    const copy = await store.duplicate('env-nodes', { name: 'Mines Copy' });
+    assert.deepEqual(copy.nodeRuntime, {}, 'a duplicate starts with full pools');
+  });
+});

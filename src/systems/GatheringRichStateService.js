@@ -1,4 +1,5 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+import { normalizeNodeConfig } from './gatheringNodeConfig.js';
 
 const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
@@ -872,23 +873,53 @@ export class GatheringRichStateService {
   async restockNode({ environmentId, taskId, current = null, max = null } = {}) {
     const environment = this.environmentStore?.get?.(environmentId);
     if (!environment) return null;
-    const tasks = normalizeList(environment.tasks).map(task => {
-      if (task?.id !== taskId) return task;
-      const existing = task.nodes || { enabled: true, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } };
-      const nextMax = nonNegativeInteger(max, existing.max);
-      return {
-        ...task,
-        nodes: {
-          ...existing,
-          enabled: true,
-          max: nextMax,
-          current: Math.min(nonNegativeInteger(current, nextMax), nextMax)
-        }
-      };
-    });
-    const updated = await this.environmentStore.update(environmentId, { tasks });
+    const existing = this._currentNodeState(environment, taskId);
+    if (!existing) return null;
+    // A null/undefined max keeps the existing cap (don't let Number(null)→0 wipe it).
+    const nextMax = (max === null || max === undefined) ? Number(existing.max || 0) : nonNegativeInteger(max, existing.max);
+    const node = {
+      ...existing,
+      enabled: true,
+      max: nextMax,
+      current: Math.min(nonNegativeInteger(current, nextMax), nextMax)
+    };
+    const updated = await this._writeNodeState({ environmentId, taskId, node });
     this._callHook('fabricate.gathering.nodeRestocked', { environmentId, taskId, current, max });
     return updated;
+  }
+
+  /**
+   * The current node object for a task in an environment: the inline state on a
+   * directly-authored environment task, else the per-environment runtime pool,
+   * else a fresh full pool seeded from the library task's node config. Null when
+   * the task has no node config.
+   */
+  _currentNodeState(environment, taskId) {
+    const envTask = normalizeList(environment?.tasks).find(task => task?.id === taskId);
+    if (envTask?.nodes) return envTask.nodes;
+    const runtime = environment?.nodeRuntime?.[taskId];
+    if (runtime) return runtime;
+    const libraryTasks = this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
+    const config = normalizeNodeConfig(normalizeList(libraryTasks).find(task => task?.id === taskId)?.nodes);
+    return config ? { ...config, current: config.max } : null;
+  }
+
+  /**
+   * Persist a node object for a task: onto the directly-authored environment
+   * task's inline `nodes` when present, otherwise into the per-environment
+   * `nodeRuntime` map (the path used by library-matched tasks). Always reads the
+   * raw stored environment so a composed/runtime environment is never written.
+   */
+  async _writeNodeState({ environmentId, taskId, node }) {
+    const stored = this.environmentStore?.get?.(environmentId);
+    if (!stored) return null;
+    if (normalizeList(stored.tasks).some(task => task?.id === taskId)) {
+      const tasks = normalizeList(stored.tasks).map(task => (task?.id === taskId ? { ...task, nodes: node } : task));
+      return this.environmentStore.update(environmentId, { tasks });
+    }
+    return this.environmentStore.update(environmentId, {
+      nodeRuntime: { ...(stored.nodeRuntime || {}), [taskId]: node }
+    });
   }
 
   /**
@@ -973,59 +1004,88 @@ export class GatheringRichStateService {
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
 
-    let changed = false;
+    // Directly-authored environment tasks carry inline node state; library-matched
+    // tasks keep per-environment state in `nodeRuntime`. Respawn both the same way.
+    let tasksChanged = false;
     const tasks = normalizeList(environment.tasks).map(task => {
-      const respawn = task?.nodes?.respawn;
-      if (!task?.nodes || !respawn || !['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(respawn.policy)) return task;
-      const interval = Number(respawn.intervalSeconds || 0);
-      if (!(interval > 0)) return task;
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
-
-      if (now <= last) {
-        if (respawn.lastEvaluatedWorldTime !== now) {
-          changed = true;
-          return { ...task, nodes: { ...task.nodes, respawn: { ...respawn, lastEvaluatedWorldTime: now } } };
-        }
-        return task;
-      }
-
-      const max = Number(task.nodes.max || 0);
-      const before = Number(task.nodes.current || 0);
-      let intervals = Math.floor((now - last) / interval);
-      if (intervals <= 0) return task;
-      const room = Math.max(0, max - before);
-      const advancedAnchor = last + intervals * interval;
-      if (room === 0) {
-        changed = true;
-        return { ...task, nodes: { ...task.nodes, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } } };
-      }
-      intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
-
-      let gain = 0;
-      let lastRoll = respawn.lastRoll;
-      if (respawn.policy === 'elapsedTime') {
-        gain = intervals;
-      } else {
-        const chance = Math.max(0, Math.min(1, Number(respawn.chance || 0)));
-        const rolls = [];
-        for (let i = 0; i < intervals; i++) {
-          const roll = Number(this.rollD100());
-          rolls.push(roll);
-          if (roll <= chance * 100) gain += 1;
-        }
-        lastRoll = { worldTime: now, chance, rolls };
-      }
-      const nextCurrent = Math.min(max, before + gain);
-      changed = true;
-      this._callHook('fabricate.gathering.nodeRespawned', { environmentId: environment.id, taskId: task.id, amount: nextCurrent - before, current: nextCurrent, max });
-      return {
-        ...task,
-        nodes: { ...task.nodes, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
-      };
+      if (!task?.nodes) return task;
+      const result = this._respawnNode(task.nodes, { now, environmentId: environment.id, taskId: task.id });
+      if (!result.changed) return task;
+      tasksChanged = true;
+      return { ...task, nodes: result.node };
     });
 
-    if (!changed) return null;
-    return this.environmentStore.update(environment.id, { tasks });
+    let runtimeChanged = false;
+    const nodeRuntime = { ...(environment.nodeRuntime || {}) };
+    for (const [taskId, node] of Object.entries(nodeRuntime)) {
+      const result = this._respawnNode(node, { now, environmentId: environment.id, taskId });
+      if (result.changed) { runtimeChanged = true; nodeRuntime[taskId] = result.node; }
+    }
+
+    if (!tasksChanged && !runtimeChanged) return null;
+    const patch = {};
+    if (tasksChanged) patch.tasks = tasks;
+    if (runtimeChanged) patch.nodeRuntime = nodeRuntime;
+    return this.environmentStore.update(environment.id, patch);
+  }
+
+  /**
+   * Respawn one resource-node pool as world time passes. Restores one node per
+   * elapsed interval (`elapsedTime`) or one persisted d100 roll per interval
+   * (`probability`/`manualAndElapsedTime`), clamped to max, advancing the
+   * `respawn.lastEvaluatedWorldTime` anchor so a same-tick refresh never rerolls.
+   *
+   * @param {object} nodes The node object (config + state).
+   * @param {{now:number, environmentId:string, taskId:string}} ctx
+   * @returns {{changed: boolean, node: object}}
+   */
+  _respawnNode(nodes, { now, environmentId, taskId }) {
+    const respawn = nodes?.respawn;
+    if (!nodes || !respawn || !['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(respawn.policy)) {
+      return { changed: false, node: nodes };
+    }
+    const interval = Number(respawn.intervalSeconds || 0);
+    if (!(interval > 0)) return { changed: false, node: nodes };
+    const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
+
+    if (now <= last) {
+      if (respawn.lastEvaluatedWorldTime !== now) {
+        return { changed: true, node: { ...nodes, respawn: { ...respawn, lastEvaluatedWorldTime: now } } };
+      }
+      return { changed: false, node: nodes };
+    }
+
+    const max = Number(nodes.max || 0);
+    const before = Number(nodes.current || 0);
+    let intervals = Math.floor((now - last) / interval);
+    if (intervals <= 0) return { changed: false, node: nodes };
+    const room = Math.max(0, max - before);
+    const advancedAnchor = last + intervals * interval;
+    if (room === 0) {
+      return { changed: true, node: { ...nodes, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } } };
+    }
+    intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
+
+    let gain = 0;
+    let lastRoll = respawn.lastRoll;
+    if (respawn.policy === 'elapsedTime') {
+      gain = intervals;
+    } else {
+      const chance = Math.max(0, Math.min(1, Number(respawn.chance || 0)));
+      const rolls = [];
+      for (let i = 0; i < intervals; i++) {
+        const roll = Number(this.rollD100());
+        rolls.push(roll);
+        if (roll <= chance * 100) gain += 1;
+      }
+      lastRoll = { worldTime: now, chance, rolls };
+    }
+    const nextCurrent = Math.min(max, before + gain);
+    this._callHook('fabricate.gathering.nodeRespawned', { environmentId, taskId, amount: nextCurrent - before, current: nextCurrent, max });
+    return {
+      changed: true,
+      node: { ...nodes, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
+    };
   }
 
   async updateConditions({ environmentId, conditions = {} } = {}) {
@@ -1196,8 +1256,13 @@ export class GatheringRichStateService {
     const mode = this._economyMode(systemId);
 
     if (mode === 'nodes' && task?.nodes && shouldDepleteNode(task, outcome)) {
-      const current = Math.max(0, Number(task.nodes.current || 0) - 1);
-      await this.restockNode({ environmentId: environment.id, taskId: task.id, current, max: task.nodes.max });
+      // Persist the full node object (config + respawn timers) with one consumed,
+      // so the per-environment pool (nodeRuntime for library tasks) is seeded and
+      // decremented in a single write.
+      const max = Number(task.nodes.max || 0);
+      const current = Math.min(max, Math.max(0, Number(task.nodes.current || 0) - 1));
+      const node = { ...cloneJson(task.nodes), current };
+      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
 
@@ -1295,6 +1360,15 @@ export class GatheringRichStateService {
       toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : []
     };
     if (normalized.timeRequirement) runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
+    // Resource nodes are per-environment: use this environment's stored runtime
+    // pool if present, else seed a fresh full pool from the library config. The
+    // seed is read-only here; it persists on first depletion.
+    if (normalized.nodes) {
+      const stored = environment?.nodeRuntime?.[normalized.id];
+      runtimeTask.nodes = stored
+        ? cloneJson(stored)
+        : { ...cloneJson(normalized.nodes), current: Number(normalized.nodes.max || 0) };
+    }
     return runtimeTask;
   }
 
@@ -1665,7 +1739,8 @@ function normalizeLibraryTask(task = {}) {
     timeRequirement: plainObjectOrNull(task.timeRequirement),
     toolIds: Array.isArray(task.toolIds)
       ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
-      : []
+      : [],
+    nodes: normalizeNodeConfig(task.nodes)
   };
 }
 

@@ -1,6 +1,7 @@
 import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
 import { DANGER_LEVELS, evaluateEnvironmentMatch, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
+import { normalizeNodeConfig, normalizeRespawn, normalizeNodeRuntime, VALID_DEPLETION_TIMINGS, VALID_RESPAWN_POLICIES } from './gatheringNodeConfig.js';
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
@@ -10,8 +11,6 @@ const VALID_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutc
 const VALID_CHECK_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const VALID_PROGRESSIVE_AWARD_MODES = new Set(['partial', 'equal', 'exceed']);
 const VALID_RISK_LEVELS = new Set(['safe', 'hazardous', 'unsafe', 'extreme']);
-const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
-const VALID_RESPAWN_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
 const VALID_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const VALID_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
@@ -182,6 +181,7 @@ export class GatheringEnvironmentStore {
       ...cloneJson(source),
       ...cloneJson(overrides),
       id: this.randomID(),
+      nodeRuntime: {}, // a copy starts with full pools (task ids are reissued anyway)
       tasks: source.tasks.map(task => ({
         ...cloneJson(task),
         id: this.randomID()
@@ -312,7 +312,10 @@ export class GatheringEnvironmentStore {
       ...(blindSelection ? { blindSelection } : {}),
       ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
       ...(forcedHazardIds.length > 0 ? { forcedHazardIds } : {}),
-      tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
+      tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : [],
+      // Per-environment node runtime state (taskId → node object), so a library
+      // task's resource nodes deplete/respawn independently in each environment.
+      nodeRuntime: normalizeNodeRuntime(data?.nodeRuntime)
     };
   }
 
@@ -1004,35 +1007,6 @@ function normalizeChatMessages(data = null) {
   };
 }
 
-function normalizeNodeConfig(data = null) {
-  if (!data || typeof data !== 'object') return null;
-  const max = numberOrNull(data.max ?? data.maxCount);
-  const current = numberOrNull(data.current ?? data.availableCount);
-  const config = {
-    enabled: data.enabled === true || max !== null || current !== null,
-    max: max ?? 0,
-    current: current ?? max ?? 0,
-    depletionTiming: VALID_DEPLETION_TIMINGS.has(data.depletionTiming) ? data.depletionTiming : 'onStart',
-    respawn: normalizeRespawn(data.respawn)
-  };
-  if (data.showCountsToPlayers === true) config.showCountsToPlayers = true;
-  return config.enabled ? config : null;
-}
-
-function normalizeRespawn(data = null) {
-  if (!data || typeof data !== 'object') return { policy: 'none' };
-  const policy = VALID_RESPAWN_POLICIES.has(data.policy) ? data.policy : 'none';
-  const intervalSeconds = numberOrNull(data.intervalSeconds);
-  const chance = numberOrNull(data.chance);
-  return {
-    policy,
-    intervalSeconds: intervalSeconds ?? 0,
-    chance: chance ?? 0,
-    lastEvaluatedWorldTime: numberOrNull(data.lastEvaluatedWorldTime),
-    nextEvaluationWorldTime: numberOrNull(data.nextEvaluationWorldTime),
-    lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null
-  };
-}
 
 function validateNodeConfig(nodes, label) {
   if (!nodes) return [];

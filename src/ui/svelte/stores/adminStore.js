@@ -43,6 +43,7 @@ import {
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
+import { normalizeNodeConfig } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
 
 // ---------------------------------------------------------------------------
@@ -626,7 +627,10 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null,
     toolIds: Array.isArray(task.toolIds)
       ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
-      : []
+      : [],
+    // Preserve the resource-node config (count/depletion/respawn) so authoring it
+    // on a task survives the save (the runtime reads it back to seed per-env pools).
+    ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {})
   };
 }
 

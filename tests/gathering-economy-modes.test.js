@@ -183,6 +183,96 @@ describe('gathering economy — node respawn over world time', () => {
   });
 });
 
+describe('gathering economy — per-environment node pools (library tasks)', () => {
+  const LIB_TASK = (overrides = {}) => ({
+    id: 'lib-1', name: 'Mine',
+    nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'none' }, ...(overrides.nodes || {}) },
+    ...overrides
+  });
+
+  function libService({ mode = 'nodes', task = LIB_TASK(), nodeRuntime = {}, envs = null, rolls = [] } = {}) {
+    const environments = envs || [environment({ id: 'env-1', tasks: [], nodeRuntime })];
+    const byId = new Map(environments.map(e => [e.id, e]));
+    const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: { mode }, tasks: [task] } } }]]);
+    const queue = [...rolls];
+    const service = new GatheringRichStateService({
+      getSetting: key => settings.get(key),
+      setSetting: async (key, value) => { settings.set(key, value); return value; },
+      settingKey: SETTING_KEYS.GATHERING_CONFIG,
+      environmentStore: {
+        get: id => byId.get(id) ?? environments[0],
+        list: () => environments,
+        update: async (id, patch) => { Object.assign(byId.get(id), patch); return byId.get(id); }
+      },
+      rollD100: () => queue.shift() ?? 100,
+      hooks: { callAll: () => {} }
+    });
+    return { service, environments, env: environments[0], task };
+  }
+
+  it('carries node config into the runtime task: seeds current=max, else uses stored runtime', async () => {
+    const { service, env, task } = libService();
+    const fresh = service._libraryTaskToRuntimeTask(task, env);
+    assert.equal(fresh.nodes.current, 2);
+    assert.equal(fresh.nodes.max, 2);
+
+    env.nodeRuntime = { 'lib-1': { enabled: true, max: 2, current: 1, depletionTiming: 'onStart', respawn: { policy: 'none' } } };
+    const stored = service._libraryTaskToRuntimeTask(task, env);
+    assert.equal(stored.nodes.current, 1, 'uses the per-environment runtime pool');
+  });
+
+  it('depletes the per-environment pool on attempt, floors at 0, and the gate blocks when empty', async () => {
+    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'none' } } }) });
+    const actor = makeFakeActor();
+
+    const runtime1 = service._libraryTaskToRuntimeTask(task, env);
+    const ev1 = await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: runtime1, outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 1);
+    assert.equal(ev1.node.remaining, 1);
+
+    const runtime2 = service._libraryTaskToRuntimeTask(task, env); // reads nodeRuntime → current 1
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: runtime2, outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 0);
+
+    const gate = await service.evaluateStart({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env) });
+    assert.equal(gate.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
+  });
+
+  it('respects depletionTiming onSuccess (only successful attempts consume)', async () => {
+    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onSuccess', respawn: { policy: 'none' } } }) });
+    const actor = makeFakeActor();
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'failed' } });
+    assert.equal(env.nodeRuntime['lib-1'], undefined, 'a failed attempt does not consume');
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 2);
+  });
+
+  it('keeps pools independent across environments', async () => {
+    const envs = [environment({ id: 'env-a', tasks: [], nodeRuntime: {} }), environment({ id: 'env-b', tasks: [], nodeRuntime: {} })];
+    const { service, task } = libService({ envs });
+    const actor = makeFakeActor();
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: envs[0], task: service._libraryTaskToRuntimeTask(task, envs[0]), outcome: { status: 'succeeded' } });
+    assert.equal(envs[0].nodeRuntime['lib-1'].current, 1);
+    assert.equal(envs[1].nodeRuntime['lib-1'], undefined, 'the other environment is untouched');
+  });
+
+  it('respawns the per-environment pool over world time', async () => {
+    const { service, env, task } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'elapsedTime', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: { policy: 'elapsedTime', intervalSeconds: HOUR } } }
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 }); // anchor
+    await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
+    assert.equal(env.nodeRuntime['lib-1'].current, 2);
+  });
+
+  it('GM restock refills a depleted library pool, clamped to max', async () => {
+    const { service, env, task } = libService({ nodeRuntime: { 'lib-1': { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } } } });
+    await service.restockNode({ environmentId: env.id, taskId: 'lib-1', current: 5, max: null });
+    assert.equal(env.nodeRuntime['lib-1'].current, 2); // clamped to max
+  });
+});
+
 describe('gathering economy — cost modifiers and mode gating', () => {
   function costConfig(mode = 'stamina') {
     return {

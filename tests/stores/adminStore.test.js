@@ -4094,6 +4094,17 @@ describe('createAdminStore — gathering economy', () => {
     assert.equal(vs.gatheringConfig.systems.sys1.economy.stamina.max, '40');
   });
 
+  it('preserves a library task node config through normalization (so it survives save)', async () => {
+    const gatheringConfig = { systems: { sys1: { economy: { mode: 'nodes' }, tasks: [{ id: 't1', name: 'Mine', nodes: { enabled: true, max: 4, current: 4, depletionTiming: 'onStart', respawn: { policy: 'elapsedTime', intervalSeconds: 3600 } } }] } } };
+    const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
+    const store = createAdminStore(services);
+    await store.refresh();
+    const node = get(store.viewState).gatheringConfig.systems.sys1.tasks[0].nodes;
+    assert.equal(node.max, 4);
+    assert.equal(node.depletionTiming, 'onStart');
+    assert.equal(node.respawn.policy, 'elapsedTime');
+  });
+
   it('refreshGatheringConfig re-reads the setting so a mode change reflects without reopening', async () => {
     // The economy panel persists via the game service, not the store, so the
     // store's viewState would otherwise stay stale until the app reopens.
