@@ -1,6 +1,6 @@
 # UI PR Screenshot Evidence
 
-UI changes must have real smoke-run screenshot evidence embedded in the PR body. The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`.
+UI changes must include screenshot evidence in the PR body. The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`: the body must contain a **Screenshots** heading (any ATX level, normally `##`) with at least one image beneath it. The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading — including a drag-and-dropped GitHub attachment — satisfies the check.
 
 ## When It Applies
 
@@ -75,14 +75,22 @@ Screenshot evidence must come from real smoke-harness artifacts in `test-results
 
 ## CI Behavior
 
-CI runs only the lightweight `check` (no smoke run on the runner). It reads the live PR body, changed files, and labels, then accepts:
+CI runs only the lightweight `check` (no smoke run on the runner). It reads the live PR body, changed files, and labels, then passes when the body has a **Screenshots** heading whose section contains at least one image:
 
-- PR-scoped S3 object URLs under `…amazonaws.com/pr-screenshots/<pr-number>/...` (the normal evidence produced by `publish`)
-- PR-scoped GitHub attachment markdown whose alt text includes `pr-<pr-number>` (manual `user-attachments` uploads)
-- PR-scoped uploaded artifact references such as `codex-ui-evidence-<pr-number>` (automation fallback)
-- PR-scoped `test-results/...png|jpg|jpeg|webp|gif` artifact paths (automation fallback)
+```md
+## Screenshots
 
-CI does not accept unrelated image markdown, and there is **no `SCREENSHOTS_NEEDED:` text bypass** — that self-serve escape hatch has been removed.
+![Manager gathering tools](https://github.com/user-attachments/assets/<uuid>)
+```
+
+Details of the rule:
+
+- The heading match is case-insensitive, accepts any ATX level (`#`–`######`) and the singular form (`## Screenshot`).
+- The section runs from the heading to the next heading of the same or higher level, so an image under a *different* later heading does not count.
+- Images may be markdown (`![alt](url)`) or HTML (`<img src=...>`). GitHub drag-and-drop attachment URLs have no file extension, so the image syntax — not the URL shape — is what matters.
+- An image with no Screenshots heading, or a Screenshots heading with no image, does not pass. There is **no `SCREENSHOTS_NEEDED:` text bypass**.
+
+The `publish` step writes its managed block beneath a `## Screenshots` heading, so an auto-published body satisfies the same rule.
 
 ## Bypass
 
