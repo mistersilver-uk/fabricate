@@ -494,12 +494,14 @@
     opacity: 0.55;
   }
 
-  /* The trailing action column (bulk Save in the header, roll/reset per row). */
+  /* The trailing action column (bulk Save in the header, roll/reset per row).
+     Slightly more compact than a default button, with slightly larger label. */
   .manager-economy-bulk-save {
     width: 100%;
-    padding-left: 0;
-    padding-right: 0;
+    padding: 3px 6px;
     justify-content: center;
+    font-size: 0.82rem;
+    line-height: 1.1;
   }
 
   .manager-economy-actor-roll {
