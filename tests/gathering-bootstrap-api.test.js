@@ -175,11 +175,6 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
       rollCalls[rollCalls.length - 1].options = options;
       return { total: this.formula === '@skills.sur.mod + 10' ? this.data.skills.sur.mod + 10 : 12 };
     }
-
-    evaluateSync() {
-      rollCalls[rollCalls.length - 1].options = 'sync';
-      return { total: this.formula === '@skills.sur.mod + 10' ? this.data.skills.sur.mod + 10 : 12 };
-    }
   };
 
   try {
@@ -199,7 +194,7 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
     assert.equal(result.reasonCode, 'VISIBLE');
     assert.deepEqual(rollCalls.map(call => call.formula), ['@skills.sur.mod + 10', '12']);
     assert.deepEqual(rollCalls[0].data, { skills: { sur: { mod: 5 } } });
-    assert.equal(rollCalls[0].options, 'sync');
+    assert.equal(rollCalls[0].options, undefined); // async evaluate(), not evaluateSync()
   } finally {
     if (previousRoll === undefined) {
       delete globalThis.Roll;
