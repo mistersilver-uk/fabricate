@@ -21,7 +21,7 @@
   // The shared actor-selection store (services.actorBar). Existing tests mount
   // GatheringView with a `services` bag that has no `actorBar`, so EVERY access
   // goes through `store?.` optional chaining to stay green unmodified.
-  const store = services?.actorBar ?? null;
+  const store = $derived(services?.actorBar ?? null);
 
   let loading = $state(true);
   let error = $state(false);

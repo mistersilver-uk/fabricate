@@ -320,7 +320,7 @@
             <div class="manager-tools-row-body"
               role="button"
               tabindex="0"
-              aria-selected={isSelected}
+              aria-pressed={isSelected}
               aria-expanded={isExpanded}
               onclick={() => handleSelectRow(tool)}
               onkeydown={(event) => handleRowKey(event, tool)}>

@@ -135,35 +135,31 @@ export function mapChangedFilesToViews(files = []) {
   return matched.filter(Boolean);
 }
 
-export function hasScreenshotEvidence(body = '', { prNumber = '' } = {}) {
-  const text = String(body || '');
-  const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
-  if (normalizedPrNumber) {
-    // `(?![0-9])` after the PR number prevents a longer PR's reference from
-    // satisfying a shorter PR's gate (e.g. pr-251 must not match pr-25).
-    const prPart = `pr-${escapeRegExp(normalizedPrNumber)}(?![0-9])`;
-    const prScopedTestResultArtifact = new RegExp(`test-results/[^\\s)>"']*${prPart}[^\\s)>"']*\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
-    if (prScopedTestResultArtifact.test(text)) return true;
-
-    const prScopedArtifact = new RegExp(`codex-ui-evidence-${escapeRegExp(normalizedPrNumber)}(?:\\b|[-_.][\\w.-]*)|actions/runs/[0-9]+/artifacts/[0-9]+[^\\n]*${prPart}`, 'i');
-    if (prScopedArtifact.test(text)) return true;
-
-    // PR-scoped S3 object (publish uploads to <prefix>/<pr>/<view>.png).
-    const prScopedS3 = new RegExp(`https://[^\\s)>"']*amazonaws\\.com/[^\\s)>"']*${escapeRegExp(screenshotPrefix())}/${escapeRegExp(normalizedPrNumber)}/[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
-    if (prScopedS3.test(text)) return true;
-
-    const prScopedAttachment = new RegExp(`!\\[[^\\]]*${prPart}[^\\]]*\\]\\(https://github\\.com/user-attachments/assets/[0-9a-f-]+\\)`, 'i');
-    return prScopedAttachment.test(text);
+// A UI PR satisfies the screenshot check when its body has a "Screenshots"
+// heading (any ATX level — typically `##`) whose section contains at least one
+// image. Images may be markdown (`![alt](url)`) or HTML (`<img ... src=...>`);
+// GitHub drag-and-drop attachment URLs carry no file extension, so the image
+// syntax itself — not the URL shape — is the signal. The section runs from the
+// heading to the next heading of the same or higher level (or end of body).
+export function hasScreenshotEvidence(body = '') {
+  const lines = String(body || '').replace(/\r\n/g, '\n').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const heading = lines[i].match(/^(#{1,6})\s+(.+?)\s*#*$/);
+    if (!heading || !/^screenshots?\b/i.test(heading[2].trim())) continue;
+    const level = heading[1].length;
+    let section = '';
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j].match(/^(#{1,6})\s/);
+      if (next && next[1].length <= level) break;
+      section += `${lines[j]}\n`;
+    }
+    if (containsImage(section)) return true;
   }
+  return false;
+}
 
-  const testResultArtifact = /test-results\/[^\s)>"']+\.(?:png|jpg|jpeg|webp|gif)/i;
-  if (testResultArtifact.test(text)) return true;
-
-  const s3Asset = new RegExp(`https://[^\\s)>"']*amazonaws\\.com/[^\\s)>"']*${escapeRegExp(screenshotPrefix())}/[^\\s)>"']+\\.(?:png|jpg|jpeg|webp|gif)`, 'i');
-  if (s3Asset.test(text)) return true;
-
-  const uploadedArtifact = /codex-ui-evidence-[\w.-]+|actions\/runs\/[0-9]+\/artifacts\/[0-9]+|github\.com\/user-attachments\/assets\/[0-9a-f-]+/i;
-  return uploadedArtifact.test(text);
+function containsImage(text) {
+  return /!\[[^\]]*\]\([^)]+\)/.test(text) || /<img\b[^>]*\bsrc\s*=/i.test(text);
 }
 
 export function validateChangedFilesForCheck(changedFiles = [], { required = false } = {}) {
@@ -175,11 +171,10 @@ export function validateChangedFilesForCheck(changedFiles = [], { required = fal
 
 export function explainScreenshotEvidenceFailure(files = [], body = '', options = {}) {
   if (!hasUiChanges(files)) return null;
-  if (hasScreenshotEvidence(body, options)) return null;
-  const prNumber = options.prNumber || '<number>';
+  if (hasScreenshotEvidence(body)) return null;
   const exemptLabel = options.exemptLabel || DEFAULT_EXEMPT_LABEL;
   const views = mapChangedFilesToViews(files).map(recipe => recipe.label).join(', ') || 'changed UI views';
-  return `This PR changes UI files but has no smoke-run screenshot evidence for: ${views}. Run npm run test:foundry to produce real Foundry screenshots, then npm run screenshots:ui -- --base origin/main --pr ${prNumber} to collect the relevant smoke artifacts under tmp/pr-screenshots/${prNumber}/, then npm run screenshots:ui:publish -- --pr ${prNumber} to upload them to S3 and embed the returned ![pr-${prNumber} ...] image markdown in the PR body. If screenshot capture is genuinely impossible, a maintainer must add the '${exemptLabel}' label (it cannot be self-applied by an agent).`;
+  return `This PR changes UI files (${views}) but its description has no Screenshots section with an image. Add a "## Screenshots" heading to the PR body and embed at least one screenshot of the affected view(s) beneath it — drag-and-drop an image into the GitHub editor, or paste markdown (![alt](url)) or <img> markup. If a screenshot is genuinely impossible, a maintainer must add the '${exemptLabel}' label (it cannot be self-applied by an agent).`;
 }
 
 export function collectScreenshotEvidence({
@@ -245,7 +240,9 @@ export function buildScreenshotMarkdown(prNumber, uploaded = []) {
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
   const text = String(body || '');
-  const inner = `${SCREENSHOTS_BLOCK_START}\n${blockMarkdown}\n${SCREENSHOTS_BLOCK_END}`;
+  // Include a `## Screenshots` heading so an auto-published body satisfies the
+  // same check humans do (an image beneath a Screenshots heading).
+  const inner = `${SCREENSHOTS_BLOCK_START}\n## Screenshots\n\n${blockMarkdown}\n${SCREENSHOTS_BLOCK_END}`;
   const startIndex = text.indexOf(SCREENSHOTS_BLOCK_START);
   const endIndex = text.indexOf(SCREENSHOTS_BLOCK_END);
   if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {

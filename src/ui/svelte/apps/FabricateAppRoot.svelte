@@ -36,7 +36,7 @@
 </script>
 
 <div class="fabricate-app-shell">
-  <nav class="fabricate-app-nav" role="tablist" aria-orientation="vertical">
+  <div class="fabricate-app-nav" role="tablist" aria-orientation="vertical">
     {#each tabs as tab (tab.id)}
       <button
         type="button"
@@ -50,7 +50,7 @@
         <span class="fabricate-app-nav-label">{localize(tab.label)}</span>
       </button>
     {/each}
-  </nav>
+  </div>
 
   <div class="fabricate-app-main">
     <ActorSelectTopBar store={services?.actorBar} {activeTab} />

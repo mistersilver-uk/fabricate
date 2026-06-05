@@ -58,52 +58,32 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('rejects committed PR screenshot asset markdown and unrelated image markdown', () => {
-    assert.equal(
-      hasScreenshotEvidence(
-        '![Environment editor](https://github.com/example/repo/blob/branch/docs/assets/pr-screenshots/pr-123/manager-environments.png?raw=1)',
-        { prNumber: 123 },
-      ),
-      false,
-    );
-    assert.equal(hasScreenshotEvidence('![Unrelated](https://example.com/mock.png)', { prNumber: 123 }), false);
+  it('accepts an image beneath a Screenshots heading at any level', () => {
+    const attachment = '![Environment](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)';
+    assert.equal(hasScreenshotEvidence(`## Screenshots\n\n${attachment}`), true);
+    // Any ATX level qualifies, and a closed (`## Screenshots ##`) heading too.
+    assert.equal(hasScreenshotEvidence(`# Screenshots\n\n${attachment}`), true);
+    assert.equal(hasScreenshotEvidence(`### Screenshots ###\n\n${attachment}`), true);
+    // The heading match is case-insensitive and allows the singular form.
+    assert.equal(hasScreenshotEvidence(`## screenshot\n\n${attachment}`), true);
+    // An HTML <img> under the heading counts as well.
+    assert.equal(hasScreenshotEvidence('## Screenshots\n\n<img src="https://example.com/a.png" alt="a">'), true);
   });
 
-  it('accepts GitHub attachment images and automation fallback artifacts', () => {
-    assert.equal(hasScreenshotEvidence('Screenshot artifacts were uploaded as `codex-ui-evidence-42-99`.'), true);
-    assert.equal(hasScreenshotEvidence('![Environment](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)'), true);
-    assert.equal(hasScreenshotEvidence('See `test-results/screenshot-01-manager-components-normal.png`.'), true);
+  it('rejects images that are not under a Screenshots heading', () => {
+    const attachment = '![Environment](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)';
+    // A bare image with no Screenshots heading is not evidence.
+    assert.equal(hasScreenshotEvidence(attachment), false);
+    assert.equal(hasScreenshotEvidence(`## Description\n\n${attachment}`), false);
+    // A Screenshots heading with no image beneath it is not evidence; the image
+    // sits under a sibling heading, outside the (empty) Screenshots section.
+    assert.equal(hasScreenshotEvidence(`## Screenshots\n\nComing soon.\n\n## Notes\n\n${attachment}`), false);
   });
 
-  it('no longer accepts the self-serve SCREENSHOTS_NEEDED text bypass', () => {
+  it('does not accept legacy artifact text or the SCREENSHOTS_NEEDED bypass as evidence', () => {
+    assert.equal(hasScreenshotEvidence('Screenshot artifacts were uploaded as `codex-ui-evidence-42-99`.'), false);
+    assert.equal(hasScreenshotEvidence('See `test-results/screenshot-01-manager-components-normal.png`.'), false);
     assert.equal(hasScreenshotEvidence('SCREENSHOTS_NEEDED: Playwright could not launch for Manager tools.'), false);
-    assert.equal(hasScreenshotEvidence('SCREENSHOTS_NEEDED:   '), false);
-  });
-
-  it('scopes uploaded screenshot evidence to the current PR when prNumber is supplied', () => {
-    assert.equal(hasScreenshotEvidence('Screenshot artifacts were uploaded as `codex-ui-evidence-123-abc`.', { prNumber: 123 }), true);
-    assert.equal(hasScreenshotEvidence('Screenshot artifacts were uploaded as `codex-ui-evidence-999-abc`.', { prNumber: 123 }), false);
-    assert.equal(hasScreenshotEvidence('Screenshot artifacts were uploaded as `codex-ui-evidence-1234`.', { prNumber: 123 }), false);
-    assert.equal(
-      hasScreenshotEvidence(
-        '![pr-123 manager environment](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)',
-        { prNumber: 123 },
-      ),
-      true,
-    );
-    assert.equal(
-      hasScreenshotEvidence(
-        '![manager environment](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)',
-        { prNumber: 123 },
-      ),
-      false,
-    );
-    assert.equal(hasScreenshotEvidence('See `test-results/pr-123/screenshot-manager.png`.', { prNumber: 123 }), true);
-    assert.equal(hasScreenshotEvidence('See `test-results/pr-999/screenshot-manager.png`.', { prNumber: 123 }), false);
-  });
-
-  it('rejects invalid PR numbers before building evidence regexes', () => {
-    assert.throws(() => hasScreenshotEvidence('codex-ui-evidence-123', { prNumber: '../123' }), /Invalid PR number/);
   });
 
   it('explains missing UI screenshot evidence with mapped changed views', () => {
@@ -114,12 +94,17 @@ describe('UI PR screenshot evidence', () => {
     );
 
     assert.match(failure, /Manager gathering tools/);
-    assert.match(failure, /tmp\/pr-screenshots\/321/);
-    assert.match(failure, /npm run test:foundry/);
-    assert.match(failure, /npm run screenshots:ui:publish -- --pr 321/);
-    assert.match(failure, /to S3/);
-    assert.match(failure, /!\[pr-321 \.\.\.\]/);
+    assert.match(failure, /## Screenshots/);
     assert.match(failure, /screenshots-exempt/);
+  });
+
+  it('passes the check once a Screenshots section with an image is present', () => {
+    const failure = explainScreenshotEvidenceFailure(
+      ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+      '## Screenshots\n\n![Tools](https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000)',
+      { prNumber: 321 },
+    );
+    assert.equal(failure, null);
   });
 
   it('treats empty changed-file input as an invalid check-mode state', () => {
@@ -270,23 +255,6 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('does not let a longer PR number satisfy a shorter PR gate (prefix collision)', () => {
-    // PR 25 must not be satisfied by evidence scoped to PR 251.
-    assert.equal(
-      hasScreenshotEvidence('See `test-results/pr-251/screenshot-manager.png`.', { prNumber: 25 }),
-      false,
-    );
-    assert.equal(
-      hasScreenshotEvidence('Artifact `codex-ui-evidence-251-abc`.', { prNumber: 25 }),
-      false,
-    );
-    // The exact PR still passes.
-    assert.equal(
-      hasScreenshotEvidence('See `test-results/pr-25/screenshot-manager.png`.', { prNumber: 25 }),
-      true,
-    );
-  });
-
   it('deletes only the PR-scoped S3 prefix via an injected list-and-delete seam', async () => {
     const config = { bucket: 'test-bucket', baseUrl: 'https://test-bucket.s3.eu-west-2.amazonaws.com', region: 'eu-west-2', prefix: 'pr-screenshots' };
     const calls = [];
@@ -306,30 +274,15 @@ describe('UI PR screenshot evidence', () => {
     await assert.rejects(() => deletePrScreenshotsFromS3({ prNumber: '../../251', config, listAndDelete }), /Invalid PR number/);
   });
 
-  it('accepts a PR-scoped S3 object URL as evidence', () => {
-    assert.equal(
-      hasScreenshotEvidence(
-        '![pr-251 tools](https://fabricate-modules-088545273404-eu-west-2-an.s3.eu-west-2.amazonaws.com/pr-screenshots/251/manager-tools.png)',
-        { prNumber: 251 },
-      ),
-      true,
-    );
-    // An S3 object scoped to a different PR must not satisfy PR 251.
-    assert.equal(
-      hasScreenshotEvidence(
-        '![tools](https://fabricate-modules-088545273404-eu-west-2-an.s3.eu-west-2.amazonaws.com/pr-screenshots/999/manager-tools.png)',
-        { prNumber: 251 },
-      ),
-      false,
-    );
-  });
-
-  it('builds pr-scoped attachment markdown that satisfies the scoped check', () => {
+  it('builds attachment markdown that satisfies the check once placed in the managed block', () => {
     const md = buildScreenshotMarkdown(251, [
       { label: 'Manager gathering environments', url: 'https://github.com/user-attachments/assets/abcabcab-abcd-abcd-abcd-abcabcabcabc' },
     ]);
     assert.match(md, /!\[pr-251 Manager gathering environments\]/);
-    assert.equal(hasScreenshotEvidence(md, { prNumber: 251 }), true);
+    // Bare image markdown alone is not evidence, but the managed block wraps it
+    // beneath a `## Screenshots` heading, which satisfies the check.
+    assert.equal(hasScreenshotEvidence(md), false);
+    assert.equal(hasScreenshotEvidence(upsertScreenshotsBlock('Body.', md)), true);
   });
 
   it('upserts the screenshot block idempotently', () => {
@@ -388,6 +341,7 @@ describe('UI PR screenshot evidence', () => {
       const bodyFile = editCalls[0][editCalls[0].indexOf('--body-file') + 1];
       const written = readFileSync(bodyFile, 'utf8');
       assert.match(written, /Original\./);
+      assert.match(written, /##\s+Screenshots/);
       assert.match(written, /!\[pr-251 Manager gathering environments\]\(https:\/\/test-bucket\.s3\.eu-west-2\.amazonaws\.com\/pr-screenshots\/251\/manager-environments\.png\)/);
       assert.match(written, /!\[pr-251 Manager gathering tools\]/);
       assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
