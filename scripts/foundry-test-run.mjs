@@ -1219,10 +1219,14 @@ async function closeOpenApplications(page) {
  */
 function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('console', msg => {
-    const entry = `[${msg.type()}] ${msg.text()}`;
-    consoleLog.push(entry);
+    // Browser "Failed to load resource" console errors carry no URL in their
+    // text; the resource path lives in msg.location(). Append it so a bare 404
+    // can be traced to the exact asset in both console.log and the gate's
+    // consoleErrors list.
+    const location = msg.type() === 'error' ? (msg.location()?.url || '') : '';
+    const text = location ? `${msg.text()} (${location})` : msg.text();
+    consoleLog.push(`[${msg.type()}] ${text}`);
     if (msg.type() === 'error') {
-      const text = msg.text();
       const isIgnored = ignoredErrorPatterns.some(p => p.test(text));
       if (!isIgnored) {
         consoleErrors.push(text);
@@ -1237,6 +1241,24 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
     if (!isIgnored) {
       consoleErrors.push(`pageerror: ${err.message}`);
     }
+  });
+
+  // Diagnostic only: a console 'error' is logged for failed resource loads but
+  // is not always paired with a usable URL. Record every failing HTTP response
+  // (4xx/5xx) and every network-level request failure with its URL into
+  // console.log so the source of a "Failed to load resource" is always
+  // traceable. These do NOT push to consoleErrors, so they never change the
+  // run's pass/fail — the console 'error' above remains the gate.
+  page.on('response', response => {
+    const status = response.status();
+    if (status >= 400) {
+      consoleLog.push(`[response ${status}] ${response.url()}`);
+    }
+  });
+
+  page.on('requestfailed', request => {
+    const failure = request.failure();
+    consoleLog.push(`[requestfailed ${failure?.errorText || 'unknown'}] ${request.url()}`);
   });
 }
 
