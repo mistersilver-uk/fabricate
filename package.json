@@ -1,7 +1,7 @@
 {
   "name": "fabricate",
   "version": "0.0.0-development",
-  "description": "Universal crafting system for Foundry VTT - supports simple recipes, catalysts, variable outputs, and active effect transfer",
+  "description": "A universal crafting & gathering system for Foundry VTT.",
   "type": "module",
   "scripts": {
     "build": "node scripts/release.js --no-zip",
