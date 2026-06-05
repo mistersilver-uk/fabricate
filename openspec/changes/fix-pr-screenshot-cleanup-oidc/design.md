@@ -15,9 +15,9 @@ This means GitHub could mint an OIDC token and the workflow had
 The screenshot role should keep an AWS-required `sub` guard, but should not use
 `job_workflow_ref` for these normal workflows. The `sub` guard should allow only:
 
-- `repo:mistersilver-uk/fabricate-v2:ref:refs/heads/main` for
+- `repo:mistersilver-uk/fabricate:ref:refs/heads/main` for
   `workflow_dispatch` publishing from `main`.
-- `repo:mistersilver-uk/fabricate-v2:pull_request` for `pull_request_target` cleanup.
+- `repo:mistersilver-uk/fabricate:pull_request` for `pull_request_target` cleanup.
 
 The tighter workflow guard should use the GitHub-specific AWS OIDC condition
 keys:

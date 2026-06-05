@@ -45,7 +45,7 @@
 - [x] `npm run build`.
 - [x] `git diff --check main...HEAD`.
 - [ ] (User, AWS-side) Extend IAM role `GitHubFoundryModulePublisherRole` trust policy to
-      allow `repo:mistersilver-uk/fabricate-v2:*` OIDC subject; ensure its permissions policy
+      allow `repo:mistersilver-uk/fabricate:*` OIDC subject; ensure its permissions policy
       allows `modules/fabricate/*` and `testers/*/fabricate/*` writes.
 - [x] Set repo vars `AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL`.
 - [ ] (User) Dispatch `release-s3.yml` with a real RC tag + `dry_run: true`, then `dry_run: false`;
