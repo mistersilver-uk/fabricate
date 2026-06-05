@@ -143,8 +143,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -398,6 +400,74 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await settle();
     assert.equal(calls.attempts.length, 1, 'still exactly one attempt after settle');
     assert.equal(calls.list, 2, 'listing re-fetched once after the attempt resolves');
+  });
+
+  it('auto-selects the first attemptable task and shows it in the right-column inspector', async () => {
+    const { services } = makeServices(listing([environment()]));
+    await mountView(services);
+
+    // Right column shows the selected-task inspector for task-1 (the only,
+    // attemptable, task), with its name and a "no requirements" note.
+    const panel = target.querySelector('[data-gathering-task-detail]');
+    assert.ok(panel, 'right-column task inspector renders for the auto-selected task');
+    assert.equal(panel.getAttribute('data-detail-task-id'), 'task-1');
+    assert.ok(panel.textContent.includes('Gather Iron'), 'inspector header shows the task name');
+    assert.ok(panel.querySelector('[data-gathering-no-requirements]'), 'a task with no tools/blocks shows the no-requirements note');
+
+    // The matching center row is the selected one.
+    const row = target.querySelector('[data-task-id="task-1"]');
+    assert.equal(row.getAttribute('data-selected'), 'true', 'the center row reflects the selection');
+  });
+
+  it('selecting a task updates the inspector and moves the center accordion (single expanded row)', async () => {
+    const tooled = taskModel({
+      id: 'task-2',
+      name: 'Chop Wood',
+      attemptable: true,
+      blockedReasons: [],
+      tools: [{ id: 'c-axe', name: 'Axe', img: 'icons/axe.webp', state: 'present', required: true }]
+    });
+    const { services } = makeServices(listing([environment({ tasks: [taskModel(), tooled] })]));
+    await mountView(services);
+
+    // Defaults to the first attemptable task (task-1); task-2 is not selected.
+    assert.equal(target.querySelector('[data-gathering-task-detail]').getAttribute('data-detail-task-id'), 'task-1');
+    assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'false');
+
+    // Select task-2 by clicking its summary.
+    target.querySelector('[data-task-id="task-2"] .gathering-task-summary').click();
+    flushSync();
+
+    // Right column now shows task-2, including its required tool.
+    const panel = target.querySelector('[data-gathering-task-detail]');
+    assert.equal(panel.getAttribute('data-detail-task-id'), 'task-2');
+    assert.ok(panel.querySelector('[data-gathering-tool]'), 'inspector lists the selected task tools');
+
+    // Accordion moved: task-2 selected + expanded, task-1 deselected.
+    assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'true');
+    assert.equal(target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'), 'false');
+    assert.ok(target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'), 'selected expandable row shows inline requirements');
+  });
+
+  it('shows the "select a gathering task" hint when tasks exist but none is attemptable', async () => {
+    const blocked = taskModel({ id: 'task-x', attemptable: false, successChance: null, blockedReasons: [{ code: 'CONDITIONS_BLOCKED', message: 'no', data: {} }] });
+    const { services } = makeServices(listing([environment({ tasks: [blocked] })]));
+    await mountView(services);
+
+    const column = target.querySelector('[data-gathering-task-detail-column]');
+    const state = column.querySelector('[data-gathering-task-detail-state]');
+    assert.ok(state, 'right column shows a hint state');
+    assert.equal(state.getAttribute('data-gathering-task-detail-state'), 'empty');
+    assert.ok(state.textContent.includes('SelectTaskHint'), 'shows the select-a-task hint');
+  });
+
+  it('shows the "no available tasks" hint when the environment has no visible tasks', async () => {
+    const { services } = makeServices(listing([environment({ tasks: [] })]));
+    await mountView(services);
+
+    const state = target.querySelector('[data-gathering-task-detail-column] [data-gathering-task-detail-state]');
+    assert.equal(state.getAttribute('data-gathering-task-detail-state'), 'none');
+    assert.ok(state.textContent.includes('NoAvailableTasks'), 'shows the no-available-tasks hint');
   });
 
   it('wires the blind Attempt to startGatheringAttempt with a null task id', async () => {

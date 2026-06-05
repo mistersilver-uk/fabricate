@@ -24,7 +24,9 @@
   let {
     environment = null,
     services = null,
-    onAttempted = null
+    onAttempted = null,
+    selectedTaskId = null,
+    onSelectTask = null
   } = $props();
 
   const env = $derived(environment);
@@ -213,6 +215,8 @@
                   environmentId={envId}
                   onAttempt={attempt}
                   {busy}
+                  selected={String(discoveredTask.id) === String(selectedTaskId)}
+                  onSelect={onSelectTask}
                 />
               {/each}
             </div>
@@ -228,6 +232,8 @@
               environmentId={envId}
               onAttempt={attempt}
               {busy}
+              selected={String(gatheringTask.id) === String(selectedTaskId)}
+              onSelect={onSelectTask}
             />
           {/each}
         </div>
