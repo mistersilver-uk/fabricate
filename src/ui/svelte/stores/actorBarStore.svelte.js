@@ -23,6 +23,7 @@ export function createActorBarStore({ services } = {}) {
   let selectedActorId = $state('');
   let selectableActors = $state([]);
   let region = $state('');
+  let staminaPool = $state(null);
   let conditions = $state(null);
   let loaded = $state(false);
 
@@ -88,6 +89,17 @@ export function createActorBarStore({ services } = {}) {
   }
 
   /**
+   * Store the gathering tab's active stamina pool (`{ current, max, … }`) for
+   * the header bar, or `null` when the active system is not in stamina mode (or
+   * no actor/pool applies).
+   *
+   * @param {object|null} next Stamina pool state.
+   */
+  function setStaminaPool(next) {
+    staminaPool = next ?? null;
+  }
+
+  /**
    * Refresh `conditions` from the current global gathering conditions.
    */
   function refreshConditions() {
@@ -104,6 +116,9 @@ export function createActorBarStore({ services } = {}) {
     get region() {
       return region;
     },
+    get staminaPool() {
+      return staminaPool;
+    },
     get conditions() {
       return conditions;
     },
@@ -116,6 +131,7 @@ export function createActorBarStore({ services } = {}) {
     loadSelectableActors,
     selectActor,
     setRegion,
+    setStaminaPool,
     refreshConditions
   };
 }

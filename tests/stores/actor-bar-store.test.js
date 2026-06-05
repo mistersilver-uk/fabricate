@@ -158,6 +158,21 @@ describe('actorBarStore', () => {
     assert.equal(store.region, '', 'null normalizes to empty string');
   });
 
+  it('setStaminaPool stores the active pool and clears to null', () => {
+    const { services } = makeServices({ actors: ACTORS });
+    const store = createActorBarStore({ services });
+
+    assert.equal(store.staminaPool, null, 'defaults to null');
+
+    store.setStaminaPool({ current: 4, max: 10 });
+    flushSync();
+    assert.deepEqual(store.staminaPool, { current: 4, max: 10 });
+
+    store.setStaminaPool(null);
+    flushSync();
+    assert.equal(store.staminaPool, null, 'cleared back to null');
+  });
+
   it('refreshConditions pulls the current conditions through services', () => {
     const conditions = { weather: 'clear', timeOfDay: 'dusk' };
     const { services } = makeServices({ actors: ACTORS, conditions });

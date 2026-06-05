@@ -16,6 +16,7 @@
       },
       "ActorBar": {
         "Trigger": "Select a character",
+        "Stamina": "Stamina",
         "SearchPlaceholder": "Search characters…",
         "SearchLabel": "Search characters",
         "NoActors": "No selectable characters.",

@@ -152,10 +152,13 @@
   // without reopening the app. No-ops outside the Foundry runtime.
   $effect(() => subscribeSceneChange(() => load(true)));
 
-  // Report the selected environment's region up to the shared store so the bar
-  // can render it; `''` clears the region when no environment is selected.
+  // Report the selected environment's region + stamina pool up to the shared
+  // store so the header bar can render them; cleared when no environment is
+  // selected. `staminaPool` is already null unless the system is in stamina mode
+  // and an actor is selected (gated in the engine listing).
   $effect(() => {
     store?.setRegion(selectedEnvironment?.region ?? '');
+    store?.setStaminaPool(selectedEnvironment?.staminaPool ?? null);
   });
 </script>
 
