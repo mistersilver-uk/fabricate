@@ -1157,7 +1157,7 @@ export class GatheringRichStateService {
     const systemId = system?.id || environment?.craftingSystemId;
     const mode = this._economyMode(systemId);
 
-    if (mode === 'nodes' && task?.nodes && Number(task.nodes.current || 0) <= 0 && viewer?.isGM !== true) {
+    if (mode === 'nodes' && task?.nodes && Number(task.nodes.current || 0) <= 0) {
       blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
     }
 
@@ -1167,7 +1167,7 @@ export class GatheringRichStateService {
       const stamina = this.getActorStamina(actor, systemId);
       evidence.stamina = { cost, base: Number(task.staminaCost || 0), state: stamina };
       // Only enforce when a pool exists (max configured); no max ⇒ no stamina limit.
-      if (cost > 0 && viewer?.isGM !== true && stamina.max != null && Number(stamina.current ?? 0) < cost) {
+      if (cost > 0 && stamina.max != null && Number(stamina.current ?? 0) < cost) {
         blockedReasons.push(this._blockedReason('STAMINA_BLOCKED', {
           taskId: task.id,
           required: cost,
@@ -1191,13 +1191,6 @@ export class GatheringRichStateService {
           ?? null
       )
     };
-
-    // A GM acting as a viewer bypasses the economy, so the attempt must not
-    // consume the actor's stamina or the environment's nodes.
-    if (viewer?.isGM === true) {
-      this._callHook('fabricate.gathering.richAttemptCommitted', { actor, system, environment, task, outcome, evidence });
-      return evidence;
-    }
 
     const systemId = system?.id || environment?.craftingSystemId;
     const mode = this._economyMode(systemId);

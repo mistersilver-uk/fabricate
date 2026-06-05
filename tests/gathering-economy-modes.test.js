@@ -260,7 +260,7 @@ describe('gathering economy — cost modifiers and mode gating', () => {
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 1); // untouched
   });
 
-  it('blocks a depleted node only in nodes mode; a GM viewer bypasses without consuming', async () => {
+  it('blocks a depleted node for players and GMs alike (GMs are subject to the economy)', async () => {
     const { service } = makeRichState({ config: costConfig('nodes') });
     const env = environment();
     const depleted = task({ staminaCost: 0, nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } } });
@@ -269,7 +269,20 @@ describe('gathering economy — cost modifiers and mode gating', () => {
     assert.equal(player.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
 
     const gm = await service.evaluateStart({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: depleted, viewer: { isGM: true } });
-    assert.equal(gm.blockedReasons.length, 0);
+    assert.equal(gm.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true, 'GMs are now gated by the economy too');
+  });
+
+  it('spends stamina on a committed attempt by a GM viewer (no economy bypass)', async () => {
+    const { service } = makeRichState({ config: costConfig('stamina'), evaluateExpression: () => 0 });
+    const env = environment();
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 8, max: 10 });
+
+    const evidence = await service.commitAcceptedAttempt({
+      actor, system: { id: SYSTEM }, environment: env, task: task(), outcome: { status: 'succeeded' }, viewer: { isGM: true }
+    });
+    assert.equal(evidence.stamina.spent, 5);
+    assert.equal(service.getActorStamina(actor, SYSTEM).current, 3); // 8 - 5, GM included
   });
 
   it('treats an external stamina provider max as read-only', async () => {

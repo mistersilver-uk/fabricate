@@ -25,6 +25,7 @@ import { IngredientGroup } from './models/IngredientGroup.js';
 import { Catalyst } from './models/Catalyst.js';
 import { Tool } from './models/Tool.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
+import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -376,6 +377,16 @@ function createGatheringResultCreator(craftingSystemManager) {
         }
         if (source.uuid) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+        }
+
+        // Stack onto an existing matching item (same source UUID chain) that uses
+        // a quantity field, rather than creating a duplicate document.
+        const existing = findStackableMatch(normalizeFoundryCollection(actor.items), source);
+        if (existing) {
+          const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
+          await existing.update({ 'system.quantity': next });
+          created.push(gatheringRunItemRef(actor, existing, result.quantity));
+          continue;
         }
 
         const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
