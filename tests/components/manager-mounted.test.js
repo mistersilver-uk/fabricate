@@ -501,6 +501,11 @@ function createStore(calls = [], options = {}) {
     environments,
     environmentsLoading: false,
     environmentsError: null,
+    // Library-derived per-environment composition counts (tasks/hazards matched in).
+    environmentTaskCounts: options.environmentTaskCounts || {
+      'env-forest': { availableTaskCount: 1, availableHazardCount: 0 },
+      'env-cavern': { availableTaskCount: 1, availableHazardCount: 0 }
+    },
     selectedEnvironmentId: options.emptyEnvironments ? '' : 'env-forest',
     environmentDraft: options.emptyEnvironments ? null : environmentDraft,
     environmentDraftDirty: options.environmentDraftDirty === true,

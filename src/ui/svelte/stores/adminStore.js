@@ -1025,147 +1025,6 @@ function _normalizeNullablePositiveInteger(value) {
   return Math.max(1, Math.floor(numeric));
 }
 
-function _normalizeTimeUnitValue(value) {
-  if (value === null || value === undefined || value === '') return 0;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : String(value ?? '').trim();
-}
-
-/**
- * Normalize a selected task visibility gate for the admin draft.
- *
- * Provider switches intentionally keep only the fields needed by the selected
- * provider: macro gates store `macroUuid`, while dnd5e/pf2e gates store
- * `formula` and `threshold`.
- */
-function _normalizeEnvironmentTaskVisibility(currentVisibility = null, updates = {}) {
-  const currentProvider = TASK_VISIBILITY_PROVIDERS.has(currentVisibility?.provider)
-    ? currentVisibility.provider
-    : 'macro';
-  const provider = TASK_VISIBILITY_PROVIDERS.has(updates?.provider) ? updates.provider : currentProvider;
-
-  if (provider === 'macro') {
-    const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
-      ? updates.macroUuid
-      : currentVisibility?.macroUuid;
-    return {
-      provider,
-      macroUuid: String(macroUuid ?? '').trim()
-    };
-  }
-
-  const formula = Object.prototype.hasOwnProperty.call(updates, 'formula')
-    ? updates.formula
-    : currentVisibility?.formula;
-  const threshold = Object.prototype.hasOwnProperty.call(updates, 'threshold')
-    ? updates.threshold
-    : currentVisibility?.threshold;
-
-  return {
-    provider,
-    formula: String(formula ?? '').trim(),
-    threshold: String(threshold ?? '').trim()
-  };
-}
-
-function _normalizeEnvironmentTaskResultSelection(currentResultSelection = null, updates = {}) {
-  const currentProvider = TASK_RESULT_SELECTION_PROVIDERS.has(currentResultSelection?.provider)
-    ? currentResultSelection.provider
-    : 'macroOutcome';
-  const provider = TASK_RESULT_SELECTION_PROVIDERS.has(updates?.provider) ? updates.provider : currentProvider;
-
-  if (provider === 'rollTableOutcome') {
-    const rollTableUuid = Object.prototype.hasOwnProperty.call(updates, 'rollTableUuid')
-      ? updates.rollTableUuid
-      : currentResultSelection?.rollTableUuid;
-    const normalized = String(rollTableUuid ?? '').trim();
-    return normalized
-      ? { provider, rollTableUuid: normalized }
-      : { provider, rollTableUuid: '' };
-  }
-
-  const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
-    ? updates.macroUuid
-    : currentResultSelection?.macroUuid;
-  const normalized = String(macroUuid ?? '').trim();
-  return normalized
-    ? { provider: 'macroOutcome', macroUuid: normalized }
-    : { provider: 'macroOutcome', macroUuid: '' };
-}
-
-function _normalizeEnvironmentTaskProgressive(currentProgressive = null, updates = {}) {
-  const awardMode = TASK_PROGRESSIVE_AWARD_MODES.has(updates?.awardMode)
-    ? updates.awardMode
-    : (TASK_PROGRESSIVE_AWARD_MODES.has(currentProgressive?.awardMode) ? currentProgressive.awardMode : 'equal');
-  return { awardMode };
-}
-
-function _normalizeEnvironmentTaskCheck(currentCheck = null, updates = {}) {
-  const currentProvider = TASK_CHECK_PROVIDERS.has(currentCheck?.provider) ? currentCheck.provider : 'macro';
-  const provider = TASK_CHECK_PROVIDERS.has(updates?.provider) ? updates.provider : currentProvider;
-
-  if (provider === 'macro') {
-    const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
-      ? updates.macroUuid
-      : currentCheck?.macroUuid;
-    return {
-      provider,
-      macroUuid: String(macroUuid ?? '').trim()
-    };
-  }
-
-  const formula = Object.prototype.hasOwnProperty.call(updates, 'formula')
-    ? updates.formula
-    : currentCheck?.formula;
-  const threshold = Object.prototype.hasOwnProperty.call(updates, 'threshold')
-    ? updates.threshold
-    : currentCheck?.threshold;
-  const normalized = {
-    provider,
-    formula: String(formula ?? '').trim()
-  };
-  const normalizedThreshold = String(threshold ?? '').trim();
-  if (normalizedThreshold) {
-    normalized.threshold = normalizedThreshold;
-  }
-  return normalized;
-}
-
-function _normalizeEnvironmentTaskTimeRequirement(currentTimeRequirement = null, updates = {}) {
-  const normalized = TASK_TIME_UNITS.reduce((timeRequirement, unit) => {
-    const sourceValue = Object.prototype.hasOwnProperty.call(updates, unit)
-      ? updates[unit]
-      : currentTimeRequirement?.[unit];
-    timeRequirement[unit] = _normalizeTimeUnitValue(sourceValue);
-    return timeRequirement;
-  }, {});
-  return normalized;
-}
-
-function _normalizeEnvironmentTaskFailureOutcome(currentFailureOutcome = null, updates = {}) {
-  const currentMode = TASK_FAILURE_OUTCOME_MODES.has(currentFailureOutcome?.mode)
-    ? currentFailureOutcome.mode
-    : 'text';
-  const mode = TASK_FAILURE_OUTCOME_MODES.has(updates?.mode) ? updates.mode : currentMode;
-
-  if (mode === 'macro') {
-    const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
-      ? updates.macroUuid
-      : currentFailureOutcome?.macroUuid;
-    return {
-      mode,
-      macroUuid: String(macroUuid ?? '').trim()
-    };
-  }
-
-  const text = Object.prototype.hasOwnProperty.call(updates, 'text')
-    ? updates.text
-    : currentFailureOutcome?.text;
-  return {
-    mode: 'text',
-    text: String(text ?? '').trim()
-  };
-}
 
 /**
  * Build the recipe list for the recipes tab.
@@ -1558,7 +1417,6 @@ export function createAdminStore(services) {
   const graphSearch = writable('');
   const selectedEnvironmentId = writable('');
   const selectedEnvironmentSystemId = writable('');
-  const selectedEnvironmentTaskId = writable('');
   const environmentDraft = writable(null);
   const persistedEnvironmentDraft = writable(null);
   const environmentDraftDirty = writable(false);
@@ -1610,16 +1468,11 @@ export function createAdminStore(services) {
     persistedDraft = draft,
     dirty = false,
     isNew = false,
-    saveError = null,
-    selectedTaskId = null
+    saveError = null
   } = {}) {
     const draftClone = _clonePlain(draft);
     environmentDraft.set(draftClone);
     persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
-    selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(
-      draftClone,
-      selectedTaskId ?? get(selectedEnvironmentTaskId)
-    ));
     environmentDraftDirty.set(dirty);
     environmentDraftIsNew.set(isNew);
     environmentSaveError.set(saveError);
@@ -1640,7 +1493,6 @@ export function createAdminStore(services) {
   function _currentEnvironmentViewPatch() {
     return {
       selectedEnvironmentId: get(selectedEnvironmentId),
-      selectedEnvironmentTaskId: get(selectedEnvironmentTaskId),
       environmentDraft: _clonePlain(get(environmentDraft)),
       environmentDraftDirty: get(environmentDraftDirty),
       environmentDraftIsNew: get(environmentDraftIsNew),
@@ -2434,37 +2286,6 @@ export function createAdminStore(services) {
     return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
   }
 
-  function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
-    const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
-    if (preferredTaskId && tasks.some(task => task.id === preferredTaskId)) {
-      return preferredTaskId;
-    }
-    return tasks[0]?.id || '';
-  }
-
-  function _newEnvironmentPlaceholderTask() {
-    return {
-      id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.Environments.NewTaskName') || 'Configure gathering task',
-      description: '',
-      img: DEFAULT_GATHERING_TASK_IMG,
-      enabled: false,
-      resolutionMode: 'routed',
-      catalysts: [],
-      resultSelection: {
-        provider: 'macroOutcome',
-        macroUuid: ''
-      },
-      resultGroups: [
-        {
-          id: _randomID(),
-          name: services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results',
-          results: []
-        }
-      ]
-    };
-  }
-
   function _selectedManagedItemOptions() {
     const systemManager = services.getCraftingSystemManager();
     const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
@@ -2576,8 +2397,7 @@ export function createAdminStore(services) {
       enabled: false,
       selectionMode: 'targeted',
       dangerLevel: 'safe',
-      sceneUuid: null,
-      tasks: [_newEnvironmentPlaceholderTask()]
+      sceneUuid: null
     };
   }
 
@@ -3136,8 +2956,7 @@ export function createAdminStore(services) {
       'taskDropRateAdjustmentsEnabled',
       'hazardDropRateAdjustments',
       'hazardDropRateAdjustmentsEnabled',
-      'blindSelection',
-      'tasks'
+      'blindSelection'
     ]);
     const next = _clonePlain(current);
     for (const [field, value] of Object.entries(updates)) {
@@ -3152,9 +2971,6 @@ export function createAdminStore(services) {
       } else if (field === 'img') {
         const normalized = String(value ?? '').trim();
         next.img = normalized || null;
-      } else if (field === 'tasks') {
-        next.tasks = Array.isArray(value) ? _clonePlain(value) : [];
-        selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, get(selectedEnvironmentTaskId)));
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
       } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
@@ -3180,33 +2996,6 @@ export function createAdminStore(services) {
     environmentDraftDirty.set(true);
     environmentSaveError.set(null);
     environmentValidationState.set(null);
-    _patchEnvironmentViewState();
-    return true;
-  }
-
-  function _setEnvironmentTasks(nextTasks, selectedTaskId = get(selectedEnvironmentTaskId)) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-
-    const next = {
-      ..._clonePlain(current),
-      tasks: Array.isArray(nextTasks) ? _clonePlain(nextTasks) : []
-    };
-    environmentDraft.set(next);
-    selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, selectedTaskId));
-    environmentDraftDirty.set(true);
-    environmentSaveError.set(null);
-    environmentValidationState.set(null);
-    _patchEnvironmentViewState();
-    return true;
-  }
-
-  function selectEnvironmentTask(taskId) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-    const nextTaskId = _resolveEnvironmentTaskSelection(current, taskId);
-    if (!nextTaskId) return false;
-    selectedEnvironmentTaskId.set(nextTaskId);
     _patchEnvironmentViewState();
     return true;
   }
@@ -3294,490 +3083,6 @@ export function createAdminStore(services) {
     ids.splice(to, 0, moved);
     const { orderKey } = _compositionFieldKeys(kind);
     return updateEnvironmentDraft({ [orderKey]: ids });
-  }
-
-  function addEnvironmentTask() {
-    const current = get(environmentDraft);
-    if (!current) return null;
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const task = _newEnvironmentPlaceholderTask();
-    _setEnvironmentTasks([...tasks, task], task.id);
-    return _clonePlain(task);
-  }
-
-  function updateEnvironmentTask(taskId = get(selectedEnvironmentTaskId), updates = {}) {
-    const current = get(environmentDraft);
-    if (!current || !taskId || typeof updates !== 'object' || updates === null) return false;
-
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const index = tasks.findIndex(task => task.id === taskId);
-    if (index < 0) return false;
-
-    const nextTask = { ...tasks[index] };
-    for (const [field, value] of Object.entries(updates)) {
-      if (field === 'name' || field === 'description') {
-        nextTask[field] = String(value ?? '');
-      } else if (field === 'img') {
-        const normalized = String(value ?? '').trim();
-        nextTask.img = normalized || DEFAULT_GATHERING_TASK_IMG;
-      } else if (field === 'enabled') {
-        nextTask.enabled = value === true;
-      } else if (field === 'resolutionMode' && TASK_RESOLUTION_MODES.has(value)) {
-        nextTask.resolutionMode = value;
-      }
-    }
-
-    tasks[index] = nextTask;
-    return _setEnvironmentTasks(tasks, taskId);
-  }
-
-  function _updateEnvironmentTaskDraft(taskId = get(selectedEnvironmentTaskId), updater) {
-    const current = get(environmentDraft);
-    if (!current || !taskId || typeof updater !== 'function') return null;
-
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const index = tasks.findIndex(task => task.id === taskId);
-    if (index < 0) return null;
-
-    const nextTask = updater(_clonePlain(tasks[index]));
-    if (!nextTask) return null;
-
-    tasks[index] = nextTask;
-    _setEnvironmentTasks(tasks, taskId);
-    return _clonePlain(nextTask);
-  }
-
-  function addEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId)) {
-    let added = null;
-    _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? task.resultGroups : [];
-      added = _newEnvironmentResultGroup(resultGroups);
-      return {
-        ...task,
-        resultGroups: [...resultGroups, added]
-      };
-    });
-    return _clonePlain(added);
-  }
-
-  function updateEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId), groupId, updates = {}) {
-    if (!groupId || typeof updates !== 'object' || updates === null) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      const index = resultGroups.findIndex(group => group.id === groupId);
-      if (index < 0) return null;
-
-      const nextGroup = { ...resultGroups[index] };
-      if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
-        nextGroup.name = String(updates.name ?? '');
-      }
-      resultGroups[index] = nextGroup;
-      return { ...task, resultGroups };
-    });
-    return !!updated;
-  }
-
-  function deleteEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId), groupId) {
-    if (!groupId) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      if (!resultGroups.some(group => group.id === groupId)) return null;
-      return {
-        ...task,
-        resultGroups: resultGroups.filter(group => group.id !== groupId)
-      };
-    });
-    return !!updated;
-  }
-
-  function reorderEnvironmentTaskResultGroups(taskId = get(selectedEnvironmentTaskId), orderedGroupIds = []) {
-    let reordered = [];
-    _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      const byId = new Map(resultGroups.map(group => [group.id, group]));
-      const emitted = new Set();
-      reordered = [];
-
-      for (const id of Array.isArray(orderedGroupIds) ? orderedGroupIds : []) {
-        if (!byId.has(id) || emitted.has(id)) continue;
-        reordered.push(byId.get(id));
-        emitted.add(id);
-      }
-
-      for (const group of resultGroups) {
-        if (emitted.has(group.id)) continue;
-        reordered.push(group);
-      }
-
-      return { ...task, resultGroups: reordered };
-    });
-    return _clonePlain(reordered);
-  }
-
-  function moveEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId), groupId, direction = 'down') {
-    const current = get(environmentDraft);
-    const task = (Array.isArray(current?.tasks) ? current.tasks : []).find(candidate => candidate.id === taskId);
-    const resultGroups = Array.isArray(task?.resultGroups) ? task.resultGroups : [];
-    const index = resultGroups.findIndex(group => group.id === groupId);
-    if (index < 0) return _clonePlain(resultGroups);
-
-    const nextIndex = direction === 'up' ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= resultGroups.length) return _clonePlain(resultGroups);
-
-    const ordered = resultGroups.map(group => group.id);
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(nextIndex, 0, moved);
-    return reorderEnvironmentTaskResultGroups(taskId, ordered);
-  }
-
-  function addEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId) {
-    if (!groupId) return null;
-
-    let added = null;
-    _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
-      if (groupIndex < 0) return null;
-
-      added = _newEnvironmentResult();
-      const group = resultGroups[groupIndex];
-      resultGroups[groupIndex] = {
-        ...group,
-        results: [...(Array.isArray(group.results) ? group.results : []), added]
-      };
-      return { ...task, resultGroups };
-    });
-    return _clonePlain(added);
-  }
-
-  function updateEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId, resultId, updates = {}) {
-    if (!groupId || !resultId || typeof updates !== 'object' || updates === null) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
-      if (groupIndex < 0) return null;
-
-      const group = resultGroups[groupIndex];
-      const results = Array.isArray(group.results) ? _clonePlain(group.results) : [];
-      const resultIndex = results.findIndex(result => result.id === resultId);
-      if (resultIndex < 0) return null;
-
-      const nextResult = { ...results[resultIndex] };
-      if (Object.prototype.hasOwnProperty.call(updates, 'componentId')) {
-        const componentId = String(updates.componentId ?? '').trim();
-        nextResult.componentId = componentId || null;
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'quantity')) {
-        nextResult.quantity = _normalizePositiveQuantity(updates.quantity);
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'propertyMacroUuid')) {
-        const propertyMacroUuid = String(updates.propertyMacroUuid ?? '').trim();
-        nextResult.propertyMacroUuid = propertyMacroUuid || null;
-      } else if (!Object.prototype.hasOwnProperty.call(nextResult, 'propertyMacroUuid')) {
-        nextResult.propertyMacroUuid = null;
-      }
-
-      results[resultIndex] = nextResult;
-      resultGroups[groupIndex] = { ...group, results };
-      return { ...task, resultGroups };
-    });
-    return !!updated;
-  }
-
-  function deleteEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId, resultId) {
-    if (!groupId || !resultId) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
-      if (groupIndex < 0) return null;
-
-      const group = resultGroups[groupIndex];
-      const results = Array.isArray(group.results) ? _clonePlain(group.results) : [];
-      if (!results.some(result => result.id === resultId)) return null;
-
-      resultGroups[groupIndex] = {
-        ...group,
-        results: results.filter(result => result.id !== resultId)
-      };
-      return { ...task, resultGroups };
-    });
-    return !!updated;
-  }
-
-  function reorderEnvironmentTaskResults(taskId = get(selectedEnvironmentTaskId), groupId, orderedResultIds = []) {
-    if (!groupId) return [];
-
-    let reordered = [];
-    _updateEnvironmentTaskDraft(taskId, task => {
-      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
-      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
-      if (groupIndex < 0) return null;
-
-      const group = resultGroups[groupIndex];
-      const results = Array.isArray(group.results) ? _clonePlain(group.results) : [];
-      const byId = new Map(results.map(result => [result.id, result]));
-      const emitted = new Set();
-      reordered = [];
-
-      for (const id of Array.isArray(orderedResultIds) ? orderedResultIds : []) {
-        if (!byId.has(id) || emitted.has(id)) continue;
-        reordered.push(byId.get(id));
-        emitted.add(id);
-      }
-
-      for (const result of results) {
-        if (emitted.has(result.id)) continue;
-        reordered.push(result);
-      }
-
-      resultGroups[groupIndex] = { ...group, results: reordered };
-      return { ...task, resultGroups };
-    });
-    return _clonePlain(reordered);
-  }
-
-  function moveEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId, resultId, direction = 'down') {
-    const current = get(environmentDraft);
-    const task = (Array.isArray(current?.tasks) ? current.tasks : []).find(candidate => candidate.id === taskId);
-    const group = (Array.isArray(task?.resultGroups) ? task.resultGroups : []).find(candidate => candidate.id === groupId);
-    const results = Array.isArray(group?.results) ? group.results : [];
-    const index = results.findIndex(result => result.id === resultId);
-    if (index < 0) return _clonePlain(results);
-
-    const nextIndex = direction === 'up' ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= results.length) return _clonePlain(results);
-
-    const ordered = results.map(result => result.id);
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(nextIndex, 0, moved);
-    return reorderEnvironmentTaskResults(taskId, groupId, ordered);
-  }
-
-  function addEnvironmentTaskCatalyst(taskId = get(selectedEnvironmentTaskId)) {
-    let added = null;
-    _updateEnvironmentTaskDraft(taskId, task => {
-      const catalysts = Array.isArray(task.catalysts) ? _clonePlain(task.catalysts) : [];
-      added = _newEnvironmentCatalyst();
-      return {
-        ...task,
-        catalysts: [...catalysts, added]
-      };
-    });
-    return _clonePlain(added);
-  }
-
-  function updateEnvironmentTaskCatalyst(taskId = get(selectedEnvironmentTaskId), catalystIndex, updates = {}) {
-    const index = Number(catalystIndex);
-    if (!Number.isInteger(index) || index < 0 || typeof updates !== 'object' || updates === null) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const catalysts = Array.isArray(task.catalysts) ? _clonePlain(task.catalysts) : [];
-      if (index >= catalysts.length) return null;
-
-      const nextCatalyst = {
-        componentId: catalysts[index]?.componentId || null,
-        degradesOnUse: catalysts[index]?.degradesOnUse === true,
-        destroyWhenExhausted: catalysts[index]?.destroyWhenExhausted === true,
-        maxUses: _normalizeNullablePositiveInteger(catalysts[index]?.maxUses)
-      };
-
-      if (Object.prototype.hasOwnProperty.call(updates, 'componentId')) {
-        const componentId = String(updates.componentId ?? '').trim();
-        nextCatalyst.componentId = componentId || null;
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'degradesOnUse')) {
-        nextCatalyst.degradesOnUse = updates.degradesOnUse === true;
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'destroyWhenExhausted')) {
-        nextCatalyst.destroyWhenExhausted = updates.destroyWhenExhausted === true;
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'maxUses')) {
-        nextCatalyst.maxUses = _normalizeNullablePositiveInteger(updates.maxUses);
-      }
-
-      catalysts[index] = nextCatalyst;
-      return { ...task, catalysts };
-    });
-    return !!updated;
-  }
-
-  function deleteEnvironmentTaskCatalyst(taskId = get(selectedEnvironmentTaskId), catalystIndex) {
-    const index = Number(catalystIndex);
-    if (!Number.isInteger(index) || index < 0) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const catalysts = Array.isArray(task.catalysts) ? _clonePlain(task.catalysts) : [];
-      if (index >= catalysts.length) return null;
-      return {
-        ...task,
-        catalysts: catalysts.filter((_, candidateIndex) => candidateIndex !== index)
-      };
-    });
-    return !!updated;
-  }
-
-  function updateEnvironmentTaskVisibility(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
-    if (!taskId) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      if (updatesOrNull === null) {
-        const { visibility, ...rest } = task;
-        return rest;
-      }
-      if (typeof updatesOrNull !== 'object') return null;
-      return {
-        ...task,
-        visibility: _normalizeEnvironmentTaskVisibility(task.visibility, updatesOrNull)
-      };
-    });
-    return !!updated;
-  }
-
-  function updateEnvironmentTaskResultSelection(taskId = get(selectedEnvironmentTaskId), updates = {}) {
-    if (!taskId || typeof updates !== 'object' || updates === null) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => ({
-      ...task,
-      resultSelection: _normalizeEnvironmentTaskResultSelection(task.resultSelection, updates)
-    }));
-    return !!updated;
-  }
-
-  function updateEnvironmentTaskProgressive(taskId = get(selectedEnvironmentTaskId), updates = {}) {
-    if (!taskId || typeof updates !== 'object' || updates === null) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => ({
-      ...task,
-      progressive: _normalizeEnvironmentTaskProgressive(task.progressive, updates)
-    }));
-    return !!updated;
-  }
-
-  function updateEnvironmentTaskCheck(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
-    if (!taskId) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      if (updatesOrNull === null) {
-        const { check, ...rest } = task;
-        return rest;
-      }
-      if (typeof updatesOrNull !== 'object') return null;
-      return {
-        ...task,
-        check: _normalizeEnvironmentTaskCheck(task.check, updatesOrNull)
-      };
-    });
-    return !!updated;
-  }
-
-  function updateEnvironmentTaskTimeRequirement(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
-    if (!taskId) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      if (updatesOrNull === null) {
-        const { timeRequirement, ...rest } = task;
-        return rest;
-      }
-      if (typeof updatesOrNull !== 'object') return null;
-      return {
-        ...task,
-        timeRequirement: _normalizeEnvironmentTaskTimeRequirement(task.timeRequirement, updatesOrNull)
-      };
-    });
-    return !!updated;
-  }
-
-  function updateEnvironmentTaskFailureOutcome(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
-    if (!taskId) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      if (updatesOrNull === null) {
-        const { failureOutcome, ...rest } = task;
-        return rest;
-      }
-      if (typeof updatesOrNull !== 'object') return null;
-      return {
-        ...task,
-        failureOutcome: _normalizeEnvironmentTaskFailureOutcome(task.failureOutcome, updatesOrNull)
-      };
-    });
-    return !!updated;
-  }
-
-  function duplicateEnvironmentTask(taskId = get(selectedEnvironmentTaskId)) {
-    const current = get(environmentDraft);
-    if (!current || !taskId) return null;
-
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const index = tasks.findIndex(task => task.id === taskId);
-    if (index < 0) return null;
-
-    const duplicate = {
-      ..._clonePlain(tasks[index]),
-      id: _randomID(),
-      name: _taskCopyName(tasks[index].name, services.localize)
-    };
-    tasks.splice(index + 1, 0, duplicate);
-    _setEnvironmentTasks(tasks, duplicate.id);
-    return _clonePlain(duplicate);
-  }
-
-  function deleteEnvironmentTask(taskId = get(selectedEnvironmentTaskId)) {
-    const current = get(environmentDraft);
-    if (!current || !taskId) return false;
-
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const index = tasks.findIndex(task => task.id === taskId);
-    if (index < 0) return false;
-
-    const nextTasks = tasks.filter(task => task.id !== taskId);
-    const nextSelected = nextTasks[Math.min(index, nextTasks.length - 1)]?.id || '';
-    return _setEnvironmentTasks(nextTasks, nextSelected);
-  }
-
-  function reorderEnvironmentTasks(orderedTaskIds = []) {
-    const current = get(environmentDraft);
-    if (!current) return [];
-
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const byId = new Map(tasks.map(task => [task.id, task]));
-    const emitted = new Set();
-    const reordered = [];
-
-    for (const id of Array.isArray(orderedTaskIds) ? orderedTaskIds : []) {
-      if (!byId.has(id) || emitted.has(id)) continue;
-      reordered.push(byId.get(id));
-      emitted.add(id);
-    }
-
-    for (const task of tasks) {
-      if (emitted.has(task.id)) continue;
-      reordered.push(task);
-    }
-
-    _setEnvironmentTasks(reordered, get(selectedEnvironmentTaskId));
-    return _clonePlain(reordered);
-  }
-
-  function moveEnvironmentTask(taskId = get(selectedEnvironmentTaskId), direction = 'down') {
-    const current = get(environmentDraft);
-    if (!current || !taskId) return [];
-
-    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
-    const index = tasks.findIndex(task => task.id === taskId);
-    if (index < 0) return tasks;
-
-    const nextIndex = direction === 'up' ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= tasks.length) return tasks;
-
-    const [moved] = tasks.splice(index, 1);
-    tasks.splice(nextIndex, 0, moved);
-    _setEnvironmentTasks(tasks, taskId);
-    return _clonePlain(tasks);
   }
 
   async function cancelEnvironmentDraft() {
@@ -5372,7 +4677,6 @@ export function createAdminStore(services) {
     recipeSearch,
     itemSearch,
     selectedEnvironmentId,
-    selectedEnvironmentTaskId,
     // Computed state
     viewState,
     // Actions
@@ -5391,32 +4695,6 @@ export function createAdminStore(services) {
     excludeEnvironmentRecord,
     restoreEnvironmentRecord,
     reorderEnvironmentRecord,
-    selectEnvironmentTask,
-    addEnvironmentTask,
-    updateEnvironmentTask,
-    duplicateEnvironmentTask,
-    deleteEnvironmentTask,
-    reorderEnvironmentTasks,
-    moveEnvironmentTask,
-    addEnvironmentTaskResultGroup,
-    updateEnvironmentTaskResultGroup,
-    deleteEnvironmentTaskResultGroup,
-    reorderEnvironmentTaskResultGroups,
-    moveEnvironmentTaskResultGroup,
-    addEnvironmentTaskResult,
-    updateEnvironmentTaskResult,
-    deleteEnvironmentTaskResult,
-    reorderEnvironmentTaskResults,
-    moveEnvironmentTaskResult,
-    addEnvironmentTaskCatalyst,
-    updateEnvironmentTaskCatalyst,
-    deleteEnvironmentTaskCatalyst,
-    updateEnvironmentTaskVisibility,
-    updateEnvironmentTaskResultSelection,
-    updateEnvironmentTaskProgressive,
-    updateEnvironmentTaskCheck,
-    updateEnvironmentTaskTimeRequirement,
-    updateEnvironmentTaskFailureOutcome,
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,

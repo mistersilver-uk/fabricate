@@ -230,10 +230,6 @@
   function environmentName(environment) {
     const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
     if (explicitName) return explicitName;
-    const firstTaskName = Array.isArray(environment?.tasks) && typeof environment.tasks[0]?.name === 'string'
-      ? environment.tasks[0].name.trim()
-      : '';
-    if (firstTaskName) return `${text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment')} - ${firstTaskName}`;
     return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
   }
 
@@ -265,7 +261,7 @@
   function environmentTaskCount(environment) {
     const counts = environmentTaskCounts?.[environment?.id];
     if (counts && Number.isFinite(Number(counts.availableTaskCount))) return Number(counts.availableTaskCount);
-    return Array.isArray(environment?.tasks) ? environment.tasks.length : 0;
+    return 0;
   }
 
   function environmentDirtyFor(environment) {

@@ -199,17 +199,14 @@ export class GatheringRichStateService {
           hazardPolicy: environment.hazardPolicy
         });
     const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-    const tasks = [
-      ...normalizeList(environment.tasks).map(task => this._environmentTaskToRuntimeTask(task, environment)),
-      ...sortRecordsByOrder(
-        normalizeList(libraries.tasks)
-          .filter(task => task?.enabled !== false)
-          .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
-            || this._recordIsForced(environment, task.id, 'task', compositionMode))
-          .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
-        environment?.taskOrder
-      ).map(task => this._libraryTaskToRuntimeTask(task, environment))
-    ];
+    const tasks = sortRecordsByOrder(
+      normalizeList(libraries.tasks)
+        .filter(task => task?.enabled !== false)
+        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
+          || this._recordIsForced(environment, task.id, 'task', compositionMode))
+        .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
+      environment?.taskOrder
+    ).map(task => this._libraryTaskToRuntimeTask(task, environment));
     const hazards = sortRecordsByOrder(
       normalizeList(libraries.hazards)
         .filter(hazard => hazard?.enabled !== false)
@@ -889,14 +886,11 @@ export class GatheringRichStateService {
   }
 
   /**
-   * The current node object for a task in an environment: the inline state on a
-   * directly-authored environment task, else the per-environment runtime pool,
-   * else a fresh full pool seeded from the library task's node config. Null when
-   * the task has no node config.
+   * The current node object for a task in an environment: the per-environment
+   * runtime pool if present, else a fresh full pool seeded from the library
+   * task's node config. Null when the task has no node config.
    */
   _currentNodeState(environment, taskId) {
-    const envTask = normalizeList(environment?.tasks).find(task => task?.id === taskId);
-    if (envTask?.nodes) return envTask.nodes;
     const runtime = environment?.nodeRuntime?.[taskId];
     if (runtime) return runtime;
     const libraryTasks = this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
@@ -905,18 +899,13 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Persist a node object for a task: onto the directly-authored environment
-   * task's inline `nodes` when present, otherwise into the per-environment
-   * `nodeRuntime` map (the path used by library-matched tasks). Always reads the
-   * raw stored environment so a composed/runtime environment is never written.
+   * Persist a node object for a task into the environment's per-environment
+   * `nodeRuntime` map. Reads the raw stored environment so a composed/runtime
+   * environment is never written.
    */
   async _writeNodeState({ environmentId, taskId, node }) {
     const stored = this.environmentStore?.get?.(environmentId);
     if (!stored) return null;
-    if (normalizeList(stored.tasks).some(task => task?.id === taskId)) {
-      const tasks = normalizeList(stored.tasks).map(task => (task?.id === taskId ? { ...task, nodes: node } : task));
-      return this.environmentStore.update(environmentId, { tasks });
-    }
     return this.environmentStore.update(environmentId, {
       nodeRuntime: { ...(stored.nodeRuntime || {}), [taskId]: node }
     });
@@ -1005,20 +994,8 @@ export class GatheringRichStateService {
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
 
-    // Directly-authored environment tasks carry inline node state; library-matched
-    // tasks keep per-environment state in `nodeRuntime`. Respawn both the same way.
+    // Per-environment node state lives in `nodeRuntime` (keyed by library task id).
     // A sequential loop (not `.map`) so the `expression` gain mode can await.
-    let tasksChanged = false;
-    const tasks = [];
-    for (const task of normalizeList(environment.tasks)) {
-      if (!task?.nodes) { tasks.push(task); continue; }
-      // eslint-disable-next-line no-await-in-loop
-      const result = await this._respawnNode(task.nodes, { now, environment, environmentId: environment.id, taskId: task.id });
-      if (!result.changed) { tasks.push(task); continue; }
-      tasksChanged = true;
-      tasks.push({ ...task, nodes: result.node });
-    }
-
     let runtimeChanged = false;
     const nodeRuntime = { ...(environment.nodeRuntime || {}) };
     for (const [taskId, node] of Object.entries(nodeRuntime)) {
@@ -1027,11 +1004,8 @@ export class GatheringRichStateService {
       if (result.changed) { runtimeChanged = true; nodeRuntime[taskId] = result.node; }
     }
 
-    if (!tasksChanged && !runtimeChanged) return null;
-    const patch = {};
-    if (tasksChanged) patch.tasks = tasks;
-    if (runtimeChanged) patch.nodeRuntime = nodeRuntime;
-    return this.environmentStore.update(environment.id, patch);
+    if (!runtimeChanged) return null;
+    return this.environmentStore.update(environment.id, { nodeRuntime });
   }
 
   /**
@@ -1383,15 +1357,6 @@ export class GatheringRichStateService {
       return enabled.includes(String(id)) || forced.includes(String(id));
     }
     return true;
-  }
-
-  _environmentTaskToRuntimeTask(task, environment) {
-    if (!task || typeof task !== 'object') return task;
-    const normalized = cloneJson(task);
-    const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
-    normalized.dropRows = normalizeList(normalized.dropRows ?? normalized.itemDrops)
-      .map(row => applyDropRateAdjustment(row, rowAdjustments[String(row?.id || '')]));
-    return normalized;
   }
 
   _libraryTaskToRuntimeTask(task, environment = null) {

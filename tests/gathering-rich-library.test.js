@@ -33,6 +33,10 @@ function makeRichState({ config = {}, rolls = [100] } = {}) {
       callAll: (name, payload) => hooks.push({ name, payload })
     }
   });
+  // Expose the settings to makeEngine so it can register an environment's
+  // (formerly env-authored) tasks as library tasks — env-authored tasks were
+  // removed; every task now lives in the system library and is matched in.
+  service._testSettings = settings;
   return { service, settings, writes, hooks, rollCalls };
 }
 
@@ -54,6 +58,18 @@ function environment(overrides = {}) {
 function makeEngine({ richState, env = environment(), environmentStore = null, paused = false, calls = {}, runManager = null, actingActor = actor } = {}) {
   calls.created = [];
   calls.terminal = [];
+  // Library-task shim: move any environment-authored tasks into the system
+  // library config (empty region/biome → matches every environment) so they
+  // compose in as library tasks. Library tasks are d100 drop-row resolution.
+  const settings = richState?._testSettings;
+  if (settings && !environmentStore && Array.isArray(env.tasks) && env.tasks.length > 0) {
+    const libTasks = env.tasks;
+    const cfg = settings.get(SETTING_KEYS.GATHERING_CONFIG) || {};
+    cfg.systems = cfg.systems || {};
+    cfg.systems['system-a'] = { ...(cfg.systems['system-a'] || {}), tasks: libTasks };
+    settings.set(SETTING_KEYS.GATHERING_CONFIG, cfg);
+    env = { ...env, tasks: [] };
+  }
   return new GatheringEngine({
     environmentStore: environmentStore ?? {
       list: () => [env],
@@ -290,13 +306,6 @@ test('disabled per-system weather and time matching ignores task and hazard cond
 test('environment task and hazard toggles preserve mixed-case library IDs', async () => {
   const store = makeEnvironmentStore();
   const saved = await store.create(environment({
-    tasks: [{
-      id: 'inline-task',
-      name: 'Inline',
-      enabled: true,
-      resolutionMode: 'd100',
-      dropRows: [{ id: 'inline-drop', componentId: 'herb', quantity: 1, dropRate: 100 }]
-    }],
     enabledTaskIds: ['Task-Mixed'],
     disabledHazardIds: ['Hazard-Mixed']
   }));
@@ -323,60 +332,8 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
 
   // Automatic mode ignores the enabled allow-list, so every matching library task
   // composes; the disabled list still excludes Hazard-Mixed (mixed-case preserved).
-  assert.deepEqual(composed.tasks.map(task => task.id), ['inline-task', 'Task-Mixed', 'task-other']);
+  assert.deepEqual(composed.tasks.map(task => task.id), ['Task-Mixed', 'task-other']);
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-other']);
-});
-
-test('d100 drop-row save validation accepts zero chance and rejects invalid dropRate values', () => {
-  const store = makeEnvironmentStore();
-
-  const zeroRate = store.validate(environment({
-    tasks: [{
-      id: 'd100-zero',
-      name: 'Valid Zero D100',
-      enabled: true,
-      resolutionMode: 'd100',
-      dropRows: [{ id: 'zero-rate', componentId: 'herb', quantity: 1, dropRate: 0 }]
-    }]
-  }));
-  assert.equal(zeroRate.valid, true);
-
-  const unresolvedDisabled = store.validate(environment({
-    tasks: [{
-      id: 'd100-unresolved-authoring-row',
-      name: 'Invalid With Unresolved Authoring Row',
-      enabled: true,
-      resolutionMode: 'd100',
-      dropRows: [
-        { id: 'ready-row', componentId: 'herb', quantity: 1, dropRate: 50 },
-        { id: 'unresolved-row', componentId: '', itemUuid: '', quantity: 1, dropRate: 25, enabled: false }
-      ]
-    }]
-  }));
-  assert.equal(unresolvedDisabled.valid, false);
-  assert.ok(
-    unresolvedDisabled.errors.some(error => error.includes('unresolved-row') && error.includes('requires componentId or itemUuid')),
-    `expected unresolved disabled row to be rejected: ${unresolvedDisabled.errors.join(' | ')}`
-  );
-
-  for (const row of [
-    { id: 'missing-rate', componentId: 'herb', quantity: 1 },
-    { id: 'negative-rate', componentId: 'herb', quantity: 1, dropRate: -1 },
-    { id: 'overflow-rate', componentId: 'herb', quantity: 1, dropRate: 101 },
-    { id: 'fractional-rate', componentId: 'herb', quantity: 1, dropRate: 20.5 },
-    { id: 'zero-quantity', componentId: 'herb', quantity: 0, dropRate: 50 }
-  ]) {
-    const result = store.validate(environment({
-      tasks: [{
-        id: 'd100-invalid',
-        name: 'Invalid D100',
-        enabled: true,
-        resolutionMode: 'd100',
-        dropRows: [row]
-      }]
-    }));
-    assert.equal(result.valid, false, `expected invalid row ${row.id}`);
-  }
 });
 
 test('environment dangerLevel migrates from dangerTags, preserves explicit values, and validates', async () => {

@@ -129,11 +129,9 @@ describe('gathering economy — stamina regeneration over world time', () => {
 describe('gathering economy — node respawn over world time', () => {
   function nodeService({ mode = 'nodes', respawn, current = 0, max = 4, rolls = [], amounts = null, onEvaluate = null, evaluate = null } = {}) {
     const env = environment({
-      tasks: [{
-        id: 'task-node',
-        name: 'Vein',
-        nodes: { enabled: true, max, current, depletionTiming: 'onStart', respawn }
-      }]
+      nodeRuntime: {
+        'task-node': { enabled: true, max, current, depletionTiming: 'onStart', respawn }
+      }
     });
     const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: { mode } } } }]]);
     const queue = [...rolls];
@@ -161,9 +159,9 @@ describe('gathering economy — node respawn over world time', () => {
     const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 0, max: 3 });
     await service.respawnNodes({ environment: env, worldTime: 0 }); // anchor
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
-    assert.equal(env.tasks[0].nodes.current, 2);
+    assert.equal(env.nodeRuntime['task-node'].current, 2);
     await service.respawnNodes({ environment: env, worldTime: 10 * HOUR });
-    assert.equal(env.tasks[0].nodes.current, 3); // clamped
+    assert.equal(env.nodeRuntime['task-node'].current, 3); // clamped
   });
 
   it('uses a persisted chance roll (overTime + chance) that is not rerolled on a same-tick refresh', async () => {
@@ -171,12 +169,12 @@ describe('gathering economy — node respawn over world time', () => {
     const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'chance', intervalSeconds: HOUR, chance: 0.5 }, current: 0, max: 5, rolls: [30] });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await service.respawnNodes({ environment: env, worldTime: HOUR });
-    assert.equal(env.tasks[0].nodes.current, 1);
-    assert.equal(env.tasks[0].nodes.respawn.lastRoll.rolls[0], 30);
+    assert.equal(env.nodeRuntime['task-node'].current, 1);
+    assert.equal(env.nodeRuntime['task-node'].respawn.lastRoll.rolls[0], 30);
     // Same world time again → no new interval, no reroll, count unchanged.
     const again = await service.respawnNodes({ environment: env, worldTime: HOUR });
     assert.equal(again, null);
-    assert.equal(env.tasks[0].nodes.current, 1);
+    assert.equal(env.nodeRuntime['task-node'].current, 1);
   });
 
   it('rolls a dice expression for the per-interval amount (overTime + expression)', async () => {
@@ -187,9 +185,9 @@ describe('gathering economy — node respawn over world time', () => {
     });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
-    assert.equal(env.tasks[0].nodes.current, 5);
-    assert.equal(env.tasks[0].nodes.respawn.lastRoll.expression, '1d4');
-    assert.deepEqual(env.tasks[0].nodes.respawn.lastRoll.rolls, [3, 2]);
+    assert.equal(env.nodeRuntime['task-node'].current, 5);
+    assert.equal(env.nodeRuntime['task-node'].respawn.lastRoll.expression, '1d4');
+    assert.deepEqual(env.nodeRuntime['task-node'].respawn.lastRoll.rolls, [3, 2]);
   });
 
   it('stops rolling the expression once the pool is full (clamped to max)', async () => {
@@ -200,9 +198,9 @@ describe('gathering economy — node respawn over world time', () => {
     });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await service.respawnNodes({ environment: env, worldTime: 5 * HOUR });
-    assert.equal(env.tasks[0].nodes.current, 5);
+    assert.equal(env.nodeRuntime['task-node'].current, 5);
     // Bounded by room (2): a single roll filled the pool, so only one roll was taken.
-    assert.equal(env.tasks[0].nodes.respawn.lastRoll.rolls.length, 1);
+    assert.equal(env.nodeRuntime['task-node'].respawn.lastRoll.rolls.length, 1);
   });
 
   it('falls back to a numeric expression when no Roll evaluator is injected (headless)', async () => {
@@ -213,7 +211,7 @@ describe('gathering economy — node respawn over world time', () => {
     });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
-    assert.equal(env.tasks[0].nodes.current, 4); // 2 intervals × 2
+    assert.equal(env.nodeRuntime['task-node'].current, 4); // 2 intervals × 2
   });
 
   it('floors negative / NaN expression results at zero (never shrinks the pool)', async () => {
@@ -223,7 +221,7 @@ describe('gathering economy — node respawn over world time', () => {
     });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await service.respawnNodes({ environment: env, worldTime: 3 * HOUR });
-    assert.equal(env.tasks[0].nodes.current, 2); // -3→0, NaN→0, 2→2
+    assert.equal(env.nodeRuntime['task-node'].current, 2); // -3→0, NaN→0, 2→2
   });
 
   it('treats a malformed expression as zero gain without aborting respawn', async () => {
@@ -235,15 +233,15 @@ describe('gathering economy — node respawn over world time', () => {
     });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await assert.doesNotReject(() => service.respawnNodes({ environment: env, worldTime: 3 * HOUR }));
-    assert.equal(env.tasks[0].nodes.current, 1); // unchanged, no crash
+    assert.equal(env.nodeRuntime['task-node'].current, 1); // unchanged, no crash
   });
 
   it('re-anchors without gain when world time runs backwards (overTime)', async () => {
     const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 0, max: 5 });
     await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }); // anchor at 10h
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR }); // time goes backwards
-    assert.equal(env.tasks[0].nodes.current, 0); // no gain
-    assert.equal(env.tasks[0].nodes.respawn.lastEvaluatedWorldTime, 2 * HOUR); // re-anchored
+    assert.equal(env.nodeRuntime['task-node'].current, 0); // no gain
+    assert.equal(env.nodeRuntime['task-node'].respawn.lastEvaluatedWorldTime, 2 * HOUR); // re-anchored
   });
 
   it('evaluates the amount expression with the nodeRespawn kind and environment context', async () => {
@@ -266,7 +264,7 @@ describe('gathering economy — node respawn over world time', () => {
     await service.respawnNodes({ environment: env, worldTime: 0 });
     const result = await service.respawnNodes({ environment: env, worldTime: 5 * HOUR });
     assert.equal(result, null);
-    assert.equal(env.tasks[0].nodes.current, 0);
+    assert.equal(env.nodeRuntime['task-node'].current, 0);
   });
 });
 

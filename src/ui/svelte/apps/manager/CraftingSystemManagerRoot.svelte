@@ -2130,10 +2130,6 @@
   function environmentName(environment) {
     const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
     if (explicitName) return explicitName;
-    const firstTaskName = Array.isArray(environment?.tasks) && typeof environment.tasks[0]?.name === 'string'
-      ? environment.tasks[0].name.trim()
-      : '';
-    if (firstTaskName) return `${text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment')} - ${firstTaskName}`;
     return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
   }
 
