@@ -1555,6 +1555,7 @@
             "ClearAdjustment": "Clear",
             "DropRow": "Drop row",
             "NoDropRows": "This task has no drop rows to adjust.",
+            "AvailableNodes": "Available nodes",
             "EconomyImpact": "Economy impact",
             "EconomyNormal": "Normal",
             "AttemptsPerNode": "Attempts per node",

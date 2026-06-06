@@ -11649,6 +11649,23 @@
   gap: 8px;
 }
 
+.fabricate-manager .manager-environment-node-count {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-node-count-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-environment-node-count-value strong {
+  font-size: 1.25em;
+}
+
 .fabricate-manager .manager-environment-drop-adjustment-row {
   display: grid;
   grid-template-columns: minmax(112px, 1fr) 92px;

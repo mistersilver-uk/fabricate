@@ -846,6 +846,44 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(get(store.viewState).environmentDraft.id, 'environment-b');
   });
 
+  it('keeps per-environment node-pool edits in the environment draft and persists them on save', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'environment-a', enabledTaskIds: ['mine-ore'] })],
+      gatheringConfig: {
+        systems: {
+          'system-a': {
+            tasks: [
+              { id: 'mine-ore', name: 'Mine Ore', nodes: { max: 5, current: 5 } }
+            ]
+          }
+        }
+      }
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    // No stored pool yet — the environment seeds from the library config at runtime.
+    assert.deepEqual(get(store.viewState).environmentDraft.nodeRuntime ?? {}, {});
+
+    // A nodeRuntime patch is no longer dropped by the draft allow-list, and is
+    // normalized through normalizeNodeRuntime (gains enabled/depletionTiming/respawn).
+    store.updateEnvironmentDraft({ nodeRuntime: { 'mine-ore': { max: 5, current: 3 } } });
+    const draft = get(store.viewState).environmentDraft;
+    assert.equal(get(store.viewState).environmentDraftDirty, true);
+    assert.equal(draft.nodeRuntime['mine-ore'].current, 3);
+    assert.equal(draft.nodeRuntime['mine-ore'].max, 5);
+    assert.equal(draft.nodeRuntime['mine-ore'].enabled, true);
+    assert.equal(draft.nodeRuntime['mine-ore'].depletionTiming, 'onStart');
+
+    const saveResult = await store.saveEnvironmentDraft();
+    assert.equal(saveResult.ok, true);
+    const lastUpdate = services._environmentCalls.update.at(-1);
+    assert.equal(lastUpdate.environmentId, 'environment-a');
+    assert.equal(lastUpdate.environment.nodeRuntime['mine-ore'].current, 3);
+    assert.equal(lastUpdate.environment.nodeRuntime['mine-ore'].max, 5);
+  });
+
   it('summarizes task and hazard drop-rate adjustments in environment composition view state', async () => {
     const services = createServices({
       systems: [makeSystem({

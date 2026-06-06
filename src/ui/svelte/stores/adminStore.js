@@ -43,7 +43,7 @@ import {
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
-import { normalizeNodeConfig } from '../../../systems/gatheringNodeConfig.js';
+import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
 
 // ---------------------------------------------------------------------------
@@ -2956,7 +2956,8 @@ export function createAdminStore(services) {
       'taskDropRateAdjustmentsEnabled',
       'hazardDropRateAdjustments',
       'hazardDropRateAdjustmentsEnabled',
-      'blindSelection'
+      'blindSelection',
+      'nodeRuntime'
     ]);
     const next = _clonePlain(current);
     for (const [field, value] of Object.entries(updates)) {
@@ -2987,6 +2988,8 @@ export function createAdminStore(services) {
         next.taskDropRateAdjustmentsEnabled = _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
       } else if (field === 'blindSelection') {
         next.blindSelection = _normalizeDraftBlindSelection(value);
+      } else if (field === 'nodeRuntime') {
+        next.nodeRuntime = normalizeNodeRuntime(value);
       } else {
         next[field] = String(value ?? '');
       }
