@@ -432,7 +432,7 @@ test('rich gathering metadata and task economy fields normalize and validate add
         current: 2,
         max: 4,
         depletionTiming: 'onSuccess',
-        respawn: { policy: 'probability', intervalSeconds: 86400, chance: 0.5 }
+        respawn: { policy: 'overTime', gainMode: 'chance', intervalSeconds: 86400, chance: 0.5 }
       },
       staminaCost: 3,
       staminaCostModifiers: [{ modifierId: 'strength', operator: '-', min: 0, max: 2 }],
@@ -458,6 +458,35 @@ test('rich gathering metadata and task economy fields normalize and validate add
   assert.equal('attemptLimit' in saved.tasks[0], false);
   assert.equal(saved.tasks[0].staminaCostModifiers[0].modifierId, 'strength');
   assert.equal(saved.tasks[0].staminaCostModifiers[0].operator, '-');
+});
+
+test('validation rejects malformed over-time respawn configs', async () => {
+  const { store } = makeMemoryStore();
+  store.load();
+  const withRespawn = respawn => store.validate(environment({
+    tasks: [routedTask({ nodes: { current: 0, max: 4, depletionTiming: 'onStart', respawn } })]
+  }));
+
+  // overTime needs a positive interval.
+  assert.match(
+    withRespawn({ policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 0 }).errors.join('\n'),
+    /respawn\.intervalSeconds must be positive for over-time respawn/
+  );
+  // (An invalid gainMode/policy is sanitized by normalizeRespawn before validation
+  //  reaches it, so those enum branches are defensive-only and not exercised here;
+  //  normalizeRespawn defaulting is covered in gathering-node-config.test.js.)
+  // chance gain mode requires a 0..1 chance.
+  assert.match(
+    withRespawn({ policy: 'overTime', gainMode: 'chance', intervalSeconds: 3600, chance: 1.5 }).errors.join('\n'),
+    /respawn\.chance must be between 0 and 1/
+  );
+  // expression gain mode requires a non-empty amount expression.
+  assert.match(
+    withRespawn({ policy: 'overTime', gainMode: 'expression', intervalSeconds: 3600, amountExpression: '   ' }).errors.join('\n'),
+    /respawn\.amountExpression is required for expression gain/
+  );
+  // manual respawn has no interval/gain requirements.
+  assert.equal(withRespawn({ policy: 'manual' }).valid, true);
 });
 
 test('validation permits disabled draft placeholder tasks but blocks enabled missing outcome providers', async () => {
@@ -839,7 +868,7 @@ test('preserves a per-environment nodeRuntime map through update and resets it o
 
   // A runtime pool survives update with its current preserved (not reset to max).
   return store.update('env-nodes', {
-    nodeRuntime: { 'lib-1': { enabled: true, max: 4, current: 1, depletionTiming: 'onStart', respawn: { policy: 'none' } } }
+    nodeRuntime: { 'lib-1': { enabled: true, max: 4, current: 1, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }
   }).then(async (updated) => {
     assert.equal(updated.nodeRuntime['lib-1'].current, 1);
     assert.equal(updated.nodeRuntime['lib-1'].max, 4);

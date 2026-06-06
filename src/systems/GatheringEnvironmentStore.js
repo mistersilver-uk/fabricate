@@ -1,7 +1,7 @@
 import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
 import { DANGER_LEVELS, evaluateEnvironmentMatch, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
-import { normalizeNodeConfig, normalizeRespawn, normalizeNodeRuntime, VALID_DEPLETION_TIMINGS, VALID_RESPAWN_POLICIES } from './gatheringNodeConfig.js';
+import { normalizeNodeConfig, normalizeRespawn, normalizeNodeRuntime, VALID_DEPLETION_TIMINGS, VALID_RESPAWN_POLICIES, VALID_RESPAWN_GAIN_MODES } from './gatheringNodeConfig.js';
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
@@ -1026,13 +1026,21 @@ function validateNodeConfig(nodes, label) {
   if (!VALID_RESPAWN_POLICIES.has(nodes.respawn?.policy)) {
     errors.push(`${label}.respawn.policy is invalid`);
   }
-  if (['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(nodes.respawn?.policy) && Number(nodes.respawn?.intervalSeconds || 0) <= 0) {
-    errors.push(`${label}.respawn.intervalSeconds must be positive for timed respawn`);
-  }
-  if (nodes.respawn?.policy === 'probability' || nodes.respawn?.policy === 'manualAndElapsedTime') {
-    const chance = Number(nodes.respawn?.chance);
-    if (!Number.isFinite(chance) || chance < 0 || chance > 1) {
-      errors.push(`${label}.respawn.chance must be between 0 and 1`);
+  if (nodes.respawn?.policy === 'overTime') {
+    if (Number(nodes.respawn?.intervalSeconds || 0) <= 0) {
+      errors.push(`${label}.respawn.intervalSeconds must be positive for over-time respawn`);
+    }
+    if (!VALID_RESPAWN_GAIN_MODES.has(nodes.respawn?.gainMode)) {
+      errors.push(`${label}.respawn.gainMode is invalid`);
+    }
+    if (nodes.respawn?.gainMode === 'chance') {
+      const chance = Number(nodes.respawn?.chance);
+      if (!Number.isFinite(chance) || chance < 0 || chance > 1) {
+        errors.push(`${label}.respawn.chance must be between 0 and 1`);
+      }
+    }
+    if (nodes.respawn?.gainMode === 'expression' && !String(nodes.respawn?.amountExpression || '').trim()) {
+      errors.push(`${label}.respawn.amountExpression is required for expression gain`);
     }
   }
   return errors;

@@ -3,7 +3,14 @@
  *
  * A "node" object is both config and runtime state:
  *   { enabled, max, current, depletionTiming, respawn: { policy, intervalSeconds,
- *     chance, lastEvaluatedWorldTime, nextEvaluationWorldTime, lastRoll }, showCountsToPlayers? }
+ *     gainMode, chance, amountExpression, lastEvaluatedWorldTime,
+ *     nextEvaluationWorldTime, lastRoll }, showCountsToPlayers? }
+ *
+ * Respawn `policy` is one of `manual` (no automatic respawn — the GM tops up
+ * counts via the restock API) or `overTime` (one evaluation per elapsed
+ * interval). For `overTime`, `gainMode` selects the per-interval node gain:
+ * `guaranteed` (+1), `chance` (a 0-1 probability of +1), or `expression`
+ * (roll `amountExpression`, e.g. `1d4`, and add the rolled total).
  *
  * Library tasks carry node CONFIG; each environment keeps its own runtime STATE
  * (the `current` count + respawn timers) under `environment.nodeRuntime[taskId]`,
@@ -12,7 +19,8 @@
  */
 
 export const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
-export const VALID_RESPAWN_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
+export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime']);
+export const VALID_RESPAWN_GAIN_MODES = new Set(['guaranteed', 'chance', 'expression']);
 
 function numberOrNull(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -25,20 +33,27 @@ function cloneJson(value) {
 }
 
 /**
- * Normalize a node respawn block. Unknown policies fall back to `none`.
+ * Normalize a node respawn block. Unknown policies fall back to `manual`;
+ * unknown gain modes fall back to `guaranteed`. Legacy policy values
+ * (`none`/`elapsedTime`/`probability`/`manualAndElapsedTime`) are mapped to the
+ * current schema by the 0.4.0 migration; here they simply coerce to `manual`.
  *
  * @param {object|null} data
  * @returns {object}
  */
 export function normalizeRespawn(data = null) {
-  if (!data || typeof data !== 'object') return { policy: 'none' };
-  const policy = VALID_RESPAWN_POLICIES.has(data.policy) ? data.policy : 'none';
+  if (!data || typeof data !== 'object') return { policy: 'manual' };
+  const policy = VALID_RESPAWN_POLICIES.has(data.policy) ? data.policy : 'manual';
+  const gainMode = VALID_RESPAWN_GAIN_MODES.has(data.gainMode) ? data.gainMode : 'guaranteed';
   const intervalSeconds = numberOrNull(data.intervalSeconds);
   const chance = numberOrNull(data.chance);
+  const amountExpression = typeof data.amountExpression === 'string' ? data.amountExpression.trim() : '';
   return {
     policy,
     intervalSeconds: intervalSeconds ?? 0,
+    gainMode,
     chance: chance ?? 0,
+    amountExpression,
     lastEvaluatedWorldTime: numberOrNull(data.lastEvaluatedWorldTime),
     nextEvaluationWorldTime: numberOrNull(data.nextEvaluationWorldTime),
     lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null

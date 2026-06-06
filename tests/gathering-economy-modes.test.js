@@ -127,7 +127,7 @@ describe('gathering economy — stamina regeneration over world time', () => {
 });
 
 describe('gathering economy — node respawn over world time', () => {
-  function nodeService({ mode = 'nodes', respawn, current = 0, max = 4, rolls = [] } = {}) {
+  function nodeService({ mode = 'nodes', respawn, current = 0, max = 4, rolls = [], amounts = null, onEvaluate = null, evaluate = null } = {}) {
     const env = environment({
       tasks: [{
         id: 'task-node',
@@ -137,6 +137,9 @@ describe('gathering economy — node respawn over world time', () => {
     });
     const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: { mode } } } }]]);
     const queue = [...rolls];
+    // Expression seam: when `amounts` is provided, evaluate the dice expression
+    // to the next queued amount (deterministic stand-in for Foundry's Roll).
+    const amountQueue = Array.isArray(amounts) ? [...amounts] : null;
     const service = new GatheringRichStateService({
       getSetting: key => settings.get(key),
       setSetting: async (key, value) => { settings.set(key, value); return value; },
@@ -147,13 +150,15 @@ describe('gathering economy — node respawn over world time', () => {
         update: async (id, patch) => { Object.assign(env, patch); return env; }
       },
       rollD100: () => queue.shift() ?? 100,
+      ...(evaluate ? { evaluateExpression: evaluate } : {}),
+      ...(amountQueue ? { evaluateExpression: async (payload) => { onEvaluate?.(payload); return amountQueue.length ? amountQueue.shift() : 0; } } : {}),
       hooks: { callAll: () => {} }
     });
     return { service, env };
   }
 
-  it('restores one node per elapsed interval (elapsedTime), clamped to max', async () => {
-    const { service, env } = nodeService({ respawn: { policy: 'elapsedTime', intervalSeconds: HOUR }, current: 0, max: 3 });
+  it('adds one node per elapsed interval (overTime + guaranteed), clamped to max', async () => {
+    const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 0, max: 3 });
     await service.respawnNodes({ environment: env, worldTime: 0 }); // anchor
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
     assert.equal(env.tasks[0].nodes.current, 2);
@@ -161,9 +166,9 @@ describe('gathering economy — node respawn over world time', () => {
     assert.equal(env.tasks[0].nodes.current, 3); // clamped
   });
 
-  it('uses a persisted probability roll that is not rerolled on a same-tick refresh', async () => {
+  it('uses a persisted chance roll (overTime + chance) that is not rerolled on a same-tick refresh', async () => {
     // chance 0.5 → success threshold 50. One interval, roll 30 ≤ 50 → +1.
-    const { service, env } = nodeService({ respawn: { policy: 'probability', intervalSeconds: HOUR, chance: 0.5 }, current: 0, max: 5, rolls: [30] });
+    const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'chance', intervalSeconds: HOUR, chance: 0.5 }, current: 0, max: 5, rolls: [30] });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     await service.respawnNodes({ environment: env, worldTime: HOUR });
     assert.equal(env.tasks[0].nodes.current, 1);
@@ -174,8 +179,90 @@ describe('gathering economy — node respawn over world time', () => {
     assert.equal(env.tasks[0].nodes.current, 1);
   });
 
+  it('rolls a dice expression for the per-interval amount (overTime + expression)', async () => {
+    // Two intervals, each rolls the expression: 3 then 2 → +5.
+    const { service, env } = nodeService({
+      respawn: { policy: 'overTime', gainMode: 'expression', intervalSeconds: HOUR, amountExpression: '1d4' },
+      current: 0, max: 10, amounts: [3, 2]
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
+    assert.equal(env.tasks[0].nodes.current, 5);
+    assert.equal(env.tasks[0].nodes.respawn.lastRoll.expression, '1d4');
+    assert.deepEqual(env.tasks[0].nodes.respawn.lastRoll.rolls, [3, 2]);
+  });
+
+  it('stops rolling the expression once the pool is full (clamped to max)', async () => {
+    // room is 2 but the first roll already overfills → clamp to max, stop early.
+    const { service, env } = nodeService({
+      respawn: { policy: 'overTime', gainMode: 'expression', intervalSeconds: HOUR, amountExpression: '1d4' },
+      current: 3, max: 5, amounts: [3, 3, 3]
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await service.respawnNodes({ environment: env, worldTime: 5 * HOUR });
+    assert.equal(env.tasks[0].nodes.current, 5);
+    // Bounded by room (2): a single roll filled the pool, so only one roll was taken.
+    assert.equal(env.tasks[0].nodes.respawn.lastRoll.rolls.length, 1);
+  });
+
+  it('falls back to a numeric expression when no Roll evaluator is injected (headless)', async () => {
+    // No `amounts` seam → evaluateExpression is absent → Number('2') resolves per interval.
+    const { service, env } = nodeService({
+      respawn: { policy: 'overTime', gainMode: 'expression', intervalSeconds: HOUR, amountExpression: '2' },
+      current: 0, max: 10
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
+    assert.equal(env.tasks[0].nodes.current, 4); // 2 intervals × 2
+  });
+
+  it('floors negative / NaN expression results at zero (never shrinks the pool)', async () => {
+    const { service, env } = nodeService({
+      respawn: { policy: 'overTime', gainMode: 'expression', intervalSeconds: HOUR, amountExpression: '1d4-2' },
+      current: 0, max: 10, amounts: [-3, NaN, 2]
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await service.respawnNodes({ environment: env, worldTime: 3 * HOUR });
+    assert.equal(env.tasks[0].nodes.current, 2); // -3→0, NaN→0, 2→2
+  });
+
+  it('treats a malformed expression as zero gain without aborting respawn', async () => {
+    // An evaluator that throws (e.g. an unparseable dice string) must not bubble
+    // up and abort respawn for the environment — the interval simply adds nothing.
+    const { service, env } = nodeService({
+      respawn: { policy: 'overTime', gainMode: 'expression', intervalSeconds: HOUR, amountExpression: '1d' },
+      current: 1, max: 5, evaluate: async () => { throw new Error('malformed dice'); }
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await assert.doesNotReject(() => service.respawnNodes({ environment: env, worldTime: 3 * HOUR }));
+    assert.equal(env.tasks[0].nodes.current, 1); // unchanged, no crash
+  });
+
+  it('re-anchors without gain when world time runs backwards (overTime)', async () => {
+    const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 0, max: 5 });
+    await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }); // anchor at 10h
+    await service.respawnNodes({ environment: env, worldTime: 2 * HOUR }); // time goes backwards
+    assert.equal(env.tasks[0].nodes.current, 0); // no gain
+    assert.equal(env.tasks[0].nodes.respawn.lastEvaluatedWorldTime, 2 * HOUR); // re-anchored
+  });
+
+  it('evaluates the amount expression with the nodeRespawn kind and environment context', async () => {
+    const payloads = [];
+    const { service, env } = nodeService({
+      respawn: { policy: 'overTime', gainMode: 'expression', intervalSeconds: HOUR, amountExpression: '1d4' },
+      current: 0, max: 10, amounts: [2], onEvaluate: p => payloads.push(p)
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await service.respawnNodes({ environment: env, worldTime: HOUR });
+    assert.equal(payloads.length, 1);
+    assert.equal(payloads[0].kind, 'nodeRespawn');
+    assert.equal(payloads[0].actor, null); // respawn is environment-level, no actor
+    assert.equal(payloads[0].expression, '1d4');
+    assert.ok(payloads[0].environment, 'the environment is passed for expression context');
+  });
+
   it('does not respawn when the system is not in nodes mode', async () => {
-    const { service, env } = nodeService({ mode: 'stamina', respawn: { policy: 'elapsedTime', intervalSeconds: HOUR }, current: 0, max: 3 });
+    const { service, env } = nodeService({ mode: 'stamina', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 0, max: 3 });
     await service.respawnNodes({ environment: env, worldTime: 0 });
     const result = await service.respawnNodes({ environment: env, worldTime: 5 * HOUR });
     assert.equal(result, null);
@@ -186,7 +273,7 @@ describe('gathering economy — node respawn over world time', () => {
 describe('gathering economy — per-environment node pools (library tasks)', () => {
   const LIB_TASK = (overrides = {}) => ({
     id: 'lib-1', name: 'Mine',
-    nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'none' }, ...(overrides.nodes || {}) },
+    nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'manual' }, ...(overrides.nodes || {}) },
     ...overrides
   });
 
@@ -216,13 +303,13 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
     assert.equal(fresh.nodes.current, 2);
     assert.equal(fresh.nodes.max, 2);
 
-    env.nodeRuntime = { 'lib-1': { enabled: true, max: 2, current: 1, depletionTiming: 'onStart', respawn: { policy: 'none' } } };
+    env.nodeRuntime = { 'lib-1': { enabled: true, max: 2, current: 1, depletionTiming: 'onStart', respawn: { policy: 'manual' } } };
     const stored = service._libraryTaskToRuntimeTask(task, env);
     assert.equal(stored.nodes.current, 1, 'uses the per-environment runtime pool');
   });
 
   it('depletes the per-environment pool on attempt, floors at 0, and the gate blocks when empty', async () => {
-    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'none' } } }) });
+    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }) });
     const actor = makeFakeActor();
 
     const runtime1 = service._libraryTaskToRuntimeTask(task, env);
@@ -239,7 +326,7 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
   });
 
   it('respects depletionTiming onSuccess (only successful attempts consume)', async () => {
-    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onSuccess', respawn: { policy: 'none' } } }) });
+    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onSuccess', respawn: { policy: 'manual' } } }) });
     const actor = makeFakeActor();
     await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'failed' } });
     assert.equal(env.nodeRuntime['lib-1'], undefined, 'a failed attempt does not consume');
@@ -258,8 +345,8 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
 
   it('respawns the per-environment pool over world time', async () => {
     const { service, env, task } = libService({
-      task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'elapsedTime', intervalSeconds: HOUR } } }),
-      nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: { policy: 'elapsedTime', intervalSeconds: HOUR } } }
+      task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }
     });
     await service.respawnNodes({ environment: env, worldTime: 0 }); // anchor
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
@@ -267,7 +354,7 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
   });
 
   it('GM restock refills a depleted library pool, clamped to max', async () => {
-    const { service, env, task } = libService({ nodeRuntime: { 'lib-1': { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } } } });
+    const { service, env, task } = libService({ nodeRuntime: { 'lib-1': { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } } });
     await service.restockNode({ environmentId: env.id, taskId: 'lib-1', current: 5, max: null });
     assert.equal(env.nodeRuntime['lib-1'].current, 2); // clamped to max
   });
@@ -353,7 +440,7 @@ describe('gathering economy — cost modifiers and mode gating', () => {
   it('blocks a depleted node for players and GMs alike (GMs are subject to the economy)', async () => {
     const { service } = makeRichState({ config: costConfig('nodes') });
     const env = environment();
-    const depleted = task({ staminaCost: 0, nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } } });
+    const depleted = task({ staminaCost: 0, nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } });
 
     const player = await service.evaluateStart({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: depleted, viewer: { isGM: false } });
     assert.equal(player.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);

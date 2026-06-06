@@ -33,19 +33,29 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.ok(nodesIdx > guardIdx, 'the node card should render inside the nodes-mode guard');
   });
 
-  it('exposes the full node-config controls (count, depletion, respawn, interval, chance)', () => {
+  it('exposes the full node-config controls (count, depletion, respawn, interval, gain mode, chance, amount)', () => {
     for (const attr of [
       'data-gathering-task-node-count',
       'data-gathering-task-node-deplete',
       'data-gathering-task-node-respawn',
       'data-gathering-task-node-interval',
-      'data-gathering-task-node-chance'
+      'data-gathering-task-node-gain-mode',
+      'data-gathering-task-node-chance',
+      'data-gathering-task-node-amount'
     ]) {
       assert.ok(editorSource.includes(attr), `node card should expose ${attr}`);
     }
-    // All five respawn policies are offered.
-    for (const policy of ['"none"', '"manual"', '"elapsedTime"', '"probability"', '"manualAndElapsedTime"']) {
+    // The two simplified respawn policies are offered.
+    for (const policy of ['"manual"', '"overTime"']) {
       assert.ok(editorSource.includes(`value=${policy}`), `respawn select should offer policy ${policy}`);
+    }
+    // The three over-time gain modes are offered.
+    for (const gainMode of ['"guaranteed"', '"chance"', '"expression"']) {
+      assert.ok(editorSource.includes(`value=${gainMode}`), `gain-mode select should offer ${gainMode}`);
+    }
+    // The removed legacy policies are gone.
+    for (const policy of ['"none"', '"elapsedTime"', '"probability"', '"manualAndElapsedTime"']) {
+      assert.ok(!editorSource.includes(`value=${policy}`), `respawn select should no longer offer policy ${policy}`);
     }
   });
 
@@ -76,8 +86,18 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.equal(keys.TaskNodesTitle, 'Resource node');
     assert.equal(keys.TaskNodeCount, 'Node count');
     assert.equal(keys.DepleteOnStart, 'On start');
-    assert.equal(keys.RespawnElapsed, 'Over world time');
-    assert.equal(keys.RespawnProbability, 'Probability');
+    assert.equal(keys.RespawnManual, 'Manual');
+    assert.equal(keys.RespawnOverTime, 'Over world time');
+    assert.equal(keys.RespawnGainMode, 'Each interval');
+    assert.equal(keys.GainGuaranteed, 'Add one node');
+    assert.equal(keys.GainChance, 'Chance to add one');
+    assert.equal(keys.GainExpression, 'Roll an amount');
     assert.equal(keys.RespawnChance, 'Chance');
+    assert.equal(keys.RespawnAmount, 'Amount per interval');
+    // The removed legacy labels are gone.
+    assert.equal(keys.RespawnNone, undefined);
+    assert.equal(keys.RespawnElapsed, undefined);
+    assert.equal(keys.RespawnProbability, undefined);
+    assert.equal(keys.RespawnManualElapsed, undefined);
   });
 });

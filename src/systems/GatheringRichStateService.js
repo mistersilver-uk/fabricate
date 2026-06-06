@@ -988,12 +988,13 @@ export class GatheringRichStateService {
 
   /**
    * Respawn finite resource nodes for one environment as world time passes
-   * (nodes-mode systems only). For each task with a timed/probabilistic respawn
-   * policy, restores one node per elapsed interval (`elapsedTime`) or one
-   * persisted d100 roll per interval (`probability`/`manualAndElapsedTime`),
-   * clamped to the task max. Advances each task's `respawn.lastEvaluatedWorldTime`
-   * with the consumed intervals (persisting `lastRoll`) so a same-tick refresh
-   * never rerolls. Writes the environment once when any task changed.
+   * (nodes-mode systems only). For each task with an `overTime` respawn policy,
+   * adds nodes per elapsed interval per the gain mode: `guaranteed` (+1),
+   * `chance` (a persisted d100 roll per interval), or `expression` (roll
+   * `amountExpression` per interval and add the rolled total), clamped to the
+   * task max. Advances each task's `respawn.lastEvaluatedWorldTime` with the
+   * consumed intervals (persisting `lastRoll`) so a same-tick refresh never
+   * rerolls. Writes the environment once when any task changed.
    *
    * @param {object} payload
    * @returns {Promise<object|null>} The updated environment, or null on no-op.
@@ -1006,19 +1007,23 @@ export class GatheringRichStateService {
 
     // Directly-authored environment tasks carry inline node state; library-matched
     // tasks keep per-environment state in `nodeRuntime`. Respawn both the same way.
+    // A sequential loop (not `.map`) so the `expression` gain mode can await.
     let tasksChanged = false;
-    const tasks = normalizeList(environment.tasks).map(task => {
-      if (!task?.nodes) return task;
-      const result = this._respawnNode(task.nodes, { now, environmentId: environment.id, taskId: task.id });
-      if (!result.changed) return task;
+    const tasks = [];
+    for (const task of normalizeList(environment.tasks)) {
+      if (!task?.nodes) { tasks.push(task); continue; }
+      // eslint-disable-next-line no-await-in-loop
+      const result = await this._respawnNode(task.nodes, { now, environment, environmentId: environment.id, taskId: task.id });
+      if (!result.changed) { tasks.push(task); continue; }
       tasksChanged = true;
-      return { ...task, nodes: result.node };
-    });
+      tasks.push({ ...task, nodes: result.node });
+    }
 
     let runtimeChanged = false;
     const nodeRuntime = { ...(environment.nodeRuntime || {}) };
     for (const [taskId, node] of Object.entries(nodeRuntime)) {
-      const result = this._respawnNode(node, { now, environmentId: environment.id, taskId });
+      // eslint-disable-next-line no-await-in-loop
+      const result = await this._respawnNode(node, { now, environment, environmentId: environment.id, taskId });
       if (result.changed) { runtimeChanged = true; nodeRuntime[taskId] = result.node; }
     }
 
@@ -1030,18 +1035,20 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Respawn one resource-node pool as world time passes. Restores one node per
-   * elapsed interval (`elapsedTime`) or one persisted d100 roll per interval
-   * (`probability`/`manualAndElapsedTime`), clamped to max, advancing the
-   * `respawn.lastEvaluatedWorldTime` anchor so a same-tick refresh never rerolls.
+   * Respawn one resource-node pool as world time passes (`overTime` policy
+   * only). Per elapsed interval, adds nodes per `respawn.gainMode`: `guaranteed`
+   * (+1), `chance` (a persisted d100 roll), or `expression` (roll
+   * `respawn.amountExpression` and add the rolled total). Clamped to max,
+   * advancing the `respawn.lastEvaluatedWorldTime` anchor so a same-tick refresh
+   * never rerolls.
    *
    * @param {object} nodes The node object (config + state).
-   * @param {{now:number, environmentId:string, taskId:string}} ctx
-   * @returns {{changed: boolean, node: object}}
+   * @param {{now:number, environment?:object, environmentId:string, taskId:string}} ctx
+   * @returns {Promise<{changed: boolean, node: object}>}
    */
-  _respawnNode(nodes, { now, environmentId, taskId }) {
+  async _respawnNode(nodes, { now, environment = null, environmentId, taskId }) {
     const respawn = nodes?.respawn;
-    if (!nodes || !respawn || !['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(respawn.policy)) {
+    if (!nodes || !respawn || respawn.policy !== 'overTime') {
       return { changed: false, node: nodes };
     }
     const interval = Number(respawn.intervalSeconds || 0);
@@ -1066,11 +1073,12 @@ export class GatheringRichStateService {
     }
     intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
 
+    const gainMode = respawn.gainMode || 'guaranteed';
     let gain = 0;
     let lastRoll = respawn.lastRoll;
-    if (respawn.policy === 'elapsedTime') {
+    if (gainMode === 'guaranteed') {
       gain = intervals;
-    } else {
+    } else if (gainMode === 'chance') {
       const chance = Math.max(0, Math.min(1, Number(respawn.chance || 0)));
       const rolls = [];
       for (let i = 0; i < intervals; i++) {
@@ -1079,6 +1087,17 @@ export class GatheringRichStateService {
         if (roll <= chance * 100) gain += 1;
       }
       lastRoll = { worldTime: now, chance, rolls };
+    } else {
+      // expression: roll the dice amount per interval, stopping once the pool is full.
+      const rolls = [];
+      for (let i = 0; i < intervals; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        const amount = await this._respawnExpressionAmount({ expression: respawn.amountExpression, environment });
+        rolls.push(amount);
+        gain += amount;
+        if (before + gain >= max) break;
+      }
+      lastRoll = { worldTime: now, expression: String(respawn.amountExpression || ''), rolls };
     }
     const nextCurrent = Math.min(max, before + gain);
     this._callHook('fabricate.gathering.nodeRespawned', { environmentId, taskId, amount: nextCurrent - before, current: nextCurrent, max });
@@ -1086,6 +1105,42 @@ export class GatheringRichStateService {
       changed: true,
       node: { ...nodes, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
     };
+  }
+
+  /**
+   * Roll the per-interval node gain for an `expression` respawn. Respawn is
+   * environment-level with no actor, so the expression must be plain dice
+   * (e.g. `1d4`); any `@actor.*` reference resolves against an empty roll-data
+   * context and coerces to 0 (never throws). Floored at 0 and rounded.
+   *
+   * @param {object} payload
+   * @returns {Promise<number>} Non-negative integer node gain for one interval.
+   */
+  async _respawnExpressionAmount({ expression, environment = null } = {}) {
+    if (expression === null || expression === undefined || String(expression).trim() === '') return 0;
+    let value;
+    try {
+      if (typeof this.evaluateExpression === 'function') {
+        value = await this.evaluateExpression({
+          expression: String(expression),
+          provider: null,
+          actor: null,
+          kind: 'nodeRespawn',
+          system: null,
+          environment
+        });
+      } else {
+        // No Roll available (e.g. headless): a plain number still resolves.
+        value = Number(expression);
+      }
+    } catch (_err) {
+      // A malformed dice string (e.g. `1d`, `(`) or an `@actor.*` reference with
+      // no actor must not abort respawn for the rest of the environment — treat
+      // this interval as no gain.
+      return 0;
+    }
+    const numeric = Number(value);
+    return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
   }
 
   async updateConditions({ environmentId, conditions = {} } = {}) {

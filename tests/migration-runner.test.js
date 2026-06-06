@@ -282,7 +282,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '0.3.0');
+  assert.equal(versionCall.value, '0.4.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall?.value, '0.3.0');
+  assert.equal(versionCall?.value, '0.4.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -460,7 +460,34 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   const config = settings.store.get('gatheringConfig');
   assert.equal(config.systems['sys-1'].economy.mode, 'nodes');
 
-  assert.equal(settings.store.get('migrationVersion'), '0.3.0');
+  assert.equal(settings.store.get('migrationVersion'), '0.4.0');
+});
+
+test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.3.0',
+      gatheringConfig: { systems: { 'sys-1': { economy: { mode: 'nodes' }, tasks: [
+        { id: 'lib-1', nodes: { max: 2, current: 0, respawn: { policy: 'elapsedTime', intervalSeconds: 3600 } } }
+      ] } } },
+      gatheringEnvironments: [{
+        id: 'env-1', craftingSystemId: 'sys-1',
+        tasks: [{ id: 't1', nodes: { max: 3, current: 1, respawn: { policy: 'probability', intervalSeconds: 7200, chance: 0.4 } } }],
+        nodeRuntime: { 't1': { max: 3, current: 0, respawn: { policy: 'manualAndElapsedTime', intervalSeconds: 60, chance: 0.2 } } }
+      }]
+    }
+  });
+
+  await runner.run();
+
+  const config = settings.store.get('gatheringConfig');
+  assert.deepEqual(config.systems['sys-1'].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 });
+
+  const envs = settings.store.get('gatheringEnvironments');
+  assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', intervalSeconds: 7200, chance: 0.4 });
+  assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', intervalSeconds: 60, chance: 0.2 });
+
+  assert.equal(settings.store.get('migrationVersion'), '0.4.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {

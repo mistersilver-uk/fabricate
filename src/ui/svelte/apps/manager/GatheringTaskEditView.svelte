@@ -369,15 +369,15 @@
   }
 
   // Resource-node authoring (enforced only when the system uses nodes mode).
-  const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none', intervalSeconds: 0, chance: 0 } };
+  const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual', intervalSeconds: 0, gainMode: 'guaranteed', chance: 0, amountExpression: '' } };
   const RESPAWN_UNITS = { minutes: 60, hours: 3600, days: 86400, weeks: 604800 };
-  const TIMED_RESPAWN = ['elapsedTime', 'probability', 'manualAndElapsedTime'];
-  const CHANCE_RESPAWN = ['probability', 'manualAndElapsedTime'];
 
   const nodes = $derived(task?.nodes || DEFAULT_NODES);
   const respawn = $derived(nodes.respawn || DEFAULT_NODES.respawn);
-  const respawnIsTimed = $derived(TIMED_RESPAWN.includes(respawn.policy));
-  const respawnHasChance = $derived(CHANCE_RESPAWN.includes(respawn.policy));
+  const respawnIsOverTime = $derived(respawn.policy === 'overTime');
+  const respawnGainMode = $derived(respawn.gainMode || 'guaranteed');
+  const respawnIsChance = $derived(respawnIsOverTime && respawnGainMode === 'chance');
+  const respawnIsExpression = $derived(respawnIsOverTime && respawnGainMode === 'expression');
   // Largest whole unit that divides the interval evenly, else hours.
   const intervalParts = $derived((() => {
     const seconds = Number(respawn.intervalSeconds) || 0;
@@ -408,6 +408,17 @@
   function setRespawnChance(percent) {
     const next = Number(percent);
     updateRespawn({ chance: Number.isFinite(next) ? Math.min(1, Math.max(0, next / 100)) : 0 });
+  }
+  function setRespawnPolicy(value) {
+    // Switching to over-time always carries a gain mode so the draft is valid
+    // even before normalization (defaults to the current/guaranteed mode).
+    updateRespawn(value === 'overTime' ? { policy: 'overTime', gainMode: respawnGainMode } : { policy: value });
+  }
+  function setRespawnGainMode(value) {
+    updateRespawn({ gainMode: value });
+  }
+  function setRespawnExpression(value) {
+    updateRespawn({ amountExpression: String(value ?? '') });
   }
 
   function modifierEntries(row) {
@@ -800,16 +811,13 @@
 
         <label class="manager-field">
           <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
-          <select value={respawn.policy} onchange={(event) => updateRespawn({ policy: event.currentTarget.value })} data-gathering-task-node-respawn>
-            <option value="none">{text('FABRICATE.Admin.Manager.Economy.RespawnNone', 'None')}</option>
+          <select value={respawn.policy} onchange={(event) => setRespawnPolicy(event.currentTarget.value)} data-gathering-task-node-respawn>
             <option value="manual">{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option>
-            <option value="elapsedTime">{text('FABRICATE.Admin.Manager.Economy.RespawnElapsed', 'Over world time')}</option>
-            <option value="probability">{text('FABRICATE.Admin.Manager.Economy.RespawnProbability', 'Probability')}</option>
-            <option value="manualAndElapsedTime">{text('FABRICATE.Admin.Manager.Economy.RespawnManualElapsed', 'Manual + over time')}</option>
+            <option value="overTime">{text('FABRICATE.Admin.Manager.Economy.RespawnOverTime', 'Over world time')}</option>
           </select>
         </label>
 
-        {#if respawnIsTimed}
+        {#if respawnIsOverTime}
           <label class="manager-field manager-task-node-interval">
             <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
             <div class="manager-task-node-interval-row">
@@ -827,9 +835,18 @@
               </select>
             </div>
           </label>
+
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span>
+            <select value={respawnGainMode} onchange={(event) => setRespawnGainMode(event.currentTarget.value)} data-gathering-task-node-gain-mode>
+              <option value="guaranteed">{text('FABRICATE.Admin.Manager.Economy.GainGuaranteed', 'Add one node')}</option>
+              <option value="chance">{text('FABRICATE.Admin.Manager.Economy.GainChance', 'Chance to add one')}</option>
+              <option value="expression">{text('FABRICATE.Admin.Manager.Economy.GainExpression', 'Roll an amount')}</option>
+            </select>
+          </label>
         {/if}
 
-        {#if respawnHasChance}
+        {#if respawnIsChance}
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
             <div class="manager-task-node-chance-row">
@@ -841,6 +858,21 @@
               />
               <span class="manager-muted">%</span>
             </div>
+          </label>
+        {/if}
+
+        {#if respawnIsExpression}
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnAmount', 'Amount per interval')}</span>
+            <input
+              type="text"
+              placeholder="1d4"
+              value={respawn.amountExpression || ''}
+              oninput={(event) => setRespawnExpression(event.currentTarget.value)}
+              aria-describedby="gathering-task-node-amount-hint"
+              data-gathering-task-node-amount
+            />
+            <span id="gathering-task-node-amount-hint" class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.RespawnAmountHint', 'Plain dice only (e.g. 1d4) — no character data.')}</span>
           </label>
         {/if}
       </div>
