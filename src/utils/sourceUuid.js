@@ -99,3 +99,28 @@ export function itemMatchesComponentSource(item, component) {
   if (itemRefs.size === 0) return false;
   return getComponentSourceReferences(component).some(ref => itemRefs.has(ref));
 }
+
+/**
+ * Find an existing actor item that should stack with a freshly-awarded source —
+ * i.e. one that shares a source-UUID reference with `source` AND carries a
+ * `system.quantity` field (so it can be incremented). Items without a quantity
+ * field (unique gear) or with no shared source never match, so they create a new
+ * document instead of stacking.
+ *
+ * @param {Array<object>} items - The actor's existing items (item-like objects).
+ * @param {object} source - The resolved award source (a Foundry item or component).
+ * @returns {object|null} The stackable match, or null.
+ */
+export function findStackableMatch(items, source) {
+  const sourceRefs = new Set([
+    ...getItemSourceReferences(source),
+    ...getComponentSourceReferences(source)
+  ].filter(Boolean));
+  if (sourceRefs.size === 0) return null;
+  for (const item of Array.isArray(items) ? items : []) {
+    const quantity = item?.system?.quantity;
+    if (quantity === undefined || quantity === null) continue;
+    if (getItemSourceReferences(item).some(ref => sourceRefs.has(ref))) return item;
+  }
+  return null;
+}

@@ -512,6 +512,7 @@
     biomeModifierAggregation: 'strongestOfEach'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
+  const selectedGatheringTaskEconomyMode = $derived(selectedGatheringSystemConfig.economy?.mode || 'none');
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
   const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
   const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
@@ -2129,10 +2130,6 @@
   function environmentName(environment) {
     const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
     if (explicitName) return explicitName;
-    const firstTaskName = Array.isArray(environment?.tasks) && typeof environment.tasks[0]?.name === 'string'
-      ? environment.tasks[0].name.trim()
-      : '';
-    if (firstTaskName) return `${text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment')} - ${firstTaskName}`;
     return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
   }
 
@@ -3073,6 +3070,7 @@
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedHazardId={selectedGatheringHazard?.id || selectedGatheringHazardId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
+        {services}
         onSelectGatheringTab={selectGatheringTab}
         onSelectGatheringTask={selectGatheringTask}
         onCreateGatheringTask={createGatheringTask}
@@ -3129,6 +3127,7 @@
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={editingGatheringTask}
+        economyMode={selectedGatheringTaskEconomyMode}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}

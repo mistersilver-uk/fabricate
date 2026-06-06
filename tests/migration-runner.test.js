@@ -282,7 +282,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '0.2.0');
+  assert.equal(versionCall.value, '0.4.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall?.value, '0.2.0');
+  assert.equal(versionCall?.value, '0.4.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -430,4 +430,87 @@ test('null gatheringConfig setting is handled gracefully', async () => {
   const runner = new MigrationRunner({ getSetting: patchedGet, setSetting: settings.setSetting });
 
   await assert.doesNotReject(() => runner.run());
+});
+
+// ---------------------------------------------------------------------------
+// Group: 0.3.0 — system-level gathering economy modes
+// ---------------------------------------------------------------------------
+
+test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode on the system', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.2.0',
+      gatheringConfig: { systems: { 'sys-1': { tasks: [] } } },
+      gatheringEnvironments: [{
+        id: 'env-1',
+        craftingSystemId: 'sys-1',
+        economyMode: 'nodes',
+        tasks: [{ id: 't1', staminaCost: 2, attemptLimit: { scope: 'actor', max: 3 } }]
+      }]
+    }
+  });
+
+  await runner.run();
+
+  const envs = settings.store.get('gatheringEnvironments');
+  assert.equal('economyMode' in envs[0], false);
+  assert.equal('attemptLimit' in envs[0].tasks[0], false);
+  assert.equal(envs[0].tasks[0].staminaCost, 2); // unrelated fields preserved
+
+  const config = settings.store.get('gatheringConfig');
+  assert.equal(config.systems['sys-1'].economy.mode, 'nodes');
+
+  assert.equal(settings.store.get('migrationVersion'), '0.4.0');
+});
+
+test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.3.0',
+      gatheringConfig: { systems: { 'sys-1': { economy: { mode: 'nodes' }, tasks: [
+        { id: 'lib-1', nodes: { max: 2, current: 0, respawn: { policy: 'elapsedTime', intervalSeconds: 3600 } } }
+      ] } } },
+      gatheringEnvironments: [{
+        id: 'env-1', craftingSystemId: 'sys-1',
+        tasks: [{ id: 't1', nodes: { max: 3, current: 1, respawn: { policy: 'probability', intervalSeconds: 7200, chance: 0.4 } } }],
+        nodeRuntime: { 't1': { max: 3, current: 0, respawn: { policy: 'manualAndElapsedTime', intervalSeconds: 60, chance: 0.2 } } }
+      }]
+    }
+  });
+
+  await runner.run();
+
+  const config = settings.store.get('gatheringConfig');
+  assert.deepEqual(config.systems['sys-1'].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 });
+
+  const envs = settings.store.get('gatheringEnvironments');
+  assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', intervalSeconds: 7200, chance: 0.4 });
+  assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', intervalSeconds: 60, chance: 0.2 });
+
+  assert.equal(settings.store.get('migrationVersion'), '0.4.0');
+});
+
+test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.2.0',
+      gatheringConfig: { systems: { 'sys-h': {}, 'sys-t': {} } },
+      gatheringEnvironments: [
+        { id: 'e-h', craftingSystemId: 'sys-h', economyMode: 'hybrid', tasks: [] },
+        { id: 'e-t', craftingSystemId: 'sys-t', economyMode: 'time', tasks: [] }
+      ]
+    }
+  });
+
+  await runner.run();
+  const config = settings.store.get('gatheringConfig');
+  assert.equal(config.systems['sys-h'].economy.mode, 'stamina'); // hybrid -> stamina
+  // time -> none: economy is only seeded when a non-default mode must be kept.
+  assert.equal(config.systems['sys-t'].economy?.mode ?? 'none', 'none');
+
+  // Re-running over already-migrated data changes nothing further.
+  const before = JSON.stringify(settings.store.get('gatheringEnvironments'));
+  settings.store.set('migrationVersion', '0.2.0');
+  await runner.run();
+  assert.equal(JSON.stringify(settings.store.get('gatheringEnvironments')), before);
 });

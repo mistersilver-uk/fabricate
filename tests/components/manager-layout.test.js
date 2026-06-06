@@ -31,12 +31,14 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   const managerFocusBlock = blockFor('.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus');
   const managerFocusVisibleBlock = blockFor('.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible');
   const adminFocusBlock = blockFor('.fabricate-admin button:focus,\n.fabricate-admin input:focus,\n.fabricate-admin select:focus,\n.fabricate-admin textarea:focus,\n.fabricate-admin [tabindex]:focus');
-  const shellFocusBlock = blockFor('.fabricate.fabricate-app button:focus:not(:focus-visible),\n.fabricate.fabricate-app [tabindex]:focus:not(:focus-visible)');
+  const shellFocusBlock = blockFor('.fabricate-app button:focus,\n.fabricate-app input:focus,\n.fabricate-app select:focus,\n.fabricate-app textarea:focus,\n.fabricate-app [tabindex]:focus');
+  const shellFocusVisibleBlock = blockFor('.fabricate-app button:focus-visible,\n.fabricate-app input:focus-visible,\n.fabricate-app select:focus-visible,\n.fabricate-app textarea:focus-visible,\n.fabricate-app [tabindex]:focus-visible');
 
   assert.ok(managerFocusBlock.includes('outline: none;') && managerFocusBlock.includes('box-shadow: none;'), 'manager controls should clear host click focus outlines');
   assert.ok(adminFocusBlock.includes('outline: none;') && adminFocusBlock.includes('box-shadow: none;'), 'legacy admin controls should clear host click focus outlines');
   assert.ok(shellFocusBlock.includes('outline: none;') && shellFocusBlock.includes('box-shadow: none;'), 'unified Fabricate shell controls should clear host click focus outlines');
   assert.ok(managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager keyboard focus should remain visible');
+  assert.ok(shellFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'), 'unified shell keyboard focus should remain visible');
 });
 
 test('manager character modifier search suggestions keep icons in row flow', () => {
@@ -550,7 +552,6 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   const toolsEmptyStubBlock = blockFor('.fabricate-manager .manager-tools-empty-stub');
   const toolsEmptyStubActiveBlock = blockFor('.fabricate-manager .manager-tools-empty-stub:hover,\n.fabricate-manager .manager-tools-empty-stub:focus-visible,\n.fabricate-manager .manager-tools-empty-stub.is-drop-active');
   const editorBlock = blockFor('.fabricate-manager .manager-gathering-task-edit-view');
-  const editorWithNoticeBlock = blockFor('.fabricate-manager .manager-gathering-task-edit-view.has-reward-rule-notice');
   const availabilityBlock = blockFor('.fabricate-manager .manager-task-availability-row');
   const componentBrowserBlock = blockFor('.fabricate-manager .manager-task-component-browser-card');
   const componentBrowserControlsBlock = blockFor('.fabricate-manager .manager-task-component-browser-controls');
@@ -798,8 +799,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     toolsEditorPercentInputBlock.includes('padding: 0 10px 0 0;'),
     'tools breakage chance percent input should keep its specialized compact padding'
   );
-  assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px 340px 410px auto;'), 'task edit route should reserve fixed component browser and drop-rule rows for drag/drop');
-  assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px 340px auto 410px auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
+  assert.ok(editorBlock.includes('grid-auto-rows: auto;'), 'task edit route should size rows to each card so sections can be reordered; the fixed-height cards (component browser, drops) set their own height');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
   assert.ok(availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'), 'task availability controls should form a stable two-column grid');
   assert.ok(componentBrowserBlock.includes('height: 340px;') && componentBrowserBlock.includes('max-height: 340px;') && componentBrowserBlock.includes('overflow: hidden;'), 'component browser should own a fixed bounded height that keeps the footer visible');

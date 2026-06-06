@@ -611,7 +611,14 @@ GatheringNodeConfig = {
 18. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
 19. Player-facing UI should show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
 
-## Gathering Attempt Limits
+## Gathering Attempt Limits (removed)
+
+> Removed by the gathering-attempt-limitation change. The per-scope attempt-count
+> limiter (`GatheringAttemptLimitConfig`, `task.attemptLimit`, and its recharge)
+> was scaffolded but never enforced and has been deleted. Pacing is provided by
+> the per-system economy mode (`stamina` / `nodes`) instead. The original
+> requirements are retained below for historical context only and are no longer
+> normative.
 
 ### Purpose
 
@@ -652,27 +659,31 @@ Allow crafting systems with gathering enabled to select the primary pacing econo
 ### Properties
 
 ```js
+// Stored per crafting system at gatheringConfig.systems[systemId].economy.
 GatheringEconomyConfig = {
-  mode?: "time" | "nodes" | "stamina" | "hybrid",
-  stamina?: {
-    enabled: boolean,
-    regenerationMode?: "manual" | "elapsedTime" | "providerEvent" | "hybrid",
-    intervalSeconds?: number,
-    amount?: number,
-    provider?: ModifierProvider,
+  mode: "none" | "stamina" | "nodes",
+  stamina: {
+    regen: {
+      policy: "none" | "elapsedTime",
+      unit: "minutes" | "hours" | "days" | "weeks",
+      amount: number | null,            // fixed amount per unit
+      formula: string,                  // provider expression; wins over amount when set
+      characterModifiers: ModifierReference[],
+      lastRoll: object | null,
+    },
   },
 }
 ```
 
 ### Requirements
 
-1. Supported gathering economy modes should include `time`, `nodes`, `stamina`, and `hybrid`.
-2. `time` preserves existing `timeRequirement` active-run behavior as the primary pacing model.
-3. `nodes` uses task availability/depletion/respawn as the primary pacing model.
-4. `stamina` uses actor stamina spend/regeneration as the primary pacing model.
-5. `hybrid` allows a system to combine configured time requirements, node availability, and stamina costs.
+1. The gathering limitation mode is selected per crafting system and is one of `none`, `stamina`, or `nodes`.
+2. `none` applies no limitation (legacy behaviour); timed attempts via `timeRequirement` remain available in every mode and are orthogonal to the limitation mode.
+3. `nodes` uses task availability/depletion/respawn as the limitation model; node enforcement applies only in this mode.
+4. `stamina` uses actor stamina spend/regeneration as the limitation model; stamina enforcement applies only in this mode.
+5. A task's stamina cost may be adjusted per actor by character-modifier references resolved against the per-system character modifier library, floored at zero.
 6. The selected economy mode controls which GM authoring controls are primary, secondary, or hidden.
-7. Existing gathering systems without an economy mode behave as `time` or equivalent legacy-compatible mode.
+7. Existing gathering systems without an economy mode behave as `none`; a 0.3.0 migration removes the legacy per-environment `economyMode` field and the unused per-task `attemptLimit`, mapping a non-`time` legacy value onto the system mode (`hybrid → stamina`).
 8. Gathering stamina is optional and actor-scoped.
 9. When stamina is enabled, a gathering task may define a stamina cost.
 10. A start attempt is blocked if the selected actor lacks the required stamina and no GM override is used.

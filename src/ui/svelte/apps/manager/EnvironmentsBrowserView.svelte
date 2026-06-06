@@ -8,6 +8,7 @@
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
+  import GatheringEconomyView from './GatheringEconomyView.svelte';
 
   let {
     environments = [],
@@ -24,6 +25,7 @@
     environmentTaskCounts = {},
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
+    services = null,
     selectedTaskId = '',
     selectedHazardId = '',
     managedItemOptions = [],
@@ -228,10 +230,6 @@
   function environmentName(environment) {
     const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
     if (explicitName) return explicitName;
-    const firstTaskName = Array.isArray(environment?.tasks) && typeof environment.tasks[0]?.name === 'string'
-      ? environment.tasks[0].name.trim()
-      : '';
-    if (firstTaskName) return `${text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment')} - ${firstTaskName}`;
     return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
   }
 
@@ -263,7 +261,7 @@
   function environmentTaskCount(environment) {
     const counts = environmentTaskCounts?.[environment?.id];
     if (counts && Number.isFinite(Number(counts.availableTaskCount))) return Number(counts.availableTaskCount);
-    return Array.isArray(environment?.tasks) ? environment.tasks.length : 0;
+    return 0;
   }
 
   function environmentDirtyFor(environment) {
@@ -831,6 +829,8 @@
       role="tabpanel"
       aria-labelledby="manager-gathering-nav-settings"
     >
+      <GatheringEconomyView {services} systemId={selectedSystemId} />
+
       {#each [
         { kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition },
         { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }

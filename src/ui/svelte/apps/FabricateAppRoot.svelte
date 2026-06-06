@@ -136,10 +136,9 @@
     border-color: var(--fab-accent);
   }
 
-  .fabricate-app-nav-item:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
+  /* Focus rings (Foundry orange suppressed on :focus, accent ring on
+     :focus-visible) are handled globally for the .fabricate-app area in
+     styles/fabricate.css. */
 
   .fabricate-app-main {
     flex: 1 1 auto;

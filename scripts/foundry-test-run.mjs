@@ -924,7 +924,11 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         regions: { values: ['northreach'] }
       },
       tasks: [
-        ...withoutIds(systemConfig.tasks, new Set(['smoke-forage-library'])),
+        ...withoutIds(systemConfig.tasks, new Set([
+          'smoke-forage-library',
+          'smoke-meadow-herbs', 'smoke-sunken-survey', 'smoke-crystal-dew',
+          'smoke-slow-bloom', 'smoke-withered-search', 'smoke-moonpetal'
+        ])),
         {
           id: 'smoke-forage-library',
           name: 'Smoke Reusable Forage',
@@ -944,6 +948,58 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
             dropRate: 80,
             enabled: true
           }]
+        },
+        // Player-gathering scenario library tasks. Each player environment fixture
+        // below force-includes one of these via compositionMode 'manual' +
+        // forcedTaskIds. region 'meadowlands' keeps them from matching the automatic
+        // Azure Grove / GM fixtures (northreach / no region); no weather/timeOfDay
+        // constraint keeps them available. Library tasks are d100 drop-row gathers —
+        // the per-scenario "state" (success / scene-block / tool-block / timed /
+        // empty / blind) comes from the environment config or the drop-rate, since
+        // progressive/check/catalyst/failure task resolution no longer exists.
+        {
+          id: 'smoke-meadow-herbs', name: 'Gather Meadow Herbs',
+          description: 'Immediate successful gather for the player Gathering tab.',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
+          dropRows: [{ id: 'smoke-meadow-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 90, enabled: true }]
+        },
+        {
+          id: 'smoke-sunken-survey', name: 'Survey Sunken Reagents',
+          description: 'Visible task gated by its linked scene at the environment level.',
+          img: 'icons/svg/item-bag.svg',
+          enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
+          dropRows: [{ id: 'smoke-sunken-drop', componentId: componentMap['Iron Ore'], quantity: 1, dropRate: 70, enabled: true }]
+        },
+        {
+          id: 'smoke-crystal-dew', name: 'Bottle Crystal Dew',
+          description: 'Requires the Herbalist Sickle tool, demonstrating a blocked task.',
+          img: 'icons/consumables/potions/vial-cork-empty.webp',
+          enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
+          toolIds: ['smoke-herbalist-sickle'],
+          dropRows: [{ id: 'smoke-crystal-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 80, enabled: true }]
+        },
+        {
+          id: 'smoke-slow-bloom', name: 'Tend Slow Bloom',
+          description: 'A timed gather that creates an active run before completion.',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
+          timeRequirement: { minutes: 1, hours: 0, days: 0, months: 0, years: 0 },
+          dropRows: [{ id: 'smoke-bloom-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 80, enabled: true }]
+        },
+        {
+          id: 'smoke-withered-search', name: 'Search Withered Patch',
+          description: 'An exhausted patch whose only drop never lands (empty-result feedback).',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
+          dropRows: [{ id: 'smoke-withered-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 0, enabled: true }]
+        },
+        {
+          id: 'smoke-moonpetal', name: 'Secret Moonpetal Harvest',
+          description: 'Real task name that must stay GM-only in player blind views.',
+          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
+          dropRows: [{ id: 'smoke-moonpetal-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 70, enabled: true }]
         }
       ],
       tools: [
@@ -1902,61 +1958,7 @@ async function main() {
           hazardSelectionMode: 'highestRankedDrop',
           hazardPolicy: 'successWithHazard',
           enabledTaskIds: ['smoke-forage-library'],
-          enabledHazardIds: ['smoke-bramble-hazard'],
-          tasks: [{
-            name: 'Forage Verdant Reagents',
-            description: 'Collect useful plants and incidental ore from a controlled test clearing.',
-            img: 'icons/consumables/plants/leaf-herb-green.webp',
-            enabled: false,
-            resolutionMode: 'routed',
-            resultSelection: {
-              provider: 'rollTableOutcome',
-              rollTableUuid: 'RollTable.fabricateMissingTable'
-            },
-            timeRequirement: {
-              minutes: 10,
-              hours: 0,
-              days: 0,
-              months: 0,
-              years: 0
-            },
-            failureOutcome: {
-              mode: 'text',
-              text: 'The grove yields only damp leaves.'
-            },
-            visibility: {
-              provider: 'dnd5e',
-              formula: '1d20',
-              threshold: '10'
-            },
-            catalysts: [
-              {
-                componentId: componentMap['Empty Vial'],
-                degradesOnUse: false,
-                destroyWhenExhausted: true,
-                maxUses: null
-              },
-              {
-                componentId: componentMap['Dragon Scale'],
-                degradesOnUse: true,
-                destroyWhenExhausted: true,
-                maxUses: 3
-              }
-            ],
-            resultGroups: [
-              {
-                name: 'Common Finds',
-                results: [
-                  { componentId: componentMap['Mystic Herb'], quantity: 2 },
-                  { componentId: componentMap['Iron Ore'], quantity: 1 }
-                ]
-              },
-              {
-                name: 'Rare Finds',
-                results: []
-              }
-            ]
-          }]
+          enabledHazardIds: ['smoke-bramble-hazard']
         });
 
         const playerGatheringFixtures = [];
@@ -1967,19 +1969,8 @@ async function main() {
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
-          tasks: [{
-            name: 'Gather Meadow Herbs',
-            description: 'Collect fresh herbs for a quick brewing session.',
-            img: 'icons/consumables/plants/leaf-herb-green.webp',
-            enabled: true,
-            resolutionMode: 'progressive',
-            progressive: { awardMode: 'equal' },
-            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
-            resultGroups: [{
-              name: 'Meadow Herbs',
-              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
-            }]
-          }]
+          compositionMode: 'manual',
+          forcedTaskIds: ['smoke-meadow-herbs']
         }));
 
         playerGatheringFixtures.push(await environmentStore.create({
@@ -1989,47 +1980,19 @@ async function main() {
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: 'Scene.fabricateMissingGatheringScene',
-          tasks: [{
-            name: 'Survey Sunken Reagents',
-            description: 'This task is visible but cannot be attempted away from its linked scene.',
-            img: 'icons/svg/item-bag.svg',
-            enabled: true,
-            resolutionMode: 'progressive',
-            progressive: { awardMode: 'equal' },
-            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
-            resultGroups: [{
-              name: 'Ruins Finds',
-              results: [{ componentId: componentMap['Iron Ore'], quantity: 1 }]
-            }]
-          }]
+          compositionMode: 'manual',
+          forcedTaskIds: ['smoke-sunken-survey']
         }));
 
         playerGatheringFixtures.push(await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Crystal Thicket',
-          description: 'Requires a vial catalyst so Bromm demonstrates a blocked task.',
+          description: 'Requires the Herbalist Sickle tool so Bromm demonstrates a blocked task.',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
-          tasks: [{
-            name: 'Bottle Crystal Dew',
-            description: 'A vial is required before the dew can be gathered.',
-            img: 'icons/consumables/potions/vial-cork-empty.webp',
-            enabled: true,
-            resolutionMode: 'progressive',
-            progressive: { awardMode: 'equal' },
-            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
-            catalysts: [{
-              componentId: componentMap['Empty Vial'],
-              degradesOnUse: false,
-              destroyWhenExhausted: false,
-              maxUses: null
-            }],
-            resultGroups: [{
-              name: 'Crystal Dew',
-              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
-            }]
-          }]
+          compositionMode: 'manual',
+          forcedTaskIds: ['smoke-crystal-dew']
         }));
 
         playerGatheringFixtures.push(await environmentStore.create({
@@ -2039,43 +2002,19 @@ async function main() {
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
-          tasks: [{
-            name: 'Tend Slow Bloom',
-            description: 'The bloom matures after a short world-time delay.',
-            img: 'icons/consumables/plants/leaf-herb-green.webp',
-            enabled: true,
-            resolutionMode: 'progressive',
-            progressive: { awardMode: 'equal' },
-            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
-            timeRequirement: { minutes: 1, hours: 0, days: 0, months: 0, years: 0 },
-            resultGroups: [{
-              name: 'Slow Bloom',
-              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
-            }]
-          }]
+          compositionMode: 'manual',
+          forcedTaskIds: ['smoke-slow-bloom']
         }));
 
         playerGatheringFixtures.push(await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Withered Patch',
-          description: 'A deterministic failure task for failure feedback screenshots.',
+          description: 'An exhausted patch whose only drop never lands, for empty-result feedback.',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
-          tasks: [{
-            name: 'Search Withered Patch',
-            description: 'The patch is exhausted and should fail cleanly.',
-            img: 'icons/consumables/plants/leaf-herb-green.webp',
-            enabled: true,
-            resolutionMode: 'progressive',
-            progressive: { awardMode: 'equal' },
-            check: { provider: 'dnd5e', formula: '1', threshold: '10' },
-            failureOutcome: { mode: 'text', text: 'The patch yields only brittle stems.' },
-            resultGroups: [{
-              name: 'Withered Finds',
-              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
-            }]
-          }]
+          compositionMode: 'manual',
+          forcedTaskIds: ['smoke-withered-search']
         }));
 
         playerGatheringFixtures.push(await environmentStore.create({
@@ -2085,19 +2024,8 @@ async function main() {
           enabled: true,
           selectionMode: 'blind',
           sceneUuid: '',
-          tasks: [{
-            name: 'Secret Moonpetal Harvest',
-            description: 'This real task name should remain GM-only in player blind views.',
-            img: 'icons/consumables/plants/leaf-herb-green.webp',
-            enabled: true,
-            resolutionMode: 'progressive',
-            progressive: { awardMode: 'equal' },
-            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
-            resultGroups: [{
-              name: 'Moonpetals',
-              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
-            }]
-          }]
+          compositionMode: 'manual',
+          forcedTaskIds: ['smoke-moonpetal']
         }));
 
         await game.settings.set('fabricate', 'gatheringConfig', {

@@ -25,6 +25,7 @@ import { IngredientGroup } from './models/IngredientGroup.js';
 import { Catalyst } from './models/Catalyst.js';
 import { Tool } from './models/Tool.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
+import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -376,6 +377,16 @@ function createGatheringResultCreator(craftingSystemManager) {
         }
         if (source.uuid) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+        }
+
+        // Stack onto an existing matching item (same source UUID chain) that uses
+        // a quantity field, rather than creating a duplicate document.
+        const existing = findStackableMatch(normalizeFoundryCollection(actor.items), source);
+        if (existing) {
+          const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
+          await existing.update({ 'system.quantity': next });
+          created.push(gatheringRunItemRef(actor, existing, result.quantity));
+          continue;
         }
 
         const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
@@ -1005,13 +1016,77 @@ class Fabricate {
   setGatheringStamina(options = {}) {
     this._requireReady();
     this._requireGM();
-    return this.gatheringRichStateService?.setActorStamina(options.actor, options);
+    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
+    return this.gatheringRichStateService?.setActorStamina(actor, options);
   }
 
   adjustGatheringStamina(options = {}) {
     this._requireReady();
     this._requireGM();
-    return this.gatheringRichStateService?.adjustActorStamina(options.actor, options);
+    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
+    return this.gatheringRichStateService?.adjustActorStamina(actor, options);
+  }
+
+  /**
+   * Read a crafting system's gathering economy block (mode + stamina regen).
+   * Player-safe — the mode and regen cadence are surfaced in the player UI.
+   *
+   * @param {{systemId: string}} options
+   * @returns {{mode: string, stamina: {regen: object}}|null}
+   */
+  getGatheringEconomy(options = {}) {
+    this._requireReady();
+    return this.gatheringRichStateService?.systemEconomy(options.systemId) ?? null;
+  }
+
+  /**
+   * Set a crafting system's gathering economy block. GM-only.
+   *
+   * @param {{systemId: string, economy: object}} options
+   * @returns {Promise<object|null>} The normalized economy block.
+   */
+  setGatheringEconomy(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.setSystemEconomy(options);
+  }
+
+  /**
+   * List the stamina pools of player-owned actors for one crafting system, for
+   * the GM "Gathering State" panel. GM-only.
+   *
+   * @param {{systemId: string}} options
+   * @returns {Array<{actorId: string, name: string, img: string, current: number|null, max: number|null, provider: string}>}
+   */
+  getGatheringStaminaState(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    const systemId = options.systemId;
+    const service = this.gatheringRichStateService;
+    if (!service || !systemId) return [];
+    // Characters only — exclude NPCs (and other non-character actor types). A
+    // character with no rolled pool yet reports max: null (the panel offers Roll).
+    return Array.from(game.actors?.contents ?? [])
+      .filter(actor => actor?.type === 'character')
+      .map(actor => {
+        const stamina = service.getActorStamina(actor, systemId);
+        return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
+      });
+  }
+
+  /**
+   * (Re)roll a character's stamina pool from the system max/start expression
+   * templates and persist it. GM-only; used by the panel's Roll/Reset control.
+   *
+   * @param {{systemId: string, actorId: string}} options
+   * @returns {Promise<object|null>} The materialized pool, or null.
+   */
+  rollGatheringStamina(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
+    if (!actor) return null;
+    return this.gatheringRichStateService?.seedActorStaminaIfNeeded({ actor, systemId: options.systemId, force: true });
   }
 
   revealGatheringTask(options = {}) {

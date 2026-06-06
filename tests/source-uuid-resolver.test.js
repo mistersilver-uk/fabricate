@@ -22,7 +22,8 @@ const {
   getDuplicateSourceUuid,
   getItemSourceReferences,
   getComponentSourceReferences,
-  itemMatchesComponentSource
+  itemMatchesComponentSource,
+  findStackableMatch
 } = await import('../src/utils/sourceUuid.js');
 
 test('1 - returns _stats.compendiumSource when present (v12+ canonical field)', () => {
@@ -175,4 +176,35 @@ test('18 - itemMatchesComponentSource does NOT match on flags.fabricate.mythwrig
     fallbackItemIds: []
   };
   assert.equal(itemMatchesComponentSource(item, component), false);
+});
+
+test('19 - findStackableMatch: returns an existing quantity item sharing the source uuid', () => {
+  const source = { uuid: 'Compendium.world.items.raw-ore' };
+  const items = [
+    { name: 'Sword', uuid: 'Item.sword', system: {} }, // no quantity → not stackable
+    { name: 'Raw Ore', uuid: 'Item.owned-ore', system: { quantity: 3 }, flags: { core: { sourceId: 'Compendium.world.items.raw-ore' } } }
+  ];
+  const match = findStackableMatch(items, source);
+  assert.equal(match?.uuid, 'Item.owned-ore');
+});
+
+test('20 - findStackableMatch: no match when no item has a quantity field', () => {
+  const source = { uuid: 'Compendium.world.items.raw-ore' };
+  const items = [
+    { name: 'Raw Ore', uuid: 'Item.owned-ore', system: {}, flags: { core: { sourceId: 'Compendium.world.items.raw-ore' } } }
+  ];
+  assert.equal(findStackableMatch(items, source), null);
+});
+
+test('21 - findStackableMatch: no match when source refs do not overlap', () => {
+  const source = { uuid: 'Compendium.world.items.raw-ore' };
+  const items = [
+    { name: 'Gemstone', uuid: 'Item.gem', system: { quantity: 1 }, flags: { core: { sourceId: 'Compendium.world.items.gemstone' } } }
+  ];
+  assert.equal(findStackableMatch(items, source), null);
+});
+
+test('22 - findStackableMatch: empty source refs never match (no false positives)', () => {
+  const items = [{ uuid: 'Item.x', system: { quantity: 1 } }];
+  assert.equal(findStackableMatch(items, {}), null);
 });

@@ -53,6 +53,7 @@ function fakeStore(overrides = {}) {
       selectableActors,
       selectedActorId,
       region: overrides.region ?? '',
+      staminaPool: overrides.staminaPool ?? null,
       conditions: overrides.conditions ?? null,
       loaded: overrides.loaded ?? true,
       get selectedActor() {
@@ -119,6 +120,28 @@ describe('ActorSelectTopBar mounted behavior', () => {
     rmSync(tempRoot, { recursive: true, force: true });
     teardownDOM();
     delete globalThis.game;
+  });
+
+  it('renders a contextual stamina bar on the gathering tab when a pool is set', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: { current: 4, max: 10 } });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const bar = target.querySelector('[data-actor-bar-stamina]');
+    assert.ok(bar, 'stamina bar renders on the gathering tab');
+    assert.ok(bar.textContent.includes('4/10'), 'shows current/max');
+    const fill = bar.querySelector('.actor-bar-stamina-fill');
+    assert.ok(/width:\s*40%/.test(fill.getAttribute('style') || ''), 'fill width reflects 4/10');
+  });
+
+  it('hides the stamina bar when there is no pool or off the gathering tab', async () => {
+    const noPool = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: null });
+    await mountBar({ store: noPool.store, activeTab: 'gathering' });
+    assert.equal(target.querySelector('[data-actor-bar-stamina]'), null, 'no bar without a pool');
+    unmount(mounted); mounted = null; target.remove();
+
+    const withPool = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: { current: 4, max: 10 } });
+    await mountBar({ store: withPool.store, activeTab: 'crafting' });
+    assert.equal(target.querySelector('[data-actor-bar-stamina]'), null, 'no bar off the gathering tab');
   });
 
   it('renders the selected actor portrait image in the trigger', async () => {

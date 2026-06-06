@@ -805,10 +805,27 @@
   overflow: hidden;
 }
 
-.fabricate.fabricate-app button:focus:not(:focus-visible),
-.fabricate.fabricate-app [tabindex]:focus:not(:focus-visible) {
+.fabricate-app button:focus,
+.fabricate-app input:focus,
+.fabricate-app select:focus,
+.fabricate-app textarea:focus,
+.fabricate-app [tabindex]:focus {
   outline: none;
   box-shadow: none;
+}
+
+/* Replace Foundry core's orange focus ring with the Fabricate accent ring for
+   keyboard users. The :focus rule above strips the orange on mouse click; this
+   restores an intentional ring on :focus-visible (which is also the state a nav
+   button lands in after the tab panel re-renders on click). Kept at single-class
+   specificity so per-component focus rings (e.g. gathering rows) still win. */
+.fabricate-app button:focus-visible,
+.fabricate-app input:focus-visible,
+.fabricate-app select:focus-visible,
+.fabricate-app textarea:focus-visible,
+.fabricate-app [tabindex]:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-search {
@@ -7100,16 +7117,15 @@
 
 .fabricate-manager .manager-gathering-task-edit-view {
   display: grid;
-  grid-template-rows: auto auto 340px 340px 410px auto;
+  /* Rows size to each card (cards that need a fixed height — required-tools,
+     component-browser, drops — set their own `height`). This keeps the stack
+     order free: sections can be reordered without breaking heights. */
+  grid-auto-rows: auto;
   gap: 12px;
   min-height: 0;
   min-width: 0;
   padding: 14px;
   overflow: auto;
-}
-
-.fabricate-manager .manager-gathering-task-edit-view.has-reward-rule-notice {
-  grid-template-rows: auto auto 340px 340px auto 410px auto;
 }
 
 .fabricate-manager .manager-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
@@ -11631,6 +11647,23 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.fabricate-manager .manager-environment-node-count {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-node-count-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-environment-node-count-value strong {
+  font-size: 1.25em;
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-row {

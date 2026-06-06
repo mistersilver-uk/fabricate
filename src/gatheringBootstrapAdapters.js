@@ -109,9 +109,10 @@ export async function evaluateGatheringExpression(payload = {}) {
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   if (typeof globalThis.Roll === 'function') {
     const roll = new globalThis.Roll(String(expression), rollData);
-    const evaluated = typeof roll.evaluateSync === 'function'
-      ? roll.evaluateSync()
-      : await roll.evaluate();
+    // Evaluate asynchronously — evaluateSync() rejects dice (and parenthetical
+    // dice counts like "(@abilities.con.mod)d6"). This seam is already async and
+    // every caller awaits it, so async evaluate() is safe and rolls dice.
+    const evaluated = await roll.evaluate();
     return evaluated?.total ?? evaluated?.result ?? null;
   }
 

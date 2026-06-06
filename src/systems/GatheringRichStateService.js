@@ -1,4 +1,5 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+import { normalizeNodeConfig } from './gatheringNodeConfig.js';
 
 const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
@@ -57,6 +58,12 @@ const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
+// System-level gathering limitation mode (per crafting system).
+const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
+// Stamina regeneration over world time.
+const STAMINA_REGEN_POLICIES = new Set(['none', 'elapsedTime']);
+const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
+const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86400, weeks: 604800 });
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
@@ -73,7 +80,6 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
 
 const BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
-  ATTEMPT_LIMIT_EXHAUSTED: 'FABRICATE.Gathering.Blocked.AttemptLimitExhausted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked'
 });
 
@@ -193,17 +199,14 @@ export class GatheringRichStateService {
           hazardPolicy: environment.hazardPolicy
         });
     const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-    const tasks = [
-      ...normalizeList(environment.tasks).map(task => this._environmentTaskToRuntimeTask(task, environment)),
-      ...sortRecordsByOrder(
-        normalizeList(libraries.tasks)
-          .filter(task => task?.enabled !== false)
-          .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
-            || this._recordIsForced(environment, task.id, 'task', compositionMode))
-          .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
-        environment?.taskOrder
-      ).map(task => this._libraryTaskToRuntimeTask(task, environment))
-    ];
+    const tasks = sortRecordsByOrder(
+      normalizeList(libraries.tasks)
+        .filter(task => task?.enabled !== false)
+        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
+          || this._recordIsForced(environment, task.id, 'task', compositionMode))
+        .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
+      environment?.taskOrder
+    ).map(task => this._libraryTaskToRuntimeTask(task, environment));
     const hazards = sortRecordsByOrder(
       normalizeList(libraries.hazards)
         .filter(hazard => hazard?.enabled !== false)
@@ -683,21 +686,21 @@ export class GatheringRichStateService {
 
   buildListingMetadata({ environment, task, actor, viewer }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
-    const nodes = task?.nodes ? {
+    const mode = this._economyMode(environment?.craftingSystemId);
+    const showNodeCounts = task?.nodes?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
+    const nodes = mode === 'nodes' && task?.nodes ? {
       enabled: true,
       available: Number(task.nodes.current || 0) > 0,
-      current: task.nodes.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind ? Number(task.nodes.current || 0) : null,
-      max: task.nodes.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind ? Number(task.nodes.max || 0) : null
+      current: showNodeCounts ? Number(task.nodes.current || 0) : null,
+      max: showNodeCounts ? Number(task.nodes.max || 0) : null
     } : null;
-    const stamina = Number(task?.staminaCost || 0) > 0 ? {
+    const stamina = mode === 'stamina' && Number(task?.staminaCost || 0) > 0 ? {
       cost: Number(task.staminaCost || 0),
       state: this.getActorStamina(actor, environment?.craftingSystemId)
     } : null;
-    const attemptLimit = task?.attemptLimit ? this._attemptLimitEvidence({ actor, environment, task, viewer }) : null;
     return {
       nodes,
       stamina,
-      attemptLimit,
       risk: task?.riskOverride || environment?.risk || 'safe',
       conditions: this.getConditions().weather ? cloneJson(this._config().conditions) : cloneJson(environment?.conditions || {}),
       hazards: opaqueBlind
@@ -714,27 +717,121 @@ export class GatheringRichStateService {
     const state = readState(actor);
     const key = systemId || 'default';
     const stamina = state.stamina?.[key] || {};
+    // Pools are materialized per character at seed time (the system max/start
+    // expressions are rolled once into numbers), so this stays synchronous and
+    // simply reads the stored values. A character with no pool reads `null`.
+    // `max` is the rolled value; an optional GM `maxOverride` layers over it.
+    const rolledMax = numberOrNullStrict(stamina.max);
+    const maxOverride = numberOrNullStrict(stamina.maxOverride);
+    const max = maxOverride != null ? maxOverride : rolledMax; // effective cap
+    const storedCurrent = numberOrNullStrict(stamina.current);
+    const current = storedCurrent != null ? storedCurrent : (max != null ? max : null);
     return {
-      current: Number.isFinite(Number(stamina.current)) ? Number(stamina.current) : null,
-      max: Number.isFinite(Number(stamina.max)) ? Number(stamina.max) : null,
+      current,
+      max,
+      rolledMax,
+      maxOverride,
       provider: stamina.provider || 'fabricate',
       regenerationMode: stamina.regenerationMode || 'manual'
     };
   }
 
-  async setActorStamina(actor, { systemId = 'default', current = null, max = null, provider = 'fabricate', regenerationMode = 'manual' } = {}) {
+  /**
+   * Materialize a character's stamina pool from the system `max`/`start`
+   * expression templates, rolling them once and persisting the resulting
+   * numbers. Idempotent: a character that already has a pool keeps it unless
+   * `force` is set (the GM Roll/Reset path). No-ops outside stamina mode or when
+   * the max template is blank/non-finite (⇒ no pool, stamina unenforced).
+   *
+   * @param {object} payload
+   * @returns {Promise<object|null>} The materialized pool, or null on no-op.
+   */
+  async seedActorStaminaIfNeeded({ actor, systemId, system = null, environment = null, force = false } = {}) {
+    const key = systemId || 'default';
+    const econ = this._systemEconomy(key);
+    if (econ.mode !== 'stamina') return null;
+
+    const state = readState(actor);
+    const existing = state.stamina?.[key];
+    if (!force && existing && numberOrNullStrict(existing.max) != null) {
+      return cloneJson(existing);
+    }
+
+    const maxValue = await this._evaluateStaminaExpression({ expression: econ.stamina?.max, actor, system, environment, kind: 'staminaMax' });
+    if (maxValue == null) return null; // no max configured ⇒ leave unseeded (stamina unenforced)
+    const max = Math.max(0, Math.round(maxValue));
+
+    const startRaw = await this._evaluateStaminaExpression({ expression: econ.stamina?.start, actor, system, environment, kind: 'staminaStart' });
+    const start = startRaw == null ? max : Math.max(0, Math.round(startRaw)); // blank start ⇒ full
+
+    const entry = {
+      provider: 'fabricate',
+      regenerationMode: econ.stamina?.regen?.policy === 'elapsedTime' ? 'auto' : 'manual',
+      current: Math.min(start, max),
+      max,
+      lastRegenWorldTime: this._now()
+    };
+    state.stamina = { ...(state.stamina || {}), [key]: entry };
+    state.history = [
+      this._historyEvent('stamina.seed', { systemId: key, current: entry.current, max }),
+      ...normalizeList(state.history)
+    ].slice(0, 50);
+    await writeState(actor, state);
+    this._callHook('fabricate.gathering.staminaSeeded', { actor, systemId: key, stamina: cloneJson(entry) });
+    return cloneJson(entry);
+  }
+
+  /**
+   * Evaluate a stamina expression template against an actor, returning a finite
+   * number or null when the template is blank/unresolvable. Reuses the same
+   * Roll-backed `evaluateExpression` seam regen uses.
+   */
+  async _evaluateStaminaExpression({ expression, actor, system = null, environment = null, kind = 'stamina' } = {}) {
+    if (expression === null || expression === undefined || expression === '') return null;
+    let value;
+    if (typeof this.evaluateExpression === 'function') {
+      value = await this.evaluateExpression({ expression: String(expression), provider: null, actor, kind, system, environment });
+    } else {
+      value = Number(expression);
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  async setActorStamina(actor, { systemId = 'default', current = null, max = null, maxOverride = undefined, provider = 'fabricate', regenerationMode = 'manual' } = {}) {
     const state = readState(actor);
     const key = systemId || 'default';
     const previous = state.stamina?.[key] || {};
+    const effectiveProvider = provider || previous.provider || 'fabricate';
+    const priorMax = numberOrNullStrict(previous.max);
+    const providedMax = numberOrNullStrict(max);
+    // `max` is the rolled cap. When omitted, the prior rolled max is preserved
+    // (the panel only edits current + override). When provided: Fabricate-owned
+    // pools accept it freely; an external provider's maximum is read-only once
+    // established, but an as-yet unset external pool may still be initialized.
+    const rolledMax = providedMax != null
+      ? ((effectiveProvider === 'fabricate' || priorMax == null) ? providedMax : priorMax)
+      : priorMax;
+    // `maxOverride`: undefined preserves the prior override; a finite number
+    // sets it; null/'' clears it. The effective cap is the override, else rolled.
+    const override = maxOverride === undefined
+      ? numberOrNullStrict(previous.maxOverride)
+      : (maxOverride === null || maxOverride === '' ? null : nonNegativeNumber(maxOverride, 0));
+    const effectiveMax = override != null ? override : rolledMax;
+    let currentValue = nonNegativeNumber(current, previous.current ?? 0);
+    if (Number.isFinite(Number(effectiveMax))) currentValue = Math.min(currentValue, Number(effectiveMax));
     const next = {
-      provider: provider || previous.provider || 'fabricate',
+      provider: effectiveProvider,
       regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
-      current: nonNegativeNumber(current, previous.current ?? 0),
-      max: nonNegativeNumber(max, previous.max ?? current ?? 0)
+      current: currentValue,
+      max: rolledMax,
+      ...(override != null ? { maxOverride: override } : {}),
+      // Preserve the regen anchor so a manual GM set does not reset the clock.
+      ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
     };
     state.stamina = { ...(state.stamina || {}), [key]: next };
     state.history = [
-      this._historyEvent('stamina.set', { systemId: key, current: next.current, max: next.max }),
+      this._historyEvent('stamina.set', { systemId: key, current: next.current, max: next.max, maxOverride: override }),
       ...normalizeList(state.history)
     ].slice(0, 50);
     await writeState(actor, state);
@@ -743,37 +840,281 @@ export class GatheringRichStateService {
   }
 
   async adjustActorStamina(actor, { systemId = 'default', delta = 0 } = {}) {
-    const current = this.getActorStamina(actor, systemId);
-    const nextCurrent = Math.max(0, Number(current.current || 0) + Number(delta || 0));
-    return this.setActorStamina(actor, {
-      systemId,
-      current: current.max !== null ? Math.min(nextCurrent, current.max) : nextCurrent,
-      max: current.max ?? nextCurrent,
-      provider: current.provider,
-      regenerationMode: current.regenerationMode
-    });
+    const key = systemId || 'default';
+    const effective = this.getActorStamina(actor, key);
+    const next = Math.max(0, Number(effective.current || 0) + Number(delta || 0));
+    const clamped = effective.max !== null ? Math.min(next, effective.max) : next;
+    const state = readState(actor);
+    const previous = state.stamina?.[key] || {};
+    // Preserve the stored max verbatim (null stays null) so the system default
+    // max stays authoritative when no per-actor override exists.
+    const previousOverride = numberOrNullStrict(previous.maxOverride);
+    const entry = {
+      provider: previous.provider || effective.provider || 'fabricate',
+      regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
+      current: clamped,
+      max: numberOrNullStrict(previous.max),
+      ...(previousOverride != null ? { maxOverride: previousOverride } : {}),
+      ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
+    };
+    state.stamina = { ...(state.stamina || {}), [key]: entry };
+    state.history = [
+      this._historyEvent('stamina.adjust', { systemId: key, delta: Number(delta || 0), current: clamped }),
+      ...normalizeList(state.history)
+    ].slice(0, 50);
+    await writeState(actor, state);
+    this._callHook('fabricate.gathering.staminaAdjusted', { actor, systemId: key, stamina: cloneJson(entry) });
+    return cloneJson(entry);
   }
 
   async restockNode({ environmentId, taskId, current = null, max = null } = {}) {
     const environment = this.environmentStore?.get?.(environmentId);
     if (!environment) return null;
-    const tasks = normalizeList(environment.tasks).map(task => {
-      if (task?.id !== taskId) return task;
-      const existing = task.nodes || { enabled: true, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } };
-      const nextMax = nonNegativeInteger(max, existing.max);
-      return {
-        ...task,
-        nodes: {
-          ...existing,
-          enabled: true,
-          max: nextMax,
-          current: Math.min(nonNegativeInteger(current, nextMax), nextMax)
-        }
-      };
-    });
-    const updated = await this.environmentStore.update(environmentId, { tasks });
+    const existing = this._currentNodeState(environment, taskId);
+    if (!existing) return null;
+    // A null/undefined max keeps the existing cap (don't let Number(null)→0 wipe it).
+    const nextMax = (max === null || max === undefined) ? Number(existing.max || 0) : nonNegativeInteger(max, existing.max);
+    const node = {
+      ...existing,
+      enabled: true,
+      max: nextMax,
+      current: Math.min(nonNegativeInteger(current, nextMax), nextMax)
+    };
+    const updated = await this._writeNodeState({ environmentId, taskId, node });
     this._callHook('fabricate.gathering.nodeRestocked', { environmentId, taskId, current, max });
     return updated;
+  }
+
+  /**
+   * The current node object for a task in an environment: the per-environment
+   * runtime pool if present, else a fresh full pool seeded from the library
+   * task's node config. Null when the task has no node config.
+   */
+  _currentNodeState(environment, taskId) {
+    const runtime = environment?.nodeRuntime?.[taskId];
+    if (runtime) return runtime;
+    const libraryTasks = this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
+    const config = normalizeNodeConfig(normalizeList(libraryTasks).find(task => task?.id === taskId)?.nodes);
+    return config ? { ...config, current: config.max } : null;
+  }
+
+  /**
+   * Persist a node object for a task into the environment's per-environment
+   * `nodeRuntime` map. Reads the raw stored environment so a composed/runtime
+   * environment is never written.
+   */
+  async _writeNodeState({ environmentId, taskId, node }) {
+    const stored = this.environmentStore?.get?.(environmentId);
+    if (!stored) return null;
+    return this.environmentStore.update(environmentId, {
+      nodeRuntime: { ...(stored.nodeRuntime || {}), [taskId]: node }
+    });
+  }
+
+  /**
+   * Regenerate one actor's stamina for a stamina-mode system as world time
+   * passes. Adds the configured per-interval amount once for each whole
+   * `regen.unit` elapsed since the last evaluation, clamps to the pool max, and
+   * advances the persisted anchor by exactly the consumed intervals so the
+   * fractional remainder accrues toward the next tick. No-ops when the system
+   * is not in stamina mode, regen is off, the pool has no max, or world time
+   * has not advanced a full interval (re-anchoring on backwards jumps).
+   *
+   * @param {object} payload
+   * @returns {Promise<object|null>} The updated stamina entry, or null on no-op.
+   */
+  async regenerateActorStamina({ actor, systemId, system = null, environment = null, worldTime } = {}) {
+    const key = systemId || 'default';
+    const econ = this._systemEconomy(key);
+    if (econ.mode !== 'stamina') return null;
+    const regen = econ.stamina?.regen || {};
+    if (regen.policy !== 'elapsedTime') return null;
+    const interval = durationToSeconds(1, regen.unit);
+    if (!(interval > 0)) return null;
+
+    const state = readState(actor);
+    const entry = state.stamina?.[key];
+    if (!entry) return null; // regen only tops up materialized pools, never creates them
+    // Effective cap: the GM override if set, else the rolled max.
+    const max = numberOrNullStrict(entry.maxOverride) ?? numberOrNullStrict(entry.max);
+    if (max == null) return null;
+    const now = Number(worldTime);
+    if (!Number.isFinite(now)) return null;
+    const last = Number.isFinite(Number(entry.lastRegenWorldTime)) ? Number(entry.lastRegenWorldTime) : now;
+
+    // World time stood still or ran backwards: re-anchor, never regenerate.
+    if (now <= last) {
+      if (entry.lastRegenWorldTime !== now) {
+        state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: now } };
+        await writeState(actor, state);
+      }
+      return null;
+    }
+
+    const intervals = Math.floor((now - last) / interval);
+    if (intervals <= 0) return null; // keep the anchor so the remainder accrues
+
+    const before = Number(entry.current || 0);
+    const advancedAnchor = last + intervals * interval;
+    if (before >= max) {
+      state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: advancedAnchor } };
+      await writeState(actor, state);
+      return null;
+    }
+
+    const perInterval = await this._regenAmountPerInterval({ actor, systemId: key, system, environment, regen });
+    const nextCurrent = perInterval > 0 ? Math.min(max, before + perInterval * intervals) : before;
+    const next = { ...entry, current: nextCurrent, lastRegenWorldTime: advancedAnchor };
+    state.stamina = { ...(state.stamina || {}), [key]: next };
+    state.history = [
+      this._historyEvent('stamina.regen', { systemId: key, amount: nextCurrent - before, current: nextCurrent, max }),
+      ...normalizeList(state.history)
+    ].slice(0, 50);
+    await writeState(actor, state);
+    this._callHook('fabricate.gathering.staminaRegenerated', { actor, systemId: key, amount: nextCurrent - before, stamina: cloneJson(next) });
+    return cloneJson(next);
+  }
+
+  /**
+   * Respawn finite resource nodes for one environment as world time passes
+   * (nodes-mode systems only). For each task with an `overTime` respawn policy,
+   * adds nodes per elapsed interval per the gain mode: `guaranteed` (+1),
+   * `chance` (a persisted d100 roll per interval), or `expression` (roll
+   * `amountExpression` per interval and add the rolled total), clamped to the
+   * task max. Advances each task's `respawn.lastEvaluatedWorldTime` with the
+   * consumed intervals (persisting `lastRoll`) so a same-tick refresh never
+   * rerolls. Writes the environment once when any task changed.
+   *
+   * @param {object} payload
+   * @returns {Promise<object|null>} The updated environment, or null on no-op.
+   */
+  async respawnNodes({ environment, worldTime } = {}) {
+    if (!environment) return null;
+    if (this._economyMode(environment.craftingSystemId) !== 'nodes') return null;
+    const now = Number(worldTime);
+    if (!Number.isFinite(now)) return null;
+
+    // Per-environment node state lives in `nodeRuntime` (keyed by library task id).
+    // A sequential loop (not `.map`) so the `expression` gain mode can await.
+    let runtimeChanged = false;
+    const nodeRuntime = { ...(environment.nodeRuntime || {}) };
+    for (const [taskId, node] of Object.entries(nodeRuntime)) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await this._respawnNode(node, { now, environment, environmentId: environment.id, taskId });
+      if (result.changed) { runtimeChanged = true; nodeRuntime[taskId] = result.node; }
+    }
+
+    if (!runtimeChanged) return null;
+    return this.environmentStore.update(environment.id, { nodeRuntime });
+  }
+
+  /**
+   * Respawn one resource-node pool as world time passes (`overTime` policy
+   * only). Per elapsed interval, adds nodes per `respawn.gainMode`: `guaranteed`
+   * (+1), `chance` (a persisted d100 roll), or `expression` (roll
+   * `respawn.amountExpression` and add the rolled total). Clamped to max,
+   * advancing the `respawn.lastEvaluatedWorldTime` anchor so a same-tick refresh
+   * never rerolls.
+   *
+   * @param {object} nodes The node object (config + state).
+   * @param {{now:number, environment?:object, environmentId:string, taskId:string}} ctx
+   * @returns {Promise<{changed: boolean, node: object}>}
+   */
+  async _respawnNode(nodes, { now, environment = null, environmentId, taskId }) {
+    const respawn = nodes?.respawn;
+    if (!nodes || !respawn || respawn.policy !== 'overTime') {
+      return { changed: false, node: nodes };
+    }
+    const interval = Number(respawn.intervalSeconds || 0);
+    if (!(interval > 0)) return { changed: false, node: nodes };
+    const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
+
+    if (now <= last) {
+      if (respawn.lastEvaluatedWorldTime !== now) {
+        return { changed: true, node: { ...nodes, respawn: { ...respawn, lastEvaluatedWorldTime: now } } };
+      }
+      return { changed: false, node: nodes };
+    }
+
+    const max = Number(nodes.max || 0);
+    const before = Number(nodes.current || 0);
+    let intervals = Math.floor((now - last) / interval);
+    if (intervals <= 0) return { changed: false, node: nodes };
+    const room = Math.max(0, max - before);
+    const advancedAnchor = last + intervals * interval;
+    if (room === 0) {
+      return { changed: true, node: { ...nodes, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } } };
+    }
+    intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
+
+    const gainMode = respawn.gainMode || 'guaranteed';
+    let gain = 0;
+    let lastRoll = respawn.lastRoll;
+    if (gainMode === 'guaranteed') {
+      gain = intervals;
+    } else if (gainMode === 'chance') {
+      const chance = Math.max(0, Math.min(1, Number(respawn.chance || 0)));
+      const rolls = [];
+      for (let i = 0; i < intervals; i++) {
+        const roll = Number(this.rollD100());
+        rolls.push(roll);
+        if (roll <= chance * 100) gain += 1;
+      }
+      lastRoll = { worldTime: now, chance, rolls };
+    } else {
+      // expression: roll the dice amount per interval, stopping once the pool is full.
+      const rolls = [];
+      for (let i = 0; i < intervals; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        const amount = await this._respawnExpressionAmount({ expression: respawn.amountExpression, environment });
+        rolls.push(amount);
+        gain += amount;
+        if (before + gain >= max) break;
+      }
+      lastRoll = { worldTime: now, expression: String(respawn.amountExpression || ''), rolls };
+    }
+    const nextCurrent = Math.min(max, before + gain);
+    this._callHook('fabricate.gathering.nodeRespawned', { environmentId, taskId, amount: nextCurrent - before, current: nextCurrent, max });
+    return {
+      changed: true,
+      node: { ...nodes, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
+    };
+  }
+
+  /**
+   * Roll the per-interval node gain for an `expression` respawn. Respawn is
+   * environment-level with no actor, so the expression must be plain dice
+   * (e.g. `1d4`); any `@actor.*` reference resolves against an empty roll-data
+   * context and coerces to 0 (never throws). Floored at 0 and rounded.
+   *
+   * @param {object} payload
+   * @returns {Promise<number>} Non-negative integer node gain for one interval.
+   */
+  async _respawnExpressionAmount({ expression, environment = null } = {}) {
+    if (expression === null || expression === undefined || String(expression).trim() === '') return 0;
+    let value;
+    try {
+      if (typeof this.evaluateExpression === 'function') {
+        value = await this.evaluateExpression({
+          expression: String(expression),
+          provider: null,
+          actor: null,
+          kind: 'nodeRespawn',
+          system: null,
+          environment
+        });
+      } else {
+        // No Roll available (e.g. headless): a plain number still resolves.
+        value = Number(expression);
+      }
+    } catch (_err) {
+      // A malformed dice string (e.g. `1d`, `(`) or an `@actor.*` reference with
+      // no actor must not abort respawn for the rest of the environment — treat
+      // this interval as no gain.
+      return 0;
+    }
+    const numeric = Number(value);
+    return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
   }
 
   async updateConditions({ environmentId, conditions = {} } = {}) {
@@ -902,27 +1243,23 @@ export class GatheringRichStateService {
   async evaluateStart({ actor, system, environment, task, viewer } = {}) {
     const blockedReasons = [];
     const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
+    const systemId = system?.id || environment?.craftingSystemId;
+    const mode = this._economyMode(systemId);
 
-    if (task?.nodes && Number(task.nodes.current || 0) <= 0 && viewer?.isGM !== true) {
+    if (mode === 'nodes' && task?.nodes && Number(task.nodes.current || 0) <= 0) {
       blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
     }
 
-    if (task?.attemptLimit) {
-      const attempt = this._attemptLimitEvidence({ actor, environment, task, viewer });
-      evidence.attemptLimit = attempt;
-      if (attempt.remaining !== null && attempt.remaining <= 0 && viewer?.isGM !== true) {
-        blockedReasons.push(this._blockedReason('ATTEMPT_LIMIT_EXHAUSTED', { taskId: task.id }));
-      }
-    }
-
-    const staminaCost = Number(task?.staminaCost || 0);
-    if (staminaCost > 0 && viewer?.isGM !== true) {
-      const stamina = this.getActorStamina(actor, system?.id || environment?.craftingSystemId);
-      evidence.stamina = { cost: staminaCost, state: stamina };
-      if (Number(stamina.current ?? 0) < staminaCost) {
+    if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+      await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
+      const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+      const stamina = this.getActorStamina(actor, systemId);
+      evidence.stamina = { cost, base: Number(task.staminaCost || 0), state: stamina };
+      // Only enforce when a pool exists (max configured); no max ⇒ no stamina limit.
+      if (cost > 0 && stamina.max != null && Number(stamina.current ?? 0) < cost) {
         blockedReasons.push(this._blockedReason('STAMINA_BLOCKED', {
           taskId: task.id,
-          required: staminaCost,
+          required: cost,
           current: stamina.current ?? 0
         }));
       }
@@ -931,13 +1268,12 @@ export class GatheringRichStateService {
     return { blockedReasons, evidence };
   }
 
-  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null } = {}) {
+  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
       risk: task?.riskOverride || environment?.risk || 'safe',
       node: null,
       stamina: null,
-      attemptLimit: null,
       characterModifierSnapshot: cloneJson(
         outcome?.characterModifierSnapshot
           ?? outcome?.checkResult?.characterModifierSnapshot
@@ -945,29 +1281,30 @@ export class GatheringRichStateService {
       )
     };
 
-    if (task?.nodes && shouldDepleteNode(task, outcome)) {
-      const current = Math.max(0, Number(task.nodes.current || 0) - 1);
-      await this.restockNode({ environmentId: environment.id, taskId: task.id, current, max: task.nodes.max });
+    const systemId = system?.id || environment?.craftingSystemId;
+    const mode = this._economyMode(systemId);
+
+    if (mode === 'nodes' && task?.nodes && shouldDepleteNode(task, outcome)) {
+      // Persist the full node object (config + respawn timers) with one consumed,
+      // so the per-environment pool (nodeRuntime for library tasks) is seeded and
+      // decremented in a single write.
+      const max = Number(task.nodes.max || 0);
+      const current = Math.min(max, Math.max(0, Number(task.nodes.current || 0) - 1));
+      const node = { ...cloneJson(task.nodes), current };
+      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
 
-    const staminaCost = Number(task?.staminaCost || 0);
-    if (staminaCost > 0) {
-      await this.adjustActorStamina(actor, { systemId: system?.id || environment?.craftingSystemId, delta: -staminaCost });
-      evidence.stamina = { spent: staminaCost };
-    }
-
-    if (task?.attemptLimit) {
-      const state = readState(actor);
-      const key = attemptKey({ actor, environment, task, userId: this.getUserId() });
-      const previous = state.attempts?.[key] || { count: 0 };
-      const next = {
-        count: Number(previous.count || 0) + 1,
-        updatedAtWorldTime: this._now()
-      };
-      state.attempts = { ...(state.attempts || {}), [key]: next };
-      await writeState(actor, state);
-      evidence.attemptLimit = { key, count: next.count, max: task.attemptLimit.max };
+    if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+      await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
+      // Only spend when a pool exists (max configured); no max ⇒ no stamina limit.
+      if (this.getActorStamina(actor, systemId).max != null) {
+        const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+        if (cost > 0) {
+          await this.adjustActorStamina(actor, { systemId, delta: -cost });
+          evidence.stamina = { spent: cost, base: Number(task.staminaCost || 0) };
+        }
+      }
     }
 
     this._callHook('fabricate.gathering.richAttemptCommitted', { actor, system, environment, task, outcome, evidence });
@@ -1022,15 +1359,6 @@ export class GatheringRichStateService {
     return true;
   }
 
-  _environmentTaskToRuntimeTask(task, environment) {
-    if (!task || typeof task !== 'object') return task;
-    const normalized = cloneJson(task);
-    const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
-    normalized.dropRows = normalizeList(normalized.dropRows ?? normalized.itemDrops)
-      .map(row => applyDropRateAdjustment(row, rowAdjustments[String(row?.id || '')]));
-    return normalized;
-  }
-
   _libraryTaskToRuntimeTask(task, environment = null) {
     const normalized = normalizeLibraryTask(task);
     const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
@@ -1044,6 +1372,7 @@ export class GatheringRichStateService {
       itemSelectionMode: normalized.itemSelectionMode,
       dropRows: normalized.dropRows.map(row => applyDropRateAdjustment(row, rowAdjustments[row.id])),
       staminaCost: normalized.staminaCost,
+      staminaCostModifiers: Array.isArray(normalized.staminaCostModifiers) ? cloneJson(normalized.staminaCostModifiers) : [],
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
       resultSelection: { provider: 'd100Rows' },
@@ -1051,6 +1380,15 @@ export class GatheringRichStateService {
       toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : []
     };
     if (normalized.timeRequirement) runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
+    // Resource nodes are per-environment: use this environment's stored runtime
+    // pool if present, else seed a fresh full pool from the library config. The
+    // seed is read-only here; it persists on first depletion.
+    if (normalized.nodes) {
+      const stored = environment?.nodeRuntime?.[normalized.id];
+      runtimeTask.nodes = stored
+        ? cloneJson(stored)
+        : { ...cloneJson(normalized.nodes), current: Number(normalized.nodes.max || 0) };
+    }
     return runtimeTask;
   }
 
@@ -1086,19 +1424,156 @@ export class GatheringRichStateService {
     return this.setSetting(this.settingKey, cloneJson(config));
   }
 
-  _attemptLimitEvidence({ actor, environment, task }) {
-    if (!task?.attemptLimit) return null;
-    const state = readState(actor);
-    const key = attemptKey({ actor, environment, task, userId: this.getUserId() });
-    const current = Number(state.attempts?.[key]?.count || 0);
-    const max = Number(task.attemptLimit.max || 1);
-    return {
-      key,
-      scope: task.attemptLimit.scope || 'actor',
-      count: current,
-      max,
-      remaining: Math.max(0, max - current)
-    };
+  /**
+   * Persist a crafting system's gathering economy block (mode + stamina regen)
+   * into the raw config, merging beside the system's other library state.
+   *
+   * @param {{systemId: string, economy: object}} payload
+   * @returns {Promise<object|null>} The normalized economy block, or null.
+   */
+  async setSystemEconomy({ systemId, economy } = {}) {
+    if (!systemId || typeof this.setSetting !== 'function') return null;
+    const target = String(systemId);
+    const raw = (typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : null) || {};
+    const systems = { ...(raw.systems || {}) };
+    const normalized = normalizeGatheringEconomy(economy);
+    systems[target] = { ...(systems[target] || {}), economy: cloneJson(normalized) };
+    await this.setSetting(this.settingKey, { ...raw, systems });
+    this._callHook('fabricate.gathering.economyUpdated', { systemId: target, economy: cloneJson(normalized) });
+    return normalized;
+  }
+
+  /**
+   * The normalized economy block for a crafting system (mode + stamina regen).
+   * Always returns a fully-defaulted block so callers never branch on absence.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {{mode: string, stamina: {regen: object}}}
+   */
+  _systemEconomy(systemId) {
+    return this._config().systems?.[String(systemId || '')]?.economy || normalizeGatheringEconomy(null);
+  }
+
+  /**
+   * The active limitation mode for a crafting system: `none`, `stamina`, or
+   * `nodes`.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {string}
+   */
+  _economyMode(systemId) {
+    return this._systemEconomy(systemId).mode || 'none';
+  }
+
+  /**
+   * Public accessor for a system's limitation mode (`none`/`stamina`/`nodes`),
+   * used by the engine's world-time drivers and the service layer.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {string}
+   */
+  economyMode(systemId) {
+    return this._economyMode(systemId);
+  }
+
+  /**
+   * Public accessor for a system's normalized economy block.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {{mode: string, stamina: {regen: object}}}
+   */
+  systemEconomy(systemId) {
+    return cloneJson(this._systemEconomy(systemId));
+  }
+
+  /**
+   * Resolve the character-modifier library for an attempt: prefer the
+   * per-environment map populated at composition time, falling back to the
+   * crafting system's library (needed for stamina regen, which has no
+   * environment context).
+   *
+   * @param {object} payload
+   * @returns {Map<string, object>}
+   */
+  _modifierLibrary({ environment = null, systemId = null } = {}) {
+    if (environment?.__libraryCharacterModifiers instanceof Map && environment.__libraryCharacterModifiers.size > 0) {
+      return environment.__libraryCharacterModifiers;
+    }
+    const entries = this._config().systems?.[String(systemId || environment?.craftingSystemId || '')]?.characterModifiers || [];
+    return new Map(entries.map(entry => [String(entry.id), entry]));
+  }
+
+  /**
+   * Resolve a task's stamina cost for one actor: the base `task.staminaCost`
+   * adjusted by the task's `staminaCostModifiers` (resolved against the
+   * per-environment character modifier library, the same path drop chances
+   * use). Floored at 0 so a strong character can make a task free. Used by both
+   * the start gate and the spend so they always agree.
+   *
+   * @param {object} payload
+   * @returns {Promise<number>} Non-negative integer stamina cost.
+   */
+  async _effectiveStaminaCost({ actor, system, environment, task, viewer = null } = {}) {
+    const base = Number(task?.staminaCost || 0);
+    if (base <= 0) return 0;
+    const references = normalizeList(task?.staminaCostModifiers);
+    if (references.length === 0) return Math.max(0, Math.round(base));
+    const library = this._modifierLibrary({ environment, systemId: system?.id || environment?.craftingSystemId });
+    let total = base;
+    for (const reference of references) {
+      const entry = library.get(String(reference.modifierId)) || null;
+      const resolved = await this._resolveCharacterModifierContribution({
+        reference, libraryEntry: entry, actor, environment, task, row: null, hazard: null, viewer, system
+      });
+      if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
+    }
+    return Math.max(0, Math.round(total));
+  }
+
+  /**
+   * The effective per-actor stamina cost to surface in a player listing, or
+   * `null` when there is nothing to refine (the system is not in stamina mode,
+   * or the task has no base cost). The synchronous listing build shows the base
+   * cost; callers use this to replace it with the modifier-adjusted value for
+   * the viewing character.
+   *
+   * @param {object} payload
+   * @returns {Promise<number|null>}
+   */
+  async listingStaminaCost({ actor, system = null, environment, task, viewer = null } = {}) {
+    if (this._economyMode(environment?.craftingSystemId) !== 'stamina') return null;
+    if (!(Number(task?.staminaCost || 0) > 0)) return null;
+    return this._effectiveStaminaCost({ actor, system, environment, task, viewer });
+  }
+
+  /**
+   * The stamina an actor regenerates per elapsed `regen.unit`: a fixed
+   * `regen.amount` or a `regen.formula` (which wins when set), adjusted by the
+   * regen `characterModifiers`. Floored at 0 and rounded to an integer so
+   * multi-interval catch-up is deterministic.
+   *
+   * @param {object} payload
+   * @returns {Promise<number>} Non-negative integer amount per interval.
+   */
+  async _regenAmountPerInterval({ actor, systemId, system = null, environment = null, regen } = {}) {
+    const expression = regen?.amount;
+    if (expression === null || expression === undefined || expression === '') return 0;
+    let value;
+    if (typeof this.evaluateExpression === 'function') {
+      value = await this.evaluateExpression({
+        expression: String(expression),
+        provider: null,
+        actor,
+        kind: 'staminaRegen',
+        system,
+        environment
+      });
+    } else {
+      // No Roll available (e.g. headless): a plain number still resolves.
+      value = Number(expression);
+    }
+    const numeric = Number(value);
+    return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
   }
 
   _blockedReason(code, data = null) {
@@ -1138,6 +1613,51 @@ function shouldDepleteNode(task, outcome) {
   return true;
 }
 
+/**
+ * Convert a count of whole world-time units into seconds. Mirrors
+ * CraftingRunManager's duration math and adds `weeks`. Unknown units fall back
+ * to hours.
+ *
+ * @param {number} count
+ * @param {string} unit One of minutes|hours|days|weeks.
+ * @returns {number} Non-negative seconds.
+ */
+function durationToSeconds(count, unit) {
+  const seconds = SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
+  return Math.max(0, Number(count || 0) * seconds);
+}
+
+/**
+ * Normalize a per-system gathering economy block. The `mode` selects the
+ * limitation model (`none` legacy behaviour, `stamina` actor pools, `nodes`
+ * finite resource nodes). Stamina regen is system-level: a fixed `amount` or a
+ * `formula` (which wins when set), optionally adjusted by character modifiers,
+ * applied once per `unit` of elapsed world time when `policy === 'elapsedTime'`.
+ *
+ * @param {object} raw Raw economy block.
+ * @returns {{mode: string, stamina: {regen: object}}}
+ */
+function normalizeGatheringEconomy(raw = {}) {
+  const regen = raw?.stamina?.regen || {};
+  return {
+    mode: ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none',
+    stamina: {
+      // Expression templates (number or formula, e.g. "40" or "4 * @abilities.con.mod"),
+      // rolled once per character at seed time. `start` blank ⇒ start full at max.
+      max: stringOrFallback(raw?.stamina?.max, ''),
+      start: stringOrFallback(raw?.stamina?.start, ''),
+      regen: {
+        policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : 'none',
+        unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
+        // A single expression: a plain number ("1") or a formula with character
+        // references ("1 + @abilities.con.mod"), evaluated per actor in-game.
+        amount: stringOrFallback(regen.amount, ''),
+        lastRoll: regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null
+      }
+    }
+  };
+}
+
 function normalizeGatheringConfig(raw = {}) {
   const vocabularies = {
     regions: seedVocabulary(raw?.vocabularies?.regions, DEFAULT_VOCABULARIES.regions),
@@ -1159,7 +1679,8 @@ function normalizeGatheringConfig(raw = {}) {
       hazards: normalizeList(config?.hazards).map(normalizeHazard),
       characterModifiers: normalizeList(config?.characterModifiers)
         .map(entry => normalizeCharacterModifierLibraryEntry(entry))
-        .filter(Boolean)
+        .filter(Boolean),
+      economy: normalizeGatheringEconomy(config?.economy)
     };
   }
   return {
@@ -1233,11 +1754,13 @@ function normalizeLibraryTask(task = {}) {
     itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
+    staminaCostModifiers: normalizeCharacterModifierReferenceList(task.staminaCostModifiers),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
     timeRequirement: plainObjectOrNull(task.timeRequirement),
     toolIds: Array.isArray(task.toolIds)
       ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
-      : []
+      : [],
+    nodes: normalizeNodeConfig(task.nodes)
   };
 }
 
@@ -1798,15 +2321,6 @@ function numberOrNull(value) {
 function plainObjectOrNull(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return cloneJson(value);
-}
-
-function attemptKey({ actor, environment, task, userId }) {
-  const scope = task?.attemptLimit?.scope || 'actor';
-  if (scope === 'global') return `global:${task?.id}`;
-  if (scope === 'environment') return `environment:${environment?.id}:${task?.id}`;
-  if (scope === 'user') return `user:${userId || 'unknown'}:${task?.id}`;
-  if (scope === 'task') return `task:${task?.id}`;
-  return `actor:${actor?.uuid || actor?.id || 'unknown'}:${task?.id}`;
 }
 
 function revealKey({ environmentId, taskId, scope, actor, userId }) {

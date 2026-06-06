@@ -23,7 +23,6 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   RUN_CREATION_FAILED: 'FABRICATE.Gathering.Blocked.RunCreationFailed'
   ,
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
-  ATTEMPT_LIMIT_EXHAUSTED: 'FABRICATE.Gathering.Blocked.AttemptLimitExhausted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
   BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate',
   CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked'
@@ -86,7 +85,11 @@ export class GatheringEngine {
     hazardSceneTrigger = null,
     getRunViewer = null,
     random = Math.random,
-    localize = defaultLocalize
+    localize = defaultLocalize,
+    // Stamina regen / node respawn run on world-time advance and write shared
+    // state, so they must run exactly once — only on the primary GM client.
+    isPrimaryGM = () => Boolean(globalThis.game?.user?.isGM && globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id),
+    getActors = () => Array.from(globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [])
   } = {}) {
     this.environmentStore = environmentStore;
     this.runManager = runManager;
@@ -109,6 +112,8 @@ export class GatheringEngine {
     this.getRunViewer = getRunViewer;
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
+    this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
+    this.getActors = typeof getActors === 'function' ? getActors : () => [];
   }
 
   /**
@@ -150,14 +155,74 @@ export class GatheringEngine {
       }
     }
 
+    // Drive stamina regeneration and node respawn off the same world-time tick
+    // that matures timed runs. Guarded to the primary GM so connected clients
+    // never double-apply; regen/respawn are idempotent per advanced anchor.
+    let staminaRegen = [];
+    let nodeRespawn = [];
+    if (this.isPrimaryGM()) {
+      staminaRegen = await this._processStaminaRegen(worldTime);
+      nodeRespawn = await this._processNodeRespawn(worldTime);
+    }
+
     return {
       worldTime: Number(worldTime),
       processed,
       completed,
       cancelled,
       cleared,
-      errors
+      errors,
+      staminaRegen,
+      nodeRespawn
     };
+  }
+
+  /**
+   * Regenerate stamina for every actor that owns a pool in a stamina-mode
+   * system. Per-actor failures are swallowed so one bad actor cannot abort the
+   * world-time tick. Returns the list of `{actorId, systemId}` actually changed.
+   */
+  async _processStaminaRegen(worldTime) {
+    if (typeof this.richState?.regenerateActorStamina !== 'function') return [];
+    const staminaSystems = Array.from(this._enabledGatheringSystems().values())
+      .filter(system => this.richState.economyMode?.(system.id) === 'stamina');
+    if (staminaSystems.length === 0) return [];
+    const actors = normalizeList(this.getActors?.());
+    const changed = [];
+    for (const system of staminaSystems) {
+      for (const actor of actors) {
+        try {
+          const updated = await this.richState.regenerateActorStamina({ actor, systemId: system.id, system, worldTime });
+          if (updated) changed.push({ actorId: idOf(actor), systemId: String(system.id) });
+        } catch (error) {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+      }
+    }
+    return changed;
+  }
+
+  /**
+   * Respawn nodes for every environment owned by a nodes-mode system. Per-
+   * environment failures are swallowed. Returns the changed environment ids.
+   */
+  async _processNodeRespawn(worldTime) {
+    if (typeof this.richState?.respawnNodes !== 'function') return [];
+    const systems = this._enabledGatheringSystems();
+    const changed = [];
+    for (const environment of normalizeList(this.environmentStore?.list?.())) {
+      if (!systems.has(environment?.craftingSystemId)) continue;
+      if (this.richState.economyMode?.(environment.craftingSystemId) !== 'nodes') continue;
+      try {
+        const updated = await this.richState.respawnNodes({ environment, worldTime });
+        if (updated) changed.push({ environmentId: String(environment.id) });
+      } catch (error) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+    }
+    return changed;
   }
 
   async startAttempt({
@@ -450,7 +515,7 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome });
+    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer });
     const completedRunWithRichEvidence = richEvidence && typeof richEvidence === 'object'
       ? {
           ...completedRun,
@@ -899,6 +964,15 @@ export class GatheringEngine {
       return this._lockedEnvironmentListing({ environment, system });
     }
 
+    // Auto-seed the acting character's stamina pool on first sight of a stamina
+    // system (e.g. opening the gathering tab), so the displayed pool reflects the
+    // rolled max/start. Idempotent — the dice roll persists once.
+    if (actor && this.richState?.economyMode?.(environment.craftingSystemId) === 'stamina') {
+      try {
+        await this.richState?.seedActorStaminaIfNeeded?.({ actor, systemId: environment.craftingSystemId, system });
+      } catch (error) { /* display-only: never block the listing on a seed failure */ }
+    }
+
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
     if (visibleTasks.length === 0) {
       return {
@@ -940,6 +1014,11 @@ export class GatheringEngine {
       blockedReasons: entry.blockedReasons,
       tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
     }));
+    // Refine the displayed stamina cost to the viewing character's effective
+    // cost (base + per-actor modifiers); the sync model carries the base.
+    for (let i = 0; i < taskModels.length; i++) {
+      await this._applyListingStaminaCost(taskModels[i], { system, environment, actor, viewer, task: taskEntries[i].task });
+    }
 
     const attemptable = taskModels.some(task => task.attemptable);
     const blockedReasons = environmentBlockedReasons.length > 0
@@ -972,7 +1051,10 @@ export class GatheringEngine {
       biomes,
       dangerTags,
       risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
-      economyMode: stringOrNull(environment.economyMode) || 'time',
+      economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
+      staminaPool: this.richState?.economyMode?.(environment.craftingSystemId) === 'stamina' && actor
+        ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) || null
+        : null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
       sceneUuid: stringOrNull(environment.sceneUuid),
@@ -1038,9 +1120,26 @@ export class GatheringEngine {
         forceVisible: true,
         tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
       });
+      await this._applyListingStaminaCost(model, { system, environment, actor, viewer, task: entry.task });
       discovered.push({ ...model, discovered: true });
     }
     return discovered;
+  }
+
+  /**
+   * Replace a listing model's displayed stamina cost with the viewing
+   * character's effective cost (base + per-actor cost modifiers). No-ops without
+   * an actor, without a stamina block (e.g. opaque-blind collapsed models), or
+   * when the rich state cannot resolve a cost.
+   *
+   * @param {object} model The task listing model (mutated in place).
+   * @param {object} payload
+   * @returns {Promise<void>}
+   */
+  async _applyListingStaminaCost(model, { system, environment, actor, viewer, task }) {
+    if (!actor || !model?.rich?.stamina || typeof this.richState?.listingStaminaCost !== 'function') return;
+    const cost = await this.richState.listingStaminaCost({ actor, system, environment, task, viewer });
+    if (cost != null) model.rich.stamina.cost = cost;
   }
 
   /**
@@ -1064,7 +1163,8 @@ export class GatheringEngine {
       biomes,
       dangerTags,
       risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
-      economyMode: stringOrNull(environment.economyMode) || 'time',
+      economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
+      staminaPool: null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
       sceneUuid: stringOrNull(environment.sceneUuid),
@@ -1570,7 +1670,6 @@ export class GatheringEngine {
         max: Number(task.nodes.max || 0)
       } : null,
       stamina: Number(task?.staminaCost || 0) > 0 ? { cost: Number(task.staminaCost) } : null,
-      attemptLimit: task?.attemptLimit ? { max: Number(task.attemptLimit.max || 1) } : null,
       risk: task?.riskOverride || environment?.risk || 'safe',
       conditions: plainObjectOrNull(environment?.conditions) || {}
     };
@@ -1801,7 +1900,7 @@ export class GatheringEngine {
         });
       }
 
-      const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome: { status: 'waitingTime' } });
+      const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome: { status: 'waitingTime' }, viewer });
       const waitingRun = richEvidence && typeof richEvidence === 'object'
         ? {
             ...run,
@@ -1908,7 +2007,7 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome });
+    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer });
     if (richEvidence && typeof richEvidence === 'object') {
       run = {
         ...run,
@@ -2067,9 +2166,9 @@ export class GatheringEngine {
     };
   }
 
-  async _commitRichAttempt({ actor, system, environment, task, outcome }) {
+  async _commitRichAttempt({ actor, system, environment, task, outcome, viewer = null }) {
     if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
-    return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome });
+    return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome, viewer });
   }
 
   async _commitTerminalSideEffects({ viewer, actor, system, environment, task, outcome, checkResult }) {
@@ -3205,10 +3304,8 @@ function hasRichGatheringData(environment, task) {
     stringOrNull(environment?.region) ||
     stringOrNull(environment?.biome) ||
     (stringOrNull(environment?.risk) && environment.risk !== 'safe') ||
-    (stringOrNull(environment?.economyMode) && environment.economyMode !== 'time') ||
     Object.values(plainObjectOrNull(environment?.conditions) || {}).some(value => stringOrNull(value)) ||
     task?.nodes ||
-    task?.attemptLimit ||
     Number(task?.staminaCost || 0) > 0 ||
     stringOrNull(task?.riskOverride) ||
     task?.encounters ||

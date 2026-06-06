@@ -56,6 +56,16 @@
   const timeOfDayLabel = $derived(localize(getTimeOfDayLabelKey(timeOfDayId)));
   const regionLabel = $derived(store?.region || localize('FABRICATE.App.ActorBar.Region.None'));
 
+  // The selected character's stamina pool for the active stamina-mode system,
+  // surfaced contextually on the gathering tab. Null in nodes/none mode.
+  const staminaPool = $derived(store?.staminaPool ?? null);
+  const hasStamina = $derived(Boolean(staminaPool && staminaPool.current != null && staminaPool.max != null));
+  const staminaPct = $derived(
+    hasStamina && staminaPool.max > 0
+      ? Math.max(0, Math.min(100, Math.round((staminaPool.current / staminaPool.max) * 100)))
+      : 0
+  );
+
   function hasImg(actor) {
     return typeof actor?.img === 'string' && actor.img.trim() !== '';
   }
@@ -174,6 +184,15 @@
 
   {#if isGathering}
     <div class="actor-bar-right">
+      {#if hasStamina}
+        <span class="actor-bar-stamina" title={localize('FABRICATE.App.ActorBar.Stamina')} data-actor-bar-stamina>
+          <i class="fas fa-bolt" aria-hidden="true"></i>
+          <span class="actor-bar-stamina-track">
+            <span class="actor-bar-stamina-fill" style={`width:${staminaPct}%`}></span>
+          </span>
+          <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
+        </span>
+      {/if}
       <span class="actor-bar-condition actor-bar-weather">
         <i class={weatherIcon} aria-hidden="true"></i>
         <span class="actor-bar-condition-label">{weatherLabel}</span>
@@ -309,6 +328,38 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--fab-text);
+  }
+
+  /* Contextual stamina bar (gathering tab, stamina mode only). */
+  .actor-bar-stamina {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    font-size: 13px;
+    color: var(--fab-text-muted);
+  }
+
+  .actor-bar-stamina-track {
+    width: 72px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--fab-surface-raised);
+    overflow: hidden;
+  }
+
+  .actor-bar-stamina-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--fab-accent);
+    transition: width 0.2s ease;
+  }
+
+  .actor-bar-stamina-value {
+    color: var(--fab-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .actor-bar-popover {

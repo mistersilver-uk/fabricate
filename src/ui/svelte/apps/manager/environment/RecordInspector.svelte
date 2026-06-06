@@ -20,6 +20,20 @@
   const defaultImg = $derived(kind === 'hazard' ? 'icons/svg/hazard.svg' : 'icons/svg/item-bag.svg');
   const record = $derived(entry?.record || null);
   const name = $derived(record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'));
+
+  // Per-environment resource-node pool for the selected task. Tasks only (hazards
+  // have no nodes); the section is gated on a configured capacity (`max > 0`). The
+  // available `current` count falls back to the library config seed (current = max)
+  // when this environment has no stored runtime entry yet.
+  const nodeConfig = $derived(kind === 'task' ? (record?.nodes || null) : null);
+  const nodeRuntimeEntry = $derived(environment?.nodeRuntime?.[entry?.id] || null);
+  const nodeMax = $derived(Number(nodeRuntimeEntry?.max ?? nodeConfig?.max ?? 0));
+  const hasNodes = $derived(kind === 'task' && Number.isFinite(nodeMax) && nodeMax > 0);
+  const nodeCurrent = $derived((() => {
+    const stored = Number(nodeRuntimeEntry?.current);
+    const value = Number.isFinite(stored) ? stored : nodeMax;
+    return Math.max(0, Math.min(nodeMax, value));
+  })());
   const environmentMatchTitle = $derived(kind === 'hazard'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardEnvironmentMatching', 'Hazard Environment Matching')
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.TaskEnvironmentMatching', 'Task Environment Matching'));
@@ -37,6 +51,19 @@
     const number = Number(String(value ?? '').replace(/^\+/, ''));
     if (!Number.isFinite(number)) return 0;
     return Math.max(-100, Math.min(100, Math.trunc(number)));
+  }
+
+  function adjustNodeCount(delta) {
+    const taskId = String(entry?.id || '').trim();
+    if (!taskId || !hasNodes) return;
+    const next = { ...(environment?.nodeRuntime && typeof environment.nodeRuntime === 'object' ? environment.nodeRuntime : {}) };
+    const base = next[taskId] && typeof next[taskId] === 'object'
+      ? next[taskId]
+      : { ...(nodeConfig || {}), current: nodeMax };
+    const current = Math.max(0, Math.min(nodeMax, nodeCurrent + delta));
+    if (current === Number(base.current)) return;
+    next[taskId] = { ...base, current };
+    onUpdateEnvironment({ nodeRuntime: next });
   }
 
   function setHazardAdjustment(value) {
@@ -158,6 +185,41 @@
       </div>
     </div>
   </section>
+
+  {#if hasNodes}
+    <section class="manager-inspector-card" data-record-inspector-section="nodes">
+      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableNodes', 'Available nodes')}</h3>
+      <div class="manager-environment-node-count">
+        <button
+          type="button"
+          class="manager-icon-button manager-environment-node-count-step"
+          aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
+          title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
+          disabled={nodeCurrent <= 0}
+          data-node-count-dec
+          onclick={() => adjustNodeCount(-1)}
+        >
+          <i class="fas fa-minus" aria-hidden="true"></i>
+        </button>
+        <span class="manager-environment-node-count-value" data-node-count>
+          <strong>{nodeCurrent}</strong>
+          <span aria-hidden="true">/</span>
+          <span>{nodeMax}</span>
+        </span>
+        <button
+          type="button"
+          class="manager-icon-button manager-environment-node-count-step"
+          aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
+          title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
+          disabled={nodeCurrent >= nodeMax}
+          data-node-count-inc
+          onclick={() => adjustNodeCount(1)}
+        >
+          <i class="fas fa-plus" aria-hidden="true"></i>
+        </button>
+      </div>
+    </section>
+  {/if}
 
   <section class="manager-inspector-card" data-record-inspector-section="evidence">
     <h3 class="manager-card-title">{environmentMatchTitle}</h3>

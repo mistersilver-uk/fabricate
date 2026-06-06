@@ -8,6 +8,7 @@
 
   let {
     task = null,
+    economyMode = 'none',
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -339,6 +340,87 @@
     return (characterModifierLibrary || []).find(entry => entry.id === modifierId) || null;
   }
 
+  // Stamina cost authoring (enforced only when the system uses stamina mode).
+  const staminaCostValue = $derived(Number(task?.staminaCost ?? 0));
+  const staminaCostModifiers = $derived(Array.isArray(task?.staminaCostModifiers) ? task.staminaCostModifiers : []);
+
+  function updateStaminaCost(value) {
+    const next = Number(value);
+    onUpdateTask({ staminaCost: Number.isFinite(next) && next > 0 ? Math.floor(next) : 0 });
+  }
+  function addStaminaCostModifier() {
+    const first = (characterModifierLibrary || [])[0];
+    if (!first) return;
+    onUpdateTask({
+      staminaCostModifiers: [
+        ...staminaCostModifiers,
+        { id: `scm-${first.id}-${staminaCostModifiers.length + 1}`, modifierId: first.id, operator: '-', min: null, max: null, expressionOverride: '' }
+      ]
+    });
+  }
+  function updateStaminaCostModifier(index, patch) {
+    onUpdateTask({ staminaCostModifiers: staminaCostModifiers.map((ref, i) => (i === index ? { ...ref, ...patch } : ref)) });
+  }
+  function removeStaminaCostModifier(index) {
+    onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
+  }
+  function numericFieldValue(value) {
+    return value === null || value === undefined ? '' : value;
+  }
+
+  // Resource-node authoring (enforced only when the system uses nodes mode).
+  const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual', intervalSeconds: 0, gainMode: 'guaranteed', chance: 0, amountExpression: '' } };
+  const RESPAWN_UNITS = { minutes: 60, hours: 3600, days: 86400, weeks: 604800 };
+
+  const nodes = $derived(task?.nodes || DEFAULT_NODES);
+  const respawn = $derived(nodes.respawn || DEFAULT_NODES.respawn);
+  const respawnIsOverTime = $derived(respawn.policy === 'overTime');
+  const respawnGainMode = $derived(respawn.gainMode || 'guaranteed');
+  const respawnIsChance = $derived(respawnIsOverTime && respawnGainMode === 'chance');
+  const respawnIsExpression = $derived(respawnIsOverTime && respawnGainMode === 'expression');
+  // Largest whole unit that divides the interval evenly, else hours.
+  const intervalParts = $derived((() => {
+    const seconds = Number(respawn.intervalSeconds) || 0;
+    for (const unit of ['weeks', 'days', 'hours', 'minutes']) {
+      const size = RESPAWN_UNITS[unit];
+      if (seconds > 0 && seconds % size === 0) return { value: seconds / size, unit };
+    }
+    return { value: seconds ? seconds / RESPAWN_UNITS.hours : 0, unit: 'hours' };
+  })());
+
+  function updateNodes(patch) {
+    onUpdateTask({ nodes: { ...nodes, enabled: true, ...patch } });
+  }
+  function updateRespawn(patch) {
+    updateNodes({ respawn: { ...respawn, ...patch } });
+  }
+  function setNodeCount(value) {
+    const next = Number(value);
+    if (!Number.isFinite(next) || next <= 0) { onUpdateTask({ nodes: null }); return; }
+    const max = Math.floor(next);
+    updateNodes({ max, current: max });
+  }
+  function setRespawnInterval(value, unit) {
+    const next = Number(value);
+    const size = RESPAWN_UNITS[unit] || RESPAWN_UNITS.hours;
+    updateRespawn({ intervalSeconds: Number.isFinite(next) && next > 0 ? Math.round(next * size) : 0 });
+  }
+  function setRespawnChance(percent) {
+    const next = Number(percent);
+    updateRespawn({ chance: Number.isFinite(next) ? Math.min(1, Math.max(0, next / 100)) : 0 });
+  }
+  function setRespawnPolicy(value) {
+    // Switching to over-time always carries a gain mode so the draft is valid
+    // even before normalization (defaults to the current/guaranteed mode).
+    updateRespawn(value === 'overTime' ? { policy: 'overTime', gainMode: respawnGainMode } : { policy: value });
+  }
+  function setRespawnGainMode(value) {
+    updateRespawn({ gainMode: value });
+  }
+  function setRespawnExpression(value) {
+    updateRespawn({ amountExpression: String(value ?? '') });
+  }
+
   function modifierEntries(row) {
     const modifiers = row?.conditionModifiers || {};
     const characterRefs = Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
@@ -649,6 +731,153 @@
         {/each}
       </div>
     </section>
+
+    {#if economyMode === 'stamina'}
+    <section class="manager-task-stamina-card" data-gathering-task-stamina>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskStaminaHint', 'Stamina spent per attempt when this system uses stamina mode.')}</p>
+        </div>
+      </div>
+
+      <div class="manager-task-stamina-row">
+        <label class="manager-field manager-task-stamina-cost-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span>
+          <input
+            type="number" min="0" step="1"
+            value={staminaCostValue > 0 ? staminaCostValue : ''}
+            oninput={(event) => updateStaminaCost(event.currentTarget.value)}
+            data-gathering-task-stamina-cost
+          />
+        </label>
+
+        <div class="manager-field manager-task-stamina-modifiers">
+          <span title={text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifiersHint', 'Adjust the cost for an actor (e.g. a strong character mines for less).')}>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifiers', 'Per-actor cost modifiers')}</span>
+          <div class="manager-task-stamina-modifier-list">
+            {#each staminaCostModifiers as ref, index (ref.id)}
+              <div class="manager-task-stamina-modifier-row" data-gathering-stamina-modifier={ref.id}>
+                <select value={ref.modifierId} onchange={(event) => updateStaminaCostModifier(index, { modifierId: event.currentTarget.value })} aria-label={text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifiers', 'Per-actor cost modifiers')}>
+                  {#each characterModifierLibrary as entry (entry.id)}
+                    <option value={entry.id}>{entry.label || entry.id}</option>
+                  {/each}
+                </select>
+                <select value={ref.operator} onchange={(event) => updateStaminaCostModifier(index, { operator: event.currentTarget.value })} aria-label="operator">
+                  <option value="-">−</option>
+                  <option value="+">+</option>
+                </select>
+                <input type="number" step="1" placeholder="min" value={numericFieldValue(ref.min)} oninput={(event) => updateStaminaCostModifier(index, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} aria-label="min" />
+                <input type="number" step="1" placeholder="max" value={numericFieldValue(ref.max)} oninput={(event) => updateStaminaCostModifier(index, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} aria-label="max" />
+                <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')} onclick={() => removeStaminaCostModifier(index)}><i class="fas fa-times" aria-hidden="true"></i></button>
+              </div>
+            {/each}
+            <button type="button" class="manager-button manager-task-stamina-add" disabled={(characterModifierLibrary || []).length === 0} onclick={addStaminaCostModifier} data-gathering-add-stamina-modifier>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Economy.AddModifier', 'Add modifier')}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+    {/if}
+
+    {#if economyMode === 'nodes'}
+    <section class="manager-task-nodes-card" data-gathering-task-nodes>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskNodesHint', 'Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.')}</p>
+        </div>
+      </div>
+
+      <div class="manager-task-nodes-grid">
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
+          <input
+            type="number" min="0" step="1" placeholder="—"
+            value={nodes.max > 0 ? nodes.max : ''}
+            oninput={(event) => setNodeCount(event.currentTarget.value)}
+            data-gathering-task-node-count
+          />
+        </label>
+
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
+          <select value={nodes.depletionTiming} onchange={(event) => updateNodes({ depletionTiming: event.currentTarget.value })} data-gathering-task-node-deplete>
+            <option value="onStart">{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option>
+            <option value="onSuccess">{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option>
+          </select>
+        </label>
+
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
+          <select value={respawn.policy} onchange={(event) => setRespawnPolicy(event.currentTarget.value)} data-gathering-task-node-respawn>
+            <option value="manual">{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option>
+            <option value="overTime">{text('FABRICATE.Admin.Manager.Economy.RespawnOverTime', 'Over world time')}</option>
+          </select>
+        </label>
+
+        {#if respawnIsOverTime}
+          <label class="manager-field manager-task-node-interval">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
+            <div class="manager-task-node-interval-row">
+              <input
+                type="number" min="0" step="1"
+                value={intervalParts.value || ''}
+                oninput={(event) => setRespawnInterval(event.currentTarget.value, intervalParts.unit)}
+                data-gathering-task-node-interval
+              />
+              <select value={intervalParts.unit} onchange={(event) => setRespawnInterval(intervalParts.value, event.currentTarget.value)} data-gathering-task-node-interval-unit>
+                <option value="minutes">{text('FABRICATE.Admin.Manager.Economy.Unit.minutes', 'minutes')}</option>
+                <option value="hours">{text('FABRICATE.Admin.Manager.Economy.Unit.hours', 'hours')}</option>
+                <option value="days">{text('FABRICATE.Admin.Manager.Economy.Unit.days', 'days')}</option>
+                <option value="weeks">{text('FABRICATE.Admin.Manager.Economy.Unit.weeks', 'weeks')}</option>
+              </select>
+            </div>
+          </label>
+
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span>
+            <select value={respawnGainMode} onchange={(event) => setRespawnGainMode(event.currentTarget.value)} data-gathering-task-node-gain-mode>
+              <option value="guaranteed">{text('FABRICATE.Admin.Manager.Economy.GainGuaranteed', 'Add one node')}</option>
+              <option value="chance">{text('FABRICATE.Admin.Manager.Economy.GainChance', 'Chance to add one')}</option>
+              <option value="expression">{text('FABRICATE.Admin.Manager.Economy.GainExpression', 'Roll an amount')}</option>
+            </select>
+          </label>
+        {/if}
+
+        {#if respawnIsChance}
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
+            <div class="manager-task-node-chance-row">
+              <input
+                type="number" min="0" max="100" step="1"
+                value={Math.round((Number(respawn.chance) || 0) * 100) || ''}
+                oninput={(event) => setRespawnChance(event.currentTarget.value)}
+                data-gathering-task-node-chance
+              />
+              <span class="manager-muted">%</span>
+            </div>
+          </label>
+        {/if}
+
+        {#if respawnIsExpression}
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Economy.RespawnAmount', 'Amount per interval')}</span>
+            <input
+              type="text"
+              placeholder="1d4"
+              value={respawn.amountExpression || ''}
+              oninput={(event) => setRespawnExpression(event.currentTarget.value)}
+              aria-describedby="gathering-task-node-amount-hint"
+              data-gathering-task-node-amount
+            />
+            <span id="gathering-task-node-amount-hint" class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.RespawnAmountHint', 'Plain dice only (e.g. 1d4) — no character data.')}</span>
+          </label>
+        {/if}
+      </div>
+    </section>
+    {/if}
 
     <section class="manager-task-required-tools-card" data-gathering-task-required-tools>
       <div class="manager-task-card-heading">
@@ -1041,3 +1270,81 @@
     </div>
   {/if}
 </main>
+
+<style>
+  /* Card chrome matching the other task-editor cards. */
+  .manager-task-stamina-card,
+  .manager-task-nodes-card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    padding: 13px 16px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 8px;
+    background: var(--fab-mv2-surface-2);
+    box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
+  }
+
+  .manager-task-nodes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--fab-space-3);
+    align-items: end;
+  }
+
+  .manager-task-node-interval-row,
+  .manager-task-node-chance-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-task-node-interval-row input,
+  .manager-task-node-chance-row input {
+    min-width: 0;
+  }
+
+  /* Cost field sits beside the per-actor modifiers; captions align at the top so
+     the cost input and the first modifier row land on the same line. Grids (not
+     flex) so each control fills its track and the global input width:100% can't
+     force them onto separate lines. */
+  .manager-task-stamina-row {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: var(--fab-space-3);
+    align-items: start;
+  }
+
+  .manager-task-stamina-cost-field {
+    width: 100%;
+  }
+
+  .manager-task-stamina-cost-field > span {
+    white-space: nowrap;
+  }
+
+  .manager-task-stamina-modifiers {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-task-stamina-modifier-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-task-stamina-modifier-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px 72px 72px auto;
+    gap: var(--fab-space-2);
+    align-items: center;
+  }
+
+  .manager-task-stamina-add {
+    justify-self: start;
+  }
+</style>
