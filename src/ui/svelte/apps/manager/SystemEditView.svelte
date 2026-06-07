@@ -57,7 +57,8 @@
     { systemKey: 'essences', storeKey: 'essences', labelKey: 'FABRICATE.Admin.Manager.Feature.Essences', fallback: 'Essences', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Essences', hintFallback: 'Enables essence definitions and essence requirements.' },
     { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', labelKey: 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
     { systemKey: 'propertyMacros', storeKey: 'propertyMacros', labelKey: 'FABRICATE.Admin.Manager.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
-    { systemKey: 'effectTransfer', storeKey: 'effectTransfer', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' }
+    { systemKey: 'effectTransfer', storeKey: 'effectTransfer', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' },
+    { systemKey: 'chatOutput', storeKey: 'chatOutput', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' }
   ];
 
   const resolutionModeOptions = [
