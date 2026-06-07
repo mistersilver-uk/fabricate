@@ -56,6 +56,7 @@ const BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'd
 const BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
+const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // System-level gathering limitation mode (per crafting system).
@@ -75,7 +76,8 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   biomeModifierAggregation: 'strongestOfEach',
   blindCandidateGate: 'attemptableOnly',
   revealPolicy: 'never',
-  revealScope: 'actor'
+  revealScope: 'actor',
+  hazardVisibility: 'encounterChance'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -2128,7 +2130,10 @@ function normalizeGatheringRules(rules = {}) {
       : DEFAULT_GATHERING_RULES.revealPolicy,
     revealScope: REVEAL_SCOPES.has(rules?.revealScope)
       ? rules.revealScope
-      : DEFAULT_GATHERING_RULES.revealScope
+      : DEFAULT_GATHERING_RULES.revealScope,
+    hazardVisibility: GATHERING_HAZARD_VISIBILITIES.has(rules?.hazardVisibility)
+      ? rules.hazardVisibility
+      : DEFAULT_GATHERING_RULES.hazardVisibility
   };
 }
 

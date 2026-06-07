@@ -266,6 +266,40 @@ test('task and hazard libraries match environments by tags and global conditions
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-thorns']);
 });
 
+test('composeEnvironment carries the system hazardVisibility rule onto composed.rules', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          rules: { hazardVisibility: 'dangerLevelOnly' },
+          tasks: [{ id: 'task-a', name: 'Forage', dropRows: [{ id: 'drop-a', componentId: 'herb', quantity: 1, dropRate: 50 }] }]
+        }
+      }
+    }
+  });
+
+  const composed = service.composeEnvironment(environment(), system);
+  assert.equal(composed.rules.hazardVisibility, 'dangerLevelOnly',
+    'the GM-configured hazard visibility tier reaches the engine via composed.rules');
+});
+
+test('composeEnvironment defaults hazardVisibility to encounterChance when the system rule is absent', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          rules: { rewardSelectionMode: 'allDrops' },
+          tasks: [{ id: 'task-a', name: 'Forage', dropRows: [{ id: 'drop-a', componentId: 'herb', quantity: 1, dropRate: 50 }] }]
+        }
+      }
+    }
+  });
+
+  const composed = service.composeEnvironment(environment(), system);
+  assert.equal(composed.rules.hazardVisibility, 'encounterChance',
+    'an absent rule falls back to the restrictive default');
+});
+
 test('disabled per-system weather and time matching ignores task and hazard condition tags', async () => {
   const { service } = makeRichState({
     config: {
