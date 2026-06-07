@@ -122,6 +122,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     copyModule('src/ui/svelte/util/foundryBridge.js');
+    copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
@@ -134,6 +135,9 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardRow.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
