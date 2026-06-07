@@ -7,6 +7,7 @@
     "build": "node scripts/release.js --no-zip",
     "dev": "vite serve",
     "setup:dev": "node scripts/setup-dev-module.mjs",
+    "setup:dev:dist": "node scripts/setup-dev-module.mjs --dev --force",
     "validate:agents": "node scripts/validate-agent-bindings.mjs",
     "screenshots:ui": "node scripts/ui-pr-screenshot-evidence.mjs collect",
     "screenshots:ui:plan": "node scripts/ui-pr-screenshot-evidence.mjs plan",
