@@ -3,24 +3,34 @@
   GatheringDetail is the center column of the player gathering tab. With no
   environment selected it shows a hint to pick one from the left. With an
   environment selected it renders a header (name, biome/region/danger info pips,
-  description, and a gathering-mode hint) plus a mode-aware attempt area:
+  description, and a gathering-mode hint), the economy strip, an optional
+  environment-level scene banner, then a TAB STRIP (GatheringDetailTabs) with two
+  tab panels:
 
-   - Blind environments: an "Attempt gathering" button (a blind gather omits the
-     task id so the engine picks a candidate), and — when the effective reveal
-     policy is not `never` — a paginated "Discovered Tasks (x/y)" list of
-     selectable task rows.
-   - Targeted environments: the selectable task list, with no discovered heading.
+   - Tasks (default): for blind environments an "Attempt gathering" button (a
+     blind gather omits the task id so the engine picks a candidate) plus — when
+     the effective reveal policy is not `never` — a "Discovered Tasks (x/y)" list;
+     for targeted environments the selectable task list. Searchable + paginated.
+   - Hazards: the aggregate Highest-Danger + hazard-chance summary, then a
+     searchable, paginated list of selectable hazard rows (GatheringHazardRow).
+     The list is redacted (engine sends `[]`) for a non-GM viewer of a blind
+     environment, in which case a "hidden" hint is shown in place of the rows.
 
-  Task rows are read-only and selectable: clicking one drives the right-column
-  inspector (which carries the per-task Attempt action). The blind "Attempt
-  gathering" button and the inspector's Attempt both call the `onAttempt` handler
-  (lifted to GatheringView), which runs services.startGatheringAttempt and
-  re-fetches the listing; `busy` guards against double-submits.
+  Task and hazard rows are selectable: clicking one drives the right-column
+  inspector (the task inspector carries the per-task Attempt action; the hazard
+  inspector is read-only). `activeTab`, `selectedTaskId`, and `selectedHazardId`
+  are owned by GatheringView so the right column can swap inspectors with the tab.
+  The blind "Attempt gathering" button and the task inspector's Attempt both call
+  the `onAttempt` handler (lifted to GatheringView), which runs
+  services.startGatheringAttempt and re-fetches the listing; `busy` guards against
+  double-submits. Tasks and hazards keep independent search + pagination state.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
+  import GatheringHazardRow from './GatheringHazardRow.svelte';
   import HazardChanceBar from './HazardChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
 
@@ -30,7 +40,11 @@
     onAttempt = null,
     busy = false,
     selectedTaskId = null,
-    onSelectTask = null
+    onSelectTask = null,
+    activeTab = 'tasks',
+    onTabChange = null,
+    selectedHazardId = null,
+    onSelectHazard = null
   } = $props();
 
   const env = $derived(environment);
@@ -85,20 +99,57 @@
   // the full task list for targeted ones.
   const activeTasks = $derived(isBlind ? discoveredTasks : tasks);
 
-  let pageIndex = $state(0);
-  let pageSize = $state(6);
-  const pageSizeOptions = [6, 9, 12];
-  const paginated = $derived(activeTasks.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+  // Individual hazards surfaced by the engine listing. Redacted to `[]` for a
+  // non-GM viewer of a blind environment, so an empty list while hazardChance > 0
+  // means "hidden", not "safe" (see hazardsHidden below).
+  const hazards = $derived(Array.isArray(env?.hazards) ? env.hazards : []);
 
-  // Reset pagination when the selected environment changes.
+  const pageSizeOptions = [6, 9, 12];
+
+  // Tasks: a case-insensitive name+description search applied BEFORE pagination,
+  // mirroring the left column's environment search.
+  let taskSearchTerm = $state('');
+  const normalizedTaskSearch = $derived(taskSearchTerm.trim().toLowerCase());
+  const filteredTasks = $derived(activeTasks.filter(task =>
+    !normalizedTaskSearch
+    || `${task?.name ?? ''} ${task?.description ?? ''}`.toLowerCase().includes(normalizedTaskSearch)
+  ));
+  let taskPageIndex = $state(0);
+  let taskPageSize = $state(6);
+  const paginatedTasks = $derived(filteredTasks.slice(taskPageIndex * taskPageSize, (taskPageIndex + 1) * taskPageSize));
+
+  // Hazards: an independent search + pagination set, beneath the task list.
+  let hazardSearchTerm = $state('');
+  const normalizedHazardSearch = $derived(hazardSearchTerm.trim().toLowerCase());
+  const filteredHazards = $derived(hazards.filter(hazard =>
+    !normalizedHazardSearch
+    || `${hazard?.name ?? ''} ${hazard?.description ?? ''}`.toLowerCase().includes(normalizedHazardSearch)
+  ));
+  let hazardPageIndex = $state(0);
+  let hazardPageSize = $state(6);
+  const paginatedHazards = $derived(filteredHazards.slice(hazardPageIndex * hazardPageSize, (hazardPageIndex + 1) * hazardPageSize));
+
+  // The center column shows the hazard list whenever individual hazards are
+  // present. An empty list with a non-zero chance on a blind environment means
+  // the engine redacted the hazards, so show a "hidden" hint instead of nothing.
+  const showHazardList = $derived(hazards.length > 0);
+  const hazardsHidden = $derived(hazards.length === 0 && hazardChance > 0 && isBlind);
+
+  // Reset search + pagination when the selected environment changes.
   $effect(() => {
     envId;
-    pageIndex = 0;
+    taskPageIndex = 0;
+    hazardPageIndex = 0;
+    taskSearchTerm = '';
+    hazardSearchTerm = '';
   });
 
-  // Snap back to the first page if the active list shrinks past the offset.
+  // Snap each list back to its first page if a search shrinks it past the offset.
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= activeTasks.length) pageIndex = 0;
+    if (taskPageIndex > 0 && taskPageIndex * taskPageSize >= filteredTasks.length) taskPageIndex = 0;
+  });
+  $effect(() => {
+    if (hazardPageIndex > 0 && hazardPageIndex * hazardPageSize >= filteredHazards.length) hazardPageIndex = 0;
   });
 
   function biomeChipStyle(tag) {
@@ -194,103 +245,184 @@
       </section>
     {/if}
 
-    <section class="gathering-detail-hazard" data-gathering-hazard-section>
-      <div class="gathering-detail-hazard-danger">
-        <span class="gathering-detail-hazard-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
-        <span class={`gathering-detail-hazard-level is-danger ${dangerRiskClass}`}>
-          <i class="fas fa-skull" aria-hidden="true"></i>
-          <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
-        </span>
-      </div>
-
-      {#if hasHazard}
-        <HazardChanceBar value={hazardChance} />
-        <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
-      {:else}
-        <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
-          {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
-        </p>
-      {/if}
-    </section>
-
     {#if sceneBlocked}
       <section class="gathering-detail-scene" data-gathering-scene-banner>
         <LinkedScene {sceneUuid} {services} />
       </section>
     {/if}
 
-    {#if isBlind}
-      <div class="gathering-detail-blind-card" data-gathering-blind-card>
-        <div class="gathering-detail-blind-card-lead">
-          <i class="fas fa-mask" aria-hidden="true"></i>
-          <span>{localize('FABRICATE.App.Gathering.Detail.BlindAttemptPrompt')}</span>
-        </div>
-        <span class="gathering-detail-blind-card-divider" aria-hidden="true"></span>
-        <div class="gathering-detail-blind-card-action">
-          <button
-            type="button"
-            class="gathering-detail-blind-attempt"
-            data-gathering-blind-attempt
-            disabled={!blindAttemptable || busy}
-            onclick={() => onAttempt?.({ environmentId: envId, taskId: null })}
-          >
-            <i class="fas fa-dice" aria-hidden="true"></i>
-            {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
-          </button>
-        </div>
-      </div>
+    <GatheringDetailTabs {activeTab} onSelect={onTabChange} />
 
-      {#if showDiscovered}
-        <section class="gathering-detail-section" data-gathering-discovered>
-          <h3 class="gathering-detail-section-title">
-            {localize('FABRICATE.App.Gathering.Detail.DiscoveredHeading', {
-              x: discoveredTaskCount,
-              y: composedTaskCount
-            })}
-          </h3>
-          {#if discoveredTasks.length === 0}
-            <p class="gathering-detail-empty">
-              {localize('FABRICATE.App.Gathering.Detail.NothingDiscovered')}
-            </p>
+    <div
+      class="gathering-detail-panel"
+      role="tabpanel"
+      id={`gathering-detail-panel-${activeTab}`}
+      aria-labelledby={`gathering-detail-tab-${activeTab}`}
+    >
+      {#if activeTab === 'hazards'}
+        <div class="gathering-detail-hazard" data-gathering-hazard-section>
+          <div class="gathering-detail-hazard-danger">
+            <span class="gathering-detail-hazard-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
+            <span class={`gathering-detail-hazard-level is-danger ${dangerRiskClass}`}>
+              <i class="fas fa-skull" aria-hidden="true"></i>
+              <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
+            </span>
+          </div>
+
+          {#if hasHazard}
+            <HazardChanceBar value={hazardChance} />
+            <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
           {:else}
-            <div class="gathering-detail-task-list" role="list">
-              {#each paginated as discoveredTask (discoveredTask.id)}
-                <GatheringTaskRow
-                  task={discoveredTask}
-                  selected={String(discoveredTask.id) === String(selectedTaskId)}
-                  onSelect={onSelectTask}
-                />
-              {/each}
-            </div>
+            <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
+              {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+            </p>
           {/if}
-        </section>
-      {/if}
-    {:else}
-      <section class="gathering-detail-section">
-        <div class="gathering-detail-task-list" role="list">
-          {#each paginated as gatheringTask (gatheringTask.id)}
-            <GatheringTaskRow
-              task={gatheringTask}
-              selected={String(gatheringTask.id) === String(selectedTaskId)}
-              onSelect={onSelectTask}
-            />
-          {/each}
         </div>
-      </section>
-    {/if}
 
-    {#if activeTasks.length > 0}
-      <div class="gathering-detail-pagination">
-        <Pagination
-          totalCount={activeTasks.length}
-          {pageSize}
-          {pageIndex}
-          {pageSizeOptions}
-          onPageChange={(n) => pageIndex = n}
-          onPageSizeChange={(n) => { pageSize = n; pageIndex = 0; }}
-        />
-      </div>
-    {/if}
+        {#if showHazardList}
+          <section class="gathering-detail-section" data-gathering-hazards-section>
+            <header class="gathering-detail-section-head">
+              <h3 class="gathering-detail-section-title">
+                {localize('FABRICATE.App.Gathering.Detail.HazardsHeading')}
+              </h3>
+              <label class="gathering-detail-search">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input
+                  type="search"
+                  bind:value={hazardSearchTerm}
+                  placeholder={localize('FABRICATE.App.Gathering.Detail.HazardSearchPlaceholder')}
+                  aria-label={localize('FABRICATE.App.Gathering.Detail.HazardSearchLabel')}
+                  data-gathering-hazard-search
+                />
+              </label>
+            </header>
+
+            {#if filteredHazards.length === 0}
+              <p class="gathering-detail-empty" data-gathering-no-hazard-matches>
+                {localize('FABRICATE.App.Gathering.Detail.NoHazardMatches')}
+              </p>
+            {:else}
+              <div class="gathering-detail-hazard-list" role="list">
+                {#each paginatedHazards as hazard (hazard.id)}
+                  <GatheringHazardRow
+                    {hazard}
+                    selected={String(hazard.id) === String(selectedHazardId)}
+                    onSelect={onSelectHazard}
+                  />
+                {/each}
+              </div>
+            {/if}
+
+            {#if filteredHazards.length > 0}
+              <div class="gathering-detail-pagination">
+                <Pagination
+                  totalCount={filteredHazards.length}
+                  pageSize={hazardPageSize}
+                  pageIndex={hazardPageIndex}
+                  {pageSizeOptions}
+                  onPageChange={(n) => hazardPageIndex = n}
+                  onPageSizeChange={(n) => { hazardPageSize = n; hazardPageIndex = 0; }}
+                />
+              </div>
+            {/if}
+          </section>
+        {:else if hazardsHidden}
+          <p class="gathering-detail-empty" data-gathering-hazards-hidden>
+            {localize('FABRICATE.App.Gathering.Detail.HazardsHiddenHint')}
+          </p>
+        {/if}
+      {:else}
+        {#if isBlind}
+          <div class="gathering-detail-blind-card" data-gathering-blind-card>
+            <div class="gathering-detail-blind-card-lead">
+              <i class="fas fa-mask" aria-hidden="true"></i>
+              <span>{localize('FABRICATE.App.Gathering.Detail.BlindAttemptPrompt')}</span>
+            </div>
+            <span class="gathering-detail-blind-card-divider" aria-hidden="true"></span>
+            <div class="gathering-detail-blind-card-action">
+              <button
+                type="button"
+                class="gathering-detail-blind-attempt"
+                data-gathering-blind-attempt
+                disabled={!blindAttemptable || busy}
+                onclick={() => onAttempt?.({ environmentId: envId, taskId: null })}
+              >
+                <i class="fas fa-dice" aria-hidden="true"></i>
+                {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        {#if !isBlind || showDiscovered}
+          <section
+            class="gathering-detail-section"
+            data-gathering-tasks-section
+            data-gathering-discovered={isBlind ? 'true' : undefined}
+          >
+            <header class="gathering-detail-section-head">
+              {#if isBlind}
+                <h3 class="gathering-detail-section-title">
+                  {localize('FABRICATE.App.Gathering.Detail.DiscoveredHeading', {
+                    x: discoveredTaskCount,
+                    y: composedTaskCount
+                  })}
+                </h3>
+              {:else}
+                <h3 class="gathering-detail-section-title">
+                  {localize('FABRICATE.App.Gathering.Detail.TasksHeading')}
+                </h3>
+              {/if}
+              {#if activeTasks.length > 0}
+                <label class="gathering-detail-search">
+                  <i class="fas fa-search" aria-hidden="true"></i>
+                  <input
+                    type="search"
+                    bind:value={taskSearchTerm}
+                    placeholder={localize('FABRICATE.App.Gathering.Detail.TaskSearchPlaceholder')}
+                    aria-label={localize('FABRICATE.App.Gathering.Detail.TaskSearchLabel')}
+                    data-gathering-task-search
+                  />
+                </label>
+              {/if}
+            </header>
+
+            {#if isBlind && activeTasks.length === 0}
+              <p class="gathering-detail-empty">
+                {localize('FABRICATE.App.Gathering.Detail.NothingDiscovered')}
+              </p>
+            {:else if filteredTasks.length === 0 && normalizedTaskSearch !== ''}
+              <p class="gathering-detail-empty" data-gathering-no-task-matches>
+                {localize('FABRICATE.App.Gathering.Detail.NoTaskMatches')}
+              </p>
+            {:else if filteredTasks.length > 0}
+              <div class="gathering-detail-task-list" role="list">
+                {#each paginatedTasks as gatheringTask (gatheringTask.id)}
+                  <GatheringTaskRow
+                    task={gatheringTask}
+                    selected={String(gatheringTask.id) === String(selectedTaskId)}
+                    onSelect={onSelectTask}
+                  />
+                {/each}
+              </div>
+            {/if}
+
+            {#if filteredTasks.length > 0}
+              <div class="gathering-detail-pagination">
+                <Pagination
+                  totalCount={filteredTasks.length}
+                  pageSize={taskPageSize}
+                  pageIndex={taskPageIndex}
+                  {pageSizeOptions}
+                  onPageChange={(n) => taskPageIndex = n}
+                  onPageSizeChange={(n) => { taskPageSize = n; taskPageIndex = 0; }}
+                />
+              </div>
+            {/if}
+          </section>
+        {/if}
+      {/if}
+    </div>
   </section>
 {/if}
 
@@ -597,9 +729,15 @@
     color: var(--fab-text-muted);
   }
 
+  /*
+    Sections stack at their natural height and the column (.gathering-detail,
+    overflow-y: auto) scrolls. They must NOT flex-grow/shrink: with two stacked
+    sections (tasks + hazards), `flex: 1 1 auto` + `min-height: 0` shrinks each
+    box below its content, and the inner row lists (no own scroll) overflow and
+    paint over the neighbouring section.
+  */
   .gathering-detail-section {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
@@ -612,6 +750,73 @@
     gap: 6px;
     font-size: 14px;
     font-weight: 600;
+  }
+
+  /* Section header: title on the left, search box on the right; wraps on a
+     narrow column so the search input keeps a usable width. */
+  .gathering-detail-section-head {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+  }
+
+  .gathering-detail-section-head .gathering-detail-section-title {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  /* Search box, mirroring the left column's environment search. */
+  .gathering-detail-search {
+    position: relative;
+    flex: 1 1 160px;
+    min-width: 140px;
+  }
+
+  .gathering-detail-search i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fab-text-muted);
+    pointer-events: none;
+  }
+
+  .gathering-detail-search input {
+    width: 100%;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 10px 0 32px;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface);
+    color: var(--fab-text);
+  }
+
+  .gathering-detail-search input:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 1px;
+  }
+
+  /* Hazards section sits beneath the tasks list, divided by a soft rule. */
+  /* The active tab's content: fills the remaining column height and scrolls on
+     its own, keeping the header/economy/scene strip and the tab strip pinned. */
+  .gathering-detail-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    overflow-y: auto;
+  }
+
+  .gathering-detail-hazard-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
   }
 
   /* Environment-level linked-scene banner, shown once above the task list. */

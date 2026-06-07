@@ -47,3 +47,25 @@ export function resolveDefaultTaskSelection(tasks, selectedTaskId) {
   if (stillValid) return selectedTaskId;
   return list.find(task => task?.attemptable === true)?.id ?? null;
 }
+
+// The hazards the player can see (and therefore select) for an environment. The
+// engine redacts the list to `[]` for a non-GM viewer of a blind site, so this
+// is simply the listing's `hazards` array. The task analogue is visibleTasksFor.
+export function visibleHazardsFor(environment) {
+  return Array.isArray(environment?.hazards) ? environment.hazards : [];
+}
+
+// Pure default hazard-selection for the right-column hazard inspector, the hazard
+// analogue of resolveDefaultTaskSelection:
+//   - preserve `selectedHazardId` when a hazard with that id is still present;
+//   - otherwise default to the first hazard's `.id` (hazards are not
+//     "attemptable" — any one is a fine default so the inspector isn't empty);
+//   - otherwise `null` (no hazards, or hazards redacted for a blind site).
+export function resolveDefaultHazardSelection(hazards, selectedHazardId) {
+  const list = Array.isArray(hazards) ? hazards : [];
+  const stillValid = selectedHazardId !== null
+    && selectedHazardId !== undefined
+    && list.some(hazard => String(hazard?.id) === String(selectedHazardId));
+  if (stillValid) return selectedHazardId;
+  return list[0]?.id ?? null;
+}

@@ -14,7 +14,14 @@
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import GatheringTaskDetail from './GatheringTaskDetail.svelte';
-  import { resolveDefaultSelection, resolveDefaultTaskSelection, visibleTasksFor } from './selectionDefault.js';
+  import GatheringHazardDetail from './GatheringHazardDetail.svelte';
+  import {
+    resolveDefaultSelection,
+    resolveDefaultTaskSelection,
+    visibleTasksFor,
+    resolveDefaultHazardSelection,
+    visibleHazardsFor
+  } from './selectionDefault.js';
 
   let { services = null } = $props();
 
@@ -31,6 +38,11 @@
   // accordion (the selected row is the expanded one) and the right-column task
   // inspector. Resolved to the first attemptable task by default.
   let selectedTaskId = $state(null);
+  // The center column's active tab ('tasks' | 'hazards') and the selected hazard.
+  // Lifted here (like selectedTaskId) so the right column can swap between the
+  // task inspector and the hazard inspector in step with the tab.
+  let activeTab = $state('tasks');
+  let selectedHazardId = $state(null);
   // Shared "an attempt is in flight" guard for both the blind attempt button
   // (center) and the right-column task inspector's Attempt button.
   let busy = $state(false);
@@ -57,6 +69,13 @@
   const visibleTasks = $derived(visibleTasksFor(selectedEnvironment));
   const selectedTask = $derived(
     visibleTasks.find(task => String(task?.id) === String(selectedTaskId)) ?? null
+  );
+  // The hazards the player can inspect for the selected environment, and the
+  // currently selected hazard object (drives the right-column hazard inspector
+  // when the Hazards tab is active).
+  const visibleHazards = $derived(visibleHazardsFor(selectedEnvironment));
+  const selectedHazard = $derived(
+    visibleHazards.find(hazard => String(hazard?.id) === String(selectedHazardId)) ?? null
   );
 
   // `quiet` refreshes (e.g. on scene change) keep the populated grid on screen
@@ -87,6 +106,9 @@
       const resolvedEnvironment = (Array.isArray(listing?.environments) ? listing.environments : [])
         .find(environment => environment?.id === selectedId) ?? null;
       selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(resolvedEnvironment), selectedTaskId);
+      // Resolve the hazard selection the same way (preserve a still-present pick,
+      // else default to the first hazard) so the Hazards tab inspector is seeded.
+      selectedHazardId = resolveDefaultHazardSelection(visibleHazardsFor(resolvedEnvironment), selectedHazardId);
 
       // First-load backstop: when the shared selection is still empty, adopt the
       // listing's resolved actor AT MOST ONCE and ONLY when it is a player
@@ -120,10 +142,22 @@
     // attemptable), rather than carrying over the previous env's task.
     const nextEnvironment = environments.find(environment => environment?.id === id) ?? null;
     selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(nextEnvironment), null);
+    // A new environment also resets to the default (Tasks) tab and its own
+    // default hazard selection.
+    activeTab = 'tasks';
+    selectedHazardId = resolveDefaultHazardSelection(visibleHazardsFor(nextEnvironment), null);
   }
 
   function onSelectTask(id) {
     selectedTaskId = id;
+  }
+
+  function onSelectHazard(id) {
+    selectedHazardId = id;
+  }
+
+  function onTabChange(tab) {
+    activeTab = tab;
   }
 
   // The shared attempt handler, used by the right-column inspector (targeted +
@@ -190,18 +224,30 @@
         {busy}
         {selectedTaskId}
         {onSelectTask}
+        {activeTab}
+        {onTabChange}
+        {selectedHazardId}
+        {onSelectHazard}
       />
     </section>
     <section class="gathering-view-column gathering-view-column-right" data-gathering-task-detail-column>
-      <GatheringTaskDetail
-        task={selectedTask}
-        hasTasks={visibleTasks.length > 0}
-        environmentId={selectedId}
-        onAttempt={attempt}
-        {busy}
-        {services}
-        rememberedActorId={store?.selectedActorId ?? null}
-      />
+      {#if activeTab === 'hazards'}
+        <GatheringHazardDetail
+          hazard={selectedHazard}
+          hasHazards={visibleHazards.length > 0}
+          {services}
+        />
+      {:else}
+        <GatheringTaskDetail
+          task={selectedTask}
+          hasTasks={visibleTasks.length > 0}
+          environmentId={selectedId}
+          onAttempt={attempt}
+          {busy}
+          {services}
+          rememberedActorId={store?.selectedActorId ?? null}
+        />
+      {/if}
     </section>
   </div>
 {/if}

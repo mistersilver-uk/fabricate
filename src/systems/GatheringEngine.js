@@ -576,6 +576,15 @@ export class GatheringEngine {
    *   already revealed (the "Discovered Tasks" list); `[]` for targeted
    *   environments, GM viewers, locked environments, and `never`-policy
    *   environments. See {@link GatheringEngine#_discoveredTaskModels}.
+   * - `hazards` — read-only player-facing models for the environment's composed
+   *   hazards (`id`, `name`, `description`, `img`, `dangerTags`, `risk`, a static
+   *   `chance`, the matching criteria `weather`/`timeOfDay`/`biomes`/`regions`,
+   *   resolved `biomeTags` display metadata, and an optional `linkedSceneUuid`;
+   *   see {@link GatheringEngine#_hazardModel}).
+   *   The full list for targeted environments and GM viewers; `[]` (redacted) for
+   *   a non-GM viewer of a blind environment and for locked teasers. The aggregate
+   *   `hazardChance` is still emitted regardless, so the player UI can show the
+   *   chance bar even when individual hazards are redacted.
    * - `locked` — `true` for disabled environments surfaced to every viewer
    *   (players and GMs alike) as non-interactive teasers (identity fields only;
    *   empty `tasks`, empty `discoveredTasks`, an `ENVIRONMENT_DISABLED` blocked
@@ -1037,6 +1046,15 @@ export class GatheringEngine {
       ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons })
       : [];
 
+    // Individual hazards are read-only player-facing models. They are redacted
+    // for a non-GM viewer of a blind environment (mirroring the collapsed task
+    // list) and surfaced in full for targeted environments and GM viewers.
+    const listedHazards = blindForViewer
+      ? []
+      : normalizeList(environment.hazards)
+          .filter(hazard => hazard?.enabled !== false)
+          .map(hazard => this._hazardModel(hazard, environment));
+
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
     return {
@@ -1061,6 +1079,7 @@ export class GatheringEngine {
       visible: true,
       attemptable,
       hazardChance: this._environmentHazardChance(environment),
+      hazards: listedHazards,
       blockedReasons,
       tasks: listedTasks,
       discoveredTasks,
@@ -1173,6 +1192,7 @@ export class GatheringEngine {
       blockedReasons: [this._blockedReason('ENVIRONMENT_DISABLED')],
       tasks: [],
       discoveredTasks: [],
+      hazards: [],
       ...this._playerListingFields({ environment, actor: null, locked: true })
     };
   }
@@ -1271,11 +1291,63 @@ export class GatheringEngine {
     return 1 - missAll;
   }
 
+  /**
+   * A read-only, player-safe model for a single composed hazard, used to render
+   * the center column's hazards list and the right-column hazard inspector.
+   * Carries identity (`id`/`name`/`description`/`img`), the hazard's danger tags
+   * + a derived `risk` tier (the first tag, or `safe`), a static `chance`
+   * (`dropRate/100`, clamped to 0–1) so the UI can reuse the hazard-chance bar,
+   * and the hazard's matching criteria (`weather`/`timeOfDay`/`biomes`/`regions`,
+   * each an empty array meaning "any") plus an optional `linkedSceneUuid` for the
+   * details view. Modifier internals (hazardModifier/conditionModifiers/
+   * characterModifiers) are intentionally NOT surfaced. Like
+   * `_environmentHazardChance`, `chance` ignores actor/condition/character
+   * modifiers — it is the static per-hazard trigger rate, not a resolved roll.
+   *
+   * @param {object} hazard A composed/normalized gathering hazard.
+   * @param {object} [environment] The owning environment (for biome-tag resolution).
+   * @returns {object} The player-facing hazard model.
+   */
+  _hazardModel(hazard, environment = null) {
+    const dangerTags = normalizeStringList(hazard?.dangerTags);
+    const biomes = normalizeStringList(hazard?.biomes);
+    return {
+      id: stringOrNull(hazard?.id),
+      name: stringOrEmpty(hazard?.name),
+      description: stringOrEmpty(hazard?.description),
+      img: stringOrNull(hazard?.img),
+      dangerTags,
+      risk: dangerTags[0] || 'safe',
+      chance: Math.min(1, Math.max(0, (Number(hazard?.dropRate) || 0) / 100)),
+      weather: normalizeStringList(hazard?.weather),
+      timeOfDay: normalizeStringList(hazard?.timeOfDay),
+      biomes,
+      // Resolved biome display metadata ({ id, label, icon, colorToken,
+      // customColor }) so hazard biome chips render with icons/colours like the
+      // environment's biome pips. Empty when richState can't resolve them.
+      biomeTags: this._resolveBiomeTagList(biomes, environment),
+      regions: normalizeStringList(hazard?.regions ?? hazard?.region),
+      linkedSceneUuid: stringOrNull(hazard?.linkedSceneUuid)
+    };
+  }
+
   _resolveBiomeTags(environment) {
+    return this._resolveBiomeTagList(
+      normalizeStringList(environment.biomes ?? environment.biome),
+      environment
+    );
+  }
+
+  /**
+   * Null-safe resolution of a biome-id list to display metadata via
+   * {@link GatheringRichStateService#resolveBiomeTags}, scoped to the
+   * environment's crafting system. Returns `[]` when the service is absent or
+   * throws. Shared by environment and hazard biome-tag resolution.
+   */
+  _resolveBiomeTagList(biomes, environment) {
     if (typeof this.richState?.resolveBiomeTags !== 'function') return [];
-    const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     try {
-      return this.richState.resolveBiomeTags(biomes, environment.craftingSystemId) || [];
+      return this.richState.resolveBiomeTags(biomes, environment?.craftingSystemId) || [];
     } catch (_err) {
       return [];
     }
