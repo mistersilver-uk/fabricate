@@ -9561,54 +9561,47 @@
 /* it relies on the :root --fab-* tokens and stays self-contained.            */
 /* -------------------------------------------------------------------------- */
 
+/* Blends with Foundry's chat card: inherits the chat text colour (so it stays
+   legible on parchment and on dark chat themes) and uses barely-there
+   translucent washes instead of a solid theme surface. */
 .fabricate-gather-chat {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--fab-border-strong);
-  border-left: 3px solid var(--fab-accent);
-  border-radius: 6px;
-  /* Solid surface so contrast is independent of Foundry's chat theme. */
-  background: var(--fab-bg-1);
-  color: var(--fab-text);
+  gap: 7px;
+  margin: 1px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fab-overlay-dark-12);
+  border-left: 3px solid var(--fab-accent-strong);
+  border-radius: 5px;
+  background: var(--fab-overlay-dark-05);
 }
 
 .fabricate-gather-chat--success {
-  border-left-color: var(--fab-success-border);
+  border-left-color: var(--fab-success);
 }
 
 .fabricate-gather-chat--failure {
-  border-left-color: var(--fab-danger-border);
+  border-left-color: var(--fab-danger);
 }
 
 .fabricate-gather-chat__header {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .fabricate-gather-chat__title {
   margin: 0;
   border: none;
-  font-size: 1.05em;
+  font-size: 1.02em;
   font-weight: 700;
   line-height: 1.2;
-  color: var(--fab-text);
-}
-
-.fabricate-gather-chat--success .fabricate-gather-chat__title {
-  color: var(--fab-success-text);
-}
-
-.fabricate-gather-chat--failure .fabricate-gather-chat__title {
-  color: var(--fab-danger-text);
 }
 
 .fabricate-gather-chat__subtitle {
   margin: 0;
   font-size: 0.85em;
-  color: var(--fab-text-secondary);
+  opacity: 0.72;
 }
 
 .fabricate-gather-chat__section {
@@ -9620,21 +9613,22 @@
 .fabricate-gather-chat__heading {
   margin: 0;
   border: none;
-  font-size: 0.82em;
+  font-size: 0.74em;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--fab-accent);
+  letter-spacing: 0.06em;
+  opacity: 0.58;
 }
 
 .fabricate-gather-chat__section--hazard .fabricate-gather-chat__heading {
-  color: var(--fab-danger-text);
+  color: var(--fab-danger);
+  opacity: 0.95;
 }
 
 .fabricate-gather-chat__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 6px;
+  gap: 5px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -9646,15 +9640,15 @@
   gap: 6px;
   min-width: 0;
   padding: 3px 6px;
-  border: 1px solid var(--fab-border-strong);
+  border: 1px solid var(--fab-overlay-dark-10);
   border-radius: 4px;
-  background: var(--fab-bg-3);
+  background: var(--fab-overlay-dark-05);
 }
 
 .fabricate-gather-chat__icon {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: none;
   border-radius: 3px;
   object-fit: cover;
@@ -9671,9 +9665,9 @@
 .fabricate-gather-chat__footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 6px 8px;
   padding-top: 6px;
-  border-top: 1px solid var(--fab-border-strong);
+  border-top: 1px solid var(--fab-overlay-dark-10);
 }
 
 .fabricate-gather-chat__stat {
@@ -9681,20 +9675,18 @@
   align-items: center;
   gap: 5px;
   padding: 2px 9px;
-  border: 1px solid var(--fab-border-strong);
+  border: 1px solid var(--fab-overlay-dark-15);
   border-radius: 999px;
-  background: var(--fab-bg-2);
+  background: var(--fab-overlay-dark-05);
   font-size: 0.82em;
-  color: var(--fab-text);
 }
 
 .fabricate-gather-chat__stat-icon {
   font-size: 0.95em;
   line-height: 1;
-  color: var(--fab-accent);
+  opacity: 0.75;
 }
 
 .fabricate-gather-chat__stat-value {
   font-weight: 700;
-  color: var(--fab-accent);
 }

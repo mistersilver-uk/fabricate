@@ -27,7 +27,7 @@ const CHAT_KEYS = Object.freeze({
 // FontAwesome glyphs (Foundry bundles FA6) for the footer stat pills.
 const STAT_ICONS = Object.freeze({
   stamina: 'fas fa-bolt',
-  nodes: 'fas fa-circle-nodes'
+  nodes: 'fas fa-mountain'
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */

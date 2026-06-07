@@ -56,7 +56,7 @@ test('renders stamina and remaining nodes as icon pills', () => {
   assert.ok(content.includes('>5</span>'), 'stamina value emphasized');
   assert.ok(content.includes('>2</span>'), 'nodes value emphasized');
   assert.ok(content.includes('fabricate-gather-chat__stat-icon fas fa-bolt'), 'stamina lightning bolt icon');
-  assert.ok(content.includes('fabricate-gather-chat__stat-icon fas fa-circle-nodes'), 'nodes icon');
+  assert.ok(content.includes('fabricate-gather-chat__stat-icon fas fa-mountain'), 'nodes mountain icon');
 });
 
 test('failure status uses failure header and modifier', () => {
