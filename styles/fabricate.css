@@ -887,30 +887,6 @@
   color: var(--fab-text-subtle);
 }
 
-.badge {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--fab-surface-raised);
-  color: var(--fab-text-muted);
-  border: 1px solid var(--fab-border);
-}
-
-.btn-icon {
-  padding: 4px 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.btn-icon:hover {
-  opacity: 1;
-}
-
 .fabricate-admin .fabricate-empty .btn-primary i {
   position: static !important;
   left: auto !important;
@@ -3198,12 +3174,6 @@
 .fabricate-admin .drop-zone.drop-active {
   background: var(--fab-accent-soft);
   border-color: var(--fab-accent);
-}
-
-@container manager (max-width: 900px) {
-  .manager-library-columns {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ==========================================
@@ -6054,7 +6024,6 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .badge,
 .fabricate-manager .environment-stale-warning,
 .fabricate-manager .environment-field-error {
   font-size: 0.74rem;
