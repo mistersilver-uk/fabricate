@@ -8,48 +8,52 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
 const css = readFileSync(cssPath, 'utf8');
 
-test('fabricate admin establishes a positioning root for portaled picker overlays', () => {
-  const match = css.match(/\.fabricate-admin \{[\s\S]*?\}/);
+test('manager establishes a positioning root for portaled picker overlays', () => {
+  const match = css.match(/\.fabricate-manager \{[\s\S]*?\}/);
 
-  assert.ok(match, 'fabricate admin root block should exist');
+  assert.ok(match, 'manager root block should exist');
   const block = match[0];
 
-  assert.ok(block.includes('position: relative;'), 'admin root should anchor absolutely positioned overlays');
-  assert.ok(block.includes('isolation: isolate;'), 'admin root should isolate picker z-index from host chrome');
+  assert.ok(block.includes('position: relative;'), 'manager root should anchor absolutely positioned overlays');
+  assert.ok(block.includes('isolation: isolate;'), 'manager root should isolate picker z-index from host chrome');
 });
 
-test('essence icon picker popover uses an absolute high-z overlay layer', () => {
-  const match = css.match(/\.fabricate-admin \.essence-icon-picker-popover \{[\s\S]*?\}/);
+test('essence icon picker popover uses an absolute layered overlay', () => {
+  // The icon picker and source picker popovers share one grouped rule; match the
+  // member that directly precedes the declaration block.
+  const match = css.match(/\.fabricate-manager \.essence-source-picker-popover \{[\s\S]*?\}/);
 
   assert.ok(match, 'icon picker popover block should exist');
   const block = match[0];
 
-  assert.ok(block.includes('position: absolute;'), 'popover should be removed from scroll-layout flow and anchored to the admin shell');
-  assert.ok(block.includes('z-index: 4000;'), 'popover should layer above surrounding admin UI');
+  assert.ok(block.includes('position: absolute;'), 'popover should be removed from scroll-layout flow and anchored to the manager shell');
+  assert.ok(block.includes('z-index: 120;'), 'popover should layer above surrounding manager UI');
   assert.ok(block.includes('overflow: hidden;'), 'popover should clip its own interior scroll region');
 });
 
-test('essence icon picker options keep visible 4px padding and flexible height', () => {
-  const start = css.indexOf('.fabricate-admin .essence-icon-picker-options button.essence-icon-picker-option {\n  width: 100%;');
+test('essence icon picker options use a fixed icon column with compact padding', () => {
+  const match = css.match(/\.fabricate-manager \.essence-icon-picker-option \{[\s\S]*?\}/);
 
-  assert.notEqual(start, -1, 'icon picker option layout block should exist');
-  const end = css.indexOf('\n}', start);
-  const block = css.slice(start, end + 2);
+  assert.ok(match, 'icon picker option layout block should exist');
+  const block = match[0];
 
-  assert.ok(block.includes('padding: 4px !important;'), 'option rows should render 4px padding on all sides even against host button defaults');
-  assert.ok(block.includes('min-height: 32px !important;'), 'option rows should preserve the padded row height against host button defaults');
-  assert.ok(block.includes('height: auto !important;'), 'option rows should size to content plus padding');
-  assert.ok(block.includes('box-sizing: border-box;'), 'option rows should keep padding inside the row box');
+  assert.ok(block.includes('grid-template-columns: 28px minmax(0, 1fr);'), 'option rows should reserve a fixed icon column');
+  assert.ok(block.includes('padding: 4px 8px;'), 'option rows should use compact row padding');
+  assert.ok(block.includes('min-height: 34px;'), 'option rows should preserve a stable row height');
 });
 
-test('essence icon picker trigger aligns its left inset with the option rows', () => {
-  const match = css.match(/\.fabricate-admin \.essence-icon-picker-trigger \{[\s\S]*?\}/);
+test('essence icon picker trigger shares the option icon column and padding', () => {
+  const match = css.match(/\.fabricate-manager \.essence-icon-picker-trigger \{[\s\S]*?\}/);
 
   assert.ok(match, 'icon picker trigger block should exist');
   const block = match[0];
 
   assert.ok(
-    block.includes('padding: 4px 10px 4px 4px;'),
-    'trigger should use the same 4px left inset as picker rows'
+    block.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'),
+    'trigger should share the 28px icon column with option rows'
+  );
+  assert.ok(
+    block.includes('padding: 4px 8px;'),
+    'trigger should use the same compact padding as picker rows'
   );
 });

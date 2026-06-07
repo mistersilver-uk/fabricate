@@ -30,12 +30,10 @@ test('manager root defines a scoped responsive app container', () => {
 test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
   const managerFocusBlock = blockFor('.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus');
   const managerFocusVisibleBlock = blockFor('.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible');
-  const adminFocusBlock = blockFor('.fabricate-admin button:focus,\n.fabricate-admin input:focus,\n.fabricate-admin select:focus,\n.fabricate-admin textarea:focus,\n.fabricate-admin [tabindex]:focus');
   const shellFocusBlock = blockFor('.fabricate-app button:focus,\n.fabricate-app input:focus,\n.fabricate-app select:focus,\n.fabricate-app textarea:focus,\n.fabricate-app [tabindex]:focus');
   const shellFocusVisibleBlock = blockFor('.fabricate-app button:focus-visible,\n.fabricate-app input:focus-visible,\n.fabricate-app select:focus-visible,\n.fabricate-app textarea:focus-visible,\n.fabricate-app [tabindex]:focus-visible');
 
   assert.ok(managerFocusBlock.includes('outline: none;') && managerFocusBlock.includes('box-shadow: none;'), 'manager controls should clear host click focus outlines');
-  assert.ok(adminFocusBlock.includes('outline: none;') && adminFocusBlock.includes('box-shadow: none;'), 'legacy admin controls should clear host click focus outlines');
   assert.ok(shellFocusBlock.includes('outline: none;') && shellFocusBlock.includes('box-shadow: none;'), 'unified Fabricate shell controls should clear host click focus outlines');
   assert.ok(managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager keyboard focus should remain visible');
   assert.ok(shellFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'), 'unified shell keyboard focus should remain visible');
