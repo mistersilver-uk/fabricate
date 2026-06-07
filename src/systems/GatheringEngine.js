@@ -31,6 +31,10 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
+// Player-facing hazard visibility tiers. A GM always resolves to 'full'; a
+// non-GM viewer falls back to the more-restrictive 'encounterChance' when the
+// rule is missing, so absent rules never leak the full hazard list.
+const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const FAILURE_KEYWORDS = new Set([
   'f',
   'fail',
@@ -1046,10 +1050,18 @@ export class GatheringEngine {
       ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons })
       : [];
 
+    // The GM-configured hazard visibility tier further restricts what a non-GM
+    // viewer sees, independent of the blind/targeted redaction above: only
+    // 'full' exposes individual hazards, and 'dangerLevelOnly' also hides the
+    // environment encounter-chance bar (signalled by a null hazardChance). A GM
+    // always resolves to 'full'.
+    const hazardVisibility = this._resolveHazardVisibility(environment, viewer);
+
     // Individual hazards are read-only player-facing models. They are redacted
     // for a non-GM viewer of a blind environment (mirroring the collapsed task
-    // list) and surfaced in full for targeted environments and GM viewers.
-    const listedHazards = blindForViewer
+    // list) or whenever the visibility tier is not 'full', and surfaced in full
+    // for targeted environments and GM viewers.
+    const listedHazards = (blindForViewer || hazardVisibility !== 'full')
       ? []
       : normalizeList(environment.hazards)
           .filter(hazard => hazard?.enabled !== false)
@@ -1078,8 +1090,9 @@ export class GatheringEngine {
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
       attemptable,
-      hazardChance: this._environmentHazardChance(environment),
+      hazardChance: hazardVisibility === 'dangerLevelOnly' ? null : this._environmentHazardChance(environment),
       hazards: listedHazards,
+      hazardVisibility,
       blockedReasons,
       tasks: listedTasks,
       discoveredTasks,
@@ -2621,6 +2634,23 @@ export class GatheringEngine {
       policy: rules.revealPolicy ?? 'never',
       scope: rules.revealScope ?? 'actor'
     };
+  }
+
+  /**
+   * Resolve the effective player-facing hazard visibility tier for a viewer.
+   * GMs always see the full hazard information. For a non-GM viewer the tier is
+   * read from the environment's gathering rules, defaulting to the more
+   * restrictive `encounterChance` when absent or invalid so missing rules never
+   * leak the full hazard list.
+   *
+   * @param {object} environment Composed gathering environment (carries `rules`).
+   * @param {object} [viewer] Foundry user requesting the listing.
+   * @returns {'dangerLevelOnly'|'encounterChance'|'full'} The effective tier.
+   */
+  _resolveHazardVisibility(environment, viewer) {
+    if (viewer?.isGM === true) return 'full';
+    const visibility = environment?.rules?.hazardVisibility;
+    return GATHERING_HAZARD_VISIBILITIES.has(visibility) ? visibility : 'encounterChance';
   }
 
   async _clearMisconfiguredWaitingRun({ viewer, actor, run, environment, task, errors = null, outcome = null }) {

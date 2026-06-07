@@ -3079,7 +3079,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 8);
+    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 9);
+    const hazardVisibilitySelect = target.querySelector('#manager-gathering-rule-hazard-visibility');
+    assert.ok(hazardVisibilitySelect, 'hazard visibility select renders in the rules inspector');
+    assert.deepEqual(
+      Array.from(hazardVisibilitySelect.options).map(option => option.textContent.trim()),
+      ['Danger level only', 'Encounter chance', 'Full details']
+    );
     assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),

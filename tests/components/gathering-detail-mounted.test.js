@@ -344,6 +344,55 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
   });
 
+  it('hides the Hazards tab and shows a risk note above the tasks under the dangerLevelOnly tier', async () => {
+    const { services } = makeServices(listing([environment({
+      risk: 'hazardous', hazardVisibility: 'dangerLevelOnly', hazardChance: null, hazards: []
+    })]));
+    await mountView(services);
+
+    // No tab strip at all in the restricted tiers.
+    assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
+    // The environment still carries its danger tag in the header pips.
+    assert.ok(target.querySelector('[data-gathering-pips] .is-danger'), 'danger pip retained in the header');
+    // No chance bar and no hazards summary/list, but a risk note above the tasks.
+    assert.equal(target.querySelector('[data-gathering-hazard-value]'), null, 'no chance bar under dangerLevelOnly');
+    assert.equal(target.querySelector('[data-gathering-hazard-section]'), null, 'no full-tier hazard block');
+    assert.equal(target.querySelector('[data-gathering-hazards-section]'), null, 'no individual hazard list');
+    const note = target.querySelector('[data-gathering-hazard-risk-note]');
+    assert.ok(note, 'a risk note is shown above the tasks');
+    assert.ok(note.textContent.includes('HazardRiskNote'), 'the risk note uses the localized message');
+    assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
+  });
+
+  it('hides the Hazards tab and shows the chance bar above the tasks under the encounterChance tier', async () => {
+    const { services } = makeServices(listing([environment({
+      risk: 'hazardous', hazardVisibility: 'encounterChance', hazardChance: 0.5, hazards: []
+    })]));
+    await mountView(services);
+
+    assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
+    const summary = target.querySelector('[data-gathering-hazard-summary]');
+    assert.ok(summary, 'a hazard summary renders above the tasks');
+    assert.ok(summary.querySelector('[data-gathering-hazard-value]'), 'the encounter-chance bar is shown');
+    assert.equal(target.querySelector('[data-gathering-hazard-risk-note]'), null, 'no risk note in encounterChance (bar only)');
+    assert.equal(target.querySelector('[data-gathering-hazards-section]'), null, 'no individual hazard list under encounterChance');
+    assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
+  });
+
+  it('shows the safe hint (no bar) above the tasks under encounterChance when the chance is zero', async () => {
+    const { services } = makeServices(listing([environment({
+      risk: 'safe', hazardVisibility: 'encounterChance', hazardChance: 0, hazards: []
+    })]));
+    await mountView(services);
+
+    const summary = target.querySelector('[data-gathering-hazard-summary]');
+    assert.ok(summary, 'a hazard summary renders');
+    assert.equal(summary.querySelector('[data-gathering-hazard-value]'), null, 'no bar when chance is zero');
+    const safe = summary.querySelector('[data-gathering-safe-hint]');
+    assert.ok(safe, 'the safe hint is shown instead');
+    assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
+  });
+
   it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
     const blockedTask = taskModel({
       id: 'task-blocked',

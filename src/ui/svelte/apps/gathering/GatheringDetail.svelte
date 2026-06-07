@@ -90,6 +90,17 @@
   // base danger colour.
   const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
 
+  // The GM-configured hazard visibility tier the engine resolved for this viewer:
+  // 'dangerLevelOnly' shows only the danger pip + a risk note above the tasks,
+  // 'encounterChance' adds the encounter-chance bar above the tasks, 'full' shows the
+  // dedicated Hazards tab with the searchable hazard list. GMs always resolve to 'full'.
+  const hazardVisibility = $derived(String(env?.hazardVisibility ?? 'full'));
+  // The Hazards tab (and its tab strip) only exists in the 'full' tier; the restricted
+  // tiers surface their summary above the tasks instead. effectiveTab guards against a
+  // stale 'hazards' selection when the strip is hidden.
+  const showHazardsTab = $derived(hazardVisibility === 'full');
+  const effectiveTab = $derived(showHazardsTab ? activeTab : 'tasks');
+
   // Environment-level "chance of encountering a hazard" (0..1) the engine carries
   // on the listing. > 0 shows the hazard bar; 0 shows the "safe" hint instead.
   const hazardChance = $derived(Math.max(0, Math.min(1, Number(env?.hazardChance ?? 0))));
@@ -251,15 +262,17 @@
       </section>
     {/if}
 
-    <GatheringDetailTabs {activeTab} onSelect={onTabChange} />
+    {#if showHazardsTab}
+      <GatheringDetailTabs {activeTab} onSelect={onTabChange} />
+    {/if}
 
     <div
       class="gathering-detail-panel"
-      role="tabpanel"
-      id={`gathering-detail-panel-${activeTab}`}
-      aria-labelledby={`gathering-detail-tab-${activeTab}`}
+      role={showHazardsTab ? 'tabpanel' : undefined}
+      id={showHazardsTab ? `gathering-detail-panel-${effectiveTab}` : undefined}
+      aria-labelledby={showHazardsTab ? `gathering-detail-tab-${effectiveTab}` : undefined}
     >
-      {#if activeTab === 'hazards'}
+      {#if effectiveTab === 'hazards'}
         <div class="gathering-detail-hazard" data-gathering-hazard-section>
           <div class="gathering-detail-hazard-danger">
             <span class="gathering-detail-hazard-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
@@ -332,6 +345,22 @@
           </p>
         {/if}
       {:else}
+        {#if hazardVisibility === 'dangerLevelOnly'}
+          <p class="gathering-detail-hazard-hint" data-gathering-hazard-risk-note>
+            {localize('FABRICATE.App.Gathering.Detail.HazardRiskNote')}
+          </p>
+        {:else if hazardVisibility === 'encounterChance'}
+          <div class="gathering-detail-hazard" data-gathering-hazard-summary>
+            {#if hasHazard}
+              <HazardChanceBar value={hazardChance} />
+            {:else}
+              <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
+                {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+              </p>
+            {/if}
+          </div>
+        {/if}
+
         {#if isBlind}
           <div class="gathering-detail-blind-card" data-gathering-blind-card>
             <div class="gathering-detail-blind-card-lead">

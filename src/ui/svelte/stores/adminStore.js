@@ -121,6 +121,7 @@ const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestO
 const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
+const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
   'includedByMatch',
   'explicitlyIncluded',
@@ -137,7 +138,8 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   biomeModifierAggregation: 'strongestOfEach',
   blindCandidateGate: 'attemptableOnly',
   revealPolicy: 'never',
-  revealScope: 'actor'
+  revealScope: 'actor',
+  hazardVisibility: 'encounterChance'
 });
 
 // ---------------------------------------------------------------------------
@@ -687,6 +689,9 @@ function _normalizeGatheringRules(rules = {}) {
   const revealScope = GATHERING_REVEAL_SCOPES.has(rules?.revealScope)
     ? rules.revealScope
     : DEFAULT_GATHERING_RULES.revealScope;
+  const hazardVisibility = GATHERING_HAZARD_VISIBILITIES.has(rules?.hazardVisibility)
+    ? rules.hazardVisibility
+    : DEFAULT_GATHERING_RULES.hazardVisibility;
   return {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
@@ -697,7 +702,8 @@ function _normalizeGatheringRules(rules = {}) {
     biomeModifierAggregation,
     blindCandidateGate,
     revealPolicy,
-    revealScope
+    revealScope,
+    hazardVisibility
   };
 }
 

@@ -1520,6 +1520,27 @@ async function main() {
         const csm = game.fabricate.getCraftingSystemManager();
         const rm = game.fabricate.getRecipeManager();
         const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
+
+        // Defensively clear all gathering environments before recreating fixtures.
+        // The CI world is meant to be wiped each run, but a reused (cached) Foundry
+        // container can resurrect a world's LevelDB state that the host-side wipe in
+        // foundry-setup-data.mjs misses. Stale environments authored by an older data
+        // model can lack a task source (e.g. compositionMode 'automatic' with no
+        // enabledTaskIds and no forcedTaskIds) and then fail validation on the FIRST
+        // create() in Phase C — its persist re-validates the whole list, including the
+        // stale invalid entries. We reset the raw setting directly (bypassing the
+        // store's list-validation, which would itself throw on those stale entries)
+        // and reload so the in-memory list matches. The CI world is smoke-owned and
+        // ephemeral, so clearing every environment here is safe.
+        if (environmentStore) {
+          try {
+            await game.settings.set('fabricate', 'gatheringEnvironments', []);
+            environmentStore.load?.();
+          } catch (err) {
+            console.warn(`Failed to reset gathering environments: ${err?.message}`);
+          }
+        }
+
         const allSystems = csm.getSystems();
         const staleSystems = allSystems.filter(s => s.name === 'Arcane Forge');
         for (const sys of staleSystems) {
