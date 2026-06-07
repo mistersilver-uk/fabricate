@@ -63,7 +63,7 @@
 
   function getPopoverHost() {
     if (!selectorRoot || typeof document === 'undefined') return null;
-    return selectorRoot.closest('.fabricate-admin, .fabricate-manager');
+    return selectorRoot.closest('.fabricate-manager');
   }
 
   function getPopoverHorizontalBounds(hostRect) {
