@@ -60,7 +60,8 @@ const FEATURE_MAP = {
   craftingChecks: 'craftingChecks',
   outcomeRouting: 'outcomeRouting',
   effectTransfer: 'effectTransfer',
-  gathering: 'gathering'
+  gathering: 'gathering',
+  chatOutput: 'chatOutput'
 };
 
 const RESOLUTION_MODE_LABEL_KEYS = {

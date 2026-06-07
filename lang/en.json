@@ -206,7 +206,16 @@
       "Results": "Created",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
-      "RollTableResult": "Roll Table Result"
+      "RollTableResult": "Roll Table Result",
+      "GatherSuccess": "Gathering Successful",
+      "GatherFailure": "Gathering Failed",
+      "GatherActor": "Gatherer",
+      "GatherTask": "Task",
+      "GatherComponents": "Gathered",
+      "GatherHazards": "Hazards Encountered",
+      "GatherToolsBroken": "Tools Broken",
+      "GatherStamina": "Stamina Spent",
+      "GatherNodes": "Nodes Remaining"
     },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
@@ -454,7 +463,8 @@
             "PropertyMacros": "Allows macro-backed component property behavior.",
             "CraftingChecks": "Enables system-level crafting check configuration in the current admin.",
             "OutcomeRouting": "Enables routed outcome configuration where supported.",
-            "EffectTransfer": "Allows crafted results to inherit effects from source components."
+            "EffectTransfer": "Allows crafted results to inherit effects from source components.",
+            "ChatOutput": "Posts a summary chat card after crafting and gathering attempts."
           }
         },
         "Nav": {
@@ -1712,7 +1722,8 @@
           "CraftingChecks": "Crafting checks",
           "OutcomeRouting": "Outcome routing",
           "EffectTransfer": "Effect transfer",
-          "PropertyMacros": "Property macros"
+          "PropertyMacros": "Property macros",
+          "ChatOutput": "Chat output"
         },
         "Tools": {
           "Title": "Tools",

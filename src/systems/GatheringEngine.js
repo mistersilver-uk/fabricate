@@ -1,5 +1,6 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { classifyGatheringToolStates } from '../gatheringToolRuntime.js';
+import { buildGatheringChatContent } from './GatheringChatCard.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -2599,9 +2600,102 @@ export class GatheringEngine {
       response.usedCatalysts = usedCatalysts;
       response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
+
+      // Blind tasks are redacted; only post the rich summary for transparent runs.
+      await this._postGatheringChatMessage({
+        actor,
+        system,
+        task,
+        status,
+        createdResults,
+        usedTools,
+        checkResult,
+        run
+      });
     }
 
     return response;
+  }
+
+  /**
+   * Post an automatic gathering result chat card summarizing the attempt:
+   * gathered components, hazards encountered, broken tools, stamina spent, and
+   * remaining nodes — each with its component/hazard image.
+   *
+   * Gated by the crafting system's `features.chatOutput` toggle (default true);
+   * returns silently when off or when the system cannot be resolved. Never
+   * throws into the attempt flow — `ChatMessage.create` errors are caught.
+   * Posted publicly, mirroring the crafting summary.
+   *
+   * @param {object} params
+   * @param {object}  params.actor          - The gathering actor (speaker).
+   * @param {object}  params.system         - The crafting system (carries features).
+   * @param {object}  params.task           - The resolved task.
+   * @param {string}  params.status         - 'succeeded' | 'failed'.
+   * @param {Array}   params.createdResults - Gathered item refs `{actorUuid,itemUuid,quantity}`.
+   * @param {Array}   params.usedTools      - Tool breakage plan entries.
+   * @param {object}  [params.checkResult]  - Outcome detail (hazards, items).
+   * @param {object}  params.run            - Terminal run (carries economyEvidence).
+   * @private
+   */
+  async _postGatheringChatMessage({ actor, system, task, status, createdResults, usedTools, checkResult, run }) {
+    if (!system || system.features?.chatOutput !== true) return;
+
+    try {
+      const componentsById = this._componentsById(system);
+      const itemsByUuid = new Map();
+      for (const item of normalizeList(checkResult?.items)) {
+        const uuid = stringOrNull(item?.itemUuid);
+        if (uuid) itemsByUuid.set(uuid, item);
+      }
+
+      const components = normalizeList(createdResults).map(entry => {
+        const itemUuid = stringOrNull(entry?.itemUuid);
+        const componentId = stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
+        const component = componentId ? componentsById.get(componentId) : null;
+        const resolvedDoc = component ? null : resolveItemDoc(itemUuid);
+        return {
+          name: stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || itemUuid || '',
+          img: stringOrNull(component?.img) || stringOrNull(resolvedDoc?.img) || 'icons/svg/item-bag.svg',
+          quantity: Number(entry?.quantity) || 1
+        };
+      });
+
+      const hazards = normalizeList(checkResult?.hazards).map(hazard => ({
+        name: stringOrEmpty(hazard?.name),
+        img: stringOrNull(hazard?.img) || 'icons/svg/hazard.svg'
+      }));
+
+      const brokenTools = normalizeList(usedTools)
+        .filter(entry => entry?.broken === true)
+        .map(entry => {
+          const component = componentsById.get(stringOrNull(entry?.componentId));
+          const resolvedDoc = component ? null : resolveItemDoc(stringOrNull(entry?.itemRef?.itemUuid));
+          return {
+            name: stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || this.localize(UNKNOWN_TOOL_LABEL_KEY),
+            img: stringOrNull(component?.img) || stringOrNull(resolvedDoc?.img) || DEFAULT_TOOL_IMG
+          };
+        });
+
+      const content = buildGatheringChatContent({
+        status,
+        actorName: stringOrEmpty(actor?.name),
+        taskName: stringOrEmpty(task?.name),
+        components,
+        hazards,
+        brokenTools,
+        staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
+        nodesRemaining: run?.economyEvidence?.node?.remaining ?? null
+      }, this.localize);
+
+      await ChatMessage.create({
+        user: game.user?.id,
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content
+      });
+    } catch (err) {
+      console.error('Fabricate | Failed to post gathering chat message:', err);
+    }
   }
 
   /**
@@ -3524,4 +3618,18 @@ function stringOrEmpty(value) {
 
 function defaultLocalize(key) {
   return key;
+}
+
+/**
+ * Best-effort synchronous resolution of an item document by UUID, used only to
+ * recover a display name/image when a gathered result or broken tool cannot be
+ * matched to a system component. Returns null outside Foundry or on any error.
+ */
+function resolveItemDoc(uuid) {
+  if (!uuid || typeof globalThis.fromUuidSync !== 'function') return null;
+  try {
+    return globalThis.fromUuidSync(uuid) ?? null;
+  } catch (_err) {
+    return null;
+  }
 }
