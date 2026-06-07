@@ -92,8 +92,7 @@
           "NoHazardMatches": "No hazards match your search.",
           "NoHazardDescription": "No description provided.",
           "HazardsHiddenHint": "The hazards here are hidden until you gather.",
-          "HazardDetailsHiddenHint": "Individual hazard details are hidden by the GM.",
-          "HazardAllHiddenHint": "Encounter chance and hazard details are hidden by the GM.",
+          "HazardRiskNote": "This area carries a risk of hazards.",
           "Tabs": {
             "Label": "Gathering details sections",
             "Tasks": "Tasks",
