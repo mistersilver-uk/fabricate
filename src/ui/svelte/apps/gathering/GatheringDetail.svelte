@@ -90,6 +90,12 @@
   // base danger colour.
   const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
 
+  // The GM-configured hazard visibility tier the engine resolved for this viewer:
+  // 'dangerLevelOnly' hides the encounter-chance bar and hazard list, 'encounterChance'
+  // shows the bar but no individual hazards, 'full' shows everything. GMs always 'full'.
+  const hazardVisibility = $derived(String(env?.hazardVisibility ?? 'full'));
+  const showHazardChance = $derived(hazardVisibility !== 'dangerLevelOnly');
+
   // Environment-level "chance of encountering a hazard" (0..1) the engine carries
   // on the listing. > 0 shows the hazard bar; 0 shows the "safe" hint instead.
   const hazardChance = $derived(Math.max(0, Math.min(1, Number(env?.hazardChance ?? 0))));
@@ -269,13 +275,24 @@
             </span>
           </div>
 
-          {#if hasHazard}
-            <HazardChanceBar value={hazardChance} />
-            <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
-          {:else}
-            <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
-              {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+          {#if !showHazardChance}
+            <p class="gathering-detail-hazard-hint" data-gathering-hazards-restricted="dangerLevelOnly">
+              {localize('FABRICATE.App.Gathering.Detail.HazardAllHiddenHint')}
             </p>
+          {:else}
+            {#if hasHazard}
+              <HazardChanceBar value={hazardChance} />
+              <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
+            {:else}
+              <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
+                {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+              </p>
+            {/if}
+            {#if hazardVisibility === 'encounterChance'}
+              <p class="gathering-detail-hazard-hint" data-gathering-hazards-restricted="encounterChance">
+                {localize('FABRICATE.App.Gathering.Detail.HazardDetailsHiddenHint')}
+              </p>
+            {/if}
           {/if}
         </div>
 

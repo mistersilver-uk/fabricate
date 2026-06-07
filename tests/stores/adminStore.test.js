@@ -2791,7 +2791,8 @@ describe('createAdminStore', () => {
               hazardPolicy: 'bad-policy',
               blindCandidateGate: 'not-a-gate',
               revealPolicy: 'not-a-policy',
-              revealScope: 'not-a-scope'
+              revealScope: 'not-a-scope',
+              hazardVisibility: 'not-a-visibility'
             },
             tasks: [],
             hazards: []
@@ -2812,7 +2813,8 @@ describe('createAdminStore', () => {
         biomeModifierAggregation: 'strongestOfEach',
         blindCandidateGate: 'attemptableOnly',
         revealPolicy: 'never',
-        revealScope: 'actor'
+        revealScope: 'actor',
+        hazardVisibility: 'encounterChance'
       });
 
       await store.updateGatheringRules('sys1', {
@@ -2823,7 +2825,8 @@ describe('createAdminStore', () => {
         hazardPolicy: 'failureWithHazard',
         blindCandidateGate: 'allMatching',
         revealPolicy: 'onAttempt',
-        revealScope: 'global'
+        revealScope: 'global',
+        hazardVisibility: 'full'
       });
 
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.rules, {
@@ -2836,7 +2839,8 @@ describe('createAdminStore', () => {
         biomeModifierAggregation: 'strongestOfEach',
         blindCandidateGate: 'allMatching',
         revealPolicy: 'onAttempt',
-        revealScope: 'global'
+        revealScope: 'global',
+        hazardVisibility: 'full'
       });
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });

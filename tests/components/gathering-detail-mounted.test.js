@@ -344,6 +344,39 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
   });
 
+  it('hides the chance bar and shows an all-hidden hint under the dangerLevelOnly visibility tier', async () => {
+    const { services } = makeServices(listing([environment({
+      risk: 'hazardous', hazardVisibility: 'dangerLevelOnly', hazardChance: null, hazards: []
+    })]));
+    await mountView(services);
+    clickTab('hazards');
+
+    const section = target.querySelector('[data-gathering-hazard-section]');
+    assert.ok(section, 'hazard summary still renders');
+    assert.ok(section.textContent.includes('Risk.hazardous'), 'the danger level is still shown');
+    assert.equal(section.querySelector('[data-gathering-hazard-value]'), null, 'no chance bar under dangerLevelOnly');
+    assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'hidden is not mistaken for safe');
+    const restricted = section.querySelector('[data-gathering-hazards-restricted="dangerLevelOnly"]');
+    assert.ok(restricted, 'an all-hidden hint is shown');
+    assert.ok(restricted.textContent.includes('HazardAllHiddenHint'), 'the all-hidden hint uses the localized message');
+    assert.equal(target.querySelector('[data-gathering-hazards-section]'), null, 'no individual hazard list');
+  });
+
+  it('shows the chance bar and a details-hidden hint (no hazard list) under the encounterChance tier', async () => {
+    const { services } = makeServices(listing([environment({
+      risk: 'hazardous', hazardVisibility: 'encounterChance', hazardChance: 0.5, hazards: []
+    })]));
+    await mountView(services);
+    clickTab('hazards');
+
+    const section = target.querySelector('[data-gathering-hazard-section]');
+    assert.ok(section.querySelector('[data-gathering-hazard-value]'), 'the encounter-chance bar is shown');
+    const restricted = section.querySelector('[data-gathering-hazards-restricted="encounterChance"]');
+    assert.ok(restricted, 'a details-hidden hint is shown alongside the bar');
+    assert.ok(restricted.textContent.includes('HazardDetailsHiddenHint'), 'the details-hidden hint uses the localized message');
+    assert.equal(target.querySelector('[data-gathering-hazards-section]'), null, 'no individual hazard list under encounterChance');
+  });
+
   it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
     const blockedTask = taskModel({
       id: 'task-blocked',

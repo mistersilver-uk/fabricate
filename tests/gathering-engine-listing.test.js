@@ -1215,6 +1215,7 @@ test('listForActor ignores disabled hazards and clamps out-of-range dropRates fo
 test('listForActor exposes per-hazard models (identity, danger, chance, matching) for a targeted environment', async () => {
   const engine = makeEngine({
     environments: [environment({
+      rules: { hazardVisibility: 'full' },
       hazards: [
         {
           id: 'h1', name: 'Rockslide', description: 'Falling rocks.', img: 'icons/svg/hazard.svg',
@@ -1251,7 +1252,7 @@ test('listForActor exposes per-hazard models (identity, danger, chance, matching
 
 test('listForActor defaults hazard matching criteria to empty arrays', async () => {
   const engine = makeEngine({
-    environments: [environment({ hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 20 }] })]
+    environments: [environment({ rules: { hazardVisibility: 'full' }, hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 20 }] })]
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -1274,7 +1275,7 @@ test('listForActor resolves hazard biomeTags via richState, scoped to the crafti
   };
   const engine = makeEngine({
     richState,
-    environments: [environment({ hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 20, biomes: ['forest'] }] })]
+    environments: [environment({ rules: { hazardVisibility: 'full' }, hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 20, biomes: ['forest'] }] })]
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -1306,6 +1307,61 @@ test('listForActor exposes the full hazard list to a GM viewer of a blind enviro
   const env = listing.environments.find(entry => entry.id === 'env-a');
   assert.equal(env.hazards.length, 1, 'a GM sees the full hazard list even for a blind environment');
   assert.equal(env.hazards[0].name, 'Rockslide');
+});
+
+test('listForActor defaults a non-GM viewer to the encounterChance visibility tier', async () => {
+  const engine = makeEngine({
+    environments: [environment({ hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+  });
+
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  assert.equal(env.hazardVisibility, 'encounterChance', 'absent rules fall back to the restrictive tier');
+  assert.deepEqual(env.hazards, [], 'individual hazards are withheld below the full tier');
+  assert.ok(env.hazardChance > 0, 'the aggregate encounter chance is still exposed');
+});
+
+test('listForActor with hazardVisibility "encounterChance" exposes the chance but no hazards', async () => {
+  const engine = makeEngine({
+    environments: [environment({ rules: { hazardVisibility: 'encounterChance' }, hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+  });
+
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  assert.equal(env.hazardVisibility, 'encounterChance');
+  assert.deepEqual(env.hazards, []);
+  assert.ok(env.hazardChance > 0, 'the encounter-chance bar value is exposed');
+});
+
+test('listForActor with hazardVisibility "dangerLevelOnly" hides hazards and the encounter chance', async () => {
+  const engine = makeEngine({
+    environments: [environment({ rules: { hazardVisibility: 'dangerLevelOnly' }, hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+  });
+
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  assert.equal(env.hazardVisibility, 'dangerLevelOnly');
+  assert.deepEqual(env.hazards, [], 'no individual hazards');
+  assert.equal(env.hazardChance, null, 'the encounter chance is withheld (null, not 0)');
+});
+
+test('listForActor with hazardVisibility "full" exposes hazards to a non-GM viewer', async () => {
+  const engine = makeEngine({
+    environments: [environment({ rules: { hazardVisibility: 'full' }, hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+  });
+
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  assert.equal(env.hazardVisibility, 'full');
+  assert.equal(env.hazards.length, 1, 'individual hazards are surfaced at the full tier');
+  assert.ok(env.hazardChance > 0);
+});
+
+test('listForActor always resolves hazardVisibility to full for a GM regardless of the rule', async () => {
+  const engine = makeEngine({
+    environments: [environment({ rules: { hazardVisibility: 'dangerLevelOnly' }, hazards: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+  });
+
+  const env = (await engine.listForActor({ viewer: { id: 'gm', isGM: true }, actor })).environments.find(entry => entry.id === 'env-a');
+  assert.equal(env.hazardVisibility, 'full', 'a GM is never restricted by the visibility rule');
+  assert.equal(env.hazards.length, 1, 'a GM sees the full hazard list');
+  assert.ok(env.hazardChance > 0, 'a GM sees the encounter chance');
 });
 
 test('getTaskDropBreakdown returns award/hazard info + per-drop chances with component images', async () => {

@@ -509,7 +509,8 @@
     hazardLimit: 1,
     hazardPolicy: 'successWithHazard',
     toolBreakagePolicy: 'failureOnBreak',
-    biomeModifierAggregation: 'strongestOfEach'
+    biomeModifierAggregation: 'strongestOfEach',
+    hazardVisibility: 'encounterChance'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const selectedGatheringTaskEconomyMode = $derived(selectedGatheringSystemConfig.economy?.mode || 'none');
@@ -4038,6 +4039,21 @@
                   <select id="manager-gathering-rule-outcome" value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
                     <option value="successWithHazard">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds')}</option>
                     <option value="failureWithHazard">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-eye"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-hazard-visibility">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibility', 'Hazard visibility')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityDescription', 'Control how much hazard information players see.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-hazard-visibility" value={selectedGatheringRules.hazardVisibility ?? 'encounterChance'} onchange={(event) => updateSelectedGatheringRules({ hazardVisibility: event.target.value })}>
+                    <option value="dangerLevelOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityDangerOnly', 'Danger level only')}</option>
+                    <option value="encounterChance">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityEncounter', 'Encounter chance')}</option>
+                    <option value="full">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityFull', 'Full details')}</option>
                   </select>
                 </span>
               </div>
