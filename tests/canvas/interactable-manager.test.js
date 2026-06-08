@@ -307,3 +307,70 @@ test('_attachDoubleClick is a no-op for a non-interactable placeable', () => {
     restoreGlobals(saved);
   }
 });
+
+// --- Phase 4: tool double-click → show('gathering', { activeCanvasTool }) ----
+// Interim routing: the crafting tab is still a "Coming Soon" placeholder, so a
+// Tool token routes to the gathering tab (the only live surface where the
+// virtual-present tool has a visible effect). Revisit when crafting ships.
+
+function toolToken(sourceUuid = 'Fabricate.sysA.tool.tool-1') {
+  return { flags: { fabricate: { isInteractable: true, interactableType: 'tool', sourceUuid } } };
+}
+
+test('tool double-click resolves the Tool and opens the gathering tab with the activeCanvasTool payload', () => {
+  const saved = snapshotGlobals();
+  try {
+    // Library Tool carries the componentId + label the activeCanvasTool needs.
+    installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }] });
+    const shows = [];
+    const fakeApp = { show: (tab, options) => { shows.push({ tab, options }); } };
+    const manager = new InteractableManager({ getAppClass: () => fakeApp });
+
+    manager._onDoubleClick(toolToken());
+
+    assert.equal(shows.length, 1, 'the app was opened exactly once');
+    assert.equal(shows[0].tab, 'gathering', 'tool stations open the gathering tab (crafting tab is still a placeholder)');
+    assert.deepEqual(shows[0].options.activeCanvasTool, {
+      componentId: 'comp-axe',
+      systemId: 'sysA',
+      toolId: 'tool-1',
+      label: 'Forge Anvil'
+    });
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('tool double-click is a no-op when the Tool cannot be resolved (no componentId)', () => {
+  const saved = snapshotGlobals();
+  try {
+    // The library has no matching tool id, so getTool returns null.
+    installFakeFoundry({ isGM: true, tools: [] });
+    const shows = [];
+    const fakeApp = { show: (tab, options) => { shows.push({ tab, options }); } };
+    const manager = new InteractableManager({ getAppClass: () => fakeApp });
+
+    manager._onDoubleClick(toolToken());
+
+    assert.equal(shows.length, 0, 'no app opens without a resolvable Tool');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('gathering-task double-click does NOT open the crafting tool session (Phase 5 stub)', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: true });
+    const shows = [];
+    const manager = new InteractableManager({ getAppClass: () => ({ show: (tab, options) => shows.push({ tab, options }) }) });
+
+    manager._onDoubleClick({
+      flags: { fabricate: { isInteractable: true, interactableType: 'gatheringTask', sourceUuid: 'Fabricate.sysA.gatheringTask.task-9' } }
+    });
+
+    assert.equal(shows.length, 0, 'the gathering-task branch is still the Phase-3/5 stub');
+  } finally {
+    restoreGlobals(saved);
+  }
+});

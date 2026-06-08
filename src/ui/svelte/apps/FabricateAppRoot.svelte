@@ -14,7 +14,24 @@
   import GatheringView from './gathering/GatheringView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
-  let { activeTab = 'crafting', showAlchemy = false, onSelectTab = null, services = null } = $props();
+  let {
+    activeTab = 'crafting',
+    showAlchemy = false,
+    onSelectTab = null,
+    services = null,
+    activeCanvasTool = null
+  } = $props();
+
+  // The active station tool's display name, shown in a status chip when a Tool
+  // station was double-clicked on the canvas. Falls back to the localized label
+  // when the tool carries no name. Empty when no station tool is active.
+  const activeToolName = $derived(
+    activeCanvasTool
+      ? (typeof activeCanvasTool.label === 'string' && activeCanvasTool.label.trim()
+        ? activeCanvasTool.label.trim()
+        : localize('FABRICATE.App.ActiveTool.Label'))
+      : ''
+  );
 
   // Load the shared actor-selection state and current gathering conditions once
   // the shell mounts. The store guards its own one-time load (re-entry guard).
@@ -53,6 +70,20 @@
   </div>
 
   <div class="fabricate-app-main">
+    <!-- Session-scoped status chip: announces the active canvas station tool
+         (set by a Tool-token double-click). Hidden when no tool is active.
+         aria-live so screen readers announce it appearing/changing. -->
+    <div class="fabricate-app-tool-chip-bar" aria-live="polite">
+      {#if activeCanvasTool}
+        <span class="fabricate-app-tool-chip" title={activeToolName}>
+          <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+          <span class="fabricate-app-tool-chip-label"
+            >{localize('FABRICATE.App.ActiveTool.Named', { label: activeToolName })}</span
+          >
+        </span>
+      {/if}
+    </div>
+
     <ActorSelectTopBar store={services?.actorBar} {activeTab} />
 
     <section class="fabricate-app-content" role="tabpanel">
@@ -150,6 +181,44 @@
 
   .fabricate-app-main :global(.fabricate-app-actor-bar) {
     flex: 0 0 auto;
+  }
+
+  .fabricate-app-tool-chip-bar {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    /* Empty when no tool is active; collapse to nothing so the bar adds no
+       vertical space until a station tool appears. */
+    min-height: 0;
+    padding: 0 8px;
+  }
+
+  .fabricate-app-tool-chip-bar:has(.fabricate-app-tool-chip) {
+    padding: 6px 8px 0;
+  }
+
+  .fabricate-app-tool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 3px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--fab-accent);
+    background: var(--fab-accent-soft);
+    border: 1px solid var(--fab-accent);
+    border-radius: 999px;
+  }
+
+  .fabricate-app-tool-chip i {
+    font-size: 11px;
+  }
+
+  .fabricate-app-tool-chip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .fabricate-app-content {

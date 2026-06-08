@@ -1,7 +1,46 @@
+/**
+ * Resolve the set of virtually-present componentIds that apply to a given
+ * crafting-system scope.
+ *
+ * A virtual-present tool (injected by an active canvas Tool station) is keyed by
+ * BOTH `componentId` and the active tool's `systemId`. Because `componentId` is a
+ * PER-SYSTEM id, a present tool from system A must NOT satisfy a system-B task or
+ * recipe whose required tool shares the same componentId string. This resolver
+ * enforces that scope: it returns the present componentIds ONLY when the active
+ * tool's `systemId` matches the scope `systemId`; otherwise it returns an empty
+ * set, so the present tool is inert against out-of-scope tasks/recipes.
+ *
+ * Tolerant of legacy/empty input: a bare `string[]` (no system scope) is treated
+ * as unscoped and ignored under system-scoped matching; with no active tool the
+ * set is empty (inert).
+ *
+ * @param {object} params
+ * @param {{ systemId?: string|null, componentIds?: string[] }|string[]|null} [params.presentTools]
+ *   The active canvas Tool's virtual-present payload.
+ * @param {string|null} [params.systemId] The crafting-system id of the task/recipe
+ *   being evaluated.
+ * @returns {Set<string>} componentIds present for this system scope.
+ */
+export function resolvePresentComponentIds({ presentTools, systemId } = {}) {
+  if (!presentTools || Array.isArray(presentTools)) {
+    // No scoped payload (or a legacy bare array with no system scope): under
+    // system-scoped matching there is no resolvable scope, so treat as inert.
+    return new Set();
+  }
+  const toolSystemId = presentTools.systemId ?? null;
+  const scopeSystemId = systemId ?? null;
+  // Scope guard: the active tool only counts for its own crafting system.
+  if (!toolSystemId || !scopeSystemId || toolSystemId !== scopeSystemId) {
+    return new Set();
+  }
+  const componentIds = Array.isArray(presentTools.componentIds) ? presentTools.componentIds : [];
+  return new Set(componentIds.filter(id => typeof id === 'string' && id));
+}
+
 export function createGatheringToolAvailability({ craftingSystemManager, evaluator }) {
   return {
-    async check({ actor, viewer, system, environment, task, tools = [] } = {}) {
-      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
+    async check({ actor, viewer, system, environment, task, tools = [], presentTools = null } = {}) {
+      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager, presentTools });
       const failedRequirements = [];
       for (const { tool } of matched.items) {
         if (!tool?.requirement) continue;
@@ -19,24 +58,50 @@ export function createGatheringToolAvailability({ craftingSystemManager, evaluat
         available: matched.missing.length === 0 && failedRequirements.length === 0,
         missing: matched.missing,
         failedRequirements,
-        items: matched.items.map(({ item }) => item)
+        // A virtual-present (canvas-tool) match has no owned item; drop the null
+        // so consumers only see real owned items.
+        items: matched.items.map(({ item }) => item).filter(Boolean)
       };
     }
   };
 }
 
-export function matchGatheringTools({ actor, system, task, tools = [], craftingSystemManager } = {}) {
+/**
+ * Resolve required tools to owned `{ tool, item }` pairs against an actor.
+ *
+ * Virtual-present injection (Phase 4): a required tool whose `componentId` is in
+ * the active canvas Tool's `presentTools` payload AND whose owning crafting
+ * system matches the active tool's `systemId` matches as VIRTUALLY present even
+ * when the actor owns no matching item. A virtual match is
+ * `{ tool, item: null, virtual: true }` so it satisfies availability but is
+ * excluded from breakage/usage (there is no owned item to mutate). An owned,
+ * non-broken item still takes precedence over a virtual match. The system scope
+ * is enforced by {@link resolvePresentComponentIds}: a present tool from system A
+ * never satisfies a system-B task.
+ *
+ * @param {object} params
+ * @param {{ systemId?: string|null, componentIds?: string[] }|null} [params.presentTools]
+ *   virtual-present payload supplied by an active canvas Tool station.
+ */
+export function matchGatheringTools({ actor, system, task, tools = [], craftingSystemManager, presentTools = null } = {}) {
   const matchedItems = [];
   const missing = [];
   const syntheticRecipe = syntheticToolRecipe({ system, task });
   const matcher = resolveToolMatcher(craftingSystemManager);
   const items = normalizeFoundryCollection(actor?.items);
+  const presentSet = resolvePresentComponentIds({
+    presentTools,
+    systemId: system?.id ?? task?.craftingSystemId ?? null
+  });
 
   for (const tool of tools) {
     // Attempt validation: a broken tool counts as unavailable (missing).
     const item = items.find(candidate => !isToolBroken(candidate) && matcher(syntheticRecipe, tool, candidate));
     if (item) {
       matchedItems.push({ tool, item });
+    } else if (presentSet.has(tool?.componentId)) {
+      // Virtual-present: satisfied by the active canvas Tool, no owned item.
+      matchedItems.push({ tool, item: null, virtual: true });
     } else {
       missing.push(tool);
     }
@@ -69,16 +134,23 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
  *
  * @returns {Array<{ tool: object, state: 'present'|'damaged'|'missing' }>}
  */
-export function classifyGatheringToolStates({ actor, system, task, tools = [], craftingSystemManager } = {}) {
+export function classifyGatheringToolStates({ actor, system, task, tools = [], craftingSystemManager, presentTools = null } = {}) {
   const syntheticRecipe = syntheticToolRecipe({ system, task });
   const matcher = resolveToolMatcher(craftingSystemManager);
   const items = normalizeFoundryCollection(actor?.items);
+  const presentSet = resolvePresentComponentIds({
+    presentTools,
+    systemId: system?.id ?? task?.craftingSystemId ?? null
+  });
 
   return tools.map(tool => {
     const matches = items.filter(candidate => matcher(syntheticRecipe, tool, candidate));
     let state = 'missing';
     if (matches.length > 0) {
       state = matches.some(candidate => !isToolBroken(candidate)) ? 'present' : 'damaged';
+    } else if (presentSet.has(tool?.componentId)) {
+      // Virtual-present: an active canvas Tool station satisfies this tool.
+      state = 'present';
     }
 
     // Fallback: a held `replaceWith` broken-variant component is a separate

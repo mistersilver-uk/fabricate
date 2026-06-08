@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import {
   classifyInteractableDrop,
   buildSpawnRequest,
+  buildActiveCanvasTool,
   buildInteractableSourceUuid,
   parseInteractableSourceUuid
 } from '../../src/canvas/interactableResolution.js';
@@ -40,6 +41,27 @@ test('parse rejects malformed identities', () => {
   assert.equal(parseInteractableSourceUuid('Fabricate.sys.widget.x'), null);
   assert.equal(parseInteractableSourceUuid('Fabricate.sys.tool'), null);
   assert.equal(parseInteractableSourceUuid(42), null);
+});
+
+// --- activeCanvasTool payload (Phase 4) ---
+
+test('buildActiveCanvasTool produces the normalized { componentId, systemId, toolId, label } shape', () => {
+  assert.deepEqual(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: 'comp-axe', label: ' Forge ' } }),
+    { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge' }
+  );
+});
+
+test('buildActiveCanvasTool returns null when the tool has no componentId', () => {
+  assert.equal(buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: '  ' } }), null);
+  assert.equal(buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: null }), null);
+});
+
+test('buildActiveCanvasTool defaults a missing label to an empty string', () => {
+  assert.deepEqual(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: 'comp-axe' } }),
+    { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: '' }
+  );
 });
 
 // --- drop classification ---

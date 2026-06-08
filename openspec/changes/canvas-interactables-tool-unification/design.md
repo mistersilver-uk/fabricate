@@ -65,6 +65,22 @@ satisfied without the actor owning the item, and is **excluded from breakage and
 `options.activeCanvasTool`, exposes it via `_buildServices` `getActiveCanvasTool`, sets it
 in `show(tab, { activeCanvasTool })`, and clears it on close.
 
+**Interim Tool-token routing.** Double-clicking a Tool token routes to `show('gathering', …)`,
+not `crafting`: the Svelte crafting tab is still a "Coming Soon" placeholder, so routing a Tool
+token there would dead-end with no visible effect, and gathering is the only live surface where
+the virtual-present tool has a visible effect. The injected `activeCanvasTool` context is
+tab-agnostic on the app instance, so revisit this to route to (or offer a choice of) crafting once
+that tab ships.
+
+**System-scoped virtual-present matching.** `componentId` is a PER-SYSTEM id, so the
+virtual-present payload carries BOTH the active tool's `componentId` and its `systemId`:
+`presentTools = { systemId, componentIds }`. A virtual-present match only fires when the
+evaluated task/recipe's own crafting system id equals the active tool's `systemId`
+(`resolvePresentComponentIds` in `gatheringToolRuntime.js` enforces the scope). This prevents a
+station tool from system A satisfying a system-B task/recipe whose required tool shares the same
+`componentId` string — relevant because `GatheringEngine.listForActor` iterates environments
+across ALL systems with the same present set. With no active tool the payload is null (inert).
+
 **`show` signature change.** Today `SvelteFabricateApp.show(tab = DEFAULT_TAB)` is
 **single-arg**. Phases 4 and 5 change it to `show(tab, options)` so callers can pass
 `{ activeCanvasTool }` (Phase 4) and `{ environmentId, taskId, nodeStateOverride }`

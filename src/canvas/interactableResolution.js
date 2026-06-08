@@ -151,6 +151,37 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
 }
 
 /**
+ * Build the normalized `activeCanvasTool` payload from a resolved library Tool.
+ *
+ * This is the session-scoped virtual-present Tool injected into the Fabricate
+ * app when a player double-clicks a Tool station token (Phase 4). The shape is
+ * deliberately simple/serializable: `{ componentId, systemId, toolId, label }`.
+ * The crafting/gathering prerequisite checks treat `componentId` as present
+ * without an owned item and exclude it from breakage/usage.
+ *
+ * Returns `null` when the tool cannot be resolved to a `componentId` (so the
+ * caller can decline to open a tool-scoped session).
+ *
+ * @param {object} params
+ * @param {string} params.systemId   The crafting system id.
+ * @param {string} params.toolId     The library Tool id.
+ * @param {object|null} params.tool  The resolved library Tool entry
+ *   (`{ componentId, label? }`).
+ * @returns {{ componentId: string, systemId: string, toolId: string, label: string } | null}
+ */
+export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
+  const componentId = typeof tool?.componentId === 'string' ? tool.componentId.trim() : '';
+  if (!componentId) return null;
+  const label = typeof tool?.label === 'string' && tool.label.trim() ? tool.label.trim() : '';
+  return {
+    componentId,
+    systemId: typeof systemId === 'string' ? systemId : '',
+    toolId: typeof toolId === 'string' ? toolId : '',
+    label
+  };
+}
+
+/**
  * Shape the data needed to spawn an interactable token from a classified drop.
  * Pure: returns the flag-build args plus the drop coordinates; the caller wires
  * the actual TokenDocument creation.

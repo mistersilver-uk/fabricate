@@ -19,14 +19,25 @@ const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svel
 describe('Fabricate app wiring for the gathering tab', () => {
   it('exposes listGatheringForActor and passes services down', () => {
     assert.ok(
-      appSource.includes('listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null'),
-      'app should add the listGatheringForActor service'
+      appSource.includes('game?.fabricate?.listGatheringForActor?.({ presentTools: presentTools(), ...opts })'),
+      'app should add the listGatheringForActor service threading the system-scoped active canvas tool'
     );
     assert.ok(
       appSource.includes('getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null'),
       'app should add the getGatheringDropBreakdown service'
     );
     assert.ok(appSource.includes('services: this._services'), 'app should pass the services prop');
+  });
+
+  it('threads the active canvas tool into the gathering start-attempt service', () => {
+    assert.ok(
+      appSource.includes('getActiveCanvasTool: () => this._activeCanvasTool ?? null'),
+      'app should expose getActiveCanvasTool through the services bag'
+    );
+    assert.ok(
+      appSource.includes('game?.fabricate?.startGatheringAttempt?.({ presentTools: presentTools(), ...opts })'),
+      'startGatheringAttempt should carry the derived system-scoped presentTools'
+    );
   });
 
   it('renders GatheringView on the gathering tab while other tabs keep the placeholder', () => {

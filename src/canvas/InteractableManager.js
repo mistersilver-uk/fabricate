@@ -18,18 +18,28 @@
 import {
   classifyInteractableDrop,
   buildSpawnRequest,
+  buildActiveCanvasTool,
   parseInteractableSourceUuid
 } from './interactableResolution.js';
 import { buildInteractableFlags, isInteractableToken } from './interactableTokenFlags.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
 import { ensureInteractableActor } from './interactableActor.js';
+import { getFabricateAppClass } from '../ui/appFactory.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
 
 const DOUBLE_CLICK_FLAG = '_fabricateInteractableBound';
 
 class InteractableManager {
-  constructor() {
+  /**
+   * @param {object} [deps]
+   * @param {() => Function} [deps.getAppClass] Resolver for the Fabricate app
+   *   class. Defaults to {@link getFabricateAppClass}; injectable so unit tests
+   *   can pass a fake app whose `show()` records its arguments without a live
+   *   Svelte/Foundry runtime.
+   */
+  constructor({ getAppClass = getFabricateAppClass } = {}) {
     this._registered = false;
+    this._getAppClass = getAppClass;
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._attachListeners = this._attachListeners.bind(this);
@@ -156,8 +166,9 @@ class InteractableManager {
 
   /**
    * Double-click handler. Reads the token's interactable flags and dispatches by
-   * type. Phase 3 stub handlers log/route; Phases 4 and 5 replace them with the
-   * real app-open behavior.
+   * type. The tool branch opens the Fabricate app with the station's Tool
+   * injected as an `activeCanvasTool` (Phase 4); the gathering-task branch is
+   * still the Phase-3 stub (Phase 5).
    *
    * @param {object} token  Token document.
    */
@@ -168,14 +179,32 @@ class InteractableManager {
     });
   }
 
-  // --- Phase 4/5 seams: minimal stubs replaced when the app wiring lands. ---
-
   /**
-   * Phase 4 replaces this with `SvelteFabricateApp.show('crafting', { activeCanvasTool })`.
-   * @param {object} descriptor
+   * Resolve the double-clicked Tool station's library Tool from its synthetic
+   * sourceUuid (`Fabricate.<systemId>.tool.<toolId>`) and open the Fabricate app
+   * with that Tool injected as a session-scoped `activeCanvasTool`. No-op when
+   * the tool cannot be resolved.
+   *
+   * INTERIM ROUTING: opens the `gathering` tab, not `crafting`. The Svelte
+   * crafting tab is still a "Coming Soon" placeholder (FabricateAppRoot falls
+   * through to the placeholder shell for every non-gathering tab), so routing a
+   * Tool token there would dead-end with no visible effect. Gathering is the
+   * only live surface where the virtual-present tool has a visible effect today.
+   * The injected `activeCanvasTool` context is tab-agnostic on the app instance,
+   * so revisit this to route to (or offer a choice of) crafting once that tab
+   * ships. See OpenSpec design.md §4.
+   *
+   * @param {object} descriptor  Dispatch descriptor: `{ systemId, referenceId, ... }`.
    */
   _handleToolDoubleClick(descriptor) {
-    console.log('Fabricate | Tool interactable double-clicked', descriptor);
+    const systemId = descriptor?.systemId ?? null;
+    const toolId = descriptor?.referenceId ?? null;
+    if (!systemId || !toolId) return;
+    const tool = this._resolutionDeps().getTool({ systemId, toolId });
+    const activeCanvasTool = buildActiveCanvasTool({ systemId, toolId, tool });
+    if (!activeCanvasTool) return;
+    const AppClass = this._getAppClass?.();
+    void AppClass?.show?.('gathering', { activeCanvasTool });
   }
 
   /**

@@ -182,10 +182,12 @@ export function createToolBreakageRuntime({
   }
 
   return {
-    async plan({ actor, system, task, tools = [] } = {}) {
-      const matched = matchTools({ actor, system, task, tools });
+    async plan({ actor, system, task, tools = [], presentTools = null } = {}) {
+      const matched = matchTools({ actor, system, task, tools, presentTools });
       const planned = [];
-      for (const { tool, item } of matched.items) {
+      for (const { tool, item, virtual } of matched.items) {
+        // Virtual-present (canvas-tool) matches have no owned item to break/use.
+        if (virtual || !item) continue;
         const model = tool instanceof Tool ? tool : Tool.fromJSON(tool);
         const breakageResult = await evaluateToolBreakagePlan(model, { actor, item, evaluateExpression });
         const entry = {
@@ -204,14 +206,16 @@ export function createToolBreakageRuntime({
       return planned;
     },
 
-    async apply({ actor, system, task, tools = [] } = {}) {
-      const matched = matchTools({ actor, system, task, tools });
+    async apply({ actor, system, task, tools = [], presentTools = null } = {}) {
+      const matched = matchTools({ actor, system, task, tools, presentTools });
       const key = keyOf({ actor, task });
       const plannedByItem = new Map((pendingPlans.get(key) || [])
         .map(entry => [stringOrEmpty(entry?.itemRef?.itemUuid), entry]));
       pendingPlans.delete(key);
       const evidence = [];
-      for (const { tool: toolData, item } of matched.items) {
+      for (const { tool: toolData, item, virtual } of matched.items) {
+        // Virtual-present (canvas-tool) matches have no owned item to break/use.
+        if (virtual || !item) continue;
         const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
         const planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));

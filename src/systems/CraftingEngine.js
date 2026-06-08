@@ -7,7 +7,7 @@ import { SignatureValidator } from './SignatureValidator.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage } from '../toolBreakageRuntime.js';
-import { isToolBroken } from '../gatheringToolRuntime.js';
+import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 
 /**
  * Handles the actual crafting process
@@ -33,6 +33,14 @@ export class CraftingEngine {
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
     const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    // Virtual-present tools injected by an active canvas Tool station (Phase 4):
+    // a `{ systemId, componentIds }` payload. A componentId is satisfied without
+    // an owned item (and excluded from breakage/usage) ONLY when the active
+    // tool's systemId matches the recipe's crafting system — componentId is a
+    // per-system id, so a tool from system A must not satisfy a system-B recipe.
+    const presentTools = (options?.presentTools && !Array.isArray(options.presentTools))
+      ? options.presentTools
+      : null;
     // Validate inputs
     if (!craftingActor) {
       return {
@@ -145,7 +153,7 @@ export class CraftingEngine {
     const executionRecipe = this._buildStepRecipeView(recipe, step);
 
     // Check if recipe step can be crafted
-    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe);
+    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, { presentTools });
     if (!canCraftCheck.canCraft) {
       const missingMsg = this._formatMissingItems(canCraftCheck.missing);
       return {
@@ -176,7 +184,7 @@ export class CraftingEngine {
     const toolsForSet = typeof this.recipeManager.getToolsForSet === 'function'
       ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
       : [];
-    const toolValidation = await this._validateTools(componentSourceActors, executionRecipe, toolsForSet);
+    const toolValidation = await this._validateTools(componentSourceActors, executionRecipe, toolsForSet, presentTools);
     if (!toolValidation.valid) {
       return {
         success: false,
@@ -745,14 +753,28 @@ export class CraftingEngine {
    * Returns the matched `{ tool, item }` pairs so the caller can apply
    * usage/breakage on the success and failure-consumption paths.
    *
+   * Virtual-present injection (Phase 4): a tool whose `componentId` is in the
+   * active canvas Tool's `presentTools` payload AND whose recipe crafting system
+   * matches the active tool's `systemId` is satisfied WITHOUT an owned item (the
+   * active canvas Tool station provides it). Its `{ tool, item: null, virtual:
+   * true }` pair is returned so {@link _applyToolBreakage} skips it — there is no
+   * owned item to use or break. An owned, non-broken item still takes precedence.
+   * The system scope is enforced via {@link resolvePresentComponentIds}: a
+   * present tool from system A never satisfies a system-B recipe.
+   *
    * @private
    * @param {Actor[]} actors
    * @param {Recipe} recipe
    * @param {Array<object>} tools - resolved library Tool objects
-   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item}> }>}
+   * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
+   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean}> }>}
    */
-  async _validateTools(actors, recipe, tools = []) {
+  async _validateTools(actors, recipe, tools = [], presentTools = null) {
     const toolItems = [];
+    const presentSet = resolvePresentComponentIds({
+      presentTools,
+      systemId: recipe?.craftingSystemId ?? null
+    });
 
     for (const tool of tools) {
       let found = null;
@@ -766,14 +788,17 @@ export class CraftingEngine {
         }
       }
 
-      if (!found) {
+      if (found) {
+        toolItems.push({ tool, item: found });
+      } else if (presentSet.has(tool?.componentId)) {
+        // Virtual-present: satisfied by the active canvas Tool, no owned item.
+        toolItems.push({ tool, item: null, virtual: true });
+      } else {
         return {
           valid: false,
           message: `Missing required tool (componentId: ${tool?.componentId || tool?.systemItemId})`
         };
       }
-
-      toolItems.push({ tool, item: found });
     }
 
     return { valid: true, tools: toolItems };
@@ -792,7 +817,10 @@ export class CraftingEngine {
    */
   async _applyToolBreakage(recipe, toolItems = []) {
     const evidence = [];
-    for (const { tool: toolData, item } of toolItems) {
+    for (const { tool: toolData, item, virtual } of toolItems) {
+      // Virtual-present (canvas-tool) matches have no owned item to use/break,
+      // and must not produce a consuming usedTools run-record entry.
+      if (virtual || !item) continue;
       const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
       const actor = item?.parent ?? null;
       const entry = await applyToolUsageAndBreakage({

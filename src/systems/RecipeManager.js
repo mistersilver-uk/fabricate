@@ -249,16 +249,24 @@ export class RecipeManager {
    *
    * @param {Actor[]} componentSourceActors - Actors to pull ingredients from
    * @param {Recipe} recipe - The recipe to evaluate
+   * @param {object} [options]
+   * @param {{ systemId?: string|null, componentIds?: string[] }|null} [options.presentTools] -
+   *   Virtual-present payload injected by an active canvas Tool station (Phase 4).
+   *   A tool whose componentId is in `componentIds` AND whose recipe crafting
+   *   system matches the payload `systemId` is satisfied WITHOUT an owned item and
+   *   is marked `{ available: true, virtual: true }` so the caller excludes it
+   *   from breakage/usage. componentId is per-system, so the system scope prevents
+   *   a tool from system A satisfying a system-B recipe.
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
    *   missing: { ingredients: Array, essences: Array, tools: Array },
    *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
-   *   toolStates: Array<{ name: string, available: boolean }>
+   *   toolStates: Array<{ name: string, available: boolean, virtual?: boolean }>
    * }}
    */
-  evaluateCraftability(componentSourceActors, recipe) {
+  evaluateCraftability(componentSourceActors, recipe, { presentTools = null } = {}) {
     if (!Array.isArray(componentSourceActors)) {
       componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
     }
@@ -336,7 +344,7 @@ export class RecipeManager {
     // per-system library via `toolIds`.
     const displaySet = satisfiableSet || firstSet;
     const toolsForSet = this.getToolsForSet(recipe, displaySet);
-    const toolStates = this._buildToolStates(recipe, toolsForSet, availableItems);
+    const toolStates = this._buildToolStates(recipe, toolsForSet, availableItems, presentTools);
     const missingTools = toolsForSet.filter((_tool, idx) => !toolStates[idx].available);
 
     // Final craftability: ingredients satisfied AND tools present.
@@ -401,20 +409,32 @@ export class RecipeManager {
    * @param {Array<Item>} availableItems - aggregated source-actor items
    * @returns {Array<{ name: string, available: boolean }>}
    */
-  _buildToolStates(recipe, tools, availableItems) {
+  _buildToolStates(recipe, tools, availableItems, presentTools = null) {
     if (!Array.isArray(tools) || tools.length === 0) return [];
+    // `matchGatheringTools` scopes the virtual-present set to the system passed
+    // here (the recipe's crafting system), so a present tool from a different
+    // system never satisfies this recipe's tool prerequisites.
     const matched = matchGatheringTools({
       actor: { items: availableItems },
       system: { id: recipe?.craftingSystemId ?? null },
       task: { id: recipe?.id ?? null, craftingSystemId: recipe?.craftingSystemId ?? null },
       tools,
-      craftingSystemManager: { recipeManager: this }
+      craftingSystemManager: { recipeManager: this },
+      presentTools
     });
-    const matchedTools = new Set(matched.items.map(({ tool }) => tool));
-    return tools.map(tool => ({
-      name: this.resolveComponentName(recipe, tool?.componentId || tool?.systemItemId),
-      available: matchedTools.has(tool)
-    }));
+    // Index by tool so the per-tool state can carry the virtual flag (a
+    // virtual-present match has no owned item and must be excluded from
+    // breakage/usage by the caller).
+    const matchedByTool = new Map(matched.items.map(entry => [entry.tool, entry]));
+    return tools.map(tool => {
+      const entry = matchedByTool.get(tool) ?? null;
+      const state = {
+        name: this.resolveComponentName(recipe, tool?.componentId || tool?.systemItemId),
+        available: entry !== null
+      };
+      if (entry?.virtual === true) state.virtual = true;
+      return state;
+    });
   }
 
   /**
@@ -543,9 +563,13 @@ export class RecipeManager {
    *
    * @param {Actor[]} componentSourceActors - Actors to pull ingredients from
    * @param {Recipe} recipe - The recipe to check
+   * @param {object} [options]
+   * @param {{ systemId?: string|null, componentIds?: string[] }|null} [options.presentTools] -
+   *   Virtual-present payload from an active canvas Tool station (see
+   *   evaluateCraftability for the system-scoping semantics).
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
-  canCraft(componentSourceActors, recipe) {
+  canCraft(componentSourceActors, recipe, { presentTools = null } = {}) {
     if (!Array.isArray(componentSourceActors)) {
       componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
     }
@@ -558,7 +582,7 @@ export class RecipeManager {
       };
     }
 
-    const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(componentSourceActors, recipe);
+    const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(componentSourceActors, recipe, { presentTools });
     return { canCraft, satisfiableSet, missing };
   }
 

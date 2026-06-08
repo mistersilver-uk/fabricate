@@ -1,5 +1,5 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
-import { classifyGatheringToolStates } from '../gatheringToolRuntime.js';
+import { classifyGatheringToolStates, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
@@ -234,7 +234,12 @@ export class GatheringEngine {
     actor = null,
     rememberedActorId = null,
     environmentId = null,
-    taskId = null
+    taskId = null,
+    // Virtual-present tools injected by an active canvas Tool station (Phase 4):
+    // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
+    // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
+    // ONLY for tasks in the matching crafting system — componentId is per-system.
+    presentTools = null
   } = {}) {
     const resolved = await this._resolveStartContext({
       viewer,
@@ -367,7 +372,8 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools: taskTools.tools
+        tools: taskTools.tools,
+        presentTools
       });
       if (toolResult.available !== true) {
         return this._blockedStart({
@@ -417,10 +423,13 @@ export class GatheringEngine {
     }
 
     if (hasTimeRequirement(task)) {
+      // Waiting runs mature later (no open session / canvas tool), so terminal
+      // tool side-effects use no virtual-present set; the gate above already
+      // passed for this attempt.
       return this._startWaitingAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt });
     }
 
-    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt });
+    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt, presentTools });
   }
 
   async _processMaturedWaitingRun({ actor, run }) {
@@ -584,7 +593,7 @@ export class GatheringEngine {
    * @param {string|null} [args.rememberedActorId] Previously selected actor id.
    * @returns {Promise<object>} The gathering listing model.
    */
-  async listForActor({ viewer = null, actor = null, rememberedActorId = null } = {}) {
+  async listForActor({ viewer = null, actor = null, rememberedActorId = null, presentTools = null } = {}) {
     const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
     if (selectableActors.length === 0) {
       return this._emptyListing({
@@ -627,7 +636,8 @@ export class GatheringEngine {
         environment,
         system: systems.get(environment.craftingSystemId),
         viewer,
-        actor: selectedActor
+        actor: selectedActor,
+        presentTools
       });
       if (model.visible) {
         environmentModels.push(model);
@@ -938,7 +948,7 @@ export class GatheringEngine {
     return environment;
   }
 
-  async _buildEnvironmentListing({ environment, system, viewer, actor }) {
+  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null }) {
     // Disabled environments surface to every viewer (players and GMs alike) as
     // non-interactive "locked" teasers. Build them before any task-visibility
     // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
@@ -980,7 +990,8 @@ export class GatheringEngine {
           system,
           task: visibleTask.task,
           actor,
-          viewer
+          viewer,
+          presentTools
         })
       ];
       taskEntries.push({
@@ -996,7 +1007,7 @@ export class GatheringEngine {
       viewer,
       visibility: entry.visibility,
       blockedReasons: entry.blockedReasons,
-      tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
+      tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools })
     }));
     // Refine the displayed stamina cost to the viewing character's effective
     // cost (base + per-actor modifiers); the sync model carries the base.
@@ -1018,7 +1029,7 @@ export class GatheringEngine {
       ? (taskModels.length > 0 ? [taskModels[0]] : [])
       : taskModels;
     const discoveredTasks = blindForViewer
-      ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons })
+      ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools })
       : [];
 
     // The GM-configured hazard visibility tier further restricts what a non-GM
@@ -1093,7 +1104,7 @@ export class GatheringEngine {
    * @param {object[]} args.environmentBlockedReasons Shared environment-level reasons.
    * @returns {Promise<object[]>} Transparent discovered task models (each with `discovered: true`).
    */
-  async _discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons }) {
+  async _discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools = null }) {
     const { policy, scope } = this._resolveRevealPolicy(environment);
     if (policy === 'never') return [];
     const revealedIds = new Set(this._listRevealedTaskIds({ actor, environmentId: environment.id, scope }));
@@ -1110,7 +1121,8 @@ export class GatheringEngine {
           task: entry.task,
           actor,
           viewer,
-          transparent: true
+          transparent: true,
+          presentTools
         })
       ];
       const model = this._taskModel({
@@ -1121,7 +1133,7 @@ export class GatheringEngine {
         visibility: entry.visibility,
         blockedReasons,
         forceVisible: true,
-        tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task })
+        tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools })
       });
       await this._applyListingStaminaCost(model, { system, environment, actor, viewer, task: entry.task });
       discovered.push({ ...model, discovered: true });
@@ -1409,7 +1421,7 @@ export class GatheringEngine {
    *   transparent regardless of this flag.
    * @returns {Promise<object[]>} The task's blocked reasons.
    */
-  async _taskBlockedReasons({ environment, system, task, actor, viewer, transparent = false }) {
+  async _taskBlockedReasons({ environment, system, task, actor, viewer, transparent = false, presentTools = null }) {
     const blockedReasons = [];
     // For a revealed/discovered blind task (`transparent`), keep the real
     // blocked-reason data — the row needs the actual required weather/time and
@@ -1439,7 +1451,8 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools: taskTools.tools
+        tools: taskTools.tools,
+        presentTools
       });
       if (toolResult.available !== true) {
         blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
@@ -1510,7 +1523,7 @@ export class GatheringEngine {
    * @returns {Array<{id: string|null, name: string, img: string,
    *                  state: 'present'|'damaged'|'missing', required: boolean}>}
    */
-  _resolveTaskToolStates({ actor, system, environment, task }) {
+  _resolveTaskToolStates({ actor, system, environment, task, presentTools = null }) {
     const { tools, missingToolIds, disabledToolIds } = this._resolveTaskTools({ environment, task });
     const componentsById = this._componentsById(system);
     const states = classifyGatheringToolStates({
@@ -1518,7 +1531,8 @@ export class GatheringEngine {
       system,
       task,
       tools,
-      craftingSystemManager: this.systemManager
+      craftingSystemManager: this.systemManager,
+      presentTools
     });
 
     const resolved = states.map(({ tool, state }) => {
@@ -1585,7 +1599,7 @@ export class GatheringEngine {
     };
   }
 
-  async _checkTools({ actor, viewer, system, environment, task, tools }) {
+  async _checkTools({ actor, viewer, system, environment, task, tools, presentTools = null }) {
     if (typeof this.toolAvailability?.check === 'function') {
       return normalizeToolResult(await this.toolAvailability.check({
         actor,
@@ -1593,12 +1607,21 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools
+        tools,
+        presentTools
       }));
     }
-    return tools.length === 0
+    // Fallback: treat a tool as satisfied when virtually present (canvas Tool).
+    // System-scoped: a present tool only counts when the active tool's systemId
+    // matches this task's crafting system (componentId is a per-system id).
+    const presentSet = resolvePresentComponentIds({
+      presentTools,
+      systemId: system?.id ?? task?.craftingSystemId ?? null
+    });
+    const missing = tools.filter(tool => !presentSet.has(tool?.componentId));
+    return missing.length === 0
       ? { available: true, missing: [], failedRequirements: [] }
-      : { available: false, missing: tools, failedRequirements: [] };
+      : { available: false, missing, failedRequirements: [] };
   }
 
   /**
@@ -1946,7 +1969,7 @@ export class GatheringEngine {
     }
   }
 
-  async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null }) {
+  async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null, presentTools = null }) {
     const outcome = task.resolutionMode === 'd100'
       ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
       : (task.resolutionMode === 'progressive'
@@ -1978,7 +2001,7 @@ export class GatheringEngine {
     }
 
     const checkResult = plainObjectOrNull(outcome.checkResult) ?? undefined;
-    const plan = await this._terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult });
+    const plan = await this._terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult, presentTools });
     if (plan.status === 'misconfigured') {
       return this._blockedStart({
         viewer,
@@ -2042,7 +2065,8 @@ export class GatheringEngine {
       environment,
       task,
       outcome,
-      checkResult
+      checkResult,
+      presentTools
     });
 
     return await this._terminalStart({
@@ -2059,7 +2083,7 @@ export class GatheringEngine {
     });
   }
 
-  async _terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult }) {
+  async _terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {
     try {
       const usedTools = await this._planTerminalTools({
         viewer,
@@ -2068,7 +2092,8 @@ export class GatheringEngine {
         environment,
         task,
         outcome,
-        checkResult
+        checkResult,
+        presentTools
       });
       if (usedTools?.status === 'misconfigured') return usedTools;
 
@@ -2173,7 +2198,7 @@ export class GatheringEngine {
     return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome, viewer });
   }
 
-  async _commitTerminalSideEffects({ viewer, actor, system, environment, task, outcome, checkResult }) {
+  async _commitTerminalSideEffects({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {
     if (outcome.status === 'succeeded') {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
     }
@@ -2183,7 +2208,8 @@ export class GatheringEngine {
       system,
       environment,
       task,
-      outcome
+      outcome,
+      presentTools
     });
     if (outcome.status === 'failed') {
       await this._applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult });
@@ -2371,7 +2397,7 @@ export class GatheringEngine {
     return normalizeRunItems(planned, { actor });
   }
 
-  async _planTerminalTools({ viewer, actor, system, environment, task, outcome, checkResult }) {
+  async _planTerminalTools({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
     if (this._hasBlockedToolReferences(resolvedTools)) {
       return misconfiguredOutcome({
@@ -2395,6 +2421,7 @@ export class GatheringEngine {
         environment,
         task,
         tools,
+        presentTools,
         outcomeStatus: outcome.status,
         checkResult: checkResult ?? outcome.checkResult ?? null
       });
@@ -2407,7 +2434,7 @@ export class GatheringEngine {
     }
   }
 
-  async _applyTerminalTools({ viewer, actor, system, environment, task, outcome }) {
+  async _applyTerminalTools({ viewer, actor, system, environment, task, outcome, presentTools = null }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
     const tools = resolvedTools.tools;
     if (tools.length === 0 || typeof this.toolBreakage?.apply !== 'function') {
@@ -2420,6 +2447,7 @@ export class GatheringEngine {
       environment,
       task,
       tools,
+      presentTools,
       outcomeStatus: outcome.status,
       checkResult: outcome.checkResult ?? null
     });

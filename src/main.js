@@ -147,8 +147,8 @@ async function runGatheringMacro(macroUuid, context = {}) {
 
 function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression }) {
   return createToolBreakageRuntime({
-    matchTools: ({ actor, system, task, tools = [] }) =>
-      matchGatheringTools({ actor, system, task, tools, craftingSystemManager }),
+    matchTools: ({ actor, system, task, tools = [], presentTools = null }) =>
+      matchGatheringTools({ actor, system, task, tools, craftingSystemManager, presentTools }),
     buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
     resolveReplacementSource: ({ componentId, system }) =>
       resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),

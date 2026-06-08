@@ -306,6 +306,105 @@ test('craft(): records usedTools on the success run record and increments toolUs
   assert.deepEqual(getPath(toolItem._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
 });
 
+// ---------------------------------------------------------------------------
+// Virtual-present tools (Phase 4: activeCanvasTool injection)
+// ---------------------------------------------------------------------------
+
+test('_validateTools: an unowned tool present as activeCanvasTool is satisfied and marked virtual', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actor = { items: [] };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
+
+  const result = await engine._validateTools([actor], recipe(), [tool], { systemId: 'sys-1', componentIds: ['c-axe'] });
+  assert.equal(result.valid, true);
+  assert.equal(result.tools.length, 1);
+  assert.equal(result.tools[0].virtual, true);
+  assert.equal(result.tools[0].item, null, 'no owned item backs a virtual tool');
+});
+
+test('_validateTools: a present tool from another system does NOT satisfy this recipe (cross-system collision)', async () => {
+  // componentId c-axe is a PER-SYSTEM id; a station tool from system-other must
+  // not satisfy a sys-1 recipe whose required tool shares the same componentId.
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
+  const result = await engine._validateTools(
+    [{ items: [] }],
+    recipe(),
+    [tool],
+    { systemId: 'system-other', componentIds: ['c-axe'] }
+  );
+  assert.equal(result.valid, false, 'an out-of-system present tool is inert');
+  assert.match(result.message, /Missing required tool/);
+});
+
+test('_validateTools: WITHOUT the active tool the same unowned requirement still fails (regression guard)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
+  const result = await engine._validateTools([{ items: [] }], recipe(), [tool], null);
+  assert.equal(result.valid, false);
+  assert.match(result.message, /Missing required tool/);
+});
+
+test('_validateTools: an owned non-broken item wins over a virtual match', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const axe = new FakeItem('c-axe');
+  const result = await engine._validateTools([{ items: [axe] }], recipe(), [{ componentId: 'c-axe' }], { systemId: 'sys-1', componentIds: ['c-axe'] });
+  assert.equal(result.valid, true);
+  assert.equal(result.tools[0].item, axe);
+  assert.equal(result.tools[0].virtual, undefined);
+});
+
+test('_applyToolBreakage: skips a virtual tool — no usage, no breakage, no usedTools entry', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
+
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: null, virtual: true }]);
+  assert.deepEqual(used, [], 'a virtual tool produces no usedTools run-record entry');
+});
+
+test('craft(): a tool absent from inventory but present as activeCanvasTool crafts with no breakage/usage', async () => {
+  installSystem();
+  const ingredientItem = new FakeItem('ing-1', { quantity: 2 });
+  const fakeTool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
+  const ingredientSet = fakeIngredientSet(ingredientItem);
+  // No tool item in inventory — only the active canvas tool provides it.
+  const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem: null, fakeTool, ingredientSet });
+
+  let successPayload = null;
+  const runManager = {
+    findActiveRunForRecipe: () => null,
+    getActiveRun: () => null,
+    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
+    canProceedTimeGate: () => true,
+    async markStepInProgress(_actor, run) { return run; },
+    async markStepWaitingForTime(_actor, run) { return run; },
+    async completeStepSuccess(_actor, run, _idx, payload) { successPayload = payload; return { ...run, status: 'succeeded' }; },
+    async completeStepFailure() { return {}; }
+  };
+
+  const engine = new CraftingEngine(recipeManager, runManager, null);
+  engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
+  engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
+  engine._postCraftChatMessage = async () => {};
+  engine._runSuccessMacro = async () => {};
+
+  const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem] };
+  const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
+
+  const result = await engine.craft(craftingActor, [sourceActor], fakeRecipe(ingredientSet), null, {
+    presentTools: { systemId: 'sys-1', componentIds: ['c-axe'] }
+  });
+
+  assert.equal(result.success, true);
+  assert.ok(successPayload, 'a success run payload was recorded');
+  assert.deepEqual(successPayload.usedTools, [], 'the virtual canvas tool contributes no usedTools entry');
+});
+
 test('craft(): missing required tool blocks the craft before consuming ingredients', async () => {
   installSystem();
   const ingredientItem = new FakeItem('ing-1', { quantity: 2 });

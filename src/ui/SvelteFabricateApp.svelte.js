@@ -30,6 +30,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _activeTab = DEFAULT_TAB;
   _services = null;
   _hookIds = null;
+  // Session-scoped canvas Tool (Phase 4). When a player double-clicks a Tool
+  // station token, the Tool is injected here as a virtual-present tool: a
+  // `{ componentId, systemId, toolId, label }` shape that crafting/gathering
+  // prerequisite checks treat as satisfied WITHOUT the actor owning the item,
+  // and which is excluded from breakage/usage. Cleared on close.
+  _activeCanvasTool = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
@@ -51,14 +57,35 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (VALID_TABS.has(options.activeTab)) {
       this._activeTab = options.activeTab;
     }
+    if (options.activeCanvasTool) {
+      this._activeCanvasTool = options.activeCanvasTool;
+    }
   }
 
   _buildServices() {
+    // Derive the system-scoped virtual-present tool payload from the active
+    // canvas Tool. When a Tool station is active, BOTH its componentId AND its
+    // owning crafting system are threaded into the gathering listing/attempt API
+    // as `presentTools = { systemId, componentIds }`. The prerequisite check
+    // treats the componentId as present without an owned item, but ONLY for tasks
+    // in the matching crafting system — componentId is a per-system id, so a tool
+    // from system A must not satisfy a system-B task whose required tool shares
+    // the same componentId string. The engine excludes a virtual match from
+    // breakage/usage. This is the single app→engine threading boundary for the
+    // gathering surface. With no active tool the payload is null (inert).
+    const presentTools = () => {
+      const componentId = this._activeCanvasTool?.componentId;
+      const systemId = this._activeCanvasTool?.systemId;
+      return componentId && systemId ? { systemId, componentIds: [componentId] } : null;
+    };
     const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
-      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null,
-      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.(opts) ?? null,
+      getActiveCanvasTool: () => this._activeCanvasTool ?? null,
+      listGatheringForActor: (opts = {}) =>
+        game?.fabricate?.listGatheringForActor?.({ presentTools: presentTools(), ...opts }) ?? null,
+      startGatheringAttempt: (opts = {}) =>
+        game?.fabricate?.startGatheringAttempt?.({ presentTools: presentTools(), ...opts }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
@@ -86,7 +113,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       activeTab: this._activeTab,
       showAlchemy: isAlchemyTabAvailable(this._services),
       onSelectTab: (tab) => this._selectTab(tab),
-      services: this._services
+      services: this._services,
+      // Session-scoped canvas Tool, surfaced reactively so the shell can render a
+      // status chip naming the active station tool (Phase 4 SHOULD-FIX 3). Null
+      // when no Tool station is active.
+      activeCanvasTool: this._activeCanvasTool
     };
   }
 
@@ -141,6 +172,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   async close(options) {
     this._removeHooks();
+    // Destroy the session-scoped canvas-tool context so the singleton does not
+    // leak it into the next manual open.
+    this._activeCanvasTool = null;
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
@@ -149,23 +183,42 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   _onClose(options) {
     this._removeHooks();
+    this._activeCanvasTool = null; // safety net mirroring close().
     super._onClose(options);
   }
 
   /**
    * Open (or re-focus) the shared Fabricate window on the requested tab.
+   *
+   * `activeCanvasTool` semantics (Phase 4): the active canvas tool is
+   * session-scoped and is REPLACED on every `show`, including re-show of the
+   * live singleton. An explicit `show('crafting', { activeCanvasTool })` sets
+   * it; a plain `show('crafting')` CLEARS it — a fresh manual open (or a manual
+   * re-open of the existing window) has no canvas tool, so it must not silently
+   * inherit a station tool from a prior double-click. The context is also
+   * cleared on close.
+   *
    * @param {string} [tab='crafting'] One of crafting/gathering/journal/inventory.
+   * @param {object} [options]
+   * @param {object|null} [options.activeCanvasTool] Virtual-present Tool injected
+   *   by a canvas Tool station: `{ componentId, systemId, toolId, label }`.
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(tab = DEFAULT_TAB) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
+    const nextCanvasTool = activeCanvasTool ?? null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
+      // Re-show REPLACES the active canvas tool (set when supplied, cleared when
+      // not) so a manual re-open never inherits a stale station context.
+      existing._activeCanvasTool = nextCanvasTool;
+      // Push the replaced tool to the mounted tree so the status chip updates.
+      existing.updateProps({ activeCanvasTool: nextCanvasTool });
       existing._selectTab(initialTab);
       existing.bringToFront();
       return existing;
     }
-    const app = new SvelteFabricateApp({ activeTab: initialTab });
+    const app = new SvelteFabricateApp({ activeTab: initialTab, activeCanvasTool: nextCanvasTool });
     SvelteFabricateApp._instance = app;
     await app.render(true);
     return app;

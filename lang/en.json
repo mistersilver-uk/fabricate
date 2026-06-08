@@ -17,6 +17,10 @@
     "App": {
       "Title": "Fabricate",
       "ComingSoon": "Coming soon",
+      "ActiveTool": {
+        "Label": "Active station tool",
+        "Named": "Station tool: {label}"
+      },
       "Nav": {
         "Crafting": "Crafting",
         "Alchemy": "Alchemy",
