@@ -614,7 +614,17 @@ class Fabricate {
    */
   async _runMigrations() {
     const runner = new MigrationRunner({ getSetting, setSetting });
-    await runner.run();
+    const summary = await runner.run();
+
+    // One-time GM-facing notice: when the 0.6.0 migration actually converted catalysts into
+    // shared library Tools, tell the GM (so they know where the catalyst data went). GM-only
+    // and only when something was migrated; the pure migration stays free of edge effects.
+    const migratedCount = Number(summary?.migratedCatalystCount || 0);
+    if (migratedCount > 0 && game.user?.isGM) {
+      const message = game.i18n?.format?.('FABRICATE.Migration.CatalystsToTools.Notice', { count: migratedCount })
+        || `Fabricate migrated ${migratedCount} catalyst(s) to the Tools library. Find them under the Tools tab.`;
+      ui.notifications?.info?.(message);
+    }
   }
 
   /**

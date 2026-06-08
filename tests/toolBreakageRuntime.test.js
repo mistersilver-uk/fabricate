@@ -245,3 +245,52 @@ test('createToolBreakageRuntime: no matched tools yields empty evidence', async 
   assert.deepEqual(await runtime.plan({ tools: [] }), []);
   assert.deepEqual(await runtime.apply({ tools: [] }), []);
 });
+
+// ---------------------------------------------------------------------------
+// Catalyst→Tool item-flag fallback (0.6.0): toolUsage preferred, catalystItemUsage
+// fallback only when toolUsage is absent. Writes always go to toolUsage.
+// ---------------------------------------------------------------------------
+
+test('readToolUsage falls back to catalystItemUsage when toolUsage is absent', () => {
+  const item = new FakeItem({ fabricate: { catalystItemUsage: { timesUsed: 4 } } });
+  assert.deepEqual(readToolUsage(item), { timesUsed: 4 });
+});
+
+test('readToolUsage prefers toolUsage when both flags are present', () => {
+  const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 }, catalystItemUsage: { timesUsed: 9 } } });
+  assert.deepEqual(readToolUsage(item), { timesUsed: 1 });
+});
+
+test('Tool.evaluateBreakage (limitedUses) reads catalystItemUsage when toolUsage absent', async () => {
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 4 }, onBreak: { mode: 'destroy' } });
+  // Migrated item already used 4 times as a catalyst → at maxUses → broken.
+  const item = new FakeItem({ fabricate: { catalystItemUsage: { timesUsed: 4 } } });
+  const result = await tool.evaluateBreakage({ item });
+  assert.equal(result.broken, true);
+  assert.equal(result.evidence.timesUsed, 4);
+});
+
+test('Tool.evaluateBreakage (limitedUses) prefers toolUsage over catalystItemUsage', async () => {
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 4 }, onBreak: { mode: 'destroy' } });
+  const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 }, catalystItemUsage: { timesUsed: 9 } } });
+  const result = await tool.evaluateBreakage({ item });
+  assert.equal(result.broken, false, 'toolUsage (1) wins, not catalystItemUsage (9)');
+  assert.equal(result.evidence.timesUsed, 1);
+});
+
+test('Tool.applyUsage seeds from catalystItemUsage on first post-migration write, writes toolUsage', async () => {
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 10 }, onBreak: { mode: 'flagBroken' } });
+  const item = new FakeItem({ fabricate: { catalystItemUsage: { timesUsed: 2 } } });
+  await tool.applyUsage(item);
+  // First write continues the catalyst count (2 + 1) and lands on the authoritative flag.
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 3 });
+  // Legacy catalyst flag is never back-filled or cleared.
+  assert.deepEqual(item._flags.fabricate.fabricate.catalystItemUsage, { timesUsed: 2 });
+});
+
+test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage exists', async () => {
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 10 }, onBreak: { mode: 'flagBroken' } });
+  const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 5 }, catalystItemUsage: { timesUsed: 2 } } });
+  await tool.applyUsage(item);
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
+});

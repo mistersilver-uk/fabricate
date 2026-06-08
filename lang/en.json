@@ -4,6 +4,11 @@
     "Common": {
       "General": "General"
     },
+    "Migration": {
+      "CatalystsToTools": {
+        "Notice": "Fabricate migrated {count} catalyst(s) into shared library Tools. Catalysts are now Tools — manage them under the Tools tab of the Crafting System Manager."
+      }
+    },
     "App": {
       "Title": "Fabricate",
       "ComingSoon": "Coming soon",

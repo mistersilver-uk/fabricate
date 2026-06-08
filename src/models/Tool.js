@@ -193,7 +193,12 @@ export class Tool {
     const mode = this.breakage.mode;
 
     if (mode === 'limitedUses') {
-      const usage = getFabricateFlag(item, 'toolUsage', null) || { timesUsed: 0 };
+      // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage
+      // flag (`catalystItemUsage`) so items already degraded as catalysts keep their used
+      // count after the 0.6.0 Catalyst→Tool migration. Writes always go to `toolUsage`.
+      const usage = getFabricateFlag(item, 'toolUsage', null)
+        || getFabricateFlag(item, 'catalystItemUsage', null)
+        || { timesUsed: 0 };
       const timesUsed = Number(usage?.timesUsed || 0);
       const maxUses = this.breakage.maxUses;
       const broken = maxUses !== null && Number.isFinite(maxUses) && timesUsed >= maxUses;
@@ -243,7 +248,13 @@ export class Tool {
   async applyUsage(item) {
     if (this.breakage.mode !== 'limitedUses') return;
 
-    const current = getFabricateFlag(item, 'toolUsage', null) || { timesUsed: 0 };
+    // Seed from `toolUsage`, falling back to the legacy `catalystItemUsage` so the very
+    // first post-migration write continues the catalyst-era count rather than resetting it.
+    // The result is always written to `toolUsage` (authoritative); the legacy flag is left
+    // in place (idempotent — once `toolUsage` exists, the fallback is never re-entered).
+    const current = getFabricateFlag(item, 'toolUsage', null)
+      || getFabricateFlag(item, 'catalystItemUsage', null)
+      || { timesUsed: 0 };
     const timesUsed = Number(current?.timesUsed || 0) + 1;
     await setFabricateFlag(item, 'toolUsage', { timesUsed });
   }

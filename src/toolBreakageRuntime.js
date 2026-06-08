@@ -23,13 +23,27 @@ import { Tool } from './models/Tool.js';
 /**
  * Read the persisted tool-usage flag, tolerant of the several historical flag
  * shapes (nested namespace, dotted path) and the absence of a Foundry runtime.
+ *
+ * Catalyst→Tool migration fallback: when no `toolUsage` flag exists, fall back to the
+ * legacy `flags.fabricate.catalystItemUsage` written before the 0.6.0 migration, so an item
+ * already degraded as a catalyst keeps its used count under the unified Tool runtime. This
+ * is meaningful only for migrated `limitedUses` tools; presence-only tools never read usage.
+ * Writes always go to `toolUsage` (authoritative); `catalystItemUsage` is never back-filled.
  */
 export function readToolUsage(item) {
-  return item?.getFlag?.('fabricate', 'toolUsage')
+  const toolUsage = item?.getFlag?.('fabricate', 'toolUsage')
     ?? item?.getFlag?.('fabricate', 'fabricate.toolUsage')
     ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage')
-    ?? { timesUsed: 0 };
+    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage');
+  if (toolUsage) return toolUsage;
+
+  const catalystUsage = item?.getFlag?.('fabricate', 'catalystItemUsage')
+    ?? item?.getFlag?.('fabricate', 'fabricate.catalystItemUsage')
+    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.catalystItemUsage')
+    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.catalystItemUsage');
+  if (catalystUsage) return catalystUsage;
+
+  return { timesUsed: 0 };
 }
 
 /**
