@@ -1370,6 +1370,12 @@ function _buildSelectedSystemViewData(
     itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
     essenceDefinitions,
     managedItemOptions,
+    // System-owned library Tools (canonical source). Surfaced here so the Tools
+    // browser and the gathering task editor's tool picker read the system's
+    // tools rather than the gathering-config copy.
+    tools: Array.isArray(selectedSystem.tools)
+      ? selectedSystem.tools.map(tool => _normalizeGatheringLibraryTool(tool, () => Math.random().toString(36).slice(2, 10)))
+      : [],
 
     requirements: selectedSystem.requirements || {
       time: { enabled: false },
@@ -1557,9 +1563,7 @@ export function createAdminStore(services) {
 
   function enterToolsDraft(systemId = get(selectedSystemId)) {
     if (!systemId) return false;
-    const systemConfig = _currentGatheringConfig().systems?.[String(systemId)] || {};
-    const snapshot = (Array.isArray(systemConfig.tools) ? systemConfig.tools : [])
-      .map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+    const snapshot = _systemTools(systemId);
     toolsDraft.set(_clonePlain(snapshot));
     toolsDraftBaseline.set(_clonePlain(snapshot));
     toolsDraftSystemId.set(String(systemId));
@@ -1616,12 +1620,10 @@ export function createAdminStore(services) {
       toolsDraftSaving.set(true);
       _patchToolsDraftViewState();
       try {
-        const config = _currentGatheringConfig();
-        const systemConfig = _gatheringSystemConfig(config, systemId);
-        if (!systemConfig) return false;
-        systemConfig.tools = (Array.isArray(systemConfig.tools) ? systemConfig.tools : [])
-          .filter(tool => String(tool.id) !== id);
-        await _saveGatheringConfig(config);
+        const live = _systemTools(systemId);
+        const next = live.filter(tool => String(tool.id) !== id);
+        const persisted = await _persistSystemTools(systemId, next);
+        if (persisted === null) return false;
         toolsDraftBaseline.set(baseline.filter(tool => String(tool.id) !== id));
       } finally {
         toolsDraftSaving.set(false);
@@ -1692,12 +1694,9 @@ export function createAdminStore(services) {
     toolsDraftSaving.set(true);
     _patchToolsDraftViewState();
     try {
-      const config = _currentGatheringConfig();
-      const systemConfig = _gatheringSystemConfig(config, systemId);
-      if (!systemConfig) return false;
       const baseline = get(toolsDraftBaseline) || [];
       const baselineTool = baseline.find(entry => String(entry.id) === id) || null;
-      const live = Array.isArray(systemConfig.tools) ? systemConfig.tools : [];
+      const live = _systemTools(systemId);
       const liveIndex = live.findIndex(entry => String(entry.id) === id);
       const liveTool = liveIndex >= 0 ? _normalizeGatheringLibraryTool(live[liveIndex], _randomID) : null;
       const hasConflict = baselineTool
@@ -1730,8 +1729,8 @@ export function createAdminStore(services) {
         const draftIndex = draft.findIndex(entry => String(entry.id) === id);
         next.splice(Math.max(0, Math.min(draftIndex, next.length)), 0, normalizedTool);
       }
-      systemConfig.tools = next;
-      await _saveGatheringConfig(config);
+      const persisted = await _persistSystemTools(systemId, next);
+      if (persisted === null) return false;
       toolsDraft.set(draft.map(entry => String(entry.id) === id ? _clonePlain(normalizedTool) : entry));
       const baselineById = new Map(baseline.map(entry => [String(entry.id), entry]));
       baselineById.set(id, normalizedTool);
@@ -1919,6 +1918,44 @@ export function createAdminStore(services) {
     config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
     config.systems[id].hazards = Array.isArray(config.systems[id].hazards) ? config.systems[id].hazards : [];
     return config.systems[id];
+  }
+
+  /**
+   * Read the canonical, system-owned library Tools for a crafting system,
+   * normalized to the editor Tool shape. Tools live on the crafting system
+   * (`system.tools`), not the gathering config — this is the single source the
+   * Tools browser, recipe gate, salvage, and canvas browser all read.
+   *
+   * @param {string} systemId
+   * @returns {Array<object>}
+   */
+  function _systemTools(systemId) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return [];
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
+    return (Array.isArray(system?.tools) ? system.tools : [])
+      .map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+  }
+
+  /**
+   * Persist the given library Tools onto the crafting system via the system
+   * manager (the `craftingSystems` setting), the canonical target. Returns the
+   * normalized tools as round-tripped by the manager, or null when the system
+   * manager / system is unavailable.
+   *
+   * @param {string} systemId
+   * @param {Array<object>} tools
+   * @returns {Promise<Array<object>|null>}
+   */
+  async function _persistSystemTools(systemId, tools) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return null;
+    const systemManager = services.getCraftingSystemManager?.();
+    if (!systemManager?.updateSystem) return null;
+    const normalized = (Array.isArray(tools) ? tools : [])
+      .map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+    const updated = await systemManager.updateSystem(id, { tools: normalized });
+    return Array.isArray(updated?.tools) ? updated.tools : normalized;
   }
 
   function _environmentList() {
@@ -3929,36 +3966,35 @@ export function createAdminStore(services) {
   }
 
   async function addGatheringLibraryTool(systemId = get(selectedSystemId)) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig) return null;
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return null;
     const tool = _normalizeGatheringLibraryTool({ id: _randomID() }, _randomID);
-    systemConfig.tools = [...(systemConfig.tools || []), tool];
-    await _saveGatheringConfig(config);
+    const persisted = await _persistSystemTools(id, [..._systemTools(id), tool]);
+    if (persisted === null) return null;
     await refresh();
     return tool;
   }
 
   async function updateGatheringLibraryTool(systemId = get(selectedSystemId), toolId, updates = {}) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !toolId) return false;
-    systemConfig.tools = (systemConfig.tools || []).map(tool => tool.id === toolId
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id || !toolId) return false;
+    const next = _systemTools(id).map(tool => tool.id === toolId
       ? _normalizeGatheringLibraryTool({ ...tool, ...updates }, _randomID)
       : tool);
-    await _saveGatheringConfig(config);
+    const persisted = await _persistSystemTools(id, next);
+    if (persisted === null) return false;
     await refresh();
     return true;
   }
 
   async function deleteGatheringLibraryTool(systemId = get(selectedSystemId), toolId) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !toolId) return false;
-    const tool = (systemConfig.tools || []).find(t => t.id === toolId);
-    if (tool && !await _confirmGatheringLibraryRecordDelete({ systemId, record: tool, kind: 'tool' })) return false;
-    systemConfig.tools = (systemConfig.tools || []).filter(t => t.id !== toolId);
-    await _saveGatheringConfig(config);
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id || !toolId) return false;
+    const tools = _systemTools(id);
+    const tool = tools.find(t => t.id === toolId);
+    if (tool && !await _confirmGatheringLibraryRecordDelete({ systemId: id, record: tool, kind: 'tool' })) return false;
+    const persisted = await _persistSystemTools(id, tools.filter(t => t.id !== toolId));
+    if (persisted === null) return false;
     await refresh();
     return true;
   }

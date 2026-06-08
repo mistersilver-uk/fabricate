@@ -248,8 +248,18 @@ export class GatheringRichStateService {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
+    // Tools are now system-owned: source the library from the crafting system
+    // (`system.tools`, populated by CraftingSystemManager._normalizeSystem) — the
+    // single canonical source the recipe gate, salvage, and the canvas browser all
+    // read. The `system` argument is the normalized crafting system; fall back to a
+    // live lookup via the global registry when a caller did not pass one. The
+    // gathering-config `tools` copy is no longer the source (a reconciliation
+    // migration moves any UI-authored tools onto the system).
+    const toolSource = (Array.isArray(system?.tools) && system.tools)
+      || globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.tools
+      || [];
     const libraryTools = new Map();
-    for (const tool of normalizeList(libraries.tools)) {
+    for (const tool of normalizeList(toolSource)) {
       if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));
     }
 

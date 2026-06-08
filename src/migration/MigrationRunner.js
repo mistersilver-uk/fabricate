@@ -13,6 +13,7 @@ import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
+import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,14 @@ const MIGRATIONS = [
       // (Spread-merged into the accumulated data; `_migratedCatalystCount` is consumed by
       // the runner and never persisted as a setting.)
       return { recipes, systems, _migratedCatalystCount: migratedCount };
+    }
+  },
+  {
+    version: '0.7.0',
+    label: 'Reconcile UI-authored library tools from gatheringConfig onto the crafting system',
+    migrate(data) {
+      const { systems, gatheringConfig } = migrateToolsToSystem(data.systems, data.gatheringConfig);
+      return { systems, gatheringConfig };
     }
   }
   // Future migrations added here in version order

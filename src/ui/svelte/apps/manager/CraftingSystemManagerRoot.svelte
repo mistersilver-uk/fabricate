@@ -516,7 +516,10 @@
   const selectedGatheringTaskEconomyMode = $derived(selectedGatheringSystemConfig.economy?.mode || 'none');
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
   const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
-  const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
+  // Tools are system-owned: read the canonical library from the selected
+  // crafting system (surfaced on $viewState.selectedSystem.tools by the store)
+  // rather than the gathering-config copy.
+  const selectedGatheringSystemTools = $derived(Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []);
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
   // Environments of the selected system, as { id, name } rows for the task
   // editor's optional default-environment select (the on-drop precedence middle

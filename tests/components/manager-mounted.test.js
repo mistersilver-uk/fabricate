@@ -149,6 +149,10 @@ function createStore(calls = [], options = {}) {
       advancedOptionsEnabled: true,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
+      // Tools are system-owned: the manager reads the library from
+      // selectedSystem.tools (not gatheringConfig). Mirror the option here so the
+      // Tools browser + the gathering task editor's tool picker see them.
+      tools: options.gatheringLibraryTools || [],
       essenceDefinitions: [
         { id: 'earth', name: 'Earth', description: 'Stone and root.', icon: 'fas fa-mountain', sourceComponentId: 'c1', sourceItemUuid: 'c1', associatedSystemItemId: 'c1' },
         { id: 'water', name: 'Water', description: 'Clear current.', icon: 'fas fa-water', sourceComponentId: null, sourceItemUuid: null, associatedSystemItemId: null }

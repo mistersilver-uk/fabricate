@@ -6,6 +6,14 @@ import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from '../config/preferencesCleanup.js';
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
+import { TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST, TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST, TOOL_REQUIREMENT_PROVIDERS as TOOL_REQUIREMENT_PROVIDER_LIST } from '../models/Tool.js';
+
+// Membership sets derived from the canonical Tool model vocabularies, so the
+// system-owned tool normalizer enforces the exact same enumerations as the Tool
+// model and the adminStore editor without duplicating the literal lists.
+const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
+const TOOL_ON_BREAK_MODES = new Set(TOOL_ON_BREAK_MODE_LIST);
+const TOOL_REQUIREMENT_PROVIDERS = new Set(TOOL_REQUIREMENT_PROVIDER_LIST);
 
 export class CraftingSystemManager {
   constructor(recipeManager) {
@@ -95,8 +103,86 @@ export class CraftingSystemManager {
       enableEssences: features.essences === true,
       enableCategories: true,
       enableMultiStepRecipes: features.multiStepRecipes === true,
-      components: items
+      components: items,
+      // Canonical, system-owned library Tools. Populated here so every consumer
+      // (`getSystem(id).tools`) — the recipe tool gate, salvage, the canvas
+      // interactable browser, item-drop resolution, and gathering composition —
+      // reads a single source of truth. Mirrors how `components` is normalized.
+      tools: Array.isArray(system.tools) ? system.tools.map(t => this._normalizeTool(t)) : []
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Library Tool normalization (system-owned canonical shape:
+  //   { id, label, enabled, componentId, requirement, breakage, onBreak }).
+  // Field coercion mirrors the adminStore tool editor and the Tool model so a
+  // tool authored in the Manager, migrated from a catalyst, or hand-edited in
+  // settings loads to the same shape regardless of origin.
+  // ---------------------------------------------------------------------------
+
+  _normalizeTool(tool = {}) {
+    if (!tool || typeof tool !== 'object') tool = {};
+    const id = String(tool.id || foundry.utils.randomID());
+    const label = typeof tool.label === 'string' ? tool.label.trim() : '';
+    const componentId = typeof tool.componentId === 'string' && tool.componentId.trim()
+      ? tool.componentId.trim()
+      : null;
+    return {
+      id,
+      label,
+      enabled: tool.enabled !== false,
+      componentId,
+      requirement: this._normalizeToolRequirement(tool.requirement),
+      breakage: this._normalizeToolBreakage(tool.breakage),
+      onBreak: this._normalizeToolOnBreak(tool.onBreak)
+    };
+  }
+
+  _normalizeToolRequirement(input) {
+    if (input === null || input === undefined) return null;
+    if (typeof input !== 'object') return null;
+    const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
+    return {
+      provider,
+      formula: typeof input.formula === 'string' ? input.formula : '',
+      macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+    };
+  }
+
+  _normalizeToolBreakage(input) {
+    const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
+    if (mode === 'limitedUses') {
+      const raw = input?.maxUses;
+      let maxUses = null;
+      if (raw !== null && raw !== undefined && raw !== '') {
+        const numeric = Number(raw);
+        maxUses = Number.isFinite(numeric) ? numeric : null;
+      }
+      return { mode, maxUses };
+    }
+    if (mode === 'breakageChance') {
+      const raw = Number(input?.breakageChance);
+      return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
+    }
+    const threshold = Number(input?.threshold);
+    return {
+      mode,
+      formula: typeof input?.formula === 'string' ? input.formula : '',
+      threshold: Number.isFinite(threshold) ? threshold : 0
+    };
+  }
+
+  _normalizeToolOnBreak(input) {
+    const mode = TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
+    if (mode === 'replaceWith') {
+      return {
+        mode,
+        replacementComponentId: typeof input?.replacementComponentId === 'string'
+          ? input.replacementComponentId
+          : null
+      };
+    }
+    return { mode };
   }
 
   _normalizeFeatures(system = {}) {

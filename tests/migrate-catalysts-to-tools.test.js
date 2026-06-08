@@ -383,7 +383,9 @@ test('0.6.0 runs from 0.5.0: catalysts become tools + toolIds and version advanc
   assert.equal('catalysts' in recipes[0], false);
   assert.equal(recipes[0].toolIds.length, 1);
   assert.equal(systems[0].tools.length, 1);
-  assert.equal(settings.store.get('migrationVersion'), '0.6.0');
+  // The full runner also applies the later 0.7.0 tool-reconciliation migration,
+  // so the persisted version advances to the highest migration version.
+  assert.equal(settings.store.get('migrationVersion'), '0.7.0');
   assert.equal(summary.migratedCatalystCount, 1);
 
   // The transient count field is never persisted onto any setting payload.
@@ -404,10 +406,16 @@ test('version gate: 0.6.0 is NOT re-applied when migrationVersion is already 0.6
 
   const summary = await runner.run();
 
-  // No migration pending — catalysts untouched, nothing persisted.
+  // The 0.6.0 catalyst migration itself is gated out (catalysts untouched). The
+  // later 0.7.0 tool-reconciliation migration is still pending and runs, but with
+  // no gathering-config tools to move it is a data no-op — only the version bumps.
   const recipes = settings.store.get('recipes');
-  assert.ok('catalysts' in recipes[0], 'catalysts untouched when gate blocks the run');
-  assert.equal(settings.calls.set.length, 0);
+  assert.ok('catalysts' in recipes[0], 'catalysts untouched when 0.6.0 gate blocks the run');
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes not persisted (0.6.0 gated, 0.7.0 untouched)');
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted');
+  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted');
+  assert.equal(settings.store.get('migrationVersion'), '0.7.0');
   assert.equal(summary.migratedCatalystCount, 0);
 });
 
