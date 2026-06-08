@@ -347,6 +347,7 @@
           "TaskStaminaModifiersHint": "Adjust the cost for an actor (e.g. a strong character mines for less).",
           "TaskNodesTitle": "Resource node",
           "TaskNodesHint": "Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.",
+          "TaskNodesEconomyHint": "Canvas per-token depletion and depleted-token behavior are only available when this system's gathering economy is set to \"nodes\". Switch the gathering economy mode in the system's Economy settings to author a resource node here.",
           "TaskNodeCount": "Node count",
           "TaskNodeDeplete": "Deplete",
           "DepleteOnStart": "On start",

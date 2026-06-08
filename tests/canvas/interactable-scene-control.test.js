@@ -57,16 +57,27 @@ test('the group exposes a button tool (click action, not a toggle mode) in the V
   assert.equal(tool.icon, FABRICATE_SCENE_CONTROL_ICON);
 });
 
-test('the button handler launches the browser app (via onClick and onChange)', () => {
+test('the group declares NO activeTool (a button-only group must not pin a persistent tool)', () => {
+  // An `activeTool` on a button-only group makes V13 render the icon twice and
+  // keeps the button stuck "active" so re-clicks never re-fire. It must be absent.
+  const controls = v13Controls();
+  addInteractableSceneControl(controls, { isGM: true, onClick: () => {} });
+  const group = controls[FABRICATE_SCENE_CONTROL_NAME];
+  assert.equal('activeTool' in group, false, 'the group must not declare an activeTool');
+});
+
+test('the button handler launches the browser app via onChange ONLY (no deprecated onClick)', () => {
   const controls = v13Controls();
   let clicks = 0;
   addInteractableSceneControl(controls, { isGM: true, onClick: () => { clicks += 1; } });
   const tool = controls[FABRICATE_SCENE_CONTROL_NAME].tools[FABRICATE_INTERACTABLE_TOOL_NAME];
 
-  tool.onClick();
-  assert.equal(clicks, 1, 'onClick fires the launch callback');
+  // The V13 `onClick` tool handler is deprecated and must NOT be wired (it emits
+  // a SceneControlTool#onClick deprecation warning).
+  assert.equal('onClick' in tool, false, 'the deprecated onClick handler is not set on the tool');
+  assert.equal(typeof tool.onChange, 'function', 'onChange is the only activation handler');
   tool.onChange();
-  assert.equal(clicks, 2, 'onChange also fires the launch callback (V13 dispatches it for button tools)');
+  assert.equal(clicks, 1, 'onChange fires the launch callback');
 });
 
 test('non-GM ⇒ the Fabricate control is NOT added', () => {

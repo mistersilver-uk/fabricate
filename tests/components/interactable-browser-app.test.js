@@ -37,7 +37,19 @@ describe('InteractableBrowserApp singleton window', () => {
     assert.ok(appSource.includes('static _instance = null'), 'tracks a single instance');
     assert.ok(appSource.includes('static async show()'), 'exposes a static show()');
     assert.ok(appSource.includes('existing.bringToFront()'), 're-show brings the existing window to front');
-    assert.ok(appSource.includes('await app.render(true)'), 'a fresh show renders the window');
+    assert.ok(appSource.includes('app.render(true)'), 'a fresh show renders the window');
+  });
+
+  it('coalesces concurrent show() calls to a single window (V13 re-entrancy guard)', () => {
+    // The scene-control button fires the launch handler 2–3× per activation; a
+    // second show() mid-render must NOT construct a competing instance (which
+    // collided in ApplicationV2 _updatePosition → "el.parentElement is null").
+    assert.ok(appSource.includes('static _renderPromise = null'), 'tracks an in-flight render promise');
+    assert.ok(appSource.includes('if (existing) {'), 'show() returns early whenever ANY instance exists');
+    assert.ok(appSource.includes('await InteractableBrowserApp._renderPromise'), 'an in-flight render is awaited');
+    const newIdx = appSource.indexOf('new InteractableBrowserApp()');
+    const guardIdx = appSource.indexOf('if (existing) {');
+    assert.ok(newIdx > guardIdx, 'the only construct sits after the existing-instance guard');
   });
 
   it('clears the singleton on close() and the _onClose safety net', () => {

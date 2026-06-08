@@ -32,8 +32,9 @@ export const FABRICATE_SCENE_CONTROL_ICON = 'fas fa-mortar-pestle';
  * @param {Record<string, object>} controls  The V13 object-of-controls record.
  * @param {object} deps
  * @param {boolean} deps.isGM        When false, nothing is added.
- * @param {() => void} deps.onClick   Invoked when the button tool is clicked
- *   (launches the Interactable browser app).
+ * @param {() => void} deps.onClick   Invoked when the button tool is activated
+ *   (launches the Interactable browser app). Wired to the V13 tool `onChange`
+ *   handler; `onClick` on the tool itself is deprecated in V13 and not set.
  * @param {(key: string, fallback: string) => string} [deps.localize]  Localizer;
  *   defaults to the fallback string.
  * @returns {Record<string, object>} The (possibly mutated) controls record.
@@ -64,16 +65,18 @@ export function addInteractableSceneControl(controls, { isGM, onClick, localize 
         // A click action (one-shot), NOT a toggle mode.
         button: true,
         visible: true,
-        onClick: () => { if (typeof onClick === 'function') onClick(); },
-        // V13 also dispatches `onChange` for button tools; route both to the
-        // launch callback so the click fires regardless of which the running
-        // Foundry build invokes.
+        // V13 SceneControlTool dispatches `onChange` for button tools; `onClick`
+        // is DEPRECATED on the tool and emits a console warning, so we only wire
+        // `onChange`. The launch callback fires every activation regardless of
+        // whether the button was already active.
         onChange: () => { if (typeof onClick === 'function') onClick(); }
       }
-    },
-    // V13 control groups carry an `activeTool`; a button-only group points it at
-    // its single tool so the bar has a valid default selection.
-    activeTool: FABRICATE_INTERACTABLE_TOOL_NAME
+    }
+    // NOTE: deliberately NO `activeTool`. A button-only group must not declare an
+    // active/persistent tool: in V13 that makes the bar render the icon twice
+    // (group icon + active-tool child) and keeps the button stuck "active" so
+    // re-clicks do not re-fire the launch callback. Without it, the group is a
+    // plain button that re-opens the browser on every click.
   };
 
   return controls;

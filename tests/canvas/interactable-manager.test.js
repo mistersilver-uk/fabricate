@@ -124,19 +124,21 @@ const FOREIGN_DROP = { type: 'Item', uuid: 'Item.unknown' };
 
 // --- register() idempotency -------------------------------------------------
 
-test('register() binds each canvas hook exactly once across repeated calls', () => {
+test('register() binds the dropCanvasData hook exactly once across repeated calls', () => {
   const saved = snapshotGlobals();
   try {
     const registrations = [];
     globalThis.Hooks = { on: (hook, fn) => registrations.push({ hook, fn }) };
+    // No Token class available ⇒ the double-click wrap install is a no-op (it is
+    // exercised directly in interactable-doubleclick-wrap.test.js).
 
     const manager = new InteractableManager();
     manager.register();
     manager.register(); // second call must be a no-op.
 
     const hooks = registrations.map(r => r.hook);
-    assert.deepEqual(hooks.sort(), ['canvasReady', 'drawToken', 'dropCanvasData']);
-    assert.equal(registrations.length, 3, 'each hook bound only once');
+    assert.deepEqual(hooks.sort(), ['dropCanvasData']);
+    assert.equal(registrations.length, 1, 'the drop hook is bound only once');
     assert.equal(manager._registered, true);
   } finally {
     restoreGlobals(saved);
@@ -278,62 +280,6 @@ test('_spawnInteractable carries environmentId into the gathering-task flag bloc
       sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
       environmentId: 'env-3'
     });
-  } finally {
-    restoreGlobals(saved);
-  }
-});
-
-// --- _attachDoubleClick idempotency -----------------------------------------
-
-function fakeInteractablePlaceable() {
-  const listeners = [];
-  return {
-    on: (event, fn) => listeners.push({ event, fn }),
-    _listeners: listeners,
-    document: {
-      flags: {
-        fabricate: {
-          isInteractable: true,
-          interactableType: 'tool',
-          sourceUuid: 'Fabricate.sysA.tool.tool-1'
-        }
-      }
-    }
-  };
-}
-
-test('_attachDoubleClick binds clickLeft2 only once per placeable (canvasReady + drawToken)', () => {
-  const saved = snapshotGlobals();
-  try {
-    installFakeFoundry({ isGM: true });
-    const manager = new InteractableManager();
-    const placeable = fakeInteractablePlaceable();
-
-    // Re-attach via both seam paths against the SAME placeable.
-    manager._attachDoubleClick(placeable);
-    manager._onTokenDrawn(placeable);
-    globalThis.canvas.tokens.placeables = [placeable];
-    manager._attachListeners();
-
-    const clickLeft2 = placeable._listeners.filter(l => l.event === 'clickLeft2');
-    assert.equal(clickLeft2.length, 1, 'clickLeft2 bound exactly once');
-    assert.equal(placeable._fabricateInteractableBound, true);
-  } finally {
-    restoreGlobals(saved);
-  }
-});
-
-test('_attachDoubleClick is a no-op for a non-interactable placeable', () => {
-  const saved = snapshotGlobals();
-  try {
-    installFakeFoundry({ isGM: true });
-    const manager = new InteractableManager();
-    const placeable = {
-      on: () => { throw new Error('must not bind on a non-interactable token'); },
-      document: { flags: {} }
-    };
-    manager._attachDoubleClick(placeable);
-    assert.equal(placeable._fabricateInteractableBound, undefined);
   } finally {
     restoreGlobals(saved);
   }

@@ -31,6 +31,10 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
   // Single shared instance so the scene-control button re-focuses one window.
   static _instance = null;
 
+  // In-flight render promise for the live instance; lets concurrent show() calls
+  // coalesce onto the SAME window rather than constructing a competing instance.
+  static _renderPromise = null;
+
   _services = null;
 
   static DEFAULT_OPTIONS = {
@@ -108,6 +112,7 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
   async close(options) {
     if (InteractableBrowserApp._instance === this) {
       InteractableBrowserApp._instance = null;
+      InteractableBrowserApp._renderPromise = null;
     }
     return super.close(options);
   }
@@ -115,6 +120,7 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
   _onClose(options) {
     if (InteractableBrowserApp._instance === this) {
       InteractableBrowserApp._instance = null;
+      InteractableBrowserApp._renderPromise = null;
     }
     super._onClose(options);
   }
@@ -122,17 +128,55 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
   /**
    * Open (or re-focus) the shared Interactable browser window.
    *
+   * RE-ENTRANCY: the V13 scene-control button fires the launch handler 2–3× per
+   * activation (and a fast re-click is also possible), so concurrent `show()`
+   * calls can arrive while the first render is still in flight. Guarding only on
+   * `rendered` was insufficient: a second call mid-render constructed a SECOND
+   * instance and the two ApplicationV2 renders collided in `_updatePosition`
+   * ("el.parentElement is null"). We coalesce to a single window — if ANY
+   * instance already exists (rendering OR rendered), we await/return it and never
+   * construct a second. Only construct when `_instance` is null. `close()` /
+   * `_onClose()` clear `_instance`, so a closed window allows a fresh open.
+   *
    * @returns {Promise<InteractableBrowserApp>}
    */
   static async show() {
     const existing = InteractableBrowserApp._instance;
-    if (existing?.rendered) {
-      existing.bringToFront();
+    if (existing) {
+      // An instance is already live (in-flight render or finished). Re-focus a
+      // finished window; for an in-flight one, await the tracked render promise
+      // so a concurrent caller resolves to the SAME window once it completes.
+      if (existing.rendered) existing.bringToFront();
+      else if (InteractableBrowserApp._renderPromise) await InteractableBrowserApp._renderPromise;
       return existing;
     }
     const app = new InteractableBrowserApp();
     InteractableBrowserApp._instance = app;
-    await app.render(true);
+    // Track the in-flight render so concurrent show() calls coalesce onto it
+    // instead of constructing a competing instance.
+    const renderPromise = Promise.resolve(app.render(true));
+    InteractableBrowserApp._renderPromise = renderPromise;
+    try {
+      await renderPromise;
+    } catch (err) {
+      // The render REJECTED: leaving `_instance` pointing at the dead app would
+      // make a later show() return it and never re-render (browser stuck-closed
+      // until reload). Clear the failed instance + its tracked promise so the
+      // NEXT show() constructs and renders a fresh window. Only clear when they
+      // still point at THIS attempt (a concurrent close()/show() may have moved
+      // on). Rethrow to preserve the existing reject contract.
+      if (InteractableBrowserApp._instance === app) {
+        InteractableBrowserApp._instance = null;
+      }
+      if (InteractableBrowserApp._renderPromise === renderPromise) {
+        InteractableBrowserApp._renderPromise = null;
+      }
+      throw err;
+    } finally {
+      if (InteractableBrowserApp._renderPromise === renderPromise) {
+        InteractableBrowserApp._renderPromise = null;
+      }
+    }
     return app;
   }
 }

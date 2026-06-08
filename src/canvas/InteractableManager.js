@@ -5,8 +5,9 @@
  *  - `dropCanvasData` intercepts a dropped Fabricate Tool / Gathering Task,
  *    suppresses the default drop, and spawns a flagged UNLINKED token against the
  *    single backing actor.
- *  - `canvasReady` / token-draw hooks attach a PIXI double-click (`clickLeft2`)
- *    handler to each interactable placeable.
+ *  - a one-time wrap of the V13 Token `_onClickLeft2` handler intercepts a
+ *    double-click on an interactable token, suppressing Foundry's default (which
+ *    would open the backing actor's sheet for a GM / no-op for a player).
  *  - double-click reads the token's interactable flags and dispatches by type.
  *
  * All decision logic (drop classification, spawn-payload shaping, double-click
@@ -21,6 +22,8 @@ import {
   buildActiveCanvasTool,
   parseInteractableSourceUuid
 } from './interactableResolution.js';
+import { resolveItemUuidToTool } from './interactableItemResolution.js';
+import { decideInteractableDoubleClick } from './interactableDoubleClickWrap.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
 import { buildInteractableFlags, isInteractableToken } from './interactableTokenFlags.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
@@ -34,7 +37,71 @@ import { getFabricateAppClass } from '../ui/appFactory.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
 import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
 
-const DOUBLE_CLICK_FLAG = '_fabricateInteractableBound';
+/**
+ * Idempotency guard so the V13 Token double-click wrap is installed exactly once
+ * even if `register()` runs more than once (or across hot reloads). Lives at
+ * module scope because the wrap mutates the shared Token class prototype, not a
+ * per-instance binding.
+ */
+const DOUBLE_CLICK_WRAP_FLAG = '_fabricateInteractableDoubleClickWrapped';
+
+/**
+ * Resolve the V13 Token placeable class whose `_onClickLeft2` we wrap.
+ *
+ * We prefer `CONFIG.Token.objectClass` — the class Foundry actually INSTANTIATES
+ * for canvas tokens — FIRST, so we wrap the most-derived live class. A game
+ * system whose active Token subclass overrides `_onClickLeft2` WITHOUT calling
+ * `super` would otherwise bypass a base-class wrap and leak the backing actor
+ * sheet for an interactable token. We then fall back to the V13 base placeable
+ * `foundry.canvas.placeables.Token`, then to a bare `Token` global (older
+ * shapes), returning the first whose prototype owns `_onClickLeft2` so the wrap
+ * binds to the live build's class.
+ *
+ * @returns {Function|null} The Token class, or null when none is resolvable.
+ */
+function resolveTokenClass() {
+  const candidates = [
+    globalThis.CONFIG?.Token?.objectClass,
+    globalThis.foundry?.canvas?.placeables?.Token,
+    globalThis.Token
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'function' && typeof candidate.prototype?._onClickLeft2 === 'function') {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * Install a one-time, idempotent wrap of the V13 Token `_onClickLeft2` handler.
+ *
+ * The wrapper consults the pure {@link decideInteractableDoubleClick}: for an
+ * interactable token it routes to {@link InteractableManager#_onDoubleClick} and
+ * SUPPRESSES the V13 default (no actor sheet for a GM, and an actual UI for a
+ * player); for any other token it delegates to the captured original handler with
+ * the correct `this` and arguments. Defensive: no-throw when the class/method is
+ * absent (e.g. at import/init before the canvas layer exists).
+ */
+function installInteractableDoubleClickWrap() {
+  const TokenClass = resolveTokenClass();
+  if (!TokenClass) return; // canvas placeables not available yet — tolerate.
+  const proto = TokenClass.prototype;
+  if (proto[DOUBLE_CLICK_WRAP_FLAG] === true) return; // already wrapped once.
+
+  const original = proto._onClickLeft2;
+  if (typeof original !== 'function') return;
+
+  proto._onClickLeft2 = function wrappedOnClickLeft2(...args) {
+    const decision = decideInteractableDoubleClick(this?.document, isInteractableToken);
+    if (decision === 'dispatch') {
+      InteractableManager.instance?._onDoubleClick?.(this.document);
+      return; // suppress the V13 default for BOTH GM and player.
+    }
+    return original.apply(this, args);
+  };
+  proto[DOUBLE_CLICK_WRAP_FLAG] = true;
+}
 
 class InteractableManager {
   /**
@@ -62,21 +129,23 @@ class InteractableManager {
     this._promptDropEnvironment = promptEnvironment;
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
-    this._attachListeners = this._attachListeners.bind(this);
-    this._onTokenDrawn = this._onTokenDrawn.bind(this);
   }
 
   /**
-   * Install canvas hooks. Idempotent — repeated calls are a no-op.
+   * Install canvas hooks + the V13 Token double-click wrap. Idempotent —
+   * repeated calls are a no-op.
    */
   register() {
     if (this._registered) return;
     const hooks = globalThis.Hooks;
-    if (!hooks?.on) return;
-    hooks.on('dropCanvasData', this._onDrop);
-    hooks.on('canvasReady', this._attachListeners);
-    // Re-attach the double-click handler for tokens created after canvasReady.
-    hooks.on('drawToken', this._onTokenDrawn);
+    if (hooks?.on) {
+      hooks.on('dropCanvasData', this._onDrop);
+    }
+    // Wrap the V13 Token double-click handler so interactable tokens route to the
+    // Fabricate dispatcher and SUPPRESS the default (which would open the backing
+    // actor sheet for a GM / no-op for a player). Installed once, defensively, and
+    // independently of Hooks availability (the prototype wrap is its own concern).
+    installInteractableDoubleClickWrap();
     this._registered = true;
   }
 
@@ -311,41 +380,6 @@ class InteractableManager {
   }
 
   /**
-   * `canvasReady` handler: attach the double-click handler to every interactable
-   * placeable currently on the token layer.
-   */
-  _attachListeners() {
-    const placeables = globalThis.canvas?.tokens?.placeables ?? [];
-    for (const placeable of placeables) {
-      this._attachDoubleClick(placeable);
-    }
-  }
-
-  /**
-   * `drawToken` handler: attach to a single placeable as it is (re)drawn.
-   *
-   * @param {object} placeable
-   */
-  _onTokenDrawn(placeable) {
-    this._attachDoubleClick(placeable);
-  }
-
-  /**
-   * Attach a PIXI `clickLeft2` (double-click) handler to an interactable
-   * placeable, once. No-op for non-interactable tokens.
-   *
-   * @param {object} placeable  A canvas Token placeable.
-   */
-  _attachDoubleClick(placeable) {
-    const document = placeable?.document;
-    if (!document || !isInteractableToken(document)) return;
-    if (placeable[DOUBLE_CLICK_FLAG]) return;
-    if (typeof placeable.on !== 'function') return;
-    placeable.on('clickLeft2', () => this._onDoubleClick(document));
-    placeable[DOUBLE_CLICK_FLAG] = true;
-  }
-
-  /**
    * Double-click handler. Reads the token's interactable flags and dispatches by
    * type. The tool branch opens the Fabricate app with the station's Tool
    * injected as an `activeCanvasTool` (Phase 4); the gathering-task branch is
@@ -497,8 +531,14 @@ class InteractableManager {
         const tasks = this._readLibraryTasks(systemId);
         return tasks.find(task => task?.id === taskId) ?? null;
       },
-      // Phase 4+ may map a dropped component Item uuid to a Tool; unresolved for now.
-      resolveItemUuidToTool: () => null
+      // Map a dropped Foundry Item uuid to a crafting-system Tool by matching the
+      // item against each tool's managed-component source refs (Fix 4). The
+      // Foundry edges (sync uuid resolution, system enumeration) are isolated
+      // here; the matching strategy itself is the pure injected resolver.
+      resolveItemUuidToTool: (uuid) => resolveItemUuidToTool(uuid, {
+        resolveItem: (id) => globalThis.fromUuidSync?.(id) ?? null,
+        getSystems: () => systemManager?.getSystems?.() ?? []
+      })
     };
   }
 

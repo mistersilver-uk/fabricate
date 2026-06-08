@@ -33,6 +33,25 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.ok(nodesIdx > guardIdx, 'the node card should render inside the nodes-mode guard');
   });
 
+  it('shows a guidance hint in the node area when NOT in nodes mode (the {:else} branch)', () => {
+    // The hint lives in the `{:else}` of the nodes guard, so it renders for any
+    // non-nodes economy (stamina/none) explaining how to enable canvas depletion.
+    const guardIdx = editorSource.indexOf("{#if economyMode === 'nodes'}");
+    const elseIdx = editorSource.indexOf('{:else}', guardIdx);
+    const hintIdx = editorSource.indexOf('data-gathering-task-nodes-hint');
+    assert.ok(elseIdx > guardIdx, 'the nodes guard has an else branch');
+    assert.ok(hintIdx > elseIdx, 'the guidance hint renders inside the else (non-nodes) branch');
+    // It is wired to the dedicated economy hint key.
+    assert.match(editorSource, /FABRICATE\.Admin\.Manager\.Economy\.TaskNodesEconomyHint/, 'the hint uses the economy-mode guidance key');
+  });
+
+  it('adds the non-nodes economy guidance hint i18n key (mentions the nodes economy)', () => {
+    const hint = lang.FABRICATE.Admin.Manager.Economy.TaskNodesEconomyHint;
+    assert.ok(typeof hint === 'string' && hint.length > 0, 'the guidance key exists');
+    assert.match(hint, /nodes/i, 'the hint explains the nodes economy requirement');
+    assert.match(hint, /economy/i, 'the hint points at the gathering economy setting');
+  });
+
   it('exposes the full node-config controls (count, depletion, respawn, interval, gain mode, chance, amount)', () => {
     for (const attr of [
       'data-gathering-task-node-count',

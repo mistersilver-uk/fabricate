@@ -1012,6 +1012,18 @@
         </div>
       </div>
     </section>
+    {:else}
+    <section class="manager-task-nodes-card manager-task-nodes-hint-card" data-gathering-task-nodes-hint>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
+        </div>
+      </div>
+      <p class="manager-muted manager-task-nodes-hint-text">
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodesEconomyHint', 'Canvas per-token depletion and depleted-token behavior are only available when this system\'s gathering economy is set to "nodes". Switch the gathering economy mode in the system\'s Economy settings to author a resource node here.')}</span>
+      </p>
+    </section>
     {/if}
 
     <section class="manager-task-required-tools-card" data-gathering-task-required-tools>
@@ -1426,6 +1438,19 @@
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: var(--fab-space-3);
     align-items: end;
+  }
+
+  /* Guidance shown in the node area when the system is NOT in nodes economy. */
+  .manager-task-nodes-hint-text {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-2);
+    margin: 0;
+  }
+
+  .manager-task-nodes-hint-text i {
+    margin-top: 2px;
+    flex: 0 0 auto;
   }
 
   .manager-task-node-interval-row,
