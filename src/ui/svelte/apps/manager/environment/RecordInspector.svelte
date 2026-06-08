@@ -274,7 +274,7 @@
                 <input
                   type="text"
                   inputmode="numeric"
-                  pattern="[+-]?[0-9]*"
+                  pattern="[+\-]?[0-9]*"
                   value={adjustmentDisplayValue(hazardAdjustment)}
                   aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
                   title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
@@ -324,7 +324,7 @@
                   <input
                     type="text"
                     inputmode="numeric"
-                    pattern="[+-]?[0-9]*"
+                    pattern="[+\-]?[0-9]*"
                     value={adjustmentDisplayValue(row.adjustment)}
                     aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
                     title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
