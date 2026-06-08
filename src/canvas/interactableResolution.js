@@ -182,27 +182,38 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
 }
 
 /**
- * Shape the data needed to spawn an interactable token from a classified drop.
- * Pure: returns the flag-build args plus the drop coordinates; the caller wires
- * the actual TokenDocument creation.
+ * Shape the data needed to spawn an interactable TILE from a classified drop.
+ * Pure: returns the flag-build args plus the placement geometry; the caller wires
+ * the actual TileDocument creation (and resolves the icon `texture`/grid `width`/
+ * `height` at the Foundry edge, passing them in here).
  *
- * For a gathering-task drop the request carries:
- *  - `name`: the task's name, so the spawned token's nameplate identifies the
- *    gathering point (double-click discoverability).
- *  - `node`: a SNAPSHOT of the task's node CONFIG (built via `buildNode`), carrying
- *    both config and runtime, or `null` for an unlimited (never-depleting) node.
- *    Tool requirements are NOT snapshotted — they resolve live from `task.toolIds`.
+ * The request carries:
+ *  - `name`: the tool's label or the task's name, stored in the tile flag for the
+ *    hover tooltip (tiles have no nameplate) and resolution.
+ *  - `texture`: the icon path for the tile image (`texture.src`), resolved by the
+ *    caller from the tool's component img / the task img with a sensible default.
+ *  - `width`/`height`: the tile dimensions (default one grid square), resolved by
+ *    the caller from the scene grid.
+ *  - `node` (gatheringTask only): a SNAPSHOT of the task's node CONFIG (built via
+ *    `buildNode`), carrying both config and runtime, or `null` for an unlimited
+ *    (never-depleting) node. Tool requirements are NOT snapshotted — they resolve
+ *    live from `task.toolIds`.
+ *  - `environmentId` (gatheringTask only): the resolved drop environment.
  *
  * @param {object} params
  * @param {ReturnType<typeof classifyInteractableDrop>} params.classification
  * @param {{x: number, y: number}} [params.point]   Drop point in scene coordinates.
  * @param {string} [params.environmentId]           Resolved environment (gatheringTask only).
+ * @param {string} [params.texture]                 Tile image path (`texture.src`).
+ * @param {number} [params.width]                   Tile width (scene units).
+ * @param {number} [params.height]                  Tile height (scene units).
  * @param {(task: object) => (object|null)} [params.buildNode] Node-snapshot builder
  *   applied to the classified task entry (gatheringTask only).
  * @returns {{ interactableType: string, sourceUuid: string, environmentId?: string,
- *   name?: string, node?: object, x: number, y: number } | null}
+ *   name?: string, texture?: string, width?: number, height?: number,
+ *   node?: object, x: number, y: number } | null}
  */
-export function buildSpawnRequest({ classification, point, environmentId, buildNode } = {}) {
+export function buildSpawnRequest({ classification, point, environmentId, texture, width, height, buildNode } = {}) {
   if (!classification) return null;
   const request = {
     interactableType: classification.interactableType,
@@ -210,14 +221,24 @@ export function buildSpawnRequest({ classification, point, environmentId, buildN
     x: Number(point?.x ?? 0),
     y: Number(point?.y ?? 0)
   };
+
+  // The hover-tooltip name comes from the task name or the tool label/name.
+  const entry = classification.entry ?? null;
+  const name = typeof entry?.name === 'string' && entry.name.trim()
+    ? entry.name.trim()
+    : (typeof entry?.label === 'string' ? entry.label.trim() : '');
+  if (name) request.name = name;
+
+  if (typeof texture === 'string' && texture.trim()) request.texture = texture.trim();
+  if (Number.isFinite(Number(width)) && Number(width) > 0) request.width = Number(width);
+  if (Number.isFinite(Number(height)) && Number(height) > 0) request.height = Number(height);
+
   if (classification.interactableType === 'gatheringTask') {
     if (typeof environmentId === 'string' && environmentId) {
       request.environmentId = environmentId;
     }
-    const name = typeof classification.entry?.name === 'string' ? classification.entry.name.trim() : '';
-    if (name) request.name = name;
     if (typeof buildNode === 'function') {
-      const node = buildNode(classification.entry);
+      const node = buildNode(entry);
       if (node) request.node = node;
     }
   }

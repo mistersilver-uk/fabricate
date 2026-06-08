@@ -1,19 +1,29 @@
 /**
- * Canvas Interactable foundation (Phase 3).
+ * Canvas Interactable foundation.
  *
  * Singleton that wires Foundry canvas hooks to the pure interactable logic:
  *  - `dropCanvasData` intercepts a dropped Fabricate Tool / Gathering Task,
- *    suppresses the default drop, and spawns a flagged UNLINKED token against the
- *    single backing actor.
- *  - a one-time wrap of the V13 Token `_onClickLeft2` handler intercepts a
- *    double-click on an interactable token, suppressing Foundry's default (which
- *    would open the backing actor's sheet for a GM / no-op for a player).
- *  - double-click reads the token's interactable flags and dispatches by type.
+ *    suppresses the default drop, and spawns a flagged TileDocument (no actor,
+ *    no sheet).
+ *  - a one-time wrap of the V13 Tile `_onClickLeft2` handler intercepts a
+ *    double-click on an interactable tile, suppressing Foundry's default and
+ *    routing to the Fabricate dispatcher.
+ *  - a one-time wrap of the V13 `MouseInteractionManager#can` permission gate
+ *    permits a non-GM player's double-click / hover on an interactable tile
+ *    (tiles are not natively pointer-interactive for players).
+ *  - a one-time wrap of the Tile hover handlers shows a discoverability tooltip
+ *    (tiles have no nameplate) — rendered as a canvas-native PIXI label child,
+ *    NOT via the DOM TooltipManager (a Tile has no DOM element).
+ *  - a draw-time enablement (`drawTile` + a `canvasReady` sweep) makes
+ *    interactable tiles pointer-eventful for ALL users, so a non-GM player's
+ *    double-click / hover actually reaches the placeable's MouseInteractionManager
+ *    (a Tile is GM scenery and is not natively pointer-interactive for players).
  *
  * All decision logic (drop classification, spawn-payload shaping, double-click
- * routing) lives in the pure modules `interactableResolution.js` and
- * `interactableDispatch.js`; the hook bodies here are the thin Foundry/PIXI edge.
- * Spawning is GM-only.
+ * routing, permission, tooltip text) lives in the pure modules
+ * `interactableResolution.js`, `interactableDispatch.js`,
+ * `interactableDoubleClickWrap.js`, and `interactableTooltip.js`; the hook/wrap
+ * bodies here are the thin Foundry/PIXI edge. Spawning is GM-only.
  */
 
 import {
@@ -23,12 +33,20 @@ import {
   parseInteractableSourceUuid
 } from './interactableResolution.js';
 import { resolveItemUuidToTool } from './interactableItemResolution.js';
-import { decideInteractableDoubleClick } from './interactableDoubleClickWrap.js';
+import {
+  decideInteractableDoubleClick,
+  shouldPermitInteractableAction
+} from './interactableDoubleClickWrap.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
-import { buildInteractableFlags, isInteractableToken } from './interactableTokenFlags.js';
+import { buildInteractableTileFlags, isInteractableTile } from './interactableTileFlags.js';
+import { interactableTooltipText } from './interactableTooltip.js';
+import { showInteractableTileLabel, hideInteractableTileLabel } from './interactableTileLabel.js';
+import {
+  enableInteractableTilePointerEvents,
+  enableInteractableTilesIn
+} from './interactableTileInteractivity.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
-import { ensureInteractableActor } from './interactableActor.js';
-import { buildTokenNodeSnapshot, createTokenNodeStateAdapter } from './tokenNodeStateAdapter.js';
+import { buildTileNodeSnapshot, createTileNodeStateAdapter } from './tileNodeStateAdapter.js';
 import { emitInteractableNodeWrite, buildDepletedBehaviorApply } from './interactableSocketBridge.js';
 import { resolveDropEnvironment } from './environmentResolution.js';
 import { regionEnvironmentIdsAtPoint } from './regionHitTest.js';
@@ -37,33 +55,35 @@ import { getFabricateAppClass } from '../ui/appFactory.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
 import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
 
-/**
- * Idempotency guard so the V13 Token double-click wrap is installed exactly once
- * even if `register()` runs more than once (or across hot reloads). Lives at
- * module scope because the wrap mutates the shared Token class prototype, not a
- * per-instance binding.
- */
-const DOUBLE_CLICK_WRAP_FLAG = '_fabricateInteractableDoubleClickWrapped';
+/** Fallback tile image when no tool/task icon can be resolved. */
+const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
 
 /**
- * Resolve the V13 Token placeable class whose `_onClickLeft2` we wrap.
- *
- * We prefer `CONFIG.Token.objectClass` — the class Foundry actually INSTANTIATES
- * for canvas tokens — FIRST, so we wrap the most-derived live class. A game
- * system whose active Token subclass overrides `_onClickLeft2` WITHOUT calling
- * `super` would otherwise bypass a base-class wrap and leak the backing actor
- * sheet for an interactable token. We then fall back to the V13 base placeable
- * `foundry.canvas.placeables.Token`, then to a bare `Token` global (older
- * shapes), returning the first whose prototype owns `_onClickLeft2` so the wrap
- * binds to the live build's class.
- *
- * @returns {Function|null} The Token class, or null when none is resolvable.
+ * Idempotency guards so the V13 Tile wraps are installed exactly once even if
+ * `register()` runs more than once (or across hot reloads). They live at module
+ * scope because the wraps mutate shared class prototypes, not a per-instance
+ * binding.
  */
-function resolveTokenClass() {
+const DOUBLE_CLICK_WRAP_FLAG = '_fabricateInteractableDoubleClickWrapped';
+const HOVER_WRAP_FLAG = '_fabricateInteractableHoverWrapped';
+const PERMISSION_WRAP_FLAG = '_fabricateInteractablePermissionWrapped';
+
+/**
+ * Resolve the V13 Tile placeable class whose `_onClickLeft2` / hover handlers we
+ * wrap, mirroring the prior token-class resolution.
+ *
+ * We prefer `CONFIG.Tile.objectClass` — the class Foundry actually INSTANTIATES
+ * for canvas tiles — FIRST, so we wrap the most-derived live class. We then fall
+ * back to the V13 base placeable `foundry.canvas.placeables.Tile`, then to a bare
+ * `Tile` global, returning the first whose prototype owns `_onClickLeft2`.
+ *
+ * @returns {Function|null} The Tile class, or null when none is resolvable.
+ */
+function resolveTileClass() {
   const candidates = [
-    globalThis.CONFIG?.Token?.objectClass,
-    globalThis.foundry?.canvas?.placeables?.Token,
-    globalThis.Token
+    globalThis.CONFIG?.Tile?.objectClass,
+    globalThis.foundry?.canvas?.placeables?.Tile,
+    globalThis.Tile
   ];
   for (const candidate of candidates) {
     if (typeof candidate === 'function' && typeof candidate.prototype?._onClickLeft2 === 'function') {
@@ -74,26 +94,44 @@ function resolveTokenClass() {
 }
 
 /**
- * Install a one-time, idempotent wrap of the V13 Token `_onClickLeft2` handler.
+ * Resolve the V13 `MouseInteractionManager` class whose `can` permission gate we
+ * wrap, defensively (V13 namespace first, then a bare global).
+ *
+ * @returns {Function|null}
+ */
+function resolveMouseInteractionManagerClass() {
+  const candidates = [
+    globalThis.foundry?.canvas?.interaction?.MouseInteractionManager,
+    globalThis.MouseInteractionManager
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'function' && typeof candidate.prototype?.can === 'function') {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * Install a one-time, idempotent wrap of the V13 Tile `_onClickLeft2` handler.
  *
  * The wrapper consults the pure {@link decideInteractableDoubleClick}: for an
- * interactable token it routes to {@link InteractableManager#_onDoubleClick} and
- * SUPPRESSES the V13 default (no actor sheet for a GM, and an actual UI for a
- * player); for any other token it delegates to the captured original handler with
- * the correct `this` and arguments. Defensive: no-throw when the class/method is
- * absent (e.g. at import/init before the canvas layer exists).
+ * interactable tile it routes to {@link InteractableManager#_onDoubleClick} and
+ * SUPPRESSES the V13 default; for any other tile it delegates to the captured
+ * original handler with the correct `this` and arguments. Defensive: no-throw
+ * when the class/method is absent.
  */
 function installInteractableDoubleClickWrap() {
-  const TokenClass = resolveTokenClass();
-  if (!TokenClass) return; // canvas placeables not available yet — tolerate.
-  const proto = TokenClass.prototype;
+  const TileClass = resolveTileClass();
+  if (!TileClass) return; // canvas placeables not available yet — tolerate.
+  const proto = TileClass.prototype;
   if (proto[DOUBLE_CLICK_WRAP_FLAG] === true) return; // already wrapped once.
 
   const original = proto._onClickLeft2;
   if (typeof original !== 'function') return;
 
   proto._onClickLeft2 = function wrappedOnClickLeft2(...args) {
-    const decision = decideInteractableDoubleClick(this?.document, isInteractableToken);
+    const decision = decideInteractableDoubleClick(this?.document, isInteractableTile);
     if (decision === 'dispatch') {
       InteractableManager.instance?._onDoubleClick?.(this.document);
       return; // suppress the V13 default for BOTH GM and player.
@@ -101,6 +139,69 @@ function installInteractableDoubleClickWrap() {
     return original.apply(this, args);
   };
   proto[DOUBLE_CLICK_WRAP_FLAG] = true;
+}
+
+/**
+ * Install a one-time, idempotent wrap of the V13 Tile hover handlers so an
+ * interactable tile shows a discoverability tooltip (tiles have no nameplate).
+ * The "what name to show" is the pure {@link interactableTooltipText}; the
+ * `_onHoverIn`/`_onHoverOut` wraps are the thin PIXI/Foundry edge. Defensive.
+ */
+function installInteractableHoverWrap() {
+  const TileClass = resolveTileClass();
+  if (!TileClass) return;
+  const proto = TileClass.prototype;
+  if (proto[HOVER_WRAP_FLAG] === true) return;
+
+  const originalIn = proto._onHoverIn;
+  const originalOut = proto._onHoverOut;
+
+  if (typeof originalIn === 'function') {
+    proto._onHoverIn = function wrappedOnHoverIn(...args) {
+      const result = originalIn.apply(this, args);
+      if (isInteractableTile(this?.document)) {
+        InteractableManager.instance?._showTooltip?.(this);
+      }
+      return result;
+    };
+  }
+  if (typeof originalOut === 'function') {
+    proto._onHoverOut = function wrappedOnHoverOut(...args) {
+      if (isInteractableTile(this?.document)) {
+        InteractableManager.instance?._hideTooltip?.(this);
+      }
+      return originalOut.apply(this, args);
+    };
+  }
+  proto[HOVER_WRAP_FLAG] = true;
+}
+
+/**
+ * Install a one-time, idempotent wrap of the V13 `MouseInteractionManager#can`
+ * permission gate so a non-GM player's `clickLeft2` / hover is PERMITTED on
+ * interactable tiles (tiles are not natively pointer-interactive for players).
+ *
+ * The wrapper consults the pure {@link shouldPermitInteractableAction}: it only
+ * ADDS permission for interactable tiles + the allowed actions, and otherwise
+ * delegates to the original gate (so it never DENIES anything Foundry would
+ * permit). Defensive: no-throw when the class/method is absent.
+ */
+function installInteractablePermissionWrap() {
+  const ManagerClass = resolveMouseInteractionManagerClass();
+  if (!ManagerClass) return;
+  const proto = ManagerClass.prototype;
+  if (proto[PERMISSION_WRAP_FLAG] === true) return;
+
+  const original = proto.can;
+  if (typeof original !== 'function') return;
+
+  proto.can = function wrappedCan(action, event) {
+    const placeable = this?.object;
+    const permit = shouldPermitInteractableAction(action, placeable?.document, isInteractableTile);
+    if (permit === true) return true;
+    return original.call(this, action, event);
+  };
+  proto[PERMISSION_WRAP_FLAG] = true;
 }
 
 class InteractableManager {
@@ -132,20 +233,35 @@ class InteractableManager {
   }
 
   /**
-   * Install canvas hooks + the V13 Token double-click wrap. Idempotent —
-   * repeated calls are a no-op.
+   * Install canvas hooks + the V13 Tile double-click / hover / permission wraps,
+   * plus the draw-time pointer-interactivity enablement for interactable tiles.
+   * Idempotent — repeated calls are a no-op.
    */
   register() {
     if (this._registered) return;
     const hooks = globalThis.Hooks;
     if (hooks?.on) {
       hooks.on('dropCanvasData', this._onDrop);
+      // Make interactable tiles pointer-eventful for ALL users. A Tile is GM
+      // scenery and is NOT natively pointer-interactive for a non-GM player, so
+      // without this the player's double-click / hover never reaches the
+      // placeable's MouseInteractionManager and the permission/double-click wraps
+      // below are never even consulted. `drawTile` catches each tile as it is
+      // drawn; the `canvasReady` sweep catches tiles drawn before this hook was
+      // installed and re-applies after a scene swap. Both delegate to the pure-
+      // decision-gated, defensive enablement edge.
+      hooks.on('drawTile', (placeable) => enableInteractableTilePointerEvents(placeable));
+      hooks.on('canvasReady', () => enableInteractableTilesIn(globalThis.canvas?.tiles?.placeables));
     }
-    // Wrap the V13 Token double-click handler so interactable tokens route to the
-    // Fabricate dispatcher and SUPPRESS the default (which would open the backing
-    // actor sheet for a GM / no-op for a player). Installed once, defensively, and
-    // independently of Hooks availability (the prototype wrap is its own concern).
+    // Wrap the V13 Tile double-click handler so interactable tiles route to the
+    // Fabricate dispatcher and SUPPRESS the default; wrap the interaction
+    // permission so a non-GM player's double-click / hover is permitted on
+    // interactable tiles; wrap the Tile hover so a discoverability tooltip shows.
+    // Installed once, defensively, and independently of Hooks availability (the
+    // prototype wraps are their own concern).
     installInteractableDoubleClickWrap();
+    installInteractablePermissionWrap();
+    installInteractableHoverWrap();
     this._registered = true;
   }
 
@@ -172,12 +288,18 @@ class InteractableManager {
     }
 
     const point = this._dropPoint(canvas, data);
-    // Tool tokens carry no environment; spawn immediately. Gathering-task tokens
+    // Tool tiles carry no environment; spawn immediately. Gathering-task tiles
     // resolve their environment via the precedence chain (which may await a GM
     // dialog), so that runs in an async helper while the hook returns false
     // synchronously to suppress Foundry's default item-drop handling.
     if (classification.interactableType !== 'gatheringTask') {
-      const spawnRequest = buildSpawnRequest({ classification, point });
+      const spawnRequest = buildSpawnRequest({
+        classification,
+        point,
+        texture: this._resolveIconTexture(classification),
+        width: this._gridSize(),
+        height: this._gridSize()
+      });
       void this._spawnInteractable(spawnRequest);
       return false;
     }
@@ -189,7 +311,7 @@ class InteractableManager {
   }
 
   /**
-   * Click-to-place a11y fallback for the Interactable browser app (Phase 7).
+   * Click-to-place a11y fallback for the Interactable browser app.
    *
    * Drag-and-drop is a keyboard/no-pointer dead-end, so the browser also offers
    * a "Place on current scene" button per row. That button calls here. This is
@@ -261,9 +383,9 @@ class InteractableManager {
 
   /**
    * Resolve a dropped gathering task's environment via the precedence chain and
-   * spawn its token. PURE decision in {@link resolveDropEnvironment}; the region
+   * spawn its tile. PURE decision in {@link resolveDropEnvironment}; the region
    * hit-test, the GM dialog, and the auto-resolve notification are the thin edges
-   * here. A cancelled dialog ABORTS the spawn (no token created).
+   * here. A cancelled dialog ABORTS the spawn (no tile created).
    *
    * Precedence (design.md §6): Scene Region auto-detect (region flagged
    * `flags.fabricate.environmentId`) → task `defaultEnvironmentId` → GM dialog.
@@ -297,7 +419,7 @@ class InteractableManager {
         defaultEnvironmentId: task?.defaultEnvironmentId ?? '',
         localize: (key, fallback) => globalThis.game?.i18n?.localize?.(key) ?? fallback
       });
-      // Cancel ⇒ abort the spawn (no token created).
+      // Cancel ⇒ abort the spawn (no tile created).
       if (!environmentId) return null;
     }
 
@@ -315,7 +437,10 @@ class InteractableManager {
       classification,
       point,
       environmentId: environmentId ?? undefined,
-      buildNode: (entry) => buildTokenNodeSnapshot(entry)
+      texture: this._resolveIconTexture(classification),
+      width: this._gridSize(),
+      height: this._gridSize(),
+      buildNode: (entry) => buildTileNodeSnapshot(entry)
     });
     return this._spawnInteractable(spawnRequest);
   }
@@ -335,63 +460,103 @@ class InteractableManager {
   }
 
   /**
-   * Create the flagged, unlinked TokenDocument for a classified drop.
+   * Create the flagged TileDocument for a classified drop. Tiles have no actor
+   * and no sheet, so all per-Interactable data lives in `flags.fabricate`
+   * (including the display `name` for the hover tooltip). Snaps the drop point to
+   * the grid so the tile aligns with the scene.
    *
    * @param {object} spawnRequest  Result of {@link buildSpawnRequest}.
-   * @returns {Promise<object|null>} The created TokenDocument, or null.
+   * @returns {Promise<object|null>} The created TileDocument, or null.
    */
   async _spawnInteractable(spawnRequest) {
     if (!spawnRequest) return null;
-    const actor = await ensureInteractableActor();
-    if (!actor) return null;
 
     const scene = globalThis.canvas?.scene;
     if (!scene) return null;
 
-    const { fabricate } = buildInteractableFlags({
+    const { fabricate } = buildInteractableTileFlags({
       interactableType: spawnRequest.interactableType,
       sourceUuid: spawnRequest.sourceUuid,
+      name: spawnRequest.name,
       environmentId: spawnRequest.environmentId,
       node: spawnRequest.node
     });
 
-    const tokenData = {
-      // Gathering-task tokens take the task's name so the nameplate identifies the
-      // gathering point (double-click discoverability); Tool tokens keep the
-      // backing actor name.
-      name: spawnRequest.name || actor.name,
-      actorId: actor.id,
-      actorLink: false, // unlinked: all real data is in the token flags.
-      x: spawnRequest.x,
-      y: spawnRequest.y,
+    const gridSize = this._gridSize();
+    const width = Number.isFinite(Number(spawnRequest.width)) && Number(spawnRequest.width) > 0
+      ? Number(spawnRequest.width)
+      : gridSize;
+    const height = Number.isFinite(Number(spawnRequest.height)) && Number(spawnRequest.height) > 0
+      ? Number(spawnRequest.height)
+      : gridSize;
+    const { x, y } = this._snapToGrid({ x: spawnRequest.x, y: spawnRequest.y });
+
+    const tileData = {
+      texture: { src: spawnRequest.texture || DEFAULT_INTERACTABLE_IMG },
+      x,
+      y,
+      width,
+      height,
       flags: { fabricate }
     };
 
-    const TokenDocument = globalThis.foundry?.documents?.TokenDocument
-      ?? globalThis.CONFIG?.Token?.documentClass;
-    if (TokenDocument?.create) {
-      return await TokenDocument.create(tokenData, { parent: scene });
+    const TileDocument = globalThis.foundry?.documents?.TileDocument
+      ?? globalThis.CONFIG?.Tile?.documentClass;
+    if (TileDocument?.create) {
+      return await TileDocument.create(tileData, { parent: scene });
     }
     if (scene.createEmbeddedDocuments) {
-      const [created] = await scene.createEmbeddedDocuments('Token', [tokenData]);
+      const [created] = await scene.createEmbeddedDocuments('Tile', [tileData]);
       return created ?? null;
     }
     return null;
   }
 
   /**
-   * Double-click handler. Reads the token's interactable flags and dispatches by
+   * Double-click handler. Reads the tile's interactable flags and dispatches by
    * type. The tool branch opens the Fabricate app with the station's Tool
-   * injected as an `activeCanvasTool` (Phase 4); the gathering-task branch is
-   * still the Phase-3 stub (Phase 5).
+   * injected as an `activeCanvasTool`; the gathering-task branch opens the
+   * gathering tab scoped to the resolved environment + a per-tile node adapter.
    *
-   * @param {object} token  Token document.
+   * @param {object} tile  Tile document.
    */
-  _onDoubleClick(token) {
-    dispatchInteractableDoubleClick(token, {
+  _onDoubleClick(tile) {
+    dispatchInteractableDoubleClick(tile, {
       onTool: (descriptor) => this._handleToolDoubleClick(descriptor),
-      onGatheringTask: (descriptor) => this._handleGatheringTaskDoubleClick(descriptor, token)
+      onGatheringTask: (descriptor) => this._handleGatheringTaskDoubleClick(descriptor, tile)
     });
+  }
+
+  /**
+   * Show the discoverability tooltip for a hovered interactable tile.
+   *
+   * A Tile has no DOM `.element` and no nameplate, so we render a canvas-native
+   * PIXI text LABEL above the tile (see {@link showInteractableTileLabel}) rather
+   * than handing a PIXI object to the DOM `TooltipManager.activate(...)` (which
+   * expects an HTMLElement and mis-positions / throws). The "what name to show"
+   * is the pure {@link interactableTooltipText} (flag name, or resolved from
+   * `sourceUuid`); the PIXI label draw is the thin Foundry/PIXI edge. Renders for
+   * players too (hover is permitted by the interaction wrap).
+   *
+   * @param {object} placeable  The Tile placeable being hovered.
+   */
+  _showTooltip(placeable) {
+    const tile = placeable?.document;
+    const text = interactableTooltipText(tile, {
+      resolveName: (sourceUuid) => this._resolveSourceName(sourceUuid)
+    });
+    if (!text) return;
+    showInteractableTileLabel(placeable, text);
+  }
+
+  /**
+   * Hide the discoverability tooltip (canvas-native PIXI label) for a tile
+   * leaving hover.
+   *
+   * @param {object} placeable
+   */
+  _hideTooltip(placeable) {
+    hideInteractableTileLabel(placeable);
   }
 
   /**
@@ -401,13 +566,9 @@ class InteractableManager {
    * the tool cannot be resolved.
    *
    * INTERIM ROUTING: opens the `gathering` tab, not `crafting`. The Svelte
-   * crafting tab is still a "Coming Soon" placeholder (FabricateAppRoot falls
-   * through to the placeholder shell for every non-gathering tab), so routing a
-   * Tool token there would dead-end with no visible effect. Gathering is the
-   * only live surface where the virtual-present tool has a visible effect today.
-   * The injected `activeCanvasTool` context is tab-agnostic on the app instance,
-   * so revisit this to route to (or offer a choice of) crafting once that tab
-   * ships. See OpenSpec design.md §4.
+   * crafting tab is still a "Coming Soon" placeholder, so routing a Tool tile
+   * there would dead-end with no visible effect. Gathering is the only live
+   * surface where the virtual-present tool has a visible effect today.
    *
    * @param {object} descriptor  Dispatch descriptor: `{ systemId, referenceId, ... }`.
    */
@@ -423,25 +584,25 @@ class InteractableManager {
   }
 
   /**
-   * Open the gathering app scoped to a double-clicked gathering-task token.
+   * Open the gathering app scoped to a double-clicked gathering-task tile.
    *
-   * The token owns its OWN depletion/respawn state in `flags.fabricate.node`; a
-   * per-token {@link createTokenNodeStateAdapter} is built so the engine reads/
-   * writes the token node (not `environment.nodeRuntime[taskId]`), routing writes
+   * The tile owns its OWN depletion/respawn state in `flags.fabricate.node`; a
+   * per-tile {@link createTileNodeStateAdapter} is built so the engine reads/
+   * writes the tile node (not `environment.nodeRuntime[taskId]`), routing writes
    * through the active GM socket. When NO active GM is connected, a player's
    * node-mutating attempt cannot be applied, so the attempt is blocked cleanly
    * with a graceful message instead of hanging.
    *
-   * ENVIRONMENT RESOLUTION: the environment is resolved at DROP time (Phase 6
-   * precedence chain in `_spawnGatheringTask`) and stamped onto the token flag,
+   * ENVIRONMENT RESOLUTION: the environment is resolved at DROP time (the
+   * precedence chain in `_spawnGatheringTask`) and stamped onto the tile flag,
    * so here we use the flag's environmentId. The `_resolveTaskEnvironmentId`
-   * lookup remains only as a defensive fallback for legacy tokens placed before
+   * lookup remains only as a defensive fallback for legacy tiles placed before
    * drop-time resolution (or whose flag was cleared).
    *
    * @param {object} descriptor Dispatch descriptor: `{ systemId, referenceId, environmentId, ... }`.
-   * @param {object} token The double-clicked token document.
+   * @param {object} tile The double-clicked tile document.
    */
-  _handleGatheringTaskDoubleClick(descriptor, token) {
+  _handleGatheringTaskDoubleClick(descriptor, tile) {
     const systemId = descriptor?.systemId ?? null;
     const taskId = descriptor?.referenceId ?? null;
     if (!systemId || !taskId) return;
@@ -467,14 +628,14 @@ class InteractableManager {
       return;
     }
 
-    const nodeStateOverride = createTokenNodeStateAdapter({
-      token,
-      emitWrite: emitInteractableNodeWrite(token),
+    const nodeStateOverride = createTileNodeStateAdapter({
+      tile,
+      emitWrite: emitInteractableNodeWrite(tile),
       now: () => Number(globalThis.game?.time?.worldTime || 0),
       secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null),
-      // Phase 6: enact the depleted-behavior token visual (swap-image / postfix /
-      // terminal delete) whenever the attempt writes the node, routed through the
-      // same active-GM socket path as the node write itself.
+      // Enact the depleted-behavior tile visual (swap-image / terminal delete)
+      // whenever the attempt writes the node, routed through the same active-GM
+      // socket path as the node write itself.
       applyDepletedBehavior: buildDepletedBehaviorApply()
     });
 
@@ -484,9 +645,9 @@ class InteractableManager {
 
   /**
    * Resolve the first environment whose composition includes a gathering task,
-   * as the defensive double-click fallback when the token carries no resolved
-   * environmentId (drop-time resolution now stamps it via the Phase-6 precedence
-   * chain in `_spawnGatheringTask`).
+   * as the defensive double-click fallback when the tile carries no resolved
+   * environmentId (drop-time resolution now stamps it via the precedence chain in
+   * `_spawnGatheringTask`).
    *
    * @param {object} args
    * @param {string} args.systemId
@@ -515,6 +676,83 @@ class InteractableManager {
   // --- Foundry-edge helpers. ---
 
   /**
+   * Resolve the tile image path for a classified drop from the tool's managed
+   * component img / the task's img, falling back to a sensible default. Isolated
+   * Foundry/library read.
+   *
+   * @param {object} classification  Result of {@link classifyInteractableDrop}.
+   * @returns {string}
+   */
+  _resolveIconTexture(classification) {
+    const entry = classification?.entry ?? null;
+    if (classification?.interactableType === 'tool') {
+      const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
+      const system = systemManager?.getSystem?.(classification.systemId);
+      const componentId = entry?.componentId;
+      const component = (system?.components ?? []).find((c) => String(c?.id ?? '') === String(componentId));
+      const img = component?.img;
+      if (typeof img === 'string' && img.trim()) return img.trim();
+    }
+    const taskImg = entry?.img;
+    if (typeof taskImg === 'string' && taskImg.trim()) return taskImg.trim();
+    return DEFAULT_INTERACTABLE_IMG;
+  }
+
+  /**
+   * Resolve a source name from a synthetic sourceUuid for the hover tooltip when
+   * the tile flag carries no `name` (defensive / legacy tiles). Isolated
+   * Foundry/library read.
+   *
+   * @param {string} sourceUuid
+   * @returns {string|null}
+   */
+  _resolveSourceName(sourceUuid) {
+    const parsed = parseInteractableSourceUuid(sourceUuid);
+    if (!parsed) return null;
+    const deps = this._resolutionDeps();
+    if (parsed.interactableType === 'tool') {
+      const tool = deps.getTool({ systemId: parsed.systemId, toolId: parsed.referenceId });
+      const label = typeof tool?.label === 'string' ? tool.label.trim() : '';
+      return label || null;
+    }
+    const task = deps.getTask({ systemId: parsed.systemId, taskId: parsed.referenceId });
+    const name = typeof task?.name === 'string' ? task.name.trim() : '';
+    return name || null;
+  }
+
+  /**
+   * The active scene's grid size (one square), the default tile dimension. Falls
+   * back to 100 when no scene/grid is available.
+   *
+   * @returns {number}
+   */
+  _gridSize() {
+    const size = globalThis.canvas?.scene?.grid?.size
+      ?? globalThis.canvas?.grid?.size
+      ?? globalThis.canvas?.dimensions?.size;
+    return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;
+  }
+
+  /**
+   * Snap a scene-space point to the top-left of its grid square so a placed tile
+   * aligns with the scene grid. Falls back to the raw point when no grid snap is
+   * available.
+   *
+   * @param {{x: number, y: number}} point
+   * @returns {{x: number, y: number}}
+   */
+  _snapToGrid({ x, y } = {}) {
+    const px = Number(x ?? 0);
+    const py = Number(y ?? 0);
+    const size = this._gridSize();
+    if (!Number.isFinite(size) || size <= 0) return { x: px, y: py };
+    return {
+      x: Math.floor(px / size) * size,
+      y: Math.floor(py / size) * size
+    };
+  }
+
+  /**
    * Build the injected resolution adapters from the live Fabricate runtime.
    * Kept thin so {@link classifyInteractableDrop} stays pure/testable.
    *
@@ -532,9 +770,9 @@ class InteractableManager {
         return tasks.find(task => task?.id === taskId) ?? null;
       },
       // Map a dropped Foundry Item uuid to a crafting-system Tool by matching the
-      // item against each tool's managed-component source refs (Fix 4). The
-      // Foundry edges (sync uuid resolution, system enumeration) are isolated
-      // here; the matching strategy itself is the pure injected resolver.
+      // item against each tool's managed-component source refs. The Foundry edges
+      // (sync uuid resolution, system enumeration) are isolated here; the matching
+      // strategy itself is the pure injected resolver.
       resolveItemUuidToTool: (uuid) => resolveItemUuidToTool(uuid, {
         resolveItem: (id) => globalThis.fromUuidSync?.(id) ?? null,
         getSystems: () => systemManager?.getSystems?.() ?? []

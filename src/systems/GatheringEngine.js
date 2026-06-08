@@ -86,13 +86,13 @@ export class GatheringEngine {
     failureFeedback = null,
     hazardSceneTrigger = null,
     getRunViewer = null,
-    // Rebuild a per-token node-state adapter from a persisted `{ sceneId, tokenId }`
+    // Rebuild a per-tile node-state adapter from a persisted `{ sceneId, tileId }`
     // ref. Injected so a TIMED `onSuccess` waiting run can, at MATURITY, route its
-    // node decrement onto the token's `flags.fabricate.node` (via the GM socket)
-    // instead of `environment.nodeRuntime[taskId]`. Returns null when the token is
+    // node decrement onto the tile's `flags.fabricate.node` (via the GM socket)
+    // instead of `environment.nodeRuntime[taskId]`. Returns null when the tile is
     // gone (deleted) or the ref is unresolvable, in which case maturity falls back
-    // to the env node — see {@link GatheringEngine#_resolveMaturedTokenNodeState}.
-    resolveTokenNodeState = null,
+    // to the env node — see {@link GatheringEngine#_resolveMaturedTileNodeState}.
+    resolveTileNodeState = null,
     random = Math.random,
     localize = defaultLocalize,
     // Stamina regen / node respawn run on world-time advance and write shared
@@ -117,7 +117,7 @@ export class GatheringEngine {
     this.failureFeedback = failureFeedback;
     this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
-    this.resolveTokenNodeState = typeof resolveTokenNodeState === 'function' ? resolveTokenNodeState : null;
+    this.resolveTileNodeState = typeof resolveTileNodeState === 'function' ? resolveTileNodeState : null;
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
@@ -515,12 +515,12 @@ export class GatheringEngine {
       });
     }
 
-    // Rebuild the per-token node adapter when this waiting run was started from a
-    // canvas gathering-task token, so a TIMED `onSuccess` decrement at maturity
-    // lands on the TOKEN's `flags.fabricate.node` (via the GM socket), not the
-    // shared `environment.nodeRuntime[taskId]`. Null (token gone / no ref / no
+    // Rebuild the per-tile node adapter when this waiting run was started from a
+    // canvas gathering-task tile, so a TIMED `onSuccess` decrement at maturity
+    // lands on the TILE's `flags.fabricate.node` (via the GM socket), not the
+    // shared `environment.nodeRuntime[taskId]`. Null (tile gone / no ref / no
     // seam) falls back to the env node.
-    const nodeState = this._resolveMaturedTokenNodeState(run);
+    const nodeState = this._resolveMaturedTileNodeState(run);
     const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer, nodeState });
     const completedRunWithRichEvidence = richEvidence && typeof richEvidence === 'object'
       ? {
@@ -1963,29 +1963,29 @@ export class GatheringEngine {
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id)
     };
-    // Persist the placed token's scene+token identity when this attempt was
-    // started from a canvas gathering-task token. A per-token node adapter is a
+    // Persist the placed tile's scene+tile identity when this attempt was
+    // started from a canvas gathering-task tile. A per-tile node adapter is a
     // live function object (not JSON-serializable), so the waiting run carries
-    // only the token REF; the adapter is rebuilt at maturity (on the active GM)
-    // so a TIMED `onSuccess` decrement lands on the TOKEN flag, not the env
+    // only the tile REF; the adapter is rebuilt at maturity (on the active GM)
+    // so a TIMED `onSuccess` decrement lands on the TILE flag, not the env
     // nodeRuntime (see {@link GatheringEngine#_processMaturedWaitingRun}).
-    const tokenNodeRef = typeof nodeStateOverride?.tokenRef === 'function'
-      ? nodeStateOverride.tokenRef()
+    const tileNodeRef = typeof nodeStateOverride?.tileRef === 'function'
+      ? nodeStateOverride.tileRef()
       : null;
     if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
       const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
       richPayload.economyEvidence = {
         ...(richPayload.economyEvidence || {}),
         runtimeSnapshot: this._runtimeSnapshot({ environment, task }),
-        ...(tokenNodeRef ? { tokenNodeRef } : {})
+        ...(tileNodeRef ? { tileNodeRef } : {})
       };
       Object.assign(runData, richPayload);
-    } else if (tokenNodeRef) {
-      // No rich snapshot for this task, but still persist the token ref so the
-      // maturity commit can rebuild the per-token adapter.
+    } else if (tileNodeRef) {
+      // No rich snapshot for this task, but still persist the tile ref so the
+      // maturity commit can rebuild the per-tile adapter.
       runData.economyEvidence = {
         ...(runData.economyEvidence || {}),
-        tokenNodeRef
+        tileNodeRef
       };
     }
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
@@ -2269,27 +2269,27 @@ export class GatheringEngine {
   }
 
   /**
-   * Rebuild a per-token node-state adapter for a matured waiting run that was
-   * started from a placed canvas gathering-task token. The run persists only the
-   * token REF (`economyEvidence.tokenNodeRef`) because the live adapter is a
+   * Rebuild a per-tile node-state adapter for a matured waiting run that was
+   * started from a placed canvas gathering-task tile. The run persists only the
+   * tile REF (`economyEvidence.tileNodeRef`) because the live adapter is a
    * function object that cannot survive serialization; this reconstructs it on
-   * the active GM via the injected `resolveTokenNodeState` seam so the maturity
-   * commit decrements the TOKEN node (not the shared env nodeRuntime).
+   * the active GM via the injected `resolveTileNodeState` seam so the maturity
+   * commit decrements the TILE node (not the shared env nodeRuntime).
    *
-   * Returns null — falling back to the env node — when there is no token ref, no
-   * seam injected, or the token can no longer be resolved (e.g. deleted).
+   * Returns null — falling back to the env node — when there is no tile ref, no
+   * seam injected, or the tile can no longer be resolved (e.g. deleted).
    *
    * @param {object} run The matured waiting run record.
-   * @returns {object|null} A per-token node-state adapter, or null.
+   * @returns {object|null} A per-tile node-state adapter, or null.
    */
-  _resolveMaturedTokenNodeState(run) {
-    if (typeof this.resolveTokenNodeState !== 'function') return null;
-    const ref = plainObjectOrNull(run?.economyEvidence?.tokenNodeRef);
+  _resolveMaturedTileNodeState(run) {
+    if (typeof this.resolveTileNodeState !== 'function') return null;
+    const ref = plainObjectOrNull(run?.economyEvidence?.tileNodeRef);
     const sceneId = stringOrNull(ref?.sceneId);
-    const tokenId = stringOrNull(ref?.tokenId);
-    if (!sceneId || !tokenId) return null;
+    const tileId = stringOrNull(ref?.tileId);
+    if (!sceneId || !tileId) return null;
     try {
-      return this.resolveTokenNodeState({ sceneId, tokenId }) || null;
+      return this.resolveTileNodeState({ sceneId, tileId }) || null;
     } catch (_err) {
       return null;
     }

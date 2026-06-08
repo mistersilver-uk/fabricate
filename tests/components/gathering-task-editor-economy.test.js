@@ -100,36 +100,32 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.match(rootSource, /economyMode=\{selectedGatheringTaskEconomyMode\}/, 'parent passes economyMode to the task editor');
   });
 
-  it('authors depletedBehavior with FilePicker swap-image, postfix toggle, and a mutually-exclusive delete', () => {
-    // Delete toggle, swap-image picker (FilePicker via onPickImagePath), and the
-    // postfix toggle are all present.
+  it('authors depletedBehavior with FilePicker swap-image and a mutually-exclusive delete (no postfix on tiles)', () => {
+    // Delete toggle and swap-image picker (FilePicker via onPickImagePath) are
+    // present. The postfix toggle is DROPPED for canvas tiles (tiles have no
+    // nameplate), so its data attribute must NOT be rendered.
     for (const attr of [
       'data-gathering-task-depleted-behavior',
       'data-gathering-task-depleted-delete',
-      'data-gathering-task-depleted-image',
-      'data-gathering-task-depleted-postfix'
+      'data-gathering-task-depleted-image'
     ]) {
       assert.ok(editorSource.includes(attr), `depleted-behavior block should expose ${attr}`);
     }
+    assert.ok(
+      !editorSource.includes('data-gathering-task-depleted-postfix'),
+      'the postfix toggle is dropped for canvas tiles (no nameplate)'
+    );
     // The swap-image control is wired to the FilePicker service (onPickImagePath),
     // not a free-text input.
     assert.match(editorSource, /async function chooseDepletedImage/, 'swap-image uses the FilePicker via onPickImagePath');
     assert.match(editorSource, /onPickImagePath\(depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
 
-    // Mutual exclusion: when delete is on, the swap/postfix controls are disabled
-    // and the visuals block is greyed (is-disabled).
+    // Mutual exclusion: when delete is on, the swap control is disabled and the
+    // visuals block is greyed (is-disabled).
     assert.match(editorSource, /class:is-disabled=\{depletedDeleteToken\}/, 'the visuals block greys out when delete is on');
     assert.match(editorSource, /disabled=\{depletedDeleteToken \|\| typeof onPickImagePath/, 'the swap picker is disabled when delete is on');
-    // The postfix toggle button carries disabled={depletedDeleteToken}; assert
-    // the button element (delimited by the data attr) also carries the disabled
-    // binding regardless of attribute order.
-    const postfixBtnIdx = editorSource.indexOf('data-gathering-task-depleted-postfix');
-    const postfixBtnStart = editorSource.lastIndexOf('<button', postfixBtnIdx);
-    const postfixBtnEnd = editorSource.indexOf('>', postfixBtnIdx);
-    const postfixButton = editorSource.slice(postfixBtnStart, postfixBtnEnd);
-    assert.match(postfixButton, /disabled=\{depletedDeleteToken\}/, 'the postfix toggle is disabled when delete is on');
 
-    // The normalizer-mirroring author guard clears swap/postfix when delete is on.
+    // The normalizer-mirroring author guard clears swap when delete is on.
     assert.match(editorSource, /if \(next\.deleteToken === true\)[\s\S]*?delete next\.swapImage/, 'enabling delete clears swap in the editor');
   });
 
@@ -156,11 +152,10 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
 
   it('adds the depleted-behavior + default-environment + drop-dialog i18n keys', () => {
     const econ = lang.FABRICATE.Admin.Manager.Economy;
-    assert.equal(econ.DepletedBehaviorTitle, 'When depleted (canvas token)');
-    assert.equal(econ.DepletedDeleteToken, 'Delete the token');
+    assert.equal(econ.DepletedBehaviorTitle, 'When depleted (canvas tile)');
+    assert.equal(econ.DepletedDeleteToken, 'Delete the tile');
     assert.ok(typeof econ.DepletedDeleteWarning === 'string' && econ.DepletedDeleteWarning.length > 0);
-    assert.equal(econ.DepletedSwapImage, 'Swap token image');
-    assert.ok(typeof econ.DepletedPostfixName === 'string');
+    assert.equal(econ.DepletedSwapImage, 'Swap tile image');
 
     const tasks = lang.FABRICATE.Admin.Manager.Environment.Tasks;
     assert.equal(tasks.DefaultEnvironment, 'Default environment (canvas drop)');

@@ -427,36 +427,31 @@
     updateRespawn({ amountExpression: String(value ?? '') });
   }
 
-  // --- Depleted-behavior authoring (per-token canvas visual on depletion). -----
-  // deleteToken is MUTUALLY EXCLUSIVE with swapImage/postfixName: when delete is
-  // on, the swap/postfix controls are greyed and their values are cleared on save
-  // (the normalizer drops them too).
+  // --- Depleted-behavior authoring (per-tile canvas visual on depletion). ------
+  // deleteToken is MUTUALLY EXCLUSIVE with swapImage: when delete is on, the swap
+  // control is greyed and its value is cleared on save (the normalizer drops it
+  // too). The `postfixName` mode is NOT offered for canvas tiles — tiles have no
+  // nameplate, so only swap-image and the terminal delete change a tile's look.
   const depletedBehavior = $derived(nodes.depletedBehavior || {});
   const depletedDeleteToken = $derived(depletedBehavior.deleteToken === true);
   const depletedSwapImage = $derived(typeof depletedBehavior.swapImage === 'string' ? depletedBehavior.swapImage : '');
-  const depletedPostfixName = $derived(depletedBehavior.postfixName === true);
 
   function updateDepletedBehavior(patch) {
     const next = { ...depletedBehavior, ...patch };
-    // Enforce mutual exclusion at author time: clear swap/postfix when delete is on.
+    // Enforce mutual exclusion at author time: clear swap when delete is on.
     if (next.deleteToken === true) {
       delete next.swapImage;
       delete next.postfixName;
     }
     const cleaned = {};
     if (next.deleteToken === true) cleaned.deleteToken = true;
-    else {
-      if (typeof next.swapImage === 'string' && next.swapImage.trim()) cleaned.swapImage = next.swapImage.trim();
-      if (next.postfixName === true) cleaned.postfixName = true;
+    else if (typeof next.swapImage === 'string' && next.swapImage.trim()) {
+      cleaned.swapImage = next.swapImage.trim();
     }
     updateNodes({ depletedBehavior: Object.keys(cleaned).length > 0 ? cleaned : null });
   }
   function toggleDepletedDelete() {
     updateDepletedBehavior({ deleteToken: !depletedDeleteToken });
-  }
-  function toggleDepletedPostfix() {
-    if (depletedDeleteToken) return;
-    updateDepletedBehavior({ postfixName: !depletedPostfixName });
   }
   async function chooseDepletedImage() {
     if (depletedDeleteToken || typeof onPickImagePath !== 'function') return;
@@ -945,8 +940,8 @@
 
       <div class="manager-task-depleted-behavior" data-gathering-task-depleted-behavior>
         <div class="manager-task-drop-header-copy">
-          <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (canvas token)')}</h4>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed canvas token looks once this node runs out. Restored automatically when it respawns.')}</p>
+          <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (canvas tile)')}</h4>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed canvas tile looks once this node runs out. Restored automatically when it respawns.')}</p>
         </div>
 
         <label class="manager-field manager-task-depleted-delete">
@@ -958,25 +953,25 @@
             data-gathering-task-depleted-delete
           >
             <i class={`fas ${depletedDeleteToken ? 'fa-trash' : 'fa-trash-can'}`} aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteToken', 'Delete the token')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteToken', 'Delete the tile')}</span>
           </button>
         </label>
 
         {#if depletedDeleteToken}
           <span class="manager-chip is-danger" role="alert" data-gathering-task-depleted-warning>
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteWarning', 'Deleting is irreversible — a deleted token never respawns.')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteWarning', 'Deleting is irreversible — a deleted tile never respawns.')}</span>
           </span>
         {/if}
 
         <div class="manager-task-depleted-visuals" class:is-disabled={depletedDeleteToken}>
           <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImage', 'Swap token image')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImage', 'Swap tile image')}</span>
             <div class="manager-task-depleted-image-row">
               <button
                 type="button"
                 class="manager-task-image-picker manager-task-depleted-image-picker"
-                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted token image')}
+                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted tile image')}
                 onclick={chooseDepletedImage}
                 disabled={depletedDeleteToken || typeof onPickImagePath !== 'function'}
                 data-gathering-task-depleted-image
@@ -994,20 +989,6 @@
                 </button>
               {/if}
             </div>
-          </label>
-
-          <label class="manager-field manager-task-depleted-postfix">
-            <button
-              type="button"
-              class={`manager-status-toggle ${depletedPostfixName ? 'is-on' : 'is-off'}`}
-              aria-pressed={depletedPostfixName}
-              onclick={toggleDepletedPostfix}
-              disabled={depletedDeleteToken}
-              data-gathering-task-depleted-postfix
-            >
-              <i class={`fas ${depletedPostfixName ? 'fa-check' : 'fa-tag'}`} aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Economy.DepletedPostfixName', 'Append "(depleted)" to the name')}</span>
-            </button>
           </label>
         </div>
       </div>
@@ -1486,8 +1467,8 @@
     align-items: start;
   }
 
-  /* Mutual exclusion: when delete-token is on, the swap/postfix controls are
-     greyed and inert (the controls themselves are also `disabled`). */
+  /* Mutual exclusion: when delete-tile is on, the swap-image control is greyed
+     and inert (the control itself is also `disabled`). */
   .manager-task-depleted-visuals.is-disabled {
     opacity: 0.45;
     pointer-events: none;

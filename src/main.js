@@ -53,8 +53,8 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
-import { handleInteractableSocketMessage, resolveTokenNodeStateForRef } from './canvas/interactableSocketBridge.js';
-import { respawnInteractableTokens } from './canvas/interactableWorldTime.js';
+import { handleInteractableSocketMessage, resolveTileNodeStateForRef } from './canvas/interactableSocketBridge.js';
+import { respawnInteractableTiles } from './canvas/interactableWorldTime.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
@@ -416,14 +416,14 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
       callback: () => gatheringEngine?.processWorldTime?.(worldTime)
     },
     {
-      // Per-token gathering node respawn for placed canvas Interactable tokens.
+      // Per-tile gathering node respawn for placed canvas Interactable tiles.
       // Active-GM ONLY so connected clients never double-apply (mirrors the
       // engine's per-environment respawn, which is primary-GM gated).
-      label: 'InteractableTokens',
+      label: 'InteractableTiles',
       callback: () => {
-        return respawnInteractableTokens({
+        return respawnInteractableTiles({
           worldTime,
-          // Active-GM gate is now inside respawnInteractableTokens (passable so a
+          // Active-GM gate is now inside respawnInteractableTiles (passable so a
           // "non-active-GM applies nothing" case is unit-testable).
           isActiveGM: () => game.user === game.users?.activeGM,
           secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null),
@@ -560,10 +560,10 @@ class Fabricate {
         showPrompt: showHazardScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
-      // Rebuild a per-token node adapter at TIMED-run maturity from the persisted
-      // token ref, so an `onSuccess` decrement lands on the token flag (via the
+      // Rebuild a per-tile node adapter at TIMED-run maturity from the persisted
+      // tile ref, so an `onSuccess` decrement lands on the tile flag (via the
       // GM socket), not `environment.nodeRuntime[taskId]`.
-      resolveTokenNodeState: resolveTokenNodeStateForRef,
+      resolveTileNodeState: resolveTileNodeStateForRef,
       localize: localizeGathering
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));

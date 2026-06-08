@@ -1,17 +1,17 @@
 /**
  * MUST-FIX 1 coverage: a TIMED gathering attempt started from a canvas
- * gathering-task token must, at MATURITY, route its node decrement onto the
- * TOKEN's own node (via a rebuilt per-token adapter) and leave
+ * gathering-task tile must, at MATURITY, route its node decrement onto the
+ * TILE's own node (via a rebuilt per-tile adapter) and leave
  * `environment.nodeRuntime[taskId]` untouched — even for
  * `depletionTiming: 'onSuccess'`, where nothing is consumed at start.
  *
  * The waiting run cannot persist the live adapter (a function object), so it
- * persists only the token REF (`economyEvidence.tokenNodeRef`). The engine
- * rebuilds the adapter at maturity through the injected `resolveTokenNodeState`
+ * persists only the tile REF (`economyEvidence.tileNodeRef`). The engine
+ * rebuilds the adapter at maturity through the injected `resolveTileNodeState`
  * seam and threads it into `_commitRichAttempt`. This test asserts the rebuilt
  * adapter is the SAME `nodeState` the rich-state commit receives at maturity
- * (the token-vs-env decrement behavior itself is covered by
- * `gathering-node-override.test.js`). Both branches are exercised: token ref
+ * (the tile-vs-env decrement behavior itself is covered by
+ * `gathering-node-override.test.js`). Both branches are exercised: tile ref
  * present (rebuilt adapter threaded) vs. absent (null → env fallback).
  */
 
@@ -100,20 +100,20 @@ function spyRichState() {
   };
 }
 
-function tokenAdapter(current) {
+function tileAdapter(current) {
   const node = { enabled: true, max: 5, current, respawn: { policy: 'manual' } };
   const writes = [];
   return {
     writes,
     adapter: {
-      tokenRef: () => ({ sceneId: 'scene-1', tokenId: 'token-1' }),
+      tileRef: () => ({ sceneId: 'scene-1', tileId: 'tile-1' }),
       read: () => node,
       write: (next) => { writes.push(next); node.current = next.current; }
     }
   };
 }
 
-function makeEngine({ runManager, rich, resolveTokenNodeState }) {
+function makeEngine({ runManager, rich, resolveTileNodeState }) {
   return new GatheringEngine({
     environmentStore: {
       list: () => [environment()],
@@ -125,7 +125,7 @@ function makeEngine({ runManager, rich, resolveTokenNodeState }) {
     getSelectableActors: () => [actor],
     isActorSelectable: ({ actor: a }) => a?.uuid === actor.uuid,
     isGamePaused: () => false,
-    resolveTokenNodeState,
+    resolveTileNodeState,
     evaluator: {
       evaluateVisibility: async () => ({ visible: true, reasonCode: 'VISIBLE', diagnostic: null }),
       evaluateCheck: async () => ({ success: true, status: 'succeeded', value: 10, reasonCode: 'OK', diagnostic: null })
@@ -151,44 +151,44 @@ function makeRunManager(now) {
   });
 }
 
-test('MF-1: onSuccess timed token run rebuilds the TOKEN adapter at maturity and threads it into the commit', async () => {
+test('MF-1: onSuccess timed tile run rebuilds the TILE adapter at maturity and threads it into the commit', async () => {
   actor.flags = { fabricate: {} };
   let worldTime = 1000;
   const runManager = makeRunManager(() => worldTime);
   const { rich, commits } = spyRichState();
-  const { adapter, writes } = tokenAdapter(5);
+  const { adapter, writes } = tileAdapter(5);
 
   let resolvedRef = null;
-  const resolveTokenNodeState = (ref) => { resolvedRef = ref; return adapter; };
-  const engine = makeEngine({ runManager, rich, resolveTokenNodeState });
+  const resolveTileNodeState = (ref) => { resolvedRef = ref; return adapter; };
+  const engine = makeEngine({ runManager, rich, resolveTileNodeState });
 
   await runManager.createWaitingRun(actor, {
     craftingSystemId: SYS,
     environmentId: 'env-node',
     taskId: 'task-node',
-    economyEvidence: { tokenNodeRef: { sceneId: 'scene-1', tokenId: 'token-1' } }
+    economyEvidence: { tileNodeRef: { sceneId: 'scene-1', tileId: 'tile-1' } }
   }, { minutes: 1 });
 
   worldTime = 1060; // mature
   const result = await engine.processWorldTime(worldTime);
 
   assert.equal(result.completed.length, 1, 'the run matured to completion');
-  assert.deepEqual(resolvedRef, { sceneId: 'scene-1', tokenId: 'token-1' }, 'maturity rebuilt the adapter from the persisted ref');
+  assert.deepEqual(resolvedRef, { sceneId: 'scene-1', tileId: 'tile-1' }, 'maturity rebuilt the adapter from the persisted ref');
   assert.equal(commits.length, 1);
-  assert.equal(commits[0].nodeState, adapter, 'the rebuilt TOKEN adapter is threaded into the maturity commit');
-  assert.equal(writes.length, 1, 'the onSuccess decrement routed through the TOKEN adapter');
-  assert.equal(writes[0].current, 4, '5 → 4 on the token node (env nodeRuntime is never written by the spy)');
+  assert.equal(commits[0].nodeState, adapter, 'the rebuilt TILE adapter is threaded into the maturity commit');
+  assert.equal(writes.length, 1, 'the onSuccess decrement routed through the TILE adapter');
+  assert.equal(writes[0].current, 4, '5 → 4 on the tile node (env nodeRuntime is never written by the spy)');
 });
 
-test('MF-1: a matured run WITHOUT a token ref threads nodeState=null (env fallback), never invoking the rebuild seam', async () => {
+test('MF-1: a matured run WITHOUT a tile ref threads nodeState=null (env fallback), never invoking the rebuild seam', async () => {
   actor.flags = { fabricate: {} };
   let worldTime = 1000;
   const runManager = makeRunManager(() => worldTime);
   const { rich, commits } = spyRichState();
 
   let seamCalls = 0;
-  const resolveTokenNodeState = () => { seamCalls += 1; return null; };
-  const engine = makeEngine({ runManager, rich, resolveTokenNodeState });
+  const resolveTileNodeState = () => { seamCalls += 1; return null; };
+  const engine = makeEngine({ runManager, rich, resolveTileNodeState });
 
   await runManager.createWaitingRun(actor, {
     craftingSystemId: SYS,
@@ -200,7 +200,7 @@ test('MF-1: a matured run WITHOUT a token ref threads nodeState=null (env fallba
   const result = await engine.processWorldTime(worldTime);
 
   assert.equal(result.completed.length, 1);
-  assert.equal(seamCalls, 0, 'no token ref ⇒ the rebuild seam is never invoked');
+  assert.equal(seamCalls, 0, 'no tile ref ⇒ the rebuild seam is never invoked');
   assert.equal(commits.length, 1);
   assert.equal(commits[0].nodeState, null, 'the maturity commit receives nodeState=null and falls back to the env node');
 });

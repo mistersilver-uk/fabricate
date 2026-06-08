@@ -113,25 +113,31 @@ test('classifies a dropped item uuid that maps to a tool', () => {
 
 // --- spawn payload shaping ---
 
-test('buildSpawnRequest shapes a tool spawn (no environmentId)', () => {
+test('buildSpawnRequest shapes a tool spawn (no environmentId) with tile texture + dimensions', () => {
   const classification = classifyInteractableDrop({ fabricate: { interactableType: 'tool', systemId: 'sysA', toolId: 'tool-1' } }, deps());
-  const request = buildSpawnRequest({ classification, point: { x: 120, y: 240 } });
+  const request = buildSpawnRequest({ classification, point: { x: 120, y: 240 }, texture: 'icons/tools/axe.webp', width: 100, height: 100 });
   assert.deepEqual(request, {
     interactableType: 'tool',
     sourceUuid: 'Fabricate.sysA.tool.tool-1',
+    texture: 'icons/tools/axe.webp',
+    width: 100,
+    height: 100,
     x: 120,
     y: 240
   });
 });
 
-test('buildSpawnRequest carries environmentId + the task name for a gathering task', () => {
+test('buildSpawnRequest carries environmentId + name + tile texture for a gathering task', () => {
   const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, deps());
-  const request = buildSpawnRequest({ classification, point: { x: 10, y: 20 }, environmentId: 'env-3' });
+  const request = buildSpawnRequest({ classification, point: { x: 10, y: 20 }, environmentId: 'env-3', texture: 'icons/ore.webp', width: 100, height: 100 });
   assert.deepEqual(request, {
     interactableType: 'gatheringTask',
     sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
     environmentId: 'env-3',
-    name: 'Mine Ore', // nameplate identifies the gathering point (discoverability)
+    name: 'Mine Ore', // hover tooltip identifies the gathering point (discoverability)
+    texture: 'icons/ore.webp',
+    width: 100,
+    height: 100,
     x: 10,
     y: 20
   });

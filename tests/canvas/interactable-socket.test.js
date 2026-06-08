@@ -2,7 +2,7 @@
  * Unit coverage for the PURE GM-routed Interactable node-update socket logic.
  *
  * Mirrors `tests/hazard-scene-coordinator.test.js`: only the active GM applies a
- * token write; the GM-on-GM case applies LOCALLY (no socket round-trip, because
+ * tile write; the GM-on-GM case applies LOCALLY (no socket round-trip, because
  * an emit never reaches the emitter); a non-GM emits; malformed payloads are
  * rejected. No live Foundry runtime — the apply/emit side-effects are injected.
  */
@@ -17,7 +17,7 @@ import {
   validateNodeUpdatePayload,
   validateNodeDeletePayload,
   createInteractableNodeWriter,
-  createInteractableTokenDeleter,
+  createInteractableTileDeleter,
   routeInteractableSocketMessage,
   routeInteractableDeleteMessage
 } from '../../src/canvas/interactableSocket.js';
@@ -32,17 +32,17 @@ test('socket channel is the shared fabricate module channel', () => {
 // --- payload validation -----------------------------------------------------
 
 test('validateNodeUpdatePayload accepts a well-formed payload', () => {
-  const ok = validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: UPDATE });
-  assert.deepEqual(ok, { action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: UPDATE });
+  const ok = validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: UPDATE });
+  assert.deepEqual(ok, { action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: UPDATE });
 });
 
 test('validateNodeUpdatePayload rejects malformed payloads', () => {
   assert.equal(validateNodeUpdatePayload(null), null);
-  assert.equal(validateNodeUpdatePayload({ action: 'other', sceneId: 's1', tokenId: 't1', update: UPDATE }), null);
-  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: '', tokenId: 't1', update: UPDATE }), null);
-  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: '', update: UPDATE }), null);
-  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: null }), null);
-  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: [1, 2] }), null);
+  assert.equal(validateNodeUpdatePayload({ action: 'other', sceneId: 's1', tileId: 't1', update: UPDATE }), null);
+  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: '', tileId: 't1', update: UPDATE }), null);
+  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: '', update: UPDATE }), null);
+  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: null }), null);
+  assert.equal(validateNodeUpdatePayload({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: [1, 2] }), null);
 });
 
 // --- writer: GM applies locally, non-GM emits -------------------------------
@@ -55,8 +55,8 @@ test('writer applies locally on the active GM (no socket round-trip)', () => {
     emitUpdate: (p) => emitted.push(p),
     applyUpdate: (a) => applied.push(a)
   });
-  writer.write({ sceneId: 's1', tokenId: 't1', update: UPDATE });
-  assert.deepEqual(applied, [{ sceneId: 's1', tokenId: 't1', update: UPDATE }]);
+  writer.write({ sceneId: 's1', tileId: 't1', update: UPDATE });
+  assert.deepEqual(applied, [{ sceneId: 's1', tileId: 't1', update: UPDATE }]);
   assert.equal(emitted.length, 0, 'the GM does NOT emit its own write (an emit never reaches the emitter)');
 });
 
@@ -68,9 +68,9 @@ test('writer emits to the active GM on a non-GM client', () => {
     emitUpdate: (p) => emitted.push(p),
     applyUpdate: (a) => applied.push(a)
   });
-  writer.write({ sceneId: 's1', tokenId: 't1', update: UPDATE });
+  writer.write({ sceneId: 's1', tileId: 't1', update: UPDATE });
   assert.equal(applied.length, 0, 'a non-GM does not apply directly');
-  assert.deepEqual(emitted, [{ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: UPDATE }]);
+  assert.deepEqual(emitted, [{ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: UPDATE }]);
 });
 
 test('writer drops a malformed write request', () => {
@@ -80,7 +80,7 @@ test('writer drops a malformed write request', () => {
     emitUpdate: () => { touched = true; },
     applyUpdate: () => { touched = true; }
   });
-  writer.write({ sceneId: '', tokenId: 't1', update: UPDATE });
+  writer.write({ sceneId: '', tileId: 't1', update: UPDATE });
   assert.equal(touched, false);
 });
 
@@ -91,14 +91,14 @@ test('router applies an inbound node update only on the active GM', () => {
   const applied2 = [];
 
   const wasApplied = routeInteractableSocketMessage(
-    { action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: UPDATE },
+    { action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: UPDATE },
     { isActiveGM: () => true, applyUpdate: (a) => applied.push(a) }
   );
   assert.equal(wasApplied, true);
-  assert.deepEqual(applied, [{ sceneId: 's1', tokenId: 't1', update: UPDATE }]);
+  assert.deepEqual(applied, [{ sceneId: 's1', tileId: 't1', update: UPDATE }]);
 
   const wasApplied2 = routeInteractableSocketMessage(
-    { action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tokenId: 't1', update: UPDATE },
+    { action: INTERACTABLE_NODE_UPDATE, sceneId: 's1', tileId: 't1', update: UPDATE },
     { isActiveGM: () => false, applyUpdate: (a) => applied2.push(a) }
   );
   assert.equal(wasApplied2, false, 'a non-active-GM ignores the inbound update');
@@ -114,59 +114,59 @@ test('router ignores malformed / non-node inbound payloads', () => {
   assert.equal(touched, false);
 });
 
-// --- terminal deleteToken routing (Phase 6) ---------------------------------
+// --- terminal delete routing ------------------------------------------------
 
-test('validateNodeDeletePayload requires a scene + token id', () => {
+test('validateNodeDeletePayload requires a scene + tile id', () => {
   assert.equal(validateNodeDeletePayload(null), null);
-  assert.equal(validateNodeDeletePayload({ action: 'other', sceneId: 's', tokenId: 't' }), null);
+  assert.equal(validateNodeDeletePayload({ action: 'other', sceneId: 's', tileId: 't' }), null);
   assert.equal(validateNodeDeletePayload({ action: INTERACTABLE_NODE_DELETE, sceneId: 's1' }), null);
   assert.deepEqual(
-    validateNodeDeletePayload({ action: INTERACTABLE_NODE_DELETE, sceneId: ' s1 ', tokenId: ' t1 ' }),
-    { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' }
+    validateNodeDeletePayload({ action: INTERACTABLE_NODE_DELETE, sceneId: ' s1 ', tileId: ' t1 ' }),
+    { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tileId: 't1' }
   );
 });
 
 test('the deleter applies LOCALLY on the active GM (no socket round-trip)', () => {
   const applied = [];
   const emitted = [];
-  const deleter = createInteractableTokenDeleter({
+  const deleter = createInteractableTileDeleter({
     isActiveGM: () => true,
     emitDelete: (p) => emitted.push(p),
     applyDelete: (a) => applied.push(a)
   });
-  deleter.delete({ sceneId: 's1', tokenId: 't1' });
-  assert.deepEqual(applied, [{ sceneId: 's1', tokenId: 't1' }]);
+  deleter.delete({ sceneId: 's1', tileId: 't1' });
+  assert.deepEqual(applied, [{ sceneId: 's1', tileId: 't1' }]);
   assert.equal(emitted.length, 0, 'the active GM never emits its own delete');
 });
 
 test('a non-active-GM EMITS the delete for the active GM to apply', () => {
   const applied = [];
   const emitted = [];
-  const deleter = createInteractableTokenDeleter({
+  const deleter = createInteractableTileDeleter({
     isActiveGM: () => false,
     emitDelete: (p) => emitted.push(p),
     applyDelete: (a) => applied.push(a)
   });
-  deleter.delete({ sceneId: 's1', tokenId: 't1' });
+  deleter.delete({ sceneId: 's1', tileId: 't1' });
   assert.equal(applied.length, 0);
-  assert.deepEqual(emitted, [{ action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' }]);
+  assert.deepEqual(emitted, [{ action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tileId: 't1' }]);
 });
 
 test('the inbound delete router applies only on the active GM', () => {
   const applied = [];
   assert.equal(
     routeInteractableDeleteMessage(
-      { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' },
+      { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tileId: 't1' },
       { isActiveGM: () => true, applyDelete: (a) => applied.push(a) }
     ),
     true
   );
-  assert.deepEqual(applied, [{ sceneId: 's1', tokenId: 't1' }]);
+  assert.deepEqual(applied, [{ sceneId: 's1', tileId: 't1' }]);
 
   const ignored = [];
   assert.equal(
     routeInteractableDeleteMessage(
-      { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' },
+      { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tileId: 't1' },
       { isActiveGM: () => false, applyDelete: (a) => ignored.push(a) }
     ),
     false
