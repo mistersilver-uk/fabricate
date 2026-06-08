@@ -580,12 +580,19 @@ Allow gathering tasks to represent resource-node availability independently from
 
 ```js
 GatheringNodeConfig = {
-  maxCount?: number,
-  availableCount?: number,
+  max?: number,
+  current?: number,
   depletionTiming?: "onStart" | "onSuccess",
-  respawnPolicy?: "manual" | "elapsedTime" | "probability" | "manualAndElapsedTime" | "none",
-  respawnIntervalSeconds?: number,
-  respawnChance?: number,
+  respawn?: {
+    policy: "manual" | "overTime",
+    gainMode: "guaranteed" | "chance" | "expression", // when policy is overTime
+    intervalUnit: "minutes" | "hours" | "days" | "weeks", // day/week lengths are calendar-derived at runtime
+    intervalAmount: number,
+    chance?: number,            // 0..1, for gainMode "chance"
+    amountExpression?: string,  // dice expression, for gainMode "expression"
+    // legacy: nodes authored before the unit/amount schema may carry a raw
+    // intervalSeconds instead; the runtime honours it until migrated.
+  },
 }
 ```
 
@@ -600,16 +607,15 @@ GatheringNodeConfig = {
 7. Supported depletion timing includes at least `onStart` and `onSuccess`.
 8. If a task is blind, node count display to non-GM users uses generic availability copy unless revealing the count is explicitly safe for that environment.
 9. GM users can inspect and manually adjust node availability.
-10. A respawn policy may be `manual`, `elapsedTime`, `probability`, `manualAndElapsedTime`, or `none`.
-11. `manual` means only a GM restock action changes available node count.
-12. `elapsedTime` means nodes become available after a configured world-time interval.
-13. `probability` means a configured world-time interval creates a persisted chance to restore nodes.
-14. `manualAndElapsedTime` means both GM restock and world-time restoration are allowed.
-15. Probabilistic respawn persists the evaluated roll/outcome so repeated listing refreshes do not reroll the same interval.
-16. Respawn evaluation is deterministic from persisted state once evaluated.
-17. Respawn must not exceed the task's configured maximum node count unless a GM override explicitly changes the maximum or applies an overstock action.
-18. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
-19. Player-facing UI should show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
+10. A respawn policy may be `manual` or `overTime`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval.
+11. An `overTime` policy selects a `gainMode` per interval: `guaranteed` (+1), `chance` (a configured 0..1 probability of +1, persisted as a roll), or `expression` (roll a dice expression and add the rolled total).
+12. The respawn interval is authored as `intervalUnit` (`minutes` | `hours` | `days` | `weeks`) + `intervalAmount`. A unit of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) at runtime so it tracks custom calendars; `minutes`/`hours` are fixed (60s/3600s); with no calendar the lengths fall back to 86400s/604800s. Nodes authored before this schema may persist a raw `intervalSeconds`, which the runtime honours until a migration rewrites it to unit+amount.
+13. `chance`-mode respawn persists the evaluated roll/outcome so repeated listing refreshes do not reroll the same interval.
+14. Respawn advances its `lastEvaluatedWorldTime` anchor by exactly the consumed intervals, so a same-tick refresh never re-applies and the fractional remainder accrues toward the next interval.
+15. Respawn evaluation is deterministic from persisted state once evaluated.
+16. Respawn must not exceed the task's configured maximum node count unless a GM override explicitly changes the maximum or applies an overstock action.
+17. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
+18. Player-facing UI should show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
 
 ## Gathering Attempt Limits (removed)
 
@@ -665,7 +671,7 @@ GatheringEconomyConfig = {
   stamina: {
     regen: {
       policy: "none" | "elapsedTime",
-      unit: "minutes" | "hours" | "days" | "weeks",
+      unit: "minutes" | "hours" | "days" | "weeks", // day/week lengths are calendar-derived at runtime
       amount: number | null,            // fixed amount per unit
       formula: string,                  // provider expression; wins over amount when set
       characterModifiers: ModifierReference[],
@@ -692,6 +698,7 @@ GatheringEconomyConfig = {
 13. A crafting system lets the GM choose whether stamina regenerates over time, regenerates from explicit rest/provider events, is manual-only, or uses a hybrid of manual and automatic regeneration.
 14. Manual-only stamina means stamina changes only through explicit GM adjustment, approved API calls, or provider events configured by the GM.
 15. Automatic elapsed-time regeneration defines an interval and amount, or a provider expression/macro that calculates amount from actor and world-time context.
+15a. The regeneration interval `unit` of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) so it tracks custom (non-24h-day / non-7-day-week) calendars; `minutes` (60s) and `hours` (3600s) are fixed. With no calendar configured the lengths fall back to 86400s (day) and 604800s (week), reproducing the pre-calendar behaviour. The interval length is resolved per evaluation so a mid-session calendar change is honoured.
 16. Rest/provider-event regeneration identifies the provider event or hook contract that grants stamina.
 17. GMs can manually set current stamina for an actor when they have permission to manage that actor's gathering state.
 18. GMs should be able to manually set or override maximum stamina when the selected stamina provider is Fabricate-owned. External provider maximums may be read-only.

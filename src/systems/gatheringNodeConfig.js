@@ -2,9 +2,15 @@
  * Canonical normalizers for gathering resource-node config/state.
  *
  * A "node" object is both config and runtime state:
- *   { enabled, max, current, depletionTiming, respawn: { policy, intervalSeconds,
- *     gainMode, chance, amountExpression, lastEvaluatedWorldTime,
+ *   { enabled, max, current, depletionTiming, respawn: { policy, intervalUnit,
+ *     intervalAmount, gainMode, chance, amountExpression, lastEvaluatedWorldTime,
  *     nextEvaluationWorldTime, lastRoll }, showCountsToPlayers? }
+ *
+ * Respawn interval is stored as `intervalUnit` (minutes|hours|days|weeks) +
+ * `intervalAmount` so day/week lengths resolve against the active Foundry world
+ * calendar at runtime. Nodes persisted before this schema carry a raw
+ * `intervalSeconds` instead; that legacy field is preserved by `normalizeRespawn`
+ * and honored by the runtime until the node-interval migration rewrites it.
  *
  * Respawn `policy` is one of `manual` (no automatic respawn — the GM tops up
  * counts via the restock API) or `overTime` (one evaluation per elapsed
@@ -21,6 +27,7 @@
 export const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
 export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime']);
 export const VALID_RESPAWN_GAIN_MODES = new Set(['guaranteed', 'chance', 'expression']);
+export const VALID_RESPAWN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 
 function numberOrNull(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -38,6 +45,12 @@ function cloneJson(value) {
  * (`none`/`elapsedTime`/`probability`/`manualAndElapsedTime`) are mapped to the
  * current schema by the 0.4.0 migration; here they simply coerce to `manual`.
  *
+ * The respawn interval is stored as `intervalUnit` + `intervalAmount` so day/week
+ * lengths resolve against the active world calendar at runtime. A node that still
+ * carries only a legacy raw `intervalSeconds` (pre-unit/amount schema) keeps that
+ * field — the runtime honors it as a fallback — until the node-interval migration
+ * rewrites it to unit+amount.
+ *
  * @param {object|null} data
  * @returns {object}
  */
@@ -45,12 +58,10 @@ export function normalizeRespawn(data = null) {
   if (!data || typeof data !== 'object') return { policy: 'manual' };
   const policy = VALID_RESPAWN_POLICIES.has(data.policy) ? data.policy : 'manual';
   const gainMode = VALID_RESPAWN_GAIN_MODES.has(data.gainMode) ? data.gainMode : 'guaranteed';
-  const intervalSeconds = numberOrNull(data.intervalSeconds);
   const chance = numberOrNull(data.chance);
   const amountExpression = typeof data.amountExpression === 'string' ? data.amountExpression.trim() : '';
-  return {
+  const base = {
     policy,
-    intervalSeconds: intervalSeconds ?? 0,
     gainMode,
     chance: chance ?? 0,
     amountExpression,
@@ -58,6 +69,14 @@ export function normalizeRespawn(data = null) {
     nextEvaluationWorldTime: numberOrNull(data.nextEvaluationWorldTime),
     lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null
   };
+  // Prefer the unit+amount schema; fall back to a legacy raw `intervalSeconds`
+  // only when neither unit field is present (so un-migrated nodes keep working).
+  if (data.intervalUnit !== undefined || data.intervalAmount !== undefined) {
+    const intervalUnit = VALID_RESPAWN_UNITS.has(data.intervalUnit) ? data.intervalUnit : 'hours';
+    const intervalAmount = numberOrNull(data.intervalAmount);
+    return { ...base, intervalUnit, intervalAmount: intervalAmount ?? 0 };
+  }
+  return { ...base, intervalSeconds: numberOrNull(data.intervalSeconds) ?? 0 };
 }
 
 /**

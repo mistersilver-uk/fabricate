@@ -282,7 +282,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '0.4.0');
+  assert.equal(versionCall.value, '0.5.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall?.value, '0.4.0');
+  assert.equal(versionCall?.value, '0.5.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -460,7 +460,7 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   const config = settings.store.get('gatheringConfig');
   assert.equal(config.systems['sys-1'].economy.mode, 'nodes');
 
-  assert.equal(settings.store.get('migrationVersion'), '0.4.0');
+  assert.equal(settings.store.get('migrationVersion'), '0.5.0');
 });
 
 test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
@@ -480,14 +480,16 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
 
   await runner.run();
 
+  // The full runner also applies 0.5.0, converting the legacy intervalSeconds to
+  // the calendar-aware intervalUnit + intervalAmount schema.
   const config = settings.store.get('gatheringConfig');
-  assert.deepEqual(config.systems['sys-1'].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 });
+  assert.deepEqual(config.systems['sys-1'].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 });
 
   const envs = settings.store.get('gatheringEnvironments');
-  assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', intervalSeconds: 7200, chance: 0.4 });
-  assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', intervalSeconds: 60, chance: 0.2 });
+  assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
+  assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
-  assert.equal(settings.store.get('migrationVersion'), '0.4.0');
+  assert.equal(settings.store.get('migrationVersion'), '0.5.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {

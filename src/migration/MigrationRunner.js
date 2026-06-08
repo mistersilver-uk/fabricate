@@ -11,6 +11,7 @@ import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js'
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,13 @@ const MIGRATIONS = [
     label: 'Collapse resource-node respawn policies to manual|overTime + gainMode',
     migrate(data) {
       return migrateNodeRespawnModes(data.gatheringConfig, data.environments);
+    }
+  },
+  {
+    version: '0.5.0',
+    label: 'Store node respawn intervals as unit+amount (calendar-aware) instead of raw seconds',
+    migrate(data) {
+      return migrateNodeRespawnIntervals(data.gatheringConfig, data.environments);
     }
   }
   // Future migrations added here in version order

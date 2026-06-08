@@ -125,7 +125,8 @@ export class GatheringRichStateService {
     rollD100 = () => Math.floor(Math.random() * 100) + 1,
     hooks = globalThis.Hooks ?? null,
     evaluateExpression = null,
-    runMacro = null
+    runMacro = null,
+    secondsPerUnit = null
   } = {}) {
     this.environmentStore = environmentStore;
     this.getSetting = getSetting;
@@ -137,6 +138,28 @@ export class GatheringRichStateService {
     this.hooks = hooks;
     this.evaluateExpression = evaluateExpression;
     this.runMacro = runMacro;
+    // Seam: seconds in one regen/respawn unit. The default reproduces the
+    // hardcoded Earth-calendar table; main.js injects a calendar-aware provider
+    // so `days`/`weeks` track the active Foundry world calendar (minutes/hours
+    // are universal and always 60/3600).
+    this.secondsPerUnit = typeof secondsPerUnit === 'function'
+      ? secondsPerUnit
+      : (unit) => SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
+  }
+
+  /**
+   * Convert a count of whole world-time units into seconds via the
+   * `secondsPerUnit` seam, so day/week interval lengths follow the active
+   * calendar. Mirrors the pure `durationToSeconds` helper but is calendar-aware.
+   *
+   * @param {number} count
+   * @param {string} unit One of minutes|hours|days|weeks.
+   * @returns {number} Non-negative seconds.
+   */
+  _durationToSeconds(count, unit) {
+    const seconds = Number(this.secondsPerUnit(unit));
+    const safe = seconds > 0 ? seconds : SECONDS_PER_UNIT.hours;
+    return Math.max(0, Number(count || 0) * safe);
   }
 
   getConditions() {
@@ -931,7 +954,7 @@ export class GatheringRichStateService {
     if (econ.mode !== 'stamina') return null;
     const regen = econ.stamina?.regen || {};
     if (regen.policy !== 'elapsedTime') return null;
-    const interval = durationToSeconds(1, regen.unit);
+    const interval = this._durationToSeconds(1, regen.unit);
     if (!(interval > 0)) return null;
 
     const state = readState(actor);
@@ -1027,7 +1050,11 @@ export class GatheringRichStateService {
     if (!nodes || !respawn || respawn.policy !== 'overTime') {
       return { changed: false, node: nodes };
     }
-    const interval = Number(respawn.intervalSeconds || 0);
+    // Calendar-aware interval from the stored unit+amount; fall back to a legacy
+    // raw `intervalSeconds` for nodes persisted before the unit/amount schema.
+    const interval = respawn.intervalUnit
+      ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
+      : Number(respawn.intervalSeconds || 0);
     if (!(interval > 0)) return { changed: false, node: nodes };
     const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
 
