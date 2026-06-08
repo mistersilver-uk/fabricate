@@ -1,7 +1,6 @@
 import { IngredientSet } from './IngredientSet.js';
 import { Result } from './Result.js';
 import { Ingredient } from './Ingredient.js';
-import { Catalyst } from './Catalyst.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 
 /**
@@ -35,9 +34,6 @@ export class Recipe {
     // Output groups (canonical). Legacy flat `results` is still accepted and flattened for compatibility.
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap(group => group.results);
-    this.catalysts = (data.catalysts || []).map(c =>
-      c instanceof Catalyst ? c : Catalyst.fromJSON(c)
-    );
 
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
@@ -100,12 +96,13 @@ export class Recipe {
       ) &&
       Object.keys(firstSet?.essences || {}).length === 0;
 
-    const hasNoCatalysts =
-      this.ingredientSets.every(set => (set.catalysts?.length || 0) === 0);
+    const hasNoTools =
+      (this.toolIds?.length || 0) === 0 &&
+      this.ingredientSets.every(set => (set.toolIds?.length || 0) === 0);
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
 
-    return hasSimpleIngredients && hasNoCatalysts && hasNoVariableOutput && hasNoEffectTransfer;
+    return hasSimpleIngredients && hasNoTools && hasNoVariableOutput && hasNoEffectTransfer;
   }
 
   /**
@@ -288,7 +285,6 @@ export class Recipe {
           name: group.name,
           results: (group.results || []).map(result => result.toJSON ? result.toJSON() : result)
         })),
-        catalysts: (step.catalysts || []).map(c => c.toJSON ? c.toJSON() : c),
         toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : []
       })),
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
@@ -297,7 +293,6 @@ export class Recipe {
         name: group.name,
         results: group.results.map(r => r.toJSON())
       })),
-      catalysts: this.catalysts.map(c => c.toJSON()),
       toolIds: [...this.toolIds],
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map(r => r.toJSON()),
@@ -398,9 +393,6 @@ export class Recipe {
         set instanceof IngredientSet ? set : IngredientSet.fromJSON(set)
       ),
       resultGroups: this._normalizeResultGroups(step),
-      catalysts: (step.catalysts || []).map(c =>
-        c instanceof Catalyst ? c : Catalyst.fromJSON(c)
-      ),
       toolIds: this._normalizeToolIds(step.toolIds),
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
       currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
@@ -453,7 +445,7 @@ export class Recipe {
         teaserDescription: ''
       };
     }
-    const VALID_FIELDS = ['ingredients', 'results', 'description', 'catalysts', 'essences'];
+    const VALID_FIELDS = ['ingredients', 'results', 'description', 'tools', 'essences'];
     return {
       enabled: teaser.enabled !== false,
       hiddenFields: Array.isArray(teaser.hiddenFields)
@@ -502,7 +494,6 @@ export class Recipe {
       description: '',
       ingredientSets: this.ingredientSets,
       resultGroups: this.resultGroups,
-      catalysts: this.catalysts || [],
       toolIds: this.toolIds || [],
       timeRequirement: null,
       currencyRequirement: null,

@@ -151,7 +151,7 @@ test('GatheringRunManager normalizes missing and malformed containers', () => {
     status: 'inProgress',
     startedAtWorldTime: 30,
     updatedAtWorldTime: 40,
-    usedCatalysts: [],
+    usedTools: [],
     createdResults: []
   }]);
   assert.deepEqual(runs.getRunHistory(actor), []);
@@ -171,7 +171,7 @@ test('GatheringRunManager creates active runs with only canonical fields', async
     blindLabel: 'Generic Gather',
     environmentSnapshot: { name: 'Snapshot' },
     checkResult: { total: 18, leaked: 'allowed because checkResult is opaque' },
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.catalyst', quantity: 1, label: 'Catalyst' }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1, label: 'Tool' }],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2, name: 'Herb' }]
   }));
 
@@ -186,12 +186,12 @@ test('GatheringRunManager creates active runs with only canonical fields', async
     'startedAtWorldTime',
     'updatedAtWorldTime',
     'checkResult',
-    'usedCatalysts',
+    'usedTools',
     'createdResults'
   ]);
   assert.equal(run.id, 'run-1');
   assert.equal(run.status, 'inProgress');
-  assert.deepEqual(run.usedCatalysts, [{ actorUuid: actor.uuid, itemUuid: 'Item.catalyst', quantity: 1 }]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1 }]);
   assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2 }]);
   assert.equal('blindLabel' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
   assert.equal('environmentSnapshot' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
@@ -340,8 +340,8 @@ test('GatheringRunManager drops malformed run item refs', async () => {
   const runs = manager();
 
   const run = await runs.createRun(actor, runData({
-    usedCatalysts: [
-      { actorUuid: actor.uuid, itemUuid: 'Item.valid-catalyst', quantity: 1 },
+    usedTools: [
+      { actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 },
       { actorUuid: actor.uuid, quantity: 1 },
       { itemUuid: 'Item.missing-actor', quantity: 1 }
     ],
@@ -352,7 +352,7 @@ test('GatheringRunManager drops malformed run item refs', async () => {
     ]
   }));
 
-  assert.deepEqual(run.usedCatalysts, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-catalyst', quantity: 1 }]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 }]);
   assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 }]);
 });
 

@@ -23,7 +23,6 @@ import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
-import { Catalyst } from './models/Catalyst.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
@@ -145,35 +144,6 @@ async function runGatheringMacro(macroUuid, context = {}) {
   return MacroExecutor.run(macroUuid, context);
 }
 
-function createGatheringCatalystAvailability(craftingSystemManager) {
-  return {
-    check({ actor, system, task, catalysts = [] } = {}) {
-      const matched = matchGatheringCatalysts({ actor, system, task, catalysts, craftingSystemManager });
-      return {
-        available: matched.missing.length === 0,
-        missing: matched.missing
-      };
-    }
-  };
-}
-
-function createGatheringCatalystUsage(craftingSystemManager) {
-  return {
-    plan({ actor, system, task, catalysts = [] } = {}) {
-      const matched = matchGatheringCatalysts({ actor, system, task, catalysts, craftingSystemManager });
-      return matched.items.map(({ item }) => gatheringRunItemRef(actor, item));
-    },
-
-    async apply({ actor, system, task, catalysts = [] } = {}) {
-      const matched = matchGatheringCatalysts({ actor, system, task, catalysts, craftingSystemManager });
-      for (const { catalyst, item } of matched.items) {
-        await Catalyst.fromJSON(catalyst).applyDegradation(item);
-      }
-      return matched.items.map(({ item }) => gatheringRunItemRef(actor, item));
-    }
-  };
-}
-
 function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression }) {
   return createToolBreakageRuntime({
     matchTools: ({ actor, system, task, tools = [] }) =>
@@ -183,29 +153,6 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
       resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
     evaluateExpression
   });
-}
-
-function matchGatheringCatalysts({ actor, system, task, catalysts = [], craftingSystemManager } = {}) {
-  const matchedItems = [];
-  const missing = [];
-  const syntheticRecipe = {
-    id: `gathering:${task?.id ?? 'task'}`,
-    craftingSystemId: system?.id ?? task?.craftingSystemId ?? null
-  };
-  const items = normalizeFoundryCollection(actor?.items);
-
-  for (const catalyst of catalysts) {
-    const item = items.find(candidate =>
-      craftingSystemManager?.catalystMatchesItem?.(syntheticRecipe, catalyst, candidate)
-    );
-    if (item) {
-      matchedItems.push({ catalyst, item });
-    } else {
-      missing.push(catalyst);
-    }
-  }
-
-  return { items: matchedItems, missing };
 }
 
 function createGatheringResultResolver(resolutionModeService) {
@@ -562,14 +509,12 @@ class Fabricate {
         getCurrentUser: () => game.user,
         getCurrentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
       }),
-      catalystAvailability: createGatheringCatalystAvailability(this.craftingSystemManager),
       toolAvailability: createGatheringToolAvailability({
         craftingSystemManager: this.craftingSystemManager,
         evaluator: this.gatheringGateAndCheckEvaluator
       }),
       resultResolver: createGatheringResultResolver(this.resolutionModeService),
       resultCreator: createGatheringResultCreator(this.craftingSystemManager),
-      catalystUsage: createGatheringCatalystUsage(this.craftingSystemManager),
       toolBreakage: createGatheringToolBreakage({
         craftingSystemManager: this.craftingSystemManager,
         evaluateExpression: evaluateGatheringExpression
@@ -1082,7 +1027,6 @@ Hooks.once('init', async () => {
     Recipe,
     Ingredient,
     IngredientGroup,
-    Catalyst,
     RecipeManager,
     CraftingEngine,
     getFabricateAppClass,

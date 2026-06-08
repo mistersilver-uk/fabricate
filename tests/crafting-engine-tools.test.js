@@ -1,13 +1,12 @@
 /**
- * Phase 0 — CraftingEngine recipe-level Tool support (additive; catalysts
- * still work).
+ * CraftingEngine recipe-level Tool support.
  *
  * Covers:
  *   - _validateTools matched / missing (and broken-item rejection);
  *   - tool usage/breakage application via the shared toolBreakageRuntime
  *     (limitedUses increments toolUsage; breakageChance honored; diceExpression
  *     honored; onBreak destroy / flagBroken / replaceWith);
- *   - usedTools recorded on the success run record alongside usedCatalysts.
+ *   - usedTools recorded on the success run record.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -228,10 +227,8 @@ test('_applyToolBreakage: replaceWith deletes and creates the replacement compon
 function fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet }) {
   return {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [], tools: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
     getToolsForSet() { return fakeTool ? [fakeTool] : []; },
     toolMatchesItem: (_recipe, tool, item) => tool === fakeTool && item === toolItem,
     ingredientMatchesItem: (_recipe, _ingredient, item) => item === ingredientItem
@@ -256,7 +253,7 @@ function fakeRecipe(ingredientSet) {
     craftingSystemId: 'sys-1',
     ingredientSets: [ingredientSet],
     resultGroups: [],
-    catalysts: [],
+    toolIds: [],
     toolIds: [],
     outcomeRouting: null,
     steps: [],

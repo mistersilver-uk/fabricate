@@ -43,7 +43,6 @@ function buildStep(overrides = {}) {
       {
         id: 'set-1',
         ingredientGroups: [{ id: 'g-1', options: [{ id: 'i-1' }] }],
-        catalysts: [],
       },
     ],
     resultGroups: [
@@ -102,8 +101,8 @@ test('simple mode — 2 ingredient sets → invalid with error mentioning "ingre
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [
-      { id: 'set-1', ingredientGroups: [], catalysts: [] },
-      { id: 'set-2', ingredientGroups: [], catalysts: [] },
+      { id: 'set-1', ingredientGroups: [] },
+      { id: 'set-2', ingredientGroups: [] },
     ],
   });
   const recipe = buildRecipe([step]);
@@ -170,7 +169,7 @@ test('mapped mode — each set has resultGroupId matching a result group → val
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [
-      { id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [], catalysts: [] },
+      { id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] },
     ],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
@@ -187,7 +186,7 @@ test('mapped mode — resultGroupId references non-existent group → invalid', 
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [
-      { id: 'set-1', resultGroupId: 'rg-does-not-exist', ingredientGroups: [], catalysts: [] },
+      { id: 'set-1', resultGroupId: 'rg-does-not-exist', ingredientGroups: [] },
     ],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
@@ -209,7 +208,7 @@ test('mapped mode — resultGroupId is null → valid (null is treated as unset,
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [
-      { id: 'set-1', resultGroupId: null, ingredientGroups: [], catalysts: [] },
+      { id: 'set-1', resultGroupId: null, ingredientGroups: [] },
     ],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
@@ -225,8 +224,8 @@ test('mapped mode — multiple sets with valid mappings → valid', () => {
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [
-      { id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [], catalysts: [] },
-      { id: 'set-2', resultGroupId: 'rg-2', ingredientGroups: [], catalysts: [] },
+      { id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] },
+      { id: 'set-2', resultGroupId: 'rg-2', ingredientGroups: [] },
     ],
     resultGroups: [
       { id: 'rg-1', results: [] },
@@ -290,7 +289,7 @@ function buildLegacyOutcomeRoutingSystem(overrides = {}) {
  */
 function buildLegacyOutcomeRoutingStep(overrides = {}) {
   return buildStep({
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [
       { id: 'rg-success', results: [] },
       { id: 'rg-failure', results: [] },
@@ -451,7 +450,7 @@ test('legacy tiered compatibility mode — no step-level routing, valid recipe-l
 
   // Step has NO outcomeRouting; recipe-level routing covers both outcomes
   const step = buildStep({
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [
       { id: 'rg-success', results: [] },
       { id: 'rg-failure', results: [] },
@@ -499,7 +498,7 @@ function buildProgressiveSystem(components = [], overrides = {}) {
  */
 function buildProgressiveStep(results = [], overrides = {}) {
   return buildStep({
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results }],
     ...overrides,
   });
@@ -636,7 +635,7 @@ test('progressive mode — exactly 1 result group required; multiple → invalid
   const system = buildProgressiveSystem([{ id: 'item-potion', difficulty: 2 }]);
   const service = buildService(system);
   const step = buildStep({
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [
       { id: 'rg-1', results: [{ id: 'r-1', componentId: 'item-potion' }] },
       { id: 'rg-2', results: [{ id: 'r-2', componentId: 'item-potion' }] },

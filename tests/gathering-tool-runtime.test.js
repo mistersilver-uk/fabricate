@@ -132,8 +132,6 @@ function makeSimpleEngine({
     isGamePaused: () => false,
     sceneAccess: { canAttempt: async () => ({ allowed: true }) },
     toolAvailability: makeAvailability({ missing: toolMissing, failedRequirements }),
-    catalystAvailability: { check: async () => ({ available: true, missing: [] }) },
-    catalystUsage: { plan: async () => [], apply: async () => [] },
     toolBreakage: breakage.impl,
     resultResolver: {
       async resolveRouted() {
@@ -158,7 +156,6 @@ function baseTask(overrides = {}) {
     name: 'Gather',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
     tools: [],
     resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.x' },
     resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }],
@@ -334,7 +331,6 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     evaluator: makeEvaluator(),
     getSystems: () => [system],
     getRunViewer: () => viewer,
-    catalystUsage: { plan: async () => [], apply: async () => [] },
     toolBreakage: breakage.impl,
     resultResolver: {
       async resolveRouted() {
@@ -431,7 +427,7 @@ test('isToolBroken detects every supported flag form and is false otherwise', ()
 });
 
 const matcher = {
-  catalystMatchesItem: (_recipe, tool, candidate) => Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
+  toolMatchesItem: (_recipe, tool, candidate) => Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
 };
 
 function inventoryItem(componentId, broken = false) {

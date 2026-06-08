@@ -240,7 +240,7 @@ export class RecipeManager {
   /**
    * Evaluate whether a recipe can be crafted, returning a single unified result
    * that is the sole source of truth for both the craftability boolean and the
-   * per-ingredient/essence/catalyst display states.
+   * per-ingredient/essence/tool display states.
    *
    * This eliminates the divergent computation paths that caused the false
    * "Cannot Craft" status (T-082): previously canCraft() and the UI display loop
@@ -252,10 +252,10 @@ export class RecipeManager {
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
-   *   missing: { ingredients: Array, essences: Array, catalysts: Array },
+   *   missing: { ingredients: Array, essences: Array, tools: Array },
    *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
-   *   catalystStates: Array<{ name: string, available: boolean }>
+   *   toolStates: Array<{ name: string, available: boolean }>
    * }}
    */
   evaluateCraftability(componentSourceActors, recipe) {
@@ -266,10 +266,9 @@ export class RecipeManager {
     const emptyResult = {
       canCraft: false,
       satisfiableSet: null,
-      missing: { ingredients: [], essences: [], catalysts: [], tools: [] },
+      missing: { ingredients: [], essences: [], tools: [] },
       ingredientStates: [],
       essenceStates: [],
-      catalystStates: [],
       toolStates: []
     };
 
@@ -331,33 +330,17 @@ export class RecipeManager {
       }
     }
 
-    // Build catalyst states using the satisfiable set (or first set as fallback).
+    // Build tool states from resolved library Tools using the satisfiable set
+    // (or first set as fallback). Reuses the gathering tool matcher path so the
+    // presence check agrees with attempt validation. Tools resolve from the
+    // per-system library via `toolIds`.
     const displaySet = satisfiableSet || firstSet;
-    const catalystsForSet = this.getCatalystsForSet(recipe, displaySet);
-    const catalystStates = catalystsForSet.map(cat => {
-      let available = false;
-      for (const actor of componentSourceActors) {
-        const actorItems = Array.from(actor?.items ?? []);
-        if (actorItems.filter(item => this._catalystMatchesItem(recipe, cat, item)).length > 0) {
-          available = true;
-          break;
-        }
-      }
-      const name = this.resolveComponentName(recipe, cat.componentId || cat.systemItemId);
-      return { name, available };
-    });
-    const missingCatalysts = catalystsForSet.filter((_cat, idx) => !catalystStates[idx].available);
-
-    // Build tool states (mirrors catalystStates) from resolved library Tools.
-    // Reuses the gathering tool matcher path so the presence check agrees with
-    // attempt validation. Tools resolve from per-system library `toolIds`,
-    // parallel to and independent of the still-functional catalyst path.
     const toolsForSet = this.getToolsForSet(recipe, displaySet);
     const toolStates = this._buildToolStates(recipe, toolsForSet, availableItems);
     const missingTools = toolsForSet.filter((_tool, idx) => !toolStates[idx].available);
 
-    // Final craftability: ingredients satisfied AND catalysts present AND tools present.
-    const canCraft = satisfiableSet !== null && missingCatalysts.length === 0 && missingTools.length === 0;
+    // Final craftability: ingredients satisfied AND tools present.
+    const canCraft = satisfiableSet !== null && missingTools.length === 0;
 
     // Build ingredient display states from the selection result that matches
     // the craftability decision — ensuring they are always consistent.
@@ -397,19 +380,17 @@ export class RecipeManager {
       missing: {
         ingredients: canCraft ? [] : missingIngredients,
         essences: canCraft ? [] : missingEssences,
-        catalysts: missingCatalysts,
         tools: missingTools
       },
       ingredientStates,
       essenceStates,
-      catalystStates,
       toolStates
     };
   }
 
   /**
    * Build per-tool display/presence states for a recipe's resolved library
-   * Tools, mirroring `catalystStates`. Each entry is
+   * Tools. Each entry is
    * `{ name, available }` where `available` is true when at least one of the
    * supplied items satisfies the tool's component reference (and is not broken),
    * using the same matcher gathering attempt validation uses.
@@ -573,7 +554,7 @@ export class RecipeManager {
       return {
         canCraft: false,
         satisfiableSet: null,
-        missing: { ingredients: [], essences: [], catalysts: [] }
+        missing: { ingredients: [], essences: [], tools: [] }
       };
     }
 
@@ -630,47 +611,6 @@ export class RecipeManager {
     }
 
     return missing;
-  }
-
-  /**
-   * Check if catalysts are available
-   * @param {Catalyst[]} catalysts - Catalysts to check
-   * @param {Actor[]} actors - Actors to search for catalysts
-   * @returns {Array}
-   * @private
-   */
-  _checkCatalysts(recipe, catalysts, actors) {
-    const missing = [];
-
-    for (const catalyst of catalysts) {
-      let found = false;
-
-      for (const actor of actors) {
-        const actorItems = Array.from(actor?.items ?? []);
-        const matchingItems = actorItems.filter(item => this._catalystMatchesItem(recipe, catalyst, item));
-        if (matchingItems.length > 0) {
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        missing.push(catalyst);
-      }
-    }
-
-    return missing;
-  }
-
-  /**
-   * Return catalysts that apply to the given ingredient set.
-   * @private
-   */
-  getCatalystsForSet(recipe, ingredientSet) {
-    return [
-      ...(Array.isArray(recipe?.catalysts) ? recipe.catalysts : []),
-      ...(Array.isArray(ingredientSet?.catalysts) ? ingredientSet.catalysts : [])
-    ];
   }
 
   /**
@@ -746,23 +686,12 @@ export class RecipeManager {
   }
 
   /**
-   * Check whether a concrete item satisfies a catalyst requirement
-   * @param {Recipe} recipe
-   * @param {Catalyst} catalyst
-   * @param {Item} item
-   * @returns {boolean}
-   */
-  catalystMatchesItem(recipe, catalyst, item) {
-    return this._catalystMatchesItem(recipe, catalyst, item);
-  }
-
-  /**
    * Check whether a concrete item satisfies a Tool's component reference.
    *
-   * Delegates to the SAME generic component matcher as
-   * {@link catalystMatchesItem} (a Tool and a Catalyst both reference a managed
-   * component by id). The gathering tool runtime prefers this alias when present
-   * so Phase 2 can drop the catalyst matcher name atomically.
+   * A Tool references a managed component by id; an item satisfies the tool when
+   * it matches that component's source reference chain (or, for sourceless
+   * components, by name). This is the primary generic component matcher reused by
+   * both recipe crafting and gathering tool validation.
    *
    * @param {Recipe} recipe
    * @param {{componentId?: string, systemItemId?: string}} tool
@@ -770,16 +699,8 @@ export class RecipeManager {
    * @returns {boolean}
    */
   toolMatchesItem(recipe, tool, item) {
-    return this._catalystMatchesItem(recipe, tool, item);
-  }
-
-  /**
-   * Check whether a concrete item satisfies a catalyst requirement
-   * @private
-   */
-  _catalystMatchesItem(recipe, catalyst, item) {
-    if (catalyst.componentId || catalyst.systemItemId) {
-      const managedItem = this._getComponent(recipe, catalyst.componentId || catalyst.systemItemId);
+    if (tool.componentId || tool.systemItemId) {
+      const managedItem = this._getComponent(recipe, tool.componentId || tool.systemItemId);
       if (!managedItem) return false;
       if (managedItem.sourceUuid || managedItem.sourceItemUuid || managedItem.fallbackItemIds?.length) {
         if (itemMatchesComponentSource(item, managedItem)) return true;
@@ -787,7 +708,7 @@ export class RecipeManager {
       }
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
     }
-    // No componentId means catalyst cannot be matched; treat as no match.
+    // No componentId means the tool cannot be matched; treat as no match.
     return false;
   }
 

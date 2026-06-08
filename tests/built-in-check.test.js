@@ -314,7 +314,7 @@ test('validateRecipe accepts checkSource builtIn as valid for legacy tiered comp
     craftingSystemId: 'sys-res',
     getExecutionSteps: () => [{
       id: 'step-1', name: 'Step 1',
-      ingredientSets: [{ id: 'is1', ingredients: [], catalysts: [], resultGroupId: 'rg1' }],
+      ingredientSets: [{ id: 'is1', ingredients: [], toolIds: [], resultGroupId: 'rg1' }],
       resultGroups: [{ id: 'rg1', results: [] }]
     }]
   };
@@ -329,7 +329,7 @@ test('validateRecipe accepts checkSource builtIn as valid for progressive mode',
     craftingSystemId: 'sys-res',
     getExecutionSteps: () => [{
       id: 'step-1', name: 'Step 1',
-      ingredientSets: [{ id: 'is1', ingredients: [], catalysts: [] }],
+      ingredientSets: [{ id: 'is1', ingredients: [], toolIds: [] }],
       resultGroups: [{ id: 'rg1', results: [] }]
     }]
   };

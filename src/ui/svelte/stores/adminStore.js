@@ -6,7 +6,7 @@
  * isolated set of writable() instances. Gathering environment admin state is
  * read from an injected environment store, cloned before exposure, gated by the
  * selected system's `features.gathering` flag, and edited through explicit
- * environment draft actions. Selected-task result, catalyst, committed
+ * environment draft actions. Selected-task result, committed
  * visibility, routed result-selection, progressive award-mode, check, time
  * requirement, and failure-outcome edits stay store-owned so Svelte components
  * only render state and call injected callbacks. Failed environment saves keep
@@ -190,7 +190,7 @@ function _getRecipeExecutionSteps(recipe) {
     name: 'Step 1',
     ingredientSets: Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [],
     resultGroups: Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [],
-    catalysts: Array.isArray(recipe?.catalysts) ? recipe.catalysts : []
+    toolIds: Array.isArray(recipe?.toolIds) ? recipe.toolIds : []
   }];
 }
 
@@ -198,20 +198,20 @@ function _usesExplicitRecipeSteps(recipe, executionSteps) {
   return (Array.isArray(recipe?.steps) && recipe.steps.length > 0) || executionSteps.length > 1;
 }
 
-function _buildRequirementPreviewStep(step, index, sharedRecipeCatalysts = []) {
+function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
   const ingredientSets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
   const ingredientSetSummaries = ingredientSets.map((set, setIndex) => ({
     id: set?.id || `set-${setIndex + 1}`,
     name: set?.name || `Set ${setIndex + 1}`,
     ingredientCount: _ingredientCountForSet(set),
-    catalystCount: Array.isArray(set?.catalysts) ? set.catalysts.length : 0
+    toolCount: Array.isArray(set?.toolIds) ? set.toolIds.length : 0
   }));
-  const stepCatalystCount = Array.isArray(step?.catalysts) ? step.catalysts.length : 0;
+  const stepToolCount = Array.isArray(step?.toolIds) ? step.toolIds.length : 0;
   const previewIngredientCount = ingredientSetSummaries.length > 0
     ? Math.max(...ingredientSetSummaries.map(set => set.ingredientCount))
     : 0;
-  const previewSetCatalystCount = ingredientSetSummaries.length > 0
-    ? Math.max(...ingredientSetSummaries.map(set => set.catalystCount))
+  const previewSetToolCount = ingredientSetSummaries.length > 0
+    ? Math.max(...ingredientSetSummaries.map(set => set.toolCount))
     : 0;
 
   return {
@@ -219,7 +219,7 @@ function _buildRequirementPreviewStep(step, index, sharedRecipeCatalysts = []) {
     name: step?.name || `Step ${index + 1}`,
     ingredientSetCount: ingredientSets.length,
     ingredientCount: previewIngredientCount,
-    catalystCount: sharedRecipeCatalysts.length + stepCatalystCount + previewSetCatalystCount,
+    toolCount: sharedRecipeToolIds.length + stepToolCount + previewSetToolCount,
     resultGroupCount: Array.isArray(step?.resultGroups) ? step.resultGroups.length : 0,
     hasAlternatives: ingredientSetSummaries.length > 1,
     ingredientSetSummaries
@@ -239,11 +239,11 @@ function _recipeStructure(isSimple, stepCount) {
 function _buildRecipeBrowserDisplay(recipe) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
   const isSimple = typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true;
-  const sharedRecipeCatalysts = _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.catalysts)
-    ? recipe.catalysts
+  const sharedRecipeToolIds = _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.toolIds)
+    ? recipe.toolIds
     : [];
   const requirementsPreview = executionSteps.map((step, index) =>
-    _buildRequirementPreviewStep(step, index, sharedRecipeCatalysts)
+    _buildRequirementPreviewStep(step, index, sharedRecipeToolIds)
   );
   const structure = _recipeStructure(isSimple, requirementsPreview.length);
 
@@ -252,7 +252,7 @@ function _buildRecipeBrowserDisplay(recipe) {
     stepCount: requirementsPreview.length,
     resultGroupCount: requirementsPreview.reduce((sum, step) => sum + step.resultGroupCount, 0),
     ingredientCount: requirementsPreview.reduce((sum, step) => sum + step.ingredientCount, 0),
-    catalystCount: requirementsPreview.reduce((sum, step) => sum + step.catalystCount, 0),
+    toolCount: requirementsPreview.reduce((sum, step) => sum + step.toolCount, 0),
     ...structure,
     requirementsPreview,
     isSimple
@@ -292,7 +292,7 @@ function _buildSalvageSummary(item, salvageEnabled) {
 
   return {
     quantityRequired: Number(salvage.ingredientQuantity) || 1,
-    catalystCount: Array.isArray(salvage.catalysts) ? salvage.catalysts.length : 0,
+    toolCount: Array.isArray(salvage.toolIds) ? salvage.toolIds.length : 0,
     resultGroupCount: Array.isArray(salvage.resultGroups) ? salvage.resultGroups.length : 0,
     hasTimeRequirement: !!salvage.timeRequirement,
     hasCurrencyRequirement: !!salvage.currencyRequirement,
@@ -943,13 +943,6 @@ function _inferEnvironmentValidationTarget(message, draft, context = _createEnvi
     return { taskId: task.id, path: `${prefix}.failureOutcome.macroUuid` };
   }
 
-  const catalystIndex = lower.match(/catalyst (\d+)/)?.[1];
-  if (catalystIndex) {
-    const index = Math.max(0, Number(catalystIndex) - 1);
-    const field = /maxuses/.test(lower) ? 'maxUses' : 'componentId';
-    return { taskId: task.id, path: `${prefix}.catalysts.${index}.${field}` };
-  }
-
   const resultGroupName = message.match(/result group "([^"]+)"/)?.[1];
   if (resultGroupName) {
     const group = _resolveResultGroupValidationTarget({
@@ -1077,12 +1070,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       stepCount: display.stepCount,
       resultGroupCount: display.resultGroupCount,
       ingredientCount: display.ingredientCount,
-      catalystCount: display.catalystCount,
+      toolCount: display.toolCount,
       structureKey: display.structureKey,
       structureLabel: display.structureLabel,
       requirementsPreview: display.requirementsPreview,
       ingredients: new Array(display.ingredientCount),
-      catalysts: new Array(display.catalystCount)
+      tools: new Array(display.toolCount)
     };
   });
 
@@ -2383,16 +2376,6 @@ export function createAdminStore(services) {
       componentId: firstComponent?.id || null,
       quantity: 1,
       propertyMacroUuid: null
-    };
-  }
-
-  function _newEnvironmentCatalyst() {
-    const firstComponent = _selectedManagedItemOptions()[0];
-    return {
-      componentId: firstComponent?.id || null,
-      degradesOnUse: false,
-      destroyWhenExhausted: false,
-      maxUses: null
     };
   }
 

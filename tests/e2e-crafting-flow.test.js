@@ -137,7 +137,6 @@ function makeRecipe({
   craftingSystemId = 'sys-1',
   ingredientSets = [],
   resultGroups = [],
-  catalysts = [],
   outcomeRouting = null,
   steps = null
 } = {}) {
@@ -147,7 +146,6 @@ function makeRecipe({
     craftingSystemId,
     ingredientSets,
     resultGroups,
-    catalysts,
     outcomeRouting,
     transferEffects: false,
     validate() { return { valid: true, errors: [] }; },
@@ -199,16 +197,16 @@ function makeResolutionService(system) {
 /**
  * Build a RecipeManager mock that uses item identity (by id) for ingredient matching.
  */
-function makeRecipeManager({ ingredientItem, catalystItem = null, catalystModel = null, ingredientSet } = {}) {
+function makeRecipeManager({ ingredientItem, toolItem = null, toolModel = null, ingredientSet } = {}) {
   return {
     canCraft(_actors, _recipe) {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
     },
-    getCatalystsForSet(_recipe, _set) {
-      return catalystModel ? [catalystModel] : [];
+    getToolsForSet(_recipe, _set) {
+      return toolModel ? [toolModel] : [];
     },
-    catalystMatchesItem(_recipe, _catalyst, item) {
-      return catalystItem ? item === catalystItem : false;
+    toolMatchesItem(_recipe, _tool, item) {
+      return toolItem ? item === toolItem : false;
     },
     ingredientMatchesItem(_recipe, ingredient, item) {
       return item === ingredientItem && item.id === ingredient.systemItemId;
@@ -306,12 +304,9 @@ test('simple mode: returns failure when ingredient is missing', async () => {
         missing: {
           ingredients: [{ ingredient: { getDescription: () => '1x Herb' }, have: 0, need: 1 }],
           essences: [],
-          catalysts: []
         }
       };
     },
-    getCatalystsForSet: () => [],
-    catalystMatchesItem: () => false,
     ingredientMatchesItem: () => false
   };
 
@@ -446,14 +441,12 @@ test('multi-step: craft() advances through two steps to completion', async () =>
     {
       id: 'step-1', name: 'Step 1',
       ingredientSets: [set1],
-      resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] }],
-      catalysts: [], outcomeRouting: null, timeRequirement: null
+      resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
     },
     {
       id: 'step-2', name: 'Step 2',
       ingredientSets: [set2],
-      resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] }],
-      catalysts: [], outcomeRouting: null, timeRequirement: null
+      resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
     }
   ];
 
@@ -468,15 +461,13 @@ test('multi-step: craft() advances through two steps to completion', async () =>
     canCraft(_actors, executionRecipe) {
       const currentSets = executionRecipe.ingredientSets || [];
       if (currentSets.some(s => s.id === 'set-step1')) {
-        return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [], catalysts: [] } };
+        return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [] } };
       }
       if (currentSets.some(s => s.id === 'set-step2')) {
-        return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [], catalysts: [] } };
+        return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [] } };
       }
-      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ ingredient: { getDescription: () => 'Item' }, have: 0, need: 1 }], essences: [], catalysts: [] } };
+      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ ingredient: { getDescription: () => 'Item' }, have: 0, need: 1 }], essences: [] } };
     },
-    getCatalystsForSet: () => [],
-    catalystMatchesItem: () => false,
     ingredientMatchesItem(_recipe, ingredient, item) { return item.id === ingredient.systemItemId; }
   };
 
@@ -516,8 +507,7 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
   const steps = [{
     id: 'step-1', name: 'Step 1',
     ingredientSets: [set1],
-    resultGroups: [{ id: 'rg-s1', results: [] }],
-    catalysts: [], outcomeRouting: null, timeRequirement: null
+    resultGroups: [{ id: 'rg-s1', results: [] }], outcomeRouting: null, timeRequirement: null
   }];
 
   const recipe = makeRecipe({ craftingSystemId: 'sys-1', steps });
@@ -532,12 +522,9 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
         missing: {
           ingredients: [{ ingredient: { getDescription: () => '2x Herb' }, have: 1, need: 2 }],
           essences: [],
-          catalysts: []
         }
       };
     },
-    getCatalystsForSet: () => [],
-    catalystMatchesItem: () => false,
     ingredientMatchesItem: () => false
   };
 
@@ -585,8 +572,7 @@ function makeLegacyOutcomeRoutingRecipeFixture(system) {
       { id: 'rg-critical', results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }] },
       { id: 'rg-pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }
     ],
-    outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-pass' },
-    catalysts: [], timeRequirement: null
+    outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-pass' }, timeRequirement: null
   };
 
   const recipe = makeRecipe({
@@ -676,8 +662,7 @@ test('legacy tiered compatibility mode: check failure returns failure without cr
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
     resultGroups: [{ id: 'rg-pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }],
-    outcomeRouting: { critical: 'rg-pass', pass: 'rg-pass', fail: 'rg-pass' },
-    catalysts: [], timeRequirement: null
+    outcomeRouting: { critical: 'rg-pass', pass: 'rg-pass', fail: 'rg-pass' }, timeRequirement: null
   };
 
   const recipe = makeRecipe({
@@ -755,8 +740,7 @@ test('progressive mode: check value 8 awards comp-a (cost 3) and comp-b (cost 5)
         { id: 'r-b', componentId: 'comp-b', quantity: 1 },
         { id: 'r-c', componentId: 'comp-c', quantity: 1 }
       ]
-    }],
-    catalysts: [], outcomeRouting: null, timeRequirement: null
+    }], outcomeRouting: null, timeRequirement: null
   };
 
   const recipe = makeRecipe({ craftingSystemId: system.id, steps: [step] });
@@ -794,8 +778,7 @@ test('progressive mode: check value 0 awards no results', async () => {
   const step = {
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-prog', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 1 }] }],
-    catalysts: [], outcomeRouting: null, timeRequirement: null
+    resultGroups: [{ id: 'rg-prog', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
   };
 
   const recipe = makeRecipe({ craftingSystemId: system.id, steps: [step] });
@@ -839,8 +822,7 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
         { id: 'r-a', componentId: 'comp-a', quantity: 1 },
         { id: 'r-b', componentId: 'comp-b', quantity: 1 }
       ]
-    }],
-    catalysts: [], outcomeRouting: null, timeRequirement: null
+    }], outcomeRouting: null, timeRequirement: null
   };
 
   const recipe = makeRecipe({ craftingSystemId: system.id, steps: [step] });

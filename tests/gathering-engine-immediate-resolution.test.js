@@ -20,7 +20,8 @@ function makeEngine({
   checkResult = { success: null, status: null, value: 10, reasonCode: 'CHECK_VALUE' },
   includeProgressiveResolver = true,
   createdResults = [],
-  usedCatalysts = [],
+  usedTools = [],
+  libraryTools = [],
   terminalRunError = null,
   runManager = null,
   calls = {}
@@ -30,15 +31,21 @@ function makeEngine({
   calls.evaluateCheck = [];
   calls.planResults = [];
   calls.createResults = [];
-  calls.planCatalysts = [];
-  calls.useCatalysts = [];
+  calls.planTools = [];
+  calls.applyTools = [];
   calls.failureFeedback = [];
   calls.createTerminalRun = [];
   calls.createWaitingRun = [];
 
+  const libraryToolsMap = new Map(libraryTools.map(tool => [tool.id, tool]));
+
   return new GatheringEngine({
     environmentStore: {
-      list: () => [{ ...environment, tasks: [task] }]
+      list: () => {
+        const composed = { ...environment, tasks: [task] };
+        Object.defineProperty(composed, '__libraryTools', { value: libraryToolsMap, enumerable: false });
+        return [composed];
+      }
     },
     getSystems: () => [{
       id: 'system-a',
@@ -63,8 +70,8 @@ function makeEngine({
     sceneAccess: {
       canAttempt: () => ({ allowed: true })
     },
-    catalystAvailability: {
-      check: () => ({ available: true, missing: [] })
+    toolAvailability: {
+      check: () => ({ available: true, missing: [], failedRequirements: [] })
     },
     resultResolver: {
       resolveRouted: async (payload) => {
@@ -98,14 +105,14 @@ function makeEngine({
         return createdResults;
       }
     },
-    catalystUsage: {
+    toolBreakage: {
       plan: async (payload) => {
-        calls.planCatalysts.push(payload);
-        return usedCatalysts;
+        calls.planTools.push(payload);
+        return usedTools;
       },
       apply: async (payload) => {
-        calls.useCatalysts.push(payload);
-        return usedCatalysts;
+        calls.applyTools.push(payload);
+        return usedTools;
       }
     },
     failureFeedback: {
@@ -151,7 +158,7 @@ function routedTask(overrides = {}) {
     name: 'Gather Iron',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
+    toolIds: [],
     resultGroups: [{
       id: 'group-a',
       name: 'Iron',
@@ -208,14 +215,14 @@ function assertNoTerminalSideEffects(calls) {
   assert.deepEqual(calls.createWaitingRun, []);
   assert.deepEqual(calls.planResults, []);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.planCatalysts, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.planTools, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 }
 
 function assertNoPostHistorySideEffects(calls) {
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 }
 
@@ -232,9 +239,9 @@ function assertNoBlindTerminalLeak(call) {
 test('immediate routed success creates result items and writes succeeded terminal history', async () => {
   const calls = {};
   const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
-  const usedCatalysts = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
-  const task = routedTask({ catalysts: [{ componentId: 'pick', degradesOnUse: true }] });
-  const engine = makeEngine({ task, createdResults, usedCatalysts, calls });
+  const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const task = routedTask({ toolIds: ['tool-pick'] });
+  const engine = makeEngine({ task, createdResults, usedTools, libraryTools: [{ id: 'tool-pick', componentId: 'pick' }], calls });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
@@ -242,7 +249,7 @@ test('immediate routed success creates result items and writes succeeded termina
   assert.equal(result.state, 'succeeded');
   assert.equal(result.runStatus, 'succeeded');
   assert.deepEqual(result.createdResults, createdResults);
-  assert.deepEqual(result.usedCatalysts, usedCatalysts);
+  assert.deepEqual(result.usedTools, usedTools);
   assert.equal(calls.resolveRouted.length, 1);
   assert.equal(calls.resolveRouted[0].provider, 'macroOutcome');
   assert.equal(calls.createResults.length, 1);
@@ -258,26 +265,26 @@ test('immediate routed success creates result items and writes succeeded termina
   assert.equal(calls.createTerminalRun[0][2], 'succeeded');
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults,
-    usedCatalysts,
-    usedTools: [],
+    usedTools,
     checkResult: { outcome: 'Iron', provider: 'macroOutcome' }
   });
 });
 
-test('immediate routed failure writes failed terminal history, creates no results, and applies catalyst plus failure feedback', async () => {
+test('immediate routed failure writes failed terminal history, creates no results, and applies tool breakage plus failure feedback', async () => {
   const calls = {};
-  const usedCatalysts = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
   const failureOutcome = { mode: 'text', text: 'The vein is exhausted.' };
-  const task = routedTask({ catalysts: [{ componentId: 'pick', degradesOnUse: true }], failureOutcome });
+  const task = routedTask({ toolIds: ['tool-pick'], failureOutcome });
   const engine = makeEngine({
     task,
+    libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
     resolver: {
       routed: {
         status: 'failed',
         checkResult: { outcome: 'fail', provider: 'rollTableOutcome' }
       }
     },
-    usedCatalysts,
+    usedTools,
     calls
   });
 
@@ -286,9 +293,9 @@ test('immediate routed failure writes failed terminal history, creates no result
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'failed');
   assert.deepEqual(result.createdResults, []);
-  assert.deepEqual(result.usedCatalysts, usedCatalysts);
+  assert.deepEqual(result.usedTools, usedTools);
   assert.deepEqual(calls.createResults, []);
-  assert.equal(calls.useCatalysts.length, 1);
+  assert.equal(calls.applyTools.length, 1);
   assert.equal(calls.failureFeedback.length, 1);
   assert.equal(calls.failureFeedback[0].actor, actor);
   assert.equal(calls.failureFeedback[0].failureOutcome, failureOutcome);
@@ -297,8 +304,7 @@ test('immediate routed failure writes failed terminal history, creates no result
   assert.equal(calls.createTerminalRun[0][2], 'failed');
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
-    usedCatalysts,
-    usedTools: [],
+    usedTools,
     checkResult: { outcome: 'fail', provider: 'rollTableOutcome' }
   });
 });
@@ -396,7 +402,7 @@ test('invalid failureOutcome aborts before resolver or terminal side effects', a
     { mode: 'other', text: 'No useful finds.' }
   ]) {
     const calls = {};
-    const task = routedTask({ failureOutcome, catalysts: [{ componentId: 'pick', degradesOnUse: true }] });
+    const task = routedTask({ failureOutcome });
     const engine = makeEngine({ task, calls });
 
     const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
@@ -408,10 +414,9 @@ test('invalid failureOutcome aborts before resolver or terminal side effects', a
   }
 });
 
-test('terminal history persistence failure prevents results, catalysts, and failure feedback side effects', async () => {
+test('terminal history persistence failure prevents results, tools, and failure feedback side effects', async () => {
   const calls = {};
   const task = routedTask({
-    catalysts: [{ componentId: 'pick', degradesOnUse: true }],
     failureOutcome: { mode: 'text', text: 'No useful finds.' }
   });
   const engine = makeEngine({
@@ -438,8 +443,8 @@ test('real run manager persists immediate non-blind history with the same create
   const calls = {};
   const actingActor = new FakeActor();
   const createdResults = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
-  const usedCatalysts = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
-  const task = routedTask({ catalysts: [{ componentId: 'pick', degradesOnUse: true }] });
+  const usedTools = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const task = routedTask({ toolIds: ['tool-pick'] });
   const runManager = new GatheringRunManager({
     randomID: () => 'run-terminal',
     nowWorldTime: () => 1000,
@@ -449,7 +454,8 @@ test('real run manager persists immediate non-blind history with the same create
     actingActor,
     task,
     createdResults,
-    usedCatalysts,
+    usedTools,
+    libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
     runManager,
     calls
   });
@@ -459,30 +465,30 @@ test('real run manager persists immediate non-blind history with the same create
 
   assert.equal(result.accepted, true);
   assert.deepEqual(result.createdResults, createdResults);
-  assert.deepEqual(result.usedCatalysts, usedCatalysts);
+  assert.deepEqual(result.usedTools, usedTools);
   assert.equal(history.length, 1);
   assert.equal(history[0].status, 'succeeded');
   assert.deepEqual(history[0].createdResults, createdResults);
-  assert.deepEqual(history[0].usedCatalysts, usedCatalysts);
+  assert.deepEqual(history[0].usedTools, usedTools);
   assert.deepEqual(history[0].checkResult, { outcome: 'Iron', provider: 'macroOutcome' });
   assert.equal(calls.createResults.length, 1);
-  assert.equal(calls.useCatalysts.length, 1);
+  assert.equal(calls.applyTools.length, 1);
 });
 
-test('catalyst terminal usage receives only the acting actor and never actor collections', async () => {
+test('tool terminal usage receives only the acting actor and never actor collections', async () => {
   const calls = {};
-  const task = routedTask({ catalysts: [{ componentId: 'pick', degradesOnUse: true }] });
-  const engine = makeEngine({ task, calls });
+  const task = routedTask({ toolIds: ['tool-pick'] });
+  const engine = makeEngine({ task, libraryTools: [{ id: 'tool-pick', componentId: 'pick' }], calls });
 
   await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
-  assert.equal(calls.useCatalysts.length, 1);
-  assert.equal(calls.useCatalysts[0].actor, actor);
-  assert.equal('actors' in calls.useCatalysts[0], false);
-  assert.equal('componentSourceActors' in calls.useCatalysts[0], false);
+  assert.equal(calls.applyTools.length, 1);
+  assert.equal(calls.applyTools[0].actor, actor);
+  assert.equal('actors' in calls.applyTools[0], false);
+  assert.equal('componentSourceActors' in calls.applyTools[0], false);
 });
 
-test('misconfiguration abort creates no active run, terminal history, result items, or catalyst usage', async () => {
+test('misconfiguration abort creates no active run, terminal history, result items, or tool usage', async () => {
   const calls = {};
   const task = routedTask({ resultSelection: { provider: 'macroOutcome' } });
   const engine = makeEngine({ task, calls });
@@ -497,7 +503,6 @@ test('misconfiguration abort creates no active run, terminal history, result ite
 test('routed task with reserved failure keyword result group aborts before resolver or terminal side effects', async () => {
   const calls = {};
   const task = routedTask({
-    catalysts: [{ componentId: 'pick', degradesOnUse: true }],
     resultGroups: [{
       id: 'group-fail',
       name: 'fail',
@@ -540,9 +545,9 @@ test('routed task with duplicate normalized result group names aborts before ter
   assertNoTerminalSideEffects(calls);
 });
 
-test('resolver diagnostics abort as task misconfiguration without results, catalysts, or history', async () => {
+test('resolver diagnostics abort as task misconfiguration without results, tools, or history', async () => {
   const calls = {};
-  const task = routedTask({ catalysts: [{ componentId: 'pick', degradesOnUse: true }] });
+  const task = routedTask();
   const engine = makeEngine({
     task,
     resolver: {
@@ -566,7 +571,7 @@ test('resolver diagnostics abort as task misconfiguration without results, catal
 
 test('explicit resolver misconfiguration with result groups aborts before terminal side effects', async () => {
   const calls = {};
-  const task = routedTask({ catalysts: [{ componentId: 'pick', degradesOnUse: true }] });
+  const task = routedTask();
   const engine = makeEngine({
     task,
     resolver: {
@@ -587,18 +592,19 @@ test('explicit resolver misconfiguration with result groups aborts before termin
   assertNoTerminalSideEffects(calls);
 });
 
-test('blind non-GM terminal success response redacts task, catalyst, provider, and result internals', async () => {
+test('blind non-GM terminal success response redacts task, tool, provider, and result internals', async () => {
   const calls = {};
   const secretTask = routedTask({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    catalysts: [{ componentId: 'silver-sickle', degradesOnUse: true }]
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
     environment: targetedEnvironment({ selectionMode: 'blind', tasks: [secretTask] }),
     task: secretTask,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+    libraryTools: [{ id: 'tool-sickle', componentId: 'silver-sickle' }],
     calls
   });
 
@@ -614,7 +620,7 @@ test('blind non-GM terminal success response redacts task, catalyst, provider, a
   assert.equal(serialized.includes('secret-mooncap'), false);
   assert.equal(serialized.includes('macroOutcome'), false);
   assert.equal('createdResults' in result, false);
-  assert.equal('usedCatalysts' in result, false);
+  assert.equal('usedTools' in result, false);
   assert.equal('checkResult' in result, false);
   assert.equal(calls.createTerminalRun.length, 1);
   assert.deepEqual(calls.createTerminalRun[0][1], {
@@ -624,23 +630,23 @@ test('blind non-GM terminal success response redacts task, catalyst, provider, a
   });
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
-    usedCatalysts: [],
     usedTools: [],
     checkResult: { blind: true, status: 'succeeded' }
   });
   assertNoBlindTerminalLeak(calls.createTerminalRun[0]);
 });
 
-test('blind non-GM terminal failure response redacts task, catalyst, provider diagnostics, and result internals', async () => {
+test('blind non-GM terminal failure response redacts task, tool, provider diagnostics, and result internals', async () => {
   const calls = {};
   const secretTask = routedTask({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    catalysts: [{ componentId: 'silver-sickle', degradesOnUse: true }]
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
     environment: targetedEnvironment({ selectionMode: 'blind', tasks: [secretTask] }),
     task: secretTask,
+    libraryTools: [{ id: 'tool-sickle', componentId: 'silver-sickle' }],
     resolver: {
       routed: {
         status: 'failed',
@@ -651,7 +657,7 @@ test('blind non-GM terminal failure response redacts task, catalyst, provider di
         }
       }
     },
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
     calls
   });
 
@@ -667,7 +673,7 @@ test('blind non-GM terminal failure response redacts task, catalyst, provider di
   assert.equal(serialized.includes('macroOutcome'), false);
   assert.equal(serialized.includes('diagnostic'), false);
   assert.equal('createdResults' in result, false);
-  assert.equal('usedCatalysts' in result, false);
+  assert.equal('usedTools' in result, false);
   assert.equal('checkResult' in result, false);
   assert.equal(calls.createTerminalRun.length, 1);
   assert.deepEqual(calls.createTerminalRun[0][1], {
@@ -677,7 +683,6 @@ test('blind non-GM terminal failure response redacts task, catalyst, provider di
   });
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
-    usedCatalysts: [],
     usedTools: [],
     checkResult: { blind: true, status: 'failed' }
   });

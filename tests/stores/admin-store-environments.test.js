@@ -53,12 +53,7 @@ function makeEnvironment(overrides = {}) {
         img: 'icons/svg/forest.svg',
         enabled: true,
         resolutionMode: 'routed',
-        catalysts: [{
-          componentId: 'catalyst-a',
-          degradesOnUse: false,
-          destroyWhenExhausted: false,
-          maxUses: null
-        }],
+        toolIds: ['tool-a'],
         visibility: { provider: 'macro', macroUuid: 'Macro.visibility' },
         timeRequirement: { minutes: 5, hours: 0, days: 0, months: 0, years: 0 },
         failureOutcome: { mode: 'text', text: 'Nothing useful turns up.' },

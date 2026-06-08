@@ -9,7 +9,7 @@
  *   TC5: Multiple component source actors — correct aggregation
  *   TC6: Managed-component matching (match.type === 'component')
  *   TC7: Shared items across groups — remaining-quantity tracking consistent
- *   TC8: Catalyst presence/absence — catalystStates match craftability
+ *   TC8: Tool presence/absence — toolStates match craftability
  *   TC9: Essence requirements — essenceStates match craftability
  *   TC10 (regression): False uncraftable state — managed-component scenario
  */
@@ -144,13 +144,14 @@ function makeRecipeManager() {
 /**
  * Build a RecipeManager wired to a system that exposes named components.
  */
-function makeRecipeManagerWithSystem(systemId, components) {
+function makeRecipeManagerWithSystem(systemId, components, tools = []) {
   const system = {
     id: systemId,
     advancedOptionsEnabled: false,
     features: { itemTags: false, essences: false },
     components,
     managedItems: components,
+    tools,
     essenceDefinitions: []
   };
   globalThis.game = {
@@ -398,10 +399,10 @@ test('TC7b: evaluateCraftability succeeds when shared item covers both groups', 
 });
 
 // ---------------------------------------------------------------------------
-// TC8: Catalyst presence/absence
+// TC8: Tool presence/absence
 // ---------------------------------------------------------------------------
 
-test('TC8: evaluateCraftability catalystStates show available when catalyst present', () => {
+test('TC8: evaluateCraftability toolStates show available when tool present', () => {
   const systemId = 'sys-tc8';
   const compId = 'comp-mortar';
   const sourceUuid = 'Item.mortar-source';
@@ -409,37 +410,37 @@ test('TC8: evaluateCraftability catalystStates show available when catalyst pres
   const actorItem = makeComponentItem('mortar-uuid', sourceUuid, 1);
   const ingredientItem = makeItem('item-a', 1);
 
-  // Recipe with one ingredient and one catalyst
+  // Recipe with one ingredient and one tool
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a', 1)])
   ]);
 
   const manager = makeRecipeManagerWithSystem(systemId, [
     { id: compId, sourceUuid, name: 'Mortar' }
-  ]);
+  ], [{ id: 'tool-mortar', componentId: compId, enabled: true }]);
 
   const recipe = new Recipe({
-    name: 'Catalyst Recipe',
+    name: 'Tool Recipe',
     craftingSystemId: systemId,
     ingredientSets: [set.toJSON()],
-    catalysts: [{ componentId: compId, name: 'Mortar' }],
+    toolIds: ['tool-mortar'],
     resultGroups: [{ id: 'rg-1', results: [] }]
   });
 
   const actor = makeActor([ingredientItem, actorItem]);
   const result = manager.evaluateCraftability([actor], recipe);
 
-  assert.equal(result.canCraft, true, 'should be craftable with catalyst present');
-  assert.equal(result.catalystStates.length, 1);
-  assert.equal(result.catalystStates[0].available, true, 'catalyst should be marked available');
+  assert.equal(result.canCraft, true, 'should be craftable with tool present');
+  assert.equal(result.toolStates.length, 1);
+  assert.equal(result.toolStates[0].available, true, 'tool should be marked available');
 });
 
-test('TC8b: evaluateCraftability catalystStates show unavailable when catalyst missing', () => {
+test('TC8b: evaluateCraftability toolStates show unavailable when tool missing', () => {
   const systemId = 'sys-tc8b';
   const compId = 'comp-mortar-b';
   const sourceUuid = 'Item.mortar-b-source';
 
-  // Actor has the ingredient but NOT the catalyst
+  // Actor has the ingredient but NOT the tool
   const ingredientItem = makeItem('item-a', 1);
 
   const set = makeIngredientSet([
@@ -448,22 +449,22 @@ test('TC8b: evaluateCraftability catalystStates show unavailable when catalyst m
 
   const manager = makeRecipeManagerWithSystem(systemId, [
     { id: compId, sourceUuid, name: 'Mortar B' }
-  ]);
+  ], [{ id: 'tool-mortar-b', componentId: compId, enabled: true }]);
 
   const recipe = new Recipe({
-    name: 'Missing Catalyst Recipe',
+    name: 'Missing Tool Recipe',
     craftingSystemId: systemId,
     ingredientSets: [set.toJSON()],
-    catalysts: [{ componentId: compId, name: 'Mortar B' }],
+    toolIds: ['tool-mortar-b'],
     resultGroups: [{ id: 'rg-1', results: [] }]
   });
 
   const actor = makeActor([ingredientItem]);
   const result = manager.evaluateCraftability([actor], recipe);
 
-  assert.equal(result.canCraft, false, 'should not be craftable when catalyst is missing');
-  assert.equal(result.catalystStates.length, 1);
-  assert.equal(result.catalystStates[0].available, false, 'catalyst should be marked unavailable');
+  assert.equal(result.canCraft, false, 'should not be craftable when tool is missing');
+  assert.equal(result.toolStates.length, 1);
+  assert.equal(result.toolStates[0].available, false, 'tool should be marked unavailable');
 });
 
 test('TC8c: evaluateCraftability supports iterable actor.items without Array.filter', () => {
@@ -480,13 +481,13 @@ test('TC8c: evaluateCraftability supports iterable actor.items without Array.fil
 
   const manager = makeRecipeManagerWithSystem(systemId, [
     { id: compId, sourceUuid, name: 'Mortar C' }
-  ]);
+  ], [{ id: 'tool-mortar-c', componentId: compId, enabled: true }]);
 
   const recipe = new Recipe({
-    name: 'Catalyst Collection Recipe',
+    name: 'Tool Collection Recipe',
     craftingSystemId: systemId,
     ingredientSets: [set.toJSON()],
-    catalysts: [{ componentId: compId, name: 'Mortar C' }],
+    toolIds: ['tool-mortar-c'],
     resultGroups: [{ id: 'rg-1', results: [] }]
   });
 
@@ -494,8 +495,8 @@ test('TC8c: evaluateCraftability supports iterable actor.items without Array.fil
   const result = manager.evaluateCraftability([actor], recipe);
 
   assert.equal(result.canCraft, true, 'should remain craftable with iterable items collection');
-  assert.equal(result.catalystStates.length, 1);
-  assert.equal(result.catalystStates[0].available, true, 'catalyst should be detected from iterable collection');
+  assert.equal(result.toolStates.length, 1);
+  assert.equal(result.toolStates[0].available, true, 'tool should be detected from iterable collection');
 });
 
 // ---------------------------------------------------------------------------

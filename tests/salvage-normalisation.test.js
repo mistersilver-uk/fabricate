@@ -150,11 +150,11 @@ test('when features.salvage is true and component has no salvage data, defaults 
   assert.ok(Object.prototype.hasOwnProperty.call(component, 'salvage'), 'salvage key should be present');
   assert.equal(component.salvage.enabled, false);
   assert.equal(component.salvage.ingredientQuantity, 1);
-  assert.deepEqual(component.salvage.catalysts, []);
+  assert.deepEqual(component.salvage.toolIds, []);
   assert.deepEqual(component.salvage.resultGroups, []);
 });
 
-test('salvage data is normalised: enabled, ingredientQuantity, catalysts, resultGroups', () => {
+test('salvage data is normalised: enabled, ingredientQuantity, toolIds, resultGroups', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
@@ -165,7 +165,7 @@ test('salvage data is normalised: enabled, ingredientQuantity, catalysts, result
       salvage: {
         enabled: true,
         ingredientQuantity: 3,
-        catalysts: [{ componentId: 'cat-1', degradesOnUse: true, maxUses: 5 }],
+        toolIds: ['tool-1'],
         resultGroups: [{
           id: 'rg-1',
           name: 'Iron Scraps',
@@ -177,8 +177,7 @@ test('salvage data is normalised: enabled, ingredientQuantity, catalysts, result
   const { salvage } = system.components[0];
   assert.equal(salvage.enabled, true);
   assert.equal(salvage.ingredientQuantity, 3);
-  assert.equal(salvage.catalysts.length, 1);
-  assert.equal(salvage.catalysts[0].componentId, 'cat-1');
+  assert.deepEqual(salvage.toolIds, ['tool-1']);
   assert.equal(salvage.resultGroups.length, 1);
   assert.equal(salvage.resultGroups[0].id, 'rg-1');
 });
@@ -200,7 +199,7 @@ test('invalid ingredientQuantity (0, negative, non-numeric) defaults to 1', () =
   }
 });
 
-test('salvage catalyst normalises componentId with systemItemId fallback', () => {
+test('salvage toolIds are normalised to trimmed, non-empty, deduped strings', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
@@ -209,19 +208,12 @@ test('salvage catalyst normalises componentId with systemItemId fallback', () =>
       id: 'comp-1',
       name: 'Item',
       salvage: {
-        catalysts: [
-          { componentId: 'primary-id', degradesOnUse: false },
-          { systemItemId: 'legacy-id', degradesOnUse: true, maxUses: 3 }
-        ]
+        toolIds: ['tool-a', '  tool-b  ', '', 'tool-a', null]
       }
     }]
   });
-  const { catalysts } = system.components[0].salvage;
-  assert.equal(catalysts.length, 2);
-  assert.equal(catalysts[0].componentId, 'primary-id');
-  assert.equal(catalysts[1].componentId, 'legacy-id');
-  assert.equal(catalysts[1].degradesOnUse, true);
-  assert.equal(catalysts[1].maxUses, 3);
+  const { toolIds } = system.components[0].salvage;
+  assert.deepEqual(toolIds, ['tool-a', 'tool-b']);
 });
 
 test('salvage resultGroups normalises id, name, and nested results with componentId', () => {
@@ -267,7 +259,7 @@ test('empty salvage object on component produces defaults', () => {
   const { salvage } = system.components[0];
   assert.equal(salvage.enabled, false);
   assert.equal(salvage.ingredientQuantity, 1);
-  assert.deepEqual(salvage.catalysts, []);
+  assert.deepEqual(salvage.toolIds, []);
   assert.deepEqual(salvage.resultGroups, []);
 });
 
@@ -328,7 +320,7 @@ test('full round-trip: system with salvage enabled, component with full salvage 
       salvage: {
         enabled: true,
         ingredientQuantity: 2,
-        catalysts: [{ componentId: 'acid-vial', degradesOnUse: true, destroyWhenExhausted: true, maxUses: 1 }],
+        toolIds: ['tool-acid-vial'],
         resultGroups: [
           {
             id: 'rg-high',
@@ -363,9 +355,7 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   assert.ok(comp.salvage, 'salvage sub-object should be present');
   assert.equal(comp.salvage.enabled, true);
   assert.equal(comp.salvage.ingredientQuantity, 2);
-  assert.equal(comp.salvage.catalysts.length, 1);
-  assert.equal(comp.salvage.catalysts[0].componentId, 'acid-vial');
-  assert.equal(comp.salvage.catalysts[0].destroyWhenExhausted, true);
+  assert.deepEqual(comp.salvage.toolIds, ['tool-acid-vial']);
   assert.equal(comp.salvage.resultGroups.length, 2);
   assert.deepEqual(comp.salvage.outcomeRouting, { critical: 'rg-high', pass: 'rg-low', fail: 'rg-low' });
   assert.deepEqual(comp.salvage.timeRequirement, { hours: 2 });

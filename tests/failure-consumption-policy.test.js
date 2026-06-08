@@ -63,9 +63,11 @@ function setupGame(consumptionPolicy = {}) {
 }
 
 /**
- * Build a minimal fake actor item that tracks calls to delete() and update().
+ * Build a minimal fake actor item that tracks calls to delete() and update(),
+ * plus a fabricate flag store so tool usage/breakage can be observed.
  */
 function buildFakeItem(id, quantity = 1) {
+  const flags = {};
   const item = {
     id,
     uuid: `Item.${id}`,
@@ -75,6 +77,8 @@ function buildFakeItem(id, quantity = 1) {
     deleteCalled: false,
     updateCalled: false,
     updatePayloads: [],
+    getFlag(ns, key) { return flags[`${ns}.${key}`]; },
+    async setFlag(ns, key, value) { flags[`${ns}.${key}`] = value; return value; },
     async delete() {
       this.deleteCalled = true;
     },
@@ -90,15 +94,16 @@ function buildFakeItem(id, quantity = 1) {
 }
 
 /**
- * Build a fake catalyst model that tracks calls to applyDegradation().
+ * Build a fake library Tool (limitedUses) plus a spy recording whether it was
+ * used on the failure-consumption path. The Tool itself is a plain object the
+ * RecipeManager test-double resolves via getToolsForSet.
  */
-function buildFakeCatalyst(systemItemId = 'cat-1') {
+function buildFakeTool(componentId = 'tool-1') {
   return {
-    systemItemId,
-    applyDegradationCalled: false,
-    async applyDegradation(item) {
-      this.applyDegradationCalled = true;
-    }
+    id: `lib-${componentId}`,
+    componentId,
+    breakage: { mode: 'limitedUses', maxUses: 5 },
+    onBreak: { mode: 'flagBroken' }
   };
 }
 
@@ -123,14 +128,14 @@ function buildFakeIngredientSet(ingredientItem) {
  * in its internal paths; craft() calls recipe.validate() then
  * recipe.getExecutionSteps() (or falls back to recipe.ingredientSets etc.).
  */
-function buildFakeRecipe(ingredientSet, catalysts = []) {
+function buildFakeRecipe(ingredientSet, toolIds = []) {
   return {
     id: 'recipe-1',
     name: 'Test Recipe',
     craftingSystemId: 'sys-1',
     ingredientSets: [ingredientSet],
     resultGroups: [],
-    catalysts,
+    toolIds,
     outcomeRouting: null,
     steps: [],
     transferEffects: false,
@@ -147,16 +152,16 @@ function buildFakeRecipe(ingredientSet, catalysts = []) {
 /**
  * Build a CraftingEngine with a mock RecipeManager and optional services.
  */
-function buildEngine({ ingredientItem, catalystItem, fakeCatalyst, ingredientSet, options = {} } = {}) {
+function buildEngine({ ingredientItem, toolItem, fakeTool, ingredientSet, options = {} } = {}) {
   const mockRecipeManager = {
     canCraft(actors, recipe) {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getCatalystsForSet(recipe, set) {
-      return fakeCatalyst ? [fakeCatalyst] : [];
+    getToolsForSet(recipe, set) {
+      return fakeTool ? [fakeTool] : [];
     },
-    catalystMatchesItem(recipe, catalyst, item) {
-      return item === catalystItem;
+    toolMatchesItem(recipe, tool, item) {
+      return item === toolItem;
     },
     ingredientMatchesItem(recipe, ingredient, item) {
       return item === ingredientItem;
@@ -242,71 +247,67 @@ async function runCheckFailureScenario({ consumeIngredientsOnFail, consumeCataly
   setupGame({ consumeIngredientsOnFail, consumeCatalystsOnFail });
 
   const ingredientItem = buildFakeItem('ing-1', 2);
-  const catalystItem = buildFakeItem('cat-item-1', 1);
-  const fakeCatalyst = buildFakeCatalyst('cat-1');
+  const toolItem = buildFakeItem('tool-item-1', 1);
+  const fakeTool = buildFakeTool('tool-1');
   const ingredientSet = buildFakeIngredientSet(ingredientItem);
-  const recipe = buildFakeRecipe(ingredientSet, [fakeCatalyst]);
+  const recipe = buildFakeRecipe(ingredientSet, [fakeTool.id]);
 
-  const engine = buildEngine({ ingredientItem, catalystItem, fakeCatalyst, ingredientSet });
+  const engine = buildEngine({ ingredientItem, toolItem, fakeTool, ingredientSet });
   stubCraftingCheck(engine, { success: false, message: 'Check failed', outcome: null, value: null, data: {} });
 
-  // _validateCatalysts needs actor.items with a matching catalyst item
-  catalystItem.id = 'cat-item-1';
-  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, catalystItem] };
-  const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
+  const toolUsed = { value: false };
+  engine._applyToolBreakage = async () => { toolUsed.value = true; return []; };
 
-  // Also need catalystMatchesItem to match catalystItem for the fakeCatalyst
-  engine.recipeManager.catalystMatchesItem = (recipe, catalyst, item) => {
-    return catalyst === fakeCatalyst && item === catalystItem;
-  };
+  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
+  const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  return { result, ingredientItem, fakeCatalyst };
+  return { result, ingredientItem, toolUsed };
 }
 
-test('craft() consumes ingredients AND degrades catalysts on check failure when both flags true', async () => {
-  const { result, ingredientItem, fakeCatalyst } = await runCheckFailureScenario({
+test('craft() consumes ingredients AND breaks tools on check failure when both flags true', async () => {
+  const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: true,
     consumeCatalystsOnFail: true
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should not have been deleted (quantity > requested)');
-  assert.equal(fakeCatalyst.applyDegradationCalled, true, 'catalyst should have been degraded');
+  assert.equal(toolUsed.value, true, 'tool should have been used/broken');
 });
 
-test('craft() consumes ingredients but NOT catalysts on check failure (default policy: true/false)', async () => {
-  const { result, ingredientItem, fakeCatalyst } = await runCheckFailureScenario({
+test('craft() consumes ingredients but NOT tools on check failure (default policy: true/false)', async () => {
+  const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: true,
     consumeCatalystsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should not have been deleted (quantity > requested)');
-  assert.equal(fakeCatalyst.applyDegradationCalled, false, 'catalyst should NOT have been degraded');
+  assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
 });
 
-test('craft() does NOT consume ingredients but DOES degrade catalysts on check failure (false/true)', async () => {
-  const { result, ingredientItem, fakeCatalyst } = await runCheckFailureScenario({
+test('craft() does NOT consume ingredients but DOES break tools on check failure (false/true)', async () => {
+  const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: false,
     consumeCatalystsOnFail: true
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
   assert.equal(ingredientItem.updateCalled, false, 'ingredient should NOT have been updated');
-  assert.equal(fakeCatalyst.applyDegradationCalled, true, 'catalyst should have been degraded');
+  assert.equal(toolUsed.value, true, 'tool should have been used/broken');
 });
 
-test('craft() does NOT consume ingredients AND does NOT degrade catalysts on check failure when both flags false', async () => {
-  const { result, ingredientItem, fakeCatalyst } = await runCheckFailureScenario({
+test('craft() does NOT consume ingredients AND does NOT break tools on check failure when both flags false', async () => {
+  const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: false,
     consumeCatalystsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
   assert.equal(ingredientItem.updateCalled, false, 'ingredient should NOT have been updated');
-  assert.equal(fakeCatalyst.applyDegradationCalled, false, 'catalyst should NOT have been degraded');
+  assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
 });
 
 // ---------------------------------------------------------------------------
@@ -317,20 +318,20 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, consumeC
   setupGame({ consumeIngredientsOnFail, consumeCatalystsOnFail });
 
   const ingredientItem = buildFakeItem('ing-2', 3);
-  const catalystItem = buildFakeItem('cat-item-2', 1);
-  const fakeCatalyst = buildFakeCatalyst('cat-2');
+  const toolItem = buildFakeItem('tool-item-2', 1);
+  const fakeTool = buildFakeTool('tool-2');
   const ingredientSet = buildFakeIngredientSet(ingredientItem);
-  const recipe = buildFakeRecipe(ingredientSet, [fakeCatalyst]);
+  const recipe = buildFakeRecipe(ingredientSet, [fakeTool.id]);
 
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getCatalystsForSet() {
-      return [fakeCatalyst];
+    getToolsForSet() {
+      return [fakeTool];
     },
-    catalystMatchesItem(recipe, catalyst, item) {
-      return catalyst === fakeCatalyst && item === catalystItem;
+    toolMatchesItem(recipe, tool, item) {
+      return tool === fakeTool && item === toolItem;
     },
     ingredientMatchesItem(recipe, ingredient, item) {
       return item === ingredientItem;
@@ -349,17 +350,19 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, consumeC
   // The check itself succeeds — only the validateCheckResult call fails
   stubCraftingCheck(engine, { success: true, outcome: 'pass', value: 10, data: {} });
 
-  catalystItem.id = 'cat-item-2';
-  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, catalystItem] };
+  const toolUsed = { value: false };
+  engine._applyToolBreakage = async () => { toolUsed.value = true; return []; };
+
+  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  return { result, ingredientItem, fakeCatalyst };
+  return { result, ingredientItem, toolUsed };
 }
 
 test('craft() applies failure consumption policy when check result validation fails (both true)', async () => {
-  const { result, ingredientItem, fakeCatalyst } = await runValidationFailureScenario({
+  const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
     consumeIngredientsOnFail: true,
     consumeCatalystsOnFail: true
   });
@@ -367,18 +370,18 @@ test('craft() applies failure consumption policy when check result validation fa
   assert.match(result.message, /resolution mode requirements/i);
   assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should not have been deleted (quantity > requested)');
-  assert.equal(fakeCatalyst.applyDegradationCalled, true, 'catalyst should have been degraded');
+  assert.equal(toolUsed.value, true, 'tool should have been used/broken');
 });
 
 test('craft() does not consume when policy is false/false and check result validation fails', async () => {
-  const { result, ingredientItem, fakeCatalyst } = await runValidationFailureScenario({
+  const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
     consumeIngredientsOnFail: false,
     consumeCatalystsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
   assert.equal(ingredientItem.updateCalled, false, 'ingredient should NOT have been updated');
-  assert.equal(fakeCatalyst.applyDegradationCalled, false, 'catalyst should NOT have been degraded');
+  assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
 });
 
 // ---------------------------------------------------------------------------
@@ -389,9 +392,9 @@ test('craft() does not consume on pre-check failure (missing ingredients)', asyn
   setupGame({ consumeIngredientsOnFail: true, consumeCatalystsOnFail: true });
 
   const ingredientItem = buildFakeItem('ing-3', 1);
-  const fakeCatalyst = buildFakeCatalyst('cat-3');
+  const fakeTool = buildFakeTool('tool-3');
   const ingredientSet = buildFakeIngredientSet(ingredientItem);
-  const recipe = buildFakeRecipe(ingredientSet, [fakeCatalyst]);
+  const recipe = buildFakeRecipe(ingredientSet, [fakeTool.id]);
 
   const mockRecipeManager = {
     canCraft() {
@@ -401,16 +404,18 @@ test('craft() does not consume on pre-check failure (missing ingredients)', asyn
         missing: {
           ingredients: [{ ingredient: { getDescription: () => 'Herb' }, have: 0, need: 1 }],
           essences: [],
-          catalysts: []
+          tools: []
         }
       };
     },
-    getCatalystsForSet() { return [fakeCatalyst]; },
-    catalystMatchesItem() { return false; },
+    getToolsForSet() { return [fakeTool]; },
+    toolMatchesItem() { return false; },
     ingredientMatchesItem() { return false; }
   };
 
   const engine = new CraftingEngine(mockRecipeManager, null, null);
+  const toolUsed = { value: false };
+  engine._applyToolBreakage = async () => { toolUsed.value = true; return []; };
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
   const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
 
@@ -419,7 +424,7 @@ test('craft() does not consume on pre-check failure (missing ingredients)', asyn
   assert.equal(result.success, false);
   assert.match(result.message, /Missing required items/i);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT be consumed on pre-check failure');
-  assert.equal(fakeCatalyst.applyDegradationCalled, false, 'catalyst should NOT be degraded on pre-check failure');
+  assert.equal(toolUsed.value, false, 'tool should NOT be used/broken on pre-check failure');
 });
 
 test('_consumeIngredients defaults missing item.system.quantity to 1', async () => {
@@ -457,10 +462,10 @@ test('craft() success path still consumes ingredients regardless of consumeIngre
 
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
+    getToolsForSet() { return []; },
+    toolMatchesItem() { return false; },
     ingredientMatchesItem(recipe, ingredient, item) {
       return item === ingredientItem;
     }

@@ -51,8 +51,6 @@ globalThis.ui = {
 function makeEngine() {
   const mockRecipeManager = {
     canCraft: () => ({ canCraft: false }),
-    getCatalystsForSet: () => [],
-    catalystMatchesItem: () => false,
     ingredientMatchesItem: () => false
   };
   return new CraftingEngine(mockRecipeManager, null, null);

@@ -277,7 +277,7 @@ test('(c) craft() of the step-tier step is blocked when the tool is absent', asy
 
 test('(c) failure-path: a failed check breaks the step-tier tool when consumeCatalystsOnFail is set', async () => {
   const system = installSystem();
-  // Enable failure-path catalyst/tool consumption (the gate at CraftingEngine
+  // Enable failure-path tool consumption (the gate at CraftingEngine
   // ~line 233/306 that drives _applyToolBreakage on a failed check).
   system.craftingCheck = { consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: true } };
 

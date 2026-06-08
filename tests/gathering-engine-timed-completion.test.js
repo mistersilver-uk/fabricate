@@ -48,7 +48,7 @@ function timedTask(overrides = {}) {
     name: 'Gather Iron',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
+    toolIds: [],
     timeRequirement: { minutes: 1 },
     resultGroups: [{
       id: 'group-a',
@@ -60,8 +60,13 @@ function timedTask(overrides = {}) {
   };
 }
 
+const LIBRARY_TOOLS = [
+  { id: 'tool-pick', componentId: 'pick', enabled: true },
+  { id: 'tool-sickle', componentId: 'silver-sickle', enabled: true }
+];
+
 function environment(task = timedTask(), overrides = {}) {
-  return {
+  const env = {
     id: 'env-a',
     craftingSystemId: 'system-a',
     name: 'Old Mine',
@@ -71,6 +76,12 @@ function environment(task = timedTask(), overrides = {}) {
     tasks: [task],
     ...overrides
   };
+  Object.defineProperty(env, '__libraryTools', {
+    value: new Map(LIBRARY_TOOLS.map(t => [t.id, t])),
+    enumerable: false,
+    configurable: true
+  });
+  return env;
 }
 
 function system(overrides = {}) {
@@ -90,7 +101,7 @@ function makeEngine({
   systems = [system()],
   routedOutcome = null,
   createdResults = [],
-  usedCatalysts = [],
+  usedTools = [],
   calls = {},
   getRunViewer = null
 } = {}) {
@@ -98,8 +109,8 @@ function makeEngine({
   calls.evaluateCheck = [];
   calls.planResults = [];
   calls.createResults = [];
-  calls.planCatalysts = [];
-  calls.useCatalysts = [];
+  calls.planTools = [];
+  calls.applyTools = [];
   calls.failureFeedback = [];
 
   return new GatheringEngine({
@@ -121,7 +132,7 @@ function makeEngine({
       }
     },
     sceneAccess: { canAttempt: () => ({ allowed: true }) },
-    catalystAvailability: { check: () => ({ available: true, missing: [] }) },
+    toolAvailability: { check: () => ({ available: true, missing: [], failedRequirements: [] }) },
     resultResolver: {
       resolveRouted: async (payload) => {
         calls.resolveRouted.push(payload);
@@ -147,14 +158,14 @@ function makeEngine({
         return createdResults;
       }
     },
-    catalystUsage: {
+    toolBreakage: {
       plan: async (payload) => {
-        calls.planCatalysts.push(payload);
-        return usedCatalysts;
+        calls.planTools.push(payload);
+        return usedTools;
       },
       apply: async (payload) => {
-        calls.useCatalysts.push(payload);
-        return usedCatalysts;
+        calls.applyTools.push(payload);
+        return usedTools;
       }
     },
     failureFeedback: {
@@ -216,16 +227,16 @@ test('processWorldTime completes matured failure without results and applies fee
     cancelRun: (...args) => realRunManager.cancelRun(...args)
   };
   const calls = {};
-  const usedCatalysts = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
   const task = timedTask({
-    catalysts: [{ componentId: 'pick', degradesOnUse: true }],
+    toolIds: ['tool-pick'],
     failureOutcome: { mode: 'text', text: 'The vein is exhausted.' }
   });
   const engine = makeEngine({
     runManager,
     environments: [environment(task)],
     routedOutcome: { status: 'failed', checkResult: { outcome: 'fail', provider: 'macroOutcome' } },
-    usedCatalysts,
+    usedTools,
     calls
   });
 
@@ -236,10 +247,10 @@ test('processWorldTime completes matured failure without results and applies fee
   assert.deepEqual(realRunManager.getActiveRuns(actor), []);
   assert.equal(realRunManager.getRunHistory(actor)[0].status, 'failed');
   assert.deepEqual(realRunManager.getRunHistory(actor)[0].createdResults, []);
-  assert.deepEqual(realRunManager.getRunHistory(actor)[0].usedCatalysts, usedCatalysts);
+  assert.deepEqual(realRunManager.getRunHistory(actor)[0].usedTools, usedTools);
   assert.deepEqual(calls.createResults, []);
-  assert.equal(calls.useCatalysts.length, 1);
-  assert.equal(calls.useCatalysts[0].actor, actor);
+  assert.equal(calls.applyTools.length, 1);
+  assert.equal(calls.applyTools[0].actor, actor);
   assert.equal(calls.failureFeedback.length, 1);
   assert.deepEqual(order, ['completeRun']);
 });
@@ -291,7 +302,7 @@ test('processWorldTime cancels matured runs whose references disappear before re
   }
 });
 
-test('resume-time misconfiguration clears active run without history, results, catalysts, or feedback', async () => {
+test('resume-time misconfiguration clears active run without history, results, tools, or feedback', async () => {
   resetActor();
   let worldTime = 1000;
   const runManager = makeRunManager({ now: () => worldTime });
@@ -302,7 +313,7 @@ test('resume-time misconfiguration clears active run without history, results, c
   const engine = makeEngine({
     runManager,
     environments: [environment(invalidTask)],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
     calls
   });
@@ -314,7 +325,7 @@ test('resume-time misconfiguration clears active run without history, results, c
   assert.deepEqual(runManager.getRunHistory(actor), []);
   assert.deepEqual(calls.resolveRouted, []);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 });
 
@@ -331,7 +342,7 @@ test('post-history timed side effects are blocked if completeRun persistence fai
     startedAtWorldTime: 1000,
     updatedAtWorldTime: 1000,
     timeGate: { requiredSeconds: 60, initiatedAt: 1000, availableAt: 1060 },
-    usedCatalysts: [],
+    usedTools: [],
     createdResults: []
   };
   const runManager = {
@@ -343,18 +354,18 @@ test('post-history timed side effects are blocked if completeRun persistence fai
   const calls = {};
   const engine = makeEngine({
     runManager,
-    environments: [environment(timedTask({ catalysts: [{ componentId: 'pick' }] }))],
+    environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
     routedOutcome: { status: 'failed', checkResult: { outcome: 'fail' } },
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     calls
   });
 
   const result = await engine.processWorldTime(1060);
 
   assert.equal(result.errors.length, 1);
-  assert.deepEqual(calls.planCatalysts.length, 1);
+  assert.deepEqual(calls.planTools.length, 1);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 });
 
@@ -371,7 +382,7 @@ test('post-history timed side effects are blocked when completeRun returns null'
     startedAtWorldTime: 1000,
     updatedAtWorldTime: 1000,
     timeGate: { requiredSeconds: 60, initiatedAt: 1000, availableAt: 1060 },
-    usedCatalysts: [],
+    usedTools: [],
     createdResults: []
   };
   const runManager = {
@@ -381,9 +392,9 @@ test('post-history timed side effects are blocked when completeRun returns null'
   const calls = {};
   const engine = makeEngine({
     runManager,
-    environments: [environment(timedTask({ catalysts: [{ componentId: 'pick' }] }))],
+    environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     calls
   });
 
@@ -393,9 +404,9 @@ test('post-history timed side effects are blocked when completeRun returns null'
   assert.equal(result.errors.length, 1);
   assert.equal(result.errors[0].code, 'TERMINAL_HISTORY_NOT_WRITTEN');
   assert.equal(calls.planResults.length, 1);
-  assert.equal(calls.planCatalysts.length, 1);
+  assert.equal(calls.planTools.length, 1);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 });
 
@@ -456,7 +467,7 @@ test('non-GM blind missing-task timed cancellation history and result do not exp
   assert.equal(history[0].status, 'cancelled');
   assert.equal(history[0].taskId, 'blind');
   assert.deepEqual(history[0].createdResults, []);
-  assert.deepEqual(history[0].usedCatalysts, []);
+  assert.deepEqual(history[0].usedTools, []);
   assert.deepEqual(history[0].checkResult, { blind: true, status: 'cancelled' });
   for (const text of ['secret-task', 'Secret Mooncap Patch']) {
     assert.equal(serializedResult.includes(text), false, text);
@@ -471,7 +482,7 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
   const secretTask = timedTask({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    catalysts: [{ componentId: 'silver-sickle' }]
+    toolIds: ['tool-sickle']
   });
   await createWaitingRun(runManager, actor, { taskId: secretTask.id });
   worldTime = 1060;
@@ -480,7 +491,7 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
     runManager,
     environments: [environment(secretTask, { selectionMode: 'blind' })],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
     calls
   });
 
@@ -494,7 +505,7 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
   assert.equal(history.length, 1);
   assert.equal(history[0].taskId, 'blind');
   assert.deepEqual(history[0].createdResults, []);
-  assert.deepEqual(history[0].usedCatalysts, []);
+  assert.deepEqual(history[0].usedTools, []);
   assert.deepEqual(history[0].checkResult, { blind: true, status: 'succeeded' });
   for (const text of ['secret-mooncap-task', 'Secret Mooncap Patch', 'silver-sickle', 'secret-mooncap', 'macroOutcome']) {
     assert.equal(serializedResult.includes(text), false, text);

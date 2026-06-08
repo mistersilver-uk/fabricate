@@ -1,5 +1,5 @@
 /**
- * Phase 0 — recipe-level Tool support (additive; catalysts still work).
+ * Recipe-level Tool support.
  *
  * Covers:
  *   - `toolIds` normalization + serialization at recipe / step / ingredient-set
@@ -250,7 +250,7 @@ test('evaluateCraftability: a broken matching item does NOT satisfy the tool', (
   assert.equal(result.canCraft, false);
 });
 
-test('evaluateCraftability: no toolIds leaves toolStates/missing.tools empty (catalyst path unaffected)', () => {
+test('evaluateCraftability: no toolIds leaves toolStates/missing.tools empty', () => {
   installSystem({ id: 'sys-1', components: [toolComponent('c-iron', 'Iron')], tools: [] });
   const manager = new RecipeManager();
   const recipe = craftableRecipe();

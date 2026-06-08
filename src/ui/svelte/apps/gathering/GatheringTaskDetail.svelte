@@ -45,7 +45,6 @@
   const BLOCK_LABEL_KEYS = {
     TOOL_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools',
     CONDITIONS_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Conditions',
-    CATALYST_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst',
     GAME_PAUSED: 'FABRICATE.App.Gathering.Detail.Callout.Paused',
     DUPLICATE_ACTIVE_RUN: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun',
     SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene',

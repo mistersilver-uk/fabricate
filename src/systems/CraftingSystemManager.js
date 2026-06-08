@@ -546,7 +546,7 @@ export class CraftingSystemManager {
       return {
         enabled: false,
         ingredientQuantity: 1,
-        catalysts: [],
+        toolIds: [],
         resultGroups: []
       };
     }
@@ -559,9 +559,9 @@ export class CraftingSystemManager {
     return {
       enabled: salvage.enabled === true,
       ingredientQuantity,
-      catalysts: Array.isArray(salvage.catalysts)
-        ? salvage.catalysts.map(c => this._normalizeSalvageCatalyst(c)).filter(Boolean)
-        : [],
+      // Preserve migrated salvage tool references so they are not orphaned on the
+      // next system save. Coerced to trimmed, non-empty, deduped id strings.
+      toolIds: this._normalizeToolIds(salvage.toolIds),
       resultGroups: Array.isArray(salvage.resultGroups)
         ? salvage.resultGroups.map(g => this._normalizeSalvageResultGroup(g)).filter(Boolean)
         : [],
@@ -577,19 +577,23 @@ export class CraftingSystemManager {
     };
   }
 
-  _normalizeSalvageCatalyst(catalyst) {
-    if (!catalyst || typeof catalyst !== 'object') return null;
-    const compId = catalyst.componentId || catalyst.systemItemId;
-    if (!compId) return null;
-    return {
-      componentId: compId,
-      systemItemId: compId, // transitional alias
-      degradesOnUse: catalyst.degradesOnUse === true,
-      destroyWhenExhausted: catalyst.destroyWhenExhausted === true,
-      maxUses: Number.isFinite(Number(catalyst.maxUses)) && catalyst.maxUses !== null
-        ? Number(catalyst.maxUses)
-        : null
-    };
+  /**
+   * Normalize an array of library tool id strings: coerce to trimmed, non-empty,
+   * deduped strings. Tolerant of non-array / nullish input (returns []).
+   * @param {unknown} toolIds
+   * @returns {string[]}
+   */
+  _normalizeToolIds(toolIds) {
+    if (!Array.isArray(toolIds)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of toolIds) {
+      const id = String(raw ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
   }
 
   _normalizeSalvageResult(result) {
@@ -1468,8 +1472,7 @@ export class CraftingSystemManager {
               ((ing.match?.type === 'component' || ing.match?.type === 'systemItem') ? (ing.match.componentId || ing.match.systemItemId) : (ing.componentId || ing.systemItemId)) !== itemId
             )
           })).filter(group => (group.options || []).length > 0),
-          ingredients: (set.ingredients || []).filter(ing => (ing.componentId || ing.systemItemId) !== itemId),
-          catalysts: (set.catalysts || []).filter(cat => (cat.componentId || cat.systemItemId) !== itemId)
+          ingredients: (set.ingredients || []).filter(ing => (ing.componentId || ing.systemItemId) !== itemId)
         }))
         .map(set => ({
           ...set,
@@ -1482,7 +1485,6 @@ export class CraftingSystemManager {
           Object.keys(set.essences || {}).length > 0
         );
 
-      updated.catalysts = (updated.catalysts || []).filter(cat => (cat.componentId || cat.systemItemId) !== itemId);
       updated.resultGroups = (updated.resultGroups || [])
         .map(group => ({
           ...group,

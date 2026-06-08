@@ -100,7 +100,6 @@ test('Changing salvageResolutionMode from simple to routed disables components w
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
-        catalysts: [],
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
         // no outcomeRouting → invalid for routed
       }
@@ -140,7 +139,6 @@ test('Changing salvageResolutionMode from routed to simple disables components w
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
-        catalysts: [],
         resultGroups: [
           { id: 'rg-pass', name: 'Pass', results: [{ id: 'r-1', componentId: 'gem', quantity: 1 }] },
           { id: 'rg-fail', name: 'Fail', results: [{ id: 'r-2', componentId: 'dust', quantity: 1 }] }
@@ -180,7 +178,6 @@ test('Mode change does not disable components that are already valid for the new
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
-        catalysts: [],
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
       }
     }]
@@ -219,7 +216,6 @@ test('GM notification sent when components are disabled by mode change', async (
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
-        catalysts: [],
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
         // no outcomeRouting → invalid for routed
       }
@@ -369,7 +365,7 @@ test('Deleting a component removes salvage run history referencing that componen
 
   const comp = {
     id: componentId, name: 'Deletable Component',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
     id: systemId, name: 'Test', features: { salvage: true },
@@ -402,11 +398,11 @@ test('Deleting a component does not remove runs for other components', async () 
 
   const comp = {
     id: componentId, name: 'Deletable',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const otherComp = {
     id: otherComponentId, name: 'Other',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
     id: systemId, name: 'Test', features: { salvage: true },
@@ -436,7 +432,7 @@ test('Deleting a component works when no salvageRuns flag exists on actor', asyn
 
   const comp = {
     id: componentId, name: 'Iron Ore',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
     id: systemId, name: 'Test', features: { salvage: true },
@@ -465,7 +461,7 @@ test('Deleting a component works when history is empty', async () => {
 
   const comp = {
     id: componentId, name: 'Iron Ore',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
     id: systemId, name: 'Test', features: { salvage: true },

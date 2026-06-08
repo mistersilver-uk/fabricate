@@ -52,7 +52,7 @@ export class CraftingRunManager {
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
       consumedIngredients: [],
-      usedCatalysts: [],
+      usedTools: [],
       createdResults: [],
       failureReason: undefined
     }));
@@ -199,7 +199,7 @@ export class CraftingRunManager {
     step.selectedIngredientSetId = payload.selectedIngredientSetId || step.selectedIngredientSetId;
     step.lastCheckResult = payload.lastCheckResult || step.lastCheckResult;
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
-    step.usedCatalysts = payload.usedCatalysts || step.usedCatalysts || [];
+    step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
 
     const nextIndex = stepIndex + 1;
@@ -231,7 +231,7 @@ export class CraftingRunManager {
     step.lastCheckResult = payload.lastCheckResult || step.lastCheckResult;
     step.selectedIngredientSetId = payload.selectedIngredientSetId || step.selectedIngredientSetId;
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
-    step.usedCatalysts = payload.usedCatalysts || step.usedCatalysts || [];
+    step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
 
     return this.completeRun(actor, run, 'failed');

@@ -19,14 +19,14 @@ function makeEngine({
   sceneAccess = null,
   activeRuns = new Map(),
   history = [],
-  catalystAvailability = null,
+  toolAvailability = null,
   richState = null,
   systemManager = null,
   calls = {}
 } = {}) {
   calls.visibility = [];
   calls.scene = [];
-  calls.catalysts = [];
+  calls.tools = [];
   calls.activeRuns = [];
 
   return new GatheringEngine({
@@ -60,19 +60,24 @@ function makeEngine({
         return activeRuns instanceof Map ? activeRuns.get(taskId) : activeRuns?.[taskId] ?? null;
       }
     },
-    catalystAvailability: {
+    toolAvailability: {
       check: (payload) => {
-        calls.catalysts.push(payload);
-        if (typeof catalystAvailability === 'function') return catalystAvailability(payload);
-        return catalystAvailability ?? { available: true, missing: [] };
+        calls.tools.push(payload);
+        if (typeof toolAvailability === 'function') return toolAvailability(payload);
+        return toolAvailability ?? { available: true, missing: [], failedRequirements: [] };
       }
     },
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
   });
 }
 
+const LIBRARY_TOOLS = [
+  { id: 'tool-sickle', componentId: 'silver-sickle', enabled: true },
+  { id: 'tool-a', componentId: 'tool-comp-a', enabled: true }
+];
+
 function environment(overrides = {}) {
-  return {
+  const env = {
     id: 'env-a',
     craftingSystemId: 'system-a',
     name: 'Old Mine',
@@ -83,6 +88,12 @@ function environment(overrides = {}) {
     tasks: [task()],
     ...overrides
   };
+  Object.defineProperty(env, '__libraryTools', {
+    value: new Map(LIBRARY_TOOLS.map(t => [t.id, t])),
+    enumerable: false,
+    configurable: true
+  });
+  return env;
 }
 
 function task(overrides = {}) {
@@ -93,7 +104,7 @@ function task(overrides = {}) {
     img: 'icons/svg/item-bag.svg',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
+    toolIds: [],
     resultGroups: [{ id: 'group-a', name: 'Iron', results: [] }],
     resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
     ...overrides
@@ -300,7 +311,7 @@ test('listForActor keeps blind active runs and history redacted when the sole ta
     updatedAtWorldTime: 20,
     completedAtWorldTime: 20,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-truffle', quantity: 1 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-spade', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-spade', quantity: 1 }],
     checkResult: { provider: 'macro', value: 19 }
   };
   const engine = makeEngine({
@@ -321,7 +332,7 @@ test('listForActor keeps blind active runs and history redacted when the sole ta
   assert.equal(listing.history[0].label, 'FABRICATE.Gathering.BlindTaskLabel');
   assert.equal(listing.history[0].taskId, null);
   assert.equal(Object.hasOwn(listing.history[0], 'createdResults'), false);
-  assert.equal(Object.hasOwn(listing.history[0], 'usedCatalysts'), false);
+  assert.equal(Object.hasOwn(listing.history[0], 'usedTools'), false);
   assert.equal(Object.hasOwn(listing.history[0], 'checkResult'), false);
   assert.equal(serialized.includes('Secret Truffle Grove'), false);
   assert.equal(serialized.includes('secret-truffle'), false);
@@ -362,20 +373,20 @@ test('duplicate active run blocks attemptability through GatheringRunManager.fin
   assert.deepEqual(calls.activeRuns.map(call => call.taskId), ['task-a']);
 });
 
-test('catalyst blocking uses only the acting actor and does not mutate items', async () => {
-  const componentSourceActor = { id: 'source-actor', items: [{ id: 'source-catalyst' }] };
+test('tool blocking uses only the acting actor and does not mutate items', async () => {
+  const componentSourceActor = { id: 'source-actor', items: [{ id: 'source-tool' }] };
   const actingActor = {
     ...actor,
     items: Object.freeze([{ id: 'acting-item', system: { quantity: 1 } }])
   };
   const calls = {};
-  const catalyst = { componentId: 'catalyst-a', degradesOnUse: true, maxUses: 2 };
+  const tool = { componentId: 'tool-comp-a', degradesOnUse: true, maxUses: 2 };
   const engine = makeEngine({
-    environments: [environment({ tasks: [task({ catalysts: [catalyst] })] })],
+    environments: [environment({ tasks: [task({ toolIds: ['tool-a'] })] })],
     selectableActors: [actingActor, componentSourceActor],
-    catalystAvailability: ({ actor: selectedActor }) => ({
+    toolAvailability: ({ actor: selectedActor }) => ({
       available: false,
-      missing: [{ componentId: 'catalyst-a', actorId: selectedActor.id }]
+      missing: [{ componentId: 'tool-comp-a', actorId: selectedActor.id }]
     }),
     calls
   });
@@ -383,15 +394,15 @@ test('catalyst blocking uses only the acting actor and does not mutate items', a
   const listing = await engine.listForActor({ viewer, actor: actingActor });
 
   assert.equal(listing.attemptable, false);
-  assert.deepEqual(reasonCodes(listing.environments[0].tasks[0]), ['CATALYST_BLOCKED']);
-  assert.equal(calls.catalysts.length, 1);
-  assert.equal(calls.catalysts[0].actor, actingActor);
-  assert.equal('actors' in calls.catalysts[0], false);
-  assert.equal('componentSourceActors' in calls.catalysts[0], false);
+  assert.deepEqual(reasonCodes(listing.environments[0].tasks[0]), ['TOOL_BLOCKED']);
+  assert.equal(calls.tools.length, 1);
+  assert.equal(calls.tools[0].actor, actingActor);
+  assert.equal('actors' in calls.tools[0], false);
+  assert.equal('componentSourceActors' in calls.tools[0], false);
   assert.deepEqual(actingActor.items[0], { id: 'acting-item', system: { quantity: 1 } });
 });
 
-test('non-GM visible blind task listing is opaque even when duplicate and catalyst blocked', async () => {
+test('non-GM visible blind task listing is opaque even when duplicate and tool blocked', async () => {
   const revealingTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
@@ -399,7 +410,7 @@ test('non-GM visible blind task listing is opaque even when duplicate and cataly
     img: 'icons/commodities/flowers/mushroom-red.webp',
     resolutionMode: 'progressive',
     timeRequirement: { hours: 1 },
-    catalysts: [{ componentId: 'silver-sickle' }]
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
     environments: [
@@ -418,7 +429,7 @@ test('non-GM visible blind task listing is opaque even when duplicate and cataly
       }
     ]]),
     activeRuns: new Map([[revealingTask.id, { id: 'run-active', taskId: revealingTask.id }]]),
-    catalystAvailability: {
+    toolAvailability: {
       available: false,
       missing: [{ componentId: 'silver-sickle', taskId: revealingTask.id }]
     }
@@ -456,7 +467,7 @@ test('non-GM visible blind task listing is opaque even when duplicate and cataly
     blindTask.blockedReasons.map(reason => [reason.code, reason.data]),
     [
       ['DUPLICATE_ACTIVE_RUN', null],
-      ['CATALYST_BLOCKED', null]
+      ['TOOL_BLOCKED', null]
     ]
   );
 });
@@ -470,7 +481,7 @@ test('GM blind task listing exposes real task metadata for inspection', async ()
     img: 'icons/commodities/flowers/mushroom-red.webp',
     resolutionMode: 'progressive',
     timeRequirement: { hours: 1 },
-    catalysts: [{ componentId: 'silver-sickle' }]
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
     environments: [
@@ -491,7 +502,6 @@ test('GM blind task listing exposes real task metadata for inspection', async ()
   assert.equal(blindTask.img, 'icons/commodities/flowers/mushroom-red.webp');
   assert.equal(blindTask.resolutionMode, 'progressive');
   assert.equal(blindTask.hasTimeRequirement, true);
-  assert.equal(blindTask.catalystCount, 1);
 });
 
 test('hidden targeted tasks are omitted while visible targeted tasks remain attemptable', async () => {
@@ -544,7 +554,7 @@ test('listForActor returns active timed runs and recent terminal history for tar
     updatedAtWorldTime: 20,
     completedAtWorldTime: 20,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     checkResult: { value: 17, status: 'success' }
   };
   const engine = makeEngine({
@@ -566,9 +576,9 @@ test('listForActor returns active timed runs and recent terminal history for tar
   assert.equal(listing.history[0].label, 'Gather Iron');
   assert.equal(listing.history[0].status, 'succeeded');
   assert.equal(listing.history[0].createdResultCount, 1);
-  assert.equal(listing.history[0].usedCatalystCount, 1);
+  assert.equal(listing.history[0].usedToolCount, 1);
   assert.deepEqual(listing.history[0].createdResults, historyRun.createdResults);
-  assert.deepEqual(listing.history[0].usedCatalysts, historyRun.usedCatalysts);
+  assert.deepEqual(listing.history[0].usedTools, historyRun.usedTools);
   assert.deepEqual(listing.history[0].checkResult, historyRun.checkResult);
 });
 
@@ -623,7 +633,7 @@ test('non-GM blind active and history rows do not expose task identity or termin
     name: 'Secret Mooncap Patch',
     description: 'A hidden mushroom source.',
     img: 'icons/commodities/flowers/mushroom-red.webp',
-    catalysts: [{ componentId: 'silver-sickle' }]
+    toolIds: ['tool-sickle']
   });
   const activeRun = {
     id: 'blind-active',
@@ -649,7 +659,7 @@ test('non-GM blind active and history rows do not expose task identity or termin
     updatedAtWorldTime: 20,
     completedAtWorldTime: 20,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 2 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
     checkResult: {
       provider: 'macro',
       value: 22,
@@ -675,7 +685,7 @@ test('non-GM blind active and history rows do not expose task identity or termin
   assert.equal(listing.history[0].taskId, null);
   assert.equal(listing.history[0].label, 'FABRICATE.Gathering.BlindTaskLabel');
   assert.equal(Object.hasOwn(listing.history[0], 'createdResults'), false);
-  assert.equal(Object.hasOwn(listing.history[0], 'usedCatalysts'), false);
+  assert.equal(Object.hasOwn(listing.history[0], 'usedTools'), false);
   assert.equal(Object.hasOwn(listing.history[0], 'checkResult'), false);
   assert.equal(serialized.includes('secret-mooncap-task'), false);
   assert.equal(serialized.includes('Secret Mooncap Patch'), false);
@@ -1078,7 +1088,7 @@ function toolItem({ componentId, broken = false }) {
 function systemManagerMock(components = []) {
   return {
     getItems: () => components,
-    catalystMatchesItem: (_recipe, tool, candidate) =>
+    toolMatchesItem: (_recipe, tool, candidate) =>
       Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
   };
 }

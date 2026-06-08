@@ -13,7 +13,6 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   ENVIRONMENT_DISABLED: 'FABRICATE.Gathering.Blocked.EnvironmentDisabled',
   SCENE_TOKEN_BLOCKED: 'FABRICATE.Gathering.Blocked.SceneTokenBlocked',
   DUPLICATE_ACTIVE_RUN: 'FABRICATE.Gathering.Blocked.DuplicateActiveRun',
-  CATALYST_BLOCKED: 'FABRICATE.Gathering.Blocked.CatalystBlocked',
   TOOL_BLOCKED: 'FABRICATE.Gathering.Blocked.ToolBlocked',
   GAME_PAUSED: 'FABRICATE.Gathering.Blocked.GamePaused',
   MISSING_REFERENCE: 'FABRICATE.Gathering.Blocked.MissingReference',
@@ -61,8 +60,8 @@ const FAILURE_KEYWORDS = new Set([
  * active timed runs and recent terminal history even when browsing rows are
  * empty or blocked for the selected actor. Non-timed attempts resolve
  * immediately into terminal routed/progressive outcomes, plan created-result,
- * catalyst, and check history payloads, persist terminal history, then commit
- * irreversible result, catalyst, and failure-feedback effects. Timed attempts
+ * tool, and check history payloads, persist terminal history, then commit
+ * irreversible result, tool, and failure-feedback effects. Timed attempts
  * resume through processWorldTime(worldTime), which asks the run manager for
  * matured waitingTime runs, writes terminal history before post-history
  * effects, cancels missing-reference runs into terminal history, and clears
@@ -80,11 +79,9 @@ export class GatheringEngine {
     isActorSelectable = null,
     isGamePaused = null,
     sceneAccess = null,
-    catalystAvailability = null,
     toolAvailability = null,
     resultResolver = null,
     resultCreator = null,
-    catalystUsage = null,
     toolBreakage = null,
     failureFeedback = null,
     hazardSceneTrigger = null,
@@ -106,11 +103,9 @@ export class GatheringEngine {
     this.isActorSelectable = isActorSelectable;
     this.isGamePaused = isGamePaused;
     this.sceneAccess = sceneAccess;
-    this.catalystAvailability = catalystAvailability;
     this.toolAvailability = toolAvailability;
     this.resultResolver = resultResolver;
     this.resultCreator = resultCreator;
-    this.catalystUsage = catalystUsage;
     this.toolBreakage = toolBreakage;
     this.failureFeedback = failureFeedback;
     this.hazardSceneTrigger = hazardSceneTrigger;
@@ -126,8 +121,8 @@ export class GatheringEngine {
    *
    * Non-matured waitingTime runs are filtered by GatheringRunManager and are
    * not resolved here. Matured success/failure paths call completeRun with
-   * planned result/catalyst/check refs before committing result creation,
-   * catalyst usage, or failure feedback. If terminal history persistence
+   * planned result/tool/check refs before committing result creation,
+   * tool usage, or failure feedback. If terminal history persistence
    * throws or returns null, those post-history side effects are skipped.
    */
   async processWorldTime(worldTime) {
@@ -351,34 +346,6 @@ export class GatheringEngine {
       });
     }
 
-    const catalysts = normalizeList(task.catalysts);
-    if (catalysts.length > 0) {
-      const catalystResult = await this._checkCatalysts({
-        actor: selectedActor,
-        viewer,
-        system,
-        environment,
-        task,
-        catalysts
-      });
-      if (catalystResult.available !== true) {
-        return this._blockedStart({
-          viewer,
-          actor: selectedActor,
-          environment,
-          task,
-          reason: this._blockedReason('CATALYST_BLOCKED', {
-            data: this._isOpaqueBlindTask({ environment, viewer })
-              ? null
-              : {
-                  taskId: task.id,
-                  missing: normalizeList(catalystResult.missing)
-                }
-          })
-        });
-      }
-    }
-
     const taskTools = this._resolveTaskTools({ environment, task });
     if (this._hasBlockedToolReferences(taskTools)) {
       return this._blockedStart({
@@ -554,7 +521,6 @@ export class GatheringEngine {
       status: outcome.status,
       run: completedRunWithRichEvidence,
       createdResults: plan.createdResults,
-      usedCatalysts: plan.usedCatalysts,
       usedTools: plan.usedTools ?? [],
       checkResult
     });
@@ -831,11 +797,11 @@ export class GatheringEngine {
       model.completedAtWorldTime = numberOrNull(run.completedAtWorldTime);
       if (!opaqueBlind) {
         const createdResults = normalizeList(run.createdResults);
-        const usedCatalysts = normalizeList(run.usedCatalysts);
+        const usedTools = normalizeList(run.usedTools);
         model.createdResultCount = createdResults.length;
-        model.usedCatalystCount = usedCatalysts.length;
+        model.usedToolCount = usedTools.length;
         model.createdResults = cloneJson(createdResults);
-        model.usedCatalysts = cloneJson(usedCatalysts);
+        model.usedTools = cloneJson(usedTools);
         if (run.checkResult && typeof run.checkResult === 'object') {
           model.checkResult = cloneJson(run.checkResult);
         }
@@ -1266,7 +1232,7 @@ export class GatheringEngine {
    * least one item: `1 − ∏(1 − dropRate_i/100)` over enabled drop rows.
    *
    * This deliberately ignores actor/condition/character modifiers, attempt
-   * limits, node depletion, stamina, catalysts, and the d100 success threshold,
+   * limits, node depletion, stamina, tools, and the d100 success threshold,
    * so it represents "chance at least one drop rolls", not whole-attempt
    * success. Returns `null` for non-d100 tasks or when there are no enabled drop
    * rows, so the UI can hide the success-chance bar.
@@ -1428,7 +1394,7 @@ export class GatheringEngine {
 
   /**
    * Collect the blocked-reason list for a single task (game-paused, duplicate
-   * run, catalyst, tool, conditions, scene, and rich-attempt gates).
+   * run, tool, conditions, scene, and rich-attempt gates).
    *
    * @param {object} args
    * @param {object} args.environment Composed environment.
@@ -1457,28 +1423,6 @@ export class GatheringEngine {
       blockedReasons.push(this._blockedReason('DUPLICATE_ACTIVE_RUN', {
         data: redact ? null : { taskId: task.id }
       }));
-    }
-
-    const catalysts = normalizeList(task.catalysts);
-    if (catalysts.length > 0) {
-      const catalystResult = await this._checkCatalysts({
-        actor,
-        viewer,
-        system,
-        environment,
-        task,
-        catalysts
-      });
-      if (catalystResult.available !== true) {
-        blockedReasons.push(this._blockedReason('CATALYST_BLOCKED', {
-          data: redact
-            ? null
-            : {
-                taskId: task.id,
-                missing: normalizeList(catalystResult.missing)
-              }
-        }));
-      }
     }
 
     const taskTools = this._resolveTaskTools({ environment, task });
@@ -1526,22 +1470,6 @@ export class GatheringEngine {
     blockedReasons.push(...richAttempt.blockedReasons);
 
     return blockedReasons;
-  }
-
-  async _checkCatalysts({ actor, viewer, system, environment, task, catalysts }) {
-    if (typeof this.catalystAvailability?.check === 'function') {
-      return normalizeCatalystResult(await this.catalystAvailability.check({
-        actor,
-        viewer,
-        system,
-        environment,
-        task,
-        catalysts
-      }));
-    }
-    return catalysts.length === 0
-      ? { available: true, missing: [] }
-      : { available: false, missing: catalysts };
   }
 
   _resolveTaskTools({ environment, task }) {
@@ -1739,7 +1667,6 @@ export class GatheringEngine {
       },
       resolutionMode: stringOrNull(task.resolutionMode),
       hasTimeRequirement: Boolean(task.timeRequirement),
-      catalystCount: normalizeList(task.catalysts).length,
       successChance: typeof this.richState?.taskSuccessChance === 'function'
         ? this.richState.taskSuccessChance(task, environment)
         : this._taskSuccessChance(task),
@@ -2127,7 +2054,6 @@ export class GatheringEngine {
       status: outcome.status,
       run,
       createdResults: plan.createdResults,
-      usedCatalysts: plan.usedCatalysts,
       usedTools: plan.usedTools ?? [],
       checkResult
     });
@@ -2157,21 +2083,9 @@ export class GatheringEngine {
         : [];
       if (createdResults?.status === 'misconfigured') return createdResults;
 
-      const usedCatalysts = await this._planTerminalCatalysts({
-        viewer,
-        actor,
-        system,
-        environment,
-        task,
-        outcome,
-        checkResult
-      });
-      if (usedCatalysts?.status === 'misconfigured') return usedCatalysts;
-
       return {
         status: 'ready',
         createdResults,
-        usedCatalysts,
         usedTools: Array.isArray(usedTools) ? usedTools : []
       };
     } catch (error) {
@@ -2194,7 +2108,6 @@ export class GatheringEngine {
         },
         payload: {
           createdResults: [],
-          usedCatalysts: [],
           usedTools: [],
           checkResult: { blind: true, status: outcome.status },
           ...this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot })
@@ -2204,7 +2117,6 @@ export class GatheringEngine {
 
     const payload = {
       createdResults: plan.createdResults,
-      usedCatalysts: plan.usedCatalysts,
       usedTools: plan.usedTools ?? []
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
@@ -2265,14 +2177,6 @@ export class GatheringEngine {
     if (outcome.status === 'succeeded') {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
     }
-    await this._applyTerminalCatalysts({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome
-    });
     await this._applyTerminalTools({
       viewer,
       actor,
@@ -2467,49 +2371,6 @@ export class GatheringEngine {
     return normalizeRunItems(planned, { actor });
   }
 
-  async _applyTerminalCatalysts({ viewer, actor, system, environment, task, outcome }) {
-    const catalysts = normalizeList(task.catalysts);
-    if (catalysts.length === 0 || typeof this.catalystUsage?.apply !== 'function') {
-      return [];
-    }
-
-    return this.catalystUsage.apply({
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-      catalysts,
-      outcomeStatus: outcome.status,
-      checkResult: outcome.checkResult ?? null
-    });
-  }
-
-  async _planTerminalCatalysts({ viewer, actor, system, environment, task, outcome, checkResult }) {
-    const catalysts = normalizeList(task.catalysts);
-    if (catalysts.length === 0 || typeof this.catalystUsage?.plan !== 'function') {
-      return [];
-    }
-
-    const planned = await this.catalystUsage.plan({
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-      catalysts,
-      outcomeStatus: outcome.status,
-      checkResult: checkResult ?? outcome.checkResult ?? null
-    });
-    if (runHasDiagnostics(planned)) {
-      return misconfiguredOutcome({
-        code: 'CATALYST_PLAN_DIAGNOSTIC',
-        diagnostics: planned.diagnostics ?? planned.diagnostic
-      });
-    }
-    return normalizeRunItems(planned, { actor });
-  }
-
   async _planTerminalTools({ viewer, actor, system, environment, task, outcome, checkResult }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
     if (this._hasBlockedToolReferences(resolvedTools)) {
@@ -2578,12 +2439,12 @@ export class GatheringEngine {
     });
   }
 
-  async _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, usedTools = [], checkResult }) {
+  async _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedTools = [], checkResult }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
-      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), { createdResults, usedCatalysts, usedTools, checkResult });
+      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), { createdResults, usedTools, checkResult });
     const response = {
       accepted: true,
       started: true,
@@ -2601,7 +2462,6 @@ export class GatheringEngine {
 
     if (!opaqueBlind) {
       response.createdResults = createdResults;
-      response.usedCatalysts = usedCatalysts;
       response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
 
@@ -2802,7 +2662,7 @@ export class GatheringEngine {
           payload: {
             ...cancellationPayload,
             createdResults: [],
-            usedCatalysts: [],
+            usedTools: [],
             checkResult: { blind: true, status: 'cancelled' }
           }
         }
@@ -2986,17 +2846,6 @@ function normalizeGateResult(result) {
     messageKey: stringOrNull(result.messageKey),
     message: stringOrNull(result.message),
     data: plainObjectOrNull(result.data)
-  };
-}
-
-function normalizeCatalystResult(result) {
-  if (result === true) return { available: true, missing: [] };
-  if (result === false || !result || typeof result !== 'object') {
-    return { available: false, missing: [] };
-  }
-  return {
-    available: result.available === true || result.valid === true,
-    missing: normalizeList(result.missing)
   };
 }
 
@@ -3413,7 +3262,7 @@ function redactBlindTerminalRun(run) {
   const redacted = redactBlindRun(run);
   if (!redacted || typeof redacted !== 'object') return redacted;
   delete redacted.checkResult;
-  delete redacted.usedCatalysts;
+  delete redacted.usedTools;
   delete redacted.createdResults;
   return redacted;
 }
@@ -3427,12 +3276,11 @@ function stripRuntimeSnapshotFromRun(run) {
   return publicRun;
 }
 
-function enrichPublicTerminalRun(run, { createdResults, usedCatalysts, usedTools = [], checkResult }) {
+function enrichPublicTerminalRun(run, { createdResults, usedTools = [], checkResult }) {
   if (!run || typeof run !== 'object') return run;
   const enriched = {
     ...run,
     createdResults,
-    usedCatalysts,
     usedTools
   };
   if (checkResult !== undefined) enriched.checkResult = checkResult;

@@ -123,7 +123,6 @@ test('_terminalStart skips chat output for opaque blind tasks', async () => {
     status: 'succeeded',
     run: { id: 'run-1', status: 'succeeded', economyEvidence: { stamina: { spent: 5 } } },
     createdResults: [],
-    usedCatalysts: [],
     usedTools: [],
     checkResult: { items: [], hazards: [] }
   });
@@ -142,7 +141,6 @@ test('_terminalStart posts chat output for transparent tasks', async () => {
     status: 'succeeded',
     run: { id: 'run-1', status: 'succeeded', economyEvidence: { node: { remaining: 1 } } },
     createdResults: [{ actorUuid: 'Actor.aria', itemUuid: 'Item.h1', quantity: 1 }],
-    usedCatalysts: [],
     usedTools: [],
     checkResult: { items: [{ componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 1 }], hazards: [] }
   });

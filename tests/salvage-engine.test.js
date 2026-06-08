@@ -4,7 +4,7 @@
  * 18 tests across 6 groups:
  *  Group 1: Input validation (3 tests)
  *  Group 2: Component resolution and feature validation (3 tests)
- *  Group 3: Salvage validation + ownership + catalyst checks (3 tests)
+ *  Group 3: Salvage validation + ownership + tool checks (3 tests)
  *  Group 4: Salvage check failure + consumption policy (3 tests)
  *  Group 5: Success path — consume, create, record run (3 tests)
  *  Group 6: SalvageRun record shape and history management (3 tests)
@@ -115,7 +115,8 @@ function makeSystem({
   salvageEnabled = true,
   salvageResolutionMode = 'simple',
   salvageCraftingCheck = null,
-  components = []
+  components = [],
+  tools = []
 } = {}) {
   return {
     id,
@@ -129,6 +130,7 @@ function makeSystem({
       consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
     },
     components,
+    tools,
     craftingCheck: {}
   };
 }
@@ -139,7 +141,7 @@ function makeComponent({
   sourceUuid = null,
   salvageEnabled = true,
   ingredientQuantity = 1,
-  catalysts = [],
+  toolIds = [],
   resultGroups = null
 } = {}) {
   return {
@@ -149,7 +151,7 @@ function makeComponent({
     salvage: salvageEnabled ? {
       enabled: true,
       ingredientQuantity,
-      catalysts,
+      toolIds,
       resultGroups: resultGroups ?? [
         { id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'result-comp', quantity: 1 }] }
       ]
@@ -157,25 +159,29 @@ function makeComponent({
   };
 }
 
-function makeFakeCatalyst(componentId = 'cat-comp') {
+/**
+ * Build a library Tool (limitedUses) whose `componentId` matches the salvage
+ * tool item id used by the test-double matcher (item.id === tool.componentId).
+ */
+function makeFakeTool(componentId = 'cat-comp') {
   return {
+    id: `lib-${componentId}`,
     componentId,
-    degradesOnUse: true,
-    applyDegradationCalled: false,
-    async applyDegradation() { this.applyDegradationCalled = true; }
+    breakage: { mode: 'limitedUses', maxUses: 5 },
+    onBreak: { mode: 'flagBroken' }
   };
 }
 
 /**
  * Build a CraftingEngine with minimal stubs.
- * The mock RecipeManager always matches catalysts to items by componentId = item.id.
+ * The mock RecipeManager matches tools to items by componentId = item.id.
  */
 function makeEngine(opts = {}) {
   const mockRecipeManager = {
-    canCraft() { return { canCraft: true, satisfiableSet: null, missing: { ingredients: [], essences: [], catalysts: [] } }; },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem(_recipe, catalyst, item) {
-      return item.id === (catalyst.componentId || catalyst.systemItemId);
+    canCraft() { return { canCraft: true, satisfiableSet: null, missing: { ingredients: [], essences: [], tools: [] } }; },
+    getToolsForSet() { return []; },
+    toolMatchesItem(_recipe, tool, item) {
+      return item.id === (tool.componentId || tool.systemItemId);
     },
     ingredientMatchesItem() { return false; }
   };
@@ -304,7 +310,7 @@ test('salvage() returns failure when validateSalvage reports errors', async () =
 });
 
 // ---------------------------------------------------------------------------
-// Group 3: Ownership and catalyst checks
+// Group 3: Ownership and tool checks
 // ---------------------------------------------------------------------------
 
 test('salvage() returns failure when actor does not have enough component items', async () => {
@@ -321,22 +327,22 @@ test('salvage() returns failure when actor does not have enough component items'
   assert.match(result.message, /not enough/i);
 });
 
-test('salvage() returns failure when required catalyst item is missing', async () => {
+test('salvage() returns failure when required tool item is missing', async () => {
   const engine = makeEngine();
   const compItem = makeItem('comp-item', 'Test Component', 1);
-  const actor = makeActor('actor-1', [compItem]); // no catalyst item
-  const catalystModel = makeFakeCatalyst('acid-vial-comp');
-  const component = makeComponent({ name: 'Test Component', catalysts: [catalystModel] });
-  const system = makeSystem({ components: [component] });
+  const actor = makeActor('actor-1', [compItem]); // no tool item
+  const tool = makeFakeTool('acid-vial-comp');
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id] });
+  const system = makeSystem({ components: [component], tools: [tool] });
   setupGame(system, actor);
 
   const result = await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(result.success, false);
-  assert.match(result.message, /catalyst/i);
+  assert.match(result.message, /tool/i);
 });
 
-test('salvage() passes checks when actor has enough items and catalysts present', async () => {
+test('salvage() passes checks when actor has enough items and tools present', async () => {
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),
     resolveResultGroups: () => ({ groups: [], meta: {} })
@@ -345,17 +351,17 @@ test('salvage() passes checks when actor has enough items and catalysts present'
   engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
 
   const compItem = makeItem('comp-item', 'Test Component', 2);
-  const catalystItem = makeItem('acid-vial-comp', 'Acid Vial', 1);
-  const actor = makeActor('actor-1', [compItem, catalystItem]);
+  const toolItem = makeItem('acid-vial-comp', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
 
-  const catalystModel = makeFakeCatalyst('acid-vial-comp');
-  const component = makeComponent({ name: 'Test Component', catalysts: [catalystModel], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const tool = makeFakeTool('acid-vial-comp');
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
   const system = makeSystem({ components: [component] });
   setupGame(system, actor);
 
   const result = await engine.salvage(actor.uuid, system.id, component.id);
 
-  // Should not fail due to ownership/catalyst checks
+  // Should not fail due to ownership/tool checks
   assert.ok(result.success || /check|macro/i.test(result.message || ''), `Unexpected failure: ${result.message}`);
 });
 
@@ -695,7 +701,7 @@ test('salvage() routed mode routes to correct result group based on check outcom
   const component = {
     id: 'comp-1', name: 'Test Component',
     salvage: {
-      enabled: true, ingredientQuantity: 1, catalysts: [],
+      enabled: true, ingredientQuantity: 1,
       resultGroups: [passGroup, failGroup],
       outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' }
     }
@@ -728,7 +734,7 @@ test('salvage() routed mode returns empty results array when outcome has no rout
   const component = {
     id: 'comp-1', name: 'Test Component',
     salvage: {
-      enabled: true, ingredientQuantity: 1, catalysts: [],
+      enabled: true, ingredientQuantity: 1,
       resultGroups: [{ id: 'rg-pass', name: 'Pass', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }],
       outcomeRouting: { pass: 'rg-pass' }
     }
@@ -754,7 +760,7 @@ test('_resolveSalvageResultGroups routed mode selects correct group for each out
   const component = {
     id: 'comp-1', name: 'Ore',
     salvage: {
-      enabled: true, ingredientQuantity: 1, catalysts: [],
+      enabled: true, ingredientQuantity: 1,
       resultGroups: groups,
       outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-fail' }
     }
@@ -783,7 +789,7 @@ test('_resolveSalvageResultGroups legacy tiered alias uses routed logic', () => 
   const component = {
     id: 'comp-1', name: 'Ore',
     salvage: {
-      enabled: true, ingredientQuantity: 1, catalysts: [],
+      enabled: true, ingredientQuantity: 1,
       resultGroups: groups,
       outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' }
     }
@@ -812,7 +818,7 @@ test('_resolveSalvageResultGroups progressive mode awards results up to check va
   };
   const component = {
     id: 'comp-1', name: 'Ore',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [resultGroup] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
   };
   const system = makeSystem({
     salvageResolutionMode: 'progressive',
@@ -843,7 +849,7 @@ test('_resolveSalvageResultGroups progressive mode awards nothing when check val
   };
   const component = {
     id: 'comp-1', name: 'Ore',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [resultGroup] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
   };
   const system = makeSystem({
     salvageResolutionMode: 'progressive',
@@ -882,7 +888,7 @@ test('salvage() progressive mode creates items matching awarded results', async 
   const actor = makeActor('actor-1', [compItem]);
   const component = {
     id: 'comp-1', name: 'Test Component',
-    salvage: { enabled: true, ingredientQuantity: 1, catalysts: [], resultGroups: [resultGroup] }
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
   };
   const system = makeSystem({
     salvageResolutionMode: 'progressive',
@@ -914,13 +920,16 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both cons
   engine._runSalvageCraftingCheck = async () => ({ success: false, message: 'Check failed', outcome: null, value: null, data: {} });
 
   const compItem = makeItem('comp-item', 'Test Component', 1);
-  const catalystItem = makeItem('acid-vial', 'Acid Vial', 1);
-  const actor = makeActor('actor-1', [compItem, catalystItem]);
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
 
-  const catalyst = makeFakeCatalyst('acid-vial');
-  const component = makeComponent({ name: 'Test Component', catalysts: [catalyst], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const tool = makeFakeTool('acid-vial');
+  tool.used = false;
+  engine._applyToolBreakage = async () => { tool.used = true; return []; };
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
   const system = makeSystem({
     components: [component],
+    tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
       consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true }
@@ -931,7 +940,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both cons
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, true, 'Component should be consumed (consumeComponentOnFail=true)');
-  assert.equal(catalyst.applyDegradationCalled, true, 'Catalyst should be degraded (consumeCatalystsOnFail=true)');
+  assert.equal(tool.used, true, 'Tool should be broken (consumeCatalystsOnFail=true)');
 });
 
 test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only component consumed', async () => {
@@ -943,13 +952,16 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only com
   engine._runSalvageCraftingCheck = async () => ({ success: false, message: 'Check failed', outcome: null, value: null, data: {} });
 
   const compItem = makeItem('comp-item', 'Test Component', 1);
-  const catalystItem = makeItem('acid-vial', 'Acid Vial', 1);
-  const actor = makeActor('actor-1', [compItem, catalystItem]);
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
 
-  const catalyst = makeFakeCatalyst('acid-vial');
-  const component = makeComponent({ name: 'Test Component', catalysts: [catalyst], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const tool = makeFakeTool('acid-vial');
+  tool.used = false;
+  engine._applyToolBreakage = async () => { tool.used = true; return []; };
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
   const system = makeSystem({
     components: [component],
+    tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
       consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
@@ -960,10 +972,10 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only com
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, true, 'Component should be consumed (consumeComponentOnFail=true)');
-  assert.equal(catalyst.applyDegradationCalled, false, 'Catalyst should NOT be degraded (consumeCatalystsOnFail=false)');
+  assert.equal(tool.used, false, 'Tool should NOT be broken (consumeCatalystsOnFail=false)');
 });
 
-test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only catalysts degraded', async () => {
+test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only tools broken', async () => {
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),
     resolveResultGroups: () => ({ groups: [], meta: {} })
@@ -972,13 +984,16 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only cat
   engine._runSalvageCraftingCheck = async () => ({ success: false, message: 'Check failed', outcome: null, value: null, data: {} });
 
   const compItem = makeItem('comp-item', 'Test Component', 1);
-  const catalystItem = makeItem('acid-vial', 'Acid Vial', 1);
-  const actor = makeActor('actor-1', [compItem, catalystItem]);
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
 
-  const catalyst = makeFakeCatalyst('acid-vial');
-  const component = makeComponent({ name: 'Test Component', catalysts: [catalyst], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const tool = makeFakeTool('acid-vial');
+  tool.used = false;
+  engine._applyToolBreakage = async () => { tool.used = true; return []; };
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
   const system = makeSystem({
     components: [component],
+    tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
       consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: true }
@@ -989,7 +1004,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only cat
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be consumed (consumeComponentOnFail=false)');
-  assert.equal(catalyst.applyDegradationCalled, true, 'Catalyst should be degraded (consumeCatalystsOnFail=true)');
+  assert.equal(tool.used, true, 'Tool should be broken (consumeCatalystsOnFail=true)');
 });
 
 test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing consumed', async () => {
@@ -1001,13 +1016,16 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
   engine._runSalvageCraftingCheck = async () => ({ success: false, message: 'Check failed', outcome: null, value: null, data: {} });
 
   const compItem = makeItem('comp-item', 'Test Component', 1);
-  const catalystItem = makeItem('acid-vial', 'Acid Vial', 1);
-  const actor = makeActor('actor-1', [compItem, catalystItem]);
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
 
-  const catalyst = makeFakeCatalyst('acid-vial');
-  const component = makeComponent({ name: 'Test Component', catalysts: [catalyst], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const tool = makeFakeTool('acid-vial');
+  tool.used = false;
+  engine._applyToolBreakage = async () => { tool.used = true; return []; };
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id], resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
   const system = makeSystem({
     components: [component],
+    tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
       consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: false }
@@ -1018,7 +1036,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be consumed (consumeComponentOnFail=false)');
-  assert.equal(catalyst.applyDegradationCalled, false, 'Catalyst should NOT be degraded (consumeCatalystsOnFail=false)');
+  assert.equal(tool.used, false, 'Tool should NOT be broken (consumeCatalystsOnFail=false)');
 });
 
 // ---------------------------------------------------------------------------
@@ -1033,12 +1051,12 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
   // We stub only _runSalvageCraftingCheck since it needs MacroExecutor.
 
   const scrapComp = { id: 'scrap-metal', name: 'Scrap Metal', sourceUuid: null };
-  const catalystItem = makeItem('acid-vial', 'Acid Vial', 1);
-  const catalyst = makeFakeCatalyst('acid-vial');
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const tool = makeFakeTool('acid-vial');
 
   // Component item: qty=2, ingredientQuantity=2 → fully consumed (delete called)
   const compItem = makeItem('comp-item', 'Iron Ore', 2);
-  const actor = makeActor('actor-1', [compItem, catalystItem]);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
 
   const resultGroup = {
     id: 'rg-1', name: 'Scraps',
@@ -1049,7 +1067,7 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
     salvage: {
       enabled: true,
       ingredientQuantity: 2,
-      catalysts: [catalyst],
+      toolIds: [tool.id],
       resultGroups: [resultGroup]
     }
   };
@@ -1061,7 +1079,8 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
       enabled: false, macroUuid: null, outcomes: [], progressive: null,
       consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true }
     },
-    components: [component, scrapComp]
+    components: [component, scrapComp],
+    tools: [tool]
   });
 
   // Build engine with real ResolutionModeService wired to a system manager that returns our system
@@ -1072,6 +1091,8 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
 
   // Stub only the macro executor step
   engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  tool.used = false;
+  engine._applyToolBreakage = async () => { tool.used = true; return []; };
 
   setupGame(system, actor);
 
@@ -1083,8 +1104,8 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
   // 2. Component fully consumed (qty 2 == ingredientQuantity 2)
   assert.equal(compItem.deleteCalled, true, 'Component item should be deleted when fully consumed');
 
-  // 3. Catalyst degraded on success path
-  assert.equal(catalyst.applyDegradationCalled, true, 'Catalyst should be degraded after successful salvage');
+  // 3. Tool used/broken on success path
+  assert.equal(tool.used, true, 'Tool should be used/broken after successful salvage');
 
   // 4. Result items created on actor
   assert.ok(Array.isArray(result.results), 'result.results should be an array');
@@ -1119,7 +1140,6 @@ test('salvage() creates a waitingTime run when salvage has a time requirement', 
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [{ id: 'rg-1', name: 'Bits', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }],
       timeRequirement: { minutes: 10 }
     }
@@ -1146,7 +1166,6 @@ test('processPendingSalvageRuns() auto-completes timed salvage runs after world-
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [{ id: 'rg-1', name: 'Shards', results: [{ id: 'r-1', componentId: 'shard', quantity: 2 }] }],
       timeRequirement: { minutes: 5 }
     }

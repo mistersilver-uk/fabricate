@@ -103,13 +103,11 @@ function buildMockRecipeManager(canCraftResult = true) {
         return {
           canCraft: false,
           satisfiableSet: null,
-          missing: { ingredients: [{ ingredient: { getDescription: () => 'item' }, have: 0, need: 1 }], essences: [], catalysts: [] }
+          missing: { ingredients: [{ ingredient: { getDescription: () => 'item' }, have: 0, need: 1 }], essences: [], tools: [] }
         };
       }
-      return { canCraft: true, satisfiableSet: ingredientSets[0] || null, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSets[0] || null, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
     ingredientMatchesItem(_recipe, ingredient, item) {
       return item.id === (ingredient.componentId || ingredient.systemItemId);
     }
@@ -143,7 +141,7 @@ function buildIngredientSet(id, ingredientDefs, resultGroupId = null) {
 function buildRecipe({ id = 'recipe-1', name = 'Test Recipe', craftingSystemId = 'sys-1', ingredientSets = [], resultGroups = [], outcomeRouting = null, steps = null } = {}) {
   const recipe = {
     id, name, craftingSystemId, ingredientSets, resultGroups, outcomeRouting,
-    catalysts: [], transferEffects: false,
+    toolIds: [], transferEffects: false,
     validate() { return { valid: true, errors: [] }; },
     toJSON() { return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId }; }
   };
@@ -403,13 +401,13 @@ test('multistep: start run, advance through 2 steps, complete', async () => {
       id: 'step-1', name: 'Gather',
       ingredientSets: [set1],
       resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'extract', quantity: 1 }] }],
-      catalysts: [], outcomeRouting: null, timeRequirement: null
+      toolIds: [], outcomeRouting: null, timeRequirement: null
     },
     {
       id: 'step-2', name: 'Refine',
       ingredientSets: [set2],
       resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'ingot', quantity: 1 }] }],
-      catalysts: [], outcomeRouting: null, timeRequirement: null
+      toolIds: [], outcomeRouting: null, timeRequirement: null
     }
   ];
 
@@ -425,12 +423,10 @@ test('multistep: start run, advance through 2 steps, complete', async () => {
       const sets = executionRecipe.ingredientSets || [];
       const isStep1 = sets.some(s => s.id === 'set-s1');
       const isStep2 = sets.some(s => s.id === 'set-s2');
-      if (isStep1) return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [], catalysts: [] } };
-      if (isStep2) return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [], catalysts: [] } };
-      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ ingredient: { getDescription: () => 'item' }, have: 0, need: 1 }], essences: [], catalysts: [] } };
+      if (isStep1) return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [], tools: [] } };
+      if (isStep2) return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [], tools: [] } };
+      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ ingredient: { getDescription: () => 'item' }, have: 0, need: 1 }], essences: [], tools: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
     ingredientMatchesItem(_recipe, ingredient, item) {
       return item.id === (ingredient.componentId || ingredient.systemItemId);
     }
@@ -490,13 +486,13 @@ test('multistep: step failure records failure and stops run', async () => {
       id: 'step-1', name: 'Gather',
       ingredientSets: [set1],
       resultGroups: [{ id: 'rg-sf1', results: [{ id: 'r-sf1', componentId: 'extract', quantity: 1 }] }],
-      catalysts: [], outcomeRouting: null, timeRequirement: null
+      toolIds: [], outcomeRouting: null, timeRequirement: null
     },
     {
       id: 'step-2', name: 'Refine',
       ingredientSets: [set1],
       resultGroups: [{ id: 'rg-sf2', results: [] }],
-      catalysts: [], outcomeRouting: null, timeRequirement: null
+      toolIds: [], outcomeRouting: null, timeRequirement: null
     }
   ];
 
@@ -505,9 +501,7 @@ test('multistep: step failure records failure and stops run', async () => {
   const craftingActor = new FakeActor('Worker-f');
 
   const recipeManager = {
-    canCraft() { return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [], catalysts: [] } }; },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
+    canCraft() { return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [], tools: [] } }; },
     ingredientMatchesItem(_r, ingredient, item) { return item.id === (ingredient.componentId || ingredient.systemItemId); }
   };
 
@@ -566,7 +560,7 @@ function buildLegacyOutcomeRoutingFixture() {
       { id: 'rg-fail', results: [{ id: 'r-fail', componentId: 'weak-potion', quantity: 1 }] }
     ],
     outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' },
-    catalysts: [], timeRequirement: null
+    toolIds: [], timeRequirement: null
   };
 
   const recipe = buildRecipe({
@@ -619,9 +613,7 @@ test("legacy tiered compatibility mode: 'fail' outcome routes craft to the fail 
   const craftingActor = new FakeActor('Brewer2');
 
   const recipeManager = {
-    canCraft() { return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } }; },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
+    canCraft() { return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } }; },
     ingredientMatchesItem(_r, ingredient, item) { return item.id === (ingredient.componentId || ingredient.systemItemId); }
   };
 
@@ -685,7 +677,7 @@ function buildProgressiveFixture() {
         { id: 'r-c', componentId: 'comp-c', quantity: 1 }
       ]
     }],
-    catalysts: [], outcomeRouting: null, timeRequirement: null
+    toolIds: [], outcomeRouting: null, timeRequirement: null
   };
 
   const recipe = buildRecipe({ craftingSystemId: 'sys-prog', steps: [step] });

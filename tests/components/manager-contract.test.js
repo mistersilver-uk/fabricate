@@ -392,7 +392,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.Title, 'Set up recipes');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint,
-      'Add components before creating recipes so ingredients, catalysts, and results have reusable items to reference.'
+      'Add components before creating recipes so ingredients, tools, and results have reusable items to reference.'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents, 'Add components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs, 'Recipe docs');

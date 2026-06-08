@@ -1,6 +1,5 @@
 import { Ingredient } from './Ingredient.js';
 import { IngredientGroup } from './IngredientGroup.js';
-import { Catalyst } from './Catalyst.js';
 import { getFabricateFlag } from '../config/flags.js';
 
 /**
@@ -27,11 +26,6 @@ export class IngredientSet {
 
     // Required essences (accumulated from ingredients)
     this.essences = data.essences || {}; // { 'light': 2, 'fire': 1 }
-
-    // Catalysts for this specific ingredient set (non-consumable requirements)
-    this.catalysts = (data.catalysts || []).map(c =>
-      c instanceof Catalyst ? c : Catalyst.fromJSON(c)
-    );
 
     // Shared library tool references applying to this ingredient set.
     this.toolIds = this._normalizeToolIds(data.toolIds);
@@ -93,14 +87,6 @@ export class IngredientSet {
     for (const [essenceType, quantity] of Object.entries(this.essences)) {
       if (typeof quantity !== 'number' || quantity <= 0) {
         errors.push(`Essence "${essenceType}" must have a positive quantity`);
-      }
-    }
-
-    // Validate catalysts
-    for (const catalyst of this.catalysts) {
-      const catalystValidation = catalyst.validate();
-      if (!catalystValidation.valid) {
-        errors.push(...catalystValidation.errors.map(e => `Catalyst: ${e}`));
       }
     }
 
@@ -258,7 +244,6 @@ export class IngredientSet {
       // Legacy alias retained for compatibility with older consumers.
       ingredients: this.ingredients.map(i => i.toJSON()),
       essences: this.essences,
-      catalysts: this.catalysts.map(c => c.toJSON()),
       toolIds: [...this.toolIds],
       resultMapping: this.resultMapping,
       resultGroupId: this.resultGroupId,

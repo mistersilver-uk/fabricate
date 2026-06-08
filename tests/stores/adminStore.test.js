@@ -3529,8 +3529,8 @@ describe('createAdminStore', () => {
         for (const field of [
           'id', 'name', 'img', 'description', 'category', 'enabled', 'locked',
           'isSimple', 'visibilitySummary', 'stepCount', 'resultGroupCount',
-          'ingredientCount', 'catalystCount', 'structureKey', 'structureLabel',
-          'requirementsPreview', 'ingredients', 'catalysts'
+          'ingredientCount', 'toolCount', 'structureKey', 'structureLabel',
+          'requirementsPreview', 'ingredients', 'tools'
         ]) {
           assert.ok(field in recipe, `recipe entry should have field: ${field}`);
         }
@@ -3559,19 +3559,19 @@ describe('createAdminStore', () => {
         craftingSystemId: 'sys1',
         ingredientSets: [],
         resultGroups: [],
-        catalysts: [{ componentId: 'cauldron' }],
+        toolIds: ['cauldron'],
         steps: [
           {
             id: 'step-mix',
             name: 'Mix',
-            catalysts: [{ componentId: 'stirring-rod' }],
+            toolIds: ['stirring-rod'],
             ingredientSets: [{
               id: 'set-herbs',
               ingredientGroups: [
                 { id: 'group-herb', options: [{ componentId: 'mint' }, { componentId: 'sage' }] },
                 { id: 'group-water', options: [{ componentId: 'water' }] }
               ],
-              catalysts: [{ componentId: 'mortar' }]
+              toolIds: ['mortar']
             }],
             resultGroups: [{ id: 'mix-success' }, { id: 'mix-critical' }]
           },
@@ -3581,7 +3581,7 @@ describe('createAdminStore', () => {
             ingredientSets: [{
               id: 'set-finish',
               ingredients: [{ componentId: 'ash' }, { componentId: 'salt' }],
-              catalysts: [{ componentId: 'filter' }, { componentId: 'vial' }]
+              toolIds: ['filter', 'vial']
             }],
             resultGroups: [{ id: 'finish-success' }]
           }
@@ -3607,25 +3607,25 @@ describe('createAdminStore', () => {
       assert.equal(recipe.stepCount, 2);
       assert.equal(recipe.resultGroupCount, 3);
       assert.equal(recipe.ingredientCount, 5);
-      assert.equal(recipe.catalystCount, 6);
+      assert.equal(recipe.toolCount, 6);
       assert.equal(recipe.structureKey, 'multiStep');
       assert.equal(recipe.structureLabel, 'Multi-step');
       assert.equal(recipe.ingredients.length, 5, 'legacy ingredients array should track derived count');
-      assert.equal(recipe.catalysts.length, 6, 'legacy catalysts array should track derived count');
+      assert.equal(recipe.tools.length, 6, 'tools array should track derived count');
       assert.deepEqual(recipe.requirementsPreview, [
         {
           id: 'step-mix',
           name: 'Mix',
           ingredientSetCount: 1,
           ingredientCount: 3,
-          catalystCount: 3,
+          toolCount: 3,
           resultGroupCount: 2,
           hasAlternatives: false,
           ingredientSetSummaries: [{
             id: 'set-herbs',
             name: 'Set 1',
             ingredientCount: 3,
-            catalystCount: 1
+            toolCount: 1
           }]
         },
         {
@@ -3633,14 +3633,14 @@ describe('createAdminStore', () => {
           name: 'Finish',
           ingredientSetCount: 1,
           ingredientCount: 2,
-          catalystCount: 3,
+          toolCount: 3,
           resultGroupCount: 1,
           hasAlternatives: false,
           ingredientSetSummaries: [{
             id: 'set-finish',
             name: 'Set 1',
             ingredientCount: 2,
-            catalystCount: 2
+            toolCount: 2
           }]
         }
       ]);
@@ -3658,14 +3658,14 @@ describe('createAdminStore', () => {
           ingredientGroups: [
             { id: 'group-main', options: [{ componentId: 'root' }, { componentId: 'mushroom' }] }
           ],
-          catalysts: [{ componentId: 'pot' }]
+          toolIds: ['pot']
         }, {
           id: 'set-alt',
           ingredients: [{ componentId: 'fish' }, { componentId: 'salt' }, { componentId: 'herb' }],
-          catalysts: []
+          toolIds: []
         }],
         resultGroups: [{ id: 'success' }, { id: 'bonus' }],
-        catalysts: [{ componentId: 'ladle' }]
+        toolIds: ['ladle']
       });
 
       services.getRecipeManager = () => ({
@@ -3682,14 +3682,14 @@ describe('createAdminStore', () => {
       assert.equal(recipe.stepCount, 1);
       assert.equal(recipe.resultGroupCount, 2);
       assert.equal(recipe.ingredientCount, 3);
-      assert.equal(recipe.catalystCount, 2);
+      assert.equal(recipe.toolCount, 2);
       assert.equal(recipe.structureKey, 'simple');
       assert.deepEqual(recipe.requirementsPreview, [{
         id: 'implicit-step',
         name: 'Step 1',
         ingredientSetCount: 2,
         ingredientCount: 3,
-        catalystCount: 2,
+        toolCount: 2,
         resultGroupCount: 2,
         hasAlternatives: true,
         ingredientSetSummaries: [
@@ -3697,13 +3697,13 @@ describe('createAdminStore', () => {
             id: 'set-main',
             name: 'Set 1',
             ingredientCount: 2,
-            catalystCount: 1
+            toolCount: 1
           },
           {
             id: 'set-alt',
             name: 'Set 2',
             ingredientCount: 3,
-            catalystCount: 0
+            toolCount: 0
           }
         ]
       }]);
@@ -3839,7 +3839,7 @@ describe('createAdminStore', () => {
             salvage: {
               enabled: true,
               ingredientQuantity: 3,
-              catalysts: [{ componentId: 'knife' }],
+              toolIds: ['knife'],
               resultGroups: [{ id: 'grp-1', results: [] }],
               timeRequirement: { seconds: 60 },
               currencyRequirement: { amount: 5 },
@@ -3868,7 +3868,7 @@ describe('createAdminStore', () => {
       ]);
       assert.deepEqual(card.salvageSummary, {
         quantityRequired: 3,
-        catalystCount: 1,
+        toolCount: 1,
         resultGroupCount: 1,
         hasTimeRequirement: true,
         hasCurrencyRequirement: true,

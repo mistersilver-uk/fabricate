@@ -93,7 +93,7 @@ function buildRecipe(systemId = 'sys-1') {
     craftingSystemId: systemId,
     ingredientSets: [],
     resultGroups: [],
-    catalysts: [],
+    tools: [],
     outcomeRouting: null,
     transferEffects: false,
     getExecutionSteps: null,
@@ -129,10 +129,8 @@ function buildIngredientSet(item) {
 function buildEngine(item, ingredientSet, overrideResolution = null) {
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
     ingredientMatchesItem(recipe, ingredient, itm) { return itm === item; }
   };
   const resolutionService = overrideResolution || {
@@ -168,7 +166,7 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   const consumedIngredients = [
     { item: { name: 'Iron Ingot', uuid: 'Item.iron' }, quantity: 3 }
   ];
-  const catalysts = [{ item: { name: 'Forge Hammer', uuid: 'Item.hammer' } }];
+  const tools = [{ item: { name: 'Forge Hammer', uuid: 'Item.hammer' } }];
   const createdResults = [{ name: 'Iron Sword', uuid: 'Item.sword', system: { quantity: 1 } }];
 
   await engine._postCraftChatMessage({
@@ -176,7 +174,7 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
     craftingActor: buildActor('Gandalf'),
     recipe: buildRecipe(),
     consumedIngredients,
-    catalysts,
+    tools,
     createdResults,
     failureReason: undefined
   });
@@ -187,7 +185,7 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   assert.ok(content.includes('Iron Sword'), 'Recipe name in content');
   assert.ok(content.includes('Iron Ingot'), 'Consumed ingredient name in content');
   assert.ok(content.includes('3'), 'Consumed ingredient quantity in content');
-  assert.ok(content.includes('Forge Hammer'), 'Catalyst name in content');
+  assert.ok(content.includes('Forge Hammer'), 'Tool name in content');
   assert.ok(content.includes('Iron Sword'), 'Created result name in content');
 });
 
@@ -202,14 +200,14 @@ test('_postCraftChatMessage: failure message includes actor, recipe, reason, and
   const engine = new CraftingEngine({});
 
   const consumedIngredients = [{ item: { name: 'Silver Dust', uuid: 'Item.silver' }, quantity: 2 }];
-  const catalysts = [{ item: { name: 'Magic Crucible', uuid: 'Item.crucible' } }];
+  const tools = [{ item: { name: 'Magic Crucible', uuid: 'Item.crucible' } }];
 
   await engine._postCraftChatMessage({
     success: false,
     craftingActor: buildActor('Merlin'),
     recipe: buildRecipe(),
     consumedIngredients,
-    catalysts,
+    tools,
     createdResults: [],
     failureReason: 'Skill check too low'
   });
@@ -220,7 +218,7 @@ test('_postCraftChatMessage: failure message includes actor, recipe, reason, and
   assert.ok(content.includes('Iron Sword'), 'Recipe name in failure message');
   assert.ok(content.includes('Skill check too low'), 'Failure reason in message');
   assert.ok(content.includes('Silver Dust'), 'Consumed ingredient in failure message');
-  assert.ok(content.includes('Magic Crucible'), 'Consumed catalyst in failure message');
+  assert.ok(content.includes('Magic Crucible'), 'Consumed tool in failure message');
 });
 
 // ---------------------------------------------------------------------------
@@ -237,7 +235,7 @@ test('_postCraftChatMessage: does not call ChatMessage.create when chatOutput is
     craftingActor: buildActor(),
     recipe: buildRecipe(),
     consumedIngredients: [],
-    catalysts: [],
+    tools: [],
     createdResults: []
   });
 
@@ -258,7 +256,7 @@ test('_postCraftChatMessage: calls ChatMessage.create when chatOutput is true', 
     craftingActor: buildActor(),
     recipe: buildRecipe(),
     consumedIngredients: [],
-    catalysts: [],
+    tools: [],
     createdResults: []
   });
 
@@ -282,7 +280,7 @@ test('_postCraftChatMessage: does not throw when system is not found', async () 
       craftingActor: buildActor(),
       recipe,
       consumedIngredients: [],
-      catalysts: [],
+      tools: [],
       createdResults: []
     }),
     'Should not throw when system is not found'
@@ -305,7 +303,7 @@ test('_postCraftChatMessage: uses FABRICATE.Chat.* localization keys', async () 
     craftingActor: buildActor(),
     recipe: buildRecipe(),
     consumedIngredients: [{ item: { name: 'Iron Ingot' }, quantity: 1 }],
-    catalysts: [],
+    tools: [],
     createdResults: [{ name: 'Iron Sword', system: { quantity: 1 } }]
   });
 
@@ -389,10 +387,8 @@ test('craft(): does not post chat when ingredient check fails (canCraft false)',
 
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ name: 'Iron Ingot' }], essences: [], catalysts: [] } };
+      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ name: 'Iron Ingot' }], essences: [], tools: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
     ingredientMatchesItem() { return false; }
   };
 
@@ -423,7 +419,7 @@ test('_postCraftChatMessage: failure does not post when chatOutput toggle is off
     craftingActor: buildActor(),
     recipe: buildRecipe(),
     consumedIngredients: [],
-    catalysts: [],
+    tools: [],
     createdResults: [],
     failureReason: 'Check failed'
   });

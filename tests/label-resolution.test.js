@@ -8,7 +8,7 @@
  *   TC4: resolveComponentImg — valid component with img returns component.img
  *   TC5: resolveComponentImg — missing component returns fallback icon
  *   TC6: Ingredient states return resolved component names (not "managed item")
- *   TC7: Catalyst states return resolved names (not undefined)
+ *   TC7: Tool states return resolved names (not undefined)
  *   TC8: Result description resolution via resolveComponentName
  *   TC9: Recipe icon fallback — custom img passes through unchanged
  *   TC10: Recipe icon fallback — default bag icon falls back to linked item img
@@ -53,18 +53,18 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { Ingredient } = await import('../src/models/Ingredient.js');
-const { Catalyst } = await import('../src/models/Catalyst.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSystem(components = []) {
+function makeSystem(components = [], tools = []) {
   return {
     id: 'sys-1',
     advancedOptionsEnabled: false,
     features: {},
-    components
+    components,
+    tools
   };
 }
 
@@ -231,31 +231,30 @@ test('TC6: _buildIngredientStates resolves component names instead of "managed i
 });
 
 // ---------------------------------------------------------------------------
-// TC7: Catalyst states return resolved names (not undefined)
+// TC7: Tool states return resolved names (not undefined)
 // ---------------------------------------------------------------------------
 
-test('TC7: evaluateCraftability resolves catalyst names (not undefined)', () => {
+test('TC7: evaluateCraftability resolves tool names (not undefined)', () => {
   const component = makeComponent('cat-comp-1', 'Mortar and Pestle');
-  const system = makeSystem([component]);
+  const system = makeSystem([component], [{ id: 'tool-mortar', componentId: 'cat-comp-1', enabled: true }]);
   setupGame(system);
 
   const manager = new RecipeManager();
-  const catalyst = Catalyst.fromJSON({ componentId: 'cat-comp-1' });
   const recipe = new Recipe({
     craftingSystemId: 'sys-1',
-    name: 'Catalyst Recipe',
-    catalysts: [catalyst.toJSON()],
+    name: 'Tool Recipe',
+    toolIds: ['tool-mortar'],
     ingredientSets: [{ ingredientGroups: [] }]
   });
 
-  // Actor with no items — catalyst will be "unavailable"
+  // Actor with no items — tool will be "unavailable"
   const actor = { items: new Map() };
   const result = manager.evaluateCraftability([actor], recipe);
 
-  assert.equal(result.catalystStates.length, 1);
-  const catState = result.catalystStates[0];
-  assert.ok(catState.name !== undefined, 'Catalyst name should not be undefined');
-  assert.equal(catState.name, 'Mortar and Pestle');
+  assert.equal(result.toolStates.length, 1);
+  const toolState = result.toolStates[0];
+  assert.ok(toolState.name !== undefined, 'Tool name should not be undefined');
+  assert.equal(toolState.name, 'Mortar and Pestle');
 
   teardownGame();
 });

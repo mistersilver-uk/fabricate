@@ -105,7 +105,7 @@ function buildFakeRecipe(ingredientSet, systemId = 'sys-1') {
     craftingSystemId: systemId,
     ingredientSets: [ingredientSet],
     resultGroups: [],
-    catalysts: [],
+    toolIds: [],
     outcomeRouting: null,
     transferEffects: false,
     getExecutionSteps: null, // force implicit step path
@@ -121,11 +121,11 @@ function buildEngine(ingredientItem, ingredientSet, resolutionService = null) {
       return {
         canCraft: true,
         satisfiableSet: ingredientSet,
-        missing: { ingredients: [], essences: [], catalysts: [] }
+        missing: { ingredients: [], essences: [], tools: [] }
       };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
+    getToolsForSet() { return []; },
+    toolMatchesItem() { return false; },
     ingredientMatchesItem(recipe, ingredient, item) { return item === ingredientItem; }
   };
   return new CraftingEngine(mockRecipeManager, null, resolutionService);
@@ -250,14 +250,14 @@ test('craft() calls _runSuccessMacro with spec-defined context on success', asyn
   assert.ok('step' in ctx, 'context must include step');
   assert.ok('selectedIngredientSet' in ctx, 'context must include selectedIngredientSet');
   assert.ok('consumedIngredients' in ctx, 'context must include consumedIngredients');
-  assert.ok('consumedCatalysts' in ctx, 'context must include consumedCatalysts');
+  assert.ok('consumedTools' in ctx, 'context must include consumedTools');
   assert.ok('createdResults' in ctx, 'context must include createdResults');
   assert.ok('checkResult' in ctx, 'context must include checkResult');
 
   // Spot-check a few values
   assert.deepEqual(ctx.craftingActor, craftingActor);
   assert.deepEqual(ctx.componentSourceActors, [sourceActor]);
-  assert.ok(Array.isArray(ctx.consumedCatalysts), 'consumedCatalysts should be an array');
+  assert.ok(Array.isArray(ctx.consumedTools), 'consumedTools should be an array');
   assert.ok(Array.isArray(ctx.createdResults), 'createdResults should be an array');
 });
 
@@ -347,13 +347,13 @@ test('craft() calls _runFailureMacro with spec-defined context on check failure'
   assert.ok('failureReason' in ctx, 'context must include failureReason');
   assert.ok('checkResult' in ctx, 'context must include checkResult');
   assert.ok('consumedIngredients' in ctx, 'context must include consumedIngredients');
-  assert.ok('consumedCatalysts' in ctx, 'context must include consumedCatalysts');
+  assert.ok('consumedTools' in ctx, 'context must include consumedTools');
 
   // Spot-check values
   assert.deepEqual(ctx.craftingActor, craftingActor);
   assert.equal(ctx.failureReason, 'Dice roll too low');
   assert.ok(Array.isArray(ctx.consumedIngredients), 'consumedIngredients should be an array');
-  assert.ok(Array.isArray(ctx.consumedCatalysts), 'consumedCatalysts should be an array');
+  assert.ok(Array.isArray(ctx.consumedTools), 'consumedTools should be an array');
 });
 
 test('craft() calls _runFailureMacro on validation failure path', async () => {
@@ -388,7 +388,7 @@ test('craft() calls _runFailureMacro on validation failure path', async () => {
   const requiredKeys = [
     'recipe', 'craftingSystem', 'craftingActor', 'componentSourceActors',
     'step', 'selectedIngredientSet', 'failureReason', 'checkResult',
-    'consumedIngredients', 'consumedCatalysts'
+    'consumedIngredients', 'consumedTools'
   ];
   for (const key of requiredKeys) {
     assert.ok(key in failureMacroContext, `context must include ${key}`);

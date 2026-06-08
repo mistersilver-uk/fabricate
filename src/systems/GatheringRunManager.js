@@ -322,7 +322,7 @@ export class GatheringRunManager {
       run.revealEvents = cloneJson(record.revealEvents);
     }
 
-    run.usedCatalysts = normalizeRunItems(record.usedCatalysts);
+    run.usedTools = normalizeRunItems(record.usedTools);
     run.createdResults = terminal && status !== 'succeeded' ? [] : normalizeRunItems(record.createdResults);
 
     return run;
@@ -405,7 +405,7 @@ export class GatheringRunManager {
     if (payload.encounterOutcome !== undefined) terminalPayload.encounterOutcome = payload.encounterOutcome;
     if (payload.chatMessageIds !== undefined) terminalPayload.chatMessageIds = payload.chatMessageIds;
     if (payload.revealEvents !== undefined) terminalPayload.revealEvents = payload.revealEvents;
-    if (payload.usedCatalysts !== undefined) terminalPayload.usedCatalysts = payload.usedCatalysts;
+    if (payload.usedTools !== undefined) terminalPayload.usedTools = payload.usedTools;
     terminalPayload.createdResults = status === 'succeeded' ? payload.createdResults : [];
     return terminalPayload;
   }
@@ -461,7 +461,7 @@ function pickRunPayload(data = {}) {
     'encounterOutcome',
     'chatMessageIds',
     'revealEvents',
-    'usedCatalysts',
+    'usedTools',
     'createdResults'
   ]) {
     if (data[field] !== undefined) payload[field] = data[field];

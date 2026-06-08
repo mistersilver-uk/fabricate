@@ -78,7 +78,7 @@ function buildStep(results = [], overrides = {}) {
   return {
     id: 'step-1',
     name: 'Step One',
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results }],
     ...overrides,
   };
@@ -514,7 +514,7 @@ test('edge case — no result groups → returns empty groups and zero remaining
   const step = {
     id: 'step-1',
     name: 'Step One',
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [],
   };
   // Recipe also has no resultGroups, so allGroups will be []
