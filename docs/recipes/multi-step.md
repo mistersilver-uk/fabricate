@@ -139,9 +139,7 @@ Time gates are checked:
 
 ## Managing Runs
 
-Players can see their active runs in the crafting app. From there they can:
-- **Resume** a run (continue from the current step)
-- **Cancel** a run (abandons progress; consumed items are not returned)
+Multi-step run state is stored on the actor through `CraftingRunManager`. Integrations can resume or cancel runs through the runtime APIs today; the planned Crafting UI will surface active runs to players with resume and cancel controls.
 
 {: .warning }
 > Disabling the `multiStepRecipes` feature is destructive. All existing multi-step recipes will be deleted.

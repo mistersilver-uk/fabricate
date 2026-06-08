@@ -55,7 +55,7 @@ Recipes are partially visible to players before they are discovered. Players can
 
 - Each recipe defines which fields to hide and a `revealThreshold` (the amount of discovery progress required to fully unlock it).
 - Progress accumulates via **fragments** (items linked to a UUID that grant progress automatically on acquisition) or **manual GM assignment**, or both.
-- A progress bar in the Crafting App shows each player how close they are to unlocking a teaser recipe.
+- API consumers can read progress toward unlocking a teaser recipe; the planned Crafting UI will show that progress to players.
 - When progress meets the threshold the recipe transitions to fully visible and craftable.
 
 See [Teaser Mode]({% link visibility-teaser.md %}) for full configuration details.
@@ -130,10 +130,10 @@ When `knowledge.mode` is `learned` or `itemOrLearned`, players can explicitly le
 
 ### Learn Flow
 
-1. Player sees a recipe with a "Learn" action in the crafting app
-2. Preconditions: recipe has a `linkedRecipeItemUuid`, player owns a matching item, recipe not yet learned
-3. Player clicks "Learn" and confirms
-4. The recipe is recorded in the actor's flags:
+1. An owned recipe item is evaluated by `RecipeVisibilityService.learnRecipesFromOwnedItem(...)`, or an integration calls `learnRecipe(...)`.
+2. Preconditions: recipe has a `linkedRecipeItemUuid`, player owns a matching item, recipe not yet learned.
+3. The service records the recipe in the actor's flags.
+4. The planned Crafting UI will expose this flow as a player "Learn" action.
 
 ```
 Actor.flags.fabricate.learnedRecipes = {
@@ -208,7 +208,7 @@ After a drag-and-drop learn attempt, Fabricate shows notifications for successfu
 Any recipe can be `locked` regardless of visibility mode. Locked recipes:
 - Are visible to all players (so they know it exists)
 - Cannot be crafted by non-GM users
-- Show a "Locked" badge in the crafting app
+- Return locked state through the visibility guard; the planned Crafting UI will show a "Locked" badge
 
 ## Crafting Guards
 

@@ -39,11 +39,20 @@ game.fabricate.getCraftingRunManager()      // Multi-step run management
 game.fabricate.getGatheringEnvironmentStore() // Gathering environment persistence
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
+game.fabricate.getGatheringRichStateService() // Gathering rich-state internals
+game.fabricate.getItemPilesIntegration()     // Item Piles integration facade
 game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering listing
 game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
+game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop preview data
 game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
 game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering actor id
 game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
+game.fabricate.getGatheringConditions()     // Current gathering weather/time and vocabularies
+game.fabricate.setGatheringWeather(weatherTag) // GM-only gathering weather update
+game.fabricate.setGatheringTimeOfDay(timeOfDayTag) // GM-only gathering time update
+game.fabricate.setGatheringConditions({ weather, timeOfDay }) // GM-only conditions update
+game.fabricate.getGatheringEconomy({ systemId }) // Gathering economy block
+game.fabricate.setGatheringEconomy({ systemId, economy }) // GM-only economy update
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
 game.fabricate.getResolutionModeService()   // Mode validation and resolution
 ```
@@ -54,6 +63,7 @@ game.fabricate.getResolutionModeService()   // Mode validation and resolution
 fabricate.createSimpleRecipe(name, ingredients, result)
 fabricate.craft(actor, recipeId, options)
 fabricate.listRecipes(filters)
+fabricate.deleteRecipe(recipeId)
 fabricate.getAvailableRecipes(actorOrActors)
 fabricate.openRecipeManager()
 fabricate.listCraftingSystems()
@@ -64,14 +74,14 @@ fabricate.listCraftingSystems()
 ```javascript
 const {
   Recipe, Ingredient, IngredientGroup, Catalyst,
-  RecipeManager, CraftingEngine, CraftingSystemManager,
+  RecipeManager, CraftingEngine,
+  getFabricateAppClass, getCraftingSystemManagerAppClass,
+  CraftingSystemManager,
   CraftingRunManager, SalvageRunManager,
   GatheringEnvironmentStore, GatheringRunManager,
   GatheringGateAndCheckEvaluator, GatheringEngine,
   RecipeVisibilityService, ResolutionModeService,
   SignatureValidator, ItemPilesIntegration,
-  getCraftingAppClass, getGatheringAppClass,
-  getRecipeManagerAppClass, getRecipeEditorAppClass,
   CompendiumImporter, CraftingSystemExporter
 } = game.fabricate.api;
 ```
@@ -137,7 +147,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
-| Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system in the Alchemy tab |
+| Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system for the planned Alchemy tab |
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
 | Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
 | Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |

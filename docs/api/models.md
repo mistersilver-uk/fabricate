@@ -7,14 +7,15 @@ nav_order: 7
 
 # Data Models
 
-All model classes are available via `game.fabricate.api`:
+These model classes are exported via `game.fabricate.api`:
 
 ```javascript
 const {
-  Recipe, Ingredient, IngredientGroup, IngredientSet,
-  Catalyst, Result
+  Recipe, Ingredient, IngredientGroup, Catalyst
 } = game.fabricate.api;
 ```
+
+`IngredientSet` and `Result` are documented below as recipe data shapes. They are normalised through recipe and manager APIs, but they are not exported as public constructors.
 
 ---
 
@@ -34,7 +35,7 @@ new Recipe({
     restricted,          // boolean (default false)
     allowedUserIds       // string[]
   },
-  ingredientSets,        // IngredientSet[] (single-step)
+  ingredientSets,        // Ingredient-set data[] (single-step)
   steps,                 // object[] (multi-step)
   resultGroups,          // object[]
   catalysts,             // Catalyst[]
@@ -65,26 +66,25 @@ new Recipe({
 
 ---
 
-## IngredientSet
+## IngredientSet Data Shape
 
 ```javascript
-IngredientSet.fromJSON({
+{
   id,                // string
   name,              // string
   ingredientGroups,  // IngredientGroup[] -- all must be satisfied (AND)
   essences,          // { [essenceId]: quantity }
   catalysts,         // Catalyst[]
   resultGroupId      // string | null (routed ingredientSet provider routing)
-})
+}
 ```
 
 **Key methods:**
 
 | Method | Returns | Description |
 |:-------|:--------|:------------|
-| `canBeCraftedWith(items)` | `boolean` | Quick check against available items |
-| `resolveIngredientSelection(items, matcher)` | `{success, selectedIngredients, missingGroups}` | Detailed resolution |
-| `validate()` | `{valid, errors}` | Validates structure |
+| `Recipe.validate()` | `{valid, errors}` | Validates nested ingredient-set data as part of the recipe |
+| `RecipeManager.evaluateCraftability(recipe, actors)` | `object` | Evaluates whether an actor inventory can satisfy ingredient-set data |
 
 ---
 
@@ -152,24 +152,26 @@ new Catalyst({
 
 ---
 
-## Result
+## Result Data Shape
 
 ```javascript
-new Result({
+{
   id,                // string
   componentId,       // string (managed component reference)
   itemUuid,          // string (direct Foundry item reference)
   quantity,          // number (default 1)
   propertyMacroUuid  // string | null
-})
+}
 ```
 
 {: .note }
 > The field was previously named `systemItemId`. Use `componentId` for all new data.
 
-**Key methods:**
+Result data is validated as part of recipe validation and consumed by the crafting engine when a result group is awarded.
+
+**Related methods:**
 
 | Method | Returns | Description |
 |:-------|:--------|:------------|
-| `validate()` | `{valid, errors}` | Validates structure |
-| `getDescription()` | `string` | Human-readable description |
+| `Recipe.validate()` | `{valid, errors}` | Validates nested result data as part of the recipe |
+| `Recipe.getResultDescription()` | `string` | Human-readable result summary |
