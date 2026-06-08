@@ -19,16 +19,16 @@ Validates recipes against their resolution mode rules and resolves which result 
 
 Returns the resolution mode for a recipe (derived from its crafting system).
 
-**Returns:** `string` -- `"simple"`, `"routed"`, or `"progressive"`
+**Returns:** `string` -- "simple", "routed", or "progressive"
 
 {: .note }
-> The legacy modes `"mapped"` and `"tiered"` are normalised to `"routed"` on load. `getMode()` always returns `"routed"` for recipes that were previously `"mapped"` or `"tiered"`.
+> The legacy modes "mapped" and "tiered" are normalised to "routed" on load. `getMode()` always returns "routed" for recipes that were previously "mapped" or "tiered".
 
 ### getProvider(recipe)
 
 Returns the result-selection provider for a routed recipe.
 
-**Returns:** `string` -- `"ingredientSet"`, `"macroOutcome"`, or `"rollTableOutcome"`, or `null` for non-routed recipes.
+**Returns:** `string` -- "ingredientSet", "macroOutcome", or "rollTableOutcome", or `null` for non-routed recipes.
 
 ### validateRecipe(recipe)
 
@@ -62,7 +62,7 @@ Validates a component's salvage configuration against the system's `salvageResol
 Analogous to `validateRecipe` but operates on salvage-specific data shapes.
 
 Returns early as valid when the component has no `salvage` data or when `system` is `null`.
-Rejects `"mapped"` mode immediately, as mapped mode is not supported for salvage.
+Rejects "mapped" mode immediately, as mapped mode is not supported for salvage.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
@@ -74,8 +74,9 @@ Rejects `"mapped"` mode immediately, as mapped mode is not supported for salvage
 ```javascript
 Hooks.once('fabricate.ready', () => {
   const svc = game.fabricate.getResolutionModeService();
-  const system = game.fabricate.getCraftingSystem('my-alchemy-system');
-  const component = game.fabricate.getComponent('silver-ore-uuid', 'my-alchemy-system');
+  const mgr = game.fabricate.getCraftingSystemManager();
+  const system = mgr.getSystem('my-alchemy-system');
+  const component = system?.components?.find(c => c.id === 'silver-ore-component-id');
 
   const result = svc.validateSalvage(component, system);
   if (!result.valid) {

@@ -36,7 +36,7 @@ Every recipe has:
 
 ## Enabling and Disabling Recipes
 
-The `enabled` field controls whether a recipe can be crafted. A disabled recipe does not appear in the player-facing crafting app, but it remains fully accessible to GMs in the Crafting Admin panel.
+The `enabled` field controls whether a recipe can be crafted. A disabled recipe is hidden from player-facing visibility checks and the planned Crafting UI, but it remains fully accessible to GMs in the Crafting Admin panel.
 
 **In the Crafting Admin panel.** Each recipe row in the recipe list includes an enable/disable toggle checkbox in the Actions column. Disabled recipes are shown with reduced opacity and a grey **Disabled** badge next to their name, so you can see at a glance which recipes are turned off. The recipe editor and the toggle are both accessible regardless of whether a recipe is disabled — click the edit button or toggle the checkbox directly on the row.
 
@@ -131,18 +131,43 @@ Catalysts are items required for crafting but not consumed. A blacksmith's forge
 
 See [Catalysts]({% link catalysts.md %}) for configuration and usage tracking.
 
-## The Crafting App
+## Current Crafting Surface
 
-Players access recipes through the crafting app:
+Recipes can currently be authored and managed by GMs in the Crafting Admin panel. Runtime crafting is available through the public API and macro helpers:
 
-1. Open the **Items** sidebar
-2. Click **Crafting**
-3. Select your crafting actor and ingredient sources
-4. Browse or search recipes
-5. Recipes show status badges:
-   - **Available** (green) -- you have all materials
-   - **Locked** -- GM has locked this recipe
-   - **Unknown** -- you haven't learned this recipe yet
-   - **Exhausted** -- your recipe item has no uses left
-   - **Missing Materials** (red) -- shows what you're missing
-6. Click **Craft** to start
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const actor = game.user.character;
+  const recipe = game.fabricate.getRecipeManager().getRecipe('your-recipe-id');
+
+  const access = game.fabricate.getRecipeVisibilityService().guardCraftStart({
+    viewer: game.user,
+    recipe,
+    craftingActor: actor,
+    componentSourceActors: [actor]
+  });
+
+  if (!access.craftable) {
+    ui.notifications.warn(`Recipe is not craftable: ${access.reason}`);
+    return;
+  }
+
+  const result = await game.fabricate.craft(actor, recipe, {
+    componentSourceActors: [actor]
+  });
+  console.log(result);
+});
+```
+
+`RecipeManager.evaluateCraftability(componentSourceActors, recipe)` returns the detailed ingredient, essence, and catalyst state that the planned player UI will use. `RecipeManager.canCraft(componentSourceActors, recipe)` remains the simpler backwards-compatible check.
+
+## Planned Player UI
+
+The Items sidebar **Craft Item** action currently opens the unified Fabricate window, but the Crafting tab is still a placeholder. Planned player-facing recipe functionality includes:
+
+- selecting the crafting actor and ingredient-source actors
+- browsing and searching visible recipes
+- showing available, locked, unknown, exhausted, and missing-material states
+- starting simple and multi-step crafting runs
+- presenting active and historical crafting runs
+- supporting favourites, recent recipes, and shopping-list planning

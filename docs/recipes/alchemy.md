@@ -7,81 +7,64 @@ nav_order: 6
 
 # Alchemy Mode
 
-Alchemy mode turns recipe crafting into a discovery game. Players cannot see recipe names or ingredient lists up front. Instead, they select components from a palette on their Alchemy workspace and submit them. If the combination matches a recipe, the craft succeeds. If it does not match, the items may be silently consumed.
+Alchemy mode turns recipe crafting into a discovery game. Players cannot see recipe names or ingredient lists up front. Instead, an integration or macro submits selected items to the alchemy engine. If the combination matches a recipe, the craft succeeds. If it does not match, the items may be silently consumed.
 
 Use alchemy mode for systems where recipes are secrets — a witch's grimoire, an experimental alchemist's bench, or any scenario where players are meant to experiment rather than follow a known formula.
 
 ---
 
-## The Alchemy Tab
+## Current API Surface
 
-When your world has at least one alchemy-mode crafting system, the Crafting App shows a tabbed layout. The **Alchemy** tab is the workspace for experimental crafting. If you also have non-alchemy crafting systems, the **Crafting** tab holds the normal recipe list. If you only have alchemy systems, only the Alchemy tab is shown (no tab bar appears).
+Alchemy systems can be authored today in the GM **Manage Crafting Systems** app. The player-facing Alchemy tab in the unified Fabricate window is a planned UI surface; current play use is through macros or integrations that call the crafting engine.
 
-### Selecting a System
+Use `game.fabricate.getCraftingEngine().craftAlchemy(...)` to submit a discovered combination:
 
-If multiple alchemy systems exist, a drop-down appears at the top of the Alchemy tab. Choosing a system loads that system's components into the palette and updates the Discovered Recipes panel on the right. Your last selection is remembered between sessions.
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const actor = game.user.character;
+  const sourceActors = [actor];
+  const submittedItems = [
+    actor.items.getName('Nightshade'),
+    actor.items.getName('Moonwater')
+  ].filter(Boolean);
 
-### The Component Palette
+  const result = await game.fabricate.getCraftingEngine().craftAlchemy(
+    actor,
+    sourceActors,
+    submittedItems,
+    { craftingSystemId: 'my-alchemy-system-id' }
+  );
 
-The left side of the tab shows every component that belongs to the selected alchemy system. Each tile displays:
+  if (!result.success) {
+    ui.notifications.warn(game.i18n.localize(result.message) || result.message);
+  }
+});
+```
 
-- The component's item image.
-- The component's name.
-- A quantity badge showing how many are available to use (inventory minus what is already on the workbench).
+`submittedItems` should be real Foundry Item documents, or item-like objects that at least include a `uuid` and `name`. Fabricate uses those references to match component signatures and consume submitted inventory when configured to do so.
 
-Tiles with zero available quantity are dimmed and cannot be clicked.
+## Planned Alchemy UI
 
-- **Left-click** a tile to add one of that component to the workbench.
-- **Right-click** a workbench chip (or a palette tile that is already on the workbench) to remove one.
+The planned player Alchemy tab will provide:
 
-### The Workbench
+- a system selector for worlds with more than one alchemy system
+- a component palette showing available inventory
+- a workbench for staging submitted components
+- discovered recipe recall when `learnOnCraft` is enabled
+- auto-fill for already-discovered recipes
+- attempt feedback and failed-combination handling
 
-Below the palette is the **Workbench** bar. It shows the components you have staged for a crafting attempt as labelled chips (`Nightshade x2`, `Moonwater x1`, etc.).
-
-| Button | Action |
-|:-------|:-------|
-| **Craft** | Submit the current workbench contents. Fabricate matches them against all enabled recipes in the selected system. |
-| **Trash icon** | Clear all chips from the workbench without crafting. |
-| **Right-click a chip** | Remove one unit of that component from the workbench. |
-
-Fabricate enforces a maximum of your current available inventory per component — you cannot stage more than you own.
-
-### Discovered Recipes Panel
-
-The right side of the tab shows the **Discovered Recipes** panel. This panel only has content when `learnOnCraft` is enabled and a player has previously discovered recipes in the selected system. GMs always see all recipes.
-
-For each discovered recipe the panel shows:
-
-- The recipe image and name.
-- A status badge — **Available** (green) if you have all the required components right now, or **Missing materials** (grey) if you do not.
-- An **Auto-fill** button (funnel icon) that instantly populates the workbench with the correct components for that recipe.
-
-You can filter the list using the search bar and the **Craftable only** toggle.
-
----
-
-## Auto-Fill
-
-Clicking the **Auto-fill** button on a discovered recipe clears the workbench and then populates it with the best ingredient set for that recipe that can be satisfied from your current inventory.
-
-The algorithm:
-
-1. Tries each of the recipe's ingredient sets in order.
-2. Uses the first set that can be fully satisfied from inventory.
-3. If no set is fully satisfiable, uses the set with the fewest missing groups and notifies you how many ingredient groups could not be fulfilled.
-
-Craftability for the Discovered Recipes panel is evaluated against your **full inventory**, not inventory minus whatever is already staged on the workbench.
+Until that UI lands, treat this page as API and authoring documentation rather than player workflow documentation.
 
 ---
 
 ## How It Works
 
 1. The GM creates a crafting system and sets its **Resolution Mode** to `alchemy`.
-2. Players open the Crafting App and select the **Alchemy** tab.
-3. Players click components in the palette to stage them on the workbench.
-4. Players click **Craft**. Fabricate matches the staged components against all enabled recipes in the system.
-5. If a matching recipe is found, the normal crafting flow runs (ingredients consumed, results created).
-6. If no recipe matches, the attempt ends. Depending on system configuration, the submitted items may or may not be consumed.
+2. A macro or integration calls `game.fabricate.getCraftingEngine().craftAlchemy(...)` with the crafting actor, source actors, submitted items, and alchemy system ID.
+3. Fabricate matches the submitted components against all enabled recipes in the system.
+4. If a matching recipe is found, the normal crafting flow runs (ingredients consumed, results created).
+5. If no recipe matches, the attempt ends. Depending on system configuration, the submitted items may or may not be consumed.
 
 ---
 
@@ -124,12 +107,12 @@ Hooks.once('fabricate.ready', async () => {
 
 ## Learn on Craft
 
-When `system.alchemy.learnOnCraft` is `true`, a player who successfully discovers a recipe has that recipe added to their learned-recipes flag. On all subsequent sessions that player can see the discovered recipe in the **Discovered Recipes** panel — they have unlocked the formula. The Auto-fill button lets them reproduce the craft without having to experiment again.
+When `system.alchemy.learnOnCraft` is `true`, a player who successfully discovers a recipe has that recipe added to their learned-recipes flag. API consumers can read that learned state through the visibility service; the planned Alchemy UI will use it to show discovered recipes and help players reproduce known combinations.
 
 | `learnOnCraft` value | Behaviour on success |
 |:---------------------|:---------------------|
 | `false` (default) | Every attempt is anonymous; players never see recipe names |
-| `true` | Discovered recipes are written to `actor.flags.fabricate.learnedRecipes`; the player can see and auto-fill them in future sessions |
+| `true` | Discovered recipes are written to `actor.flags.fabricate.learnedRecipes`; integrations and the planned UI can surface them in future sessions |
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -176,24 +159,22 @@ Hooks.once('fabricate.ready', async () => {
 
 In alchemy mode, recipe visibility follows special rules regardless of the system's `recipeVisibility.listMode`:
 
-| Viewer | Visibility in Discovered Recipes panel |
+| Viewer | Visibility result |
 |:-------|:---------------------------------------|
 | GM | All recipes visible (for authoring and debugging) |
 | Player (`learnOnCraft: false`) | No recipes visible |
 | Player (`learnOnCraft: true`, recipe not yet discovered) | Recipe not visible |
-| Player (`learnOnCraft: true`, recipe previously discovered) | Recipe visible and auto-fillable |
+| Player (`learnOnCraft: true`, recipe previously discovered) | Recipe visible to API consumers and planned discovered-recipe UI |
 
 ---
 
 ## Data Persistence
 
-The last selected alchemy system is persisted per client as a Foundry setting:
+Fabricate registers a client setting for the planned Alchemy tab:
 
 | Setting key | Scope | Description |
 |:------------|:------|:------------|
-| `fabricate.lastAlchemySystem` | Client | ID of the last alchemy system selected in the Alchemy tab |
-
-The workbench contents are held in the Crafting App's local state only. They are cleared when you switch systems, close the app, or click the trash button.
+| `fabricate.lastAlchemySystem` | Client | ID of the last alchemy system selected by the planned Alchemy UI |
 
 ---
 
