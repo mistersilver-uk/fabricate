@@ -20,6 +20,25 @@
         "EnvironmentDialogLabel": "Environment",
         "EnvironmentDialogConfirm": "Place node",
         "DropModifierHint": "Hold Alt while dropping to always choose the environment manually."
+      },
+      "SceneControl": {
+        "Title": "Fabricate",
+        "BrowserTool": "Place interactables"
+      },
+      "Browser": {
+        "Title": "Interactable browser",
+        "Hint": "Drag an entry onto the canvas, or use Place on current scene.",
+        "SystemLabel": "Crafting system",
+        "SearchLabel": "Search",
+        "SearchPlaceholder": "Search entries…",
+        "ToolsHeading": "Tools",
+        "TasksHeading": "Gathering tasks",
+        "PlaceOnScene": "Place on current scene",
+        "UnnamedTask": "Unnamed task",
+        "UnnamedTool": "Unnamed tool",
+        "NoSystems": "No crafting systems available.",
+        "NoTools": "No tools in this system.",
+        "NoTasks": "No gathering tasks in this system."
       }
     },
     "App": {

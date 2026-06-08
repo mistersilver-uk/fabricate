@@ -21,6 +21,7 @@ import {
   buildActiveCanvasTool,
   parseInteractableSourceUuid
 } from './interactableResolution.js';
+import { buildInteractableDragPayload } from './interactableDragPayload.js';
 import { buildInteractableFlags, isInteractableToken } from './interactableTokenFlags.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
 import { ensureInteractableActor } from './interactableActor.js';
@@ -116,6 +117,77 @@ class InteractableManager {
     const forceDialog = data?.altKey === true || globalThis.game?.keyboard?.isModifierActive?.('Alt') === true;
     void this._spawnGatheringTask({ classification, point, forceDialog });
     return false; // suppress Foundry's default item-drop handling.
+  }
+
+  /**
+   * Click-to-place a11y fallback for the Interactable browser app (Phase 7).
+   *
+   * Drag-and-drop is a keyboard/no-pointer dead-end, so the browser also offers
+   * a "Place on current scene" button per row. That button calls here. This is
+   * NOT a divergent spawn path: it synthesizes the SAME `dropCanvasData` payload
+   * the drag source emits (via {@link buildInteractableDragPayload}), pins it to
+   * the current scene's VIEW CENTER, and routes it through {@link _onDrop} — so
+   * the GM gate, drop classification, and the gathering-task env-resolution
+   * precedence (region → default → dialog) are all reused identically.
+   *
+   * @param {object} params
+   * @param {'tool'|'gatheringTask'} params.interactableType
+   * @param {string} params.systemId
+   * @param {string} params.referenceId  Tool id or Task id.
+   * @returns {boolean} Whether the synthesized drop was recognized as a
+   *   Fabricate interactable (false ⇒ unbuildable / unresolved).
+   */
+  placeInteractableAtViewCenter({ interactableType, systemId, referenceId } = {}) {
+    const payload = buildInteractableDragPayload({ interactableType, systemId, referenceId });
+    if (!payload) return false;
+    const center = this._viewCenter();
+    const data = { ...payload, x: center.x, y: center.y };
+    // _onDrop returns false when it recognized (and handled) the drop.
+    return this._onDrop(globalThis.canvas, data) === false;
+  }
+
+  /**
+   * Resolve the current scene's view-center in scene-space coordinates, the
+   * sensible default placement point for the click-to-place fallback. Falls back
+   * to the scene dimensions' midpoint, then to the origin, when the live view
+   * center is unavailable.
+   *
+   * @returns {{x: number, y: number}}
+   */
+  _viewCenter() {
+    const stageCenter = globalThis.canvas?.stage
+      ? this._screenCenterToScene()
+      : null;
+    if (stageCenter) return stageCenter;
+    const dims = globalThis.canvas?.scene?.dimensions ?? globalThis.canvas?.dimensions ?? null;
+    if (dims && Number.isFinite(dims.width) && Number.isFinite(dims.height)) {
+      return { x: Number(dims.width) / 2, y: Number(dims.height) / 2 };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  /**
+   * Project the viewport center (screen-space) into scene-space via the PIXI
+   * stage transform, the same conversion Foundry uses for a real drop point.
+   *
+   * @returns {{x: number, y: number}|null}
+   */
+  _screenCenterToScene() {
+    const stage = globalThis.canvas?.stage;
+    const toLocal = stage?.toLocal;
+    const PointClass = globalThis.PIXI?.Point;
+    if (typeof toLocal !== 'function' || typeof PointClass !== 'function') return null;
+    const screenW = Number(globalThis.window?.innerWidth ?? 0);
+    const screenH = Number(globalThis.window?.innerHeight ?? 0);
+    try {
+      const local = toLocal.call(stage, new PointClass(screenW / 2, screenH / 2));
+      if (local && Number.isFinite(local.x) && Number.isFinite(local.y)) {
+        return { x: local.x, y: local.y };
+      }
+    } catch (_err) {
+      return null;
+    }
+    return null;
   }
 
   /**

@@ -3,6 +3,7 @@
 // chain that requires the Svelte compiler in Node test environments.
 let _fabricateApp = null;
 let _craftingSystemManagerApp = null;
+let _interactableBrowserApp = null;
 
 export function registerFabricateApp(cls) {
   _fabricateApp = cls;
@@ -10,6 +11,10 @@ export function registerFabricateApp(cls) {
 
 export function registerCraftingSystemManagerApp(cls) {
   _craftingSystemManagerApp = cls;
+}
+
+export function registerInteractableBrowserApp(cls) {
+  _interactableBrowserApp = cls;
 }
 
 export function getFabricateAppClass() {
@@ -24,4 +29,11 @@ export function getCraftingSystemManagerAppClass() {
     throw new Error('Fabricate | CraftingSystemManagerApp not registered. Ensure SvelteCraftingSystemManagerApp.svelte.js is imported.');
   }
   return _craftingSystemManagerApp;
+}
+
+export function getInteractableBrowserAppClass() {
+  if (!_interactableBrowserApp) {
+    throw new Error('Fabricate | InteractableBrowserApp not registered. Ensure InteractableBrowserApp.svelte.js is imported.');
+  }
+  return _interactableBrowserApp;
 }

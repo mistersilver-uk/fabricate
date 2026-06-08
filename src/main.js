@@ -39,8 +39,10 @@ import {
 import { createToolBreakageRuntime } from './toolBreakageRuntime.js';
 import {
   getFabricateAppClass,
-  getCraftingSystemManagerAppClass
+  getCraftingSystemManagerAppClass,
+  getInteractableBrowserAppClass
 } from './ui/appFactory.js';
+import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS } from './config/settings.js';
@@ -56,6 +58,7 @@ import { respawnInteractableTokens } from './canvas/interactableWorldTime.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
+import './ui/InteractableBrowserApp.svelte.js';
 
 let gatheringEngine = null;
 
@@ -1142,6 +1145,23 @@ Hooks.once('ready', async () => {
 
 Hooks.on('updateWorldTime', (worldTime) => {
   void processFabricateWorldTime(worldTime);
+});
+
+// GM-only scene-control button (Phase 7): adds a Fabricate control group whose
+// single button launches the Interactable browser app. Foundry V13 passes
+// `controls` as an OBJECT-of-controls (keyed record), NOT the pre-V13 array; the
+// pure `addInteractableSceneControl` seam mutates that record. The hook body
+// here is the thin edge supplying the GM gate, the localizer, and the launch
+// callback.
+Hooks.on('getSceneControlButtons', (controls) => {
+  addInteractableSceneControl(controls, {
+    isGM: game.user?.isGM === true,
+    onClick: () => getInteractableBrowserAppClass().show(),
+    localize: (key, fallback) => {
+      const out = game.i18n?.localize?.(key);
+      return out && out !== key ? out : fallback;
+    }
+  });
 });
 
 /**
