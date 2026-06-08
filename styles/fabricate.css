@@ -2037,6 +2037,15 @@
   background: var(--fab-warning-soft);
 }
 
+/* Danger-active state: the depleted "delete the token" toggle carries `is-danger`
+   alongside `is-on` so the irreversible-delete signal lands on the toggle itself
+   (the adjacent `manager-chip is-danger` alert reinforces it). */
+.fabricate-manager .manager-status-toggle.is-danger {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
 .fabricate-manager .manager-status-toggle:hover {
   border-color: var(--fab-mv2-border-strong);
 }

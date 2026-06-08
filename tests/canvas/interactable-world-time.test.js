@@ -134,3 +134,42 @@ test('walks tokens across multiple scenes', async () => {
   assert.deepEqual(changed.map(c => c.sceneId).sort(), ['s1', 's2']);
   assert.equal(applied.length, 2);
 });
+
+// --- depleted-behavior + terminal-delete interplay (Phase 6) ----------------
+
+test('respawn no-ops against a deleted/absent token (terminal deleteToken)', async () => {
+  // A deleted token is no longer present in the scene, so the world-time pass
+  // simply never iterates it — nothing to respawn, mirroring deleteToken being
+  // terminal (no revert path).
+  const applied = [];
+  const changed = await respawnInteractableTokens({
+    worldTime: 7200,
+    secondsPerUnit: HOURS,
+    scenes: [scene('scene-1', [])], // the deleteToken'd token is gone
+    applyUpdate: (a) => applied.push(a)
+  });
+  assert.deepEqual(changed, []);
+  assert.equal(applied.length, 0);
+});
+
+test('respawn reverts the depleted visual when a node climbs back above 0', async () => {
+  const node = {
+    enabled: true, max: 3, current: 0,
+    respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 0 },
+    depletedBehavior: { swapImage: 'icons/depleted.webp' }
+  };
+  const applied = [];
+  const reverts = [];
+  await respawnInteractableTokens({
+    worldTime: 3600, // +1 hour ⇒ current 0→1 (no longer depleted)
+    secondsPerUnit: HOURS,
+    scenes: [scene('scene-1', [gatheringTaskToken('tk-1', node)])],
+    applyUpdate: (a) => applied.push(a),
+    applyDepletedBehavior: (args) => reverts.push(args)
+  });
+  assert.equal(applied.length, 1, 'the respawned node is persisted');
+  assert.equal(applied[0].update.flags.fabricate.node.current, 1);
+  assert.equal(reverts.length, 1, 'the depleted-behavior edge fires for the changed token');
+  assert.equal(reverts[0].depleted, false, 'a node back above 0 reverts (not depleted)');
+  assert.deepEqual(reverts[0].behavior, { swapImage: 'icons/depleted.webp' });
+});

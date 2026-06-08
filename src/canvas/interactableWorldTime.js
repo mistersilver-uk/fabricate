@@ -14,9 +14,9 @@
  */
 
 import { normalizeNodeConfig } from '../systems/gatheringNodeConfig.js';
-import { respawnNodeOnce } from '../systems/nodeRespawnMath.js';
+import { respawnNodeOnce, isNodeDepleted } from '../systems/nodeRespawnMath.js';
 import { readInteractableFlags } from './interactableTokenFlags.js';
-import { applyInteractableNodeUpdate } from './interactableSocketBridge.js';
+import { applyInteractableNodeUpdate, buildDepletedBehaviorApply } from './interactableSocketBridge.js';
 
 /**
  * Iterate every placed gathering-task Interactable token across all scenes and
@@ -36,6 +36,11 @@ import { applyInteractableNodeUpdate } from './interactableSocketBridge.js';
  * @param {(expression: string) => number} [opts.rollExpression] Dice roller (test seam).
  * @param {object} [opts.scenes] Foundry scenes collection (defaults to `game.scenes`).
  * @param {(args: object) => (void|Promise<void>)} [opts.applyUpdate] Token-update edge.
+ * @param {(args: { token: object, behavior: object|null, depleted: boolean }) => (void|Promise<void>)} [opts.applyDepletedBehavior]
+ *   Depleted-behavior visual edge: a node that respawns back above 0 reverts its
+ *   swap-image/postfix visual; one that respawns into depletion (unusual, but
+ *   handled) applies it. `deleteToken` tokens are already absent and never reach
+ *   here. Defaults to the GM-routed writer; injectable so the pass is testable.
  * @returns {Promise<Array<{ sceneId: string, tokenId: string }>>}
  */
 export async function respawnInteractableTokens({
@@ -45,7 +50,8 @@ export async function respawnInteractableTokens({
   rollD100 = () => Math.floor(Math.random() * 100) + 1,
   rollExpression = () => 0,
   scenes = globalThis.game?.scenes,
-  applyUpdate = applyInteractableNodeUpdate
+  applyUpdate = applyInteractableNodeUpdate,
+  applyDepletedBehavior = buildDepletedBehaviorApply()
 } = {}) {
   // Active-GM ONLY: a non-active client applies nothing (no token writes), so
   // connected clients never double-apply the per-token respawn.
@@ -78,6 +84,18 @@ export async function respawnInteractableTokens({
       if (!sceneId || !tokenId) continue;
       // eslint-disable-next-line no-await-in-loop
       await applyUpdate({ sceneId, tokenId, update: { flags: { fabricate: { node: next } } } });
+      // Keep the token visual in lockstep with the respawned count: a node that
+      // climbs back above 0 reverts its depleted swap-image/postfix. Idempotent
+      // (the pure planner no-ops when nothing changed). `deleteToken` tokens are
+      // terminal — already absent, so they never enter this loop.
+      if (typeof applyDepletedBehavior === 'function') {
+        // eslint-disable-next-line no-await-in-loop
+        await applyDepletedBehavior({
+          token,
+          behavior: next.depletedBehavior ?? null,
+          depleted: isNodeDepleted(next)
+        });
+      }
       changed.push({ sceneId, tokenId });
     }
   }

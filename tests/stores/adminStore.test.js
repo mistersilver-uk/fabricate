@@ -2102,6 +2102,52 @@ describe('createAdminStore', () => {
       assert.equal(persisted.img, 'icons/svg/item-bag.svg');
     });
 
+    it('normalizes defaultEnvironmentId (trimmed string or null) and round-trips it', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      // A fresh task defaults to null (ask on drop).
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, null);
+
+      // A trimmed id round-trips through persistence.
+      await store.updateGatheringLibraryTask('sys1', task.id, { defaultEnvironmentId: '  env-7  ' });
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, 'env-7');
+
+      // An empty/whitespace id normalizes back to null (not the empty string).
+      await store.updateGatheringLibraryTask('sys1', task.id, { defaultEnvironmentId: '   ' });
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, null);
+    });
+
+    it('persists depletedBehavior on the node config (with delete-token mutual exclusion)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        nodes: { enabled: true, max: 3, depletedBehavior: { swapImage: '  icons/x.webp ', postfixName: true } }
+      });
+      assert.deepEqual(
+        services._store.gatheringConfig.systems.sys1.tasks[0].nodes.depletedBehavior,
+        { swapImage: 'icons/x.webp', postfixName: true }
+      );
+
+      // deleteToken drops swap/postfix on persist (mutual exclusion).
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        nodes: { enabled: true, max: 3, depletedBehavior: { deleteToken: true, swapImage: 'icons/x.webp', postfixName: true } }
+      });
+      assert.deepEqual(
+        services._store.gatheringConfig.systems.sys1.tasks[0].nodes.depletedBehavior,
+        { deleteToken: true }
+      );
+    });
+
     it('does not auto-populate the task name and image when the task image has been customized', async () => {
       const services = createMockServices({
         localize: (key) => {

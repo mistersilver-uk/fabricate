@@ -176,3 +176,41 @@ test('respawn on an unlimited node (no snapshot) is a no-op', () => {
   assert.equal(adapter.respawn(), null);
   assert.equal(adapter.isDepleted(), false);
 });
+
+// --- depleted-behavior enacted on write (Phase 6) ---------------------------
+
+test('write enacts the depleted-behavior visual when the written node is depleted', () => {
+  const enacted = [];
+  const node = { enabled: true, max: 3, current: 0, respawn: { policy: 'manual' }, depletedBehavior: { swapImage: 'icons/x.webp' } };
+  const adapter = createTokenNodeStateAdapter({
+    token: token(node),
+    emitWrite: () => {},
+    applyDepletedBehavior: (args) => enacted.push(args)
+  });
+  adapter.write(node);
+  assert.equal(enacted.length, 1);
+  assert.equal(enacted[0].depleted, true, 'a current<=0 node is depleted');
+  assert.deepEqual(enacted[0].behavior, { swapImage: 'icons/x.webp' });
+});
+
+test('write enacts a revert (depleted:false) when the written node has stock', () => {
+  const enacted = [];
+  const node = { enabled: true, max: 3, current: 2, respawn: { policy: 'manual' }, depletedBehavior: { postfixName: true } };
+  const adapter = createTokenNodeStateAdapter({
+    token: token(node),
+    emitWrite: () => {},
+    applyDepletedBehavior: (args) => enacted.push(args)
+  });
+  adapter.write(node);
+  assert.equal(enacted.length, 1);
+  assert.equal(enacted[0].depleted, false, 'a node with stock is not depleted ⇒ revert path');
+});
+
+test('write does not enact depleted-behavior when none is wired (default seam)', () => {
+  const emitted = [];
+  const node = { enabled: true, max: 1, current: 0, respawn: { policy: 'manual' }, depletedBehavior: { swapImage: 'icons/x.webp' } };
+  const adapter = createTokenNodeStateAdapter({ token: token(node), emitWrite: (n) => emitted.push(n) });
+  // No applyDepletedBehavior seam ⇒ the node still persists, just no visual edge.
+  adapter.write(node);
+  assert.equal(emitted.length, 1);
+});

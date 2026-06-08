@@ -97,6 +97,44 @@ export function normalizeRespawn(data = null) {
   return { ...base, intervalSeconds: numberOrNull(data.intervalSeconds) ?? 0 };
 }
 
+function trimmedOrNull(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Normalize the per-token `depletedBehavior` block on a node config.
+ *
+ * `depletedBehavior` describes what happens to a placed gathering-task TOKEN's
+ * visual when its node depletes (`node.current <= 0`); it is orthogonal to
+ * `depletionTiming` (`onStart`/`onSuccess`, which describes WHEN a node
+ * decrements). Three combinable axes:
+ *   - `swapImage`   : a token-texture path applied while depleted.
+ *   - `postfixName` : when true, the token name gets a "(depleted)" postfix.
+ *   - `deleteToken` : terminal — the token is removed on depletion.
+ *
+ * `deleteToken` is MUTUALLY EXCLUSIVE with `swapImage`/`postfixName`: when delete
+ * is on the swap/postfix fields are dead config, so they are DROPPED here (the
+ * editor also greys them out). Returns `null` when no behavior is configured (the
+ * default — no visual change on depletion).
+ *
+ * @param {object|null} data
+ * @returns {{ swapImage?: string, postfixName?: boolean, deleteToken?: boolean }|null}
+ */
+export function normalizeDepletedBehavior(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  // Delete is terminal and mutually exclusive: when on, swap/postfix are dead
+  // config and are intentionally dropped so they never persist alongside delete.
+  if (data.deleteToken === true) return { deleteToken: true };
+
+  const behavior = {};
+  const swapImage = trimmedOrNull(data.swapImage);
+  if (swapImage) behavior.swapImage = swapImage;
+  if (data.postfixName === true) behavior.postfixName = true;
+  return Object.keys(behavior).length > 0 ? behavior : null;
+}
+
 /**
  * Normalize a node config/state object, or `null` when there is no node config.
  * Preserves a stored `current` verbatim (callers seed `current = max` when first
@@ -117,6 +155,8 @@ export function normalizeNodeConfig(data = null) {
     respawn: normalizeRespawn(data.respawn)
   };
   if (data.showCountsToPlayers === true) config.showCountsToPlayers = true;
+  const depletedBehavior = normalizeDepletedBehavior(data.depletedBehavior);
+  if (depletedBehavior) config.depletedBehavior = depletedBehavior;
   return config.enabled ? config : null;
 }
 

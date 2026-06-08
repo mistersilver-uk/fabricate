@@ -13,7 +13,13 @@
       "Interactable": {
         "GMOnlySpawn": "Only a GM can place Fabricate interactables on the canvas.",
         "NoActiveGM": "A GM must be online to gather here.",
-        "NoEnvironment": "This gathering point is not part of any environment yet."
+        "NoEnvironment": "This gathering point is not part of any environment yet.",
+        "EnvironmentAutoResolved": "Resource node placed in environment \"{environment}\".",
+        "EnvironmentDialogTitle": "Resolve gathering environment",
+        "EnvironmentDialogHint": "Choose the gathering environment for this resource node.",
+        "EnvironmentDialogLabel": "Environment",
+        "EnvironmentDialogConfirm": "Place node",
+        "DropModifierHint": "Hold Alt while dropping to always choose the environment manually."
       }
     },
     "App": {
@@ -337,6 +343,14 @@
           "RespawnChance": "Chance",
           "RespawnAmount": "Amount per interval",
           "RespawnAmountHint": "Plain dice only (e.g. 1d4) — no character data.",
+          "DepletedBehaviorTitle": "When depleted (canvas token)",
+          "DepletedBehaviorHint": "How a placed canvas token looks once this node runs out. Restored automatically when it respawns.",
+          "DepletedDeleteToken": "Delete the token",
+          "DepletedDeleteWarning": "Deleting is irreversible — a deleted token never respawns.",
+          "DepletedSwapImage": "Swap token image",
+          "DepletedSwapImagePick": "Choose depleted token image",
+          "DepletedSwapImageClear": "Clear",
+          "DepletedPostfixName": "Append \"(depleted)\" to the name",
           "AddModifier": "Add modifier",
           "RemoveModifier": "Remove"
         },
@@ -992,6 +1006,9 @@
             "Description": "Description",
             "Image": "Image",
             "ChooseImage": "Choose task image",
+            "DefaultEnvironment": "Default environment (canvas drop)",
+            "DefaultEnvironmentNone": "None (ask on drop)",
+            "DefaultEnvironmentHint": "Used when a dropped node is not inside a tagged scene region. Hold Alt while dropping to always pick manually.",
             "Enabled": "Enabled",
             "EnabledHint": "Available to use in environments.",
             "DisabledHint": "Not available to use in environments.",

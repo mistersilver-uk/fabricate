@@ -81,6 +81,79 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.match(rootSource, /economyMode=\{selectedGatheringTaskEconomyMode\}/, 'parent passes economyMode to the task editor');
   });
 
+  it('authors depletedBehavior with FilePicker swap-image, postfix toggle, and a mutually-exclusive delete', () => {
+    // Delete toggle, swap-image picker (FilePicker via onPickImagePath), and the
+    // postfix toggle are all present.
+    for (const attr of [
+      'data-gathering-task-depleted-behavior',
+      'data-gathering-task-depleted-delete',
+      'data-gathering-task-depleted-image',
+      'data-gathering-task-depleted-postfix'
+    ]) {
+      assert.ok(editorSource.includes(attr), `depleted-behavior block should expose ${attr}`);
+    }
+    // The swap-image control is wired to the FilePicker service (onPickImagePath),
+    // not a free-text input.
+    assert.match(editorSource, /async function chooseDepletedImage/, 'swap-image uses the FilePicker via onPickImagePath');
+    assert.match(editorSource, /onPickImagePath\(depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
+
+    // Mutual exclusion: when delete is on, the swap/postfix controls are disabled
+    // and the visuals block is greyed (is-disabled).
+    assert.match(editorSource, /class:is-disabled=\{depletedDeleteToken\}/, 'the visuals block greys out when delete is on');
+    assert.match(editorSource, /disabled=\{depletedDeleteToken \|\| typeof onPickImagePath/, 'the swap picker is disabled when delete is on');
+    // The postfix toggle button carries disabled={depletedDeleteToken}; assert
+    // the button element (delimited by the data attr) also carries the disabled
+    // binding regardless of attribute order.
+    const postfixBtnIdx = editorSource.indexOf('data-gathering-task-depleted-postfix');
+    const postfixBtnStart = editorSource.lastIndexOf('<button', postfixBtnIdx);
+    const postfixBtnEnd = editorSource.indexOf('>', postfixBtnIdx);
+    const postfixButton = editorSource.slice(postfixBtnStart, postfixBtnEnd);
+    assert.match(postfixButton, /disabled=\{depletedDeleteToken\}/, 'the postfix toggle is disabled when delete is on');
+
+    // The normalizer-mirroring author guard clears swap/postfix when delete is on.
+    assert.match(editorSource, /if \(next\.deleteToken === true\)[\s\S]*?delete next\.swapImage/, 'enabling delete clears swap in the editor');
+  });
+
+  it('shows an irreversible-delete warning chip (manager-chip is-danger role=alert) when delete is enabled', () => {
+    const guardIdx = editorSource.indexOf('{#if depletedDeleteToken}');
+    const chipIdx = editorSource.indexOf('data-gathering-task-depleted-warning');
+    assert.ok(guardIdx >= 0, 'the warning is guarded by depletedDeleteToken');
+    assert.ok(chipIdx > guardIdx, 'the warning chip renders inside the delete guard');
+    assert.match(
+      editorSource,
+      /<span class="manager-chip is-danger" role="alert" data-gathering-task-depleted-warning>/,
+      'reuses the manager-chip is-danger role=alert warning pattern'
+    );
+  });
+
+  it('authors the optional defaultEnvironmentId select wired from the parent', () => {
+    assert.ok(editorSource.includes('data-gathering-task-field="defaultEnvironmentId"'), 'a default-environment select is present');
+    assert.match(editorSource, /function setDefaultEnvironment/, 'has a default-environment setter');
+    assert.match(editorSource, /defaultEnvironmentId: id \|\| null/, 'the setter coerces empty to null');
+    // The parent feeds the system environments into the editor.
+    assert.match(rootSource, /selectedSystemEnvironmentOptions\s*=\s*\$derived/, 'parent derives the system environment options');
+    assert.match(rootSource, /environmentOptions=\{selectedSystemEnvironmentOptions\}/, 'parent passes environmentOptions to the task editor');
+  });
+
+  it('adds the depleted-behavior + default-environment + drop-dialog i18n keys', () => {
+    const econ = lang.FABRICATE.Admin.Manager.Economy;
+    assert.equal(econ.DepletedBehaviorTitle, 'When depleted (canvas token)');
+    assert.equal(econ.DepletedDeleteToken, 'Delete the token');
+    assert.ok(typeof econ.DepletedDeleteWarning === 'string' && econ.DepletedDeleteWarning.length > 0);
+    assert.equal(econ.DepletedSwapImage, 'Swap token image');
+    assert.ok(typeof econ.DepletedPostfixName === 'string');
+
+    const tasks = lang.FABRICATE.Admin.Manager.Environment.Tasks;
+    assert.equal(tasks.DefaultEnvironment, 'Default environment (canvas drop)');
+    assert.ok(typeof tasks.DefaultEnvironmentNone === 'string');
+    assert.ok(typeof tasks.DefaultEnvironmentHint === 'string');
+
+    const canvas = lang.FABRICATE.Canvas.Interactable;
+    assert.ok(canvas.EnvironmentAutoResolved.includes('{environment}'), 'the auto-resolve notification names the environment');
+    assert.ok(typeof canvas.EnvironmentDialogTitle === 'string');
+    assert.ok(typeof canvas.EnvironmentDialogConfirm === 'string');
+  });
+
   it('adds the node i18n keys', () => {
     const keys = lang.FABRICATE.Admin.Manager.Economy;
     assert.equal(keys.TaskNodesTitle, 'Resource node');

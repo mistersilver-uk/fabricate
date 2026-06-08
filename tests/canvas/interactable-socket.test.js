@@ -13,9 +13,13 @@ import assert from 'node:assert/strict';
 import {
   INTERACTABLE_SOCKET,
   INTERACTABLE_NODE_UPDATE,
+  INTERACTABLE_NODE_DELETE,
   validateNodeUpdatePayload,
+  validateNodeDeletePayload,
   createInteractableNodeWriter,
-  routeInteractableSocketMessage
+  createInteractableTokenDeleter,
+  routeInteractableSocketMessage,
+  routeInteractableDeleteMessage
 } from '../../src/canvas/interactableSocket.js';
 
 const UPDATE = { flags: { fabricate: { node: { current: 1 } } } };
@@ -108,4 +112,64 @@ test('router ignores malformed / non-node inbound payloads', () => {
   assert.equal(routeInteractableSocketMessage({ action: 'hazardScenePrompt' }, deps), false);
   assert.equal(routeInteractableSocketMessage({ action: INTERACTABLE_NODE_UPDATE, sceneId: 's1' }, deps), false);
   assert.equal(touched, false);
+});
+
+// --- terminal deleteToken routing (Phase 6) ---------------------------------
+
+test('validateNodeDeletePayload requires a scene + token id', () => {
+  assert.equal(validateNodeDeletePayload(null), null);
+  assert.equal(validateNodeDeletePayload({ action: 'other', sceneId: 's', tokenId: 't' }), null);
+  assert.equal(validateNodeDeletePayload({ action: INTERACTABLE_NODE_DELETE, sceneId: 's1' }), null);
+  assert.deepEqual(
+    validateNodeDeletePayload({ action: INTERACTABLE_NODE_DELETE, sceneId: ' s1 ', tokenId: ' t1 ' }),
+    { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' }
+  );
+});
+
+test('the deleter applies LOCALLY on the active GM (no socket round-trip)', () => {
+  const applied = [];
+  const emitted = [];
+  const deleter = createInteractableTokenDeleter({
+    isActiveGM: () => true,
+    emitDelete: (p) => emitted.push(p),
+    applyDelete: (a) => applied.push(a)
+  });
+  deleter.delete({ sceneId: 's1', tokenId: 't1' });
+  assert.deepEqual(applied, [{ sceneId: 's1', tokenId: 't1' }]);
+  assert.equal(emitted.length, 0, 'the active GM never emits its own delete');
+});
+
+test('a non-active-GM EMITS the delete for the active GM to apply', () => {
+  const applied = [];
+  const emitted = [];
+  const deleter = createInteractableTokenDeleter({
+    isActiveGM: () => false,
+    emitDelete: (p) => emitted.push(p),
+    applyDelete: (a) => applied.push(a)
+  });
+  deleter.delete({ sceneId: 's1', tokenId: 't1' });
+  assert.equal(applied.length, 0);
+  assert.deepEqual(emitted, [{ action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' }]);
+});
+
+test('the inbound delete router applies only on the active GM', () => {
+  const applied = [];
+  assert.equal(
+    routeInteractableDeleteMessage(
+      { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' },
+      { isActiveGM: () => true, applyDelete: (a) => applied.push(a) }
+    ),
+    true
+  );
+  assert.deepEqual(applied, [{ sceneId: 's1', tokenId: 't1' }]);
+
+  const ignored = [];
+  assert.equal(
+    routeInteractableDeleteMessage(
+      { action: INTERACTABLE_NODE_DELETE, sceneId: 's1', tokenId: 't1' },
+      { isActiveGM: () => false, applyDelete: (a) => ignored.push(a) }
+    ),
+    false
+  );
+  assert.equal(ignored.length, 0);
 });

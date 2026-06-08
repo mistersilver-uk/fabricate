@@ -17,6 +17,24 @@
 
 export const INTERACTABLE_SOCKET = 'module.fabricate';
 export const INTERACTABLE_NODE_UPDATE = 'interactableNodeUpdate';
+export const INTERACTABLE_NODE_DELETE = 'interactableNodeDelete';
+
+/**
+ * Validate an `interactableNodeDelete` payload (terminal `deleteToken`). A
+ * well-formed payload identifies a scene + token to remove. Returns the
+ * normalized payload, or `null` when malformed.
+ *
+ * @param {object} payload
+ * @returns {{ action: string, sceneId: string, tokenId: string } | null}
+ */
+export function validateNodeDeletePayload(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  if (payload.action !== INTERACTABLE_NODE_DELETE) return null;
+  const sceneId = typeof payload.sceneId === 'string' ? payload.sceneId.trim() : '';
+  const tokenId = typeof payload.tokenId === 'string' ? payload.tokenId.trim() : '';
+  if (!sceneId || !tokenId) return null;
+  return { action: INTERACTABLE_NODE_DELETE, sceneId, tokenId };
+}
 
 /**
  * Validate an `interactableNodeUpdate` payload. A well-formed payload identifies
@@ -74,6 +92,31 @@ export function createInteractableNodeWriter({ isActiveGM, emitUpdate, applyUpda
 }
 
 /**
+ * Build the token-delete router (terminal `deleteToken`). Mirrors
+ * {@link createInteractableNodeWriter}: the active GM deletes locally; any other
+ * client emits the socket message for the active GM to apply.
+ *
+ * @param {object} deps
+ * @param {() => boolean} deps.isActiveGM
+ * @param {(payload: object) => void} deps.emitDelete
+ * @param {(args: { sceneId: string, tokenId: string }) => (void|Promise<void>)} deps.applyDelete
+ * @returns {{ delete: (args: { sceneId: string, tokenId: string }) => (void|Promise<void>) }}
+ */
+export function createInteractableTokenDeleter({ isActiveGM, emitDelete, applyDelete } = {}) {
+  return {
+    delete({ sceneId, tokenId } = {}) {
+      const payload = validateNodeDeletePayload({ action: INTERACTABLE_NODE_DELETE, sceneId, tokenId });
+      if (!payload) return undefined;
+      const gm = typeof isActiveGM === 'function' ? isActiveGM() === true : false;
+      if (gm) {
+        return applyDelete?.({ sceneId: payload.sceneId, tokenId: payload.tokenId });
+      }
+      return emitDelete?.(payload);
+    }
+  };
+}
+
+/**
  * Route an inbound `module.fabricate` socket message for the node-update action.
  * Pure aside from the injected `applyUpdate` side-effect. Only the active GM
  * applies; non-GM clients (and a stale GM that is not the primary) ignore it.
@@ -91,5 +134,24 @@ export function routeInteractableSocketMessage(payload, { isActiveGM, applyUpdat
   if (!normalized) return false;
   if (typeof isActiveGM === 'function' && isActiveGM() !== true) return false;
   applyUpdate?.({ sceneId: normalized.sceneId, tokenId: normalized.tokenId, update: normalized.update });
+  return true;
+}
+
+/**
+ * Route an inbound `module.fabricate` socket message for the node-DELETE action
+ * (terminal `deleteToken`). Only the active GM applies. Returns `true` when the
+ * delete was applied, `false` otherwise.
+ *
+ * @param {object} payload
+ * @param {object} deps
+ * @param {() => boolean} deps.isActiveGM
+ * @param {(args: { sceneId: string, tokenId: string }) => (void|Promise<void>)} deps.applyDelete
+ * @returns {boolean}
+ */
+export function routeInteractableDeleteMessage(payload, { isActiveGM, applyDelete } = {}) {
+  const normalized = validateNodeDeletePayload(payload);
+  if (!normalized) return false;
+  if (typeof isActiveGM === 'function' && isActiveGM() !== true) return false;
+  applyDelete?.({ sceneId: normalized.sceneId, tokenId: normalized.tokenId });
   return true;
 }

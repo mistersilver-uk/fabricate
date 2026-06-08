@@ -21,6 +21,16 @@ import { INTERACTABLE_ACTOR_FLAG } from '../../src/canvas/interactableActor.js';
 
 const GLOBAL_KEYS = ['game', 'Hooks', 'canvas', 'foundry', 'Actor', 'CONFIG', 'ui'];
 
+/**
+ * Flush queued microtasks so a fire-and-forget `_spawnGatheringTask` (kicked off
+ * synchronously by `_onDrop`) settles before assertions. The chain awaits the
+ * region hit-test (sync), `ensureInteractableActor()`, and `TokenDocument.create`
+ * — all microtask-resolved fakes — so a handful of turns drains it.
+ */
+async function flushAsync(turns = 5) {
+  for (let i = 0; i < turns; i++) await Promise.resolve();
+}
+
 function snapshotGlobals() {
   const saved = {};
   for (const key of GLOBAL_KEYS) saved[key] = globalThis[key];
@@ -47,6 +57,7 @@ function installFakeFoundry({ isGM = true, tools = [{ id: 'tool-1' }], tasks = [
   const createdTokens = [];
   const createdActors = [];
   const warnings = [];
+  const infos = [];
 
   const backingActor = {
     id: 'actor-backing',
@@ -71,7 +82,10 @@ function installFakeFoundry({ isGM = true, tools = [{ id: 'tool-1' }], tasks = [
   };
 
   globalThis.ui = {
-    notifications: { warn: (msg) => warnings.push(msg) }
+    notifications: {
+      warn: (msg) => warnings.push(msg),
+      info: (msg) => infos.push(msg)
+    }
   };
 
   globalThis.canvas = {
@@ -98,7 +112,7 @@ function installFakeFoundry({ isGM = true, tools = [{ id: 'tool-1' }], tasks = [
     }
   };
 
-  return { createdTokens, createdActors, warnings, backingActor };
+  return { createdTokens, createdActors, warnings, infos, backingActor };
 }
 
 // A drag payload the classifier accepts as a Fabricate Tool.
@@ -144,13 +158,30 @@ test('_onDrop returns false (suppresses Foundry) for a Fabricate Tool drop', asy
   }
 });
 
-test('_onDrop returns false (suppresses Foundry) for a Fabricate Gathering Task drop', () => {
+test('_onDrop suppresses Foundry AND spawns a gathering-task token on the happy path', async () => {
   const saved = snapshotGlobals();
   try {
-    installFakeFoundry({ isGM: true });
-    const manager = new InteractableManager();
+    // tier-2 default-environment resolution: no dialog, deterministic spawn.
+    const { createdTokens } = installGatheringEnvFoundry({
+      isGM: true,
+      environments: [{ id: 'env-1', craftingSystemId: 'sysA', name: 'Forest' }],
+      tasks: [{ id: 'task-9', name: 'Chop Wood', defaultEnvironmentId: 'env-1' }]
+    });
+    // Default region hit-test returns no hits (no scene regions), so resolution
+    // falls to the task default; the dialog must never be reached on this path.
+    const manager = new InteractableManager({
+      promptDropEnvironment: async () => { throw new Error('dialog must not open on the default-environment path'); }
+    });
+
     const result = manager._onDrop(globalThis.canvas, { ...TASK_DROP, x: 10, y: 20 });
+    // The hook returns false synchronously to suppress Foundry's default drop…
     assert.equal(result, false);
+    // …then the fire-and-forget spawn settles and creates a real token.
+    await flushAsync();
+    assert.equal(createdTokens.length, 1, 'a gathering-task token is created on the happy path');
+    assert.equal(createdTokens[0].name, 'Chop Wood', 'the token takes the task name (nameplate discoverability)');
+    assert.equal(createdTokens[0].flags.fabricate.interactableType, 'gatheringTask');
+    assert.equal(createdTokens[0].flags.fabricate.environmentId, 'env-1', 'the default environment is stamped onto the token flag');
   } finally {
     restoreGlobals(saved);
   }
@@ -368,12 +399,15 @@ function gatheringTaskToken(sourceUuid = 'Fabricate.sysA.gatheringTask.task-9', 
   };
 }
 
-function installGatheringEnvFoundry({ isGM = true, hasActiveGM = true, environments = [] } = {}) {
-  const base = installFakeFoundry({ isGM });
+function installGatheringEnvFoundry({ isGM = true, hasActiveGM = true, environments = [], tasks = [{ id: 'task-9' }] } = {}) {
+  const base = installFakeFoundry({ isGM, tasks });
   globalThis.game.users = { activeGM: hasActiveGM ? { id: 'gm-1' } : null };
   globalThis.game.time = { worldTime: 0, calendar: null };
   globalThis.game.fabricate.getGatheringEnvironmentStore = () => ({ list: () => environments });
   globalThis.game.socket = { emit: () => {} };
+  // The region auto-resolve notification formats a localized message; echo the
+  // key so the notify assertions can match without a real i18n bundle.
+  globalThis.game.i18n.format = (key) => key;
   return base;
 }
 
@@ -437,6 +471,177 @@ test('gathering-task double-click blocks a player gracefully when no active GM i
     assert.equal(shows.length, 0, 'no session opens without an active GM to apply node writes');
     assert.equal(warnings.length, 1);
     assert.equal(warnings[0], 'FABRICATE.Canvas.Interactable.NoActiveGM');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+// --- Phase 6: _spawnGatheringTask env-resolution orchestration ---------------
+// The COMPOSITION seam: region hit-test → pure resolveDropEnvironment → (dialog) →
+// notify → spawn/abort. Region hit-test + the GM dialog are injected as fakes;
+// the env-store, ui.notifications, and the TokenDocument-create edge resolve
+// through the same globalThis fakes the rest of the suite uses. Production wiring
+// resolves these seams to the real Foundry edges (constructor defaults).
+
+const SYS_A_ENVS = [
+  { id: 'env-forest', craftingSystemId: 'sysA', name: 'Forest' },
+  { id: 'env-cave', craftingSystemId: 'sysA', name: 'Cave' }
+];
+
+function taskClassification(taskId = 'task-9') {
+  return {
+    interactableType: 'gatheringTask',
+    systemId: 'sysA',
+    referenceId: taskId,
+    sourceUuid: `Fabricate.sysA.gatheringTask.${taskId}`,
+    entry: { id: taskId, name: 'Chop Wood' }
+  };
+}
+
+test('(a) region single-hit → token created with the region environmentId + notification fired', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdTokens, infos } = installGatheringEnvFoundry({
+      isGM: true,
+      environments: SYS_A_ENVS,
+      tasks: [{ id: 'task-9', name: 'Chop Wood' }]
+    });
+    const manager = new InteractableManager({
+      // One unambiguous flagged region contains the drop point.
+      regionEnvironmentIdsAtPoint: () => ['env-cave'],
+      promptDropEnvironment: async () => { throw new Error('dialog must not open on a single region hit'); }
+    });
+
+    const created = await manager._spawnGatheringTask({
+      classification: taskClassification(),
+      point: { x: 5, y: 6 },
+      forceDialog: false
+    });
+
+    assert.equal(createdTokens.length, 1);
+    assert.equal(createdTokens[0].flags.fabricate.environmentId, 'env-cave', 'the region environment wins');
+    assert.equal(created, createdTokens[0]);
+    // Region auto-resolve announces the resolved environment.
+    assert.equal(infos.length, 1, 'a region auto-resolve notification fired');
+    assert.equal(infos[0], 'FABRICATE.Canvas.Interactable.EnvironmentAutoResolved');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('(b) task defaultEnvironmentId → token created with that id and NO notification', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdTokens, infos } = installGatheringEnvFoundry({
+      isGM: true,
+      environments: SYS_A_ENVS,
+      tasks: [{ id: 'task-9', name: 'Chop Wood', defaultEnvironmentId: 'env-forest' }]
+    });
+    const manager = new InteractableManager({
+      regionEnvironmentIdsAtPoint: () => [], // no region hit → fall to the task default.
+      promptDropEnvironment: async () => { throw new Error('dialog must not open when a default resolves'); }
+    });
+
+    await manager._spawnGatheringTask({
+      classification: taskClassification(),
+      point: { x: 1, y: 2 },
+      forceDialog: false
+    });
+
+    assert.equal(createdTokens.length, 1);
+    assert.equal(createdTokens[0].flags.fabricate.environmentId, 'env-forest', 'the task default is stamped');
+    assert.equal(infos.length, 0, 'the task-default tier is silent (no auto-resolve notification)');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('(c) dialog confirm → token created with the chosen environmentId', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdTokens, infos } = installGatheringEnvFoundry({
+      isGM: true,
+      environments: SYS_A_ENVS,
+      tasks: [{ id: 'task-9', name: 'Chop Wood' }] // no region hit, no default → dialog.
+    });
+    const dialogCalls = [];
+    const manager = new InteractableManager({
+      regionEnvironmentIdsAtPoint: () => [],
+      promptDropEnvironment: async (args) => { dialogCalls.push(args); return 'env-cave'; }
+    });
+
+    await manager._spawnGatheringTask({
+      classification: taskClassification(),
+      point: { x: 3, y: 4 },
+      forceDialog: false
+    });
+
+    assert.equal(dialogCalls.length, 1, 'the GM dialog was presented');
+    assert.deepEqual(
+      dialogCalls[0].environments.map((env) => env.id).sort(),
+      ['env-cave', 'env-forest'],
+      'the dialog is offered the system environments'
+    );
+    assert.equal(createdTokens.length, 1);
+    assert.equal(createdTokens[0].flags.fabricate.environmentId, 'env-cave', 'the chosen environment is stamped');
+    assert.equal(infos.length, 0, 'the dialog tier does not fire the region notification');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('(d) dialog cancel → NO token created and NO notification (abort)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdTokens, infos } = installGatheringEnvFoundry({
+      isGM: true,
+      environments: SYS_A_ENVS,
+      tasks: [{ id: 'task-9', name: 'Chop Wood' }]
+    });
+    const manager = new InteractableManager({
+      regionEnvironmentIdsAtPoint: () => [],
+      promptDropEnvironment: async () => null // GM cancels / closes the dialog.
+    });
+
+    const result = await manager._spawnGatheringTask({
+      classification: taskClassification(),
+      point: { x: 7, y: 8 },
+      forceDialog: false
+    });
+
+    assert.equal(result, null, 'a cancelled dialog aborts the spawn');
+    assert.equal(createdTokens.length, 0, 'NO token is created when the GM cancels');
+    assert.equal(infos.length, 0, 'NO notification fires on cancel');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('(e) Alt-held → dialog path taken even when a region + default would resolve', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdTokens, infos } = installGatheringEnvFoundry({
+      isGM: true,
+      environments: SYS_A_ENVS,
+      // Both an auto-resolving region AND a task default are present…
+      tasks: [{ id: 'task-9', name: 'Chop Wood', defaultEnvironmentId: 'env-forest' }]
+    });
+    const dialogCalls = [];
+    const manager = new InteractableManager({
+      regionEnvironmentIdsAtPoint: () => ['env-cave'],
+      promptDropEnvironment: async (args) => { dialogCalls.push(args); return 'env-forest'; }
+    });
+
+    await manager._spawnGatheringTask({
+      classification: taskClassification(),
+      point: { x: 9, y: 10 },
+      forceDialog: true // …but Alt forces the dialog, bypassing tiers 1 + 2.
+    });
+
+    assert.equal(dialogCalls.length, 1, 'Alt forces the GM dialog');
+    assert.equal(createdTokens.length, 1);
+    assert.equal(createdTokens[0].flags.fabricate.environmentId, 'env-forest', 'the dialog choice is stamped');
+    assert.equal(infos.length, 0, 'the forced-dialog path does not fire the region notification');
   } finally {
     restoreGlobals(saved);
   }

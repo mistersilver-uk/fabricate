@@ -119,13 +119,37 @@ export function createTokenNodeStateAdapter({
   rollChance = () => Math.floor(Math.random() * 100) + 1,
   rollExpression = () => 0,
   isDeleted = () => false,
-  tokenRef = null
+  tokenRef = null,
+  // Phase 6: enact the depleted-behavior token VISUAL (swap-image / postfix /
+  // terminal delete) whenever the node is (re)written. Given the freshly-written
+  // node's depleted state, it routes a token.update/delete through the same GM
+  // path. No-op by default (e.g. unit tests that only assert the node math).
+  applyDepletedBehavior = null
 } = {}) {
   const read = () => readTokenNode(token);
 
+  // After a node write, keep the token visual in lockstep with the count: apply
+  // the depleted visual when the written node is depleted, revert it otherwise.
+  // `depletedBehavior` rides on the normalized node config, so the writer reads
+  // it from the node we just persisted. Idempotent — the pure planner no-ops when
+  // the visual already matches.
+  const enactDepleted = (node) => {
+    if (typeof applyDepletedBehavior !== 'function' || !node) return undefined;
+    return applyDepletedBehavior({
+      token,
+      behavior: node.depletedBehavior ?? null,
+      depleted: isNodeDepleted(node)
+    });
+  };
+
   const write = (node) => {
     if (!node || typeof node !== 'object') return undefined;
-    return emitWrite?.(node);
+    const result = emitWrite?.(node);
+    if (result && typeof result.then === 'function') {
+      return result.then(() => enactDepleted(node));
+    }
+    enactDepleted(node);
+    return result;
   };
 
   const resolvedRef = tokenRef && tokenRef.sceneId && tokenRef.tokenId

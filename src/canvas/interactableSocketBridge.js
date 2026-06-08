@@ -11,10 +11,14 @@
 import {
   INTERACTABLE_SOCKET,
   INTERACTABLE_NODE_UPDATE,
+  INTERACTABLE_NODE_DELETE,
   createInteractableNodeWriter,
-  routeInteractableSocketMessage
+  createInteractableTokenDeleter,
+  routeInteractableSocketMessage,
+  routeInteractableDeleteMessage
 } from './interactableSocket.js';
-import { createTokenNodeStateAdapter } from './tokenNodeStateAdapter.js';
+import { createTokenNodeStateAdapter, identifyTokenRef } from './tokenNodeStateAdapter.js';
+import { buildDepletedBehaviorWriter } from './depletedBehavior.js';
 import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
 
 /** Whether this client is the primary (active) GM. */
@@ -48,6 +52,54 @@ export async function applyInteractableNodeUpdate({ sceneId, tokenId, update } =
   const token = scene?.tokens?.get?.(tokenId);
   if (!token?.update) return;
   await token.update(update);
+}
+
+/**
+ * Delete an Interactable token (terminal `deleteToken` depleted-behavior). The
+ * active-GM edge: looks the token up by scene + id and removes it. A deleted
+ * token cannot be restored by respawn — the world-time respawn pass no-ops
+ * against it because it is no longer present in the scene.
+ *
+ * @param {{ sceneId: string, tokenId: string }} args
+ * @returns {Promise<void>}
+ */
+export async function applyInteractableTokenDelete({ sceneId, tokenId } = {}) {
+  const scene = globalThis.game?.scenes?.get?.(sceneId);
+  const token = scene?.tokens?.get?.(tokenId);
+  if (token?.delete) {
+    await token.delete();
+    return;
+  }
+  // Fallback for collections that only expose batch deletion.
+  if (scene?.deleteEmbeddedDocuments && tokenId) {
+    await scene.deleteEmbeddedDocuments('Token', [String(tokenId)]);
+  }
+}
+
+/**
+ * Build the `(token, behavior, depleted) => void` depleted-behavior writer for a
+ * token: it routes `token.update`/`token.delete` through the active GM (local
+ * apply on the GM, socket emit otherwise), mirroring {@link emitInteractableNodeWrite}.
+ * The PURE apply/revert/delete decision lives in `depletedBehavior.js`.
+ *
+ * @returns {(args: { token: object, behavior: object|null, depleted: boolean }) => (void|Promise<void>)}
+ */
+export function buildDepletedBehaviorApply() {
+  const writer = createInteractableNodeWriter({
+    isActiveGM,
+    emitUpdate: (payload) => globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload),
+    applyUpdate: applyInteractableNodeUpdate
+  });
+  const deleter = createInteractableTokenDeleter({
+    isActiveGM,
+    emitDelete: (payload) => globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload),
+    applyDelete: applyInteractableTokenDelete
+  });
+  return buildDepletedBehaviorWriter({
+    emitUpdate: ({ sceneId, tokenId, update }) => writer.write({ sceneId, tokenId, update }),
+    emitDelete: ({ sceneId, tokenId }) => deleter.delete({ sceneId, tokenId }),
+    identify: (token) => identifyTokenRef(token)
+  });
 }
 
 /**
@@ -97,6 +149,7 @@ export function resolveTokenNodeStateForRef({ sceneId, tokenId } = {}) {
     emitWrite: emitInteractableNodeWrite(token),
     now: () => Number(globalThis.game?.time?.worldTime || 0),
     secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null),
+    applyDepletedBehavior: buildDepletedBehaviorApply(),
     tokenRef: { sceneId: String(sceneId), tokenId: String(tokenId) }
   });
 }
@@ -111,9 +164,17 @@ export function resolveTokenNodeStateForRef({ sceneId, tokenId } = {}) {
  * @param {object} payload
  */
 export function handleInteractableSocketMessage(payload) {
-  if (payload?.action !== INTERACTABLE_NODE_UPDATE) return;
-  void routeInteractableSocketMessage(payload, {
-    isActiveGM,
-    applyUpdate: applyInteractableNodeUpdate
-  });
+  if (payload?.action === INTERACTABLE_NODE_UPDATE) {
+    void routeInteractableSocketMessage(payload, {
+      isActiveGM,
+      applyUpdate: applyInteractableNodeUpdate
+    });
+    return;
+  }
+  if (payload?.action === INTERACTABLE_NODE_DELETE) {
+    void routeInteractableDeleteMessage(payload, {
+      isActiveGM,
+      applyDelete: applyInteractableTokenDelete
+    });
+  }
 }

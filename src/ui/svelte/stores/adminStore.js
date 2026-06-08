@@ -631,8 +631,17 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     toolIds: Array.isArray(task.toolIds)
       ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
       : [],
-    // Preserve the resource-node config (count/depletion/respawn) so authoring it
-    // on a task survives the save (the runtime reads it back to seed per-env pools).
+    // Optional task-default environment (new): the precedence MIDDLE tier for
+    // on-drop canvas env resolution (region auto-detect → THIS → GM dialog).
+    // Coerced to a trimmed string or null (empties dropped); a stale id falls
+    // through to the GM dialog at drop time rather than throwing.
+    defaultEnvironmentId: (() => {
+      const id = typeof task.defaultEnvironmentId === 'string' ? task.defaultEnvironmentId.trim() : '';
+      return id || null;
+    })(),
+    // Preserve the resource-node config (count/depletion/respawn/depletedBehavior)
+    // so authoring it on a task survives the save (the runtime reads it back to
+    // seed per-env pools; canvas tokens snapshot it for per-token depletion).
     ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {})
   };
 }

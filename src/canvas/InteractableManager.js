@@ -25,7 +25,10 @@ import { buildInteractableFlags, isInteractableToken } from './interactableToken
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
 import { ensureInteractableActor } from './interactableActor.js';
 import { buildTokenNodeSnapshot, createTokenNodeStateAdapter } from './tokenNodeStateAdapter.js';
-import { emitInteractableNodeWrite } from './interactableSocketBridge.js';
+import { emitInteractableNodeWrite, buildDepletedBehaviorApply } from './interactableSocketBridge.js';
+import { resolveDropEnvironment } from './environmentResolution.js';
+import { regionEnvironmentIdsAtPoint } from './regionHitTest.js';
+import { promptDropEnvironment } from './environmentDialog.js';
 import { getFabricateAppClass } from '../ui/appFactory.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
 import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
@@ -39,10 +42,23 @@ class InteractableManager {
    *   class. Defaults to {@link getFabricateAppClass}; injectable so unit tests
    *   can pass a fake app whose `show()` records its arguments without a live
    *   Svelte/Foundry runtime.
+   * @param {(args: {scene: object, point: object}) => string[]} [deps.regionEnvironmentIdsAtPoint]
+   *   Scene-Region point hit-test seam (defaults to the real Foundry edge).
+   * @param {(args: object) => Promise<string|null>} [deps.promptDropEnvironment]
+   *   On-drop GM environment-pick dialog seam (defaults to the real DialogV2 edge).
+   *   Injectable so the `_spawnGatheringTask` precedence (region → default →
+   *   dialog → notify → spawn/abort) is unit-testable with fakes; production
+   *   wiring resolves to the real Foundry seams unchanged.
    */
-  constructor({ getAppClass = getFabricateAppClass } = {}) {
+  constructor({
+    getAppClass = getFabricateAppClass,
+    regionEnvironmentIdsAtPoint: regionHitTest = regionEnvironmentIdsAtPoint,
+    promptDropEnvironment: promptEnvironment = promptDropEnvironment
+  } = {}) {
     this._registered = false;
     this._getAppClass = getAppClass;
+    this._regionEnvironmentIdsAtPoint = regionHitTest;
+    this._promptDropEnvironment = promptEnvironment;
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._attachListeners = this._attachListeners.bind(this);
@@ -86,19 +102,95 @@ class InteractableManager {
     }
 
     const point = this._dropPoint(canvas, data);
-    // Phase 5: snapshot the task's node CONFIG into the token flags at drop. Tool
-    // requirements are NOT snapshotted — they resolve live from task.toolIds.
-    // A task with no node config snapshots no node (unlimited gathering point).
-    // Phase-6 TODO: resolve environmentId via region auto-detect → task default
-    // (defaultEnvironmentId) → GM dialog precedence + Alt override. Phase 5 leaves
-    // environmentId unresolved here (task-scoped), resolved at double-click time.
+    // Tool tokens carry no environment; spawn immediately. Gathering-task tokens
+    // resolve their environment via the precedence chain (which may await a GM
+    // dialog), so that runs in an async helper while the hook returns false
+    // synchronously to suppress Foundry's default item-drop handling.
+    if (classification.interactableType !== 'gatheringTask') {
+      const spawnRequest = buildSpawnRequest({ classification, point });
+      void this._spawnInteractable(spawnRequest);
+      return false;
+    }
+
+    // Alt held during the drop forces the GM dialog (override tiers 1 + 2).
+    const forceDialog = data?.altKey === true || globalThis.game?.keyboard?.isModifierActive?.('Alt') === true;
+    void this._spawnGatheringTask({ classification, point, forceDialog });
+    return false; // suppress Foundry's default item-drop handling.
+  }
+
+  /**
+   * Resolve a dropped gathering task's environment via the precedence chain and
+   * spawn its token. PURE decision in {@link resolveDropEnvironment}; the region
+   * hit-test, the GM dialog, and the auto-resolve notification are the thin edges
+   * here. A cancelled dialog ABORTS the spawn (no token created).
+   *
+   * Precedence (design.md §6): Scene Region auto-detect (region flagged
+   * `flags.fabricate.environmentId`) → task `defaultEnvironmentId` → GM dialog.
+   * Holding Alt during drop forces the dialog.
+   *
+   * @param {object} args
+   * @param {object} args.classification  Result of {@link classifyInteractableDrop}.
+   * @param {{x: number, y: number}} args.point  Scene-space drop point.
+   * @param {boolean} args.forceDialog  Alt-override.
+   * @returns {Promise<object|null>}
+   */
+  async _spawnGatheringTask({ classification, point, forceDialog }) {
+    const deps = this._resolutionDeps();
+    const task = deps.getTask({ systemId: classification.systemId, taskId: classification.referenceId });
+    const environments = this._systemEnvironments(classification.systemId);
+    const environmentExists = (id) => environments.some((env) => String(env.id) === String(id));
+
+    const scene = globalThis.canvas?.scene;
+    const regionEnvironmentIds = this._regionEnvironmentIdsAtPoint({ scene, point });
+    const resolution = resolveDropEnvironment({
+      regionEnvironmentIds,
+      defaultEnvironmentId: task?.defaultEnvironmentId ?? null,
+      forceDialog,
+      environmentExists
+    });
+
+    let environmentId = resolution.environmentId;
+    if (resolution.needsDialog) {
+      environmentId = await this._promptDropEnvironment({
+        environments,
+        defaultEnvironmentId: task?.defaultEnvironmentId ?? '',
+        localize: (key, fallback) => globalThis.game?.i18n?.localize?.(key) ?? fallback
+      });
+      // Cancel ⇒ abort the spawn (no token created).
+      if (!environmentId) return null;
+    }
+
+    if (resolution.notify && environmentId) {
+      const env = environments.find((candidate) => String(candidate.id) === String(environmentId));
+      const name = env?.name || environmentId;
+      const message = (globalThis.game?.i18n?.format?.(
+        'FABRICATE.Canvas.Interactable.EnvironmentAutoResolved',
+        { environment: name }
+      )) ?? `Resource node placed in environment "${name}".`;
+      globalThis.ui?.notifications?.info?.(message);
+    }
+
     const spawnRequest = buildSpawnRequest({
       classification,
       point,
-      buildNode: (task) => buildTokenNodeSnapshot(task)
+      environmentId: environmentId ?? undefined,
+      buildNode: (entry) => buildTokenNodeSnapshot(entry)
     });
-    void this._spawnInteractable(spawnRequest);
-    return false; // suppress Foundry's default item-drop handling.
+    return this._spawnInteractable(spawnRequest);
+  }
+
+  /**
+   * The environments of one crafting system, as `{ id, name }` rows for the drop
+   * dialog + the precedence existence check. Isolated Foundry-runtime read.
+   *
+   * @param {string} systemId
+   * @returns {Array<{ id: string, name: string }>}
+   */
+  _systemEnvironments(systemId) {
+    const environments = globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+    return (Array.isArray(environments) ? environments : [])
+      .filter((env) => String(env?.craftingSystemId ?? '') === String(systemId))
+      .map((env) => ({ id: String(env.id), name: String(env.name ?? env.id) }));
   }
 
   /**
@@ -234,10 +326,11 @@ class InteractableManager {
    * node-mutating attempt cannot be applied, so the attempt is blocked cleanly
    * with a graceful message instead of hanging.
    *
-   * ENVIRONMENT RESOLUTION (Phase 5): use the environmentId already on the token
-   * flag if present (static/task-level); otherwise fall back to the first
-   * environment whose composition includes this task. The full region auto-detect
-   * → task default → GM dialog precedence chain (with Alt override) is Phase 6.
+   * ENVIRONMENT RESOLUTION: the environment is resolved at DROP time (Phase 6
+   * precedence chain in `_spawnGatheringTask`) and stamped onto the token flag,
+   * so here we use the flag's environmentId. The `_resolveTaskEnvironmentId`
+   * lookup remains only as a defensive fallback for legacy tokens placed before
+   * drop-time resolution (or whose flag was cleared).
    *
    * @param {object} descriptor Dispatch descriptor: `{ systemId, referenceId, environmentId, ... }`.
    * @param {object} token The double-clicked token document.
@@ -272,7 +365,11 @@ class InteractableManager {
       token,
       emitWrite: emitInteractableNodeWrite(token),
       now: () => Number(globalThis.game?.time?.worldTime || 0),
-      secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null)
+      secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null),
+      // Phase 6: enact the depleted-behavior token visual (swap-image / postfix /
+      // terminal delete) whenever the attempt writes the node, routed through the
+      // same active-GM socket path as the node write itself.
+      applyDepletedBehavior: buildDepletedBehaviorApply()
     });
 
     const AppClass = this._getAppClass?.();
@@ -281,8 +378,9 @@ class InteractableManager {
 
   /**
    * Resolve the first environment whose composition includes a gathering task,
-   * as the Phase-5 fallback when the token carries no resolved environmentId.
-   * Phase 6 replaces this with the full region/default/dialog precedence chain.
+   * as the defensive double-click fallback when the token carries no resolved
+   * environmentId (drop-time resolution now stamps it via the Phase-6 precedence
+   * chain in `_spawnGatheringTask`).
    *
    * @param {object} args
    * @param {string} args.systemId

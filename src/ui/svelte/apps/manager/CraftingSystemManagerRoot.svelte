@@ -518,6 +518,14 @@
   const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
   const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
+  // Environments of the selected system, as { id, name } rows for the task
+  // editor's optional default-environment select (the on-drop precedence middle
+  // tier).
+  const selectedSystemEnvironmentOptions = $derived(
+    environmentList
+      .filter(environment => String(environment?.craftingSystemId || '') === String(selectedSystemId || ''))
+      .map(environment => ({ id: String(environment.id), name: String(environment.name || environment.id) }))
+  );
   const gatheringNavCounts = $derived({
     environments: environmentList.length,
     tasks: gatheringTaskDefinitions.length,
@@ -3139,6 +3147,7 @@
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         libraryTools={selectedGatheringSystemTools}
+        environmentOptions={selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}

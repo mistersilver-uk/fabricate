@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeRespawn, VALID_RESPAWN_POLICIES, VALID_RESPAWN_GAIN_MODES, VALID_RESPAWN_UNITS } from '../src/systems/gatheringNodeConfig.js';
+import { normalizeRespawn, normalizeDepletedBehavior, normalizeNodeConfig, VALID_RESPAWN_POLICIES, VALID_RESPAWN_GAIN_MODES, VALID_RESPAWN_UNITS } from '../src/systems/gatheringNodeConfig.js';
 
 test('the respawn schema exposes exactly two policies and three gain modes', () => {
   assert.deepEqual([...VALID_RESPAWN_POLICIES].sort(), ['manual', 'overTime']);
@@ -72,4 +72,50 @@ test('normalizeRespawn preserves a legacy raw intervalSeconds when no unit is pr
   const out = normalizeRespawn({ policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 });
   assert.equal(out.intervalSeconds, 3600);
   assert.ok(!('intervalUnit' in out), 'no unit is fabricated for a legacy node');
+});
+
+// --- depletedBehavior normalization (Phase 6) -------------------------------
+
+test('normalizeDepletedBehavior defaults missing/empty to null (no visual change)', () => {
+  assert.equal(normalizeDepletedBehavior(null), null);
+  assert.equal(normalizeDepletedBehavior(undefined), null);
+  assert.equal(normalizeDepletedBehavior('nope'), null);
+  assert.equal(normalizeDepletedBehavior({}), null);
+  assert.equal(normalizeDepletedBehavior({ swapImage: '   ' }), null, 'a blank swap image is dropped');
+  assert.equal(normalizeDepletedBehavior({ postfixName: false }), null);
+});
+
+test('normalizeDepletedBehavior — swap-image only mode', () => {
+  assert.deepEqual(normalizeDepletedBehavior({ swapImage: '  icons/x.webp ' }), { swapImage: 'icons/x.webp' });
+});
+
+test('normalizeDepletedBehavior — postfix-only mode', () => {
+  assert.deepEqual(normalizeDepletedBehavior({ postfixName: true }), { postfixName: true });
+});
+
+test('normalizeDepletedBehavior — both swap + postfix compose', () => {
+  assert.deepEqual(
+    normalizeDepletedBehavior({ swapImage: 'icons/x.webp', postfixName: true }),
+    { swapImage: 'icons/x.webp', postfixName: true }
+  );
+});
+
+test('normalizeDepletedBehavior — deleteToken is mutually exclusive: swap/postfix are dropped', () => {
+  assert.deepEqual(
+    normalizeDepletedBehavior({ deleteToken: true, swapImage: 'icons/x.webp', postfixName: true }),
+    { deleteToken: true },
+    'when deleteToken is on, swap/postfix are dead config and dropped'
+  );
+  assert.deepEqual(normalizeDepletedBehavior({ deleteToken: true }), { deleteToken: true });
+});
+
+test('normalizeNodeConfig carries depletedBehavior through (and omits it when none)', () => {
+  const withBehavior = normalizeNodeConfig({ enabled: true, max: 3, depletedBehavior: { swapImage: 'icons/x.webp' } });
+  assert.deepEqual(withBehavior.depletedBehavior, { swapImage: 'icons/x.webp' });
+
+  const withoutBehavior = normalizeNodeConfig({ enabled: true, max: 3 });
+  assert.ok(!('depletedBehavior' in withoutBehavior), 'no depletedBehavior key when none configured');
+
+  const deleteNode = normalizeNodeConfig({ enabled: true, max: 3, depletedBehavior: { deleteToken: true, postfixName: true } });
+  assert.deepEqual(deleteNode.depletedBehavior, { deleteToken: true }, 'mutual exclusion enforced through the node config');
 });
