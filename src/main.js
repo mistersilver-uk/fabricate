@@ -51,6 +51,8 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
+import { handleInteractableSocketMessage, resolveTokenNodeStateForRef } from './canvas/interactableSocketBridge.js';
+import { respawnInteractableTokens } from './canvas/interactableWorldTime.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
@@ -409,6 +411,32 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
     {
       label: 'Gathering',
       callback: () => gatheringEngine?.processWorldTime?.(worldTime)
+    },
+    {
+      // Per-token gathering node respawn for placed canvas Interactable tokens.
+      // Active-GM ONLY so connected clients never double-apply (mirrors the
+      // engine's per-environment respawn, which is primary-GM gated).
+      label: 'InteractableTokens',
+      callback: () => {
+        return respawnInteractableTokens({
+          worldTime,
+          // Active-GM gate is now inside respawnInteractableTokens (passable so a
+          // "non-active-GM applies nothing" case is unit-testable).
+          isActiveGM: () => game.user === game.users?.activeGM,
+          secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null),
+          rollExpression: (expression) => {
+            const RollClass = globalThis.Roll;
+            if (typeof RollClass !== 'function') return 0;
+            try {
+              const roll = new RollClass(String(expression || ''));
+              roll?.evaluateSync?.();
+              return Number(roll?.total ?? 0);
+            } catch (_err) {
+              return 0;
+            }
+          }
+        });
+      }
     }
   ]));
 }
@@ -529,6 +557,10 @@ class Fabricate {
         showPrompt: showHazardScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
+      // Rebuild a per-token node adapter at TIMED-run maturity from the persisted
+      // token ref, so an `onSuccess` decrement lands on the token flag (via the
+      // GM socket), not `environment.nodeRuntime[taskId]`.
+      resolveTokenNodeState: resolveTokenNodeStateForRef,
       localize: localizeGathering
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
@@ -1085,12 +1117,18 @@ Hooks.once('ready', async () => {
   // dispatch). Idempotent — register() no-ops on repeat calls.
   InteractableManager.instance.register();
 
-  game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => routeHazardSceneSocketMessage(payload, {
-    currentUserId: () => game.user?.id,
-    isActiveGM: () => game.user === game.users?.activeGM,
-    showPrompt: showHazardScenePrompt,
-    viewSceneForSelf: (uuid) => viewScene(uuid)
-  }));
+  game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => {
+    routeHazardSceneSocketMessage(payload, {
+      currentUserId: () => game.user?.id,
+      isActiveGM: () => game.user === game.users?.activeGM,
+      showPrompt: showHazardScenePrompt,
+      viewSceneForSelf: (uuid) => viewScene(uuid)
+    });
+    // Same `module.fabricate` channel also carries the canvas Interactable
+    // node-update action (player → active GM token-flag write). Only the active
+    // GM applies; other actions are ignored by the handler.
+    handleInteractableSocketMessage(payload);
+  });
 
   addModuleButtonsToItemsDirectory();
   Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());

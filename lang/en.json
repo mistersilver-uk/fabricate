@@ -11,7 +11,9 @@
     },
     "Canvas": {
       "Interactable": {
-        "GMOnlySpawn": "Only a GM can place Fabricate interactables on the canvas."
+        "GMOnlySpawn": "Only a GM can place Fabricate interactables on the canvas.",
+        "NoActiveGM": "A GM must be online to gather here.",
+        "NoEnvironment": "This gathering point is not part of any environment yet."
       }
     },
     "App": {
@@ -183,6 +185,8 @@
           "NodesRemaining": "Nodes remaining",
           "NodesAvailable": "Nodes available: {count}",
           "NodesLegend": "This area's resources are limited and replenish over time.",
+          "NodeDepletedRespawns": "Depleted — replenishes over time.",
+          "NodeRespawnEta": "Replenishes in about {duration}.",
           "StaminaCost": "Stamina cost",
           "StaminaCostOnly": "Costs {cost} stamina",
           "StaminaCostWithPool": "Costs {cost} stamina (you have {current}/{max})",

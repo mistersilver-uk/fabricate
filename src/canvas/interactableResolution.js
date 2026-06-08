@@ -186,14 +186,23 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
  * Pure: returns the flag-build args plus the drop coordinates; the caller wires
  * the actual TokenDocument creation.
  *
+ * For a gathering-task drop the request carries:
+ *  - `name`: the task's name, so the spawned token's nameplate identifies the
+ *    gathering point (double-click discoverability).
+ *  - `node`: a SNAPSHOT of the task's node CONFIG (built via `buildNode`), carrying
+ *    both config and runtime, or `null` for an unlimited (never-depleting) node.
+ *    Tool requirements are NOT snapshotted — they resolve live from `task.toolIds`.
+ *
  * @param {object} params
  * @param {ReturnType<typeof classifyInteractableDrop>} params.classification
  * @param {{x: number, y: number}} [params.point]   Drop point in scene coordinates.
  * @param {string} [params.environmentId]           Resolved environment (gatheringTask only).
+ * @param {(task: object) => (object|null)} [params.buildNode] Node-snapshot builder
+ *   applied to the classified task entry (gatheringTask only).
  * @returns {{ interactableType: string, sourceUuid: string, environmentId?: string,
- *   x: number, y: number } | null}
+ *   name?: string, node?: object, x: number, y: number } | null}
  */
-export function buildSpawnRequest({ classification, point, environmentId } = {}) {
+export function buildSpawnRequest({ classification, point, environmentId, buildNode } = {}) {
   if (!classification) return null;
   const request = {
     interactableType: classification.interactableType,
@@ -201,8 +210,16 @@ export function buildSpawnRequest({ classification, point, environmentId } = {})
     x: Number(point?.x ?? 0),
     y: Number(point?.y ?? 0)
   };
-  if (classification.interactableType === 'gatheringTask' && typeof environmentId === 'string' && environmentId) {
-    request.environmentId = environmentId;
+  if (classification.interactableType === 'gatheringTask') {
+    if (typeof environmentId === 'string' && environmentId) {
+      request.environmentId = environmentId;
+    }
+    const name = typeof classification.entry?.name === 'string' ? classification.entry.name.trim() : '';
+    if (name) request.name = name;
+    if (typeof buildNode === 'function') {
+      const node = buildNode(classification.entry);
+      if (node) request.node = node;
+    }
   }
   return request;
 }

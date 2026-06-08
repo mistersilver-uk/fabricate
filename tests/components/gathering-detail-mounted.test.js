@@ -151,6 +151,15 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(sceneImagesDestination), { recursive: true });
     writeFileSync(sceneImagesDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8'));
 
+    // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
+    // formatter, which in turn imports the pure foundryCalendar helpers; copy
+    // both into the temp tree so the dynamic import resolves.
+    const formatDurationDestination = join(tempRoot, 'src/ui/svelte/util/formatDuration.js');
+    writeFileSync(formatDurationDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/formatDuration.js'), 'utf8'));
+    const foundryCalendarDestination = join(tempRoot, 'src/systems/foundryCalendar.js');
+    mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
+    writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');

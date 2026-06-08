@@ -24,8 +24,11 @@ import {
 import { buildInteractableFlags, isInteractableToken } from './interactableTokenFlags.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
 import { ensureInteractableActor } from './interactableActor.js';
+import { buildTokenNodeSnapshot, createTokenNodeStateAdapter } from './tokenNodeStateAdapter.js';
+import { emitInteractableNodeWrite } from './interactableSocketBridge.js';
 import { getFabricateAppClass } from '../ui/appFactory.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
+import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
 
 const DOUBLE_CLICK_FLAG = '_fabricateInteractableBound';
 
@@ -83,7 +86,17 @@ class InteractableManager {
     }
 
     const point = this._dropPoint(canvas, data);
-    const spawnRequest = buildSpawnRequest({ classification, point });
+    // Phase 5: snapshot the task's node CONFIG into the token flags at drop. Tool
+    // requirements are NOT snapshotted — they resolve live from task.toolIds.
+    // A task with no node config snapshots no node (unlimited gathering point).
+    // Phase-6 TODO: resolve environmentId via region auto-detect → task default
+    // (defaultEnvironmentId) → GM dialog precedence + Alt override. Phase 5 leaves
+    // environmentId unresolved here (task-scoped), resolved at double-click time.
+    const spawnRequest = buildSpawnRequest({
+      classification,
+      point,
+      buildNode: (task) => buildTokenNodeSnapshot(task)
+    });
     void this._spawnInteractable(spawnRequest);
     return false; // suppress Foundry's default item-drop handling.
   }
@@ -105,11 +118,15 @@ class InteractableManager {
     const { fabricate } = buildInteractableFlags({
       interactableType: spawnRequest.interactableType,
       sourceUuid: spawnRequest.sourceUuid,
-      environmentId: spawnRequest.environmentId
+      environmentId: spawnRequest.environmentId,
+      node: spawnRequest.node
     });
 
     const tokenData = {
-      name: actor.name,
+      // Gathering-task tokens take the task's name so the nameplate identifies the
+      // gathering point (double-click discoverability); Tool tokens keep the
+      // backing actor name.
+      name: spawnRequest.name || actor.name,
       actorId: actor.id,
       actorLink: false, // unlinked: all real data is in the token flags.
       x: spawnRequest.x,
@@ -175,7 +192,7 @@ class InteractableManager {
   _onDoubleClick(token) {
     dispatchInteractableDoubleClick(token, {
       onTool: (descriptor) => this._handleToolDoubleClick(descriptor),
-      onGatheringTask: (descriptor) => this._handleGatheringTaskDoubleClick(descriptor)
+      onGatheringTask: (descriptor) => this._handleGatheringTaskDoubleClick(descriptor, token)
     });
   }
 
@@ -208,12 +225,87 @@ class InteractableManager {
   }
 
   /**
-   * Phase 5 replaces this with
-   * `SvelteFabricateApp.show('gathering', { environmentId, taskId, nodeStateOverride })`.
-   * @param {object} descriptor
+   * Open the gathering app scoped to a double-clicked gathering-task token.
+   *
+   * The token owns its OWN depletion/respawn state in `flags.fabricate.node`; a
+   * per-token {@link createTokenNodeStateAdapter} is built so the engine reads/
+   * writes the token node (not `environment.nodeRuntime[taskId]`), routing writes
+   * through the active GM socket. When NO active GM is connected, a player's
+   * node-mutating attempt cannot be applied, so the attempt is blocked cleanly
+   * with a graceful message instead of hanging.
+   *
+   * ENVIRONMENT RESOLUTION (Phase 5): use the environmentId already on the token
+   * flag if present (static/task-level); otherwise fall back to the first
+   * environment whose composition includes this task. The full region auto-detect
+   * → task default → GM dialog precedence chain (with Alt override) is Phase 6.
+   *
+   * @param {object} descriptor Dispatch descriptor: `{ systemId, referenceId, environmentId, ... }`.
+   * @param {object} token The double-clicked token document.
    */
-  _handleGatheringTaskDoubleClick(descriptor) {
-    console.log('Fabricate | Gathering task interactable double-clicked', descriptor);
+  _handleGatheringTaskDoubleClick(descriptor, token) {
+    const systemId = descriptor?.systemId ?? null;
+    const taskId = descriptor?.referenceId ?? null;
+    if (!systemId || !taskId) return;
+
+    // No active GM ⇒ node writes (depletion/respawn) cannot be applied. Block the
+    // attempt cleanly with a graceful message rather than opening a session that
+    // would hang on the first write. GMs always pass (they ARE the applier).
+    if (globalThis.game?.user?.isGM !== true && !globalThis.game?.users?.activeGM) {
+      globalThis.ui?.notifications?.warn?.(
+        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM')
+        ?? 'A GM must be online to gather here.'
+      );
+      return;
+    }
+
+    const environmentId = descriptor?.environmentId
+      ?? this._resolveTaskEnvironmentId({ systemId, taskId });
+    if (!environmentId) {
+      globalThis.ui?.notifications?.warn?.(
+        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoEnvironment')
+        ?? 'This gathering point is not part of any environment yet.'
+      );
+      return;
+    }
+
+    const nodeStateOverride = createTokenNodeStateAdapter({
+      token,
+      emitWrite: emitInteractableNodeWrite(token),
+      now: () => Number(globalThis.game?.time?.worldTime || 0),
+      secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null)
+    });
+
+    const AppClass = this._getAppClass?.();
+    void AppClass?.show?.('gathering', { environmentId, taskId, nodeStateOverride });
+  }
+
+  /**
+   * Resolve the first environment whose composition includes a gathering task,
+   * as the Phase-5 fallback when the token carries no resolved environmentId.
+   * Phase 6 replaces this with the full region/default/dialog precedence chain.
+   *
+   * @param {object} args
+   * @param {string} args.systemId
+   * @param {string} args.taskId
+   * @returns {string|null}
+   */
+  _resolveTaskEnvironmentId({ systemId, taskId }) {
+    const environments = globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+    for (const environment of Array.isArray(environments) ? environments : []) {
+      if (String(environment?.craftingSystemId ?? '') !== String(systemId)) continue;
+      const enabled = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
+      const forced = Array.isArray(environment?.forcedTaskIds) ? environment.forcedTaskIds.map(String) : [];
+      const ids = new Set([...enabled, ...forced]);
+      // Automatic-mode environments may compose this task by matching even without
+      // an explicit id list; fall back to the first environment in the system when
+      // no explicit composition references it.
+      if (ids.has(String(taskId))) return String(environment.id);
+    }
+    // Fallback: the first environment in the same crafting system.
+    const first = (Array.isArray(environments) ? environments : []).find(
+      (environment) => String(environment?.craftingSystemId ?? '') === String(systemId)
+    );
+    return first?.id ?? null;
   }
 
   // --- Foundry-edge helpers. ---

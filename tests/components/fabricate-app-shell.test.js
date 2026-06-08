@@ -59,7 +59,7 @@ describe('SvelteFabricateApp shell window', () => {
   describe('activeCanvasTool session context (Phase 4)', () => {
     it('show accepts a two-arg { activeCanvasTool } options bag without breaking single-arg callers', () => {
       assert.ok(
-        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool } = {})'),
+        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, nodeStateOverride, environmentId, taskId } = {})'),
         'show should be the two-arg form with an options default so single-arg callers stay valid'
       );
       // existing single-arg call sites pass no options → activeCanvasTool undefined → null.
@@ -72,7 +72,7 @@ describe('SvelteFabricateApp shell window', () => {
         're-show of the live singleton replaces the active canvas tool'
       );
       assert.ok(
-        appSource.includes('new SvelteFabricateApp({ activeTab: initialTab, activeCanvasTool: nextCanvasTool })'),
+        appSource.includes('new SvelteFabricateApp({') && appSource.includes('activeCanvasTool: nextCanvasTool'),
         'a fresh open seeds the active canvas tool through the constructor'
       );
     });

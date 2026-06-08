@@ -3,6 +3,7 @@ import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
 import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
+import { scopeNodeStateOverride } from './nodeStateOverrideScope.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -36,6 +37,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   // prerequisite checks treat as satisfied WITHOUT the actor owning the item,
   // and which is excluded from breakage/usage. Cleared on close.
   _activeCanvasTool = null;
+  // Session-scoped per-token node-state adapter (Phase 5). When a player
+  // double-clicks a gathering-task token, the token's own node adapter is
+  // injected here so the gathering listing/attempt read/write the token's
+  // `flags.fabricate.node` (not `environment.nodeRuntime[taskId]`). The adapter
+  // also scopes the session to one environment+task. Cleared on close.
+  _nodeStateOverride = null;
+  _scopedEnvironmentId = null;
+  _scopedTaskId = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
@@ -60,6 +69,15 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (options.activeCanvasTool) {
       this._activeCanvasTool = options.activeCanvasTool;
     }
+    if (options.nodeStateOverride) {
+      this._nodeStateOverride = options.nodeStateOverride;
+    }
+    if (typeof options.environmentId === 'string') {
+      this._scopedEnvironmentId = options.environmentId;
+    }
+    if (typeof options.taskId === 'string') {
+      this._scopedTaskId = options.taskId;
+    }
   }
 
   _buildServices() {
@@ -78,14 +96,50 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       const systemId = this._activeCanvasTool?.systemId;
       return componentId && systemId ? { systemId, componentIds: [componentId] } : null;
     };
+    // Inject the per-token node-state adapter (Phase 5) into attempts (and
+    // listing) when the session is scoped to a placed gathering-task token, but
+    // ONLY for the scoped environment+task — a token's node must not leak into
+    // any other listed task. With no token session the override is null (inert).
+    const nodeStateOverrideFor = (opts = {}) => scopeNodeStateOverride({
+      override: this._nodeStateOverride,
+      scopedEnvironmentId: this._scopedEnvironmentId,
+      scopedTaskId: this._scopedTaskId,
+      environmentId: opts.environmentId,
+      taskId: opts.taskId
+    });
     const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getActiveCanvasTool: () => this._activeCanvasTool ?? null,
-      listGatheringForActor: (opts = {}) =>
-        game?.fabricate?.listGatheringForActor?.({ presentTools: presentTools(), ...opts }) ?? null,
-      startGatheringAttempt: (opts = {}) =>
-        game?.fabricate?.startGatheringAttempt?.({ presentTools: presentTools(), ...opts }) ?? null,
+      listGatheringForActor: (opts = {}) => {
+        // Thread the SCOPED per-token node override into the listing so the
+        // token's OWN current/max/depleted/respawnEta surface for the scoped
+        // task — without it, a depleted token shows "available" then blocks on
+        // attempt. The engine applies the override ONLY to the scoped env+task
+        // (the guard below scopes it), so it never leaks into other listed tasks.
+        const nodeStateOverride = this._nodeStateOverride ?? null;
+        return game?.fabricate?.listGatheringForActor?.({
+          presentTools: presentTools(),
+          ...(nodeStateOverride
+            ? {
+                nodeStateOverride,
+                nodeStateOverrideScope: {
+                  environmentId: this._scopedEnvironmentId,
+                  taskId: this._scopedTaskId
+                }
+              }
+            : {}),
+          ...opts
+        }) ?? null;
+      },
+      startGatheringAttempt: (opts = {}) => {
+        const nodeStateOverride = nodeStateOverrideFor(opts);
+        return game?.fabricate?.startGatheringAttempt?.({
+          presentTools: presentTools(),
+          ...(nodeStateOverride ? { nodeStateOverride } : {}),
+          ...opts
+        }) ?? null;
+      },
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
@@ -172,9 +226,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   async close(options) {
     this._removeHooks();
-    // Destroy the session-scoped canvas-tool context so the singleton does not
-    // leak it into the next manual open.
+    // Destroy the session-scoped canvas-tool + per-token node context so the
+    // singleton does not leak them into the next manual open.
     this._activeCanvasTool = null;
+    this._nodeStateOverride = null;
+    this._scopedEnvironmentId = null;
+    this._scopedTaskId = null;
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
@@ -184,6 +241,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _onClose(options) {
     this._removeHooks();
     this._activeCanvasTool = null; // safety net mirroring close().
+    this._nodeStateOverride = null;
+    this._scopedEnvironmentId = null;
+    this._scopedTaskId = null;
     super._onClose(options);
   }
 
@@ -202,23 +262,42 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * @param {object} [options]
    * @param {object|null} [options.activeCanvasTool] Virtual-present Tool injected
    *   by a canvas Tool station: `{ componentId, systemId, toolId, label }`.
+   * @param {object|null} [options.nodeStateOverride] Per-token node-state adapter
+   *   injected by a canvas gathering-task station (Phase 5). Scopes the gathering
+   *   session to one environment+task so the attempt/listing read/write the
+   *   token's own `flags.fabricate.node`.
+   * @param {string} [options.environmentId] Scoped environment (gathering-task token).
+   * @param {string} [options.taskId] Scoped task (gathering-task token).
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(tab = DEFAULT_TAB, { activeCanvasTool } = {}) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool, nodeStateOverride, environmentId, taskId } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
+    const nextNodeOverride = nodeStateOverride ?? null;
+    const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
+    const nextTaskId = typeof taskId === 'string' ? taskId : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
-      // Re-show REPLACES the active canvas tool (set when supplied, cleared when
-      // not) so a manual re-open never inherits a stale station context.
+      // Re-show REPLACES the session-scoped canvas tool + per-token node context
+      // (set when supplied, cleared when not) so a manual re-open never inherits
+      // a stale station context.
       existing._activeCanvasTool = nextCanvasTool;
+      existing._nodeStateOverride = nextNodeOverride;
+      existing._scopedEnvironmentId = nextEnvironmentId;
+      existing._scopedTaskId = nextTaskId;
       // Push the replaced tool to the mounted tree so the status chip updates.
       existing.updateProps({ activeCanvasTool: nextCanvasTool });
       existing._selectTab(initialTab);
       existing.bringToFront();
       return existing;
     }
-    const app = new SvelteFabricateApp({ activeTab: initialTab, activeCanvasTool: nextCanvasTool });
+    const app = new SvelteFabricateApp({
+      activeTab: initialTab,
+      activeCanvasTool: nextCanvasTool,
+      nodeStateOverride: nextNodeOverride,
+      environmentId: nextEnvironmentId,
+      taskId: nextTaskId
+    });
     SvelteFabricateApp._instance = app;
     await app.render(true);
     return app;

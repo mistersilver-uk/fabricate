@@ -55,6 +55,38 @@ at attempt time (so library edits to a Tool propagate to placed tokens). The dep
 trigger is `node.current <= 0` — one shared definition used by both the count logic and the
 depleted-visual apply.
 
+**Timed (`timeRequirement`) `onSuccess` decrement at maturity.** A per-token adapter is a
+live function object that cannot be JSON-persisted on a waiting run. For a timed
+`onSuccess` task started from a token, nothing decrements at start (correct for `onSuccess`),
+and the decrement must land on the **token** flag at maturity — not the env
+`nodeRuntime[taskId]`. So `_startWaitingAttempt` persists only the token **ref**
+(`economyEvidence.tokenNodeRef = { sceneId, tokenId }`, read from `adapter.tokenRef()`).
+At maturity (`_processMaturedWaitingRun`, which runs on the active GM), the engine rebuilds
+the adapter from that ref via an injected `resolveTokenNodeState({ sceneId, tokenId })` seam
+(`resolveTokenNodeStateForRef` in `interactableSocketBridge.js`, which re-creates the
+per-token adapter and routes the write through the GM socket) and threads it into
+`_commitRichAttempt`. When the token is gone (deleted) or the ref is unresolvable, the seam
+returns null and the commit falls back to the env node rather than throwing.
+
+**Listing-path override (not just attempt).** The scoped per-token override is also threaded
+through the **listing** (`SvelteFabricateApp.listGatheringForActor` →
+`GatheringEngine.listForActor` → `_buildEnvironmentListing` → `_taskModel` /
+`_richListingMetadata` → `richState.buildListingMetadata`), scoped to its own env+task via
+`_scopedNodeStateOverride` (the engine-side mirror of the app's `nodeStateOverrideFor` /
+`scopeNodeStateOverride` leak guard). So a depleted token surfaces its own
+current/max/depleted/respawnEta in the list instead of showing "available" and then blocking
+on attempt; the override never leaks into any other listed task.
+
+**Single respawn implementation.** `GatheringRichStateService._respawnNode` now delegates the
+respawn arithmetic to the pure `nodeRespawnMath.respawnNodeOnce`, so there is ONE respawn
+implementation shared by the per-environment pass and the per-token adapter/world-time pass.
+The env path injects the same calendar seam (`_durationToSeconds`) and the authoritative roll
+seam: `rollChance` returns the **raw 1..100 roll** (the math hits on `roll <= chance*100` and
+persists the raw roll in `lastRoll.rolls`, identical to the prior env behavior); the
+`expression` gain is pre-rolled asynchronously (Roll/`evaluateExpression`) into a queue the
+sync math consumes. The per-token adapter's default `rollChance` matches this raw-roll seam,
+removing the prior `Math.random()<chance` drift the reviewer flagged.
+
 ### 4. `activeCanvasTool` injection (virtual-present tools)
 
 Double-clicking a Tool station does not mint a synthetic `Item`. Instead it injects a

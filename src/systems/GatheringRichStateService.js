@@ -1,5 +1,6 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { normalizeNodeConfig } from './gatheringNodeConfig.js';
+import { respawnNodeOnce } from './nodeRespawnMath.js';
 
 const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
@@ -710,15 +711,22 @@ export class GatheringRichStateService {
     return environment ? cloneJson(environment) : null;
   }
 
-  buildListingMetadata({ environment, task, actor, viewer }) {
+  buildListingMetadata({ environment, task, actor, viewer, nodeState = null }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
     const mode = this._economyMode(environment?.craftingSystemId);
-    const showNodeCounts = task?.nodes?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
-    const nodes = mode === 'nodes' && task?.nodes ? {
+    // A per-token node override takes precedence over the composed task node so a
+    // placed gathering-task token reflects ITS OWN counts + respawn ETA.
+    const overrideNode = this._readOverrideNode(nodeState);
+    const displayNode = overrideNode ?? (task?.nodes ?? null);
+    const showNodeCounts = displayNode?.showCountsToPlayers === true || task?.nodes?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
+    const respawnEta = overrideNode && typeof nodeState?.respawnEta === 'function' ? nodeState.respawnEta() : null;
+    const nodes = mode === 'nodes' && displayNode ? {
       enabled: true,
-      available: Number(task.nodes.current || 0) > 0,
-      current: showNodeCounts ? Number(task.nodes.current || 0) : null,
-      max: showNodeCounts ? Number(task.nodes.max || 0) : null
+      available: Number(displayNode.current || 0) > 0,
+      depleted: Number(displayNode.current || 0) <= 0,
+      current: showNodeCounts ? Number(displayNode.current || 0) : null,
+      max: showNodeCounts ? Number(displayNode.max || 0) : null,
+      ...(respawnEta ? { respawnEta } : {})
     } : null;
     const stamina = mode === 'stamina' && Number(task?.staminaCost || 0) > 0 ? {
       cost: Number(task.staminaCost || 0),
@@ -915,8 +923,15 @@ export class GatheringRichStateService {
    * The current node object for a task in an environment: the per-environment
    * runtime pool if present, else a fresh full pool seeded from the library
    * task's node config. Null when the task has no node config.
+   *
+   * When a per-token `nodeState` adapter is injected (a canvas gathering-task
+   * token owns its own depletion/respawn state), it takes precedence over
+   * `environment.nodeRuntime[taskId]` — the token's `flags.fabricate.node` is the
+   * only node state that attempt uses.
    */
-  _currentNodeState(environment, taskId) {
+  _currentNodeState(environment, taskId, nodeState = null) {
+    const overridden = this._readOverrideNode(nodeState);
+    if (overridden) return overridden;
     const runtime = environment?.nodeRuntime?.[taskId];
     if (runtime) return runtime;
     const libraryTasks = this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
@@ -925,11 +940,26 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Persist a node object for a task into the environment's per-environment
-   * `nodeRuntime` map. Reads the raw stored environment so a composed/runtime
-   * environment is never written.
+   * Read the current node from an injected per-token override adapter, or `null`
+   * when there is no override (so callers fall back to `nodeRuntime`).
    */
-  async _writeNodeState({ environmentId, taskId, node }) {
+  _readOverrideNode(nodeState) {
+    if (!nodeState || typeof nodeState.read !== 'function') return null;
+    return nodeState.read() || null;
+  }
+
+  /**
+   * Persist a node object for a task. When a per-token `nodeState` adapter is
+   * injected the write routes through it (the GM socket), leaving
+   * `environment.nodeRuntime[taskId]` untouched. Otherwise it writes the
+   * per-environment `nodeRuntime` map (reading the raw stored environment so a
+   * composed/runtime environment is never written).
+   */
+  async _writeNodeState({ environmentId, taskId, node, nodeState = null }) {
+    if (nodeState && typeof nodeState.write === 'function') {
+      await nodeState.write(node);
+      return node;
+    }
     const stored = this.environmentStore?.get?.(environmentId);
     if (!stored) return null;
     return this.environmentStore.update(environmentId, {
@@ -1111,64 +1141,75 @@ export class GatheringRichStateService {
     if (!nodes || !respawn || respawn.policy !== 'overTime') {
       return { changed: false, node: nodes };
     }
-    // Calendar-aware interval from the stored unit+amount; fall back to a legacy
-    // raw `intervalSeconds` for nodes persisted before the unit/amount schema.
-    const interval = respawn.intervalUnit
-      ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
-      : Number(respawn.intervalSeconds || 0);
-    if (!(interval > 0)) return { changed: false, node: nodes };
-    const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
+    // The respawn ARITHMETIC (interval resolution, gain per mode, anchor advance,
+    // backwards/stalled-time re-anchor, room===0 short-circuit, max-clamp early
+    // break) is the single pure implementation in `nodeRespawnMath`. This env
+    // path injects the SAME calendar/random seams the per-token adapter uses —
+    // `secondsPerUnit` (legacy `intervalSeconds` falls through inside the math),
+    // the `rollD100() <= chance*100` chance seam, and a SYNCHRONOUS expression
+    // roll backed by pre-rolled async amounts (so Roll/`evaluateExpression`
+    // evaluation still happens, while the math stays pure). Keeping one
+    // implementation removes the prior `_respawnNode`/`respawnNodeOnce` drift.
 
-    if (now <= last) {
-      if (respawn.lastEvaluatedWorldTime !== now) {
-        return { changed: true, node: { ...nodes, respawn: { ...respawn, lastEvaluatedWorldTime: now } } };
+    // Pre-roll expression amounts asynchronously (the math is sync). The needed
+    // count is bounded by the elapsed whole intervals capped by the restock room,
+    // mirroring the math's stochastic-loop bound; the math may consume fewer (the
+    // max-clamp early break) — surplus pre-rolls are simply unused.
+    let expressionRolls = null;
+    let expressionCursor = 0;
+    if ((respawn.gainMode || 'guaranteed') === 'expression') {
+      const interval = respawn.intervalUnit
+        ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
+        : Number(respawn.intervalSeconds || 0);
+      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
+      if (interval > 0 && now > last) {
+        const elapsedIntervals = Math.floor((now - last) / interval);
+        const room = Math.max(0, Number(nodes.max || 0) - Number(nodes.current || 0));
+        const needed = Math.min(Math.max(0, elapsedIntervals), room);
+        expressionRolls = [];
+        for (let i = 0; i < needed; i++) {
+          // eslint-disable-next-line no-await-in-loop
+          expressionRolls.push(await this._respawnExpressionAmount({ expression: respawn.amountExpression, environment }));
+        }
       }
-      return { changed: false, node: nodes };
     }
 
-    const max = Number(nodes.max || 0);
     const before = Number(nodes.current || 0);
-    let intervals = Math.floor((now - last) / interval);
-    if (intervals <= 0) return { changed: false, node: nodes };
-    const room = Math.max(0, max - before);
-    const advancedAnchor = last + intervals * interval;
-    if (room === 0) {
-      return { changed: true, node: { ...nodes, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } } };
-    }
-    intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
+    const { changed, node } = respawnNodeOnce(nodes, {
+      now,
+      secondsPerUnit: (unit) => this._respawnIntervalSecondsSeam(respawn, unit),
+      // Raw 1..100 roll seam (the math hits on `roll <= chance*100` and persists
+      // the raw roll in `lastRoll.rolls`, identical to the prior env path).
+      rollChance: () => Number(this.rollD100()),
+      rollExpression: () => (expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0)
+    });
 
-    const gainMode = respawn.gainMode || 'guaranteed';
-    let gain = 0;
-    let lastRoll = respawn.lastRoll;
-    if (gainMode === 'guaranteed') {
-      gain = intervals;
-    } else if (gainMode === 'chance') {
-      const chance = Math.max(0, Math.min(1, Number(respawn.chance || 0)));
-      const rolls = [];
-      for (let i = 0; i < intervals; i++) {
-        const roll = Number(this.rollD100());
-        rolls.push(roll);
-        if (roll <= chance * 100) gain += 1;
+    if (changed) {
+      const nextCurrent = Number(node?.current ?? before);
+      const max = Number(node?.max ?? nodes.max ?? 0);
+      // Only emit the respawn hook when the count actually moved (a pure
+      // re-anchor changes the node but gains nothing).
+      if (nextCurrent !== before) {
+        this._callHook('fabricate.gathering.nodeRespawned', { environmentId, taskId, amount: nextCurrent - before, current: nextCurrent, max });
       }
-      lastRoll = { worldTime: now, chance, rolls };
-    } else {
-      // expression: roll the dice amount per interval, stopping once the pool is full.
-      const rolls = [];
-      for (let i = 0; i < intervals; i++) {
-        // eslint-disable-next-line no-await-in-loop
-        const amount = await this._respawnExpressionAmount({ expression: respawn.amountExpression, environment });
-        rolls.push(amount);
-        gain += amount;
-        if (before + gain >= max) break;
-      }
-      lastRoll = { worldTime: now, expression: String(respawn.amountExpression || ''), rolls };
     }
-    const nextCurrent = Math.min(max, before + gain);
-    this._callHook('fabricate.gathering.nodeRespawned', { environmentId, taskId, amount: nextCurrent - before, current: nextCurrent, max });
-    return {
-      changed: true,
-      node: { ...nodes, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
-    };
+    return { changed, node };
+  }
+
+  /**
+   * `secondsPerUnit` seam for `respawnNodeOnce` on the env path: resolve the
+   * interval unit through the calendar-aware `_durationToSeconds(1, unit)`, so
+   * day/week lengths follow the active world calendar exactly like the per-token
+   * adapter. The math's own legacy `intervalSeconds` fallback handles
+   * pre-unit-schema nodes (it only calls this seam when `respawn.intervalUnit`
+   * is set).
+   *
+   * @param {object} respawn The node's respawn block.
+   * @param {string} unit The interval unit passed by the math.
+   * @returns {number} Seconds for one unit.
+   */
+  _respawnIntervalSecondsSeam(respawn, unit) {
+    return this._durationToSeconds(1, unit);
   }
 
   /**
@@ -1330,13 +1371,17 @@ export class GatheringRichStateService {
     return ids.map(id => optionsById.get(id) ?? normalizeVocabularyOption('biomes', id));
   }
 
-  async evaluateStart({ actor, system, environment, task, viewer } = {}) {
+  async evaluateStart({ actor, system, environment, task, viewer, nodeState = null } = {}) {
     const blockedReasons = [];
-    const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
+    const evidence = this.buildListingMetadata({ environment, task, actor, viewer, nodeState });
     const systemId = system?.id || environment?.craftingSystemId;
     const mode = this._economyMode(systemId);
 
-    if (mode === 'nodes' && task?.nodes && Number(task.nodes.current || 0) <= 0) {
+    // A per-token node override (canvas gathering-task token) takes precedence
+    // over the composed task's per-environment node for the depletion gate.
+    const overrideNode = this._readOverrideNode(nodeState);
+    const gateNode = overrideNode ?? (task?.nodes ?? null);
+    if (mode === 'nodes' && gateNode && Number(gateNode.current || 0) <= 0) {
       blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
     }
 
@@ -1358,7 +1403,7 @@ export class GatheringRichStateService {
     return { blockedReasons, evidence };
   }
 
-  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null } = {}) {
+  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null, nodeState = null } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
       risk: task?.riskOverride || environment?.risk || 'safe',
@@ -1374,13 +1419,19 @@ export class GatheringRichStateService {
     const systemId = system?.id || environment?.craftingSystemId;
     const mode = this._economyMode(systemId);
 
-    if (mode === 'nodes' && task?.nodes && shouldDepleteNode(task, outcome)) {
+    // A per-token node override (canvas gathering-task token) takes precedence
+    // over the composed task's per-environment node: decrement and persist the
+    // TOKEN's own `flags.fabricate.node` via the GM socket, leaving
+    // `environment.nodeRuntime[taskId]` untouched.
+    const overrideNode = this._readOverrideNode(nodeState);
+    const depletionSource = overrideNode ?? (task?.nodes ?? null);
+    if (mode === 'nodes' && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
       // Persist the full node object (config + respawn timers) with one consumed,
-      // so the per-environment pool (nodeRuntime for library tasks) is seeded and
-      // decremented in a single write.
-      const max = Number(task.nodes.max || 0);
-      const current = Math.min(max, Math.max(0, Number(task.nodes.current || 0) - 1));
-      const node = { ...cloneJson(task.nodes), current };
+      // so the per-environment pool (nodeRuntime for library tasks) — or the
+      // per-token node — is seeded and decremented in a single write.
+      const max = Number(depletionSource.max || 0);
+      const current = Math.min(max, Math.max(0, Number(depletionSource.current || 0) - 1));
+      const node = { ...cloneJson(depletionSource), current };
       // Seed the respawn anchor at depletion time so the FIRST world-time advance
       // past the interval produces a gain instead of only re-anchoring. Without
       // this, a freshly-seeded pool carries lastEvaluatedWorldTime: null and the
@@ -1388,7 +1439,7 @@ export class GatheringRichStateService {
       if (node.respawn?.policy === 'overTime' && node.respawn.lastEvaluatedWorldTime == null) {
         node.respawn = { ...node.respawn, lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0) };
       }
-      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
+      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node, nodeState });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
 

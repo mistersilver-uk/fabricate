@@ -210,6 +210,37 @@ before catalyst deletion in Phase 2).
 - [ ] Gate: `npm test` && `npm run build`. Socket/respawn runtime validated via
       `npm run test:foundry`.
 
+### Phase 5 — post-implementation review fixes (applied)
+
+- [x] **MF-1 — timed `onSuccess` token decrement leaked to the env node.** Fixed by persisting
+      the token ref (`economyEvidence.tokenNodeRef`, from `adapter.tokenRef()`) on the waiting
+      run and rebuilding the adapter at maturity via the injected
+      `resolveTokenNodeState`/`resolveTokenNodeStateForRef` seam, threaded into
+      `_commitRichAttempt`. Test: `tests/canvas/timed-token-maturity.test.js` (token decrement
+      at maturity, env `nodeRuntime` untouched; absent-ref fallback). This is the **proper**
+      fix, not the documented `onStart` fallback.
+- [x] **MF-2 — listing-path override.** Threaded the scoped `nodeStateOverride` through
+      `listGatheringForActor` → `listForActor` → `_buildEnvironmentListing` → `_taskModel` /
+      `_richListingMetadata`, scoped via `_scopedNodeStateOverride`. Test:
+      `tests/canvas/listing-node-override.test.js`.
+- [x] **MF-3 — rendered depleted + respawn ETA.** `GatheringTaskDetail.svelte` renders a
+      token-scoped depleted callout (tone via `is-depleted`, not color alone) + a calendar-aware
+      respawn-ETA line (`NodeDepletedRespawns` / `NodeRespawnEta`) using the new
+      `src/ui/svelte/util/formatDuration.js`. Test:
+      `tests/util/format-respawn-duration.test.js`. Player-facing → needs PR-time smoke
+      screenshots.
+- [x] **MF-4 — unified `nodeRespawnMath` with `_respawnNode`.** `_respawnNode` delegates to
+      `respawnNodeOnce` (one implementation); the chance seam is the authoritative raw 1..100
+      roll. Env respawn tests stay green; added `tests/canvas/node-respawn-math.test.js`
+      (chance/expression/legacy-interval/re-anchor/room===0/ETA + drift guard vs `_respawnNode`).
+- [x] **GAP — world-time active-GM gate.** Extracted into a passable `isActiveGM` predicate in
+      `respawnInteractableTokens`; tests in `tests/canvas/interactable-world-time.test.js`
+      (non-active-GM applies nothing / active-GM runs).
+- [x] **GAP — `nodeStateOverrideFor` behavioral.** Extracted to the pure
+      `src/ui/nodeStateOverrideScope.js` (`scopeNodeStateOverride`); test:
+      `tests/canvas/node-state-override-scope.test.js` (scoped match returns the adapter, any
+      other env/task returns null).
+
 ## Phase 6 — Depleted-behavior config + env-resolution precedence
 
 - [ ] Add `depletedBehavior { swapImage?, postfixName?, deleteToken? }` to the

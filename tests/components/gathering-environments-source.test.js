@@ -19,8 +19,12 @@ const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svel
 describe('Fabricate app wiring for the gathering tab', () => {
   it('exposes listGatheringForActor and passes services down', () => {
     assert.ok(
-      appSource.includes('game?.fabricate?.listGatheringForActor?.({ presentTools: presentTools(), ...opts })'),
+      appSource.includes('game?.fabricate?.listGatheringForActor?.({') && appSource.includes('presentTools: presentTools(),'),
       'app should add the listGatheringForActor service threading the system-scoped active canvas tool'
+    );
+    assert.ok(
+      appSource.includes('nodeStateOverrideScope: {') && appSource.includes('environmentId: this._scopedEnvironmentId') && appSource.includes('taskId: this._scopedTaskId'),
+      'listGatheringForActor should thread the SCOPED per-token nodeStateOverride into the listing (MUST-FIX 2)'
     );
     assert.ok(
       appSource.includes('getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null'),
@@ -35,8 +39,12 @@ describe('Fabricate app wiring for the gathering tab', () => {
       'app should expose getActiveCanvasTool through the services bag'
     );
     assert.ok(
-      appSource.includes('game?.fabricate?.startGatheringAttempt?.({ presentTools: presentTools(), ...opts })'),
+      appSource.includes('game?.fabricate?.startGatheringAttempt?.({') && appSource.includes('presentTools: presentTools(),'),
       'startGatheringAttempt should carry the derived system-scoped presentTools'
+    );
+    assert.ok(
+      appSource.includes('...(nodeStateOverride ? { nodeStateOverride } : {})'),
+      'startGatheringAttempt should forward a per-token nodeStateOverride when the session is token-scoped (Phase 5)'
     );
   });
 

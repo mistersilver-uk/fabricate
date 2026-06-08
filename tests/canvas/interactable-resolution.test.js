@@ -124,16 +124,36 @@ test('buildSpawnRequest shapes a tool spawn (no environmentId)', () => {
   });
 });
 
-test('buildSpawnRequest carries environmentId for a gathering task', () => {
+test('buildSpawnRequest carries environmentId + the task name for a gathering task', () => {
   const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, deps());
   const request = buildSpawnRequest({ classification, point: { x: 10, y: 20 }, environmentId: 'env-3' });
   assert.deepEqual(request, {
     interactableType: 'gatheringTask',
     sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
     environmentId: 'env-3',
+    name: 'Mine Ore', // nameplate identifies the gathering point (discoverability)
     x: 10,
     y: 20
   });
+});
+
+test('buildSpawnRequest snapshots the task node CONFIG via buildNode (config + runtime)', () => {
+  const nodeDeps = {
+    getTask: () => ({ id: 'task-9', name: 'Mine Ore', nodes: { enabled: true, max: 3 } })
+  };
+  const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, nodeDeps);
+  const request = buildSpawnRequest({
+    classification,
+    point: { x: 1, y: 2 },
+    buildNode: (task) => ({ ...task.nodes, current: task.nodes.max })
+  });
+  assert.deepEqual(request.node, { enabled: true, max: 3, current: 3 });
+});
+
+test('buildSpawnRequest omits node for a task with no node config (unlimited gathering point)', () => {
+  const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, deps());
+  const request = buildSpawnRequest({ classification, point: { x: 1, y: 2 }, buildNode: () => null });
+  assert.equal('node' in request, false, 'no node snapshot is carried for an unlimited node');
 });
 
 test('buildSpawnRequest returns null for no classification', () => {

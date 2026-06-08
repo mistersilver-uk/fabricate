@@ -358,18 +358,85 @@ test('tool double-click is a no-op when the Tool cannot be resolved (no componen
   }
 });
 
-test('gathering-task double-click does NOT open the crafting tool session (Phase 5 stub)', () => {
+// --- Phase 5: gathering-task double-click → show('gathering', { … }) ---------
+
+function gatheringTaskToken(sourceUuid = 'Fabricate.sysA.gatheringTask.task-9', extra = {}) {
+  return {
+    id: 'token-77',
+    parent: { id: 'scene-1' },
+    flags: { fabricate: { isInteractable: true, interactableType: 'gatheringTask', sourceUuid, ...extra } }
+  };
+}
+
+function installGatheringEnvFoundry({ isGM = true, hasActiveGM = true, environments = [] } = {}) {
+  const base = installFakeFoundry({ isGM });
+  globalThis.game.users = { activeGM: hasActiveGM ? { id: 'gm-1' } : null };
+  globalThis.game.time = { worldTime: 0, calendar: null };
+  globalThis.game.fabricate.getGatheringEnvironmentStore = () => ({ list: () => environments });
+  globalThis.game.socket = { emit: () => {} };
+  return base;
+}
+
+test('gathering-task double-click opens the gathering tab scoped to the resolved environment + task with a node override', () => {
   const saved = snapshotGlobals();
   try {
-    installFakeFoundry({ isGM: true });
+    installGatheringEnvFoundry({
+      isGM: true,
+      environments: [{ id: 'env-1', craftingSystemId: 'sysA', enabledTaskIds: ['task-9'] }]
+    });
     const shows = [];
     const manager = new InteractableManager({ getAppClass: () => ({ show: (tab, options) => shows.push({ tab, options }) }) });
 
-    manager._onDoubleClick({
-      flags: { fabricate: { isInteractable: true, interactableType: 'gatheringTask', sourceUuid: 'Fabricate.sysA.gatheringTask.task-9' } }
-    });
+    manager._onDoubleClick(gatheringTaskToken('Fabricate.sysA.gatheringTask.task-9', {
+      node: { enabled: true, max: 3, current: 1, respawn: { policy: 'manual' } }
+    }));
 
-    assert.equal(shows.length, 0, 'the gathering-task branch is still the Phase-3/5 stub');
+    assert.equal(shows.length, 1, 'the gathering app opened once');
+    assert.equal(shows[0].tab, 'gathering');
+    assert.equal(shows[0].options.environmentId, 'env-1');
+    assert.equal(shows[0].options.taskId, 'task-9');
+    assert.equal(typeof shows[0].options.nodeStateOverride?.read, 'function', 'a per-token node adapter was injected');
+    assert.equal(shows[0].options.nodeStateOverride.read().current, 1, 'the adapter reads the token node');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('gathering-task double-click prefers an environmentId already on the token flag', () => {
+  const saved = snapshotGlobals();
+  try {
+    installGatheringEnvFoundry({
+      isGM: true,
+      environments: [{ id: 'env-other', craftingSystemId: 'sysA', enabledTaskIds: ['task-9'] }]
+    });
+    const shows = [];
+    const manager = new InteractableManager({ getAppClass: () => ({ show: (tab, options) => shows.push({ tab, options }) }) });
+
+    manager._onDoubleClick(gatheringTaskToken('Fabricate.sysA.gatheringTask.task-9', { environmentId: 'env-static' }));
+
+    assert.equal(shows.length, 1);
+    assert.equal(shows[0].options.environmentId, 'env-static', 'the token-flag environment wins over the fallback');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('gathering-task double-click blocks a player gracefully when no active GM is connected', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { warnings } = installGatheringEnvFoundry({
+      isGM: false,
+      hasActiveGM: false,
+      environments: [{ id: 'env-1', craftingSystemId: 'sysA', enabledTaskIds: ['task-9'] }]
+    });
+    const shows = [];
+    const manager = new InteractableManager({ getAppClass: () => ({ show: (tab, options) => shows.push({ tab, options }) }) });
+
+    manager._onDoubleClick(gatheringTaskToken());
+
+    assert.equal(shows.length, 0, 'no session opens without an active GM to apply node writes');
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0], 'FABRICATE.Canvas.Interactable.NoActiveGM');
   } finally {
     restoreGlobals(saved);
   }
