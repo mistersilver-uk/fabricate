@@ -607,7 +607,7 @@ GatheringNodeConfig = {
 7. Supported depletion timing includes at least `onStart` and `onSuccess`.
 8. If a task is blind, node count display to non-GM users uses generic availability copy unless revealing the count is explicitly safe for that environment.
 9. GM users can inspect and manually adjust node availability.
-10. A respawn policy may be `manual` or `overTime`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval.
+10. A respawn policy may be `manual` or `overTime`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval. Legacy pre-0.4.0 auto-respawn policies (`elapsedTime`, `probability`, `manualAndElapsedTime`) are mapped to `overTime` at read time (matching the 0.4.0 migration), so a world whose node data was never migrated still respawns instead of silently degrading to `manual`; `none`/unknown remain `manual`.
 11. An `overTime` policy selects a `gainMode` per interval: `guaranteed` (+1), `chance` (a configured 0..1 probability of +1, persisted as a roll), or `expression` (roll a dice expression and add the rolled total).
 12. The respawn interval is authored as `intervalUnit` (`minutes` | `hours` | `days` | `weeks`) + `intervalAmount`. A unit of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) at runtime so it tracks custom calendars; `minutes`/`hours` are fixed (60s/3600s); with no calendar the lengths fall back to 86400s/604800s. Nodes authored before this schema may persist a raw `intervalSeconds`, which the runtime honours until a migration rewrites it to unit+amount.
 13. `chance`-mode respawn persists the evaluated roll/outcome so repeated listing refreshes do not reroll the same interval.
@@ -616,6 +616,7 @@ GatheringNodeConfig = {
 16. Respawn must not exceed the task's configured maximum node count unless a GM override explicitly changes the maximum or applies an overstock action.
 17. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
 18. Player-facing UI should show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
+19. A per-environment node runtime entry persists only STATE — the current count, a GM-overridable `max`, and the respawn timers (anchor/roll). The respawn CONFIG (policy, gain mode, interval, depletion timing) is sourced from the current library task at evaluation time and is never frozen at first depletion, so editing a task's respawn config takes effect in every environment, including pools already depleted to zero.
 
 ## Gathering Attempt Limits (removed)
 

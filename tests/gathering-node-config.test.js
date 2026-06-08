@@ -14,11 +14,19 @@ test('normalizeRespawn defaults a missing/invalid block to manual', () => {
   assert.deepEqual(normalizeRespawn('nope'), { policy: 'manual' });
 });
 
-test('normalizeRespawn coerces an unknown/legacy policy to manual', () => {
-  // Legacy values are mapped by the 0.4.0 migration; at read time they coerce.
-  for (const policy of ['none', 'elapsedTime', 'probability', 'manualAndElapsedTime', 'whatever']) {
-    assert.equal(normalizeRespawn({ policy }).policy, 'manual', `${policy} → manual`);
-  }
+test('normalizeRespawn maps legacy respawn policies to the manual|overTime schema at read time', () => {
+  // Resilience to un-migrated worlds: legacy auto-respawn policies become overTime
+  // (so respawn still fires) rather than silently coercing to manual.
+  assert.deepEqual(
+    { policy: normalizeRespawn({ policy: 'elapsedTime' }).policy, gainMode: normalizeRespawn({ policy: 'elapsedTime' }).gainMode },
+    { policy: 'overTime', gainMode: 'guaranteed' }
+  );
+  assert.equal(normalizeRespawn({ policy: 'probability' }).policy, 'overTime');
+  assert.equal(normalizeRespawn({ policy: 'probability' }).gainMode, 'chance');
+  assert.equal(normalizeRespawn({ policy: 'manualAndElapsedTime' }).policy, 'overTime');
+  // `none` and truly unknown values still mean "no automatic respawn".
+  assert.equal(normalizeRespawn({ policy: 'none' }).policy, 'manual');
+  assert.equal(normalizeRespawn({ policy: 'whatever' }).policy, 'manual');
 });
 
 test('normalizeRespawn defaults an unknown gain mode to guaranteed', () => {

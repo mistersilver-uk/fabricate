@@ -200,6 +200,8 @@ export class GatheringEngine {
           const updated = await this.richState.regenerateActorStamina({ actor, systemId: system.id, system, worldTime });
           if (updated) changed.push({ actorId: idOf(actor), systemId: String(system.id) });
         } catch (error) {
+          // Surface (don't silently swallow) so a broken regen is diagnosable.
+          console.warn(`Fabricate | stamina regen failed for actor ${idOf(actor)} in system ${system.id}:`, error);
           // eslint-disable-next-line no-continue
           continue;
         }
@@ -223,6 +225,8 @@ export class GatheringEngine {
         const updated = await this.richState.respawnNodes({ environment, worldTime });
         if (updated) changed.push({ environmentId: String(environment.id) });
       } catch (error) {
+        // Surface (don't silently swallow) so a broken respawn is diagnosable.
+        console.warn(`Fabricate | node respawn failed for environment ${environment?.id}:`, error);
         // eslint-disable-next-line no-continue
         continue;
       }
