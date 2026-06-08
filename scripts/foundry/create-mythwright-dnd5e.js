@@ -942,6 +942,31 @@ const MythwrightDnd5eBootstrap = (() => {
     'tool-dragon-tongs': ['broken-tool-dragon-tongs', 'iron-ingot', 'dragon-scale']
   });
 
+  // The standard D&D 5e gathering character-modifier library, copied verbatim
+  // from DND5E_CHARACTER_MODIFIER_PRESETS (src/config/gatheringCharacterModifierPresets.js).
+  // Seeded into the system's `characterModifiers` so task `staminaCostModifiers`
+  // resolve their `@abilities.<key>.mod` / `@skills.<key>.total` expressions in-game.
+  const MYTHWRIGHT_CHARACTER_MODIFIERS = Object.freeze([
+    { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod', macroUuid: '' },
+    { id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-feather', provider: 'dnd5e', expression: '@abilities.dex.mod', macroUuid: '' },
+    { id: 'constitution', label: 'Constitution', icon: 'fa-solid fa-heart-pulse', provider: 'dnd5e', expression: '@abilities.con.mod', macroUuid: '' },
+    { id: 'intelligence', label: 'Intelligence', icon: 'fa-solid fa-brain', provider: 'dnd5e', expression: '@abilities.int.mod', macroUuid: '' },
+    { id: 'wisdom', label: 'Wisdom', icon: 'fa-solid fa-eye', provider: 'dnd5e', expression: '@abilities.wis.mod', macroUuid: '' },
+    { id: 'charisma', label: 'Charisma', icon: 'fa-solid fa-comments', provider: 'dnd5e', expression: '@abilities.cha.mod', macroUuid: '' },
+    { id: 'survival', label: 'Survival', icon: 'fa-solid fa-campground', provider: 'dnd5e', expression: '@skills.sur.total', macroUuid: '' }
+  ]);
+
+  // Mythwright stamina economy: a Constitution-scaled pool that recharges per day.
+  // Seeded as the system's economy block so the system ships in `stamina` mode.
+  const MYTHWRIGHT_STAMINA_ECONOMY = Object.freeze({
+    mode: 'stamina',
+    stamina: {
+      max: '(max(1, @abilities.con.mod))d6 + 1',
+      start: '', // blank ⇒ start full at max
+      regen: { policy: 'elapsedTime', unit: 'days', amount: '1 + @abilities.con.mod', lastRoll: null }
+    }
+  });
+
   function buildGatheringTools() {
     return MYTHWRIGHT_GATHERING_TOOL_DEFINITIONS.map(([id, label, componentId, replacementComponentId, breakageChance]) => ({
       id,
@@ -1036,6 +1061,27 @@ const MythwrightDnd5eBootstrap = (() => {
       .filter(Boolean));
   }
 
+  // A per-task resource-node pool (config + initial state). Seeded on every task
+  // so that flipping the system economy to `nodes` mode yields sensible finite
+  // counts with no further authoring; dormant while the system is in `stamina`
+  // mode. `current` starts full; the pool tops up by 1 every `intervalDays`.
+  function gatheringNode(max, intervalDays = 1) {
+    return {
+      enabled: true,
+      max,
+      current: max,
+      depletionTiming: 'onStart',
+      respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'days', intervalAmount: intervalDays }
+    };
+  }
+
+  // A stamina-cost modifier reference that *reduces* a task's cost by a character
+  // modifier (operator `-`): positive modifiers make the task cheaper, negative
+  // ones make it dearer. `modifierId` must exist in MYTHWRIGHT_CHARACTER_MODIFIERS.
+  function staminaReducedBy(taskId, modifierId) {
+    return [{ id: `${taskId}-stamina-${modifierId}`, modifierId, operator: '-', min: null, max: null, expressionOverride: '' }];
+  }
+
   function buildGatheringTasks({ srdByName = new Map(), componentIds = null, unresolvedDrops = null } = {}) {
     const resolvedComponentIds = componentIds || srdComponentIdsFromMap(srdByName);
     const drop = options => gatheringDrop({ ...options, srdByName, componentIds: resolvedComponentIds, unresolvedDrops });
@@ -1049,6 +1095,9 @@ const MythwrightDnd5eBootstrap = (() => {
         biomes: ['cave', 'mountain'],
         toolIds: ['mythwright-tool-mining-pick'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 6,
+        staminaCostModifiers: staminaReducedBy('mine-ore', 'strength'),
+        nodes: gatheringNode(8, 1),
         dropRows: [
           drop({ id: 'mine-ore-raw', name: 'Raw Ore', componentId: 'raw-ore', quantity: 2, dropRate: 90 }),
           drop({ id: 'mine-ore-ingot', name: 'Iron Ingot', componentId: 'iron-ingot', dropRate: 45 }),
@@ -1065,6 +1114,9 @@ const MythwrightDnd5eBootstrap = (() => {
         biomes: ['forest', 'grassland'],
         toolIds: ['mythwright-tool-wood-axe'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 5,
+        staminaCostModifiers: staminaReducedBy('wild-hardwood', 'strength'),
+        nodes: gatheringNode(8, 1),
         dropRows: [
           drop({ id: 'wild-hardwood-stock', name: 'Hardwood', componentId: 'hardwood', quantity: 2, dropRate: 85 }),
           drop({ id: 'wild-hardwood-bow-stave', name: 'Bow Stave', componentId: 'bow-stave', dropRate: 25 }),
@@ -1080,6 +1132,9 @@ const MythwrightDnd5eBootstrap = (() => {
         biomes: ['forest', 'grassland'],
         toolIds: ['mythwright-tool-skinning-knife'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 4,
+        staminaCostModifiers: staminaReducedBy('wild-hide', 'dexterity'),
+        nodes: gatheringNode(6, 1),
         dropRows: [
           drop({ id: 'wild-hide-cured', name: 'Cured Hide', componentId: 'cured-hide', quantity: 2, dropRate: 80 }),
           drop({ id: 'wild-hide-trophy', name: 'Monster Trophy', componentId: 'monster-trophy', dropRate: 35 }),
@@ -1095,6 +1150,9 @@ const MythwrightDnd5eBootstrap = (() => {
         biomes: ['ruins', 'urban'],
         toolIds: ['mythwright-tool-delver-kit'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 5,
+        staminaCostModifiers: staminaReducedBy('ruin-relics', 'intelligence'),
+        nodes: gatheringNode(5, 3),
         dropRows: [
           drop({ id: 'ruin-relics-fragment', name: 'Ancient Fragment', componentId: 'ancient-fragment', quantity: 2, dropRate: 80 }),
           drop({ id: 'ruin-relics-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 30 }),
@@ -1111,6 +1169,9 @@ const MythwrightDnd5eBootstrap = (() => {
         biomes: ['wasteland', 'grassland'],
         toolIds: ['mythwright-tool-delver-kit', 'mythwright-tool-skinning-knife'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 5,
+        staminaCostModifiers: staminaReducedBy('battlefield-salvage', 'strength'),
+        nodes: gatheringNode(6, 2),
         dropRows: [
           drop({ id: 'battlefield-salvage-trophy', name: 'Monster Trophy', componentId: 'monster-trophy', dropRate: 45 }),
           drop({ id: 'battlefield-salvage-plates', name: 'Armour Plates', componentId: 'armour-plates', dropRate: 35 }),
@@ -1127,6 +1188,9 @@ const MythwrightDnd5eBootstrap = (() => {
         enabled: true,
         toolIds: ['mythwright-tool-planar-binding-rod'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 7,
+        staminaCostModifiers: staminaReducedBy('planar-essence', 'wisdom'),
+        nodes: gatheringNode(4, 3),
         dropRows: [
           drop({ id: 'planar-essence-ember', name: 'Ember Essence', componentId: 'ember', dropRate: 35 }),
           drop({ id: 'planar-essence-frost', name: 'Frost Essence', componentId: 'frost', dropRate: 35 }),
@@ -1143,11 +1207,47 @@ const MythwrightDnd5eBootstrap = (() => {
         enabled: true,
         toolIds: ['mythwright-tool-dragon-tongs'],
         itemSelectionMode: 'allDrops',
+        staminaCost: 8,
+        staminaCostModifiers: staminaReducedBy('dragon-scale', 'constitution'),
+        nodes: gatheringNode(3, 7),
         dropRows: [
           drop({ id: 'dragon-scale-scale', name: 'Dragon Scale', componentId: 'dragon-scale', quantity: 2, dropRate: 70 }),
           drop({ id: 'dragon-scale-essence', name: 'Dragon Essence', componentId: 'dragon', dropRate: 35 }),
           drop({ id: 'dragon-scale-catalyst', name: 'Mythic Catalyst', componentId: 'mythic-catalyst', dropRate: 18 }),
           drop({ id: 'dragon-scale-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 30 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'forage-deadfall',
+        name: 'Forage the Deadfall',
+        description: 'Work the forest floor by hand — gathering fallen branches, shed antler, and hides snagged on the briars. No tools, just a sharp eye and patience.',
+        img: MYTHWRIGHT_ICONS.gatheringWildHardwood,
+        enabled: true,
+        biomes: ['forest', 'grassland'],
+        toolIds: [],
+        itemSelectionMode: 'allDrops',
+        staminaCost: 3,
+        staminaCostModifiers: staminaReducedBy('forage-deadfall', 'survival'),
+        nodes: gatheringNode(10, 1),
+        dropRows: [
+          drop({ id: 'forage-deadfall-hardwood', name: 'Hardwood', componentId: 'hardwood', dropRate: 70 }),
+          drop({ id: 'forage-deadfall-hide', name: 'Cured Hide', componentId: 'cured-hide', dropRate: 30 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'surface-scavenge',
+        name: 'Pick the Surface',
+        description: 'Comb the loose scree and tailings near the cave mouth, prising free stray nuggets and the odd uncut gem without ever swinging a pick.',
+        img: MYTHWRIGHT_ICONS.gatheringMineOre,
+        enabled: true,
+        biomes: ['cave', 'mountain'],
+        toolIds: [],
+        itemSelectionMode: 'allDrops',
+        staminaCost: 4,
+        nodes: gatheringNode(10, 1),
+        dropRows: [
+          drop({ id: 'surface-scavenge-ore', name: 'Raw Ore', componentId: 'raw-ore', dropRate: 70 }),
+          drop({ id: 'surface-scavenge-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 15 })
         ].filter(Boolean)
       }
     ];
@@ -1450,7 +1550,6 @@ const MythwrightDnd5eBootstrap = (() => {
       name,
       description: ENVIRONMENT_DESCRIPTIONS[id] || `${name} holds useful materials for careful gatherers.`,
       risk,
-      economyMode: 'time',
       selectionMode: 'targeted',
       enabled: true,
       tasks: [],
@@ -1517,6 +1616,19 @@ const MythwrightDnd5eBootstrap = (() => {
       ...(systemConfig.rules || {}),
       toolBreakagePolicy: systemConfig.rules?.toolBreakagePolicy || 'failureOnBreak'
     };
+    // Ship the system in stamina mode. Overwritten each run — this is the seed's
+    // intended economy; a GM can switch to `nodes`/`none` in the manager afterwards.
+    systemConfig.economy = clonePlain(MYTHWRIGHT_STAMINA_ECONOMY);
+    // Seed the standard 5e character-modifier library, preserving any existing
+    // entry whose id already matches (mirrors seedCharacterModifierPresets) so GM
+    // edits survive a re-run. The task staminaCostModifiers reference these by id.
+    const existingModifierIds = new Set(
+      collectionValues(systemConfig.characterModifiers).filter(entry => entry?.id).map(entry => String(entry.id))
+    );
+    systemConfig.characterModifiers = [
+      ...collectionValues(systemConfig.characterModifiers),
+      ...MYTHWRIGHT_CHARACTER_MODIFIERS.filter(entry => !existingModifierIds.has(entry.id)).map(entry => clonePlain(entry))
+    ];
     current.systems[SYSTEM_ID] = systemConfig;
     await settings.set('fabricate', 'gatheringConfig', current);
     if (summary) summary.gatheringConfig = { tools: tools.length, tasks: tasks.length, hazards: hazards.length, unresolvedDrops: clonePlain(unresolvedDrops) };
@@ -1714,8 +1826,8 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     if (environmentStore) {
       const taskById = new Map(gatheringTasks.map(task => [task.id, task]));
       const environments = [
-        buildEnvironment('mythwright-mines', 'Mines', 'hazardous', [taskById.get('mine-ore')].filter(Boolean)),
-        buildEnvironment('mythwright-wilds', 'Wilds', 'safe', ['wild-hardwood', 'wild-hide'].map(id => taskById.get(id)).filter(Boolean)),
+        buildEnvironment('mythwright-mines', 'Mines', 'hazardous', ['mine-ore', 'surface-scavenge'].map(id => taskById.get(id)).filter(Boolean)),
+        buildEnvironment('mythwright-wilds', 'Wilds', 'safe', ['wild-hardwood', 'wild-hide', 'forage-deadfall'].map(id => taskById.get(id)).filter(Boolean)),
         buildEnvironment('mythwright-ruins', 'Ruins', 'unsafe', [taskById.get('ruin-relics')].filter(Boolean)),
         buildEnvironment('mythwright-battlefields', 'Battlefields', 'hazardous', [taskById.get('battlefield-salvage')].filter(Boolean)),
         buildEnvironment('mythwright-planar-sites', 'Planar Sites', 'extreme', [taskById.get('planar-essence')].filter(Boolean)),
