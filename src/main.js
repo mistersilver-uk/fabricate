@@ -24,7 +24,6 @@ import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
 import { Catalyst } from './models/Catalyst.js';
-import { Tool } from './models/Tool.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
@@ -38,6 +37,7 @@ import {
   createGatheringToolAvailability,
   matchGatheringTools
 } from './gatheringToolRuntime.js';
+import { createToolBreakageRuntime } from './toolBreakageRuntime.js';
 import {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass
@@ -174,124 +174,15 @@ function createGatheringCatalystUsage(craftingSystemManager) {
   };
 }
 
-function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression, resultCreator }) {
-  const pendingPlans = new Map();
-  return {
-    async plan({ actor, system, task, tools = [] } = {}) {
-      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
-      const planned = [];
-      for (const { tool, item } of matched.items) {
-        const model = Tool.fromJSON(tool);
-        const breakageResult = await evaluateToolBreakagePlan(model, { actor, item, evaluateExpression });
-        const entry = {
-          componentId: model.componentId,
-          itemRef: gatheringRunItemRef(actor, item),
-          mode: breakageResult.mode,
-          broken: breakageResult.broken,
-          evidence: breakageResult.evidence
-        };
-        if (breakageResult.broken) {
-          entry.onBreak = plannedToolBreakageOutcome(model);
-        }
-        planned.push(entry);
-      }
-      pendingPlans.set(gatheringToolPlanKey({ actor, task }), planned);
-      return planned;
-    },
-
-    async apply({ actor, system, environment, task, tools = [] } = {}) {
-      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
-      const planKey = gatheringToolPlanKey({ actor, task });
-      const plannedByItem = new Map((pendingPlans.get(planKey) || [])
-        .map(entry => [stringOrEmpty(entry?.itemRef?.itemUuid), entry]));
-      pendingPlans.delete(planKey);
-      const evidence = [];
-      for (const { tool: toolData, item } of matched.items) {
-        const tool = Tool.fromJSON(toolData);
-        await tool.applyUsage(item);
-        const itemRef = gatheringRunItemRef(actor, item);
-        const planned = plannedByItem.get(stringOrEmpty(itemRef.itemUuid));
-        const breakageResult = planned
-          ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
-          : await evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression });
-        const entry = {
-          componentId: tool.componentId,
-          itemRef,
-          mode: breakageResult.mode,
-          broken: breakageResult.broken,
-          evidence: breakageResult.evidence
-        };
-        if (breakageResult.broken) {
-          const breakOutcome = await tool.applyBreakage({
-            item,
-            actor,
-            createReplacement: async ({ actor: replacementActor, componentId }) => {
-              const source = resolveGatheringResultSource(
-                { componentId, quantity: 1 },
-                system,
-                craftingSystemManager
-              );
-              if (!source || typeof replacementActor?.createEmbeddedDocuments !== 'function') return;
-              const itemData = source.toObject?.() ?? {
-                name: source.name ?? 'Replacement Item',
-                img: source.img ?? 'icons/svg/item-bag.svg',
-                type: source.type ?? 'loot',
-                system: source.system ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system } : {}
-              };
-              itemData.system ??= {};
-              if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
-              if (source.uuid) {
-                globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-              }
-              await replacementActor.createEmbeddedDocuments('Item', [itemData]);
-            }
-          });
-          entry.onBreak = breakOutcome;
-        }
-        evidence.push(entry);
-      }
-      return evidence;
-    }
-  };
-}
-
-async function evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression } = {}) {
-  if (tool.breakage?.mode === 'limitedUses') {
-    const usage = readToolUsage(item);
-    const timesUsed = Number(usage?.timesUsed || 0) + 1;
-    const maxUses = tool.breakage.maxUses;
-    const broken = maxUses !== null && Number.isFinite(maxUses) && timesUsed >= maxUses;
-    return { broken, mode: 'limitedUses', evidence: { timesUsed, maxUses } };
-  }
-  return tool.evaluateBreakage({ actor, item, evaluateExpression });
-}
-
-function plannedToolBreakageOutcome(tool) {
-  if (tool.onBreak?.mode === 'destroy') return { action: 'destroyed' };
-  if (tool.onBreak?.mode === 'flagBroken') return { action: 'flagged' };
-  if (tool.onBreak?.mode === 'replaceWith') {
-    return {
-      action: 'replaced',
-      replacementComponentId: tool.onBreak.replacementComponentId
-    };
-  }
-  return { action: 'none' };
-}
-
-function readToolUsage(item) {
-  return item?.getFlag?.('fabricate', 'toolUsage')
-    ?? item?.getFlag?.('fabricate', 'fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage')
-    ?? { timesUsed: 0 };
-}
-
-function gatheringToolPlanKey({ actor, task } = {}) {
-  return `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
-}
-
-function stringOrEmpty(value) {
-  return value === null || value === undefined ? '' : String(value);
+function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression }) {
+  return createToolBreakageRuntime({
+    matchTools: ({ actor, system, task, tools = [] }) =>
+      matchGatheringTools({ actor, system, task, tools, craftingSystemManager }),
+    buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
+    resolveReplacementSource: ({ componentId, system }) =>
+      resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
+    evaluateExpression
+  });
 }
 
 function matchGatheringCatalysts({ actor, system, task, catalysts = [], craftingSystemManager } = {}) {
@@ -681,8 +572,7 @@ class Fabricate {
       catalystUsage: createGatheringCatalystUsage(this.craftingSystemManager),
       toolBreakage: createGatheringToolBreakage({
         craftingSystemManager: this.craftingSystemManager,
-        evaluateExpression: evaluateGatheringExpression,
-        resultCreator: createGatheringResultCreator(this.craftingSystemManager)
+        evaluateExpression: evaluateGatheringExpression
       }),
       failureFeedback: createGatheringFailureFeedback(),
       hazardSceneTrigger: createHazardSceneTrigger({

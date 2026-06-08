@@ -115,16 +115,27 @@ function syntheticToolRecipe({ system, task }) {
 }
 
 /**
- * Resolve the tool/item matcher, preferring the manager's own
- * `catalystMatchesItem` (tests inject this) and falling back to its
- * `recipeManager` (the production `CraftingSystemManager` delegates matching to
- * `RecipeManager`). Returns a bound function or a never-match fallback.
+ * Resolve the tool/item matcher.
+ *
+ * Preference order at each provider tier is `toolMatchesItem` first, then the
+ * legacy `catalystMatchesItem` (both delegate to the same generic component
+ * matcher). This lets Phase 2 drop the catalyst matcher name atomically while
+ * gathering keeps working today. Resolution prefers the manager's own method,
+ * then falls back to its `recipeManager` (the production `CraftingSystemManager`
+ * delegates matching to `RecipeManager`). Returns a bound function or a
+ * never-match fallback.
  */
 function resolveToolMatcher(craftingSystemManager) {
+  if (typeof craftingSystemManager?.toolMatchesItem === 'function') {
+    return (recipe, tool, candidate) => craftingSystemManager.toolMatchesItem(recipe, tool, candidate);
+  }
   if (typeof craftingSystemManager?.catalystMatchesItem === 'function') {
     return (recipe, tool, candidate) => craftingSystemManager.catalystMatchesItem(recipe, tool, candidate);
   }
   const recipeManager = craftingSystemManager?.recipeManager;
+  if (typeof recipeManager?.toolMatchesItem === 'function') {
+    return (recipe, tool, candidate) => recipeManager.toolMatchesItem(recipe, tool, candidate);
+  }
   if (typeof recipeManager?.catalystMatchesItem === 'function') {
     return (recipe, tool, candidate) => recipeManager.catalystMatchesItem(recipe, tool, candidate);
   }

@@ -5,6 +5,9 @@ import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getItemSourceReferences, getComponentSourceReferences, itemMatchesComponentSource } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
+import { Tool } from '../models/Tool.js';
+import { applyToolUsageAndBreakage } from '../toolBreakageRuntime.js';
+import { isToolBroken } from '../gatheringToolRuntime.js';
 
 /**
  * Handles the actual crafting process
@@ -179,6 +182,23 @@ export class CraftingEngine {
       };
     }
 
+    // Validate tools (additive; runs alongside the catalyst path).
+    // Transitional `typeof` guard (asymmetric with the unguarded
+    // getCatalystsForSet sibling above): keeps minimal test-double recipe
+    // managers that omit getToolsForSet green during the Phase 0 rollout.
+    // Drop once all recipe managers expose getToolsForSet.
+    const toolsForSet = typeof this.recipeManager.getToolsForSet === 'function'
+      ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
+      : [];
+    const toolValidation = await this._validateTools(componentSourceActors, executionRecipe, toolsForSet);
+    if (!toolValidation.valid) {
+      return {
+        success: false,
+        results: null,
+        message: toolValidation.message
+      };
+    }
+
     const currencyCheck = await this._checkCurrencyRequirement(craftingActor, recipe, step);
     if (!currencyCheck.valid) {
       return {
@@ -209,6 +229,7 @@ export class CraftingEngine {
       const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let consumedOnFail = [];
       let degradedCatalysts = [];
+      let usedToolsOnFail = [];
       try {
         if (failurePolicy.consumeIngredientsOnFail) {
           consumedOnFail = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
@@ -216,6 +237,7 @@ export class CraftingEngine {
         if (failurePolicy.consumeCatalystsOnFail) {
           await this._degradeCatalysts(catalystValidation.catalysts);
           degradedCatalysts = catalystValidation.catalysts;
+          usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
         }
       } catch (consumptionError) {
         console.error('Fabricate | Error during failure-path consumption:', consumptionError);
@@ -239,7 +261,8 @@ export class CraftingEngine {
             actorUuid: item.parent?.uuid || null,
             itemUuid: item.uuid,
             quantity: 1
-          }))
+          })),
+          usedTools: usedToolsOnFail
         });
       }
       // Execute failure macro (spec 002 Failure Macro Contract)
@@ -279,6 +302,7 @@ export class CraftingEngine {
       const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let consumedOnValidationFail = [];
       let degradedCatalystsOnValidationFail = [];
+      let usedToolsOnValidationFail = [];
       try {
         if (validationFailurePolicy.consumeIngredientsOnFail) {
           consumedOnValidationFail = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
@@ -286,6 +310,7 @@ export class CraftingEngine {
         if (validationFailurePolicy.consumeCatalystsOnFail) {
           await this._degradeCatalysts(catalystValidation.catalysts);
           degradedCatalystsOnValidationFail = catalystValidation.catalysts;
+          usedToolsOnValidationFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
         }
       } catch (consumptionError) {
         console.error('Fabricate | Error during failure-path consumption:', consumptionError);
@@ -309,7 +334,8 @@ export class CraftingEngine {
             actorUuid: item.parent?.uuid || null,
             itemUuid: item.uuid,
             quantity: 1
-          }))
+          })),
+          usedTools: usedToolsOnValidationFail
         });
       }
       // Execute failure macro (spec 002 Failure Macro Contract)
@@ -385,6 +411,9 @@ export class CraftingEngine {
     // Apply catalyst degradation
     await this._degradeCatalysts(catalystValidation.catalysts);
 
+    // Apply tool usage/breakage (additive; alongside catalyst degradation).
+    const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
+
     // Deduct Item Piles currency cost after ingredients are consumed to avoid
     // losing currency if ingredient consumption throws.
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
@@ -422,7 +451,8 @@ export class CraftingEngine {
             actorUuid: item.parent?.uuid || null,
             itemUuid: item.uuid,
             quantity: 1
-          }))
+          })),
+          usedTools
         });
       }
       {
@@ -478,6 +508,7 @@ export class CraftingEngine {
           itemUuid: item.uuid,
           quantity: 1
         })),
+        usedTools,
         createdResults: (resultItems || []).map(item => ({
           actorUuid: craftingActor.uuid,
           itemUuid: item.uuid,
@@ -785,6 +816,123 @@ export class CraftingEngine {
     for (const { catalyst, item } of catalystItems) {
       await catalyst.applyDegradation(item);
     }
+  }
+
+  /**
+   * Validate that all required library Tools resolved for this recipe/step are
+   * present (a matching, non-broken item) on the component source actors.
+   *
+   * Mirrors {@link _validateCatalysts}: returns the matched `{ tool, item }`
+   * pairs so the caller can apply usage/breakage on the success and
+   * failure-consumption paths. Runs IN PARALLEL with the catalyst path — neither
+   * removes nor alters the other.
+   *
+   * @private
+   * @param {Actor[]} actors
+   * @param {Recipe} recipe
+   * @param {Array<object>} tools - resolved library Tool objects
+   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item}> }>}
+   */
+  async _validateTools(actors, recipe, tools = []) {
+    const toolItems = [];
+
+    for (const tool of tools) {
+      let found = null;
+      for (const actor of actors) {
+        const matching = Array.from(actor?.items ?? []).find(item =>
+          !isToolBroken(item) && this.recipeManager.toolMatchesItem(recipe, tool, item)
+        );
+        if (matching) {
+          found = matching;
+          break;
+        }
+      }
+
+      if (!found) {
+        return {
+          valid: false,
+          message: `Missing required tool (componentId: ${tool?.componentId || tool?.systemItemId})`
+        };
+      }
+
+      toolItems.push({ tool, item: found });
+    }
+
+    return { valid: true, tools: toolItems };
+  }
+
+  /**
+   * Apply usage and breakage to matched tools, delegating to the shared
+   * {@link applyToolUsageAndBreakage} runtime (the same plan/apply core the
+   * gathering tool breakage uses). Returns `usedTools` evidence in the same
+   * run-record shape as `usedCatalysts`.
+   *
+   * @private
+   * @param {Recipe} recipe
+   * @param {Array<{tool: object, item: Item}>} toolItems
+   * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
+   */
+  async _applyToolBreakage(recipe, toolItems = []) {
+    const evidence = [];
+    for (const { tool: toolData, item } of toolItems) {
+      const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
+      const actor = item?.parent ?? null;
+      const entry = await applyToolUsageAndBreakage({
+        tool,
+        actor,
+        item,
+        buildItemRef: (_actor, breakItem) => ({
+          actorUuid: breakItem?.parent?.uuid || null,
+          itemUuid: breakItem?.uuid || null,
+          quantity: 1
+        }),
+        createReplacement: this._makeToolReplacementCreator(recipe)
+      });
+      evidence.push({
+        actorUuid: entry.itemRef?.actorUuid ?? null,
+        itemUuid: entry.itemRef?.itemUuid ?? null,
+        quantity: entry.itemRef?.quantity ?? 1,
+        componentId: entry.componentId ?? null,
+        broken: entry.broken === true
+      });
+    }
+    return evidence;
+  }
+
+  /**
+   * Build a `replaceWith` creator that resolves the replacement component from
+   * the recipe's crafting system and creates the item on the actor.
+   * @private
+   */
+  _makeToolReplacementCreator(recipe) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(recipe?.craftingSystemId);
+    return async ({ actor, componentId }) => {
+      const component = (system?.components || []).find(entry => entry.id === componentId) || null;
+      if (!component || typeof actor?.createEmbeddedDocuments !== 'function') return;
+      let source = component;
+      if (component.sourceUuid && typeof globalThis.fromUuidSync === 'function') {
+        try {
+          source = globalThis.fromUuidSync(component.sourceUuid) ?? component;
+        } catch (_err) {
+          source = component;
+        }
+      }
+      const itemData = source.toObject?.() ?? {
+        name: source.name ?? 'Replacement Item',
+        img: source.img ?? 'icons/svg/item-bag.svg',
+        type: source.type ?? 'loot',
+        system: source.system
+          ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system }
+          : {}
+      };
+      itemData.system ??= {};
+      if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
+      if (source.uuid) {
+        globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+      }
+      await actor.createEmbeddedDocuments('Item', [itemData]);
+    };
   }
 
   /**
@@ -1720,6 +1868,13 @@ export class CraftingEngine {
       catalysts: [
         ...(Array.isArray(recipe?.catalysts) ? recipe.catalysts : []),
         ...(Array.isArray(step?.catalysts) ? step.catalysts : [])
+      ],
+      // Merge step-level toolIds the same way catalysts are merged so the
+      // union flows to RecipeManager.getToolsForSet via recipe.toolIds.
+      // getToolsForSet dedupes by id, so recipe/step overlap resolves once.
+      toolIds: [
+        ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
+        ...(Array.isArray(step?.toolIds) ? step.toolIds : [])
       ]
     };
   }

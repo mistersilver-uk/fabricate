@@ -39,6 +39,9 @@ export class Recipe {
       c instanceof Catalyst ? c : Catalyst.fromJSON(c)
     );
 
+    // Recipe-level shared library tool references (per-system Tool ids).
+    this.toolIds = this._normalizeToolIds(data.toolIds);
+
     // Recipe behaviour
     this.isVariable = data.isVariable !== undefined ? data.isVariable : false;
     this.transferEffects = data.transferEffects !== undefined ? data.transferEffects : false;
@@ -285,7 +288,8 @@ export class Recipe {
           name: group.name,
           results: (group.results || []).map(result => result.toJSON ? result.toJSON() : result)
         })),
-        catalysts: (step.catalysts || []).map(c => c.toJSON ? c.toJSON() : c)
+        catalysts: (step.catalysts || []).map(c => c.toJSON ? c.toJSON() : c),
+        toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : []
       })),
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
       resultGroups: this.resultGroups.map(group => ({
@@ -294,6 +298,7 @@ export class Recipe {
         results: group.results.map(r => r.toJSON())
       })),
       catalysts: this.catalysts.map(c => c.toJSON()),
+      toolIds: [...this.toolIds],
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map(r => r.toJSON()),
       isVariable: this.isVariable,
@@ -396,6 +401,7 @@ export class Recipe {
       catalysts: (step.catalysts || []).map(c =>
         c instanceof Catalyst ? c : Catalyst.fromJSON(c)
       ),
+      toolIds: this._normalizeToolIds(step.toolIds),
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
       currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
       currencyCost: this._normalizeCurrencyCost(step.currencyCost),
@@ -458,6 +464,25 @@ export class Recipe {
     };
   }
 
+  /**
+   * Normalize an array of library tool id strings: coerce to trimmed, non-empty,
+   * deduped strings. Tolerant of non-array / nullish input (returns []).
+   * @param {unknown} toolIds
+   * @returns {string[]}
+   */
+  _normalizeToolIds(toolIds) {
+    if (!Array.isArray(toolIds)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of toolIds) {
+      const id = String(raw ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
+  }
+
   _normalizeVisibility(visibility) {
     if (!visibility || typeof visibility !== 'object') return null;
     return {
@@ -478,6 +503,7 @@ export class Recipe {
       ingredientSets: this.ingredientSets,
       resultGroups: this.resultGroups,
       catalysts: this.catalysts || [],
+      toolIds: this.toolIds || [],
       timeRequirement: null,
       currencyRequirement: null,
       outcomeRouting: this.outcomeRouting || null,
