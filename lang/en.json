@@ -9,6 +9,11 @@
         "Notice": "Fabricate migrated {count} catalyst(s) into shared library Tools. Catalysts are now Tools — manage them under the Tools tab of the Crafting System Manager."
       }
     },
+    "Canvas": {
+      "Interactable": {
+        "GMOnlySpawn": "Only a GM can place Fabricate interactables on the canvas."
+      }
+    },
     "App": {
       "Title": "Fabricate",
       "ComingSoon": "Coming soon",

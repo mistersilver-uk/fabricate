@@ -50,6 +50,7 @@ import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './con
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
+import { InteractableManager } from './canvas/InteractableManager.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
@@ -1079,6 +1080,10 @@ Hooks.once('init', async () => {
 Hooks.once('ready', async () => {
   await fabricate.initialize();
   await processFabricateWorldTime();
+
+  // Wire the canvas Interactable foundation (drop interception + double-click
+  // dispatch). Idempotent — register() no-ops on repeat calls.
+  InteractableManager.instance.register();
 
   game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => routeHazardSceneSocketMessage(payload, {
     currentUserId: () => game.user?.id,
