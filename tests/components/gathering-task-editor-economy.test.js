@@ -65,7 +65,7 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.match(editorSource, /current:\s*max/, 'authoring starts a node pool full (current = max)');
     assert.match(editorSource, /chance:[^}]*next\s*\/\s*100/, 'chance is stored as a 0..1 fraction (÷100)');
     assert.match(editorSource, /Math\.min\(1,\s*Math\.max\(0,/, 'chance is clamped to 0..1');
-    assert.match(editorSource, /intervalSeconds:[^}]*\*\s*size/, 'interval is stored in seconds (value × unit)');
+    assert.match(editorSource, /intervalUnit,\s*intervalAmount:/, 'interval is stored as unit + amount (calendar-aware at runtime)');
   });
 
   it('gives both economy sections card chrome', () => {

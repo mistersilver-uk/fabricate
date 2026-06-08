@@ -125,7 +125,8 @@ export class GatheringRichStateService {
     rollD100 = () => Math.floor(Math.random() * 100) + 1,
     hooks = globalThis.Hooks ?? null,
     evaluateExpression = null,
-    runMacro = null
+    runMacro = null,
+    secondsPerUnit = null
   } = {}) {
     this.environmentStore = environmentStore;
     this.getSetting = getSetting;
@@ -137,6 +138,29 @@ export class GatheringRichStateService {
     this.hooks = hooks;
     this.evaluateExpression = evaluateExpression;
     this.runMacro = runMacro;
+    // Seam: seconds in one regen/respawn unit. The default reproduces the
+    // hardcoded Earth-calendar table; main.js injects a calendar-aware provider
+    // so `days`/`weeks` track the active Foundry world calendar (minutes/hours
+    // are universal and always 60/3600).
+    this.secondsPerUnit = typeof secondsPerUnit === 'function'
+      ? secondsPerUnit
+      : (unit) => SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
+  }
+
+  /**
+   * Convert a count of whole world-time units into seconds via the
+   * `secondsPerUnit` seam, so day/week interval lengths follow the active
+   * calendar (`days`/`weeks` track the active world calendar; `minutes`/`hours`
+   * are fixed). Uses the injected `secondsPerUnit` seam.
+   *
+   * @param {number} count
+   * @param {string} unit One of minutes|hours|days|weeks.
+   * @returns {number} Non-negative seconds.
+   */
+  _durationToSeconds(count, unit) {
+    const seconds = Number(this.secondsPerUnit(unit));
+    const safe = seconds > 0 ? seconds : SECONDS_PER_UNIT.hours;
+    return Math.max(0, Number(count || 0) * safe);
   }
 
   getConditions() {
@@ -931,7 +955,7 @@ export class GatheringRichStateService {
     if (econ.mode !== 'stamina') return null;
     const regen = econ.stamina?.regen || {};
     if (regen.policy !== 'elapsedTime') return null;
-    const interval = durationToSeconds(1, regen.unit);
+    const interval = this._durationToSeconds(1, regen.unit);
     if (!(interval > 0)) return null;
 
     const state = readState(actor);
@@ -996,18 +1020,78 @@ export class GatheringRichStateService {
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
 
-    // Per-environment node state lives in `nodeRuntime` (keyed by library task id).
-    // A sequential loop (not `.map`) so the `expression` gain mode can await.
+    // Per-environment `nodeRuntime` holds only runtime STATE (the `current` count
+    // and respawn timers); the respawn CONFIG is always sourced fresh from the
+    // current library task. Otherwise a `nodeRuntime` entry seeded under an older
+    // config (e.g. `manual` before the GM switched the task to `overTime`) would
+    // freeze that stale config and never respawn — and an emptied pool never
+    // re-depletes to pick up the new config. A sequential loop (not `.map`) so the
+    // `expression` gain mode can await.
     let runtimeChanged = false;
     const nodeRuntime = { ...(environment.nodeRuntime || {}) };
+    // Resolve the library node configs once for this environment (not per node).
+    const libNodes = this._libraryNodeConfigs(environment.craftingSystemId);
     for (const [taskId, node] of Object.entries(nodeRuntime)) {
+      const effective = this._mergeNodeConfigState(libNodes.get(String(taskId)) || null, node);
       // eslint-disable-next-line no-await-in-loop
-      const result = await this._respawnNode(node, { now, environment, environmentId: environment.id, taskId });
+      const result = await this._respawnNode(effective, { now, environment, environmentId: environment.id, taskId });
       if (result.changed) { runtimeChanged = true; nodeRuntime[taskId] = result.node; }
     }
 
     if (!runtimeChanged) return null;
     return this.environmentStore.update(environment.id, { nodeRuntime });
+  }
+
+  /**
+   * Index a system's library node configs by task id (`taskId → normalized
+   * task.nodes`). Read once from the canonical config so respawn always reflects
+   * the GM's current authoring rather than a per-environment snapshot, without
+   * re-normalizing the whole config per node.
+   *
+   * @param {string} systemId
+   * @returns {Map<string, object>}
+   */
+  _libraryNodeConfigs(systemId) {
+    const tasks = this._config().systems?.[String(systemId || '')]?.tasks;
+    const map = new Map();
+    if (Array.isArray(tasks)) {
+      for (const task of tasks) {
+        if (task?.id && task?.nodes) map.set(String(task.id), task.nodes);
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Merge a per-environment runtime node (`stored`) onto the current library node
+   * CONFIG so respawn/listing always use the authoritative policy, gain mode,
+   * interval, and depletion timing, while preserving the per-environment STATE:
+   * the `current` count, the per-environment `max` (a GM may overstock one
+   * environment via `restockNode({max})`), and the respawn anchor/roll. Falls back
+   * to `stored` when the library task has no node config (e.g. the task was
+   * deleted).
+   *
+   * @param {object|null} libNode Authoritative library node config.
+   * @param {object} stored The persisted per-environment node entry.
+   * @returns {object}
+   */
+  _mergeNodeConfigState(libNode, stored) {
+    if (!libNode) return stored;
+    const storedRespawn = stored?.respawn || {};
+    const merged = {
+      ...cloneJson(libNode),
+      // STATE stays per-environment: the live count and any GM `max` override.
+      current: Number.isFinite(Number(stored?.current)) ? Number(stored.current) : libNode.current,
+      max: Number.isFinite(Number(stored?.max)) ? Number(stored.max) : libNode.max,
+      respawn: {
+        ...cloneJson(libNode.respawn || { policy: 'manual' }),
+        lastEvaluatedWorldTime: numberOrNullStrict(storedRespawn.lastEvaluatedWorldTime),
+        nextEvaluationWorldTime: numberOrNullStrict(storedRespawn.nextEvaluationWorldTime),
+        lastRoll: storedRespawn.lastRoll && typeof storedRespawn.lastRoll === 'object' ? cloneJson(storedRespawn.lastRoll) : null
+      }
+    };
+    if (stored?.showCountsToPlayers === true) merged.showCountsToPlayers = true;
+    return merged;
   }
 
   /**
@@ -1027,7 +1111,11 @@ export class GatheringRichStateService {
     if (!nodes || !respawn || respawn.policy !== 'overTime') {
       return { changed: false, node: nodes };
     }
-    const interval = Number(respawn.intervalSeconds || 0);
+    // Calendar-aware interval from the stored unit+amount; fall back to a legacy
+    // raw `intervalSeconds` for nodes persisted before the unit/amount schema.
+    const interval = respawn.intervalUnit
+      ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
+      : Number(respawn.intervalSeconds || 0);
     if (!(interval > 0)) return { changed: false, node: nodes };
     const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
 
@@ -1293,6 +1381,13 @@ export class GatheringRichStateService {
       const max = Number(task.nodes.max || 0);
       const current = Math.min(max, Math.max(0, Number(task.nodes.current || 0) - 1));
       const node = { ...cloneJson(task.nodes), current };
+      // Seed the respawn anchor at depletion time so the FIRST world-time advance
+      // past the interval produces a gain instead of only re-anchoring. Without
+      // this, a freshly-seeded pool carries lastEvaluatedWorldTime: null and the
+      // first tick is wasted on anchoring (mirrors stamina pool anchor seeding).
+      if (node.respawn?.policy === 'overTime' && node.respawn.lastEvaluatedWorldTime == null) {
+        node.respawn = { ...node.respawn, lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0) };
+      }
       await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
@@ -1387,8 +1482,10 @@ export class GatheringRichStateService {
     // seed is read-only here; it persists on first depletion.
     if (normalized.nodes) {
       const stored = environment?.nodeRuntime?.[normalized.id];
+      // Library config is authoritative; the per-environment entry contributes
+      // only runtime state (count + respawn anchor). A fresh pool starts full.
       runtimeTask.nodes = stored
-        ? cloneJson(stored)
+        ? this._mergeNodeConfigState(cloneJson(normalized.nodes), stored)
         : { ...cloneJson(normalized.nodes), current: Number(normalized.nodes.max || 0) };
     }
     return runtimeTask;
@@ -1615,19 +1712,6 @@ function shouldDepleteNode(task, outcome) {
   return true;
 }
 
-/**
- * Convert a count of whole world-time units into seconds. Mirrors
- * CraftingRunManager's duration math and adds `weeks`. Unknown units fall back
- * to hours.
- *
- * @param {number} count
- * @param {string} unit One of minutes|hours|days|weeks.
- * @returns {number} Non-negative seconds.
- */
-function durationToSeconds(count, unit) {
-  const seconds = SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
-  return Math.max(0, Number(count || 0) * seconds);
-}
 
 /**
  * Normalize a per-system gathering economy block. The `mode` selects the

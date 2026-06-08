@@ -39,7 +39,8 @@ export function makeRichState({
   config = {},
   rolls = [100],
   evaluateExpression = null,
-  runMacro = null
+  runMacro = null,
+  secondsPerUnit = null
 } = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
   const writes = [];
@@ -68,7 +69,8 @@ export function makeRichState({
       : null,
     runMacro: runMacro
       ? async (uuid, context) => { macroCalls.push({ uuid, context }); return runMacro(uuid, context); }
-      : null
+      : null,
+    secondsPerUnit
   });
   return { service, settings, writes, hooks, rollCalls, evaluateCalls, macroCalls };
 }

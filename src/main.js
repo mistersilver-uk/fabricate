@@ -13,6 +13,7 @@ import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.j
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
+import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { HAZARD_SCENE_SOCKET, createHazardSceneTrigger, routeHazardSceneSocketMessage } from './systems/hazardSceneCoordinator.js';
 import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
@@ -651,7 +652,11 @@ class Fabricate {
       getUserId: () => game.user?.id || null,
       hooks: Hooks,
       evaluateExpression: evaluateGatheringExpression,
-      runMacro: runGatheringMacro
+      runMacro: runGatheringMacro,
+      // Calendar-aware regen/respawn intervals: day/week lengths track the active
+      // Foundry V13 world calendar (falls back to the Earth table when none).
+      // Resolved per call so a mid-session calendar reconfig is picked up.
+      secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null)
     });
     gatheringEngine = new GatheringEngine({
       environmentStore: this.gatheringEnvironmentStore,

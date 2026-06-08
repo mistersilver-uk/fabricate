@@ -369,7 +369,7 @@
   }
 
   // Resource-node authoring (enforced only when the system uses nodes mode).
-  const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual', intervalSeconds: 0, gainMode: 'guaranteed', chance: 0, amountExpression: '' } };
+  const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual', intervalUnit: 'hours', intervalAmount: 0, gainMode: 'guaranteed', chance: 0, amountExpression: '' } };
   const RESPAWN_UNITS = { minutes: 60, hours: 3600, days: 86400, weeks: 604800 };
 
   const nodes = $derived(task?.nodes || DEFAULT_NODES);
@@ -378,8 +378,11 @@
   const respawnGainMode = $derived(respawn.gainMode || 'guaranteed');
   const respawnIsChance = $derived(respawnIsOverTime && respawnGainMode === 'chance');
   const respawnIsExpression = $derived(respawnIsOverTime && respawnGainMode === 'expression');
-  // Largest whole unit that divides the interval evenly, else hours.
+  // The interval is authored as amount + unit; day/week lengths resolve against
+  // the world calendar at runtime. A legacy draft may still carry raw seconds —
+  // surface it as the largest whole unit that divides evenly.
   const intervalParts = $derived((() => {
+    if (respawn.intervalUnit) return { value: Number(respawn.intervalAmount) || 0, unit: respawn.intervalUnit };
     const seconds = Number(respawn.intervalSeconds) || 0;
     for (const unit of ['weeks', 'days', 'hours', 'minutes']) {
       const size = RESPAWN_UNITS[unit];
@@ -402,8 +405,10 @@
   }
   function setRespawnInterval(value, unit) {
     const next = Number(value);
-    const size = RESPAWN_UNITS[unit] || RESPAWN_UNITS.hours;
-    updateRespawn({ intervalSeconds: Number.isFinite(next) && next > 0 ? Math.round(next * size) : 0 });
+    const intervalUnit = RESPAWN_UNITS[unit] ? unit : 'hours';
+    // Persist amount + unit (calendar-aware at runtime); normalization drops any
+    // legacy intervalSeconds now that a unit is present.
+    updateRespawn({ intervalUnit, intervalAmount: Number.isFinite(next) && next > 0 ? Math.round(next) : 0 });
   }
   function setRespawnChance(percent) {
     const next = Number(percent);
