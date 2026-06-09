@@ -244,3 +244,128 @@ export function buildSpawnRequest({ classification, point, environmentId, textur
   }
   return request;
 }
+
+/**
+ * Shape the data needed to spawn a region-first interactable from a classified
+ * drop. PURE: returns everything the manager needs to create (a) a Scene Region
+ * (a small rectangle centered on the drop point), (b) the nested
+ * `fabricate.interactable` behaviour `system` (built via the injected
+ * `buildBehaviorSystem`, i.e. `buildInteractableBehaviorSystem` from 1a), and
+ * (c) the linked Tile data (texture/x/y/width/height). No Foundry globals — the
+ * caller resolves the icon `texture`, the grid size, and the behaviour-system
+ * builder at the edge and injects them here.
+ *
+ * Region geometry: a rectangle sized `regionGrid` grid squares per side
+ * (default 1), CENTERED on the drop point, then snapped so it tiles cleanly with
+ * the scene grid. The linked Tile is sized `width`/`height` (default one grid
+ * square) and TOP-LEFT-anchored at the same center, so the visible marker sits
+ * inside the region.
+ *
+ * @param {object} params
+ * @param {ReturnType<typeof classifyInteractableDrop>} params.classification
+ * @param {{x: number, y: number}} [params.point]   Drop point in scene coordinates.
+ * @param {string} [params.environmentId]           Resolved environment (gatheringTask only).
+ * @param {string} [params.texture]                 Linked Tile image path (`texture.src`).
+ * @param {number} [params.width]                   Linked Tile width (scene units).
+ * @param {number} [params.height]                  Linked Tile height (scene units).
+ * @param {string} [params.name]                    Display name (defaults to the entry's name/label).
+ * @param {object|null} [params.node]               Node-config snapshot (gatheringTask only) or null.
+ * @param {number} [params.gridSize]                Scene grid square size (scene units). Default 100.
+ * @param {number} [params.regionGrid]              Region size in grid squares per side. Default 1.
+ * @param {(spawn: object) => object} [params.buildBehaviorSystem]  Behaviour-system builder
+ *   (`buildInteractableBehaviorSystem`); injected so this stays Foundry-free.
+ * @returns {{ region: { name: string, shape: object }, behaviorSystem: object,
+ *   tile: { texture: { src: string }, x: number, y: number, width: number, height: number },
+ *   interactableType: string, sourceUuid: string, name: string,
+ *   environmentId: string|null } | null}
+ */
+export function buildRegionSpawnRequest({
+  classification,
+  point,
+  environmentId,
+  texture,
+  width,
+  height,
+  name,
+  node,
+  gridSize,
+  regionGrid = 1,
+  buildBehaviorSystem
+} = {}) {
+  if (!classification) return null;
+  if (typeof buildBehaviorSystem !== 'function') {
+    throw new Error('buildRegionSpawnRequest requires a buildBehaviorSystem builder');
+  }
+
+  const grid = Number.isFinite(Number(gridSize)) && Number(gridSize) > 0 ? Number(gridSize) : 100;
+  const span = Math.max(1, Math.floor(Number(regionGrid) || 1));
+
+  // The displayed name: an explicit name wins, else the entry's name/label.
+  const entry = classification.entry ?? null;
+  const resolvedName = typeof name === 'string' && name.trim()
+    ? name.trim()
+    : (typeof entry?.name === 'string' && entry.name.trim()
+      ? entry.name.trim()
+      : (typeof entry?.label === 'string' ? entry.label.trim() : ''));
+
+  const tileWidth = Number.isFinite(Number(width)) && Number(width) > 0 ? Number(width) : grid;
+  const tileHeight = Number.isFinite(Number(height)) && Number(height) > 0 ? Number(height) : grid;
+
+  const cx = Number(point?.x ?? 0);
+  const cy = Number(point?.y ?? 0);
+
+  // Region: a `span`-square rectangle centered on the drop point, snapped to the
+  // grid so it tiles cleanly.
+  const regionW = grid * span;
+  const regionH = grid * span;
+  const regionX = Math.round((cx - regionW / 2) / grid) * grid;
+  const regionY = Math.round((cy - regionH / 2) / grid) * grid;
+
+  // Linked Tile: top-left-anchored so its center sits at the drop point.
+  const tileX = cx - tileWidth / 2;
+  const tileY = cy - tileHeight / 2;
+
+  const resolvedEnvironmentId = classification.interactableType === 'gatheringTask'
+    && typeof environmentId === 'string' && environmentId
+    ? environmentId
+    : null;
+
+  const behaviorSystem = buildBehaviorSystem({
+    interactableType: classification.interactableType,
+    sourceUuid: classification.sourceUuid,
+    systemId: classification.systemId,
+    toolId: classification.interactableType === 'tool' ? classification.referenceId : null,
+    taskId: classification.interactableType === 'gatheringTask' ? classification.referenceId : null,
+    environmentId: resolvedEnvironmentId ?? undefined,
+    name: resolvedName,
+    node: classification.interactableType === 'gatheringTask' && node ? node : null
+  });
+
+  return {
+    interactableType: classification.interactableType,
+    sourceUuid: classification.sourceUuid,
+    name: resolvedName,
+    environmentId: resolvedEnvironmentId,
+    region: {
+      name: resolvedName || classification.sourceUuid,
+      shape: {
+        type: 'rectangle',
+        x: regionX,
+        y: regionY,
+        width: regionW,
+        height: regionH
+      }
+    },
+    behaviorSystem,
+    tile: {
+      texture: { src: typeof texture === 'string' && texture.trim() ? texture.trim() : DEFAULT_REGION_TILE_IMG },
+      x: tileX,
+      y: tileY,
+      width: tileWidth,
+      height: tileHeight
+    }
+  };
+}
+
+/** Fallback linked-Tile image when no tool/task icon can be resolved. */
+const DEFAULT_REGION_TILE_IMG = 'icons/svg/item-bag.svg';

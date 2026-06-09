@@ -17,11 +17,10 @@
  * into a `tile.update`/`tile.delete` routed through the SAME active-GM socket
  * path as the node writes (players never write tiles directly).
  *
- * `deleteToken` (delete the tile) is TERMINAL: a deleted tile cannot be restored
- * by respawn, so the world-time respawn pass must no-op against a deleted/absent
- * tile (see `interactableWorldTime.js`, which only iterates tiles still present).
- * The flag key `deleteToken` is retained for data compatibility — it deletes a
- * tile.
+ * `deleteToken` (delete the linked visual) is TERMINAL: a deleted visual cannot
+ * be restored by respawn, so the world-time respawn pass must no-op against a
+ * deleted/absent visual. The flag key `deleteToken` is retained for data
+ * compatibility — it deletes the linked visual.
  */
 
 import { normalizeDepletedBehavior } from '../systems/gatheringNodeConfig.js';

@@ -19,7 +19,18 @@
         "EnvironmentDialogHint": "Choose the gathering environment for this resource node.",
         "EnvironmentDialogLabel": "Environment",
         "EnvironmentDialogConfirm": "Place node",
-        "DropModifierHint": "Hold Alt while dropping to always choose the environment manually."
+        "DropModifierHint": "Hold Alt while dropping to always choose the environment manually.",
+        "SpawnFailed": "Failed to place the Fabricate interactable on the canvas.",
+        "LinkedVisualMissing": "This interactable's linked marker is missing.",
+        "BehaviorLabel": "Fabricate Interactable",
+        "Prompt": {
+          "Interact": "Interact",
+          "Close": "Dismiss"
+        },
+        "Keybinding": {
+          "Name": "Fabricate: interact here",
+          "Hint": "Re-open the Fabricate interactable your controlled token is standing in."
+        }
       },
       "SceneControl": {
         "Title": "Fabricate",

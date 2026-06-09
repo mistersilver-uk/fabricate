@@ -2269,27 +2269,38 @@ export class GatheringEngine {
   }
 
   /**
-   * Rebuild a per-tile node-state adapter for a matured waiting run that was
-   * started from a placed canvas gathering-task tile. The run persists only the
-   * tile REF (`economyEvidence.tileNodeRef`) because the live adapter is a
-   * function object that cannot survive serialization; this reconstructs it on
-   * the active GM via the injected `resolveTileNodeState` seam so the maturity
-   * commit decrements the TILE node (not the shared env nodeRuntime).
+   * Rebuild a node-state adapter for a matured waiting run that was started from a
+   * placed canvas gathering-task interactable. The run persists only the node REF
+   * (`economyEvidence.tileNodeRef`) because the live adapter is a function object
+   * that cannot survive serialization; this reconstructs it on the active GM via
+   * the injected `resolveTileNodeState` seam so the maturity commit decrements the
+   * authoritative node (not the shared env nodeRuntime).
    *
-   * Returns null — falling back to the env node — when there is no tile ref, no
-   * seam injected, or the tile can no longer be resolved (e.g. deleted).
+   * The ref is treated as OPAQUE and passed THROUGH to the widened resolver
+   * unchanged. A legacy tile run record carries `{ sceneId, tileId }`; a
+   * region-first run record carries `{ sceneId, regionId, behaviorId }`. The seam
+   * accepts either shape and rebuilds the matching adapter, so the engine does not
+   * hard-require `tileId` (which would break the region ref). We only require the
+   * ref to be a non-empty object so a junk record falls back to the env node.
+   *
+   * Returns null — falling back to the env node — when there is no node ref, no
+   * seam injected, or the node can no longer be resolved (e.g. deleted).
    *
    * @param {object} run The matured waiting run record.
-   * @returns {object|null} A per-tile node-state adapter, or null.
+   * @returns {object|null} A node-state adapter, or null.
    */
   _resolveMaturedTileNodeState(run) {
     if (typeof this.resolveTileNodeState !== 'function') return null;
     const ref = plainObjectOrNull(run?.economyEvidence?.tileNodeRef);
-    const sceneId = stringOrNull(ref?.sceneId);
-    const tileId = stringOrNull(ref?.tileId);
-    if (!sceneId || !tileId) return null;
+    if (!ref) return null;
+    const sceneId = stringOrNull(ref.sceneId);
+    // Require a scene + at least one node identity (legacy tileId OR a region
+    // behaviorId); pass the persisted ref THROUGH unchanged so a region ref
+    // ({ sceneId, regionId, behaviorId }) rebuilds a region adapter.
+    const hasTarget = stringOrNull(ref.tileId) || stringOrNull(ref.behaviorId);
+    if (!sceneId || !hasTarget) return null;
     try {
-      return this.resolveTileNodeState({ sceneId, tileId }) || null;
+      return this.resolveTileNodeState({ ...ref }) || null;
     } catch (_err) {
       return null;
     }

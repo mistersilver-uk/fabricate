@@ -1,0 +1,295 @@
+/**
+ * Unit coverage for linked-visual resolution + depleted-state reflection.
+ *
+ * The Tile branch reuses the PURE `planDepletedBehavior` (none/apply/revert/
+ * delete) and routes apply/revert via `emitVisualUpdate` and the terminal delete
+ * via `emitVisualDelete`. A missing visual is a no-op. Drawing/Token are Phase
+ * 4/5 stubs (no-op). The resolve edge (`globalThis.fromUuidSync`) is faked.
+ */
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  resolveLinkedVisual,
+  applyLinkedVisualDepleted,
+  buildLinkedTileData,
+  createLinkedTile,
+  planRelinkVisual,
+  relinkVisual,
+  recreateLinkedTile,
+  planMissingPolicy,
+  applyMissingPolicy
+} from '../../src/canvas/linkedVisuals/linkedInteractableVisual.js';
+
+function withFromUuid(map, fn) {
+  const prev = globalThis.fromUuidSync;
+  globalThis.fromUuidSync = (uuid) => map[uuid] ?? null;
+  try {
+    return fn();
+  } finally {
+    globalThis.fromUuidSync = prev;
+  }
+}
+
+function tileDoc({ uuid = 'Scene.s1.Tile.t1', src = 'orig.webp', original = null } = {}) {
+  return {
+    uuid,
+    parent: { id: 's1' },
+    texture: { src },
+    flags: original ? { fabricate: { nodeOriginal: original } } : {}
+  };
+}
+
+test('resolveLinkedVisual resolves a Tile by uuid', () => {
+  const doc = tileDoc();
+  const resolved = withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => resolveLinkedVisual(
+    { linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' } }
+  ));
+  assert.equal(resolved.doc, doc);
+  assert.equal(resolved.documentName, 'Tile');
+});
+
+test('resolveLinkedVisual returns null without uuid/documentName, no-throw', () => {
+  assert.equal(resolveLinkedVisual({ linkedVisual: { uuid: null, documentName: 'Tile' } }), null);
+  assert.equal(resolveLinkedVisual({ linkedVisual: { uuid: 'x', documentName: null } }), null);
+  assert.equal(resolveLinkedVisual({}), null);
+});
+
+test('resolveLinkedVisual falls back to a scene-embedded lookup', () => {
+  const doc = tileDoc({ uuid: 'Scene.s1.Tile.t9' });
+  const scene = { tiles: { get: (id) => (id === 't9' ? doc : null) } };
+  const resolved = withFromUuid({}, () => resolveLinkedVisual(
+    { linkedVisual: { uuid: 'Scene.s1.Tile.t9', documentName: 'Tile' } },
+    { scene }
+  ));
+  assert.equal(resolved.doc, doc);
+});
+
+test('applyLinkedVisualDepleted Tile branch routes a swap-image APPLY via emitVisualUpdate', () => {
+  const updates = [];
+  const deletes = [];
+  const doc = tileDoc({ src: 'orig.webp' });
+  const behaviorSystem = {
+    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' },
+    node: { depletedBehavior: { swapImage: 'depleted.webp' } }
+  };
+  withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => applyLinkedVisualDepleted({
+    behaviorSystem,
+    depleted: true,
+    emitVisualUpdate: (a) => updates.push(a),
+    emitVisualDelete: (a) => deletes.push(a)
+  }));
+  assert.equal(deletes.length, 0);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].documentName, 'Tile');
+  assert.equal(updates[0].update.texture.src, 'depleted.webp');
+  assert.equal(updates[0].update.flags.fabricate.nodeOriginal.img, 'orig.webp');
+});
+
+test('applyLinkedVisualDepleted Tile branch routes a REVERT via emitVisualUpdate', () => {
+  const updates = [];
+  const doc = tileDoc({ src: 'depleted.webp', original: { img: 'orig.webp' } });
+  const behaviorSystem = {
+    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' },
+    node: { depletedBehavior: { swapImage: 'depleted.webp' } }
+  };
+  withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => applyLinkedVisualDepleted({
+    behaviorSystem,
+    depleted: false,
+    emitVisualUpdate: (a) => updates.push(a)
+  }));
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].update.texture.src, 'orig.webp');
+  assert.equal(updates[0].update.flags.fabricate.nodeOriginal, null);
+});
+
+test('applyLinkedVisualDepleted Tile branch routes a terminal DELETE via emitVisualDelete', () => {
+  const updates = [];
+  const deletes = [];
+  const doc = tileDoc();
+  const behaviorSystem = {
+    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' },
+    node: { depletedBehavior: { deleteToken: true } }
+  };
+  withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => applyLinkedVisualDepleted({
+    behaviorSystem,
+    depleted: true,
+    emitVisualUpdate: (a) => updates.push(a),
+    emitVisualDelete: (a) => deletes.push(a)
+  }));
+  assert.equal(updates.length, 0);
+  assert.equal(deletes.length, 1);
+  assert.equal(deletes[0].documentName, 'Tile');
+});
+
+test('applyLinkedVisualDepleted is a no-op when the visual is missing', () => {
+  const updates = [];
+  const deletes = [];
+  withFromUuid({}, () => applyLinkedVisualDepleted({
+    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Tile.gone', documentName: 'Tile' }, node: { depletedBehavior: { swapImage: 'd.webp' } } },
+    depleted: true,
+    emitVisualUpdate: (a) => updates.push(a),
+    emitVisualDelete: (a) => deletes.push(a)
+  }));
+  assert.equal(updates.length, 0);
+  assert.equal(deletes.length, 0);
+});
+
+test('applyLinkedVisualDepleted Drawing / Token branches are no-op stubs', () => {
+  const updates = [];
+  const deletes = [];
+  const drawing = { uuid: 'Scene.s1.Drawing.d1', parent: { id: 's1' } };
+  const token = { uuid: 'Scene.s1.Token.k1', parent: { id: 's1' } };
+  withFromUuid({ 'Scene.s1.Drawing.d1': drawing, 'Scene.s1.Token.k1': token }, () => {
+    applyLinkedVisualDepleted({
+      behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' }, node: { depletedBehavior: { swapImage: 'd.webp' } } },
+      depleted: true,
+      emitVisualUpdate: (a) => updates.push(a),
+      emitVisualDelete: (a) => deletes.push(a)
+    });
+    applyLinkedVisualDepleted({
+      behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' }, node: { depletedBehavior: { swapImage: 'd.webp' } } },
+      depleted: true,
+      emitVisualUpdate: (a) => updates.push(a),
+      emitVisualDelete: (a) => deletes.push(a)
+    });
+  });
+  assert.equal(updates.length, 0);
+  assert.equal(deletes.length, 0);
+});
+
+// --- buildLinkedTileData / createLinkedTile (create) -------------------------
+
+test('buildLinkedTileData shapes the tile create payload with the reverse linked-visual flags', () => {
+  const data = buildLinkedTileData({
+    regionUuid: 'Scene.s1.Region.r1', behaviorId: 'beh-1',
+    texture: 'icons/tools/axe.webp', x: 10, y: 20, width: 100, height: 100
+  });
+  assert.deepEqual(data.texture, { src: 'icons/tools/axe.webp' });
+  assert.equal(data.x, 10);
+  assert.equal(data.y, 20);
+  assert.equal(data.width, 100);
+  assert.equal(data.height, 100);
+  assert.deepEqual(data.flags.fabricate, {
+    isInteractableVisual: true,
+    linkedRegionUuid: 'Scene.s1.Region.r1',
+    linkedBehaviorId: 'beh-1'
+  });
+});
+
+test('createLinkedTile creates the linked Tile via the scene + region/behaviour refs', async () => {
+  const created = [];
+  const scene = {
+    async createEmbeddedDocuments(type, payloads) {
+      if (type !== 'Tile') return [];
+      const tile = { id: 't1', uuid: 'Scene.s1.Tile.t1', ...payloads[0] };
+      created.push(tile);
+      return [tile];
+    }
+  };
+  const behavior = { id: 'beh-1', parent: { uuid: 'Scene.s1.Region.r1' } };
+  const tile = await createLinkedTile({ scene, behavior, texture: 'x.webp', x: 0, y: 0, width: 100, height: 100 });
+  assert.equal(created.length, 1);
+  assert.equal(tile, created[0]);
+  assert.equal(tile.flags.fabricate.linkedRegionUuid, 'Scene.s1.Region.r1');
+  assert.equal(tile.flags.fabricate.linkedBehaviorId, 'beh-1');
+});
+
+test('createLinkedTile returns null (no-throw) when the region uuid / behaviour id is missing', async () => {
+  const scene = { async createEmbeddedDocuments() { throw new Error('must not create'); } };
+  assert.equal(await createLinkedTile({ scene, behavior: { id: null, parent: null } }), null);
+});
+
+// --- relink (decision + edge) ------------------------------------------------
+
+test('planRelinkVisual returns the linkedVisual patch for a supported selected document', () => {
+  assert.deepEqual(planRelinkVisual({ uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' }), {
+    linkedVisual: { uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' }
+  });
+  assert.deepEqual(planRelinkVisual({ uuid: 'Scene.s1.Tile.t1', constructor: { documentName: 'Tile' } }), {
+    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' }
+  });
+});
+
+test('planRelinkVisual returns null for an unusable selection', () => {
+  assert.equal(planRelinkVisual({ uuid: '', documentName: 'Tile' }), null);
+  assert.equal(planRelinkVisual({ uuid: 'x', documentName: 'Actor' }), null);
+  assert.equal(planRelinkVisual(null), null);
+});
+
+test('relinkVisual persists the relink patch through the behaviour-update seam', async () => {
+  const updates = [];
+  const patch = await relinkVisual(
+    { id: 'beh-1' },
+    { uuid: 'Scene.s1.Token.k1', documentName: 'Token' },
+    {
+      applyBehaviorUpdate: (a) => updates.push(a),
+      identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' })
+    }
+  );
+  assert.deepEqual(patch, { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } });
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0], {
+    sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1',
+    update: { system: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } } }
+  });
+});
+
+// --- recreate ----------------------------------------------------------------
+
+test('recreateLinkedTile creates a fresh Tile and writes the new uuid back', async () => {
+  const updates = [];
+  const scene = {
+    async createEmbeddedDocuments(type, payloads) {
+      if (type !== 'Tile') return [];
+      return [{ id: 't9', uuid: 'Scene.s1.Tile.t9', ...payloads[0] }];
+    }
+  };
+  const behavior = { id: 'beh-1', parent: { uuid: 'Scene.s1.Region.r1' } };
+  const tile = await recreateLinkedTile(behavior, { scene, texture: 'x.webp' }, {
+    applyBehaviorUpdate: (a) => updates.push(a),
+    identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' })
+  });
+  assert.equal(tile.uuid, 'Scene.s1.Tile.t9');
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].update, { system: { linkedVisual: { uuid: 'Scene.s1.Tile.t9', documentName: 'Tile' } } });
+});
+
+// --- missing policy ----------------------------------------------------------
+
+test('planMissingPolicy: no configured visual → none', () => {
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'none', uuid: null } }, false), { action: 'none' });
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'marker', uuid: '' } }, false), { action: 'none' });
+});
+
+test('planMissingPolicy: present visual → ok', () => {
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'marker', uuid: 'u', missingPolicy: 'warn' } }, true), { action: 'ok' });
+});
+
+test('planMissingPolicy: missing visual respects the policy', () => {
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'marker', uuid: 'u', missingPolicy: 'ignore' } }, false), { action: 'none' });
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'marker', uuid: 'u', missingPolicy: 'warn' } }, false), { action: 'warn' });
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'marker', uuid: 'u', documentName: 'Tile', missingPolicy: 'recreate' } }, false), { action: 'recreate' });
+  // recreate is Tile-only; a missing Drawing falls back to warn.
+  assert.deepEqual(planMissingPolicy({ linkedVisual: { mode: 'marker', uuid: 'u', documentName: 'Drawing', missingPolicy: 'recreate' } }, false), { action: 'warn' });
+});
+
+test('applyMissingPolicy warns for a missing warn-policy visual and recreates a missing recreate-policy Tile', async () => {
+  const warns = [];
+  const recreated = [];
+  // warn: the visual does not resolve (no fromUuid map) → warn channel fires.
+  const warnDecision = await withFromUuid({}, () => applyMissingPolicy(
+    { linkedVisual: { mode: 'marker', uuid: 'Scene.s1.Tile.gone', documentName: 'Tile', missingPolicy: 'warn' } },
+    { notify: (m) => warns.push(m) }
+  ));
+  assert.deepEqual(warnDecision, { action: 'warn' });
+  assert.deepEqual(warns, ['FABRICATE.Canvas.Interactable.LinkedVisualMissing']);
+
+  const recreateDecision = await withFromUuid({}, () => applyMissingPolicy(
+    { linkedVisual: { mode: 'marker', uuid: 'Scene.s1.Tile.gone', documentName: 'Tile', missingPolicy: 'recreate' } },
+    { behavior: { id: 'beh-1' }, recreate: (behavior) => { recreated.push(behavior); return Promise.resolve({}); } }
+  ));
+  assert.deepEqual(recreateDecision, { action: 'recreate' });
+  assert.equal(recreated.length, 1, 'the recreate seam was invoked for a missing recreate-policy Tile');
+});

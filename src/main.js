@@ -53,12 +53,14 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
-import { handleInteractableSocketMessage, resolveTileNodeStateForRef } from './canvas/interactableSocketBridge.js';
-import { respawnInteractableTiles } from './canvas/interactableWorldTime.js';
+import { handleInteractableSocketMessage, resolveInteractableNodeStateForRef } from './canvas/interactableSocketBridge.js';
+import { respawnInteractableRegionBehaviors } from './canvas/regions/interactableRegionWorldTime.js';
+import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
+import './ui/InteractionPromptApp.svelte.js';
 
 let gatheringEngine = null;
 
@@ -393,6 +395,26 @@ function localizeGathering(key, data = {}) {
 }
 
 /**
+ * Evaluate a dice expression to its integer total via Foundry's `Roll`, returning
+ * 0 when `Roll` is unavailable or the expression is invalid. Shared by the per-tile
+ * and per-region interactable respawn passes.
+ *
+ * @param {string} expression
+ * @returns {number}
+ */
+function rollExpressionTotal(expression) {
+  const RollClass = globalThis.Roll;
+  if (typeof RollClass !== 'function') return 0;
+  try {
+    const roll = new RollClass(String(expression || ''));
+    roll?.evaluateSync?.();
+    return Number(roll?.total ?? 0);
+  } catch (_err) {
+    return 0;
+  }
+}
+
+/**
  * Dispatch startup/updateWorldTime processing for crafting, salvage, and gathering.
  *
  * Gathering timed completion is delegated to the module-internal GatheringEngine;
@@ -416,28 +438,17 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
       callback: () => gatheringEngine?.processWorldTime?.(worldTime)
     },
     {
-      // Per-tile gathering node respawn for placed canvas Interactable tiles.
-      // Active-GM ONLY so connected clients never double-apply (mirrors the
-      // engine's per-environment respawn, which is primary-GM gated).
-      label: 'InteractableTiles',
+      // Region-first per-behaviour gathering node respawn for placed
+      // `fabricate.interactable` Region Behaviours. Active-GM ONLY so connected
+      // clients never double-apply (gate inside the pass; mirrors the engine's
+      // per-environment respawn, which is primary-GM gated).
+      label: 'InteractableRegions',
       callback: () => {
-        return respawnInteractableTiles({
+        return respawnInteractableRegionBehaviors({
           worldTime,
-          // Active-GM gate is now inside respawnInteractableTiles (passable so a
-          // "non-active-GM applies nothing" case is unit-testable).
           isActiveGM: () => game.user === game.users?.activeGM,
           secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null),
-          rollExpression: (expression) => {
-            const RollClass = globalThis.Roll;
-            if (typeof RollClass !== 'function') return 0;
-            try {
-              const roll = new RollClass(String(expression || ''));
-              roll?.evaluateSync?.();
-              return Number(roll?.total ?? 0);
-            } catch (_err) {
-              return 0;
-            }
-          }
+          rollExpression: (expression) => rollExpressionTotal(expression)
         });
       }
     }
@@ -560,10 +571,13 @@ class Fabricate {
         showPrompt: showHazardScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
-      // Rebuild a per-tile node adapter at TIMED-run maturity from the persisted
-      // tile ref, so an `onSuccess` decrement lands on the tile flag (via the
-      // GM socket), not `environment.nodeRuntime[taskId]`.
-      resolveTileNodeState: resolveTileNodeStateForRef,
+      // Rebuild a node adapter at TIMED-run maturity from the persisted ref, so an
+      // `onSuccess` decrement lands on the authoritative node (via the GM socket),
+      // not `environment.nodeRuntime[taskId]`. The resolver is widened to accept
+      // either a legacy tile ref ({ sceneId, tileId }) or a region-behaviour ref
+      // ({ sceneId, regionId, behaviorId }); the engine treats the ref as opaque,
+      // so the seam name stays `resolveTileNodeState`.
+      resolveTileNodeState: resolveInteractableNodeStateForRef,
       localize: localizeGathering
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
@@ -1049,8 +1063,18 @@ const fabricate = new Fabricate();
 Hooks.once('init', async () => {
   console.log('Fabricate | Init Hook');
 
+  // Register the region-first `fabricate.interactable` Region Behaviour data model
+  // + its type icon/label. Defensive + idempotent: no-ops when the Foundry region
+  // APIs are unavailable (e.g. an older core), so it is safe to call unconditionally.
+  registerInteractableRegionBehavior(CONFIG);
+
   // Make API available globally
   game.fabricate = fabricate;
+  // Expose the canvas interactable manager singleton so the region behaviour event
+  // handlers (`FabricateInteractableRegionBehavior.static events`) can resolve
+  // `game.fabricate.interactableManager` to dispatch onRegionEnter/onRegionExit.
+  // The handler bodies are added in Phase 1c; the reference must resolve now.
+  game.fabricate.interactableManager = InteractableManager.instance;
   game.fabricate.gathering = {
     getConditions: () => fabricate.getGatheringConditions(),
     setWeather: (weatherTag) => fabricate.setGatheringWeather(weatherTag),
@@ -1128,9 +1152,14 @@ Hooks.once('ready', async () => {
       viewSceneForSelf: (uuid) => viewScene(uuid)
     });
     // Same `module.fabricate` channel also carries the canvas Interactable
-    // node-update action (player → active GM token-flag write). Only the active
-    // GM applies; other actions are ignored by the handler.
-    handleInteractableSocketMessage(payload);
+    // node-update action (player → active GM token-flag write) AND the region-first
+    // activation round-trip. Only the active GM applies node/behaviour writes +
+    // validates activation; only the targeted user opens a granted session. The
+    // validate/grant + open bodies are the manager's region-first activation seams.
+    handleInteractableSocketMessage(payload, {
+      validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
+      openGrant: (grant) => InteractableManager.instance.openGrant(grant)
+    });
   });
 
   addModuleButtonsToItemsDirectory();

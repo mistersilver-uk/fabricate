@@ -204,3 +204,35 @@ test('MF-1: a matured run WITHOUT a tile ref threads nodeState=null (env fallbac
   assert.equal(commits.length, 1);
   assert.equal(commits[0].nodeState, null, 'the maturity commit receives nodeState=null and falls back to the env node');
 });
+
+test('MF-1: a matured REGION run passes the { sceneId, regionId, behaviorId } ref THROUGH unchanged (region adapter rebuild)', async () => {
+  actor.flags = { fabricate: {} };
+  let worldTime = 1000;
+  const runManager = makeRunManager(() => worldTime);
+  const { rich, commits } = spyRichState();
+  const { adapter, writes } = tileAdapter(5);
+
+  let resolvedRef = null;
+  // The widened resolver accepts a region ref; the engine must NOT require tileId.
+  const resolveTileNodeState = (ref) => { resolvedRef = ref; return adapter; };
+  const engine = makeEngine({ runManager, rich, resolveTileNodeState });
+
+  await runManager.createWaitingRun(actor, {
+    craftingSystemId: SYS,
+    environmentId: 'env-node',
+    taskId: 'task-node',
+    economyEvidence: { tileNodeRef: { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' } }
+  }, { minutes: 1 });
+
+  worldTime = 1060;
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.completed.length, 1, 'the region run matured to completion');
+  assert.deepEqual(
+    resolvedRef,
+    { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' },
+    'the persisted region ref is passed through unchanged (engine treats it as opaque)'
+  );
+  assert.equal(commits[0].nodeState, adapter, 'the rebuilt region adapter is threaded into the maturity commit');
+  assert.equal(writes.length, 1, 'the onSuccess decrement routed through the region adapter');
+});

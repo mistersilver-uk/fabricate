@@ -2,9 +2,10 @@
  * Pure, Foundry-free resource-node depletion + respawn math.
  *
  * `GatheringRichStateService._respawnNode` owns the per-ENVIRONMENT respawn pass
- * (with its history hooks and per-environment persistence). The per-TILE node
- * adapter (`src/canvas/tileNodeStateAdapter.js`) needs the same calendar-aware
- * interval + gain arithmetic without those Foundry-bound side effects, so the
+ * (with its history hooks and per-environment persistence). The region node
+ * adapter (`src/canvas/regions/interactableRegionNodeAdapter.js`) needs the same
+ * calendar-aware interval + gain arithmetic without those Foundry-bound side
+ * effects, so the
  * arithmetic is factored here as injectable pure functions: the calendar
  * (`secondsPerUnit`) and the random sources (`rollChance` / `rollExpression`) are
  * passed in, so the whole thing is unit-testable with deterministic fakes and no

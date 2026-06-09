@@ -1,8 +1,8 @@
 /**
  * Unit coverage for the PURE canvas-interactable helpers: drop classification +
- * spawn-payload shaping (`interactableResolution.js`) and double-click dispatch
- * routing (`interactableDispatch.js`). The Foundry-bound `InteractableManager`
- * seams are exercised separately in `interactable-manager.test.js`.
+ * spawn-payload shaping (`interactableResolution.js`). The Foundry-bound
+ * `InteractableManager` seams are exercised separately in
+ * `interactable-manager.test.js`.
  */
 
 import test from 'node:test';
@@ -15,10 +15,6 @@ import {
   buildInteractableSourceUuid,
   parseInteractableSourceUuid
 } from '../../src/canvas/interactableResolution.js';
-import {
-  describeInteractableDispatch,
-  dispatchInteractableDoubleClick
-} from '../../src/canvas/interactableDispatch.js';
 
 // --- synthetic source identity round-trip ---
 
@@ -164,69 +160,4 @@ test('buildSpawnRequest omits node for a task with no node config (unlimited gat
 
 test('buildSpawnRequest returns null for no classification', () => {
   assert.equal(buildSpawnRequest({ classification: null, point: { x: 1, y: 2 } }), null);
-});
-
-// --- double-click dispatch routing ---
-
-function toolToken() {
-  return { flags: { fabricate: { isInteractable: true, interactableType: 'tool', sourceUuid: 'Fabricate.sysA.tool.tool-1' } } };
-}
-function taskToken() {
-  return { flags: { fabricate: { isInteractable: true, interactableType: 'gatheringTask', sourceUuid: 'Fabricate.sysA.gatheringTask.task-9', environmentId: 'env-3', node: { current: 2 } } } };
-}
-
-test('describeInteractableDispatch resolves the routed descriptor', () => {
-  assert.deepEqual(describeInteractableDispatch(toolToken()), {
-    interactableType: 'tool',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    systemId: 'sysA',
-    referenceId: 'tool-1',
-    environmentId: null,
-    node: null
-  });
-  assert.deepEqual(describeInteractableDispatch(taskToken()), {
-    interactableType: 'gatheringTask',
-    sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
-    systemId: 'sysA',
-    referenceId: 'task-9',
-    environmentId: 'env-3',
-    node: { current: 2 }
-  });
-  assert.equal(describeInteractableDispatch({ flags: {} }), null);
-});
-
-test('dispatch routes tool tokens to onTool', () => {
-  const tools = [];
-  const tasks = [];
-  const dispatched = dispatchInteractableDoubleClick(toolToken(), {
-    onTool: (d) => tools.push(d),
-    onGatheringTask: (d) => tasks.push(d)
-  });
-  assert.equal(tools.length, 1);
-  assert.equal(tasks.length, 0);
-  assert.equal(tools[0].referenceId, 'tool-1');
-  assert.equal(dispatched.interactableType, 'tool');
-});
-
-test('dispatch routes gathering-task tokens to onGatheringTask', () => {
-  const tools = [];
-  const tasks = [];
-  const dispatched = dispatchInteractableDoubleClick(taskToken(), {
-    onTool: (d) => tools.push(d),
-    onGatheringTask: (d) => tasks.push(d)
-  });
-  assert.equal(tasks.length, 1);
-  assert.equal(tools.length, 0);
-  assert.equal(tasks[0].environmentId, 'env-3');
-  assert.equal(dispatched.interactableType, 'gatheringTask');
-});
-
-test('dispatch is a no-op for non-interactable tokens', () => {
-  let called = false;
-  const dispatched = dispatchInteractableDoubleClick({ flags: {} }, {
-    onTool: () => { called = true; },
-    onGatheringTask: () => { called = true; }
-  });
-  assert.equal(dispatched, null);
-  assert.equal(called, false);
 });

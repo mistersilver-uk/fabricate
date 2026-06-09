@@ -51,13 +51,13 @@ async function flush(turns = 5) {
   for (let i = 0; i < turns; i++) await Promise.resolve();
 }
 
-test('placeInteractableAtViewCenter routes a Tool through the SAME _spawnInteractable pipeline at the view center', async () => {
+test('placeInteractableAtViewCenter routes a Tool through the SAME region-spawn pipeline at the view center', async () => {
   const saved = snapshot();
   try {
     installGM();
     const manager = new InteractableManager();
     const spawned = [];
-    manager._spawnInteractable = (request) => { spawned.push(request); return Promise.resolve({}); };
+    manager._spawnInteractableRegion = (request) => { spawned.push(request); return Promise.resolve({}); };
 
     const recognized = manager.placeInteractableAtViewCenter({
       interactableType: 'tool',
@@ -67,12 +67,14 @@ test('placeInteractableAtViewCenter routes a Tool through the SAME _spawnInterac
 
     assert.equal(recognized, true, 'the synthesized drop is recognized as a Fabricate interactable');
     await flush();
-    assert.equal(spawned.length, 1, 'exactly one tool spawn through the shared pipeline');
+    assert.equal(spawned.length, 1, 'exactly one tool spawn through the shared region pipeline');
     assert.equal(spawned[0].interactableType, 'tool');
     assert.equal(spawned[0].sourceUuid, 'Fabricate.sysA.tool.tool-1');
-    // View center = scene dimensions midpoint (no PIXI stage installed).
-    assert.equal(spawned[0].x, 2000);
-    assert.equal(spawned[0].y, 1500);
+    assert.equal(spawned[0].behaviorSystem.interactableType, 'tool', 'the region-spawn carries the behaviour system');
+    // View center = scene dimensions midpoint (no PIXI stage installed). The
+    // region shape is centered on it; the linked Tile is top-left-anchored.
+    assert.equal(spawned[0].region.shape.type, 'rectangle');
+    assert.equal(typeof spawned[0].tile.x, 'number');
   } finally {
     restore(saved);
   }
@@ -110,7 +112,7 @@ test('placeInteractableAtViewCenter declines an unbuildable request', () => {
   try {
     installGM();
     const manager = new InteractableManager();
-    manager._spawnInteractable = () => { throw new Error('must not spawn'); };
+    manager._spawnInteractableRegion = () => { throw new Error('must not spawn'); };
     assert.equal(manager.placeInteractableAtViewCenter({ interactableType: 'tool', systemId: '', referenceId: '' }), false);
   } finally {
     restore(saved);
@@ -123,7 +125,7 @@ test('placeInteractableAtViewCenter is GM-gated by the shared _onDrop GM check',
     installGM();
     globalThis.game.user.isGM = false; // non-GM cannot place.
     const manager = new InteractableManager();
-    manager._spawnInteractable = () => { throw new Error('non-GM must not spawn'); };
+    manager._spawnInteractableRegion = () => { throw new Error('non-GM must not spawn'); };
     // _onDrop returns false (recognized) but suppresses without spawning; the
     // GM warning fires through the shared path.
     const recognized = manager.placeInteractableAtViewCenter({

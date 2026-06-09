@@ -49,3 +49,47 @@ test('tolerates a document-level testPoint (no .object) and a throwing tester', 
   const ids = regionEnvironmentIdsAtPoint({ scene, point: { x: 1, y: 2 } });
   assert.deepEqual(ids, ['env-doc'], 'a throwing/absent tester is treated as no hit');
 });
+
+// --- interactableBehaviorsContainingToken (re-trigger) ----------------------
+
+import { interactableBehaviorsContainingToken } from '../../src/canvas/regionHitTest.js';
+
+function regionWithBehaviors({ contains, behaviors }) {
+  return {
+    object: { testPoint: (point) => contains(point) },
+    behaviors
+  };
+}
+
+const isInteractable = (b) => b?.type === 'fabricate.interactable';
+
+test('interactableBehaviorsContainingToken returns the interactable behaviours of regions containing the token center', () => {
+  const hitBeh = { type: 'fabricate.interactable', id: 'b1' };
+  const otherBeh = { type: 'somethingElse', id: 'b2' };
+  const scene = {
+    regions: [
+      regionWithBehaviors({ contains: () => true, behaviors: { contents: [hitBeh, otherBeh] } }),
+      regionWithBehaviors({ contains: () => false, behaviors: { contents: [{ type: 'fabricate.interactable', id: 'b3' }] } })
+    ]
+  };
+  const token = { object: { center: { x: 50, y: 50 } } };
+  const matches = interactableBehaviorsContainingToken({ scene, token, isInteractableBehavior: isInteractable });
+  assert.equal(matches.length, 1, 'only the containing region + interactable behaviour');
+  assert.equal(matches[0].behavior.id, 'b1');
+});
+
+test('interactableBehaviorsContainingToken uses the token document top-left when no placeable center exists', () => {
+  const hitBeh = { type: 'fabricate.interactable', id: 'b1' };
+  const seen = [];
+  const scene = {
+    regions: [regionWithBehaviors({ contains: (p) => { seen.push(p); return true; }, behaviors: { contents: [hitBeh] } })]
+  };
+  const matches = interactableBehaviorsContainingToken({ scene, token: { x: 10, y: 20 }, isInteractableBehavior: isInteractable });
+  assert.equal(matches.length, 1);
+  assert.deepEqual(seen[0], { x: 10, y: 20 });
+});
+
+test('interactableBehaviorsContainingToken returns [] when the token point cannot be resolved', () => {
+  const scene = { regions: [regionWithBehaviors({ contains: () => true, behaviors: { contents: [{ type: 'fabricate.interactable' }] } })] };
+  assert.deepEqual(interactableBehaviorsContainingToken({ scene, token: {}, isInteractableBehavior: isInteractable }), []);
+});

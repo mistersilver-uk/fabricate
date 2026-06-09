@@ -75,3 +75,57 @@ function collectRegions(collection) {
   if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
   return [];
 }
+
+/**
+ * Collect every `fabricate.interactable` Region Behaviour whose Region contains a
+ * token's center, paired with its owning Region. Used by the re-trigger path
+ * (`controlToken` / keybind) so a token already inside an interactable region on
+ * scene load (where Foundry's `tokenEnter` never fires) can still raise the
+ * prompt. Generalizes {@link regionEnvironmentIdsAtPoint}: same containment test,
+ * but keyed on the behaviour subtype rather than the env-id flag.
+ *
+ * The behaviour-subtype predicate is INJECTED (the pure
+ * `isInteractableRegionBehavior`), keeping this module free of the flags module
+ * and unit-testable against fakes.
+ *
+ * @param {object} args
+ * @param {object} args.scene  The token's scene (carries `regions`).
+ * @param {object} args.token  A TokenDocument (or its placeable's document) with center coords.
+ * @param {(behavior: object) => boolean} args.isInteractableBehavior  Subtype predicate.
+ * @returns {Array<{ region: object, behavior: object }>}
+ */
+export function interactableBehaviorsContainingToken({ scene, token, isInteractableBehavior } = {}) {
+  const point = tokenCenter(token);
+  if (!point) return [];
+  const regions = collectRegions(scene?.regions);
+  const out = [];
+  for (const region of regions) {
+    if (!regionContainsPoint(region, point)) continue;
+    const behaviors = collectRegions(region?.behaviors);
+    for (const behavior of behaviors) {
+      if (typeof isInteractableBehavior === 'function' && isInteractableBehavior(behavior) !== true) continue;
+      out.push({ region, behavior });
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve a token's CENTER point in scene-space, preferring the live placeable's
+ * `center` (the authoritative pixel center Foundry computes from the footprint),
+ * falling back to the document's top-left `x/y`. Returns null when no finite
+ * point resolves.
+ *
+ * @param {object} token  TokenDocument or its placeable.
+ * @returns {{ x: number, y: number } | null}
+ */
+function tokenCenter(token) {
+  const center = token?.object?.center ?? token?.center;
+  if (center && Number.isFinite(Number(center.x)) && Number.isFinite(Number(center.y))) {
+    return { x: Number(center.x), y: Number(center.y) };
+  }
+  const x = Number(token?.x);
+  const y = Number(token?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
