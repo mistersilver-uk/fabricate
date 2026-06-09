@@ -175,7 +175,12 @@
       <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.VisualHeading', 'Linked marker')}</h3>
       <p class="fab-ic-visual-status" class:is-missing={visualStatus.severity === 'missing'}>
         <i class="fas {visualStatus.icon}" aria-hidden="true"></i>
-        <span>{text(visualStatus.key, visualStatus.fallback)}</span>
+        {#if visualStatus.kind}
+          <!-- Resolved marker: read sensibly per kind ("Linked marker: Token"). -->
+          <span>{text('FABRICATE.Canvas.Interactable.Config.VisualOkPrefix', 'Linked marker:')} {text(visualStatus.kind.key, visualStatus.kind.fallback)}</span>
+        {:else}
+          <span>{text(visualStatus.key, visualStatus.fallback)}</span>
+        {/if}
       </p>
 
       {#if visualStatus.severity === 'missing'}

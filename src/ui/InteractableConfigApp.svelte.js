@@ -271,27 +271,38 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         if (!this._assertGM()) return;
         const behavior = this._resolveBehavior();
         if (!behavior) return;
-        // A real 3-way choice: Cancel (no-op), Unlink only (leave the tile on the
-        // scene), or Unlink + delete the linked visual.
+        // A linked Token is the GM's OWN document (e.g. a merchant NPC) — it is
+        // never ours to destroy. So when the marker is a Token, do NOT offer the
+        // "delete" option at all; the only safe removal is Unlink (leave the token
+        // on the scene). Tile/Drawing markers were created by Fabricate and keep
+        // the full 3-way choice.
+        const linkedDocumentName = readInteractableBehaviorSystem(behavior)?.linkedVisual?.documentName ?? null;
+        const isToken = linkedDocumentName === 'Token';
+        const choices = [
+          { action: 'unlink', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualUnlink', 'Unlink only'), icon: 'fas fa-link-slash' }
+        ];
+        if (!isToken) {
+          choices.push({ action: 'delete', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualDelete', 'Unlink + delete tile'), icon: 'fas fa-trash' });
+        }
+        choices.push({ action: 'cancel', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualCancel', 'Cancel'), icon: 'fas fa-xmark' });
+
         const choice = await choiceDialog({
           title: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualTitle', 'Remove visual marker'),
           content: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualPrompt', 'How would you like to remove the linked marker?'),
-          choices: [
-            { action: 'unlink', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualUnlink', 'Unlink only'), icon: 'fas fa-link-slash' },
-            { action: 'delete', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualDelete', 'Unlink + delete tile'), icon: 'fas fa-trash' },
-            { action: 'cancel', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualCancel', 'Cancel'), icon: 'fas fa-xmark' }
-          ],
+          choices,
           defaultAction: 'unlink'
         });
         if (choice === 'cancel') return; // Do NOT clear the link.
 
-        if (choice === 'delete') {
+        // Never delete a Token marker (belt-and-suspenders: the choice isn't even
+        // offered, but guard the edge regardless).
+        if (choice === 'delete' && !isToken) {
           const resolved = resolveLinkedVisual(readInteractableBehaviorSystem(behavior), {
             scene: behavior?.parent?.parent ?? null
           });
           const ref = identifyRegionBehaviorRef(behavior);
           const visualUuid = typeof resolved?.doc?.uuid === 'string' ? resolved.doc.uuid : null;
-          if (ref && visualUuid) {
+          if (ref && visualUuid && resolved?.documentName !== 'Token') {
             await emitInteractableVisualDelete({
               sceneId: ref.sceneId,
               visualUuid,
@@ -362,26 +373,35 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         const region = behavior?.parent ?? null;
         if (!region) return;
         // One 3-way choice: Cancel (no-op), Delete interactable (leave the linked
-        // marker), or Delete interactable + the linked visual marker.
+        // marker), or Delete interactable + the linked visual marker. A linked
+        // Token is the GM's own document, so the "+ visual" option is suppressed
+        // for a Token (deleting the interactable never deletes the GM's token).
+        const linkedDocumentName = readInteractableBehaviorSystem(behavior)?.linkedVisual?.documentName ?? null;
+        const isToken = linkedDocumentName === 'Token';
+        const choices = [
+          { action: 'delete', label: this._t('FABRICATE.Canvas.Interactable.Config.DeleteOnly', 'Delete interactable'), icon: 'fas fa-trash' }
+        ];
+        if (!isToken) {
+          choices.push({ action: 'deleteWithVisual', label: this._t('FABRICATE.Canvas.Interactable.Config.DeleteWithVisual', 'Delete interactable + visual'), icon: 'fas fa-trash-can' });
+        }
+        choices.push({ action: 'cancel', label: this._t('FABRICATE.Canvas.Interactable.Config.DeleteCancel', 'Cancel'), icon: 'fas fa-xmark' });
+
         const choice = await choiceDialog({
           title: this._t('FABRICATE.Canvas.Interactable.Config.DeleteTitle', 'Delete interactable'),
           content: this._t('FABRICATE.Canvas.Interactable.Config.DeletePrompt', 'Delete this interactable region? This cannot be undone.'),
-          choices: [
-            { action: 'delete', label: this._t('FABRICATE.Canvas.Interactable.Config.DeleteOnly', 'Delete interactable'), icon: 'fas fa-trash' },
-            { action: 'deleteWithVisual', label: this._t('FABRICATE.Canvas.Interactable.Config.DeleteWithVisual', 'Delete interactable + visual'), icon: 'fas fa-trash-can' },
-            { action: 'cancel', label: this._t('FABRICATE.Canvas.Interactable.Config.DeleteCancel', 'Cancel'), icon: 'fas fa-xmark' }
-          ],
+          choices,
           defaultAction: 'delete'
         });
         if (choice === 'cancel') return;
 
-        if (choice === 'deleteWithVisual') {
+        // Never delete a Token marker (the option isn't offered; guard regardless).
+        if (choice === 'deleteWithVisual' && !isToken) {
           const resolved = resolveLinkedVisual(readInteractableBehaviorSystem(behavior), {
             scene: region?.parent ?? null
           });
           const ref = identifyRegionBehaviorRef(behavior);
           const visualUuid = typeof resolved?.doc?.uuid === 'string' ? resolved.doc.uuid : null;
-          if (ref && visualUuid) {
+          if (ref && visualUuid && resolved?.documentName !== 'Token') {
             await emitInteractableVisualDelete({
               sceneId: ref.sceneId,
               visualUuid,

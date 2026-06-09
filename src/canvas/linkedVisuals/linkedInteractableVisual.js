@@ -13,11 +13,18 @@
  * `planDepletedBehavior` from `depletedBehavior.js` (none/apply/revert/delete);
  * for a Drawing we use the analogous PURE `planDrawingDepleted` (none/apply/
  * revert/delete) which hides the drawing when depleted (and optionally appends a
- * "(depleted)" label) and shows it on respawn. Only the resolve
+ * "(depleted)" label) and shows it on respawn. For a Token we use the PURE
+ * `planTokenDepleted`, which is a SAFE no-op by default: a linked existing Token
+ * is the GM's own document (e.g. a merchant NPC) — depletion NEVER mutates or
+ * deletes it. The most it will ever do is honour an EXPLICIT, separately-named
+ * opt-in (`depletedBehavior.tokenHide === true`) to reversibly hide the token on
+ * depletion; `deleteToken` is deliberately ignored for a Token so terminal
+ * depletion can never destroy the GM's token. Only the resolve
  * (`globalThis.fromUuidSync` / scene lookup) and the emit (routed via the injected
- * GM-socket seams) are edges. The Token branch is a Phase 5 no-op stub.
+ * GM-socket seams) are edges.
  *
- * This pass (Phase 4) implements the Tile + Drawing branches.
+ * This pass (Phase 5) implements the Token branch (safe-default no-op + opt-in
+ * reversible hide) on top of the Phase 4 Tile + Drawing branches.
  */
 
 import { planDepletedBehavior } from '../depletedBehavior.js';
@@ -136,8 +143,89 @@ export function applyLinkedVisualDepleted({
     return emitVisualUpdate?.({ sceneId, visualUuid, documentName, update: plan.update });
   }
 
-  // Phase 5: Token depleted-visual mapping — no-op stub.
+  if (documentName === 'Token') {
+    // SAFE by default: a linked existing Token is the GM's own document. The
+    // plan is `{ action:'none' }` unless the GM has set the EXPLICIT
+    // `tokenHide` opt-in — and even then only ever 'apply'/'revert' (a reversible
+    // hide), NEVER 'delete'. So a Token marker can never be destroyed here.
+    const plan = planTokenDepleted({ behavior, depleted, token: doc });
+    if (plan.action === 'none') return undefined;
+    // Defensive: planTokenDepleted never returns 'delete', but if a future change
+    // ever did, refuse to route a delete for a Token (the token is not ours).
+    if (plan.action === 'delete') return undefined;
+    return emitVisualUpdate?.({ sceneId, visualUuid, documentName, update: plan.update });
+  }
+
   return undefined;
+}
+
+/**
+ * Decide the Token mutation for a depleted-behavior transition. PURE — no Foundry
+ * globals, no mutation; returns a plan the caller's thin edge enacts.
+ *
+ * A linked existing Token (e.g. a merchant NPC the GM placed) is NOT ours to
+ * mutate or destroy: it is only borrowed as the interactable's visible marker.
+ * Therefore the SAFE DEFAULT is to do NOTHING on depletion/respawn — including on
+ * the terminal `deleteToken` flag, which is deliberately IGNORED for a Token so
+ * depletion can never delete the GM's token.
+ *
+ * The single, EXPLICIT, opt-in is `depletedBehavior.tokenHide === true`: when the
+ * GM separately asks for it, the token is reversibly HIDDEN on depletion
+ * (`hidden:true`, with the original `hidden` state stashed in
+ * `flags.fabricate.nodeOriginal`) and SHOWN again on respawn. The opt-in never
+ * deletes and never changes anything other than the `hidden` flag.
+ *
+ * All plans are idempotent — a re-run in the same visual state returns
+ * `{ action: 'none' }`.
+ *
+ *  - `{ action: 'none' }`           — nothing to do (the safe default).
+ *  - `{ action: 'apply', update }`  — opt-in hide: `hidden:true` + the
+ *      freshly-stashed `flags.fabricate.nodeOriginal` (only stashed when not
+ *      already present).
+ *  - `{ action: 'revert', update }` — opt-in show again: `hidden:<original>` +
+ *      clears the stash.
+ *
+ * Note `deleteToken` is NOT honoured for a Token (no `{ action:'delete' }` is ever
+ * returned) — that is the non-negotiable "never delete the GM's token" guarantee.
+ *
+ * @param {object} args
+ * @param {{ tokenHide?: boolean, deleteToken?: boolean }|null} args.behavior  The
+ *   node's `depletedBehavior`. Only `tokenHide` is honoured; `deleteToken` is
+ *   ignored for a Token.
+ * @param {boolean} args.depleted
+ * @param {object} args.token  The Token doc (for the current `hidden` state + the
+ *   existing `flags.fabricate.nodeOriginal` stash).
+ * @returns {{ action: 'none' } | { action: 'apply', update: object } | { action: 'revert', update: object }}
+ */
+export function planTokenDepleted({ behavior, depleted, token } = {}) {
+  // Read the opt-in DIRECTLY off the raw behavior: `normalizeDepletedBehavior`
+  // drops unknown keys (and drops swap/postfix when `deleteToken` is set), so the
+  // Token-specific `tokenHide` opt-in must be read before normalization.
+  const optInHide = behavior && typeof behavior === 'object' && behavior.tokenHide === true;
+
+  // No opt-in ⇒ the safe default: do nothing. `deleteToken` is intentionally NOT
+  // honoured here — the token is the GM's and is never deleted by depletion.
+  if (!optInHide) return { action: 'none' };
+
+  const existingOriginal = token?.flags?.fabricate?.nodeOriginal ?? null;
+
+  if (depleted) {
+    // Already stashed ⇒ the hide is applied; re-run is a no-op (idempotent).
+    if (existingOriginal) return { action: 'none' };
+    const original = { hidden: token?.hidden === true };
+    return { action: 'apply', update: { hidden: true, flags: { fabricate: { nodeOriginal: original } } } };
+  }
+
+  // Not depleted ⇒ revert: show again + restore the original hidden state.
+  // Idempotent: no stash means nothing was applied, so nothing to revert.
+  if (!existingOriginal) return { action: 'none' };
+  return {
+    action: 'revert',
+    update: {
+      hidden: existingOriginal.hidden === true,
+      flags: { fabricate: { nodeOriginal: null } }
+    }
+  };
 }
 
 /**

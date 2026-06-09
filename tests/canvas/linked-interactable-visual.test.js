@@ -19,6 +19,7 @@ import {
   createLinkedDrawing,
   recreateLinkedDrawing,
   planDrawingDepleted,
+  planTokenDepleted,
   planRelinkVisual,
   relinkVisual,
   buildClearLinkedVisualFlags,
@@ -82,6 +83,23 @@ test('resolveLinkedVisual resolves a Drawing by uuid and via the scene-embedded 
   const scene = { drawings: { get: (id) => (id === 'd1' ? doc : null) } };
   const byScene = withFromUuid({}, () => resolveLinkedVisual(
     { linkedVisual: { uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' } },
+    { scene }
+  ));
+  assert.equal(byScene.doc, doc);
+});
+
+test('resolveLinkedVisual resolves a Token by uuid and via scene.tokens.get fallback', () => {
+  const doc = { uuid: 'Scene.s1.Token.k1', parent: { id: 's1' } };
+  const byUuid = withFromUuid({ 'Scene.s1.Token.k1': doc }, () => resolveLinkedVisual(
+    { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } }
+  ));
+  assert.equal(byUuid.doc, doc);
+  assert.equal(byUuid.documentName, 'Token');
+
+  // Fallback: UUID resolver unavailable → scene.tokens.get(trailingId).
+  const scene = { tokens: { get: (id) => (id === 'k1' ? doc : null) } };
+  const byScene = withFromUuid({}, () => resolveLinkedVisual(
+    { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } },
     { scene }
   ));
   assert.equal(byScene.doc, doc);
@@ -185,20 +203,96 @@ test('planMissingPolicy reports none (not warn) for a region-only interactable',
   );
 });
 
-test('applyLinkedVisualDepleted Token branch is a no-op stub (Phase 5)', () => {
-  const updates = [];
-  const deletes = [];
-  const token = { uuid: 'Scene.s1.Token.k1', parent: { id: 's1' } };
-  withFromUuid({ 'Scene.s1.Token.k1': token }, () => {
-    applyLinkedVisualDepleted({
-      behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' }, node: { depletedBehavior: { swapImage: 'd.webp' } } },
-      depleted: true,
+// --- Token depleted decision (pure) — SAFE no-op default (Phase 5) -----------
+
+function tokenDoc({ uuid = 'Scene.s1.Token.k1', hidden = false, nodeOriginal = null } = {}) {
+  return {
+    uuid,
+    parent: { id: 's1' },
+    hidden,
+    flags: nodeOriginal ? { fabricate: { nodeOriginal } } : {}
+  };
+}
+
+test('planTokenDepleted: deplete with no opt-in is a SAFE no-op (the GM token is not ours)', () => {
+  assert.deepEqual(planTokenDepleted({ behavior: {}, depleted: true, token: tokenDoc() }), { action: 'none' });
+  assert.deepEqual(planTokenDepleted({ behavior: null, depleted: true, token: tokenDoc() }), { action: 'none' });
+});
+
+test('planTokenDepleted: respawn with no opt-in is a no-op', () => {
+  assert.deepEqual(planTokenDepleted({ behavior: {}, depleted: false, token: tokenDoc() }), { action: 'none' });
+});
+
+test('planTokenDepleted: terminal deleteToken NEVER deletes a Token marker (no-op)', () => {
+  // The non-negotiable guarantee: even the terminal `deleteToken` flag is ignored
+  // for a Token, so depletion can never destroy the GM's token.
+  assert.deepEqual(planTokenDepleted({ behavior: { deleteToken: true }, depleted: true, token: tokenDoc() }), { action: 'none' });
+});
+
+test('planTokenDepleted: explicit tokenHide opt-in reversibly hides on deplete + shows on respawn', () => {
+  // EXPLICIT, separately-named opt-in: the most a Token depletion may ever do.
+  const applyPlan = planTokenDepleted({ behavior: { tokenHide: true }, depleted: true, token: tokenDoc({ hidden: false }) });
+  assert.equal(applyPlan.action, 'apply');
+  assert.equal(applyPlan.update.hidden, true);
+  assert.deepEqual(applyPlan.update.flags.fabricate.nodeOriginal, { hidden: false });
+
+  const revertPlan = planTokenDepleted({
+    behavior: { tokenHide: true },
+    depleted: false,
+    token: tokenDoc({ hidden: true, nodeOriginal: { hidden: false } })
+  });
+  assert.equal(revertPlan.action, 'revert');
+  assert.equal(revertPlan.update.hidden, false);
+  assert.equal(revertPlan.update.flags.fabricate.nodeOriginal, null);
+});
+
+test('planTokenDepleted: opt-in tokenHide is idempotent (apply + revert)', () => {
+  // Already-stashed ⇒ re-applying the hide is a no-op.
+  assert.deepEqual(
+    planTokenDepleted({ behavior: { tokenHide: true }, depleted: true, token: tokenDoc({ nodeOriginal: { hidden: false } }) }),
+    { action: 'none' }
+  );
+  // Nothing stashed ⇒ nothing to revert.
+  assert.deepEqual(
+    planTokenDepleted({ behavior: { tokenHide: true }, depleted: false, token: tokenDoc() }),
+    { action: 'none' }
+  );
+});
+
+test('applyLinkedVisualDepleted Token branch emits NOTHING by default (deplete, respawn, terminal)', () => {
+  const token = tokenDoc();
+  for (const { depleted, behavior } of [
+    { depleted: true, behavior: { swapImage: 'd.webp' } },   // depleted, swap-image configured
+    { depleted: false, behavior: { swapImage: 'd.webp' } },  // respawn
+    { depleted: true, behavior: { deleteToken: true } }      // terminal — must NOT delete
+  ]) {
+    const updates = [];
+    const deletes = [];
+    withFromUuid({ 'Scene.s1.Token.k1': token }, () => applyLinkedVisualDepleted({
+      behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' }, node: { depletedBehavior: behavior } },
+      depleted,
       emitVisualUpdate: (a) => updates.push(a),
       emitVisualDelete: (a) => deletes.push(a)
-    });
-  });
-  assert.equal(updates.length, 0);
-  assert.equal(deletes.length, 0);
+    }));
+    assert.equal(updates.length, 0, `no update emitted (depleted=${depleted})`);
+    assert.equal(deletes.length, 0, `no delete emitted for a Token marker (depleted=${depleted})`);
+  }
+});
+
+test('applyLinkedVisualDepleted Token branch routes an opt-in hide via emitVisualUpdate (never delete)', () => {
+  const updates = [];
+  const deletes = [];
+  const token = tokenDoc({ hidden: false });
+  withFromUuid({ 'Scene.s1.Token.k1': token }, () => applyLinkedVisualDepleted({
+    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' }, node: { depletedBehavior: { tokenHide: true } } },
+    depleted: true,
+    emitVisualUpdate: (a) => updates.push(a),
+    emitVisualDelete: (a) => deletes.push(a)
+  }));
+  assert.equal(deletes.length, 0, 'opt-in hide never deletes the token');
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].documentName, 'Token');
+  assert.equal(updates[0].update.hidden, true);
 });
 
 // --- Drawing depleted decision (pure) + apply edge ---------------------------
@@ -470,6 +564,45 @@ test('relinkVisual derives documentName from a selected Drawing and writes the r
   assert.equal(setNew.visualUuid, 'Scene.s1.Drawing.d1');
   assert.equal(setNew.documentName, 'Drawing');
   assert.equal(setNew.update.flags.fabricate.isInteractableVisual, true);
+});
+
+test('relinkVisual derives documentName Token from a selected Token, writes the reverse flag, clears the old marker', async () => {
+  const behaviorUpdates = [];
+  const visualUpdates = [];
+  const behavior = {
+    id: 'beh-1',
+    parent: { uuid: 'Scene.s1.Region.r1' },
+    // Previously linked to a Tile — relinking to a Token clears the old Tile.
+    system: { linkedVisual: { uuid: 'Scene.s1.Tile.old', documentName: 'Tile' } }
+  };
+  // The selected document is a TokenDocument: documentName via constructor.documentName.
+  const selectedToken = { uuid: 'Scene.s1.Token.k1', constructor: { documentName: 'Token' } };
+  const patch = await relinkVisual(behavior, selectedToken, {
+    applyBehaviorUpdate: (a) => behaviorUpdates.push(a),
+    identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' }),
+    applyVisualUpdate: (a) => visualUpdates.push(a)
+  });
+
+  // documentName derived from the SELECTED Token, not hardcoded.
+  assert.deepEqual(patch, { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } });
+  assert.deepEqual(behaviorUpdates[0].update, {
+    system: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } }
+  });
+
+  // Clears the old Tile, writes the reverse linked-visual flag onto the Token.
+  // (The reverse flag is a FLAG, not actor data — it never touches the actor.)
+  assert.equal(visualUpdates.length, 2);
+  const [clearOld, setNew] = visualUpdates;
+  assert.equal(clearOld.visualUuid, 'Scene.s1.Tile.old');
+  assert.equal(clearOld.documentName, 'Tile');
+  assert.equal(clearOld.update.flags.fabricate.isInteractableVisual, null);
+  assert.equal(setNew.visualUuid, 'Scene.s1.Token.k1');
+  assert.equal(setNew.documentName, 'Token');
+  assert.deepEqual(setNew.update.flags.fabricate, {
+    isInteractableVisual: true,
+    linkedRegionUuid: 'Scene.s1.Region.r1',
+    linkedBehaviorId: 'beh-1'
+  });
 });
 
 test('relinkVisual writes the reverse flag onto the new tile and clears it off the old tile', async () => {

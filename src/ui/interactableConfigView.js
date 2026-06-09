@@ -18,16 +18,44 @@ const VISUAL_STATUS = Object.freeze({
   none: { severity: 'none', icon: 'fa-circle-minus', key: 'FABRICATE.Canvas.Interactable.Config.VisualNone', fallback: 'No marker (region only).' }
 });
 
+// Per-kind icon + localized label for a resolved marker, so an "ok" banner can
+// read sensibly per document kind ("Linked marker: Token"). Tile/Drawing/Token
+// are the supported linked-visual kinds (`LINKED_VISUAL_DOCUMENT_NAMES`).
+const VISUAL_KIND = Object.freeze({
+  Tile: { icon: 'fa-image', key: 'FABRICATE.Canvas.Interactable.Config.VisualKindTile', fallback: 'Tile' },
+  Drawing: { icon: 'fa-draw-polygon', key: 'FABRICATE.Canvas.Interactable.Config.VisualKindDrawing', fallback: 'Drawing' },
+  Token: { icon: 'fa-user', key: 'FABRICATE.Canvas.Interactable.Config.VisualKindToken', fallback: 'Token' }
+});
+
 /**
  * Describe the linked-visual status banner from the view model's `linkedVisual`
  * block. PURE. Returns `{ severity, icon, key, fallback }`.
  *
- * @param {{ status?: string, mode?: string } | null} linkedVisual
- * @returns {{ severity: string, icon: string, key: string, fallback: string }}
+ * For a RESOLVED ('ok') marker the banner is enriched with the linked document
+ * kind so it reads "Linked marker: Token" (or Tile / Drawing): the `key`/`fallback`
+ * switch to the per-kind "VisualOkKind" string, the per-kind icon is used, and a
+ * `documentName` + `kind:{ key, fallback }` block is attached for the component to
+ * interpolate. An unknown/absent kind falls back to the plain "Marker linked."
+ * banner — so existing callers that pass only `{ status }` are unaffected.
+ *
+ * @param {{ status?: string, mode?: string, documentName?: string } | null} linkedVisual
+ * @returns {{ severity: string, icon: string, key: string, fallback: string, documentName?: string|null, kind?: { key: string, fallback: string } }}
  */
 export function describeVisualStatus(linkedVisual) {
   const status = linkedVisual?.status;
-  if (status === 'ok') return VISUAL_STATUS.ok;
+  if (status === 'ok') {
+    const documentName = typeof linkedVisual?.documentName === 'string' ? linkedVisual.documentName : null;
+    const kind = documentName ? VISUAL_KIND[documentName] ?? null : null;
+    if (!kind) return VISUAL_STATUS.ok;
+    return {
+      severity: 'ok',
+      icon: kind.icon,
+      key: 'FABRICATE.Canvas.Interactable.Config.VisualOkKind',
+      fallback: `Linked marker: ${kind.fallback}`,
+      documentName,
+      kind: { key: kind.key, fallback: kind.fallback }
+    };
+  }
   if (status === 'missing') return VISUAL_STATUS.missing;
   return VISUAL_STATUS.none;
 }

@@ -1266,6 +1266,54 @@ Hooks.on('renderTileHUD', (hud, element) => {
   }
 });
 
+// GM-only discoverability (Phase 5): the same "Configure Fabricate Interactable"
+// button on the Token HUD for a Token that is a linked Fabricate interactable
+// visual (`linkedVisual.documentName:'Token'`). The Token carries the SAME reverse
+// linked-visual flags as a Tile/Drawing, so the pure gate + target resolution from
+// `interactableConfigSheet.js` generalize unchanged — only the host HUD differs.
+// This NEVER touches the token's actor: it only opens the behaviour config panel.
+Hooks.on('renderTokenHUD', (hud, element) => {
+  try {
+    const token = hud?.object?.document ?? hud?.document ?? null;
+    if (!shouldOfferInteractableConfigEntry(token, { isGM: game.user?.isGM === true })) return;
+
+    const target = resolveInteractableConfigTarget(token, {
+      resolveRegion: (regionUuid) => {
+        const region = fromUuidSync?.(regionUuid) ?? null;
+        const regionId = region?.id ?? region?._id ?? null;
+        const sceneId = region?.parent?.id ?? region?.parent?._id ?? null;
+        return regionId && sceneId ? { sceneId, regionId } : null;
+      }
+    });
+    if (!target) return;
+
+    const root = element instanceof HTMLElement ? element : element?.[0] ?? null;
+    const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
+    if (!column?.appendChild) return;
+
+    const label = (() => {
+      const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Config.OpenFromToken');
+      return out && out !== 'FABRICATE.Canvas.Interactable.Config.OpenFromToken'
+        ? out
+        : 'Configure Fabricate Interactable';
+    })();
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'control-icon fabricate-interactable-config-hud';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = '<i class="fas fa-sliders"></i>';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      void getInteractableConfigAppClass().show(target);
+    });
+    column.appendChild(button);
+  } catch (_error) {
+    // Defensive: a HUD augmentation must never throw into Foundry's render.
+  }
+});
+
 /**
  * System-agnostic crafting button integration
  * Add Craft button to Items Directory sidebar (works with all game systems)
