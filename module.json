@@ -27,6 +27,7 @@
     }
   ],
   "packs": [],
+  "socket": true,
   "documentTypes": {
     "RegionBehavior": {
       "interactable": {}
