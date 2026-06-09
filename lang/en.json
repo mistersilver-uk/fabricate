@@ -129,6 +129,116 @@
         "NoTasks": "No gathering tasks in this system."
       }
     },
+    "RegionBehavior": {
+      "Interactable": {
+        "FIELDS": {
+          "interactableType": {
+            "label": "Interactable type",
+            "hint": "Whether this region acts as a tool station or a gathering task."
+          },
+          "sourceUuid": {
+            "label": "Source reference (advanced)",
+            "hint": "Internal identity of the linked tool or task. Edit from the Configure Fabricate Interactable window."
+          },
+          "systemId": {
+            "label": "Crafting system (advanced)",
+            "hint": "Internal id of the owning crafting system."
+          },
+          "toolId": {
+            "label": "Tool reference (advanced)",
+            "hint": "Internal id of the linked library tool."
+          },
+          "taskId": {
+            "label": "Task reference (advanced)",
+            "hint": "Internal id of the linked gathering task."
+          },
+          "environmentId": {
+            "label": "Environment",
+            "hint": "The gathering environment this resource node belongs to."
+          },
+          "name": {
+            "label": "Name",
+            "hint": "Display name shown to players when they can interact."
+          },
+          "presentation": {
+            "promptText": {
+              "label": "Prompt text",
+              "hint": "Message shown to players on the interaction prompt."
+            },
+            "hidden": {
+              "label": "Hidden from players",
+              "hint": "Hide the interaction prompt from players."
+            }
+          },
+          "linkedVisual": {
+            "uuid": {
+              "label": "Linked marker (advanced)",
+              "hint": "Internal reference to the linked tile, drawing, or token."
+            },
+            "documentName": {
+              "label": "Marker type (advanced)",
+              "hint": "Whether the linked marker is a Tile, Drawing, or Token."
+            },
+            "mode": {
+              "label": "Marker mode (advanced)",
+              "hint": "Whether this interactable shows a visible marker or is region-only."
+            },
+            "missingPolicy": {
+              "label": "If the marker is missing",
+              "hint": "What to do when the linked marker can no longer be found."
+            }
+          },
+          "node": {
+            "label": "Resource node (advanced)",
+            "hint": "Snapshot of the gathering node's stock and respawn configuration."
+          },
+          "state": {
+            "enabled": {
+              "label": "Enabled",
+              "hint": "Whether players can currently activate this interactable."
+            },
+            "consumed": {
+              "label": "Consumed",
+              "hint": "Whether this interactable has been used up."
+            },
+            "locked": {
+              "label": "Locked",
+              "hint": "Whether this interactable is locked against activation."
+            },
+            "uses": {
+              "max": {
+                "label": "Maximum uses",
+                "hint": "Total number of times this interactable may be used (blank for unlimited)."
+              },
+              "used": {
+                "label": "Uses spent",
+                "hint": "How many times this interactable has been used."
+              }
+            },
+            "cooldown": {
+              "seconds": {
+                "label": "Cooldown (seconds)",
+                "hint": "Minimum world-time, in seconds, between activations (blank for none)."
+              },
+              "lastUsedWorldTime": {
+                "label": "Last used (advanced)",
+                "hint": "World time of the most recent activation."
+              }
+            }
+          },
+          "activation": {
+            "trigger": {
+              "label": "Trigger",
+              "hint": "How activation is initiated. Currently region entry."
+            },
+            "audience": {
+              "label": "Who can activate",
+              "hint": "Whether only players or everyone can activate this interactable."
+            }
+          }
+        }
+      }
+    },
     "App": {
       "Title": "Fabricate",
       "ComingSoon": "Coming soon",

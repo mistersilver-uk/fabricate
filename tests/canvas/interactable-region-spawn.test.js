@@ -60,14 +60,22 @@ test('buildRegionSpawnRequest (tool) shapes region geometry + behaviour system +
   assert.equal(request.name, 'Forge Anvil');
   assert.equal(request.environmentId, null, 'tools carry no environment');
 
-  // Region: a 1-grid-square rectangle centered on (150,250), grid-snapped.
+  // Region: a 1-grid-square rectangle CONCENTRIC with the tile (centered on the
+  // drop point), so the visible marker and the interactable area coincide.
   assert.equal(request.region.shape.type, 'rectangle');
   assert.equal(request.region.shape.width, 100);
   assert.equal(request.region.shape.height, 100);
-  // center (150,250) - half(50,50) = (100,200), snapped to the 100 grid.
+  // center (150,250) - half(50,50) = (100,200) — same as the tile's top-left.
   assert.equal(request.region.shape.x, 100);
   assert.equal(request.region.shape.y, 200);
   assert.equal(request.region.name, 'Forge Anvil');
+
+  // CONCENTRIC: the region rect and the tile rect share the same x/y/width/height
+  // so a player who walks onto the marker is inside the region.
+  assert.equal(request.region.shape.x, request.tile.x);
+  assert.equal(request.region.shape.y, request.tile.y);
+  assert.equal(request.region.shape.width, request.tile.width);
+  assert.equal(request.region.shape.height, request.tile.height);
 
   // Behaviour system: built by the injected builder; tool-shaped.
   assert.equal(request.behaviorSystem.interactableType, 'tool');
@@ -102,6 +110,31 @@ test('buildRegionSpawnRequest (gatheringTask) carries environmentId + node into 
   assert.equal(request.behaviorSystem.toolId, null);
   assert.equal(request.behaviorSystem.environmentId, 'env-1');
   assert.deepEqual(request.behaviorSystem.node, node, 'the node snapshot is threaded into the behaviour system');
+
+  // CONCENTRIC: a gathering-task region rect coincides with its tile rect too.
+  assert.equal(request.region.shape.x, request.tile.x);
+  assert.equal(request.region.shape.y, request.tile.y);
+  assert.equal(request.region.shape.width, request.tile.width);
+  assert.equal(request.region.shape.height, request.tile.height);
+});
+
+test('buildRegionSpawnRequest keeps the region rect coincident with the tile at an off-grid drop point', () => {
+  // An off-grid drop must still place the region exactly on the marker — the
+  // region top-left is NOT independently grid-snapped away from the tile.
+  const request = buildRegionSpawnRequest({
+    classification: toolClassification(),
+    point: { x: 137, y: 213 },
+    width: 100,
+    height: 100,
+    gridSize: 100,
+    buildBehaviorSystem: builder
+  });
+  assert.equal(request.tile.x, 87); // 137 - 50
+  assert.equal(request.tile.y, 163); // 213 - 50
+  assert.equal(request.region.shape.x, request.tile.x);
+  assert.equal(request.region.shape.y, request.tile.y);
+  assert.equal(request.region.shape.width, request.tile.width);
+  assert.equal(request.region.shape.height, request.tile.height);
 });
 
 test('buildRegionSpawnRequest defaults the tile texture + dimensions', () => {

@@ -317,7 +317,25 @@ class InteractableManager {
     if (!scene?.createEmbeddedDocuments) return null;
 
     const { region, behaviorSystem, tile } = spawnRequest;
-    const { x, y, width, height } = this._snapShape(region.shape);
+    // The region area and the linked Tile marker must COINCIDE so a player walking
+    // onto the visible marker is inside the region. When there is a marker, the
+    // region rectangle is set to the tile's exact geometry (concentric/coincident);
+    // do NOT independently re-snap the region, which would shift it off the marker.
+    // For a region-only interactable (no tile) use the pure builder's already
+    // concentric region shape directly.
+    const { x, y, width, height } = tile
+      ? {
+          x: Number(tile.x ?? region.shape?.x ?? 0),
+          y: Number(tile.y ?? region.shape?.y ?? 0),
+          width: Number(tile.width ?? region.shape?.width ?? this._gridSize()),
+          height: Number(tile.height ?? region.shape?.height ?? this._gridSize())
+        }
+      : {
+          x: Number(region.shape?.x ?? 0),
+          y: Number(region.shape?.y ?? 0),
+          width: Number(region.shape?.width ?? this._gridSize()),
+          height: Number(region.shape?.height ?? this._gridSize())
+        };
 
     let regionDoc = null;
     try {
@@ -854,23 +872,6 @@ class InteractableManager {
     return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;
   }
 
-  /**
-   * Snap a region shape's geometry to the grid (the pure builder already
-   * grid-aligns; this is a defensive re-snap at the edge using the live grid).
-   *
-   * @param {{x:number,y:number,width:number,height:number}} shape
-   * @returns {{x:number,y:number,width:number,height:number}}
-   */
-  _snapShape(shape = {}) {
-    const size = this._gridSize();
-    const snap = (v) => (Number.isFinite(size) && size > 0 ? Math.round(Number(v ?? 0) / size) * size : Number(v ?? 0));
-    return {
-      x: snap(shape.x),
-      y: snap(shape.y),
-      width: Number(shape.width ?? size),
-      height: Number(shape.height ?? size)
-    };
-  }
 
   _resolutionDeps() {
     const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();

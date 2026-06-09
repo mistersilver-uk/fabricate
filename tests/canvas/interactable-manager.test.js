@@ -263,6 +263,12 @@ test('_spawnInteractableRegion creates a Region (with nested behaviour) + linked
     assert.equal(regionPayload.shapes[0].type, 'rectangle');
 
     assert.equal(createdTiles.length, 1, 'one linked Tile created');
+    // CONCENTRIC: the created Region rectangle and the linked Tile share the same
+    // x/y/width/height so the visible marker and the interactable area coincide.
+    assert.equal(regionPayload.shapes[0].x, createdTiles[0].x);
+    assert.equal(regionPayload.shapes[0].y, createdTiles[0].y);
+    assert.equal(regionPayload.shapes[0].width, createdTiles[0].width);
+    assert.equal(regionPayload.shapes[0].height, createdTiles[0].height);
     assert.equal(createdTiles[0].texture.src, 'icons/tools/axe.webp');
     assert.equal(createdTiles[0].flags.fabricate.isInteractableVisual, true);
     assert.equal(createdTiles[0].flags.fabricate.linkedRegionUuid, 'Scene.scene-1.Region.region-1');

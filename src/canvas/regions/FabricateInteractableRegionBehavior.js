@@ -51,6 +51,14 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
   }
 
   class FabricateInteractableRegionBehavior extends RegionBehaviorType {
+    // V13 DataModel field localisation: the core schema-driven sheet
+    // (`RegionBehaviorConfig`) labels each field from
+    // `<PREFIX>.FIELDS.<fieldPath>.label` / `.hint`. Without a prefix our fields
+    // render as a stack of bare, unlabeled inputs. The keys live in `lang/en.json`
+    // under this prefix. The rich `InteractableConfigApp` remains the primary GM
+    // editor; this only stops the core sheet from rendering malformed.
+    static LOCALIZATION_PREFIXES = ['FABRICATE.RegionBehavior.Interactable'];
+
     static defineSchema() {
       const schema = buildInteractableBehaviorSchema(fields);
       // SUBSCRIPTION (not dispatch): a V13 RegionBehaviorType only RECEIVES region
@@ -72,15 +80,23 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
     }
 
     static events = {
-      // Region behaviour event handlers run on EVERY connected client with `this`
-      // bound to the behaviour. The manager seam decides prompt (local controlling
-      // user) vs mutation (active GM); these handlers are deliberately thin +
-      // no-throw so an undefined manager (pre-1c) is a safe no-op.
+      // Region behaviour event handlers run on EVERY connected client. In V13 a
+      // `RegionBehaviorType` `static events` handler is invoked with `this` bound
+      // to the DATA MODEL (the behaviour `system`), NOT the RegionBehavior
+      // document — so `this.type` / `this.system` are undefined here. The manager
+      // seam needs the DOCUMENT (it reads `document.type === 'fabricate.interactable'`,
+      // `document.system`, `document.parent` (the Region), and `Region.parent`
+      // (the Scene)), so we pass the parent document via the base getter
+      // `this.behavior` (fallback `this.parent`, then `this` for non-V13 fakes).
+      // Without this the manager's `isInteractableRegionBehavior` /
+      // `readInteractableBehaviorSystem` see `undefined` type/system and bail
+      // before the prompt is shown. These handlers stay thin + no-throw so an
+      // undefined manager is a safe no-op.
       tokenEnter: async function tokenEnter(event) {
         try {
           const manager = globalThis.game?.fabricate?.interactableManager
             ?? globalThis.fabricate?.interactableManager;
-          await manager?.onRegionEnter?.(event, this);
+          await manager?.onRegionEnter?.(event, this?.behavior ?? this?.parent ?? this);
         } catch (_error) {
           // Defensive: a region-event handler must never throw into Foundry.
         }
@@ -89,7 +105,7 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
         try {
           const manager = globalThis.game?.fabricate?.interactableManager
             ?? globalThis.fabricate?.interactableManager;
-          await manager?.onRegionExit?.(event, this);
+          await manager?.onRegionExit?.(event, this?.behavior ?? this?.parent ?? this);
         } catch (_error) {
           // Defensive: a region-event handler must never throw into Foundry.
         }

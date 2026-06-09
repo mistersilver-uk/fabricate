@@ -333,16 +333,22 @@ export function buildRegionSpawnRequest({
   const cx = Number(point?.x ?? 0);
   const cy = Number(point?.y ?? 0);
 
-  // Region: a `span`-square rectangle centered on the drop point, snapped to the
-  // grid so it tiles cleanly.
-  const regionW = grid * span;
-  const regionH = grid * span;
-  const regionX = Math.round((cx - regionW / 2) / grid) * grid;
-  const regionY = Math.round((cy - regionH / 2) / grid) * grid;
-
-  // Linked Tile: top-left-anchored so its center sits at the drop point.
+  // Linked Tile: top-left-anchored so its CENTER sits at the drop point.
   const tileX = cx - tileWidth / 2;
   const tileY = cy - tileHeight / 2;
+
+  // Region: a `span`-square rectangle that is CONCENTRIC with the tile (same
+  // center), so a player who walks onto the visible marker is inside the region.
+  // For the default single-square region the rectangle COINCIDES with the tile
+  // exactly (same x/y/width/height). For a multi-square region it stays centered
+  // on the tile's center and encloses it. Previously the region top-left was
+  // grid-snapped while the tile was raw-anchored, which shifted the interactable
+  // area ~half a tile down-right of the visible marker.
+  const regionW = grid * span;
+  const regionH = grid * span;
+  // Concentric: tile center is at (cx, cy); place the region's center there too.
+  const regionX = cx - regionW / 2;
+  const regionY = cy - regionH / 2;
 
   const resolvedEnvironmentId = classification.interactableType === 'gatheringTask'
     && typeof environmentId === 'string' && environmentId
