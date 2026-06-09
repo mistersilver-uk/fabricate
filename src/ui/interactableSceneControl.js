@@ -22,8 +22,8 @@ export const FABRICATE_SCENE_CONTROL_NAME = 'fabricate';
 export const FABRICATE_INTERACTABLE_TOOL_NAME = 'fabricate-interactables';
 /** FontAwesome icon for the top-level Fabricate control GROUP. */
 export const FABRICATE_SCENE_CONTROL_ICON = 'fas fa-mortar-pestle';
-/** FontAwesome icon for the "Place interactables" tool button (map/region pin). */
-export const FABRICATE_INTERACTABLE_TOOL_ICON = 'fas fa-map-location-dot';
+/** FontAwesome icon for the "Place interactables" tool button. */
+export const FABRICATE_INTERACTABLE_TOOL_ICON = 'fas fa-hand-pointer';
 
 /**
  * Add the GM-only Fabricate Interactable-browser control to a V13
