@@ -100,13 +100,15 @@ test('normalizeDepletedBehavior — both swap + postfix compose', () => {
   );
 });
 
-test('normalizeDepletedBehavior — deleteToken is mutually exclusive: swap/postfix are dropped', () => {
+test('normalizeDepletedBehavior — the removed deleteToken field is ignored (swap-image only)', () => {
+  // The "delete the linked marker" behavior was removed: a legacy deleteToken flag
+  // is no longer honored and only the swap-image (and postfix) survive.
   assert.deepEqual(
     normalizeDepletedBehavior({ deleteToken: true, swapImage: 'icons/x.webp', postfixName: true }),
-    { deleteToken: true },
-    'when deleteToken is on, swap/postfix are dead config and dropped'
+    { swapImage: 'icons/x.webp', postfixName: true },
+    'deleteToken is dropped; swap/postfix are kept'
   );
-  assert.deepEqual(normalizeDepletedBehavior({ deleteToken: true }), { deleteToken: true });
+  assert.equal(normalizeDepletedBehavior({ deleteToken: true }), null, 'a bare deleteToken normalizes to no behavior');
 });
 
 test('normalizeNodeConfig carries depletedBehavior through (and omits it when none)', () => {
@@ -116,6 +118,6 @@ test('normalizeNodeConfig carries depletedBehavior through (and omits it when no
   const withoutBehavior = normalizeNodeConfig({ enabled: true, max: 3 });
   assert.ok(!('depletedBehavior' in withoutBehavior), 'no depletedBehavior key when none configured');
 
-  const deleteNode = normalizeNodeConfig({ enabled: true, max: 3, depletedBehavior: { deleteToken: true, postfixName: true } });
-  assert.deepEqual(deleteNode.depletedBehavior, { deleteToken: true }, 'mutual exclusion enforced through the node config');
+  const legacyDeleteNode = normalizeNodeConfig({ enabled: true, max: 3, depletedBehavior: { deleteToken: true, swapImage: 'icons/x.webp' } });
+  assert.deepEqual(legacyDeleteNode.depletedBehavior, { swapImage: 'icons/x.webp' }, 'legacy deleteToken dropped through the node config');
 });

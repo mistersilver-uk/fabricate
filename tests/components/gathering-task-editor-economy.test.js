@@ -100,45 +100,50 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     assert.match(rootSource, /economyMode=\{selectedGatheringTaskEconomyMode\}/, 'parent passes economyMode to the task editor');
   });
 
-  it('authors depletedBehavior with FilePicker swap-image and a mutually-exclusive delete (no postfix on tiles)', () => {
-    // Delete toggle and swap-image picker (FilePicker via onPickImagePath) are
-    // present. The postfix toggle is DROPPED for canvas tiles (tiles have no
-    // nameplate), so its data attribute must NOT be rendered.
+  it('authors depletedBehavior with a FilePicker swap-image (swap is the only behavior; no delete, no postfix)', () => {
+    // Only the swap-image picker survives — the "delete the linked marker" toggle
+    // and its warning chip were removed, and the postfix toggle is not offered for
+    // canvas tiles (tiles have no nameplate).
     for (const attr of [
       'data-gathering-task-depleted-behavior',
-      'data-gathering-task-depleted-delete',
       'data-gathering-task-depleted-image'
     ]) {
       assert.ok(editorSource.includes(attr), `depleted-behavior block should expose ${attr}`);
     }
-    assert.ok(
-      !editorSource.includes('data-gathering-task-depleted-postfix'),
-      'the postfix toggle is dropped for canvas tiles (no nameplate)'
-    );
+    for (const removed of [
+      'data-gathering-task-depleted-delete',
+      'data-gathering-task-depleted-warning',
+      'data-gathering-task-depleted-postfix',
+      'depletedDeleteToken',
+      'toggleDepletedDelete'
+    ]) {
+      assert.ok(!editorSource.includes(removed), `the delete behavior is removed: ${removed} must not appear`);
+    }
+
     // The swap-image control is wired to the FilePicker service (onPickImagePath),
     // not a free-text input.
     assert.match(editorSource, /async function chooseDepletedImage/, 'swap-image uses the FilePicker via onPickImagePath');
     assert.match(editorSource, /onPickImagePath\(depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
-
-    // Mutual exclusion: when delete is on, the swap control is disabled and the
-    // visuals block is greyed (is-disabled).
-    assert.match(editorSource, /class:is-disabled=\{depletedDeleteToken\}/, 'the visuals block greys out when delete is on');
-    assert.match(editorSource, /disabled=\{depletedDeleteToken \|\| typeof onPickImagePath/, 'the swap picker is disabled when delete is on');
-
-    // The normalizer-mirroring author guard clears swap when delete is on.
-    assert.match(editorSource, /if \(next\.deleteToken === true\)[\s\S]*?delete next\.swapImage/, 'enabling delete clears swap in the editor');
   });
 
-  it('shows an irreversible-delete warning chip (manager-chip is-danger role=alert) when delete is enabled', () => {
-    const guardIdx = editorSource.indexOf('{#if depletedDeleteToken}');
-    const chipIdx = editorSource.indexOf('data-gathering-task-depleted-warning');
-    assert.ok(guardIdx >= 0, 'the warning is guarded by depletedDeleteToken');
-    assert.ok(chipIdx > guardIdx, 'the warning chip renders inside the delete guard');
-    assert.match(
-      editorSource,
-      /<span class="manager-chip is-danger" role="alert" data-gathering-task-depleted-warning>/,
-      'reuses the manager-chip is-danger role=alert warning pattern'
-    );
+  it('puts the swap-image picker inline with the title/hint and the clear control below the image (plus right-click clears)', () => {
+    // Title/hint and the image sit on one row.
+    const rowIdx = editorSource.indexOf('manager-task-depleted-row');
+    const copyIdx = editorSource.indexOf('manager-task-depleted-copy');
+    const imageColIdx = editorSource.indexOf('data-gathering-task-depleted-image-column');
+    assert.ok(rowIdx >= 0, 'an inline row wraps the depleted-behavior block');
+    assert.ok(copyIdx > rowIdx && imageColIdx > rowIdx, 'the title/hint copy and the image column both sit inside the inline row');
+
+    // The remove control is a button BELOW the thumbnail (inside the image column,
+    // after the picker button).
+    const pickerIdx = editorSource.indexOf('data-gathering-task-depleted-image');
+    const clearIdx = editorSource.indexOf('data-gathering-task-depleted-image-clear');
+    assert.ok(clearIdx > pickerIdx, 'the remove-image button renders after (below) the picker thumbnail');
+    assert.match(editorSource, /class="manager-link-button manager-task-depleted-image-clear"/, 'the remove control is a labelled button below the image');
+
+    // Right-click on the thumbnail clears it (oncontextmenu prevents the default menu).
+    assert.match(editorSource, /oncontextmenu=\{onDepletedImageContextMenu\}/, 'the thumbnail wires a context-menu (right-click) clear');
+    assert.match(editorSource, /function onDepletedImageContextMenu\(event\)\s*\{[\s\S]*?event\.preventDefault\(\)/, 'the context-menu handler prevents the default menu');
   });
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {
@@ -153,9 +158,11 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
   it('adds the depleted-behavior + default-environment + drop-dialog i18n keys', () => {
     const econ = lang.FABRICATE.Admin.Manager.Economy;
     assert.equal(econ.DepletedBehaviorTitle, 'When depleted (linked marker)');
-    assert.equal(econ.DepletedDeleteToken, 'Delete the linked marker');
-    assert.ok(typeof econ.DepletedDeleteWarning === 'string' && econ.DepletedDeleteWarning.length > 0);
+    // The delete-marker behavior was removed: its i18n keys must be gone.
+    assert.ok(!('DepletedDeleteToken' in econ), 'the DepletedDeleteToken key is removed');
+    assert.ok(!('DepletedDeleteWarning' in econ), 'the DepletedDeleteWarning key is removed');
     assert.equal(econ.DepletedSwapImage, 'Swap marker image');
+    assert.equal(econ.DepletedSwapImageClear, 'Remove image');
 
     const tasks = lang.FABRICATE.Admin.Manager.Environment.Tasks;
     assert.equal(tasks.DefaultEnvironment, 'Default environment (canvas drop)');

@@ -107,30 +107,23 @@ function trimmedOrNull(value) {
  * Normalize the `depletedBehavior` block on a node config.
  *
  * `depletedBehavior` describes what happens to a placed gathering-task
- * interactable's LINKED VISUAL marker when its node depletes (`node.current <= 0`);
- * it is orthogonal to `depletionTiming` (`onStart`/`onSuccess`, which describes
- * WHEN a node decrements). The field names keep their legacy `*Token` spelling but
- * are interpreted per linked-visual kind (Tile: swap-image/delete; Drawing:
- * hide/label; Token: safe no-op). Three combinable axes:
- *   - `swapImage`   : a marker-texture path applied while depleted (Tile).
+ * interactable's LINKED VISUAL marker when its environment node depletes
+ * (`environment.nodeRuntime[taskId].current <= 0`); it is orthogonal to
+ * `depletionTiming` (`onStart`/`onSuccess`, which describes WHEN a node
+ * decrements). Two combinable axes:
+ *   - `swapImage`   : a marker-texture path applied to the Tile while depleted
+ *                     (flipped back to the available image when it respawns).
  *   - `postfixName` : when true, append a "(depleted)" label (Drawing; a Tile has
  *                     no nameplate so it is ignored there).
- *   - `deleteToken` : terminal — the linked visual is removed on depletion (a
- *                     linked existing Token is never deleted — safe no-op).
  *
- * `deleteToken` is MUTUALLY EXCLUSIVE with `swapImage`/`postfixName`: when delete
- * is on the swap/postfix fields are dead config, so they are DROPPED here (the
- * editor also greys them out). Returns `null` when no behavior is configured (the
- * default — no visual change on depletion).
+ * Returns `null` when no behavior is configured (the default — no visual change on
+ * depletion).
  *
  * @param {object|null} data
- * @returns {{ swapImage?: string, postfixName?: boolean, deleteToken?: boolean }|null}
+ * @returns {{ swapImage?: string, postfixName?: boolean }|null}
  */
 export function normalizeDepletedBehavior(data = null) {
   if (!data || typeof data !== 'object') return null;
-  // Delete is terminal and mutually exclusive: when on, swap/postfix are dead
-  // config and are intentionally dropped so they never persist alongside delete.
-  if (data.deleteToken === true) return { deleteToken: true };
 
   const behavior = {};
   const swapImage = trimmedOrNull(data.swapImage);

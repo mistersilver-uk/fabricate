@@ -46,7 +46,7 @@ import {
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
@@ -56,6 +56,7 @@ import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnCo
 import { InteractableManager } from './canvas/InteractableManager.js';
 import { handleInteractableSocketMessage } from './canvas/interactableSocketBridge.js';
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
+import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
   assignInteractableConfigSheet,
   resolveInteractableConfigTarget,
@@ -1173,8 +1174,51 @@ Hooks.once('ready', async () => {
     void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
   });
 
+  // Env-node-driven marker swap: when an environment's task node depletes (or
+  // recharges) every linked Tile marker for that (environment, task) flips its
+  // image to/from the task's `depletedBehavior.swapImage`. The env `nodeRuntime`
+  // is persisted under the `fabricate.gatheringEnvironments` world setting — both a
+  // gather decrement and the world-time respawn write it — so reacting to that
+  // setting change covers depletion AND recharge. canvasReady does the initial sync
+  // to the current node state when a scene loads. Active-GM-gated inside the sync.
+  Hooks.on('updateSetting', (setting) => {
+    const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
+    if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
+      void runInteractableMarkerSync();
+    }
+  });
+  Hooks.on('canvasReady', () => {
+    void runInteractableMarkerSync();
+  });
+  void runInteractableMarkerSync();
+
   Hooks.callAll('fabricate.ready');
 });
+
+/**
+ * Run the env-node-driven marker image sync across all scenes. Resolves the live
+ * environment from the gathering env store and the library task from the gathering
+ * config setting (mirroring InteractableManager's task resolution), and applies the
+ * tile texture/flag write directly as the active GM (no-op for non-GM clients).
+ */
+async function runInteractableMarkerSync() {
+  try {
+    const environmentStore = fabricate?.getGatheringEnvironmentStore?.() ?? null;
+    await syncInteractableMarkers({
+      scenes: game.scenes,
+      isActiveGM: () => game.user === game.users?.activeGM,
+      resolveEnvironment: (environmentId) => environmentStore?.get?.(environmentId) ?? null,
+      resolveTask: (systemId, taskId) => {
+        const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
+        const tasks = config?.systems?.[systemId]?.tasks;
+        return (Array.isArray(tasks) ? tasks : []).find(task => task?.id === taskId) ?? null;
+      },
+      applyTileImage: (tile, update) => tile?.update?.(update)
+    });
+  } catch (_error) {
+    // Defensive: marker sync must never throw into a hook body.
+  }
+}
 
 Hooks.on('updateWorldTime', (worldTime) => {
   void processFabricateWorldTime(worldTime);

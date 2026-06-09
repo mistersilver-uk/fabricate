@@ -568,11 +568,9 @@
           "RespawnAmountHint": "Plain dice only (e.g. 1d4) — no character data.",
           "DepletedBehaviorTitle": "When depleted (linked marker)",
           "DepletedBehaviorHint": "How a placed interactable's linked marker looks once this node runs out. Restored automatically when it respawns.",
-          "DepletedDeleteToken": "Delete the linked marker",
-          "DepletedDeleteWarning": "Deleting is irreversible — a deleted marker never respawns.",
           "DepletedSwapImage": "Swap marker image",
           "DepletedSwapImagePick": "Choose depleted marker image",
-          "DepletedSwapImageClear": "Clear",
+          "DepletedSwapImageClear": "Remove image",
           "AddModifier": "Add modifier",
           "RemoveModifier": "Remove"
         },

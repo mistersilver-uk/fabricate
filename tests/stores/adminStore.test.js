@@ -2122,7 +2122,7 @@ describe('createAdminStore', () => {
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, null);
     });
 
-    it('persists depletedBehavior on the node config (with delete-token mutual exclusion)', async () => {
+    it('persists depletedBehavior swap-image on the node config (legacy deleteToken dropped)', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2138,13 +2138,13 @@ describe('createAdminStore', () => {
         { swapImage: 'icons/x.webp', postfixName: true }
       );
 
-      // deleteToken drops swap/postfix on persist (mutual exclusion).
+      // The removed deleteToken flag is ignored; only the swap-image survives.
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        nodes: { enabled: true, max: 3, depletedBehavior: { deleteToken: true, swapImage: 'icons/x.webp', postfixName: true } }
+        nodes: { enabled: true, max: 3, depletedBehavior: { deleteToken: true, swapImage: 'icons/y.webp' } }
       });
       assert.deepEqual(
         services._store.gatheringConfig.systems.sys1.tasks[0].nodes.depletedBehavior,
-        { deleteToken: true }
+        { swapImage: 'icons/y.webp' }
       );
     });
 

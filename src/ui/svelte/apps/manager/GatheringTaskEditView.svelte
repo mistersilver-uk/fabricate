@@ -428,40 +428,36 @@
   }
 
   // --- Depleted-behavior authoring (linked-marker canvas visual on depletion). -
-  // Applies to a placed gathering-task interactable's linked Tile marker.
-  // deleteToken is MUTUALLY EXCLUSIVE with swapImage: when delete is on, the swap
-  // control is greyed and its value is cleared on save (the normalizer drops it
-  // too). The `postfixName` mode is NOT offered — a Tile marker has no nameplate,
-  // so only swap-image and the terminal delete change the marker's look.
+  // Applies to a placed gathering-task interactable's linked Tile marker. The only
+  // behavior is swap-image: while the environment's node for this task is depleted
+  // the marker shows `swapImage`, and it flips back to the available image when the
+  // node respawns. (A Tile marker has no nameplate, so the postfix mode is not
+  // offered; there is no destructive delete behavior.)
   const depletedBehavior = $derived(nodes.depletedBehavior || {});
-  const depletedDeleteToken = $derived(depletedBehavior.deleteToken === true);
   const depletedSwapImage = $derived(typeof depletedBehavior.swapImage === 'string' ? depletedBehavior.swapImage : '');
 
   function updateDepletedBehavior(patch) {
     const next = { ...depletedBehavior, ...patch };
-    // Enforce mutual exclusion at author time: clear swap when delete is on.
-    if (next.deleteToken === true) {
-      delete next.swapImage;
-      delete next.postfixName;
-    }
     const cleaned = {};
-    if (next.deleteToken === true) cleaned.deleteToken = true;
-    else if (typeof next.swapImage === 'string' && next.swapImage.trim()) {
+    if (typeof next.swapImage === 'string' && next.swapImage.trim()) {
       cleaned.swapImage = next.swapImage.trim();
     }
     updateNodes({ depletedBehavior: Object.keys(cleaned).length > 0 ? cleaned : null });
   }
-  function toggleDepletedDelete() {
-    updateDepletedBehavior({ deleteToken: !depletedDeleteToken });
-  }
   async function chooseDepletedImage() {
-    if (depletedDeleteToken || typeof onPickImagePath !== 'function') return;
+    if (typeof onPickImagePath !== 'function') return;
     const value = await onPickImagePath(depletedSwapImage || nodes.depletedBehavior?.swapImage || '');
     if (value) updateDepletedBehavior({ swapImage: value });
   }
   function clearDepletedImage() {
-    if (depletedDeleteToken) return;
     updateDepletedBehavior({ swapImage: '' });
+  }
+  function onDepletedImageContextMenu(event) {
+    // Right-click on the thumbnail clears the chosen depleted image (the visible
+    // "Remove image" button below covers keyboard users).
+    event.preventDefault();
+    event.stopPropagation();
+    if (depletedSwapImage) clearDepletedImage();
   }
 
   function setDefaultEnvironment(value) {
@@ -940,57 +936,42 @@
       </div>
 
       <div class="manager-task-depleted-behavior" data-gathering-task-depleted-behavior>
-        <div class="manager-task-drop-header-copy">
-          <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (linked marker)')}</h4>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed interactable\'s linked marker looks once this node runs out. Restored automatically when it respawns.')}</p>
-        </div>
+        <div class="manager-task-depleted-row">
+          <div class="manager-task-drop-header-copy manager-task-depleted-copy">
+            <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (linked marker)')}</h4>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed interactable\'s linked marker looks once this node runs out. Restored automatically when it respawns.')}</p>
+          </div>
 
-        <label class="manager-field manager-task-depleted-delete">
-          <button
-            type="button"
-            class={`manager-status-toggle ${depletedDeleteToken ? 'is-on is-danger' : 'is-off'}`}
-            aria-pressed={depletedDeleteToken}
-            onclick={toggleDepletedDelete}
-            data-gathering-task-depleted-delete
-          >
-            <i class={`fas ${depletedDeleteToken ? 'fa-trash' : 'fa-trash-can'}`} aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteToken', 'Delete the linked marker')}</span>
-          </button>
-        </label>
-
-        {#if depletedDeleteToken}
-          <span class="manager-chip is-danger" role="alert" data-gathering-task-depleted-warning>
-            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteWarning', 'Deleting is irreversible — a deleted marker never respawns.')}</span>
-          </span>
-        {/if}
-
-        <div class="manager-task-depleted-visuals" class:is-disabled={depletedDeleteToken}>
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImage', 'Swap marker image')}</span>
-            <div class="manager-task-depleted-image-row">
+          <div class="manager-task-depleted-image-column" data-gathering-task-depleted-image-column>
+            <button
+              type="button"
+              class="manager-task-image-picker manager-task-depleted-image-picker"
+              aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted marker image')}
+              onclick={chooseDepletedImage}
+              oncontextmenu={onDepletedImageContextMenu}
+              disabled={typeof onPickImagePath !== 'function'}
+              data-gathering-task-depleted-image
+            >
+              {#if depletedSwapImage}
+                <img src={depletedSwapImage} alt="" />
+              {:else}
+                <i class="fas fa-image" aria-hidden="true"></i>
+              {/if}
+              <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+            {#if depletedSwapImage}
               <button
                 type="button"
-                class="manager-task-image-picker manager-task-depleted-image-picker"
-                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted marker image')}
-                onclick={chooseDepletedImage}
-                disabled={depletedDeleteToken || typeof onPickImagePath !== 'function'}
-                data-gathering-task-depleted-image
+                class="manager-link-button manager-task-depleted-image-clear"
+                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear', 'Remove image')}
+                onclick={clearDepletedImage}
+                data-gathering-task-depleted-image-clear
               >
-                {#if depletedSwapImage}
-                  <img src={depletedSwapImage} alt="" />
-                {:else}
-                  <i class="fas fa-image" aria-hidden="true"></i>
-                {/if}
-                <i class="fas fa-pen" aria-hidden="true"></i>
+                <i class="fas fa-xmark" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear', 'Remove image')}</span>
               </button>
-              {#if depletedSwapImage && !depletedDeleteToken}
-                <button type="button" class="manager-link-button" onclick={clearDepletedImage} data-gathering-task-depleted-image-clear>
-                  {text('FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear', 'Clear')}
-                </button>
-              {/if}
-            </div>
-          </label>
+            {/if}
+          </div>
         </div>
       </div>
     </section>
@@ -1461,28 +1442,37 @@
     font-size: var(--font-size-13, 0.8125rem);
   }
 
-  .manager-task-depleted-visuals {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--fab-space-3);
-    align-items: start;
-  }
-
-  /* Mutual exclusion: when delete-tile is on, the swap-image control is greyed
-     and inert (the control itself is also `disabled`). */
-  .manager-task-depleted-visuals.is-disabled {
-    opacity: 0.45;
-    pointer-events: none;
-  }
-
-  .manager-task-depleted-image-row {
+  /* Title/hint sit on the SAME row as the swap-image thumbnail (image alongside
+     the heading + description, not stacked beneath it). */
+  .manager-task-depleted-row {
     display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-3);
+  }
+
+  .manager-task-depleted-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* The image picker plus the "Remove image" button stack vertically: the clear
+     control sits directly UNDERNEATH the thumbnail. */
+  .manager-task-depleted-image-column {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-1);
   }
 
   .manager-task-depleted-image-picker {
     flex: 0 0 auto;
+  }
+
+  .manager-task-depleted-image-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-1);
   }
 
   /* Cost field sits beside the per-actor modifiers; captions align at the top so
