@@ -8,9 +8,11 @@
  * collection + flag-read logic can be unit-tested against fakes.
  *
  * A Fabricate-flagged region carries `flags.fabricate.environmentId`. V13 exposes
- * containment via `RegionDocument#object.testPoint(point, elevation)` on the
- * placeable; we tolerate both the document-level and placeable-level shape and
- * fall back to no hit when neither is available.
+ * containment via the document-level `RegionDocument#testPoint(point:
+ * ElevatedPoint)` — a single `{ x, y, elevation }` object. The placeable's
+ * `Region#object.testPoint(point, elevation?)` is deprecated in V13; we prefer the
+ * document method and only fall back to the deprecated placeable shape when the
+ * document method is absent, returning no hit when neither is available.
  */
 
 /**
@@ -25,20 +27,30 @@ function regionEnvironmentId(region) {
 }
 
 /**
- * Whether a region contains a scene-space point. Tolerates the V13
- * `region.object.testPoint` (placeable) and a document-level `testPoint`,
- * returning false when neither exists.
+ * Whether a region contains a scene-space point. Prefers the V13 document-level
+ * `RegionDocument#testPoint({ x, y, elevation })`; only falls back to the
+ * deprecated placeable `region.object.testPoint(point)` when the document method
+ * is absent, returning false when neither exists.
  *
  * @param {object} region  RegionDocument.
  * @param {{ x: number, y: number }} point  Scene-space drop point.
  * @returns {boolean}
  */
 function regionContainsPoint(region, point) {
-  const tester = region?.object ?? region;
-  if (typeof tester?.testPoint === 'function') {
+  // V13: the document-level testPoint takes a single ElevatedPoint; a 2D drop
+  // uses elevation 0.
+  if (typeof region?.testPoint === 'function') {
     try {
-      // V13 testPoint takes (point, elevation?); a 2D drop uses no elevation.
-      return tester.testPoint(point) === true || tester.testPoint(point, 0) === true;
+      return region.testPoint({ x: point?.x, y: point?.y, elevation: 0 }) === true;
+    } catch {
+      return false;
+    }
+  }
+  // Deprecated fallback: the placeable's testPoint(point, elevation?).
+  const placeable = region?.object;
+  if (typeof placeable?.testPoint === 'function') {
+    try {
+      return placeable.testPoint(point) === true;
     } catch {
       return false;
     }

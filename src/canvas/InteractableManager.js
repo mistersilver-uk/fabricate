@@ -362,6 +362,16 @@ class InteractableManager {
     // + `presentation.hidden=true`, so there is NO Tile to create, no orphan, and
     // no linked-visual ref to write back — the Region itself is the interactable.
     if (!tile) {
+      // TODO(diagnostic): remove once placement confirmed
+      console.warn('Fabricate | placed interactable', {
+        point: spawnRequest?.__point ?? null,
+        tile: null,
+        regionShapeCreated: { x, y, width, height },
+        liveRegionShape: regionDoc?.shapes?.[0]
+          ? { x: regionDoc.shapes[0].x, y: regionDoc.shapes[0].y, w: regionDoc.shapes[0].width, h: regionDoc.shapes[0].height, type: regionDoc.shapes[0].type }
+          : null,
+        liveTile: null
+      });
       return regionDoc;
     }
 
@@ -398,6 +408,17 @@ class InteractableManager {
       this._notifySpawnFailure();
       return null;
     }
+
+    // TODO(diagnostic): remove once placement confirmed
+    console.warn('Fabricate | placed interactable', {
+      point: spawnRequest?.__point ?? null,
+      tile: tile ? { x: tile.x, y: tile.y, w: tile.width, h: tile.height } : null,
+      regionShapeCreated: { x, y, width, height },
+      liveRegionShape: regionDoc?.shapes?.[0]
+        ? { x: regionDoc.shapes[0].x, y: regionDoc.shapes[0].y, w: regionDoc.shapes[0].width, h: regionDoc.shapes[0].height, type: regionDoc.shapes[0].type }
+        : null,
+      liveTile: tileDoc ? { x: tileDoc.x, y: tileDoc.y, w: tileDoc.width, h: tileDoc.height } : null
+    });
 
     // Write the linked-visual ref back onto the behaviour. If THIS fails the
     // interactable still works region-only; we just keep the orphan Tile (it
@@ -580,6 +601,11 @@ class InteractableManager {
       return;
     }
     if (!globalThis.game?.users?.activeGM) {
+      // Permanent, low-noise diagnostic alongside the player-facing notify: an
+      // activation that aborts for lack of an active GM must not be silent.
+      console.warn('Fabricate | activation aborted: no active GM', {
+        userId: request.userId, actorId: request.actorId, sceneId: ref.sceneId, regionId: ref.regionId, behaviorId: ref.behaviorId
+      });
       globalThis.ui?.notifications?.warn?.(
         globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM')
         ?? 'A GM must be online to gather here.'
@@ -604,26 +630,51 @@ class InteractableManager {
     if (!request || typeof request !== 'object') return false;
     const behavior = this._resolveBehavior(request);
     const system = readInteractableBehaviorSystem(behavior);
-    if (!system) return false;
+    if (!system) {
+      // Silent activation failures are bad UX: surface the unresolved behaviour.
+      console.warn('Fabricate | activation: no behaviour/system resolved', request);
+      return false;
+    }
 
     const now = Number(globalThis.game?.time?.worldTime || 0);
+    // `isGM` here means the REQUESTING user's GM-override status, NOT the
+    // validating GM's identity. Pass the requester's real GM flag so the
+    // actor-control gate cannot be bypassed by a non-owning, non-GM player.
+    // (`_userCanControlActor` already returns true for a GM requester, so the
+    // net authority is identical — this is for correctness/clarity.)
+    const isGM = globalThis.game?.users?.get?.(String(request.userId ?? ''))?.isGM === true;
+    const canControlActor = this._userCanControlActor(request.userId, request.actorId);
+    const sourceExists = this._sourceExists(system);
+    const environmentExists = system.interactableType === 'gatheringTask'
+      ? this._environmentExists(system.environmentId)
+      : true;
+    const tokenInside = this._tokenInsideRegion(behavior, request.actorId, request.userId);
     const validation = validateActivationRequest(request, {
       behaviorSystem: system,
       now,
-      // `isGM` here means the REQUESTING user's GM-override status, NOT the
-      // validating GM's identity. Pass the requester's real GM flag so the
-      // actor-control gate cannot be bypassed by a non-owning, non-GM player.
-      // (`_userCanControlActor` already returns true for a GM requester, so the
-      // net authority is identical — this is for correctness/clarity.)
-      isGM: globalThis.game?.users?.get?.(String(request.userId ?? ''))?.isGM === true,
-      canControlActor: this._userCanControlActor(request.userId, request.actorId),
-      sourceExists: this._sourceExists(system),
-      environmentExists: system.interactableType === 'gatheringTask'
-        ? this._environmentExists(system.environmentId)
-        : true,
-      tokenInside: this._tokenInsideRegion(behavior, request.actorId, request.userId)
+      isGM,
+      canControlActor,
+      sourceExists,
+      environmentExists,
+      tokenInside
     });
-    if (!validation.ok) return false;
+    if (!validation.ok) {
+      // Permanent, low-noise diagnostic: a denied Interact must never be silent.
+      // Logs the exact reason plus every collaborator value so the player/GM can
+      // see WHY the activation did nothing.
+      console.warn('Fabricate | interactable activation denied', {
+        reason: validation.reason,
+        interactableType: system.interactableType,
+        environmentId: system.environmentId ?? null,
+        canControlActor,
+        sourceExists,
+        environmentExists,
+        tokenInside,
+        userId: request.userId,
+        actorId: request.actorId
+      });
+      return false;
+    }
 
     const grant = describeGrant(system);
     if (!grant) return false;
@@ -784,10 +835,12 @@ class InteractableManager {
   }
 
   /**
-   * Whether the actor's token is still inside the behaviour's region, via the
-   * V13 `region.object.testPoint`. Defensive: returns true (do not block) when the
-   * token/region cannot be resolved (the enter event itself already vouched for
-   * presence).
+   * Whether the actor's token is still inside the behaviour's region, via the V13
+   * document-level `RegionDocument#testPoint({ x, y, elevation })`. The behaviour's
+   * `parent` is the RegionDocument; we call its document-level `testPoint` (the
+   * placeable `region.object.testPoint(point, elevation)` is deprecated in V13).
+   * Defensive: returns true (do not block) when the token/region cannot be
+   * resolved (the enter event itself already vouched for presence).
    *
    * @param {object} behavior
    * @param {string} actorId
@@ -796,8 +849,7 @@ class InteractableManager {
    */
   _tokenInsideRegion(behavior, actorId, _userId) {
     const region = behavior?.parent ?? null;
-    const tester = region?.object ?? region;
-    if (typeof tester?.testPoint !== 'function') return true;
+    if (typeof region?.testPoint !== 'function') return true; // can't locate — don't block.
     const scene = region?.parent ?? null;
     const tokens = scene?.tokens;
     const list = Array.isArray(tokens?.contents)
@@ -809,7 +861,7 @@ class InteractableManager {
       const center = tokenDoc?.object?.center ?? null;
       const point = center ?? { x: Number(tokenDoc?.x ?? 0), y: Number(tokenDoc?.y ?? 0) };
       try {
-        if (tester.testPoint(point) === true || tester.testPoint(point, 0) === true) return true;
+        if (region.testPoint({ x: point.x, y: point.y, elevation: 0 }) === true) return true;
       } catch (_error) { /* tolerate */ }
     }
     return false;

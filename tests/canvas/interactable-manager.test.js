@@ -446,7 +446,8 @@ test('(d) dialog cancel → NO region created (abort)', async () => {
 function interactableBehavior({ system, sceneId = 'scene-1', regionId = 'region-1', behaviorId = 'beh-1', testPoint = () => true } = {}) {
   const region = {
     id: regionId,
-    object: { testPoint },
+    // V13 document-level testPoint takes a single ElevatedPoint { x, y, elevation }.
+    testPoint,
     parent: { id: sceneId, tokens: { contents: [] } }
   };
   const behavior = { id: behaviorId, type: 'fabricate.interactable', system, parent: region };

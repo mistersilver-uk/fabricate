@@ -2,8 +2,9 @@
  * Coverage for the V13 Scene Region point-in-region seam (Phase 6).
  *
  * `regionEnvironmentIdsAtPoint` collects the `flags.fabricate.environmentId` of
- * every flagged region whose `testPoint(point)` returns true. The V13 region API
- * is faked; this asserts the collection + flag-read + containment glue.
+ * every flagged region whose document-level `testPoint({ x, y, elevation })`
+ * returns true. The V13 RegionDocument API is faked; this asserts the collection
+ * + flag-read + containment glue, including the deprecated placeable fallback.
  */
 
 import test from 'node:test';
@@ -14,7 +15,8 @@ import { regionEnvironmentIdsAtPoint } from '../../src/canvas/regionHitTest.js';
 function region({ envId, contains }) {
   return {
     flags: envId ? { fabricate: { environmentId: envId } } : {},
-    object: { testPoint: (point) => contains(point) }
+    // V13 document-level testPoint takes a single ElevatedPoint { x, y, elevation }.
+    testPoint: (point) => contains(point)
   };
 }
 
@@ -38,16 +40,22 @@ test('returns [] when the scene has no regions', () => {
   assert.deepEqual(regionEnvironmentIdsAtPoint({ scene: null, point: { x: 0, y: 0 } }), []);
 });
 
-test('tolerates a document-level testPoint (no .object) and a throwing tester', () => {
+test('prefers the document testPoint, falls back to the deprecated placeable, tolerates a throwing/absent tester', () => {
+  const seen = [];
   const scene = {
     regions: [
-      { flags: { fabricate: { environmentId: 'env-doc' } }, testPoint: () => true },
+      // Preferred: document-level testPoint receiving the ElevatedPoint.
+      { flags: { fabricate: { environmentId: 'env-doc' } }, testPoint: (p) => { seen.push(p); return true; } },
+      // Deprecated fallback: only the placeable's testPoint exists, and it throws.
       { flags: { fabricate: { environmentId: 'env-throws' } }, object: { testPoint: () => { throw new Error('boom'); } } },
+      // Deprecated fallback that hits: placeable testPoint(point) → true.
+      { flags: { fabricate: { environmentId: 'env-placeable' } }, object: { testPoint: () => true } },
       { flags: { fabricate: { environmentId: 'env-no-test' } } } // no tester at all
     ]
   };
   const ids = regionEnvironmentIdsAtPoint({ scene, point: { x: 1, y: 2 } });
-  assert.deepEqual(ids, ['env-doc'], 'a throwing/absent tester is treated as no hit');
+  assert.deepEqual(ids.sort(), ['env-doc', 'env-placeable'], 'document hit + placeable fallback hit; throwing/absent → no hit');
+  assert.deepEqual(seen[0], { x: 1, y: 2, elevation: 0 }, 'the document testPoint receives an ElevatedPoint');
 });
 
 // --- interactableBehaviorsContainingToken (re-trigger) ----------------------
@@ -56,7 +64,8 @@ import { interactableBehaviorsContainingToken } from '../../src/canvas/regionHit
 
 function regionWithBehaviors({ contains, behaviors }) {
   return {
-    object: { testPoint: (point) => contains(point) },
+    // Document-level testPoint (ElevatedPoint); see region() above.
+    testPoint: (point) => contains(point),
     behaviors
   };
 }
@@ -86,7 +95,7 @@ test('interactableBehaviorsContainingToken uses the token document top-left when
   };
   const matches = interactableBehaviorsContainingToken({ scene, token: { x: 10, y: 20 }, isInteractableBehavior: isInteractable });
   assert.equal(matches.length, 1);
-  assert.deepEqual(seen[0], { x: 10, y: 20 });
+  assert.deepEqual(seen[0], { x: 10, y: 20, elevation: 0 }, 'the document testPoint receives an ElevatedPoint');
 });
 
 test('interactableBehaviorsContainingToken returns [] when the token point cannot be resolved', () => {

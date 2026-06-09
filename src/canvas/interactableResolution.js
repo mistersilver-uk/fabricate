@@ -374,6 +374,9 @@ export function buildRegionSpawnRequest({
     sourceUuid: classification.sourceUuid,
     name: resolvedName,
     environmentId: resolvedEnvironmentId,
+    // TODO(diagnostic): drop-point passthrough for the placement-coordinate warn
+    // in `_spawnInteractableRegion`. Remove once placement is confirmed.
+    __point: { x: cx, y: cy },
     region: {
       name: resolvedName || classification.sourceUuid,
       shape: {
