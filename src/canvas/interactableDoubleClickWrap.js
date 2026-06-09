@@ -10,11 +10,15 @@
  * player's `hoverIn`/`hoverOut` reaches the handler and the discoverability
  * tooltip shows.
  *
- * The double-click itself is NOT routed through this permission gate or an
- * `_onClickLeft2` wrap — for a non-controllable tile placeable the
- * MouseInteractionManager click-sequence never runs `_onClickLeft2`. The
- * double-click is delivered by a raw PIXI pointer listener with our own
- * double-click detection (see `interactableTileInteractivity.js`).
+ * The double-click itself is NOT routed through this permission gate — for a
+ * non-controllable tile placeable the MouseInteractionManager click-sequence never
+ * runs `_onClickLeft2`. The double-click is delivered by a canvas-STAGE-level
+ * pointer listener (`canvas.stage`'s `pointerdown` stream) with our own
+ * double-click detection ({@link registerPointerEvent} in
+ * `interactableTileInteractivity.js`) + an interactable-tile hit-test
+ * ({@link interactableTileAtPoint} in `interactableTileHitTest.js`), installed by
+ * `InteractableManager`. This module's surviving role is the hover/permission
+ * DECISION ({@link shouldPermitInteractableAction}).
  *
  * The DECISION is pure and lives here, tested with fake Tile-like objects and no
  * live Foundry. The actual install (resolving the V13 MouseInteractionManager
@@ -25,15 +29,15 @@
 /**
  * The interaction actions we permit on an interactable tile for ALL users
  * (including non-GM players): the hover that surfaces the discoverability
- * tooltip. (The double-click is delivered by the raw PIXI pointer listener, not
- * through this gate.)
+ * tooltip. (The double-click is delivered by the canvas-stage pointer listener,
+ * not through this gate.)
  */
 const PERMITTED_INTERACTABLE_ACTIONS = Object.freeze(['hoverIn', 'hoverOut']);
 
 /**
  * Decide whether to PERMIT a pointer interaction `action` on a placeable. Returns
  * `true` ONLY when the action is one we explicitly allow for an interactable tile
- * (so a non-GM's double-click / hover is delivered); returns `null` otherwise so
+ * (so a non-GM's hover is delivered); returns `null` otherwise so
  * the caller DELEGATES to the original permission gate (the default Foundry
  * decision for every non-interactable placeable and every other action).
  *

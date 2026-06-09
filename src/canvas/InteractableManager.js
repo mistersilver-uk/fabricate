@@ -6,12 +6,21 @@
  *    suppresses the default drop, and spawns a flagged TileDocument (no actor,
  *    no sheet).
  *  - a draw-time enablement (`drawTile` + a `canvasReady` sweep) makes
- *    interactable tiles pointer-eventful for ALL users AND attaches a raw PIXI
- *    pointer listener implementing our own double-click detection (the
- *    MouseInteractionManager click-sequence never runs `_onClickLeft2` for a
- *    non-controllable tile placeable, so wrapping it is the wrong mechanism); the
- *    listener calls {@link InteractableManager#_onDoubleClick} directly. A
- *    `destroyTile` hook detaches the listener.
+ *    interactable tiles pointer-eventful for ALL users so the hover tooltip works.
+ *  - a CANVAS-STAGE-LEVEL pointer listener (installed on `canvasReady`, one per
+ *    stage) that runs its own double-click detection ({@link registerPointerEvent})
+ *    on `canvas.stage`'s `pointerdown` stream, derives the world/scene point, and
+ *    on a hit dispatches {@link InteractableManager#_onDoubleClick}. The
+ *    double-click is intercepted at the canvas STAGE (not per-placeable, and not
+ *    via a `Canvas#_onClickLeft2` wrap) because a Tile placeable's pointer events
+ *    are gated by its ancestor tiles-layer container — for a player / non-active
+ *    layer PIXI never routes pointer events into the tiles layer — whereas the
+ *    stage is the always-interactive PIXI interaction root that receives every
+ *    pointer event regardless of the active control layer. This is Monk's Active
+ *    Tiles' layer-agnostic canvas-level mechanism. The pure hit-test is
+ *    {@link interactableTileAtPoint}. The listener is ADDITIVE: on a miss it does
+ *    nothing (it does NOT suppress Foundry's own handling), so empty-canvas
+ *    double-click / pan is unaffected.
  *  - a one-time wrap of the V13 `MouseInteractionManager#can` permission gate
  *    permits a non-GM player's hover on an interactable tile (tiles are not
  *    natively pointer-interactive for players; the tooltip relies on this).
@@ -20,10 +29,12 @@
  *    NOT via the DOM TooltipManager (a Tile has no DOM element).
  *
  * All decision logic (drop classification, spawn-payload shaping, double-click
- * dispatch, permission, tooltip text) lives in the pure modules
- * `interactableResolution.js`, `interactableDispatch.js`,
- * `interactableDoubleClickWrap.js`, and `interactableTooltip.js`; the hook/wrap
- * bodies here are the thin Foundry/PIXI edge. Spawning is GM-only.
+ * dispatch, double-click detection, double-click hit-test, permission, tooltip
+ * text) lives in the pure modules `interactableResolution.js`,
+ * `interactableDispatch.js`, `interactableTileHitTest.js`,
+ * `interactableTileInteractivity.js` ({@link registerPointerEvent}),
+ * `interactableDoubleClickWrap.js`, and `interactableTooltip.js`; the hook /
+ * stage-listener bodies here are the thin Foundry/PIXI edge. Spawning is GM-only.
  */
 
 import {
@@ -41,8 +52,9 @@ import { showInteractableTileLabel, hideInteractableTileLabel } from './interact
 import {
   enableInteractableTilePointerEvents,
   enableInteractableTilesIn,
-  detachDoubleClickPointerListener
+  registerPointerEvent
 } from './interactableTileInteractivity.js';
+import { interactableTileAtPoint } from './interactableTileHitTest.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
 import { buildTileNodeSnapshot, createTileNodeStateAdapter } from './tileNodeStateAdapter.js';
 import { emitInteractableNodeWrite, buildDepletedBehaviorApply } from './interactableSocketBridge.js';
@@ -66,6 +78,20 @@ const HOVER_WRAP_FLAG = '_fabricateInteractableHoverWrapped';
 const PERMISSION_WRAP_FLAG = '_fabricateInteractablePermissionWrapped';
 
 /**
+ * Marker stashed on the `canvas.stage` object so the double-click pointer listener
+ * is installed exactly once per stage, even when `canvasReady` fires repeatedly
+ * for the same stage. The bound handler is stashed alongside so a re-install on a
+ * FRESH stage (a scene swap rebuilds the stage) starts clean; we also defensively
+ * remove any prior handler before attaching so exactly one listener exists.
+ */
+const STAGE_DBLCLICK_FLAG = '_fabricateInteractableStageDoubleClickBound';
+const STAGE_DBLCLICK_HANDLER_KEY = '_fabricateInteractableStageDoubleClickHandler';
+const STAGE_DBLCLICK_STATE_KEY = '_fabricateInteractableStageDoubleClickState';
+
+/** PIXI pointer event the stage listener uses to drive double-click detection. */
+const STAGE_POINTER_EVENT = 'pointerdown';
+
+/**
  * Resolve the V13 Tile placeable class whose hover handlers we wrap, mirroring
  * the prior token-class resolution.
  *
@@ -78,16 +104,22 @@ const PERMISSION_WRAP_FLAG = '_fabricateInteractablePermissionWrapped';
  * @returns {Function|null} The Tile class, or null when none is resolvable.
  */
 function resolveTileClass() {
-  const candidates = [
-    globalThis.CONFIG?.Tile?.objectClass,
-    globalThis.foundry?.canvas?.placeables?.Tile,
-    globalThis.Tile
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'function' && typeof candidate.prototype?._onHoverIn === 'function') {
-      return candidate;
-    }
-  }
+  // Resolve LAZILY so the deprecated bare `globalThis.Tile` getter is only read
+  // when the V13-namespaced classes are absent. Building a single array literal of
+  // all candidates would EAGERLY invoke the V13 deprecation getter for
+  // `globalThis.Tile` even though the namespaced class is found first — that is
+  // exactly the console deprecation we are eliminating. `CONFIG.Tile.objectClass`
+  // and `foundry.canvas.placeables.Tile` are NOT deprecated; only the bare global
+  // is, so a `??`-chained, short-circuiting probe never touches it on V13.
+  const isTileClass = (candidate) =>
+    typeof candidate === 'function' && typeof candidate.prototype?._onHoverIn === 'function';
+  const configClass = globalThis.CONFIG?.Tile?.objectClass;
+  if (isTileClass(configClass)) return configClass;
+  const namespacedClass = globalThis.foundry?.canvas?.placeables?.Tile;
+  if (isTileClass(namespacedClass)) return namespacedClass;
+  // Last resort only: the deprecated bare global (never reached on V13).
+  const bareClass = globalThis.Tile;
+  if (isTileClass(bareClass)) return bareClass;
   return null;
 }
 
@@ -98,15 +130,19 @@ function resolveTileClass() {
  * @returns {Function|null}
  */
 function resolveMouseInteractionManagerClass() {
-  const candidates = [
-    globalThis.foundry?.canvas?.interaction?.MouseInteractionManager,
-    globalThis.MouseInteractionManager
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'function' && typeof candidate.prototype?.can === 'function') {
-      return candidate;
-    }
-  }
+  // Resolve LAZILY (short-circuit) so the deprecated bare
+  // `globalThis.MouseInteractionManager` getter is only read when the
+  // V13-namespaced class is absent. An array literal of both candidates would
+  // EAGERLY trip the V13 deprecation getter for the bare global at construction
+  // time even though `foundry.canvas.interaction.MouseInteractionManager` is found
+  // first; checking the namespaced class first and the bare global only as a
+  // fallback never touches it on V13.
+  const hasCan = (candidate) =>
+    typeof candidate === 'function' && typeof candidate.prototype?.can === 'function';
+  const namespacedClass = globalThis.foundry?.canvas?.interaction?.MouseInteractionManager;
+  if (hasCan(namespacedClass)) return namespacedClass;
+  const bareClass = globalThis.MouseInteractionManager;
+  if (hasCan(bareClass)) return bareClass;
   return null;
 }
 
@@ -149,8 +185,8 @@ function installInteractableHoverWrap() {
  * Install a one-time, idempotent wrap of the V13 `MouseInteractionManager#can`
  * permission gate so a non-GM player's hover (`hoverIn`/`hoverOut`) is PERMITTED
  * on interactable tiles (tiles are not natively pointer-interactive for players).
- * Double-click is handled by a raw `pointerdown` listener (see
- * interactableTileInteractivity.js), not this gate.
+ * Double-click is handled by the canvas-stage pointer listener (see
+ * {@link installInteractableStageDoubleClickListener}), not this gate.
  *
  * The wrapper consults the pure {@link shouldPermitInteractableAction}: it only
  * ADDS permission for interactable tiles + the allowed actions, and otherwise
@@ -173,6 +209,156 @@ function installInteractablePermissionWrap() {
     return original.call(this, action, event);
   };
   proto[PERMISSION_WRAP_FLAG] = true;
+}
+
+/**
+ * Resolve the live PIXI interaction-root stage that receives every pointer event
+ * regardless of the active control layer. Prefers `canvas.stage`; tolerates
+ * `canvas.app.stage` when the former is absent. Returns null when no stage object
+ * exposing `.on` is available (so the install degrades to a no-op).
+ *
+ * @returns {object|null}
+ */
+function resolveCanvasStage() {
+  const direct = globalThis.canvas?.stage;
+  if (direct && typeof direct.on === 'function') return direct;
+  const appStage = globalThis.canvas?.app?.stage;
+  if (appStage && typeof appStage.on === 'function') return appStage;
+  return null;
+}
+
+/**
+ * Derive a double-click's world/scene-space `{x, y}` point from a PIXI federated
+ * pointer event delivered to the stage. PREFERS projecting the event's stage-global
+ * point through `canvas.stage.toLocal` (the stage's local space IS world/scene
+ * space). Falls back to `event.interactionData.origin`, then the raw `event.global`,
+ * then the event's own `x/y`. Returns null when no finite point resolves.
+ *
+ * @param {object} event  The PIXI federated pointer event.
+ * @param {object} stage  The stage the listener is attached to.
+ * @returns {{x: number, y: number}|null}
+ */
+function resolveStageClickPoint(event, stage) {
+  const finite = (p) => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y));
+
+  // Preferred: project the stage-global coordinates into scene space via the stage
+  // transform (the stage's local space is world/scene space).
+  const global = event?.global ?? event?.data?.global;
+  const PointClass = globalThis.PIXI?.Point;
+  if (finite(global) && typeof stage?.toLocal === 'function') {
+    try {
+      const arg = typeof PointClass === 'function'
+        ? new PointClass(Number(global.x), Number(global.y))
+        : { x: Number(global.x), y: Number(global.y) };
+      const local = stage.toLocal(arg);
+      if (finite(local)) return { x: Number(local.x), y: Number(local.y) };
+    } catch (_err) { /* fall through. */ }
+  }
+
+  const origin = event?.interactionData?.origin;
+  if (finite(origin)) return { x: Number(origin.x), y: Number(origin.y) };
+
+  if (finite(global)) return { x: Number(global.x), y: Number(global.y) };
+  if (finite(event)) return { x: Number(event.x), y: Number(event.y) };
+  return null;
+}
+
+/**
+ * Hit-test the canvas's interactable tiles at a double-click point and, on a hit,
+ * dispatch the Fabricate double-click. The pure decision is
+ * {@link interactableTileAtPoint}; this maps the live `canvas.tiles.placeables`
+ * into the record shape it expects — the thin Foundry edge.
+ *
+ * @param {{x: number, y: number}} point  The derived scene-space point.
+ * @returns {boolean} `true` when an interactable tile was hit and dispatched.
+ */
+function dispatchStageDoubleClick(point) {
+  if (!point) return false;
+  const placeables = globalThis.canvas?.tiles?.placeables ?? [];
+  const tiles = (Array.isArray(placeables) ? placeables : []).map((placeable) => ({
+    document: placeable?.document,
+    isInteractable: isInteractableTile(placeable?.document),
+    x: Number(placeable?.document?.x),
+    y: Number(placeable?.document?.y),
+    width: Number(placeable?.document?.width),
+    height: Number(placeable?.document?.height)
+  }));
+  const hit = interactableTileAtPoint(point, tiles);
+  if (!hit) return false;
+  InteractableManager.instance?._onDoubleClick?.(hit);
+  return true;
+}
+
+/**
+ * Install the CANVAS-STAGE double-click pointer listener so a double-click
+ * anywhere on the canvas hit-tests interactable tiles and dispatches the Fabricate
+ * double-click — for ALL users, regardless of the active control layer. The stage
+ * is the always-interactive PIXI interaction root: a Tile placeable's pointer
+ * events are gated by its ancestor tiles-layer container (so a per-placeable
+ * listener never fires for a player / non-active layer), but the stage receives
+ * every pointer event. This is Monk's Active Tiles' layer-agnostic mechanism.
+ *
+ * Idempotent + single-listener across scene changes: a scene swap rebuilds the
+ * stage, so on each `canvasReady` we resolve the CURRENT stage and (a) return early
+ * when it already carries our flag, and (b) defensively remove any prior bound
+ * handler before attaching, guaranteeing exactly one listener per stage. The
+ * detector state ({@link registerPointerEvent}) lives on the stage alongside the
+ * handler so a fresh stage starts a fresh sequence.
+ *
+ * The listener is ADDITIVE: on a miss it does nothing — it does NOT suppress
+ * Foundry's own handling — so normal empty-canvas double-click / pan is unaffected.
+ * Defensive: no-throw when `canvas.stage` / `.on` is absent or exotic.
+ */
+function installInteractableStageDoubleClickListener() {
+  const stage = resolveCanvasStage();
+  if (!stage) return;
+  if (stage[STAGE_DBLCLICK_FLAG] === true) return;
+
+  // Defensive single-listener: remove any handler a prior install left on THIS
+  // stage object before attaching (covers a re-install on the same stage where the
+  // flag was somehow cleared).
+  const priorHandler = stage[STAGE_DBLCLICK_HANDLER_KEY];
+  if (priorHandler && typeof stage.off === 'function') {
+    try { stage.off(STAGE_POINTER_EVENT, priorHandler); } catch (_err) { /* tolerate. */ }
+  }
+
+  const state = {};
+  const handler = (event) => {
+    try {
+      const point = resolveStageClickPoint(event, stage);
+      const decision = registerPointerEvent(state, {
+        time: resolveStageEventTime(event),
+        x: Number(event?.global?.x ?? event?.data?.global?.x ?? event?.x ?? 0),
+        y: Number(event?.global?.y ?? event?.data?.global?.y ?? event?.y ?? 0)
+      });
+      if (decision !== 'double') return;
+      dispatchStageDoubleClick(point);
+    } catch (_err) { /* tolerate; never break canvas input. */ }
+  };
+
+  try {
+    stage.on(STAGE_POINTER_EVENT, handler);
+  } catch (_err) { return; } // tolerate an exotic emitter.
+
+  try { stage[STAGE_DBLCLICK_STATE_KEY] = state; } catch (_err) { /* tolerate frozen. */ }
+  try { stage[STAGE_DBLCLICK_HANDLER_KEY] = handler; } catch (_err) { /* tolerate frozen. */ }
+  try { stage[STAGE_DBLCLICK_FLAG] = true; } catch (_err) { /* tolerate frozen. */ }
+}
+
+/**
+ * Resolve a pointer-event timestamp (ms) for the double-click detector. Prefers
+ * the event's own `timeStamp`, falling back to `performance.now()` / `Date.now()`
+ * so detection works regardless of the federated-event shape.
+ *
+ * @param {object} event
+ * @returns {number}
+ */
+function resolveStageEventTime(event) {
+  const stamp = Number(event?.timeStamp);
+  if (Number.isFinite(stamp) && stamp > 0) return stamp;
+  const perfNow = globalThis.performance?.now?.();
+  if (Number.isFinite(perfNow)) return perfNow;
+  return Date.now();
 }
 
 class InteractableManager {
@@ -204,34 +390,35 @@ class InteractableManager {
   }
 
   /**
-   * Install canvas hooks + the V13 Tile double-click / hover / permission wraps,
-   * plus the draw-time pointer-interactivity enablement for interactable tiles.
-   * Idempotent — repeated calls are a no-op.
+   * Install canvas hooks + the canvas-stage double-click listener + the V13 hover /
+   * permission wraps, plus the draw-time pointer-interactivity enablement for
+   * interactable tiles. Idempotent — repeated calls are a no-op.
    */
   register() {
     if (this._registered) return;
     const hooks = globalThis.Hooks;
     if (hooks?.on) {
       hooks.on('dropCanvasData', this._onDrop);
-      // Make interactable tiles pointer-eventful for ALL users AND attach the raw
-      // PIXI double-click pointer listener. A Tile is GM scenery and is NOT in the
-      // active control layer for a non-GM player, so the MouseInteractionManager
-      // click-sequence never runs `_onClickLeft2` for it (hover DOES fire) — so
-      // the double-click is delivered by our own pointer listener instead.
-      // `drawTile` catches each tile as it is drawn; the `canvasReady` sweep
-      // catches tiles drawn before this hook was installed and re-applies after a
-      // scene swap; `destroyTile` detaches the listener. Both enablement paths
-      // delegate to the pure-decision-gated, defensive edge.
+      // Make interactable tiles pointer-eventful for ALL users so the hover
+      // tooltip works. `drawTile` catches each tile as it is drawn; the
+      // `canvasReady` sweep catches tiles drawn before this hook was installed and
+      // re-applies after a scene swap. Both delegate to the pure-decision-gated,
+      // defensive edge. The double-click is NOT delivered per-placeable (the
+      // tiles-layer container does not route pointer events into a tile for a
+      // player / non-active layer); it is the canvas-stage listener installed on
+      // `canvasReady` below (the stage exists once the canvas is ready, and a scene
+      // swap rebuilds it — the install is idempotent + single-listener per stage).
       hooks.on('drawTile', (placeable) => enableInteractableTilePointerEvents(placeable));
-      hooks.on('canvasReady', () => enableInteractableTilesIn(globalThis.canvas?.tiles?.placeables));
-      hooks.on('destroyTile', (placeable) => detachDoubleClickPointerListener(placeable));
+      hooks.on('canvasReady', () => {
+        enableInteractableTilesIn(globalThis.canvas?.tiles?.placeables);
+        installInteractableStageDoubleClickListener();
+      });
     }
     // Wrap the interaction permission so a non-GM player's hover is permitted on
     // interactable tiles (the tooltip relies on it); wrap the Tile hover so a
-    // discoverability tooltip shows. Installed once, defensively, and
-    // independently of Hooks availability (the prototype wraps are their own
-    // concern). The double-click is delivered by the raw pointer listener above —
-    // NOT by an `_onClickLeft2` wrap.
+    // discoverability tooltip shows. Installed once, defensively, and independently
+    // of Hooks availability (the prototype wraps are their own concern). The
+    // double-click is the canvas-stage listener (installed on `canvasReady`).
     installInteractablePermissionWrap();
     installInteractableHoverWrap();
     this._registered = true;

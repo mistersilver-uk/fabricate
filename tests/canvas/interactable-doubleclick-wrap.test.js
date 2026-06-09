@@ -2,11 +2,14 @@
  * The V13 interaction-permission wrap + the Tile hover wrap for canvas
  * interactable TILES.
  *
- * The double-click is NO LONGER delivered through an `_onClickLeft2` wrap — for a
- * non-controllable tile placeable the MouseInteractionManager click-sequence
- * never runs `_onClickLeft2` (hover DOES fire). The double-click is delivered by a
- * raw PIXI pointer listener with our own detection (covered in
- * `interactable-tile-interactivity.test.js`). What remains here:
+ * The double-click is NOT delivered through this permission gate or an
+ * `_onClickLeft2` wrap — for a non-controllable tile placeable the
+ * MouseInteractionManager click-sequence never runs `_onClickLeft2` (hover DOES
+ * fire). The double-click is delivered by a canvas-STAGE-level `pointerdown`
+ * listener with our own double-click detection ({@link registerPointerEvent}) plus
+ * an interactable-tile hit-test ({@link interactableTileAtPoint}) — covered in
+ * `interactable-tile-interactivity.test.js`, `interactable-tile-hit-test.test.js`,
+ * and `interactable-canvas-doubleclick.test.js`. What remains here:
  *
  *  - the PURE permission decision {@link shouldPermitInteractableAction} (permits
  *    hover on interactable tiles only; never clickLeft2 anymore);
@@ -240,6 +243,69 @@ test('the permission wrap permits hover on an interactable tile and delegates ot
     assert.equal(plainMgr.can('hoverIn'), false, 'a plain placeable delegates to the original gate');
     assert.equal(originalCanCalls.length, 2);
   } finally {
+    restore(saved);
+  }
+});
+
+// --- Fix A: lazy class resolution never reads the deprecated bare globals -----
+
+test('resolves the Tile class LAZILY — the deprecated bare globalThis.Tile getter is NOT read when the V13 namespace is present', () => {
+  const saved = snapshot();
+  try {
+    const hoverCalls = [];
+    const NamespacedTile = makeFakeTileClass(hoverCalls);
+    globalThis.foundry = { canvas: { placeables: { Tile: NamespacedTile } } };
+
+    // The deprecated bare global as an access-recording accessor.
+    let bareReads = 0;
+    Object.defineProperty(globalThis, 'Tile', {
+      configurable: true,
+      get() { bareReads += 1; return makeFakeTileClass([]); }
+    });
+
+    const manager = new InteractableManager();
+    manager.register();
+
+    // The wrap installed on the namespaced class: a hover delegates to its original.
+    const tile = new NamespacedTile(plainDoc());
+    tile._onHoverIn();
+    assert.equal(hoverCalls.length, 1, 'the hover wrap installed on the V13-namespaced Tile class');
+    assert.equal(bareReads, 0, 'the deprecated bare globalThis.Tile getter was never invoked');
+  } finally {
+    delete globalThis.Tile;
+    restore(saved);
+  }
+});
+
+test('resolves MouseInteractionManager LAZILY — the deprecated bare global getter is NOT read when the V13 namespace is present', () => {
+  const saved = snapshot();
+  try {
+    globalThis.foundry = { canvas: { placeables: { Tile: makeFakeTileClass([]) } } };
+
+    class NamespacedMIM {
+      constructor(object) { this.object = object; }
+      can() { return false; }
+    }
+    globalThis.foundry.canvas.interaction = { MouseInteractionManager: NamespacedMIM };
+
+    let bareReads = 0;
+    Object.defineProperty(globalThis, 'MouseInteractionManager', {
+      configurable: true,
+      get() {
+        bareReads += 1;
+        return class { constructor(o) { this.object = o; } can() { return false; } };
+      }
+    });
+
+    const manager = new InteractableManager();
+    manager.register();
+
+    // The permission wrap installed on the namespaced class.
+    const mgr = new NamespacedMIM(new (makeFakeTileClass([]))(interactableDoc()));
+    assert.equal(mgr.can('hoverIn'), true, 'the permission wrap installed on the V13-namespaced MouseInteractionManager');
+    assert.equal(bareReads, 0, 'the deprecated bare globalThis.MouseInteractionManager getter was never invoked');
+  } finally {
+    delete globalThis.MouseInteractionManager;
     restore(saved);
   }
 });

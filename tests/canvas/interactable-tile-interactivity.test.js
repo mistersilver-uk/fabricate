@@ -6,8 +6,14 @@
  * PIXI/Foundry enablement edge runs ONLY for interactable tiles, sets the
  * expected pointer properties, ensures the MouseInteractionManager is activated,
  * is idempotent, and is no-throw against exotic/partial placeables — all with a
- * FAKE placeable (no live PIXI/Foundry runtime). Actual event delivery is a
+ * FAKE placeable (no live PIXI/Foundry runtime). This enablement supports the
+ * hover tooltip; the double-click is delivered at the canvas STAGE level (see
+ * `interactable-tile-hit-test.test.js` + the canvas-stage listener in
+ * `interactable-canvas-doubleclick.test.js`). Actual event delivery is a
  * live-Foundry (test:foundry) concern.
+ *
+ * This suite also covers the PURE double-click detector {@link registerPointerEvent}
+ * (window / distance / reset cases) that the canvas-stage listener consumes.
  */
 
 import test from 'node:test';
@@ -16,10 +22,8 @@ import assert from 'node:assert/strict';
 import {
   enableInteractableTilePointerEvents,
   enableInteractableTilesIn,
-  detachDoubleClickPointerListener,
   registerPointerEvent
 } from '../../src/canvas/interactableTileInteractivity.js';
-import { InteractableManager } from '../../src/canvas/InteractableManager.js';
 
 const INTERACTABLE_FLAGS = {
   isInteractable: true,
@@ -37,9 +41,6 @@ const INTERACTABLE_FLAGS = {
  */
 function fakePlaceable({ flags = INTERACTABLE_FLAGS, withManager = true } = {}) {
   const calls = { activateListeners: 0, createManager: 0, activate: 0 };
-  // A minimal PIXI-emitter shape so the raw double-click listener can be bound;
-  // `listeners[event]` records each attached handler so a test can fire it.
-  const listeners = {};
   const placeable = {
     document: { flags: flags ? { fabricate: flags } : {}, width: 100, height: 100 },
     eventMode: 'passive',
@@ -54,20 +55,13 @@ function fakePlaceable({ flags = INTERACTABLE_FLAGS, withManager = true } = {}) 
     _createInteractionManager() {
       calls.createManager += 1;
       return { activate() { calls.activate += 1; return this; } };
-    },
-    on(event, handler) { (listeners[event] ??= []).push(handler); },
-    off(event, handler) {
-      const list = listeners[event];
-      if (!list) return;
-      const i = list.indexOf(handler);
-      if (i >= 0) list.splice(i, 1);
     }
   };
-  return { placeable, calls, listeners };
+  return { placeable, calls };
 }
 
 test('enables pointer interactivity on an interactable tile', () => {
-  const { placeable, calls, listeners } = fakePlaceable();
+  const { placeable, calls } = fakePlaceable();
   const ran = enableInteractableTilePointerEvents(placeable);
 
   assert.equal(ran, true);
@@ -77,7 +71,6 @@ test('enables pointer interactivity on an interactable tile', () => {
   assert.equal(placeable.cursor, 'pointer', 'sets a pointer cursor affordance');
   assert.equal(calls.activateListeners, 1, 'activates the placeable listeners');
   assert.equal(calls.activate, 1, 'activates the MouseInteractionManager');
-  assert.equal(listeners.pointerdown?.length, 1, 'attaches a raw pointerdown listener');
 });
 
 test('does NOT enable a non-interactable (plain) tile', () => {
@@ -91,15 +84,14 @@ test('does NOT enable a non-interactable (plain) tile', () => {
   assert.equal(calls.activate, 0);
 });
 
-test('is idempotent — the mutation set + pointer listener run once per placeable', () => {
-  const { placeable, calls, listeners } = fakePlaceable();
+test('is idempotent — the mutation set runs once per placeable', () => {
+  const { placeable, calls } = fakePlaceable();
   enableInteractableTilePointerEvents(placeable);
   const second = enableInteractableTilePointerEvents(placeable);
 
   assert.equal(second, true, 'still reports the tile as interactable');
   assert.equal(calls.activateListeners, 1, 'listeners are not re-activated');
   assert.equal(calls.activate, 1, 'manager is not re-activated');
-  assert.equal(listeners.pointerdown?.length, 1, 'the pointerdown listener is not re-bound');
 });
 
 test('creates the interaction manager when the placeable lacks one', () => {
@@ -194,47 +186,4 @@ test('registerPointerEvent: resets after a double so a third event is a fresh si
 test('registerPointerEvent is no-throw / "single" with missing state or event', () => {
   assert.equal(registerPointerEvent(null, { time: 1, x: 0, y: 0 }), 'single');
   assert.equal(registerPointerEvent({}, null), 'single');
-});
-
-// --- the bound listener dispatches a double-click to the manager -------------
-
-test('a double-click on the bound listener routes to InteractableManager._onDoubleClick(document)', () => {
-  const { placeable, listeners } = fakePlaceable();
-  enableInteractableTilePointerEvents(placeable);
-  const handler = listeners.pointerdown[0];
-
-  const dispatched = [];
-  const realOnDoubleClick = InteractableManager.instance._onDoubleClick;
-  InteractableManager.instance._onDoubleClick = (doc) => dispatched.push(doc);
-  try {
-    // Two prompt, co-located pointerdowns ⇒ one double-click dispatch.
-    handler({ timeStamp: 1000, global: { x: 50, y: 50 } });
-    assert.equal(dispatched.length, 0, 'the first event does not dispatch');
-    handler({ timeStamp: 1150, global: { x: 51, y: 50 } });
-    assert.equal(dispatched.length, 1, 'the second (close+prompt) event dispatches a double-click');
-    assert.equal(dispatched[0], placeable.document, 'the tile document is routed');
-  } finally {
-    InteractableManager.instance._onDoubleClick = realOnDoubleClick;
-  }
-});
-
-test('detachDoubleClickPointerListener removes the bound listener (idempotent, no-throw)', () => {
-  const { placeable, listeners } = fakePlaceable();
-  enableInteractableTilePointerEvents(placeable);
-  assert.equal(listeners.pointerdown.length, 1, 'listener bound');
-
-  detachDoubleClickPointerListener(placeable);
-  assert.equal(listeners.pointerdown.length, 0, 'listener removed on detach');
-
-  // Idempotent + no-throw on a second detach and on null. (In production a
-  // destroyed tile is replaced by a fresh placeable on redraw, so re-binding
-  // happens on a NEW object, not a re-enable of this already-enabled one.)
-  assert.doesNotThrow(() => detachDoubleClickPointerListener(placeable));
-  assert.doesNotThrow(() => detachDoubleClickPointerListener(null));
-});
-
-test('does NOT bind a pointer listener on a non-interactable tile', () => {
-  const { placeable, listeners } = fakePlaceable({ flags: null });
-  enableInteractableTilePointerEvents(placeable);
-  assert.equal(listeners.pointerdown, undefined, 'no listener on a plain tile');
 });

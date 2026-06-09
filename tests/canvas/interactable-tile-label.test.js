@@ -181,3 +181,36 @@ test('prefers the V13-namespaced PreciseText (foundry.canvas.containers) over th
     if (savedFoundry === undefined) delete globalThis.foundry; else globalThis.foundry = savedFoundry;
   }
 });
+
+test('resolves PreciseText LAZILY — the deprecated bare globalThis.PreciseText getter is NOT read when the V13 namespace is present', () => {
+  const savedPixi = globalThis.PIXI;
+  const savedPrecise = Object.getOwnPropertyDescriptor(globalThis, 'PreciseText');
+  const savedFoundry = globalThis.foundry;
+  let usedNamespaced = false;
+  let bareReads = 0;
+  class NamespacedPrecise {
+    static getTextStyle(opts) { return { ...opts }; }
+    constructor(text) { usedNamespaced = true; this.text = text; this.anchor = { set() {} }; this.position = { set() {} }; }
+  }
+  globalThis.PIXI = { Text: class { constructor() { this.anchor = { set() {} }; this.position = { set() {} }; } } };
+  globalThis.foundry = { canvas: { containers: { PreciseText: NamespacedPrecise } } };
+  // Define the deprecated bare global as an access-recording accessor.
+  Object.defineProperty(globalThis, 'PreciseText', {
+    configurable: true,
+    get() {
+      bareReads += 1;
+      return class { constructor() { this.anchor = { set() {} }; this.position = { set() {} }; } };
+    }
+  });
+  try {
+    const tile = fakeTile();
+    showInteractableTileLabel(tile, 'Iron Vein');
+    assert.equal(usedNamespaced, true, 'the V13-namespaced PreciseText is used');
+    assert.equal(bareReads, 0, 'the deprecated bare globalThis.PreciseText getter was never invoked');
+  } finally {
+    if (savedPixi === undefined) delete globalThis.PIXI; else globalThis.PIXI = savedPixi;
+    delete globalThis.PreciseText;
+    if (savedPrecise) Object.defineProperty(globalThis, 'PreciseText', savedPrecise);
+    if (savedFoundry === undefined) delete globalThis.foundry; else globalThis.foundry = savedFoundry;
+  }
+});

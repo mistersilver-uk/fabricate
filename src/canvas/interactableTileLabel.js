@@ -27,13 +27,17 @@ const LABEL_KEY = '_fabricateTileLabel';
  * @returns {Function|null}
  */
 function resolvePreciseTextClass() {
-  const candidates = [
-    globalThis.foundry?.canvas?.containers?.PreciseText,
-    globalThis.PreciseText
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'function') return candidate;
-  }
+  // Resolve LAZILY (short-circuit) so the deprecated bare `globalThis.PreciseText`
+  // getter is only read when the V13-namespaced class is absent. An array literal
+  // of both candidates would EAGERLY trip the V13 deprecation getter for the bare
+  // global at construction time even though
+  // `foundry.canvas.containers.PreciseText` is found first; checking the
+  // namespaced class first and the bare global only as a fallback never touches it
+  // on V13.
+  const namespaced = globalThis.foundry?.canvas?.containers?.PreciseText;
+  if (typeof namespaced === 'function') return namespaced;
+  const bare = globalThis.PreciseText;
+  if (typeof bare === 'function') return bare;
   return null;
 }
 
@@ -45,10 +49,12 @@ function resolvePreciseTextClass() {
  * @returns {Function|null}
  */
 function resolveTextClass() {
-  const candidates = [resolvePreciseTextClass(), globalThis.PIXI?.Text];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'function') return candidate;
-  }
+  // Short-circuit so PreciseText (the deprecation-safe resolver above) is
+  // preferred and `PIXI.Text` is only read as a fallback.
+  const precise = resolvePreciseTextClass();
+  if (typeof precise === 'function') return precise;
+  const pixiText = globalThis.PIXI?.Text;
+  if (typeof pixiText === 'function') return pixiText;
   return null;
 }
 

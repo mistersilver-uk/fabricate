@@ -1,24 +1,28 @@
 /**
- * Make interactable Tile placeables pointer-eventful for ALL users AND deliver a
- * double-click to the Fabricate UI via a raw PIXI pointer listener.
+ * Make interactable Tile placeables pointer-eventful for ALL users so the hover
+ * discoverability tooltip works (a Tile has no nameplate).
  *
  * A Foundry Tile is GM scenery: for a non-GM player the placeable is not in the
- * active control layer, so the `MouseInteractionManager` click-sequence state
- * machine never runs `_onClickLeft2` for it — even though `_onHoverIn` DOES fire
- * (live V13 testing confirmed hover works but double-click never reached the
- * wrapped `_onClickLeft2`). Wrapping `_onClickLeft2` is therefore the wrong
- * mechanism. Instead we attach a RAW PIXI pointer listener to the placeable
- * (hover proves the placeable receives pointer events) and implement our own
- * double-click detection, then call `InteractableManager.instance._onDoubleClick`
- * directly.
+ * active control layer, so the tiles-layer container does not route pointer
+ * events DOWN into the placeable — neither the `MouseInteractionManager`
+ * click-sequence (`_onClickLeft2`) nor a raw per-placeable `pointerdown` listener
+ * ever fires for it. Live V13 testing confirmed hover works (the hover handlers
+ * are wired through the interaction manager + the permission wrap) but the
+ * double-click never reaches the placeable. The double-click is therefore
+ * delivered at the CANVAS STAGE level — a raw PIXI `pointerdown` listener on
+ * `canvas.stage` (the always-interactive PIXI interaction root) runs our own
+ * double-click detection ({@link registerPointerEvent}) and hit-tests the
+ * interactable tiles (see `interactableTileHitTest.js` + the stage-listener
+ * install in `InteractableManager.js`), matching Monk's Active Tiles' canvas-level
+ * approach. This module supplies the hover-supporting pointer enablement AND the
+ * pure double-click detector the stage listener consumes.
  *
  * The pure decision — "is this placeable an interactable tile we should enable?"
- * — is {@link isInteractableTile} from `interactableTileFlags.js`; the
- * double-click TIMING decision is the pure {@link registerPointerEvent}. The
+ * — is {@link isInteractableTile} from `interactableTileFlags.js`. The
  * PIXI/Foundry mutations (PIXI v7 `eventMode = 'static'` / legacy
- * `interactive = true`, `interactiveChildren`, `cursor`, a `hitArea`, and the
- * `.on('pointerdown', …)` wiring) are the thin edge in
- * {@link enableInteractableTilePointerEvents}.
+ * `interactive = true`, `interactiveChildren`, `cursor`, a `hitArea`, and
+ * ensuring + activating the `MouseInteractionManager` so hover routes) are the
+ * thin edge in {@link enableInteractableTilePointerEvents}.
  *
  * Everything is probed defensively against the installed V13/PIXI build and is
  * no-throw + idempotent, so an unexpected shape degrades to "not enabled" rather
@@ -38,41 +42,32 @@
  */
 
 import { isInteractableTile } from './interactableTileFlags.js';
-import { InteractableManager } from './InteractableManager.js';
 
 /** Marker so the per-placeable enablement runs its mutations at most once. */
 const ENABLED_FLAG = '_fabricateInteractableEnabled';
 
-/** Marker so the raw PIXI pointer listener is bound at most once per placeable. */
-const POINTER_BOUND_FLAG = '_fabricatePointerBound';
-
-/** Property under which the bound pointer handler is stashed (for detach). */
-const POINTER_HANDLER_KEY = '_fabricatePointerHandler';
-
-/** Property under which the per-placeable double-click detector state lives. */
-const POINTER_STATE_KEY = '_fabricatePointerState';
-
-/** PIXI pointer event we listen for to drive our own double-click detection. */
-const POINTER_EVENT = 'pointerdown';
-
 /** Max gap (ms) between two pointer events to count as a double-click. */
 const DOUBLE_CLICK_WINDOW_MS = 400;
 
-/** Max squared distance (px²) between two pointer events for a double-click. */
+/** Max distance (px) between two pointer events for a double-click. */
 const DOUBLE_CLICK_DISTANCE_PX = 5;
 const DOUBLE_CLICK_DISTANCE_SQ = DOUBLE_CLICK_DISTANCE_PX * DOUBLE_CLICK_DISTANCE_PX;
 
 /**
  * Pure double-click detector. Records the incoming pointer event into the mutable
- * `state` and reports whether it completes a double-click. A second event lands
- * as a `'double'` only when it falls WITHIN {@link DOUBLE_CLICK_WINDOW_MS} of, and
+ * `state` and reports whether it completes a double-click. A second event lands as
+ * a `'double'` only when it falls WITHIN {@link DOUBLE_CLICK_WINDOW_MS} of, and
  * WITHIN {@link DOUBLE_CLICK_DISTANCE_PX} of, the previous recorded event; any
- * event that does not (the first event, one after the window, or one too far
- * away) is a `'single'`. After reporting `'double'` the state is reset so a
- * subsequent event starts a fresh sequence (no triple-counting).
+ * event that does not (the first event, one after the window, or one too far away)
+ * is a `'single'`. After reporting `'double'` the state is reset so a subsequent
+ * event starts a fresh sequence (no triple-counting).
  *
- * @param {{ time?: number, x?: number, y?: number }} state  Mutable per-placeable
- *   carrier of the last recorded event (initialise as `{}`).
+ * This is the timing decision the canvas-stage `pointerdown` listener consumes
+ * (the stage-listener install in `InteractableManager.js`); it is pure and
+ * unit-testable in isolation, with no PIXI/Foundry dependency.
+ *
+ * @param {{ time?: number, x?: number, y?: number }} state  Mutable carrier of the
+ *   last recorded event (initialise as `{}`).
  * @param {{ time: number, x: number, y: number }} event  The incoming event.
  * @returns {'double'|'single'}
  */
@@ -124,11 +119,10 @@ export function registerPointerEvent(state, event) {
  *     layer is not the tiles layer — preferring the placeable's own
  *     `activateListeners()` (which both creates and activates), then falling
  *     back to `_createInteractionManager()` + `mouseInteractionManager.activate()`.
- *  4. Attach a RAW PIXI pointer listener (`pointerdown`) that runs our own
- *     double-click detection ({@link registerPointerEvent}) and, on a double,
- *     calls `InteractableManager.instance._onDoubleClick(document)` directly —
- *     bypassing the click-sequence state machine that never runs `_onClickLeft2`
- *     for a non-controllable tile placeable. Bound idempotently and detachable.
+ *
+ * The double-click is NOT delivered here — it is handled at the canvas STAGE
+ * level (see the module header) because the tiles-layer container does not route
+ * pointer events into a tile placeable for a non-active layer / non-GM.
  *
  * @param {object} placeable  A Tile placeable (carries `.document`).
  * @returns {boolean} `true` when this placeable was treated as interactable and
@@ -159,10 +153,6 @@ export function enableInteractableTilePointerEvents(placeable) {
   // `_onHoverIn` (tooltip) regardless of the active control layer.
   activatePlaceableInteraction(placeable);
 
-  // 4: attach our raw double-click pointer listener (the actual double-click
-  // delivery mechanism — see the module header).
-  attachDoubleClickPointerListener(placeable);
-
   try { placeable[ENABLED_FLAG] = true; } catch (_err) { /* tolerate frozen. */ }
   return true;
 }
@@ -188,94 +178,6 @@ function ensureHitArea(placeable) {
   try {
     placeable.hitArea = new RectangleClass(0, 0, width, height);
   } catch (_err) { /* tolerate. */ }
-}
-
-/**
- * Attach a raw PIXI `pointerdown` listener to the placeable that performs our own
- * double-click detection and, on a `'double'`, dispatches to
- * `InteractableManager.instance._onDoubleClick(document)`. Idempotent (guarded by
- * {@link POINTER_BOUND_FLAG}) and no-throw when `.on` is absent. The bound handler
- * and the per-placeable detector state are stashed so {@link detachDoubleClickPointerListener}
- * can remove them on tile destroy.
- *
- * @param {object} placeable
- * @returns {void}
- */
-function attachDoubleClickPointerListener(placeable) {
-  if (placeable[POINTER_BOUND_FLAG] === true) return;
-  if (typeof placeable.on !== 'function') return; // not a PIXI event emitter — tolerate.
-
-  const state = {};
-  const handler = (event) => {
-    const point = resolveEventPoint(event);
-    const decision = registerPointerEvent(state, {
-      time: resolveEventTime(event),
-      x: point.x,
-      y: point.y
-    });
-    if (decision !== 'double') return;
-    try {
-      InteractableManager.instance?._onDoubleClick?.(placeable.document);
-    } catch (_err) { /* tolerate a dispatch failure; never break canvas input. */ }
-  };
-
-  try {
-    placeable.on(POINTER_EVENT, handler);
-  } catch (_err) { return; } // tolerate an exotic emitter.
-
-  try { placeable[POINTER_STATE_KEY] = state; } catch (_err) { /* tolerate frozen. */ }
-  try { placeable[POINTER_HANDLER_KEY] = handler; } catch (_err) { /* tolerate frozen. */ }
-  try { placeable[POINTER_BOUND_FLAG] = true; } catch (_err) { /* tolerate frozen. */ }
-}
-
-/**
- * Detach the raw double-click pointer listener bound by
- * {@link attachDoubleClickPointerListener}. Idempotent + no-throw; safe to call
- * on `destroyTile` / the placeable's teardown.
- *
- * @param {object} placeable
- * @returns {void}
- */
-export function detachDoubleClickPointerListener(placeable) {
-  if (!placeable) return;
-  const handler = placeable[POINTER_HANDLER_KEY];
-  if (handler && typeof placeable.off === 'function') {
-    try { placeable.off(POINTER_EVENT, handler); } catch (_err) { /* tolerate. */ }
-  }
-  try { delete placeable[POINTER_HANDLER_KEY]; } catch (_err) { /* tolerate. */ }
-  try { delete placeable[POINTER_STATE_KEY]; } catch (_err) { /* tolerate. */ }
-  try { delete placeable[POINTER_BOUND_FLAG]; } catch (_err) { /* tolerate. */ }
-}
-
-/**
- * Resolve a `{ x, y }` point from a PIXI federated pointer event, preferring the
- * stage-global coordinates (stable across the scroll/zoom transform) and falling
- * back to the raw client coordinates, then the origin.
- *
- * @param {object} event
- * @returns {{ x: number, y: number }}
- */
-function resolveEventPoint(event) {
-  const global = event?.global ?? event?.data?.global;
-  const x = Number(global?.x ?? event?.clientX ?? event?.x ?? 0);
-  const y = Number(global?.y ?? event?.clientY ?? event?.y ?? 0);
-  return { x: Number.isFinite(x) ? x : 0, y: Number.isFinite(y) ? y : 0 };
-}
-
-/**
- * Resolve an event timestamp (ms). Prefers the event's own `timeStamp`, falling
- * back to `performance.now()` / `Date.now()` so detection works regardless of
- * the federated-event shape.
- *
- * @param {object} event
- * @returns {number}
- */
-function resolveEventTime(event) {
-  const stamp = Number(event?.timeStamp);
-  if (Number.isFinite(stamp) && stamp > 0) return stamp;
-  const perfNow = globalThis.performance?.now?.();
-  if (Number.isFinite(perfNow)) return perfNow;
-  return Date.now();
 }
 
 /**
