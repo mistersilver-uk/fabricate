@@ -13,13 +13,13 @@
  *
  * Everything in this module is PURE: it takes plain data (a behaviour system or
  * a normalized view) and returns the intended mutation/decision. No `globalThis`
- * access; the node display arithmetic is delegated to the pure
- * `nodeRespawnMath` helpers so a fake `now` / `secondsPerUnit` makes the ETA
- * unit-testable without Foundry.
+ * access.
+ *
+ * A gathering-task interactable carries NO per-interactable node pool (depletion /
+ * respawn is owned by the environment's `nodeRuntime[taskId]`), so there is no
+ * restock plan or node-state summary here.
  */
 
-import { isNodeDepleted, nextRespawnEta } from '../../systems/nodeRespawnMath.js';
-import { normalizeNodeConfig } from '../../systems/gatheringNodeConfig.js';
 import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
 import { resolveLinkedVisual } from '../linkedVisuals/linkedInteractableVisual.js';
 
@@ -54,25 +54,6 @@ function asSystemView(systemOrBehavior) {
   // A raw system passed without a `type` wrapper — accept it as-is when it looks
   // like an interactable system.
   return systemOrBehavior.interactableType ? systemOrBehavior : null;
-}
-
-/**
- * Plan a node RESTOCK: top the node back up to its `max`. PURE. Returns the
- * `{ system: { node } }` behaviour patch, or `null` when there is no node or the
- * node is already full (a no-op restock).
- *
- * @param {object} system  A behaviour system (raw or normalized view).
- * @returns {{ system: { node: object } } | null}
- */
-export function planRestock(system) {
-  const view = asSystemView(system);
-  const node = normalizeNodeConfig(view?.node ?? null);
-  if (!node) return null;
-  const max = Number(node.max || 0);
-  const current = Number(node.current || 0);
-  if (!(max > 0)) return null;
-  if (current >= max) return null; // already full — no-op.
-  return { system: { node: { ...node, current: max } } };
 }
 
 /**
@@ -129,32 +110,6 @@ function planStateFlag(system, key, next, defaultValue) {
  */
 export function planClearVisualLink(_system) {
   return { system: { linkedVisual: { uuid: null, documentName: null, mode: 'none' } } };
-}
-
-/**
- * Summarize the node display state for the panel. PURE: reuses the shared
- * depletion definition (`isNodeDepleted`) + the respawn ETA math
- * (`nextRespawnEta`) with the injected `now` / `secondsPerUnit` seams.
- *
- * @param {object} system  A behaviour system (raw or normalized view).
- * @param {object} [ctx]
- * @param {number} [ctx.now]  Current world time (seconds).
- * @param {(unit: string) => number} [ctx.secondsPerUnit]  Calendar seam.
- * @returns {{ hasNode: boolean, current: number|null, max: number|null, depleted: boolean, respawnEta: ({ nextWorldTime: number, secondsUntil: number }|null) }}
- */
-export function summarizeNodeState(system, { now = 0, secondsPerUnit = () => 3600 } = {}) {
-  const view = asSystemView(system);
-  const node = normalizeNodeConfig(view?.node ?? null);
-  if (!node) {
-    return { hasNode: false, current: null, max: null, depleted: false, respawnEta: null };
-  }
-  return {
-    hasNode: true,
-    current: numberOrNull(node.current) ?? 0,
-    max: numberOrNull(node.max) ?? 0,
-    depleted: isNodeDepleted(node),
-    respawnEta: nextRespawnEta(node, secondsPerUnit, Number(now))
-  };
 }
 
 /**

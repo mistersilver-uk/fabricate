@@ -1,7 +1,11 @@
 /**
  * Pure view-helper coverage for the Interactable config panel
- * (`interactableConfigView.js`): the linked-visual status banner, the activation
- * gate summary line, the node count line, and the respawn-ETA formatting.
+ * (`interactableConfigView.js`): the linked-visual status banner and the
+ * activation gate summary line.
+ *
+ * A region-first interactable carries NO per-interactable node pool (the
+ * environment's `nodeRuntime[taskId]` owns depletion/respawn), so there is no
+ * node count line or respawn-ETA formatting to cover here.
  */
 
 import { describe, it } from 'node:test';
@@ -9,9 +13,7 @@ import assert from 'node:assert/strict';
 
 import {
   describeVisualStatus,
-  describeActivationGate,
-  describeNodeLine,
-  formatRespawnEta
+  describeActivationGate
 } from '../../src/ui/interactableConfigView.js';
 
 describe('describeVisualStatus', () => {
@@ -46,41 +48,8 @@ describe('describeActivationGate', () => {
     assert.equal(describeActivationGate(state).status, 'active');
   });
 
-  it('reports a NODE_DEPLETED gate after cooldown in precedence order', () => {
-    const node = { hasNode: true, depleted: true };
-    assert.equal(describeActivationGate({ enabled: true }, { node }).status, 'nodeDepleted');
-    // Cooldown still wins over node depletion (higher precedence).
-    const state = { enabled: true, cooldown: { seconds: 100, lastUsedWorldTime: 1000 } };
-    assert.equal(describeActivationGate(state, { now: 1050, node }).status, 'cooldown');
-    // An available node does not block.
-    assert.equal(describeActivationGate({ enabled: true }, { node: { hasNode: true, depleted: false } }).status, 'active');
-  });
-
   it('reports active when nothing blocks', () => {
     assert.equal(describeActivationGate({ enabled: true, uses: { max: 3, used: 1 } }).status, 'active');
     assert.equal(describeActivationGate({}).status, 'active', 'empty state defaults to active');
-  });
-});
-
-describe('describeNodeLine', () => {
-  it('reports unlimited / depleted / available', () => {
-    assert.equal(describeNodeLine(null).key.endsWith('NodeUnlimited'), true);
-    assert.equal(describeNodeLine({ hasNode: false }).key.endsWith('NodeUnlimited'), true);
-    assert.equal(describeNodeLine({ hasNode: true, depleted: true }).key.endsWith('NodeDepleted'), true);
-    assert.equal(describeNodeLine({ hasNode: true, depleted: false }).key.endsWith('NodeAvailable'), true);
-  });
-});
-
-describe('formatRespawnEta', () => {
-  it('returns null when there is no ETA', () => {
-    assert.equal(formatRespawnEta(null), null);
-    assert.equal(formatRespawnEta({}), null);
-  });
-
-  it('formats seconds into the two most significant units', () => {
-    assert.equal(formatRespawnEta({ secondsUntil: 90 }), '1m 30s');
-    assert.equal(formatRespawnEta({ secondsUntil: 3661 }), '1h 1m');
-    assert.equal(formatRespawnEta({ secondsUntil: 90061 }), '1d 1h');
-    assert.equal(formatRespawnEta({ secondsUntil: 0 }), '0s');
   });
 });

@@ -208,7 +208,6 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
  * @param {number} [params.width]                   Linked Tile width (scene units).
  * @param {number} [params.height]                  Linked Tile height (scene units).
  * @param {string} [params.name]                    Display name (defaults to the entry's name/label).
- * @param {object|null} [params.node]               Node-config snapshot (gatheringTask only) or null.
  * @param {number} [params.gridSize]                Scene grid square size (scene units). Default 100.
  * @param {number} [params.regionGrid]              Region size in grid squares per side. Default 1.
  * @param {'marker'|'none'} [params.visualMode]     Linked-visual mode. 'marker' (default)
@@ -230,7 +229,6 @@ export function buildRegionSpawnRequest({
   width,
   height,
   name,
-  node,
   gridSize,
   regionGrid = 1,
   visualMode = 'marker',
@@ -293,7 +291,6 @@ export function buildRegionSpawnRequest({
     taskId: classification.interactableType === 'gatheringTask' ? classification.referenceId : null,
     environmentId: resolvedEnvironmentId ?? undefined,
     name: resolvedName,
-    node: classification.interactableType === 'gatheringTask' && node ? node : null,
     // Region-only ⇒ hidden + no marker; the builder leaves uuid/documentName null.
     presentation: regionOnly ? { hidden: true } : undefined,
     linkedVisual: regionOnly ? { mode: 'none' } : undefined

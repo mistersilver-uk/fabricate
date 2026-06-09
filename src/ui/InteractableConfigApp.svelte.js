@@ -3,19 +3,16 @@ import InteractableConfigRoot from './svelte/apps/InteractableConfigRoot.svelte'
 import { registerInteractableConfigApp } from './appFactory.js';
 import { InteractableManager } from '../canvas/InteractableManager.js';
 import {
-  planRestock,
   planSetEnabled,
   planSetLocked,
   planClearVisualLink,
-  summarizeNodeState,
   summarizeInteractable
 } from '../canvas/regions/interactableConfigActions.js';
 import {
   applyInteractableBehaviorUpdate,
   emitInteractableBehaviorWrite,
   emitInteractableVisualUpdate,
-  emitInteractableVisualDelete,
-  buildLinkedVisualApply
+  emitInteractableVisualDelete
 } from '../canvas/interactableSocketBridge.js';
 import {
   relinkVisual,
@@ -26,7 +23,6 @@ import {
 } from '../canvas/linkedVisuals/linkedInteractableVisual.js';
 import { identifyRegionBehaviorRef } from '../canvas/regions/interactableRegionNodeAdapter.js';
 import { readInteractableBehaviorSystem } from '../canvas/regions/interactableRegionFlags.js';
-import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
 import { choiceDialog, localize } from './svelte/util/foundryBridge.js';
 
 /**
@@ -116,7 +112,6 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
    */
   _buildServices() {
     const now = () => Number(globalThis.game?.time?.worldTime || 0);
-    const secondsPerUnit = (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null);
 
     // The GM-routed behaviour-update writer: local apply on the active GM, socket
     // emit otherwise. The panel is GM-only, so the GM is normally the active GM
@@ -137,9 +132,7 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         const view = summarizeInteractable(behavior, {
           resolveVisual: (s) => resolveLinkedVisual(s, { scene: behavior?.parent?.parent ?? null })
         });
-        const worldTime = now();
-        const node = summarizeNodeState(system, { now: worldTime, secondsPerUnit });
-        return { view, node, ref: this._ref ?? null, now: worldTime };
+        return { view, ref: this._ref ?? null, now: now() };
       },
       // Resolve the live tool/task label for display (the panel shows id + label).
       resolveSourceLabel: () => {
@@ -312,26 +305,6 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         }
         await writeBehavior(planClearVisualLink(readInteractableBehaviorSystem(behavior)).system);
         this._refresh();
-      },
-      restockNode: () => {
-        if (!this._assertGM()) return undefined;
-        const behavior = this._resolveBehavior();
-        const system = readInteractableBehaviorSystem(behavior);
-        const patch = planRestock(system);
-        if (!patch) return undefined;
-        // Restock writes the node, then reflects the (now not-depleted) state onto
-        // the linked visual via the same GM-routed applier the adapter uses.
-        const result = writeBehavior(patch.system);
-        const reflect = () => buildLinkedVisualApply()({
-          behaviorSystem: { ...readInteractableBehaviorSystem(behavior), node: patch.system.node },
-          depleted: false
-        });
-        if (result && typeof result.then === 'function') {
-          return result.then(() => { reflect(); this._refresh(); });
-        }
-        reflect();
-        this._refresh();
-        return result;
       },
       setEnabled: (enabled) => {
         if (!this._assertGM()) return undefined;

@@ -32,7 +32,7 @@ function toolSystem(stateOverrides = {}) {
   };
 }
 
-function taskSystem({ stateOverrides = {}, node = { current: 3 } } = {}) {
+function taskSystem({ stateOverrides = {} } = {}) {
   return {
     interactableType: 'gatheringTask',
     sourceUuid: 'Fabricate.sys.gatheringTask.task1',
@@ -40,7 +40,6 @@ function taskSystem({ stateOverrides = {}, node = { current: 3 } } = {}) {
     toolId: null,
     taskId: 'task1',
     environmentId: 'env-1',
-    node,
     state: baseState(stateOverrides)
   };
 }
@@ -85,15 +84,16 @@ test('eligibility: COOLDOWN active when now < lastUsed + seconds', () => {
   );
 });
 
-test('eligibility: NODE_DEPLETED for gatheringTask with current <= 0', () => {
-  assert.equal(evaluateActivationEligibility(taskSystem({ node: { current: 0 } }), { now: 0 }).reason, 'NODE_DEPLETED');
-  assert.equal(evaluateActivationEligibility(taskSystem({ node: { current: 3 } }), { now: 0 }).eligible, true);
-  // a null node (unlimited) never depletes
-  assert.equal(evaluateActivationEligibility(taskSystem({ node: null }), { now: 0 }).eligible, true);
+test('eligibility: a gathering-task interactable has NO per-interactable node gate (env nodeRuntime owns depletion)', () => {
+  // A region-first gathering-task interactable is a pure (environment, task)
+  // shortcut: it carries no per-interactable node pool, so eligibility never trips
+  // on NODE_DEPLETED. Node depletion is enforced by the gathering engine against
+  // the environment's `nodeRuntime[taskId]` when the session opens.
+  assert.deepEqual(evaluateActivationEligibility(taskSystem(), { now: 0 }), { eligible: true, reason: null });
 });
 
-test('eligibility: state gates take precedence over node depletion', () => {
-  const system = taskSystem({ stateOverrides: { locked: true }, node: { current: 0 } });
+test('eligibility: state gates still trip for a gathering task', () => {
+  const system = taskSystem({ stateOverrides: { locked: true } });
   assert.equal(evaluateActivationEligibility(system, { now: 0 }).reason, 'LOCKED');
 });
 
@@ -211,8 +211,9 @@ test('validateActivationRequest: ENVIRONMENT_MISSING only for gatheringTask', ()
   );
 });
 
-test('describeGrant encodes tab + context shape per type', () => {
-  assert.deepEqual(describeGrant(toolSystem()), { tab: 'gathering', context: { activeCanvasTool: null } });
+test('describeGrant encodes tab + context shape per type (tools open Crafting)', () => {
+  // A Tool station belongs to crafting, so it opens the Crafting tab.
+  assert.deepEqual(describeGrant(toolSystem()), { tab: 'crafting', context: { activeCanvasTool: null } });
   assert.deepEqual(describeGrant(taskSystem()), {
     tab: 'gathering',
     context: { environmentId: 'env-1', taskId: 'task1' }
@@ -232,7 +233,6 @@ test('activationDenialMessageKey maps every reason to a non-default key', () => 
     CONSUMED: 'FABRICATE.Canvas.Interactable.Denied.Consumed',
     USES_EXHAUSTED: 'FABRICATE.Canvas.Interactable.Denied.UsesExhausted',
     COOLDOWN: 'FABRICATE.Canvas.Interactable.Denied.Cooldown',
-    NODE_DEPLETED: 'FABRICATE.Canvas.Interactable.Denied.NodeDepleted',
     CANNOT_CONTROL_ACTOR: 'FABRICATE.Canvas.Interactable.Denied.CannotControl',
     TOKEN_NOT_INSIDE: 'FABRICATE.Canvas.Interactable.Denied.NotInside',
     SOURCE_MISSING: 'FABRICATE.Canvas.Interactable.Denied.SourceMissing',

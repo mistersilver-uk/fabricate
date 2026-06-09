@@ -172,7 +172,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Session-scoped canvas Tool, surfaced reactively so the shell can render a
       // status chip naming the active station tool (Phase 4 SHOULD-FIX 3). Null
       // when no Tool station is active.
-      activeCanvasTool: this._activeCanvasTool
+      activeCanvasTool: this._activeCanvasTool,
+      // Session-scoped environment + task for a gathering-task interactable
+      // shortcut: when a canvas gathering-task region activation is granted, the
+      // gathering view auto-selects this environment + task on open. Null on a
+      // plain manual open.
+      scopedEnvironmentId: this._scopedEnvironmentId,
+      scopedTaskId: this._scopedTaskId
     };
   }
 
@@ -285,8 +291,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       existing._nodeStateOverride = nextNodeOverride;
       existing._scopedEnvironmentId = nextEnvironmentId;
       existing._scopedTaskId = nextTaskId;
-      // Push the replaced tool to the mounted tree so the status chip updates.
-      existing.updateProps({ activeCanvasTool: nextCanvasTool });
+      // Push the replaced tool + scoped env/task to the mounted tree so the status
+      // chip updates and the gathering view re-auto-selects the scoped env+task.
+      existing.updateProps({
+        activeCanvasTool: nextCanvasTool,
+        scopedEnvironmentId: nextEnvironmentId,
+        scopedTaskId: nextTaskId
+      });
       existing._selectTab(initialTab);
       existing.bringToFront();
       return existing;

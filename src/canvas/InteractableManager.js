@@ -51,14 +51,8 @@ import {
   activationDenialMessageKey
 } from './regions/interactableRegionActivation.js';
 import {
-  createRegionNodeStateAdapter,
-  identifyRegionBehaviorRef,
-  buildInteractableNodeSnapshot
+  identifyRegionBehaviorRef
 } from './regions/interactableRegionNodeAdapter.js';
-import {
-  emitInteractableBehaviorWrite,
-  buildLinkedVisualApply
-} from './interactableSocketBridge.js';
 import {
   INTERACTABLE_SOCKET,
   INTERACTABLE_ACTIVATE,
@@ -70,8 +64,6 @@ import { regionEnvironmentIdsAtPoint, interactableBehaviorsContainingToken } fro
 import { promptDropEnvironment } from './environmentDialog.js';
 import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
-import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
-
 /** Fallback tile image when no tool/task icon can be resolved. */
 const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
 
@@ -218,11 +210,10 @@ class InteractableManager {
    * @param {object} params.classification
    * @param {{x:number,y:number}} params.point
    * @param {string} [params.environmentId]
-   * @param {object|null} [params.node]
    * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no Tile).
    * @returns {object|null}
    */
-  _buildRegionSpawnRequest({ classification, point, environmentId, node, visualMode = 'marker' } = {}) {
+  _buildRegionSpawnRequest({ classification, point, environmentId, visualMode = 'marker' } = {}) {
     return buildRegionSpawnRequest({
       classification,
       point,
@@ -231,7 +222,6 @@ class InteractableManager {
       width: this._gridSize(),
       height: this._gridSize(),
       gridSize: this._gridSize(),
-      node: node ?? null,
       visualMode,
       buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn)
     });
@@ -284,7 +274,6 @@ class InteractableManager {
       classification,
       point,
       environmentId: environmentId ?? undefined,
-      node: buildInteractableNodeSnapshot(classification.entry ?? null),
       visualMode
     });
     return this._spawnInteractableRegion(spawnRequest);
@@ -685,9 +674,13 @@ class InteractableManager {
    * Local-user body for the `interactableActivationGranted` socket route: open the
    * granted UI on THIS client.
    *
-   *   tool          → SvelteFabricateApp.show('gathering', { activeCanvasTool }).
-   *   gatheringTask → build a region node adapter for the behaviour and
-   *                   show('gathering', { environmentId, taskId, nodeStateOverride }).
+   *   tool          → SvelteFabricateApp.show('crafting', { activeCanvasTool }).
+   *   gatheringTask → SvelteFabricateApp.show('gathering', { environmentId, taskId }).
+   *
+   * A gathering-task interactable is a pure (environment, task) shortcut: it opens
+   * the gathering session scoped to that environment + task and reads/decrements the
+   * SAME environment `nodeRuntime[taskId]` as opening gathering directly. There is
+   * NO per-interactable node override.
    *
    * @param {object} payload  A validated `interactableActivationGranted` payload.
    */
@@ -706,7 +699,10 @@ class InteractableManager {
       if (!activeCanvasTool) {
         return;
       }
-      void AppClass.show('gathering', { activeCanvasTool });
+      // A Tool station belongs to crafting; open the Crafting tab with the active
+      // station tool (the Crafting tab is still a placeholder, so this shows the
+      // placeholder with the active-tool chip in the header).
+      void AppClass.show('crafting', { activeCanvasTool });
       return;
     }
 
@@ -716,18 +712,7 @@ class InteractableManager {
       if (!environmentId || !taskId) {
         return;
       }
-      const behavior = this._resolveBehavior(grant.ref ?? {});
-      const nodeStateOverride = behavior
-        ? createRegionNodeStateAdapter({
-            behavior,
-            emitWrite: emitInteractableBehaviorWrite(behavior),
-            now: () => Number(globalThis.game?.time?.worldTime || 0),
-            secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null),
-            applyLinkedVisual: buildLinkedVisualApply(),
-            ref: grant.ref ?? null
-          })
-        : null;
-      void AppClass.show('gathering', { environmentId, taskId, nodeStateOverride });
+      void AppClass.show('gathering', { environmentId, taskId });
     }
   }
 

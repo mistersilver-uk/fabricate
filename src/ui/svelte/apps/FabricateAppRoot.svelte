@@ -19,7 +19,9 @@
     showAlchemy = false,
     onSelectTab = null,
     services = null,
-    activeCanvasTool = null
+    activeCanvasTool = null,
+    scopedEnvironmentId = null,
+    scopedTaskId = null
   } = $props();
 
   // Load the shared actor-selection state and current gathering conditions once
@@ -69,7 +71,7 @@
       {#each tabs as tab (tab.id)}
         {#if activeTab === tab.id}
           {#if tab.id === 'gathering'}
-            <GatheringView {services} />
+            <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
           {:else}
             <!-- Shared placeholder for the Crafting, (future) Alchemy, Journal,
                  and Inventory tabs. FORWARD-COMPAT NOTE: when the Crafting and

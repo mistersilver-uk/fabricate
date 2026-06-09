@@ -33,8 +33,12 @@ function numberOrNull(value) {
  * behaviour `system` state. Returns the FIRST blocking reason in precedence
  * order, or `{ eligible: true, reason: null }`.
  *
- * Precedence: DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN →
- * NODE_DEPLETED.
+ * Precedence: DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN.
+ *
+ * A gathering-task interactable carries NO per-interactable node pool — node
+ * depletion/respawn is owned by the environment's `nodeRuntime[taskId]`, checked
+ * by the gathering engine when the session is opened — so there is no
+ * NODE_DEPLETED gate here.
  *
  * `isGM` is accepted for future use but eligibility is purely state-based here
  * (authority/override checks live in `validateActivationRequest`).
@@ -64,11 +68,6 @@ export function evaluateActivationEligibility(system, { now, isGM } = {}) {
   const nowNumber = numberOrNull(now);
   if (cdSeconds != null && cdLast != null && nowNumber != null && nowNumber < cdLast + cdSeconds) {
     return blocked('COOLDOWN');
-  }
-
-  if (system?.interactableType === 'gatheringTask' && system?.node) {
-    const current = Number(system.node.current ?? 0);
-    if (!(current > 0)) return blocked('NODE_DEPLETED');
   }
 
   return { eligible: true, reason: null };
@@ -202,7 +201,6 @@ const DENIAL_MESSAGE_KEYS = {
   CONSUMED: `${DENIAL_PREFIX}.Consumed`,
   USES_EXHAUSTED: `${DENIAL_PREFIX}.UsesExhausted`,
   COOLDOWN: `${DENIAL_PREFIX}.Cooldown`,
-  NODE_DEPLETED: `${DENIAL_PREFIX}.NodeDepleted`,
   CANNOT_CONTROL_ACTOR: `${DENIAL_PREFIX}.CannotControl`,
   TOKEN_NOT_INSIDE: `${DENIAL_PREFIX}.NotInside`,
   SOURCE_MISSING: `${DENIAL_PREFIX}.SourceMissing`,
@@ -213,9 +211,14 @@ const DENIAL_MESSAGE_KEYS = {
 /**
  * Describe WHICH tab + context shape the granted player client should open. PURE.
  * The manager fills in the live `activeCanvasTool` (built by `buildActiveCanvasTool`)
- * and the node adapter (`nodeStateOverride`) in 1c — this only encodes the shape.
+ * — this only encodes the shape.
  *
- *   tool          → { tab:'gathering', context:{ activeCanvasTool:null } }
+ * A Tool station belongs to CRAFTING (the active station tool is a virtual-present
+ * crafting tool), so it opens the Crafting tab. The Crafting tab is still a
+ * placeholder, so this shows the placeholder with the active-tool chip in the
+ * header until the Crafting route lands.
+ *
+ *   tool          → { tab:'crafting', context:{ activeCanvasTool:null } }
  *   gatheringTask → { tab:'gathering', context:{ environmentId, taskId } }
  *
  * @param {object} system  The behaviour system (normalized view or raw).
@@ -223,7 +226,7 @@ const DENIAL_MESSAGE_KEYS = {
  */
 export function describeGrant(system) {
   if (system?.interactableType === 'tool') {
-    return { tab: 'gathering', context: { activeCanvasTool: null } };
+    return { tab: 'crafting', context: { activeCanvasTool: null } };
   }
   if (system?.interactableType === 'gatheringTask') {
     return {

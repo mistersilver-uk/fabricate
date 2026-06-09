@@ -841,12 +841,12 @@ test('notifyActivationDenied warns with the mapped key; an unknown reason uses t
     const { warnings } = installFakeFoundry({ isGM: false });
     const manager = new InteractableManager();
 
-    manager.notifyActivationDenied('NODE_DEPLETED');
+    manager.notifyActivationDenied('LOCKED');
     manager.notifyActivationDenied('totally-unknown');
     manager.notifyActivationDenied(null);
 
     assert.deepEqual(warnings, [
-      'FABRICATE.Canvas.Interactable.Denied.NodeDepleted',
+      'FABRICATE.Canvas.Interactable.Denied.Locked',
       'FABRICATE.Canvas.Interactable.Denied.Generic',
       'FABRICATE.Canvas.Interactable.Denied.Generic'
     ]);
@@ -887,7 +887,7 @@ test('validateAndGrant opens LOCALLY when the GM activated their own token (no s
 
 // --- openGrant → SvelteFabricateApp.show -------------------------------------
 
-test('openGrant opens the gathering tab with the tool activeCanvasTool', () => {
+test('openGrant opens the CRAFTING tab with the tool activeCanvasTool', () => {
   const saved = snapshotGlobals();
   try {
     installFakeFoundry({ isGM: false });
@@ -896,35 +896,23 @@ test('openGrant opens the gathering tab with the tool activeCanvasTool', () => {
 
     manager.openGrant({
       grant: {
-        tab: 'gathering', interactableType: 'tool',
+        tab: 'crafting', interactableType: 'tool',
         context: { activeCanvasTool: { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' } }
       }
     });
 
     assert.equal(shows.length, 1);
-    assert.equal(shows[0].tab, 'gathering');
+    assert.equal(shows[0].tab, 'crafting', 'a Tool station opens the Crafting tab');
     assert.deepEqual(shows[0].options.activeCanvasTool, { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' });
   } finally {
     restoreGlobals(saved);
   }
 });
 
-test('openGrant opens a gathering-task session scoped to env+task with a region node adapter', () => {
+test('openGrant opens a gathering-task session scoped to env+task with NO node override (env nodeRuntime is the source of truth)', () => {
   const saved = snapshotGlobals();
   try {
     installFakeFoundry({ isGM: false });
-    const taskSystem = {
-      ...TOOL_SYSTEM, interactableType: 'gatheringTask', toolId: null, taskId: 'task-9', environmentId: 'env-1',
-      sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
-      node: { enabled: true, max: 3, current: 2, respawn: { policy: 'manual' } }
-    };
-    const behavior = interactableBehavior({ system: taskSystem });
-    globalThis.game.scenes = { get: () => ({ regions: { get: () => behavior.parent } }) };
-    behavior.parent.behaviors = { get: () => behavior };
-    globalThis.game.socket = { emit: () => {} };
-    globalThis.game.user = { id: 'u-1', isGM: false };
-    globalThis.game.users = { activeGM: { id: 'gm-1' } };
-
     const shows = [];
     const manager = new InteractableManager({ getAppClass: () => ({ show: (tab, options) => shows.push({ tab, options }) }) });
 
@@ -936,11 +924,10 @@ test('openGrant opens a gathering-task session scoped to env+task with a region 
     });
 
     assert.equal(shows.length, 1);
+    assert.equal(shows[0].tab, 'gathering');
     assert.equal(shows[0].options.environmentId, 'env-1');
     assert.equal(shows[0].options.taskId, 'task-9');
-    assert.equal(typeof shows[0].options.nodeStateOverride?.read, 'function', 'a region node adapter is injected');
-    assert.equal(shows[0].options.nodeStateOverride.read().current, 2);
-    assert.deepEqual(shows[0].options.nodeStateOverride.tileRef(), { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' });
+    assert.equal('nodeStateOverride' in shows[0].options, false, 'no per-interactable node override is injected');
   } finally {
     restoreGlobals(saved);
   }

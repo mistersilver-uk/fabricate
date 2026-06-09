@@ -3,10 +3,14 @@
  * ({@link InteractableConfigRoot}).
  *
  * Kept in a plain `.js` module (no Svelte/ApplicationV2 import chain) so the
- * non-trivial display decisions — the linked-visual status banner, the activation
- * gate summary line, the node count line, and the respawn-ETA formatting — are
- * unit-testable under `node:test` without the Svelte compiler. The component
- * shell imports these and renders their localization keys + fallbacks.
+ * non-trivial display decisions — the linked-visual status banner and the
+ * activation gate summary line — are unit-testable under `node:test` without the
+ * Svelte compiler. The component shell imports these and renders their
+ * localization keys + fallbacks.
+ *
+ * A gathering-task interactable carries NO per-interactable node pool (depletion /
+ * respawn is owned by the environment's `nodeRuntime[taskId]`), so there is no
+ * node count line or respawn-ETA formatting here.
  *
  * Each helper returns a `{ key, fallback, ... }` shape so the component localizes
  * the key and renders the fallback when no translation exists.
@@ -63,23 +67,20 @@ export function describeVisualStatus(linkedVisual) {
 /**
  * Describe the activation gate as a one-line summary key. PURE: folds the
  * behaviour state into the FIRST blocking gate, else "active". Mirrors the
- * Phase-1 `evaluateActivationEligibility` precedence so the panel agrees with what
- * the player sees: DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN →
- * NODE_DEPLETED.
+ * `evaluateActivationEligibility` precedence so the panel agrees with what the
+ * player sees: DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN.
  *
  * COOLDOWN needs the current world time (`ctx.now`) to compare against
- * `cooldown.lastUsedWorldTime + cooldown.seconds`; NODE_DEPLETED reads the node
- * summary (`ctx.node`). Both are optional — omitting them simply skips those
- * gates (so an existing caller that passes only `state` keeps its prior result for
- * the first four gates).
+ * `cooldown.lastUsedWorldTime + cooldown.seconds`; it is optional — omitting it
+ * simply skips that gate (so a caller that passes only `state` keeps its prior
+ * result for the first four gates).
  *
  * @param {object|null} state  The view model's `state` block.
  * @param {object} [ctx]
  * @param {number} [ctx.now]   Current world time (seconds) for the cooldown gate.
- * @param {{ hasNode?: boolean, depleted?: boolean }|null} [ctx.node]  Node summary for the depletion gate.
  * @returns {{ status: string, key: string, fallback: string }}
  */
-export function describeActivationGate(state, { now, node } = {}) {
+export function describeActivationGate(state, { now } = {}) {
   const s = state && typeof state === 'object' ? state : {};
   if (s.enabled === false) {
     return { status: 'disabled', key: 'FABRICATE.Canvas.Interactable.Config.GateDisabled', fallback: 'Disabled' };
@@ -101,63 +102,7 @@ export function describeActivationGate(state, { now, node } = {}) {
   if (cdSeconds != null && cdLast != null && nowNumber != null && nowNumber < cdLast + cdSeconds) {
     return { status: 'cooldown', key: 'FABRICATE.Canvas.Interactable.Config.GateCooldown', fallback: 'On cooldown' };
   }
-  if (node?.hasNode === true && node?.depleted === true) {
-    return { status: 'nodeDepleted', key: 'FABRICATE.Canvas.Interactable.Config.GateNodeDepleted', fallback: 'Depleted' };
-  }
   return { status: 'active', key: 'FABRICATE.Canvas.Interactable.Config.GateActive', fallback: 'Active' };
-}
-
-/**
- * Describe the node count line. PURE: returns the depleted/available key + a
- * fallback. Returns the "no node" line when there is no node.
- *
- * @param {{ hasNode?: boolean, depleted?: boolean } | null} node  The node summary.
- * @returns {{ key: string, fallback: string }}
- */
-export function describeNodeLine(node) {
-  if (!node?.hasNode) {
-    return { key: 'FABRICATE.Canvas.Interactable.Config.NodeUnlimited', fallback: 'Unlimited (no node)' };
-  }
-  if (node.depleted) {
-    return { key: 'FABRICATE.Canvas.Interactable.Config.NodeDepleted', fallback: 'Depleted' };
-  }
-  return { key: 'FABRICATE.Canvas.Interactable.Config.NodeAvailable', fallback: 'Available' };
-}
-
-/**
- * Format a respawn ETA (seconds until) into a compact human string. PURE.
- * Returns null when there is no ETA (manual / at-max / no node).
- *
- * @param {{ secondsUntil?: number } | null} respawnEta
- * @returns {string|null}
- */
-export function formatRespawnEta(respawnEta) {
-  const secondsUntil = numberOrNull(respawnEta?.secondsUntil);
-  if (secondsUntil == null) return null;
-  if (secondsUntil <= 0) return formatDuration(0);
-  return formatDuration(secondsUntil);
-}
-
-/**
- * Format a non-negative duration in seconds as `Nd Nh Nm Ns`, dropping leading
- * zero units (keeps at most the two most significant units). PURE.
- *
- * @param {number} seconds
- * @returns {string}
- */
-function formatDuration(seconds) {
-  const total = Math.max(0, Math.floor(Number(seconds) || 0));
-  if (total === 0) return '0s';
-  const days = Math.floor(total / 86400);
-  const hours = Math.floor((total % 86400) / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  const parts = [];
-  if (days) parts.push(`${days}d`);
-  if (hours) parts.push(`${hours}h`);
-  if (minutes) parts.push(`${minutes}m`);
-  if (secs) parts.push(`${secs}s`);
-  return parts.slice(0, 2).join(' ');
 }
 
 function numberOrNull(value) {

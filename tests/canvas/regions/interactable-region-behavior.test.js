@@ -67,7 +67,8 @@ test('factory builds a subclass whose defineSchema returns the behaviour schema'
   const schema = Class.defineSchema();
   assert.ok(schema.interactableType);
   assert.ok(schema.state);
-  assert.equal(schema.node.kind, 'ObjectField');
+  // A region-first interactable carries no per-interactable node pool.
+  assert.equal('node' in schema, false);
 });
 
 test('defineSchema subscribes to tokenEnter/tokenExit via the base events field', () => {

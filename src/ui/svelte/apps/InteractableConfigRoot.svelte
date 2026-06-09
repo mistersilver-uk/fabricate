@@ -4,11 +4,15 @@
   `fabricate.interactable` Region Behaviour (Phase 2).
 
   It is a THIN VIEW over the injected `services` bag: the panel reads a single
-  view model (`services.summarize()` → `{ view, node, ref }`) computed by the pure
+  view model (`services.summarize()` → `{ view, ref }`) computed by the pure
   `interactableConfigActions` helpers, renders the read-only facts + the editable
   fields, and wires each action button to a `services.*` seam. Every write routes
   through the active-GM behaviour-update edge inside the services bag — the panel
   never mutates a behaviour directly.
+
+  A gathering-task interactable carries NO per-interactable node pool — node
+  depletion/respawn is owned by the environment's `nodeRuntime[taskId]` — so this
+  panel has no resource-node section or restock control.
 
   Editable fields (name, prompt text, hidden, audience, missing-policy) write back
   via `services.updateBehavior(systemPatch)`. The non-trivial view logic (label
@@ -19,9 +23,7 @@
   import { localize } from '../util/foundryBridge.js';
   import {
     describeVisualStatus,
-    describeActivationGate,
-    formatRespawnEta,
-    describeNodeLine
+    describeActivationGate
   } from '../../interactableConfigView.js';
 
   let { services = null } = $props();
@@ -41,16 +43,13 @@
     return services?.summarize?.() ?? null;
   });
   const view = $derived(snapshot?.view ?? null);
-  const node = $derived(snapshot?.node ?? null);
   const worldTime = $derived(snapshot?.now ?? null);
 
   const sourceLabel = $derived.by(() => { void tick; return services?.resolveSourceLabel?.() ?? null; });
   const environmentLabel = $derived.by(() => { void tick; return services?.resolveEnvironmentLabel?.() ?? null; });
 
   const visualStatus = $derived(describeVisualStatus(view?.linkedVisual ?? null));
-  const activationGate = $derived(describeActivationGate(view?.state ?? null, { now: worldTime, node }));
-  const nodeLine = $derived(describeNodeLine(node));
-  const respawnText = $derived(formatRespawnEta(node?.respawnEta ?? null));
+  const activationGate = $derived(describeActivationGate(view?.state ?? null, { now: worldTime }));
 
   // Editable field local state, seeded from the view model.
   let nameDraft = $state('');
@@ -240,25 +239,6 @@
       </label>
     </section>
 
-    <!-- Node state (gathering tasks only) -->
-    {#if node?.hasNode}
-      <section class="fab-ic-section">
-        <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.NodeHeading', 'Resource node')}</h3>
-        <p class="fab-ic-node-line" class:is-depleted={node.depleted}>
-          {text(nodeLine.key, nodeLine.fallback)}
-          <span class="fab-ic-node-count">{node.current} / {node.max}</span>
-        </p>
-        {#if respawnText}
-          <p class="fab-ic-node-eta">{text('FABRICATE.Canvas.Interactable.Config.RespawnEta', 'Next respawn in')} {respawnText}</p>
-        {/if}
-        <div class="fab-ic-actions fab-ic-actions-inline">
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.restockNode?.())}>
-            {text('FABRICATE.Canvas.Interactable.Config.Restock', 'Restock')}
-          </button>
-        </div>
-      </section>
-    {/if}
-
     <!-- Presentation toggles -->
     <section class="fab-ic-section">
       <label class="fab-ic-toggle">
@@ -423,29 +403,6 @@
   .fab-ic-visual-status.is-missing {
     color: var(--fab-warning);
     font-weight: 600;
-  }
-
-  .fab-ic-node-line {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .fab-ic-node-line.is-depleted {
-    color: var(--fab-warning);
-    font-weight: 600;
-  }
-
-  .fab-ic-node-count {
-    font-variant-numeric: tabular-nums;
-    opacity: 0.85;
-  }
-
-  .fab-ic-node-eta {
-    margin: 0;
-    font-size: 0.82rem;
-    opacity: 0.75;
   }
 
   .fab-ic-toggle {

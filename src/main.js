@@ -54,8 +54,7 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
-import { handleInteractableSocketMessage, resolveInteractableNodeStateForRef } from './canvas/interactableSocketBridge.js';
-import { respawnInteractableRegionBehaviors } from './canvas/regions/interactableRegionWorldTime.js';
+import { handleInteractableSocketMessage } from './canvas/interactableSocketBridge.js';
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
 import {
   assignInteractableConfigSheet,
@@ -402,26 +401,6 @@ function localizeGathering(key, data = {}) {
 }
 
 /**
- * Evaluate a dice expression to its integer total via Foundry's `Roll`, returning
- * 0 when `Roll` is unavailable or the expression is invalid. Shared by the
- * per-environment and per-region interactable respawn passes.
- *
- * @param {string} expression
- * @returns {number}
- */
-function rollExpressionTotal(expression) {
-  const RollClass = globalThis.Roll;
-  if (typeof RollClass !== 'function') return 0;
-  try {
-    const roll = new RollClass(String(expression || ''));
-    roll?.evaluateSync?.();
-    return Number(roll?.total ?? 0);
-  } catch (_err) {
-    return 0;
-  }
-}
-
-/**
  * Dispatch startup/updateWorldTime processing for crafting, salvage, and gathering.
  *
  * Gathering timed completion is delegated to the module-internal GatheringEngine;
@@ -443,21 +422,6 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
     {
       label: 'Gathering',
       callback: () => gatheringEngine?.processWorldTime?.(worldTime)
-    },
-    {
-      // Region-first per-behaviour gathering node respawn for placed
-      // `fabricate.interactable` Region Behaviours. Active-GM ONLY so connected
-      // clients never double-apply (gate inside the pass; mirrors the engine's
-      // per-environment respawn, which is primary-GM gated).
-      label: 'InteractableRegions',
-      callback: () => {
-        return respawnInteractableRegionBehaviors({
-          worldTime,
-          isActiveGM: () => game.user === game.users?.activeGM,
-          secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null),
-          rollExpression: (expression) => rollExpressionTotal(expression)
-        });
-      }
     }
   ]));
 }
@@ -578,13 +542,6 @@ class Fabricate {
         showPrompt: showHazardScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
-      // Rebuild a node adapter at TIMED-run maturity from the persisted ref, so an
-      // `onSuccess` decrement lands on the authoritative node (via the GM socket),
-      // not `environment.nodeRuntime[taskId]`. The resolver is widened to accept
-      // either a legacy tile ref ({ sceneId, tileId }) or a region-behaviour ref
-      // ({ sceneId, regionId, behaviorId }); the engine treats the ref as opaque,
-      // so the seam name stays `resolveTileNodeState`.
-      resolveTileNodeState: resolveInteractableNodeStateForRef,
       localize: localizeGathering
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));

@@ -64,7 +64,6 @@ describe('InteractableConfigApp shell', () => {
     assert.ok(appSource.includes('recreateLinkedTile(behavior'), 'recreate creates a replacement tile');
     assert.ok(appSource.includes('recreateLinkedDrawing(behavior'), 'create-drawing-marker uses recreateLinkedDrawing');
     assert.ok(appSource.includes('planClearVisualLink('), 'remove clears the visual link');
-    assert.ok(appSource.includes('planRestock(system)'), 'restock uses the pure planner');
     assert.ok(appSource.includes('planSetEnabled(') && appSource.includes('planSetLocked('), 'enable/lock toggles use the pure planners');
     assert.ok(appSource.includes('region.delete?.()'), 'delete removes the region');
     assert.ok(appSource.includes('applyMissingPolicy('), 'missing-visual recovery reuses applyMissingPolicy');
@@ -132,7 +131,6 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('services?.createReplacementTile?.()'), 'Create replacement tile');
     assert.ok(rootSource.includes('services?.createDrawingMarker?.()'), 'Create drawing marker');
     assert.ok(rootSource.includes('services?.removeVisualMarker?.()'), 'Remove visual marker');
-    assert.ok(rootSource.includes('services?.restockNode?.()'), 'Restock');
     assert.ok(rootSource.includes('services?.setEnabled?.(!view.state.enabled)'), 'Enable/Disable toggle');
     assert.ok(rootSource.includes('services?.setLocked?.(!view.state.locked)'), 'Lock/Unlock toggle');
     assert.ok(rootSource.includes('services?.deleteInteractable?.()'), 'Delete');

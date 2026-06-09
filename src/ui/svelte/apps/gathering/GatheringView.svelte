@@ -22,8 +22,17 @@
     resolveDefaultHazardSelection,
     visibleHazardsFor
   } from './selectionDefault.js';
+  import { resolveScopedGatheringSelection } from './scopedSelection.js';
 
-  let { services = null } = $props();
+  let {
+    services = null,
+    // When a canvas gathering-task interactable is activated, the granted session
+    // opens scoped to one environment + task. These drive the INITIAL selection so
+    // the view navigates straight to that environment and opens that task's detail
+    // (rather than the generic first-attemptable default). Null on a manual open.
+    scopedEnvironmentId = null,
+    scopedTaskId = null
+  } = $props();
 
   // The shared actor-selection store (services.actorBar). Existing tests mount
   // GatheringView with a `services` bag that has no `actorBar`, so EVERY access
@@ -50,6 +59,11 @@
   // most once, and only when the store seed is still empty AND the resolved id
   // is a player character present in the bar's selectable list.
   let backstopApplied = $state(false);
+  // The scope value (`env|task`) most recently applied to the selection, so an
+  // interactable-granted env+task auto-selection applies once per distinct scope
+  // (re-applied when the window re-opens against a different env+task) without
+  // clobbering a subsequent manual navigation within the same session.
+  let appliedScopeKey = $state(null);
 
   // A listing is "populated" only when an actor is selected and at least one
   // environment is present. Missing listing / no selected actor / no
@@ -92,20 +106,38 @@
         rememberedActorId: store?.selectedActorId ?? null
       });
       listing = result ?? null;
-      // Keep a still-valid (non-locked) user selection across re-fetches;
-      // otherwise default to the first selectable env, or null when all locked.
-      selectedId = resolveDefaultSelection(
-        Array.isArray(listing?.environments) ? listing.environments : [],
-        selectedId
-      );
+      const listingEnvironments = Array.isArray(listing?.environments) ? listing.environments : [];
+
+      // Interactable-granted env+task scope: when the session was opened from a
+      // canvas gathering-task interactable, auto-navigate to the scoped environment
+      // and open the scoped task — once per distinct scope (re-applied on re-open
+      // against a different env+task), so a later manual pick within the session is
+      // not clobbered. The scoped env may be present but "locked"; the activation
+      // already validated it, so we select it regardless of the default's
+      // non-locked filter. The pure decision (incl. the "apply once per scope"
+      // gating and the locked-scope override) lives in resolveScopedGatheringSelection.
+      const scopeDecision = resolveScopedGatheringSelection({
+        environments: listingEnvironments,
+        scopedEnvironmentId,
+        scopedTaskId,
+        appliedScopeKey,
+        currentSelectedId: selectedId,
+        currentTaskId: selectedTaskId,
+        defaultResolver: resolveDefaultSelection
+      });
+      appliedScopeKey = scopeDecision.appliedScopeKey;
+      selectedId = scopeDecision.selectedEnvironmentId;
+      if (scopeDecision.switchToTasksTab) activeTab = 'tasks';
 
       // Resolve the task selection against the (possibly changed) selected
       // environment's visible tasks: preserve a still-present pick, else default
       // to the first attemptable task. Mirrors the env selection's explicit
-      // resolution and avoids an $effect write-loop.
-      const resolvedEnvironment = (Array.isArray(listing?.environments) ? listing.environments : [])
+      // resolution and avoids an $effect write-loop. When the scope was just
+      // applied, the decision's task preference is the scoped task (when present
+      // in the env's visible tasks).
+      const resolvedEnvironment = listingEnvironments
         .find(environment => environment?.id === selectedId) ?? null;
-      selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(resolvedEnvironment), selectedTaskId);
+      selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(resolvedEnvironment), scopeDecision.taskPreferenceId);
       // Resolve the hazard selection the same way (preserve a still-present pick,
       // else default to the first hazard) so the Hazards tab inspector is seeded.
       selectedHazardId = resolveDefaultHazardSelection(visibleHazardsFor(resolvedEnvironment), selectedHazardId);
@@ -179,6 +211,20 @@
     // Track the shared selection so a change re-runs this effect.
     void store?.selectedActorId;
     load();
+  });
+
+  // Re-apply the interactable env+task scope when the window is re-opened against a
+  // different gathering-task interactable (the host pushes new scoped ids via
+  // updateProps). A quiet re-load re-runs the scope auto-selection in `load()`
+  // without flashing the spinner. Tracks only the scope key so a manual navigation
+  // within the same session does not re-trigger it.
+  $effect(() => {
+    const scopeKey = scopedEnvironmentId && scopedTaskId
+      ? `${scopedEnvironmentId}|${scopedTaskId}`
+      : null;
+    if (scopeKey && scopeKey !== appliedScopeKey) {
+      load(true);
+    }
   });
 
   // Scene-linked environments unlock when the player navigates to the linked

@@ -55,7 +55,6 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
     'interactableType',
     'linkedVisual',
     'name',
-    'node',
     'presentation',
     'sourceUuid',
     'state',
@@ -78,8 +77,10 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
   }
 
   assert.equal(schema.name.kind, 'StringField');
-  assert.equal(schema.node.kind, 'ObjectField');
-  assert.equal(schema.node.options.nullable, true);
+  // A region-first interactable carries NO per-interactable node pool — the
+  // environment's `nodeRuntime[taskId]` owns depletion/respawn — so there is no
+  // behaviour `node` schema field.
+  assert.equal('node' in schema, false);
 });
 
 test('buildInteractableBehaviorSchema nests presentation/linkedVisual/state/activation with the right choices', () => {
@@ -130,7 +131,7 @@ test('buildInteractableBehaviorSystem applies sane defaults for a tool', () => {
   assert.equal(system.toolId, 't1');
   assert.equal(system.taskId, null);
   assert.equal(system.environmentId, null);
-  assert.equal(system.node, null);
+  assert.equal('node' in system, false, 'no per-interactable node field');
   assert.deepEqual(system.state, {
     enabled: true,
     consumed: false,
@@ -148,22 +149,20 @@ test('buildInteractableBehaviorSystem applies sane defaults for a tool', () => {
   assert.deepEqual(system.presentation, { promptText: null, hidden: false });
 });
 
-test('buildInteractableBehaviorSystem carries the node + environment for a gathering task', () => {
-  const node = { current: 4, max: 5 };
+test('buildInteractableBehaviorSystem carries the environment for a gathering task (no per-interactable node)', () => {
   const system = buildInteractableBehaviorSystem({
     interactableType: 'gatheringTask',
     sourceUuid: 'Fabricate.sys.gatheringTask.task1',
     systemId: 'sys',
     taskId: 'task1',
     environmentId: 'env-7',
-    node,
     presentation: { promptText: 'Mine here', hidden: true },
     linkedVisual: { uuid: 'Scene.s.Tile.t', documentName: 'Tile', mode: 'none', missingPolicy: 'recreate' }
   });
   assert.equal(system.taskId, 'task1');
   assert.equal(system.toolId, null);
   assert.equal(system.environmentId, 'env-7');
-  assert.deepEqual(system.node, node);
+  assert.equal('node' in system, false, 'no per-interactable node field');
   assert.deepEqual(system.presentation, { promptText: 'Mine here', hidden: true });
   assert.deepEqual(system.linkedVisual, {
     uuid: 'Scene.s.Tile.t',
@@ -173,14 +172,13 @@ test('buildInteractableBehaviorSystem carries the node + environment for a gathe
   });
 });
 
-test('buildInteractableBehaviorSystem drops a node for a tool and rejects bad input', () => {
+test('buildInteractableBehaviorSystem never emits a node and rejects bad input', () => {
   const system = buildInteractableBehaviorSystem({
     interactableType: 'tool',
     sourceUuid: 'Fabricate.sys.tool.t1',
-    systemId: 'sys',
-    node: { current: 3 }
+    systemId: 'sys'
   });
-  assert.equal(system.node, null);
+  assert.equal('node' in system, false, 'no per-interactable node field');
   assert.throws(() => buildInteractableBehaviorSystem({ interactableType: 'nope', sourceUuid: 'x' }));
   assert.throws(() => buildInteractableBehaviorSystem({ interactableType: 'tool', sourceUuid: '  ' }));
 });
@@ -192,8 +190,7 @@ test('readInteractableBehaviorSystem round-trips a built system on a fake behavi
     systemId: 'sys',
     taskId: 'task1',
     environmentId: 'env-1',
-    name: 'Iron Vein',
-    node: { current: 4 }
+    name: 'Iron Vein'
   });
   const behavior = { type: 'fabricate.interactable', system };
   const view = readInteractableBehaviorSystem(behavior);
@@ -201,7 +198,7 @@ test('readInteractableBehaviorSystem round-trips a built system on a fake behavi
   assert.equal(view.taskId, 'task1');
   assert.equal(view.environmentId, 'env-1');
   assert.equal(view.name, 'Iron Vein');
-  assert.deepEqual(view.node, { current: 4 });
+  assert.equal('node' in view, false, 'the reader does not surface a per-interactable node');
   assert.equal(view.state.enabled, true);
   assert.equal(view.activation.trigger, 'regionEnter');
 });

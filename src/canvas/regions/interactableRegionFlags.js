@@ -20,7 +20,6 @@
  *   presentation : { promptText:string|null, hidden:boolean }
  *   linkedVisual : { uuid:string|null, documentName:'Tile'|'Drawing'|'Token'|null,
  *                    mode:'marker'|'none', missingPolicy:'ignore'|'warn'|'recreate' }
- *   node         : object|null            // gatheringTask only; normalizeNodeConfig shape
  *   state        : { enabled, consumed, locked,
  *                    uses:{ max:number|null, used:number },
  *                    cooldown:{ seconds:number|null, lastUsedWorldTime:number|null } }
@@ -68,8 +67,7 @@ export function buildInteractableBehaviorSchema(fields) {
     StringField,
     BooleanField,
     NumberField,
-    SchemaField,
-    ObjectField
+    SchemaField
   } = fields;
 
   return {
@@ -112,9 +110,6 @@ export function buildInteractableBehaviorSchema(fields) {
         choices: [...LINKED_VISUAL_MISSING_POLICIES]
       })
     }),
-
-    // gatheringTask only; opaque normalized node config (normalizeNodeConfig shape).
-    node: new ObjectField({ required: false, nullable: true, initial: null }),
 
     state: new SchemaField({
       enabled: new BooleanField({ initial: true }),
@@ -161,7 +156,6 @@ export function buildInteractableBehaviorSchema(fields) {
  * @param {string} [spawnRequest.taskId]
  * @param {string} [spawnRequest.environmentId]
  * @param {string} [spawnRequest.name]
- * @param {object|null} [spawnRequest.node]
  * @param {object} [spawnRequest.presentation]
  * @param {object} [spawnRequest.linkedVisual]
  * @returns {object} The behaviour `system` data object.
@@ -175,7 +169,6 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
     taskId,
     environmentId,
     name,
-    node,
     presentation,
     linkedVisual
   } = spawnRequest;
@@ -210,7 +203,6 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
         ? linkedVisual.missingPolicy
         : 'warn'
     },
-    node: interactableType === 'gatheringTask' && node !== undefined && node !== null ? node : null,
     state: {
       enabled: true,
       consumed: false,
@@ -277,7 +269,6 @@ export function readInteractableBehaviorSystem(behavior) {
         ? linkedVisual.missingPolicy
         : 'warn'
     },
-    node: system.node !== undefined && system.node !== null ? system.node : null,
     state: {
       enabled: state.enabled !== false,
       consumed: state.consumed === true,

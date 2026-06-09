@@ -124,6 +124,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/ui/svelte/util/foundryBridge.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
+    copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
     // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
     // formatter, which imports the foundryCalendar helpers.

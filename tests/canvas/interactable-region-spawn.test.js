@@ -91,13 +91,11 @@ test('buildRegionSpawnRequest (tool) shapes region geometry + behaviour system +
   assert.equal(request.tile.y, 200); // 250 - 50
 });
 
-test('buildRegionSpawnRequest (gatheringTask) carries environmentId + node into the behaviour system', () => {
-  const node = { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } };
+test('buildRegionSpawnRequest (gatheringTask) carries environmentId into the behaviour system (no per-interactable node)', () => {
   const request = buildRegionSpawnRequest({
     classification: taskClassification(),
     point: { x: 0, y: 0 },
     environmentId: 'env-1',
-    node,
     gridSize: 100,
     buildBehaviorSystem: builder
   });
@@ -109,7 +107,7 @@ test('buildRegionSpawnRequest (gatheringTask) carries environmentId + node into 
   assert.equal(request.behaviorSystem.taskId, 'task-9');
   assert.equal(request.behaviorSystem.toolId, null);
   assert.equal(request.behaviorSystem.environmentId, 'env-1');
-  assert.deepEqual(request.behaviorSystem.node, node, 'the node snapshot is threaded into the behaviour system');
+  assert.equal('node' in request.behaviorSystem, false, 'no per-interactable node is seeded on the behaviour');
 
   // CONCENTRIC: a gathering-task region rect coincides with its tile rect too.
   assert.equal(request.region.shape.x, request.tile.x);
@@ -172,13 +170,11 @@ test('buildRegionSpawnRequest (visualMode none) → hidden + linkedVisual.mode n
   assert.equal(request.tile, null, 'tile is null for the no-marker variant');
 });
 
-test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the node + env', () => {
-  const node = { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } };
+test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the env (no per-interactable node)', () => {
   const request = buildRegionSpawnRequest({
     classification: taskClassification(),
     point: { x: 0, y: 0 },
     environmentId: 'env-1',
-    node,
     visualMode: 'none',
     gridSize: 100,
     buildBehaviorSystem: builder
@@ -187,7 +183,7 @@ test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the n
   assert.equal(request.behaviorSystem.presentation.hidden, true);
   assert.equal(request.behaviorSystem.linkedVisual.mode, 'none');
   assert.equal(request.behaviorSystem.environmentId, 'env-1', 'env still resolved');
-  assert.deepEqual(request.behaviorSystem.node, node, 'node snapshot still threaded');
+  assert.equal('node' in request.behaviorSystem, false, 'no per-interactable node is seeded on the behaviour');
 });
 
 test('buildRegionSpawnRequest defaults to the with-marker path (mode marker, tile present)', () => {

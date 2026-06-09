@@ -25,11 +25,8 @@ import {
   routeInteractableActivationDenied
 } from './interactableSocket.js';
 import {
-  createRegionNodeStateAdapter,
   identifyRegionBehaviorRef
 } from './regions/interactableRegionNodeAdapter.js';
-import { applyLinkedVisualDepleted } from './linkedVisuals/linkedInteractableVisual.js';
-import { secondsPerUnitFromCalendar } from '../systems/foundryCalendar.js';
 
 /** Whether this client is the primary (active) GM. */
 function isActiveGM() {
@@ -169,27 +166,10 @@ export function emitInteractableVisualDelete({ sceneId, visualUuid, documentName
 }
 
 /**
- * Build the GM-routed linked-visual depleted applier seam:
- * `({ behaviorSystem, depleted }) => void`. It reflects the behaviour's depleted
- * state onto the linked visual, routing the visual update/delete through the
- * active GM (local apply on the GM, socket emit otherwise).
- *
- * @returns {(args: { behaviorSystem: object, depleted: boolean }) => (void|Promise<void>)}
- */
-export function buildLinkedVisualApply() {
-  return ({ behaviorSystem, depleted } = {}) => applyLinkedVisualDepleted({
-    behaviorSystem,
-    depleted,
-    emitVisualUpdate: emitInteractableVisualUpdate,
-    emitVisualDelete: emitInteractableVisualDelete
-  });
-}
-
-/**
  * Build the `emitWrite(update)` seam for one region behaviour: it identifies the
- * behaviour ref and routes the `{ system: { node } }` (or other) update through
- * the GM (local apply on the active GM, socket emit otherwise). Used by the
- * region node adapter.
+ * behaviour ref and routes a behaviour `system` update through the GM (local apply
+ * on the active GM, socket emit otherwise). Used by the GM config panel for state /
+ * visual-link writes.
  *
  * @param {object} behavior The live `fabricate.interactable` Region Behaviour.
  * @returns {(update: object) => (void|Promise<void>)}
@@ -210,49 +190,6 @@ export function emitInteractableBehaviorWrite(behavior) {
       update
     });
   };
-}
-
-/**
- * Rebuild a region behaviour node-state adapter from a persisted
- * `{ sceneId, regionId, behaviorId }` ref. Used when a TIMED gathering waiting
- * run started from a placed interactable REGION matures: the adapter cannot
- * survive run-record serialization, so it is reconstructed here (on the active
- * GM) so the maturity decrement lands on the behaviour `system.node`.
- *
- * Returns null when the behaviour can no longer be resolved.
- *
- * @param {{ sceneId: string, regionId: string, behaviorId: string }} ref
- * @returns {object|null}
- */
-export function resolveRegionNodeStateForRef({ sceneId, regionId, behaviorId } = {}) {
-  const behavior = resolveRegionBehavior({ sceneId, regionId, behaviorId });
-  if (!behavior) return null;
-  return createRegionNodeStateAdapter({
-    behavior,
-    emitWrite: emitInteractableBehaviorWrite(behavior),
-    now: () => Number(globalThis.game?.time?.worldTime || 0),
-    secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, globalThis.game?.time?.calendar ?? null),
-    applyLinkedVisual: buildLinkedVisualApply(),
-    ref: { sceneId: String(sceneId), regionId: String(regionId), behaviorId: String(behaviorId) }
-  });
-}
-
-/**
- * Node-ref resolver injected into the gathering engine as
- * `resolveTileNodeState`. The engine treats the ref as opaque
- * (`economyEvidence.tileNodeRef`); to avoid rippling into the engine /
- * run-records, the seam name is kept while the payload is the region ref
- * `{ sceneId, regionId, behaviorId }`. (The legacy tile ref `{ sceneId, tileId }`
- * no longer occurs — there is no released tile-click data.)
- *
- * @param {object} ref
- * @returns {object|null}
- */
-export function resolveInteractableNodeStateForRef(ref = {}) {
-  if (ref && ref.regionId && ref.behaviorId) {
-    return resolveRegionNodeStateForRef(ref);
-  }
-  return null;
 }
 
 /**

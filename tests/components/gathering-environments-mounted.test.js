@@ -105,6 +105,15 @@ describe('GatheringView mounted behavior', () => {
       readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js'), 'utf8')
     );
 
+    // GatheringView also imports the pure scoped-selection helper (interactable
+    // env+task auto-select); copy it into the temp tree so the compiled component
+    // can resolve it at import time.
+    const scopedSelectionDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js');
+    writeFileSync(
+      scopedSelectionDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js'), 'utf8')
+    );
+
     // LinkedScene (in the detail tree) imports the scene-image helper.
     const sceneImagesDestination = join(tempRoot, 'src/ui/svelte/util/sceneImages.js');
     mkdirSync(dirname(sceneImagesDestination), { recursive: true });

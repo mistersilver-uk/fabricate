@@ -52,7 +52,7 @@ describe('Fabricate app wiring for the gathering tab', () => {
     assert.ok(rootSource.includes("import GatheringView from './gathering/GatheringView.svelte'"), 'root should import GatheringView');
     assert.ok(rootSource.includes('services = null'), 'root should accept a services prop');
     assert.ok(rootSource.includes("tab.id === 'gathering'"), 'root should branch on the gathering tab');
-    assert.ok(rootSource.includes('<GatheringView {services} />'), 'root should render GatheringView with services');
+    assert.ok(rootSource.includes('<GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />'), 'root should render GatheringView with services + the scoped env/task');
     assert.ok(rootSource.includes('fabricate-app-placeholder'), 'other tabs should keep the placeholder');
   });
 });
