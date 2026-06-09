@@ -142,6 +142,39 @@ test('renderDialog without DialogV2 returns null', () => {
   assert.equal(result, null);
 });
 
+test('renderDialog namespaces the dialog (.fabricate-dialog) and gives it a sensible width', () => {
+  let captured = null;
+  class FakeDialogV2 {
+    constructor(opts) { this.opts = opts; captured = opts; }
+    render() { return this; }
+  }
+  globalThis.foundry = {
+    applications: { api: { DialogV2: FakeDialogV2 } },
+    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) }
+  };
+  renderDialog({ title: 'Hello', buttons: [{ action: 'ok', label: 'OK', default: true }] });
+  assert.ok(captured.classes.includes('fabricate'), 'carries the .fabricate root class');
+  assert.ok(captured.classes.includes('fabricate-dialog'), 'carries the .fabricate-dialog class for button CSS');
+  assert.ok(Number(captured.position?.width) >= 360, 'default width fits a multi-button row');
+  delete globalThis.foundry;
+});
+
+test('renderDialog respects an explicit caller width + does not duplicate classes', () => {
+  let captured = null;
+  class FakeDialogV2 {
+    constructor(opts) { this.opts = opts; captured = opts; }
+    render() { return this; }
+  }
+  globalThis.foundry = {
+    applications: { api: { DialogV2: FakeDialogV2 } },
+    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) }
+  };
+  renderDialog({ title: 'Hello', classes: ['fabricate'], position: { width: 600 } });
+  assert.equal(captured.position.width, 600, 'explicit width is preserved');
+  assert.equal(captured.classes.filter((c) => c === 'fabricate').length, 1, 'no duplicate fabricate class');
+  delete globalThis.foundry;
+});
+
 // --- choiceDialog ---
 
 const CHOICES = [

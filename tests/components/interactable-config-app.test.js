@@ -11,11 +11,14 @@
  * recreate, remove, restock, enable/lock, delete), and the factory registration.
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { emitInteractableBehaviorWrite } from '../../src/canvas/interactableSocketBridge.js';
+import { planSetEnabled, planSetLocked } from '../../src/canvas/regions/interactableConfigActions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
@@ -51,7 +54,11 @@ describe('InteractableConfigApp shell', () => {
     // The panel must not call behavior.update(...) directly; all writes go through
     // emitInteractableBehaviorWrite (local apply on the active GM, socket emit
     // otherwise) or the active-GM-routed applier seams.
-    assert.ok(appSource.includes('emitInteractableBehaviorWrite(behavior)(systemPatch)'), 'writeBehavior routes through the GM writer');
+    // writeBehavior wraps system-CONTENTS under `system` exactly once — a
+    // RegionBehavior.update needs `{ system: ... }` or the write silently no-ops
+    // (BUG: Disable/Lock never persisted). The relink/recreate seams wrap
+    // separately and must NOT route through writeBehavior.
+    assert.ok(appSource.includes('emitInteractableBehaviorWrite(behavior)({ system: systemPatch })'), 'writeBehavior wraps the system patch under { system }');
     assert.ok(!/behavior\.update\(/.test(appSource), 'no direct behavior.update(...) client mutation');
     assert.ok(appSource.includes('applyInteractableBehaviorUpdate'), 'relink/recreate route the GM behaviour-update edge');
   });
@@ -110,6 +117,55 @@ describe('InteractableConfigApp shell', () => {
   });
 });
 
+describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)', () => {
+  afterEach(() => {
+    delete globalThis.game;
+  });
+
+  // Build a fake RegionBehavior wired into a fake scene→region→behaviour graph so
+  // `emitInteractableBehaviorWrite` (the App's write seam) resolves + applies it
+  // locally as the active GM. `update` records the exact shape it received — the
+  // contract the App's `writeBehavior({ system: systemPatch })` wrap depends on.
+  function fakeBehaviorGraph() {
+    const updates = [];
+    const behavior = {
+      id: 'beh1',
+      type: 'fabricate.interactable',
+      update: async (data) => { updates.push(data); }
+    };
+    const region = { id: 'reg1', behaviors: { get: (id) => (id === 'beh1' ? behavior : null) } };
+    const scene = { id: 'scn1', regions: { get: (id) => (id === 'reg1' ? region : null) } };
+    behavior.parent = region;
+    region.parent = scene;
+    const user = {};
+    globalThis.game = {
+      user,
+      users: { activeGM: user },
+      scenes: { get: (id) => (id === 'scn1' ? scene : null) },
+      socket: { emit: () => { throw new Error('must not emit when active GM'); } }
+    };
+    return { behavior, updates };
+  }
+
+  it('setEnabled composes planSetEnabled → behavior.update({ system: { state: { enabled } } })', async () => {
+    const { behavior, updates } = fakeBehaviorGraph();
+    // The App's setEnabled does: writeBehavior(planSetEnabled(system, false).system)
+    // and writeBehavior wraps once under `system`.
+    const patch = planSetEnabled({ interactableType: 'gatheringTask', state: { enabled: true } }, false);
+    assert.ok(patch, 'planner returns a patch for a real value change');
+    await emitInteractableBehaviorWrite(behavior)({ system: patch.system });
+    assert.deepEqual(updates, [{ system: { state: { enabled: false } } }], 'wrapped under system, not raw state');
+  });
+
+  it('setLocked composes planSetLocked → behavior.update({ system: { state: { locked } } })', async () => {
+    const { behavior, updates } = fakeBehaviorGraph();
+    const patch = planSetLocked({ interactableType: 'gatheringTask', state: { locked: false } }, true);
+    assert.ok(patch, 'planner returns a patch for a real value change');
+    await emitInteractableBehaviorWrite(behavior)({ system: patch.system });
+    assert.deepEqual(updates, [{ system: { state: { locked: true } } }], 'wrapped under system, not raw state');
+  });
+});
+
 describe('InteractableConfigRoot body', () => {
   it('renders from the injected services summary (thin view)', () => {
     assert.ok(rootSource.includes('services?.summarize?.()'), 'reads the summary view model from services');
@@ -161,5 +217,33 @@ describe('InteractableConfigRoot body', () => {
   it('namespaces its CSS under the .fabricate-interactable-config root', () => {
     assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'root element carries the namespaced class');
     assert.ok(rootSource.includes('.fab-ic-'), 'component classes are fab-ic-* scoped');
+  });
+
+  it('shows the live disabled/locked state on the toggle buttons (aria-pressed + is-active)', () => {
+    assert.ok(rootSource.includes('fab-ic-btn-toggle'), 'toggle buttons carry a togglable class');
+    assert.ok(rootSource.includes('class:is-active={view.state.enabled === false}'), 'Disable button reads active when disabled');
+    assert.ok(rootSource.includes('class:is-active={view.state.locked === true}'), 'Lock button reads active when locked');
+    assert.ok(rootSource.includes('aria-pressed={view.state.enabled === false}'), 'Disable button exposes aria-pressed');
+    assert.ok(rootSource.includes('aria-pressed={view.state.locked === true}'), 'Lock button exposes aria-pressed');
+    // The active treatment uses theme tokens (no literal colours).
+    assert.ok(rootSource.includes('.fab-ic-btn-toggle.is-active'), 'styles the active toggle state');
+    assert.ok(/\.fab-ic-btn-toggle\.is-active\s*\{[^}]*var\(--fab-accent/.test(rootSource), 'active treatment uses themed accent token');
+  });
+
+  it('renders the read-only facts as an inline grid and labels the gate "Status"', () => {
+    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.StatusLabel'), 'uses the Status label key (renamed from Activation)');
+    assert.ok(!rootSource.includes('FABRICATE.Canvas.Interactable.Config.ActivationLabel'), 'no longer references the Activation label key');
+    // Grid layout: 3 columns with the environment fact, 2 without — driven by a
+    // class toggle, with a min-width container collapse for narrow panels.
+    assert.ok(rootSource.includes("class:has-environment={view.interactableType === 'gatheringTask'}"), 'environment presence toggles the grid columns');
+    assert.ok(/\.fab-ic-fact-list\s*\{[\s\S]*?display:\s*grid/.test(rootSource), 'fact list is a grid (inline columns), not a vertical stack');
+    assert.ok(rootSource.includes('repeat(3, minmax(0, 1fr))'), '3 columns when the environment fact is present');
+    // dt/dd semantics preserved.
+    assert.ok(rootSource.includes('<dt>') && rootSource.includes('<dd>'), 'keeps dt/dd fact semantics');
+  });
+
+  it('rewords the prompt placeholder away from "toast" jargon', () => {
+    assert.ok(!/PromptPlaceholder[^)]*toast/i.test(rootSource), 'no "toast" jargon in the prompt placeholder fallback');
+    assert.ok(rootSource.includes('Shown to players in the interaction prompt'), 'plain-language prompt placeholder fallback');
   });
 });

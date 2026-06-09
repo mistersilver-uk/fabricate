@@ -124,8 +124,8 @@
 
   // Tab button refs so roving keyboard nav can move DOM focus to the newly
   // selected tab (WAI-ARIA roving-tabindex pattern).
-  let toolsTabEl = null;
-  let tasksTabEl = null;
+  let toolsTabEl = $state(null);
+  let tasksTabEl = $state(null);
 
   function focusActiveTab() {
     const el = activeTab === 'tools' ? toolsTabEl : tasksTabEl;

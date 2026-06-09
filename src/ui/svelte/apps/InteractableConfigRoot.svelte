@@ -132,15 +132,17 @@
           bind:value={promptDraft}
           onchange={commitPrompt}
           onblur={commitPrompt}
-          placeholder={text('FABRICATE.Canvas.Interactable.Config.PromptPlaceholder', 'Shown to players on the toast')}
+          placeholder={text('FABRICATE.Canvas.Interactable.Config.PromptPlaceholder', 'Shown to players in the interaction prompt')}
           aria-label={text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}
         />
       </label>
     </section>
 
-    <!-- Read-only facts -->
+    <!-- Read-only facts: an inline row — Linked task | Environment | Status. The
+         Environment fact is omitted for a tool interactable, so the grid lays out
+         as 3 columns when it is present and 2 columns when it is absent. -->
     <section class="fab-ic-section fab-ic-facts">
-      <dl class="fab-ic-fact-list">
+      <dl class="fab-ic-fact-list" class:has-environment={view.interactableType === 'gatheringTask'}>
         <div class="fab-ic-fact">
           <dt>{view.interactableType === 'tool'
             ? text('FABRICATE.Canvas.Interactable.Config.ToolLabel', 'Linked tool')
@@ -163,7 +165,7 @@
           </div>
         {/if}
         <div class="fab-ic-fact">
-          <dt>{text('FABRICATE.Canvas.Interactable.Config.ActivationLabel', 'Activation')}</dt>
+          <dt>{text('FABRICATE.Canvas.Interactable.Config.StatusLabel', 'Status')}</dt>
           <dd><span class="fab-ic-fact-muted">{text(activationGate.key, activationGate.fallback)}</span></dd>
         </div>
       </dl>
@@ -276,14 +278,28 @@
       </button>
     </section>
 
-    <!-- State toggle row -->
+    <!-- State toggle row. The Disable / Lock buttons carry an `is-active`
+         (and aria-pressed) treatment when the interactable is currently
+         disabled / locked so the GM sees the live state at a glance. -->
     <section class="fab-ic-section fab-ic-actions">
-      <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}>
+      <button
+        type="button"
+        class="fab-ic-btn fab-ic-btn-toggle"
+        class:is-active={view.state.enabled === false}
+        aria-pressed={view.state.enabled === false}
+        onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
+      >
         {view.state.enabled
           ? text('FABRICATE.Canvas.Interactable.Config.Disable', 'Disable')
           : text('FABRICATE.Canvas.Interactable.Config.Enable', 'Enable')}
       </button>
-      <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.setLocked?.(!view.state.locked))}>
+      <button
+        type="button"
+        class="fab-ic-btn fab-ic-btn-toggle"
+        class:is-active={view.state.locked === true}
+        aria-pressed={view.state.locked === true}
+        onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
+      >
         {view.state.locked
           ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
           : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
@@ -352,17 +368,35 @@
     opacity: 0.7;
   }
 
+  /* Inline facts row: Linked task | Environment | Status. Two columns by
+     default (tool: no Environment fact); three when the Environment fact is
+     present. `minmax(0, 1fr)` lets long values truncate/wrap inside their cell
+     instead of overflowing the panel on a narrow window. */
   .fab-ic-fact-list {
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem 0.75rem;
+    align-items: start;
+  }
+
+  .fab-ic-fact-list.has-environment {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Collapse to a single column on a narrow panel so cells never overflow. */
+  @container (max-width: 22rem) {
+    .fab-ic-fact-list,
+    .fab-ic-fact-list.has-environment {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .fab-ic-fact {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
+    min-width: 0;
   }
 
   .fab-ic-fact dt {
@@ -372,12 +406,21 @@
     opacity: 0.6;
   }
 
+  .fab-ic-facts {
+    container-type: inline-size;
+  }
+
   .fab-ic-fact dd {
     margin: 0;
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .fab-ic-fact-name {
+    overflow-wrap: anywhere;
   }
 
   .fab-ic-fact-id {
@@ -436,6 +479,16 @@
   }
 
   .fab-ic-btn-primary {
+    font-weight: 600;
+  }
+
+  /* Active-state treatment for the Disable / Lock toggles: when the interactable
+     is currently disabled / locked the button reads as "on" (themed accent fill,
+     not a literal colour) so the GM sees the live state at a glance. */
+  .fab-ic-btn-toggle.is-active {
+    background: var(--fab-accent-soft);
+    border-color: var(--fab-accent);
+    color: var(--fab-accent-strong);
     font-weight: 600;
   }
 

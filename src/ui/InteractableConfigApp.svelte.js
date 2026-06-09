@@ -116,11 +116,16 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
     // The GM-routed behaviour-update writer: local apply on the active GM, socket
     // emit otherwise. The panel is GM-only, so the GM is normally the active GM
     // and this is a local apply — but route through the same seam for correctness.
+    // `writeBehavior` is passed system-CONTENTS (e.g. `{ state: { enabled } }`,
+    // `{ presentation: {...} }`) and a RegionBehavior document needs its system
+    // data wrapped under `system`, so wrap ONCE here. The relink/recreate seams
+    // wrap separately (`applyBehaviorUpdate({ update: { system: patch } })`) and
+    // must NOT route through here.
     const writeBehavior = (systemPatch) => {
       const ref = this._ref;
       const behavior = this._resolveBehavior();
       if (!ref || !behavior || !systemPatch) return undefined;
-      return emitInteractableBehaviorWrite(behavior)(systemPatch);
+      return emitInteractableBehaviorWrite(behavior)({ system: systemPatch });
     };
 
     return {

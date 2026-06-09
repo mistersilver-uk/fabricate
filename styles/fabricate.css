@@ -9833,3 +9833,31 @@
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
+
+/* ==========================================
+   Fabricate confirm dialogs (DialogV2)
+   ==========================================
+   Multi-button confirm dialogs (e.g. "Remove visual marker", "Delete
+   interactable") built via the `choiceDialog` → `renderDialog` bridge carry the
+   `.fabricate-dialog` class. DialogV2's default button row crushes 3 buttons
+   into a too-narrow strip, so long labels like "Unlink + delete marker" wrap
+   mid-word or clip. Let the buttons size to their content and wrap to a clean
+   column on a narrow dialog instead of truncating, with adequate padding. All
+   selectors are namespaced under `.fabricate-dialog` so nothing bleeds. */
+.fabricate-dialog .form-footer,
+.fabricate-dialog .dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: stretch;
+}
+
+.fabricate-dialog .form-footer button,
+.fabricate-dialog .dialog-buttons button {
+  flex: 1 1 auto;
+  min-width: max-content;
+  white-space: normal;
+  overflow-wrap: break-word;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  line-height: 1.2;
+}
