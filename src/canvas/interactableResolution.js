@@ -185,76 +185,6 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
 }
 
 /**
- * LEGACY (pre-region-first) standalone-tile spawn shaper. Superseded by
- * {@link buildRegionSpawnRequest}, which shapes the Scene Region + nested
- * `fabricate.interactable` behaviour + linked marker the manager actually spawns;
- * the manager no longer calls this builder. Retained only for the unit tests that
- * pin the legacy flag/geometry shape.
- *
- * Shape the data needed to spawn a standalone interactable TILE from a classified
- * drop. Pure: returns the flag-build args plus the placement geometry; the caller
- * wires the actual TileDocument creation (and resolves the icon `texture`/grid
- * `width`/`height` at the Foundry edge, passing them in here).
- *
- * The request carries:
- *  - `name`: the tool's label or the task's name, stored in the tile flag for the
- *    hover tooltip (a tile has no nameplate) and resolution.
- *  - `texture`: the icon path for the tile image (`texture.src`), resolved by the
- *    caller from the tool's component img / the task img with a sensible default.
- *  - `width`/`height`: the tile dimensions (default one grid square), resolved by
- *    the caller from the scene grid.
- *  - `node` (gatheringTask only): a SNAPSHOT of the task's node CONFIG (built via
- *    `buildNode`), carrying both config and runtime, or `null` for an unlimited
- *    (never-depleting) node. Tool requirements are NOT snapshotted — they resolve
- *    live from `task.toolIds`.
- *  - `environmentId` (gatheringTask only): the resolved drop environment.
- *
- * @param {object} params
- * @param {ReturnType<typeof classifyInteractableDrop>} params.classification
- * @param {{x: number, y: number}} [params.point]   Drop point in scene coordinates.
- * @param {string} [params.environmentId]           Resolved environment (gatheringTask only).
- * @param {string} [params.texture]                 Tile image path (`texture.src`).
- * @param {number} [params.width]                   Tile width (scene units).
- * @param {number} [params.height]                  Tile height (scene units).
- * @param {(task: object) => (object|null)} [params.buildNode] Node-snapshot builder
- *   applied to the classified task entry (gatheringTask only).
- * @returns {{ interactableType: string, sourceUuid: string, environmentId?: string,
- *   name?: string, texture?: string, width?: number, height?: number,
- *   node?: object, x: number, y: number } | null}
- */
-export function buildSpawnRequest({ classification, point, environmentId, texture, width, height, buildNode } = {}) {
-  if (!classification) return null;
-  const request = {
-    interactableType: classification.interactableType,
-    sourceUuid: classification.sourceUuid,
-    x: Number(point?.x ?? 0),
-    y: Number(point?.y ?? 0)
-  };
-
-  // The hover-tooltip name comes from the task name or the tool label/name.
-  const entry = classification.entry ?? null;
-  const name = typeof entry?.name === 'string' && entry.name.trim()
-    ? entry.name.trim()
-    : (typeof entry?.label === 'string' ? entry.label.trim() : '');
-  if (name) request.name = name;
-
-  if (typeof texture === 'string' && texture.trim()) request.texture = texture.trim();
-  if (Number.isFinite(Number(width)) && Number(width) > 0) request.width = Number(width);
-  if (Number.isFinite(Number(height)) && Number(height) > 0) request.height = Number(height);
-
-  if (classification.interactableType === 'gatheringTask') {
-    if (typeof environmentId === 'string' && environmentId) {
-      request.environmentId = environmentId;
-    }
-    if (typeof buildNode === 'function') {
-      const node = buildNode(entry);
-      if (node) request.node = node;
-    }
-  }
-  return request;
-}
-
-/**
  * Shape the data needed to spawn a region-first interactable from a classified
  * drop. PURE: returns everything the manager needs to create (a) a Scene Region
  * (a small rectangle centered on the drop point), (b) the nested
@@ -374,9 +304,6 @@ export function buildRegionSpawnRequest({
     sourceUuid: classification.sourceUuid,
     name: resolvedName,
     environmentId: resolvedEnvironmentId,
-    // TODO(diagnostic): drop-point passthrough for the placement-coordinate warn
-    // in `_spawnInteractableRegion`. Remove once placement is confirmed.
-    __point: { x: cx, y: cy },
     region: {
       name: resolvedName || classification.sourceUuid,
       shape: {

@@ -362,16 +362,6 @@ class InteractableManager {
     // + `presentation.hidden=true`, so there is NO Tile to create, no orphan, and
     // no linked-visual ref to write back — the Region itself is the interactable.
     if (!tile) {
-      // TODO(diagnostic): remove once placement confirmed
-      console.warn('Fabricate | placed interactable', {
-        point: spawnRequest?.__point ?? null,
-        tile: null,
-        regionShapeCreated: { x, y, width, height },
-        liveRegionShape: regionDoc?.shapes?.[0]
-          ? { x: regionDoc.shapes[0].x, y: regionDoc.shapes[0].y, w: regionDoc.shapes[0].width, h: regionDoc.shapes[0].height, type: regionDoc.shapes[0].type }
-          : null,
-        liveTile: null
-      });
       return regionDoc;
     }
 
@@ -408,17 +398,6 @@ class InteractableManager {
       this._notifySpawnFailure();
       return null;
     }
-
-    // TODO(diagnostic): remove once placement confirmed
-    console.warn('Fabricate | placed interactable', {
-      point: spawnRequest?.__point ?? null,
-      tile: tile ? { x: tile.x, y: tile.y, w: tile.width, h: tile.height } : null,
-      regionShapeCreated: { x, y, width, height },
-      liveRegionShape: regionDoc?.shapes?.[0]
-        ? { x: regionDoc.shapes[0].x, y: regionDoc.shapes[0].y, w: regionDoc.shapes[0].width, h: regionDoc.shapes[0].height, type: regionDoc.shapes[0].type }
-        : null,
-      liveTile: tileDoc ? { x: tileDoc.x, y: tileDoc.y, w: tileDoc.width, h: tileDoc.height } : null
-    });
 
     // Write the linked-visual ref back onto the behaviour. If THIS fails the
     // interactable still works region-only; we just keep the orphan Tile (it
@@ -596,39 +575,17 @@ class InteractableManager {
       ts: Date.now()
     });
 
-    // TODO(diagnostic): remove
-    console.warn('Fabricate | activation requested', {
-      isActiveGM: isActiveGM(),
-      hasActiveGM: !!globalThis.game?.users?.activeGM,
-      userId: request.userId,
-      actorId: request.actorId,
-      sceneId: request.sceneId,
-      regionId: request.regionId,
-      behaviorId: request.behaviorId
-    });
-
     if (isActiveGM()) {
-      // TODO(diagnostic): remove
-      console.warn('Fabricate | activation requested → validate locally');
       void this.validateAndGrant(request);
       return;
     }
     if (!globalThis.game?.users?.activeGM) {
-      // TODO(diagnostic): remove
-      console.warn('Fabricate | activation requested → no active GM, abort');
-      // Permanent, low-noise diagnostic alongside the player-facing notify: an
-      // activation that aborts for lack of an active GM must not be silent.
-      console.warn('Fabricate | activation aborted: no active GM', {
-        userId: request.userId, actorId: request.actorId, sceneId: ref.sceneId, regionId: ref.regionId, behaviorId: ref.behaviorId
-      });
       globalThis.ui?.notifications?.warn?.(
         globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM')
         ?? 'A GM must be online to gather here.'
       );
       return;
     }
-    // TODO(diagnostic): remove
-    console.warn('Fabricate | activation requested → emit socket');
     globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, request);
   }
 
@@ -648,8 +605,6 @@ class InteractableManager {
     const behavior = this._resolveBehavior(request);
     const system = readInteractableBehaviorSystem(behavior);
     if (!system) {
-      // Silent activation failures are bad UX: surface the unresolved behaviour.
-      console.warn('Fabricate | activation: no behaviour/system resolved', request);
       return false;
     }
 
@@ -676,20 +631,6 @@ class InteractableManager {
       tokenInside
     });
     if (!validation.ok) {
-      // Permanent, low-noise diagnostic: a denied Interact must never be silent.
-      // Logs the exact reason plus every collaborator value so the player/GM can
-      // see WHY the activation did nothing.
-      console.warn('Fabricate | interactable activation denied', {
-        reason: validation.reason,
-        interactableType: system.interactableType,
-        environmentId: system.environmentId ?? null,
-        canControlActor,
-        sourceExists,
-        environmentExists,
-        tokenInside,
-        userId: request.userId,
-        actorId: request.actorId
-      });
       return false;
     }
 
@@ -718,11 +659,6 @@ class InteractableManager {
         taskId: system.taskId ?? null
       }
     };
-    // TODO(diagnostic): remove
-    console.warn('Fabricate | activation granted', {
-      toUserId: request.userId,
-      local: globalThis.game?.user?.id === request.userId
-    });
     // The requesting user opens the session locally. When the GM IS the requester
     // (GM activated their own token), open it here (a socket emit never reaches
     // the emitter).
@@ -745,29 +681,18 @@ class InteractableManager {
    * @param {object} payload  A validated `interactableActivationGranted` payload.
    */
   openGrant(payload) {
-    // TODO(diagnostic): remove
-    console.warn('Fabricate | openGrant', {
-      interactableType: payload?.grant?.interactableType,
-      hasAppShow: !!this._getAppClass?.()?.show
-    });
     const grant = payload?.grant;
     if (!grant || typeof grant !== 'object') {
-      // TODO(diagnostic): remove
-      console.warn('Fabricate | openGrant → abort: no grant');
       return;
     }
     const AppClass = this._getAppClass?.();
     if (!AppClass?.show) {
-      // TODO(diagnostic): remove
-      console.warn('Fabricate | openGrant → abort: no AppClass');
       return;
     }
 
     if (grant.interactableType === 'tool') {
       const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
       if (!activeCanvasTool) {
-        // TODO(diagnostic): remove
-        console.warn('Fabricate | openGrant → abort: missing activeCanvasTool');
         return;
       }
       void AppClass.show('gathering', { activeCanvasTool });
@@ -778,8 +703,6 @@ class InteractableManager {
       const environmentId = grant.environmentId ?? grant.context?.environmentId ?? null;
       const taskId = grant.taskId ?? grant.context?.taskId ?? null;
       if (!environmentId || !taskId) {
-        // TODO(diagnostic): remove
-        console.warn('Fabricate | openGrant → abort: missing env/task', { environmentId, taskId });
         return;
       }
       const behavior = this._resolveBehavior(grant.ref ?? {});

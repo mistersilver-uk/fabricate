@@ -10,7 +10,6 @@ import assert from 'node:assert/strict';
 
 import {
   classifyInteractableDrop,
-  buildSpawnRequest,
   buildActiveCanvasTool,
   buildInteractableSourceUuid,
   parseInteractableSourceUuid
@@ -105,59 +104,4 @@ test('classifies a dropped item uuid that maps to a tool', () => {
 
   const fromString = classifyInteractableDrop('Item.known', deps());
   assert.equal(fromString.sourceUuid, 'Fabricate.sysA.tool.tool-1');
-});
-
-// --- spawn payload shaping ---
-
-test('buildSpawnRequest shapes a tool spawn (no environmentId) with tile texture + dimensions', () => {
-  const classification = classifyInteractableDrop({ fabricate: { interactableType: 'tool', systemId: 'sysA', toolId: 'tool-1' } }, deps());
-  const request = buildSpawnRequest({ classification, point: { x: 120, y: 240 }, texture: 'icons/tools/axe.webp', width: 100, height: 100 });
-  assert.deepEqual(request, {
-    interactableType: 'tool',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    texture: 'icons/tools/axe.webp',
-    width: 100,
-    height: 100,
-    x: 120,
-    y: 240
-  });
-});
-
-test('buildSpawnRequest carries environmentId + name + tile texture for a gathering task', () => {
-  const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, deps());
-  const request = buildSpawnRequest({ classification, point: { x: 10, y: 20 }, environmentId: 'env-3', texture: 'icons/ore.webp', width: 100, height: 100 });
-  assert.deepEqual(request, {
-    interactableType: 'gatheringTask',
-    sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
-    environmentId: 'env-3',
-    name: 'Mine Ore', // hover tooltip identifies the gathering point (discoverability)
-    texture: 'icons/ore.webp',
-    width: 100,
-    height: 100,
-    x: 10,
-    y: 20
-  });
-});
-
-test('buildSpawnRequest snapshots the task node CONFIG via buildNode (config + runtime)', () => {
-  const nodeDeps = {
-    getTask: () => ({ id: 'task-9', name: 'Mine Ore', nodes: { enabled: true, max: 3 } })
-  };
-  const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, nodeDeps);
-  const request = buildSpawnRequest({
-    classification,
-    point: { x: 1, y: 2 },
-    buildNode: (task) => ({ ...task.nodes, current: task.nodes.max })
-  });
-  assert.deepEqual(request.node, { enabled: true, max: 3, current: 3 });
-});
-
-test('buildSpawnRequest omits node for a task with no node config (unlimited gathering point)', () => {
-  const classification = classifyInteractableDrop({ fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } }, deps());
-  const request = buildSpawnRequest({ classification, point: { x: 1, y: 2 }, buildNode: () => null });
-  assert.equal('node' in request, false, 'no node snapshot is carried for an unlimited node');
-});
-
-test('buildSpawnRequest returns null for no classification', () => {
-  assert.equal(buildSpawnRequest({ classification: null, point: { x: 1, y: 2 } }), null);
 });

@@ -265,8 +265,6 @@ export function resolveInteractableNodeStateForRef(ref = {}) {
  */
 export function handleInteractableSocketMessage(payload, deps = {}) {
   const action = payload?.action;
-  // TODO(diagnostic): remove
-  console.warn('Fabricate | socket message', { action: payload?.action, isActiveGM: isActiveGM() });
 
   // Region-first behaviour write (player → active GM `{ system: { node } }`).
   if (action === INTERACTABLE_BEHAVIOR_UPDATE) {

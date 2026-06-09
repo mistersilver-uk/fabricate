@@ -1193,9 +1193,9 @@ Hooks.once('ready', async () => {
         showPrompt: showHazardScenePrompt,
         viewSceneForSelf: (uuid) => viewScene(uuid)
       });
-    } catch (error) {
-      // TODO(diagnostic): remove
-      console.warn('Fabricate | hazard socket route threw', error);
+    } catch (_error) {
+      // Defensive: a hazard-route throw must never block the Interactable payload
+      // from reaching handleInteractableSocketMessage below.
     }
     // Same `module.fabricate` channel also carries the canvas Interactable
     // node-update action (player → active GM token-flag write) AND the region-first
