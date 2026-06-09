@@ -14,7 +14,15 @@
   import GatheringView from './gathering/GatheringView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
-  let { activeTab = 'crafting', showAlchemy = false, onSelectTab = null, services = null } = $props();
+  let {
+    activeTab = 'crafting',
+    showAlchemy = false,
+    onSelectTab = null,
+    services = null,
+    activeCanvasTool = null,
+    scopedEnvironmentId = null,
+    scopedTaskId = null
+  } = $props();
 
   // Load the shared actor-selection state and current gathering conditions once
   // the shell mounts. The store guards its own one-time load (re-entry guard).
@@ -53,14 +61,26 @@
   </div>
 
   <div class="fabricate-app-main">
-    <ActorSelectTopBar store={services?.actorBar} {activeTab} />
+    <!-- The active station-tool chip rides in the shared header bar's right-side
+         context cluster (next to the gathering weather/time/region info). It is
+         passed down so ActorSelectTopBar can render it adjacent to those
+         conditions; see ActorSelectTopBar for the chip markup + aria-live. -->
+    <ActorSelectTopBar store={services?.actorBar} {activeTab} {activeCanvasTool} />
 
     <section class="fabricate-app-content" role="tabpanel">
       {#each tabs as tab (tab.id)}
         {#if activeTab === tab.id}
           {#if tab.id === 'gathering'}
-            <GatheringView {services} />
+            <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
           {:else}
+            <!-- Shared placeholder for the Crafting, (future) Alchemy, Journal,
+                 and Inventory tabs. FORWARD-COMPAT NOTE: when the Crafting and
+                 planned Alchemy tabs gain their own header/context bar (analogous
+                 to gathering's weather/time/region in ActorSelectTopBar), the
+                 active station-tool chip should move into THAT bar's RIGHT side,
+                 next to the tab's own context info. Until then the chip rides in
+                 the shared ActorSelectTopBar right bar (see the gathering pattern
+                 there). -->
             <div class="fabricate-app-placeholder">
               <i class="fas {tab.icon}" aria-hidden="true"></i>
               <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>

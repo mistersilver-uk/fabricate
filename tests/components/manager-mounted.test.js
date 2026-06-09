@@ -149,6 +149,10 @@ function createStore(calls = [], options = {}) {
       advancedOptionsEnabled: true,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
+      // Tools are system-owned: the manager reads the library from
+      // selectedSystem.tools (not gatheringConfig). Mirror the option here so the
+      // Tools browser + the gathering task editor's tool picker see them.
+      tools: options.gatheringLibraryTools || [],
       essenceDefinitions: [
         { id: 'earth', name: 'Earth', description: 'Stone and root.', icon: 'fas fa-mountain', sourceComponentId: 'c1', sourceItemUuid: 'c1', associatedSystemItemId: 'c1' },
         { id: 'water', name: 'Water', description: 'Clear current.', icon: 'fas fa-water', sourceComponentId: null, sourceItemUuid: null, associatedSystemItemId: null }
@@ -196,7 +200,7 @@ function createStore(calls = [], options = {}) {
         showTags: true,
         showEssences: true,
         difficulty: 2,
-        salvageSummary: { quantityRequired: 1, catalystCount: 1, resultGroupCount: 1, outcomeCount: 0, hasTimeRequirement: false, hasCurrencyRequirement: false }
+        salvageSummary: { quantityRequired: 1, toolCount: 1, resultGroupCount: 1, outcomeCount: 0, hasTimeRequirement: false, hasCurrencyRequirement: false }
       },
       {
         id: 'c2',
@@ -343,7 +347,7 @@ function createStore(calls = [], options = {}) {
       img: '',
       enabled: true,
       resolutionMode: 'routed',
-      catalysts: [{ componentId: 'c2', degradesOnUse: true, destroyWhenExhausted: false, maxUses: 3 }],
+      toolIds: ['tool-c2'],
       resultSelection: { provider: 'macroOutcome', macroUuid: '' },
       resultGroups: [{
         id: 'group-common',
@@ -372,7 +376,6 @@ function createStore(calls = [], options = {}) {
         img: '',
         enabled: false,
         resolutionMode: 'progressive',
-        catalysts: [],
         progressive: { awardMode: 'partial' },
         check: { provider: 'macro', macroUuid: '' },
         resultGroups: []
@@ -464,11 +467,11 @@ function createStore(calls = [], options = {}) {
         stepCount: 1,
         resultGroupCount: 1,
         ingredientCount: 2,
-        catalystCount: 1,
-        requirementsPreview: [{ id: 'step-1', name: 'Step 1', ingredientSetCount: 1, ingredientCount: 2, catalystCount: 1, resultGroupCount: 1 }],
+        toolCount: 1,
+        requirementsPreview: [{ id: 'step-1', name: 'Step 1', ingredientSetCount: 1, ingredientCount: 2, toolCount: 1, resultGroupCount: 1 }],
         visibilitySummary: 'All players',
         ingredients: new Array(2),
-        catalysts: new Array(1)
+        tools: new Array(1)
       },
       {
         id: 'r2',
@@ -483,11 +486,11 @@ function createStore(calls = [], options = {}) {
         stepCount: 1,
         resultGroupCount: 2,
         ingredientCount: 3,
-        catalystCount: 0,
-        requirementsPreview: [{ id: 'step-1', name: 'Step 1', ingredientSetCount: 2, ingredientCount: 3, catalystCount: 0, resultGroupCount: 2 }],
+        toolCount: 0,
+        requirementsPreview: [{ id: 'step-1', name: 'Step 1', ingredientSetCount: 2, ingredientCount: 3, toolCount: 0, resultGroupCount: 2 }],
         visibilitySummary: 'Restricted (none selected)',
         ingredients: new Array(3),
-        catalysts: []
+        tools: []
       }
     ],
     recipeCategories: [{ name: 'elixirs', count: 1 }, { name: 'potions', count: 1 }],
@@ -823,9 +826,6 @@ function createStore(calls = [], options = {}) {
     updateEnvironmentTaskResult: (...args) => calls.push(['updateEnvironmentTaskResult', ...args]),
     deleteEnvironmentTaskResult: (...args) => calls.push(['deleteEnvironmentTaskResult', ...args]),
     moveEnvironmentTaskResult: (...args) => calls.push(['moveEnvironmentTaskResult', ...args]),
-    addEnvironmentTaskCatalyst: (...args) => calls.push(['addEnvironmentTaskCatalyst', ...args]),
-    updateEnvironmentTaskCatalyst: (...args) => calls.push(['updateEnvironmentTaskCatalyst', ...args]),
-    deleteEnvironmentTaskCatalyst: (...args) => calls.push(['deleteEnvironmentTaskCatalyst', ...args]),
     updateEnvironmentTaskVisibility: (...args) => calls.push(['updateEnvironmentTaskVisibility', ...args]),
     updateEnvironmentTaskResultSelection: (...args) => calls.push(['updateEnvironmentTaskResultSelection', ...args]),
     updateEnvironmentTaskProgressive: (...args) => calls.push(['updateEnvironmentTaskProgressive', ...args]),

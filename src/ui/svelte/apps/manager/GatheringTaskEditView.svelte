@@ -19,6 +19,7 @@
     rewardRules = null,
     characterModifierLibrary = [],
     libraryTools = [],
+    environmentOptions = [],
     onPickImagePath = null,
     onUpdateTask = () => {},
     onSelectDrop = () => {},
@@ -426,6 +427,44 @@
     updateRespawn({ amountExpression: String(value ?? '') });
   }
 
+  // --- Depleted-behavior authoring (linked-marker canvas visual on depletion). -
+  // Applies to a placed gathering-task interactable's linked Tile marker. The only
+  // behavior is swap-image: while the environment's node for this task is depleted
+  // the marker shows `swapImage`, and it flips back to the available image when the
+  // node respawns. (A Tile marker has no nameplate, so the postfix mode is not
+  // offered; there is no destructive delete behavior.)
+  const depletedBehavior = $derived(nodes.depletedBehavior || {});
+  const depletedSwapImage = $derived(typeof depletedBehavior.swapImage === 'string' ? depletedBehavior.swapImage : '');
+
+  function updateDepletedBehavior(patch) {
+    const next = { ...depletedBehavior, ...patch };
+    const cleaned = {};
+    if (typeof next.swapImage === 'string' && next.swapImage.trim()) {
+      cleaned.swapImage = next.swapImage.trim();
+    }
+    updateNodes({ depletedBehavior: Object.keys(cleaned).length > 0 ? cleaned : null });
+  }
+  async function chooseDepletedImage() {
+    if (typeof onPickImagePath !== 'function') return;
+    const value = await onPickImagePath(depletedSwapImage || nodes.depletedBehavior?.swapImage || '');
+    if (value) updateDepletedBehavior({ swapImage: value });
+  }
+  function clearDepletedImage() {
+    updateDepletedBehavior({ swapImage: '' });
+  }
+  function onDepletedImageContextMenu(event) {
+    // Right-click on the thumbnail clears the chosen depleted image (the visible
+    // "Remove image" button below covers keyboard users).
+    event.preventDefault();
+    event.stopPropagation();
+    if (depletedSwapImage) clearDepletedImage();
+  }
+
+  function setDefaultEnvironment(value) {
+    const id = String(value ?? '').trim();
+    onUpdateTask({ defaultEnvironmentId: id || null });
+  }
+
   function modifierEntries(row) {
     const modifiers = row?.conditionModifiers || {};
     const characterRefs = Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
@@ -662,6 +701,20 @@
             <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Description', 'Description')}</span>
             <textarea data-gathering-task-field="description" value={task.description || ''} oninput={(event) => onUpdateTask({ description: event.currentTarget.value })}></textarea>
           </label>
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironment', 'Default environment (canvas drop)')}</span>
+            <select
+              data-gathering-task-field="defaultEnvironmentId"
+              value={task.defaultEnvironmentId || ''}
+              onchange={(event) => setDefaultEnvironment(event.currentTarget.value)}
+            >
+              <option value="">{text('FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironmentNone', 'None (ask on drop)')}</option>
+              {#each environmentOptions as environment (environment.id)}
+                <option value={environment.id}>{environment.name}</option>
+              {/each}
+            </select>
+            <span class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironmentHint', 'Used when a dropped node is not inside a tagged scene region. Hold Alt while dropping to always pick manually.')}</span>
+          </label>
         </div>
       </div>
     </section>
@@ -881,6 +934,58 @@
           </label>
         {/if}
       </div>
+
+      <div class="manager-task-depleted-behavior" data-gathering-task-depleted-behavior>
+        <div class="manager-task-depleted-row">
+          <div class="manager-task-drop-header-copy manager-task-depleted-copy">
+            <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (linked marker)')}</h4>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed interactable\'s linked marker looks once this node runs out. Restored automatically when it respawns.')}</p>
+          </div>
+
+          <div class="manager-task-depleted-image-column" data-gathering-task-depleted-image-column>
+            <button
+              type="button"
+              class="manager-task-image-picker manager-task-depleted-image-picker"
+              aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted marker image')}
+              onclick={chooseDepletedImage}
+              oncontextmenu={onDepletedImageContextMenu}
+              disabled={typeof onPickImagePath !== 'function'}
+              data-gathering-task-depleted-image
+            >
+              {#if depletedSwapImage}
+                <img src={depletedSwapImage} alt="" />
+              {:else}
+                <i class="fas fa-image" aria-hidden="true"></i>
+              {/if}
+              <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+            {#if depletedSwapImage}
+              <button
+                type="button"
+                class="manager-link-button manager-task-depleted-image-clear"
+                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear', 'Remove image')}
+                onclick={clearDepletedImage}
+                data-gathering-task-depleted-image-clear
+              >
+                <i class="fas fa-xmark" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear', 'Remove image')}</span>
+              </button>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </section>
+    {:else}
+    <section class="manager-task-nodes-card manager-task-nodes-hint-card" data-gathering-task-nodes-hint>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
+        </div>
+      </div>
+      <p class="manager-muted manager-task-nodes-hint-text">
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodesEconomyHint', 'Canvas per-token depletion and depleted-token behavior are only available when this system\'s gathering economy is set to "nodes". Switch the gathering economy mode in the system\'s Economy settings to author a resource node here.')}</span>
+      </p>
     </section>
     {/if}
 
@@ -1298,6 +1403,19 @@
     align-items: end;
   }
 
+  /* Guidance shown in the node area when the system is NOT in nodes economy. */
+  .manager-task-nodes-hint-text {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-2);
+    margin: 0;
+  }
+
+  .manager-task-nodes-hint-text i {
+    margin-top: 2px;
+    flex: 0 0 auto;
+  }
+
   .manager-task-node-interval-row,
   .manager-task-node-chance-row {
     display: flex;
@@ -1308,6 +1426,53 @@
   .manager-task-node-interval-row input,
   .manager-task-node-chance-row input {
     min-width: 0;
+  }
+
+  /* Depleted-behavior authoring: a sub-block of the node card. */
+  .manager-task-depleted-behavior {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    padding-top: var(--fab-space-3);
+    border-top: 1px solid var(--fab-mv2-border);
+  }
+
+  .manager-task-depleted-behavior h4 {
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+  }
+
+  /* Title/hint sit on the SAME row as the swap-image thumbnail (image alongside
+     the heading + description, not stacked beneath it). */
+  .manager-task-depleted-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-3);
+  }
+
+  .manager-task-depleted-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* The image picker plus the "Remove image" button stack vertically: the clear
+     control sits directly UNDERNEATH the thumbnail. */
+  .manager-task-depleted-image-column {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--fab-space-1);
+  }
+
+  .manager-task-depleted-image-picker {
+    flex: 0 0 auto;
+  }
+
+  .manager-task-depleted-image-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-1);
   }
 
   /* Cost field sits beside the per-actor modifiers; captions align at the top so

@@ -132,7 +132,7 @@
     const labels = {
       ingredient: text('FABRICATE.Admin.Manager.Component.UsageIngredient', 'Ingredient usage'),
       result: text('FABRICATE.Admin.Manager.Component.UsageResult', 'Result usage'),
-      catalyst: text('FABRICATE.Admin.Manager.Component.UsageCatalyst', 'Catalyst usage'),
+      tool: text('FABRICATE.Admin.Manager.Component.UsageTool', 'Tool usage'),
       gathering: text('FABRICATE.Admin.Manager.Component.UsageGathering', 'Gathering usage'),
       salvage: text('FABRICATE.Admin.Manager.Component.UsageSalvage', 'Salvage usage')
     };
@@ -150,7 +150,7 @@
       text('FABRICATE.Admin.Manager.Component.SalvageQuantity', '{count} required')
         .replace('{count}', summary.quantityRequired ?? 1)
     ];
-    if (summary.catalystCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCatalysts', '{count} catalysts').replace('{count}', summary.catalystCount));
+    if (summary.toolCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTools', '{count} tools').replace('{count}', summary.toolCount));
     if (summary.resultGroupCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace('{count}', summary.resultGroupCount));
     if (summary.outcomeCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageOutcomes', '{count} outcomes').replace('{count}', summary.outcomeCount));
     if (summary.hasTimeRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));

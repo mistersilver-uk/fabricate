@@ -516,8 +516,19 @@
   const selectedGatheringTaskEconomyMode = $derived(selectedGatheringSystemConfig.economy?.mode || 'none');
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
   const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
-  const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
+  // Tools are system-owned: read the canonical library from the selected
+  // crafting system (surfaced on $viewState.selectedSystem.tools by the store)
+  // rather than the gathering-config copy.
+  const selectedGatheringSystemTools = $derived(Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []);
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
+  // Environments of the selected system, as { id, name } rows for the task
+  // editor's optional default-environment select (the on-drop precedence middle
+  // tier).
+  const selectedSystemEnvironmentOptions = $derived(
+    environmentList
+      .filter(environment => String(environment?.craftingSystemId || '') === String(selectedSystemId || ''))
+      .map(environment => ({ id: String(environment.id), name: String(environment.name || environment.id) }))
+  );
   const gatheringNavCounts = $derived({
     environments: environmentList.length,
     tasks: gatheringTaskDefinitions.length,
@@ -916,7 +927,7 @@
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') {
       const environmentDescription = String(environmentDraftForDisplay?.description || '').trim();
-      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.');
+      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation in the workspace.');
     }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected hazard.');
@@ -2034,8 +2045,8 @@
     return recipe?.ingredientCount ?? recipe?.ingredients?.length ?? 0;
   }
 
-  function catalystCount(recipe) {
-    return recipe?.catalystCount ?? recipe?.catalysts?.length ?? 0;
+  function toolCount(recipe) {
+    return recipe?.toolCount ?? recipe?.tools?.length ?? 0;
   }
 
   function stepCount(recipe) {
@@ -2064,7 +2075,7 @@
         .replace('{count}', step.ingredientSetCount || step.ingredientSetSummaries?.length || 0);
     }
     const ingredients = step.ingredientCount || 0;
-    const catalysts = step.catalystCount || 0;
+    const tools = step.toolCount || 0;
     const ingredientLabel = formatCount(
       'FABRICATE.Admin.Manager.Recipe.Ingredient',
       'ingredient',
@@ -2072,15 +2083,15 @@
       'ingredients',
       ingredients
     );
-    if (catalysts <= 0) return ingredientLabel;
-    const catalystLabel = formatCount(
-      'FABRICATE.Admin.Manager.Recipe.Catalyst',
-      'catalyst',
-      'FABRICATE.Admin.Manager.Recipe.Catalysts',
-      'catalysts',
-      catalysts
+    if (tools <= 0) return ingredientLabel;
+    const toolLabel = formatCount(
+      'FABRICATE.Admin.Manager.Recipe.Tool',
+      'tool',
+      'FABRICATE.Admin.Manager.Recipe.Tools',
+      'tools',
+      tools
     );
-    return `${ingredientLabel}, ${catalystLabel}`;
+    return `${ingredientLabel}, ${toolLabel}`;
   }
 
   function requirementsSummary(recipe) {
@@ -2092,7 +2103,7 @@
     if (steps.length === 1) return stepRequirementSummary(steps[0]);
     return stepRequirementSummary({
       ingredientCount: ingredientCount(recipe),
-      catalystCount: catalystCount(recipe),
+      toolCount: toolCount(recipe),
       ingredientSetCount: 1
     });
   }
@@ -2113,9 +2124,9 @@
         value: ingredientCount(recipe)
       },
       {
-        id: 'catalysts',
-        label: text('FABRICATE.Admin.Manager.Recipe.Catalysts', 'catalysts'),
-        value: catalystCount(recipe)
+        id: 'tools',
+        label: text('FABRICATE.Admin.Manager.Recipe.Tools', 'tools'),
+        value: toolCount(recipe)
       }
     ];
   }
@@ -2587,7 +2598,7 @@
     const labels = {
       ingredient: text('FABRICATE.Admin.Manager.Component.UsageIngredient', 'Ingredient usage'),
       result: text('FABRICATE.Admin.Manager.Component.UsageResult', 'Result usage'),
-      catalyst: text('FABRICATE.Admin.Manager.Component.UsageCatalyst', 'Catalyst usage'),
+      tool: text('FABRICATE.Admin.Manager.Component.UsageTool', 'Tool usage'),
       gathering: text('FABRICATE.Admin.Manager.Component.UsageGathering', 'Gathering usage'),
       salvage: text('FABRICATE.Admin.Manager.Component.UsageSalvage', 'Salvage usage')
     };
@@ -2605,7 +2616,7 @@
       text('FABRICATE.Admin.Manager.Component.SalvageQuantity', '{count} required')
         .replace('{count}', summary.quantityRequired ?? 1)
     ];
-    if (summary.catalystCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCatalysts', '{count} catalysts').replace('{count}', summary.catalystCount));
+    if (summary.toolCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTools', '{count} tools').replace('{count}', summary.toolCount));
     if (summary.resultGroupCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace('{count}', summary.resultGroupCount));
     if (summary.outcomeCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageOutcomes', '{count} outcomes').replace('{count}', summary.outcomeCount));
     if (summary.hasTimeRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));
@@ -3139,6 +3150,7 @@
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         libraryTools={selectedGatheringSystemTools}
+        environmentOptions={selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
@@ -4447,11 +4459,11 @@
                 <h3>{text('FABRICATE.Admin.Manager.Component.EmptySetup.Title', 'Set up components')}</h3>
               </div>
             </div>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EmptySetup.Hint', 'Import item-backed components before recipes can reference ingredients, catalysts, results, or essence sources.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EmptySetup.Hint', 'Import item-backed components before recipes can reference ingredients, tools, results, or essence sources.')}</p>
             <ol class="manager-setup-list">
               <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepImport', 'Drop world, compendium, pack, or folder items into the component browser.')}</li>
               <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepOrganize', 'Add tags, essences, source links, and difficulty metadata where the selected system uses them.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepRecipes', 'Use the managed components as recipe requirements, catalysts, and results.')}</li>
+              <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepRecipes', 'Use the managed components as recipe requirements, tools, and results.')}</li>
             </ol>
             <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Component.EmptySetup.Resources', 'Component resources')}>
               <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/crafting-systems/#components" target="_blank" rel="noreferrer">
@@ -4566,11 +4578,11 @@
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Hint', 'Create the first recipe for this system after its reusable components are available.')}</p>
               <ol class="manager-setup-list">
                 <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepStructure', 'Choose the recipe structure supported by the selected system.')}</li>
-                <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepRequirements', 'Add ingredient sets, catalysts, and any visibility or timing requirements.')}</li>
+                <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepRequirements', 'Add ingredient sets, tools, and any visibility or timing requirements.')}</li>
                 <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepResults', 'Define result groups and enable the recipe when it is ready for players.')}</li>
               </ol>
             {:else}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint', 'Add components before creating recipes so ingredients, catalysts, and results have reusable items to reference.')}</p>
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint', 'Add components before creating recipes so ingredients, tools, and results have reusable items to reference.')}</p>
               <ol class="manager-setup-list">
                 <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepComponents', 'Open Components and drop world, compendium, pack, or folder items into this system.')}</li>
                 <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepOrganize', 'Review component names, source links, tags, essences, and difficulty metadata.')}</li>

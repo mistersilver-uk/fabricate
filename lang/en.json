@@ -4,9 +4,256 @@
     "Common": {
       "General": "General"
     },
+    "Migration": {
+      "CatalystsToTools": {
+        "Notice": "Fabricate migrated {count} catalyst(s) into shared library Tools. Catalysts are now Tools — manage them under the Tools tab of the Crafting System Manager."
+      }
+    },
+    "Canvas": {
+      "Interactable": {
+        "GMOnlySpawn": "Only a GM can place Fabricate interactables on the canvas.",
+        "NoActiveGM": "A GM must be online to gather here.",
+        "NoEnvironment": "This gathering point is not part of any environment yet.",
+        "EnvironmentAutoResolved": "Resource node placed in environment \"{environment}\".",
+        "EnvironmentDialogTitle": "Resolve gathering environment",
+        "EnvironmentDialogHint": "Choose the gathering environment for this resource node.",
+        "EnvironmentDialogLabel": "Environment",
+        "EnvironmentDialogConfirm": "Place node",
+        "DropModifierHint": "Hold Alt while dropping to always choose the environment manually.",
+        "SpawnFailed": "Failed to place the Fabricate interactable on the canvas.",
+        "LinkedVisualMissing": "This interactable's linked marker is missing.",
+        "BehaviorLabel": "Fabricate Interactable",
+        "Prompt": {
+          "Interact": "Interact",
+          "Close": "Dismiss"
+        },
+        "Denied": {
+          "Disabled": "This isn't active right now.",
+          "Locked": "This is locked.",
+          "Consumed": "This has already been used up.",
+          "UsesExhausted": "There's nothing left to use here.",
+          "Cooldown": "This isn't ready yet.",
+          "CannotControl": "You don't control that token.",
+          "NotInside": "Your token must be inside the area.",
+          "SourceMissing": "This interactable is no longer available.",
+          "EnvironmentMissing": "This gathering point's environment is missing.",
+          "Generic": "You can't interact here right now."
+        },
+        "Keybinding": {
+          "Name": "Fabricate: interact here",
+          "Hint": "Re-open the Fabricate interactable your controlled token is standing in."
+        },
+        "Config": {
+          "Title": "Fabricate Interactable",
+          "SheetLabel": "Fabricate Interactable",
+          "OpenFromTile": "Configure Fabricate Interactable",
+          "OpenFromToken": "Configure Fabricate Interactable",
+          "Untitled": "Untitled interactable",
+          "Unavailable": "This interactable could not be loaded.",
+          "TypeTool": "Tool station",
+          "TypeTask": "Gathering task",
+          "NameLabel": "Name",
+          "PromptLabel": "Prompt text",
+          "PromptPlaceholder": "Shown to players in the interaction prompt",
+          "ToolLabel": "Linked tool",
+          "TaskLabel": "Linked gathering task",
+          "EnvironmentLabel": "Environment",
+          "NoEnvironment": "None",
+          "UnresolvedSource": "Unresolved",
+          "ActivationLabel": "Status",
+          "StatusLabel": "Status",
+          "GateActive": "Active",
+          "GateDisabled": "Disabled",
+          "GateLocked": "Locked",
+          "GateConsumed": "Consumed",
+          "GateUsesExhausted": "Uses exhausted",
+          "GateCooldown": "On cooldown",
+          "VisualHeading": "Linked marker",
+          "VisualOk": "Marker linked.",
+          "VisualOkPrefix": "Linked marker:",
+          "VisualOkKind": "Linked marker.",
+          "VisualKindTile": "Tile",
+          "VisualKindDrawing": "Drawing",
+          "VisualKindToken": "Token",
+          "VisualMissing": "Linked marker is missing.",
+          "VisualNone": "No marker (region only).",
+          "RecreateTile": "Recreate tile",
+          "CreateMarker": "Create marker",
+          "CreateDrawingMarker": "Create drawing marker",
+          "RelinkSelected": "Relink selected",
+          "ClearVisualLink": "Clear visual link",
+          "RemoveVisualMarker": "Remove visual marker",
+          "MissingPolicyLabel": "If the marker is missing",
+          "MissingIgnore": "Ignore",
+          "MissingWarn": "Warn",
+          "MissingRecreate": "Recreate",
+          "HiddenLabel": "Hidden from players",
+          "AudienceLabel": "Who can activate",
+          "AudiencePlayers": "Players",
+          "AudienceAll": "Everyone",
+          "TestAsPlayer": "Test as player",
+          "JumpToRegion": "Jump to region",
+          "JumpToVisual": "Jump to marker",
+          "Enable": "Enable",
+          "Disable": "Disable",
+          "Lock": "Lock",
+          "Unlock": "Unlock",
+          "Delete": "Delete interactable",
+          "DeleteTitle": "Delete interactable",
+          "DeletePrompt": "Delete this interactable region? This cannot be undone.",
+          "DeleteOnly": "Delete interactable",
+          "DeleteWithVisual": "Delete interactable + visual",
+          "DeleteCancel": "Cancel",
+          "RemoveVisualTitle": "Remove visual marker",
+          "RemoveVisualPrompt": "How would you like to remove the linked marker?",
+          "RemoveVisualUnlink": "Unlink only",
+          "RemoveVisualDelete": "Unlink + delete marker",
+          "RemoveVisualCancel": "Cancel",
+          "NoSelection": "Select a tile, drawing, or token on the canvas first.",
+          "NoVisual": "This interactable has no linked marker to jump to."
+        }
+      },
+      "SceneControl": {
+        "Title": "Fabricate",
+        "BrowserTool": "Place interactables"
+      },
+      "Browser": {
+        "Title": "Interactable browser",
+        "Hint": "Drag an entry onto the canvas, or use Place on current scene.",
+        "SystemLabel": "Crafting system",
+        "SearchLabel": "Search",
+        "SearchPlaceholder": "Search entries…",
+        "ToolsHeading": "Tools",
+        "TasksHeading": "Gathering tasks",
+        "PlaceOnScene": "Place region + Tile",
+        "PlaceRegionOnly": "Place region only (no marker)",
+        "RegionOnlyHint": "The cubes button places a region with a tile marker; the outlined-square button places a region only, with no visible marker.",
+        "UnnamedTask": "Unnamed task",
+        "UnnamedTool": "Unnamed tool",
+        "NoSystems": "No crafting systems available.",
+        "NoTools": "No tools in this system.",
+        "NoTasks": "No gathering tasks in this system.",
+        "NoMatchingTools": "No matching tools.",
+        "NoMatchingTasks": "No matching gathering tasks."
+      }
+    },
+    "RegionBehavior": {
+      "Interactable": {
+        "FIELDS": {
+          "interactableType": {
+            "label": "Interactable type",
+            "hint": "Whether this region acts as a tool station or a gathering task."
+          },
+          "sourceUuid": {
+            "label": "Source reference (advanced)",
+            "hint": "Internal identity of the linked tool or task. Edit from the Configure Fabricate Interactable window."
+          },
+          "systemId": {
+            "label": "Crafting system (advanced)",
+            "hint": "Internal id of the owning crafting system."
+          },
+          "toolId": {
+            "label": "Tool reference (advanced)",
+            "hint": "Internal id of the linked library tool."
+          },
+          "taskId": {
+            "label": "Task reference (advanced)",
+            "hint": "Internal id of the linked gathering task."
+          },
+          "environmentId": {
+            "label": "Environment",
+            "hint": "The gathering environment this resource node belongs to."
+          },
+          "name": {
+            "label": "Name",
+            "hint": "Display name shown to players when they can interact."
+          },
+          "presentation": {
+            "promptText": {
+              "label": "Prompt text",
+              "hint": "Message shown to players on the interaction prompt."
+            },
+            "hidden": {
+              "label": "Hidden from players",
+              "hint": "Hide the interaction prompt from players."
+            }
+          },
+          "linkedVisual": {
+            "uuid": {
+              "label": "Linked marker (advanced)",
+              "hint": "Internal reference to the linked tile, drawing, or token."
+            },
+            "documentName": {
+              "label": "Marker type (advanced)",
+              "hint": "Whether the linked marker is a Tile, Drawing, or Token."
+            },
+            "mode": {
+              "label": "Marker mode (advanced)",
+              "hint": "Whether this interactable shows a visible marker or is region-only."
+            },
+            "missingPolicy": {
+              "label": "If the marker is missing",
+              "hint": "What to do when the linked marker can no longer be found."
+            }
+          },
+          "node": {
+            "label": "Resource node (advanced)",
+            "hint": "Snapshot of the gathering node's stock and respawn configuration."
+          },
+          "state": {
+            "enabled": {
+              "label": "Enabled",
+              "hint": "Whether players can currently activate this interactable."
+            },
+            "consumed": {
+              "label": "Consumed",
+              "hint": "Whether this interactable has been used up."
+            },
+            "locked": {
+              "label": "Locked",
+              "hint": "Whether this interactable is locked against activation."
+            },
+            "uses": {
+              "max": {
+                "label": "Maximum uses",
+                "hint": "Total number of times this interactable may be used (blank for unlimited)."
+              },
+              "used": {
+                "label": "Uses spent",
+                "hint": "How many times this interactable has been used."
+              }
+            },
+            "cooldown": {
+              "seconds": {
+                "label": "Cooldown (seconds)",
+                "hint": "Minimum world-time, in seconds, between activations (blank for none)."
+              },
+              "lastUsedWorldTime": {
+                "label": "Last used (advanced)",
+                "hint": "World time of the most recent activation."
+              }
+            }
+          },
+          "activation": {
+            "trigger": {
+              "label": "Trigger",
+              "hint": "How activation is initiated. Currently region entry."
+            },
+            "audience": {
+              "label": "Who can activate",
+              "hint": "Whether only players or everyone can activate this interactable."
+            }
+          }
+        }
+      }
+    },
     "App": {
       "Title": "Fabricate",
       "ComingSoon": "Coming soon",
+      "ActiveTool": {
+        "Label": "Active station tool",
+        "Named": "Station tool: {label}"
+      },
       "Nav": {
         "Crafting": "Crafting",
         "Alchemy": "Alchemy",
@@ -161,7 +408,6 @@
             "MissingTools": "Missing tool(s)",
             "VisitScene": "Visit linked scene",
             "Conditions": "Wrong conditions",
-            "Catalyst": "Missing catalyst(s)",
             "Paused": "Game paused",
             "DuplicateRun": "Already in progress",
             "NodeDepleted": "Depleted",
@@ -170,6 +416,8 @@
           "NodesRemaining": "Nodes remaining",
           "NodesAvailable": "Nodes available: {count}",
           "NodesLegend": "This area's resources are limited and replenish over time.",
+          "NodeDepletedRespawns": "Depleted — replenishes over time.",
+          "NodeRespawnEta": "Replenishes in about {duration}.",
           "StaminaCost": "Stamina cost",
           "StaminaCostOnly": "Costs {cost} stamina",
           "StaminaCostWithPool": "Costs {cost} stamina (you have {current}/{max})",
@@ -202,7 +450,7 @@
       "Actor": "Crafter",
       "Recipe": "Recipe",
       "Consumed": "Consumed",
-      "Catalysts": "Catalysts Used",
+      "Tools": "Tools Used",
       "Results": "Created",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
@@ -305,6 +553,7 @@
           "TaskStaminaModifiersHint": "Adjust the cost for an actor (e.g. a strong character mines for less).",
           "TaskNodesTitle": "Resource node",
           "TaskNodesHint": "Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.",
+          "TaskNodesEconomyHint": "Canvas per-tile depletion and depleted-tile behavior are only available when this system's gathering economy is set to \"nodes\". Switch the gathering economy mode in the system's Economy settings to author a resource node here.",
           "TaskNodeCount": "Node count",
           "TaskNodeDeplete": "Deplete",
           "DepleteOnStart": "On start",
@@ -320,6 +569,11 @@
           "RespawnChance": "Chance",
           "RespawnAmount": "Amount per interval",
           "RespawnAmountHint": "Plain dice only (e.g. 1d4) — no character data.",
+          "DepletedBehaviorTitle": "When depleted (linked marker)",
+          "DepletedBehaviorHint": "How a placed interactable's linked marker looks once this node runs out. Restored automatically when it respawns.",
+          "DepletedSwapImage": "Swap marker image",
+          "DepletedSwapImagePick": "Choose depleted marker image",
+          "DepletedSwapImageClear": "Remove image",
           "AddModifier": "Add modifier",
           "RemoveModifier": "Remove"
         },
@@ -510,8 +764,8 @@
           "Requirements": "Requirements",
           "Ingredient": "ingredient",
           "Ingredients": "ingredients",
-          "Catalyst": "catalyst",
-          "Catalysts": "catalysts",
+          "Tool": "tool",
+          "Tools": "tools",
           "Simple": "Simple",
           "Advanced": "Advanced",
           "SingleStep": "Single step",
@@ -534,9 +788,9 @@
             "Kicker": "Recipe setup",
             "Title": "Set up recipes",
             "Hint": "Create the first recipe for this system after its reusable components are available.",
-            "NoComponentsHint": "Add components before creating recipes so ingredients, catalysts, and results have reusable items to reference.",
+            "NoComponentsHint": "Add components before creating recipes so ingredients, tools, and results have reusable items to reference.",
             "StepStructure": "Choose the recipe structure supported by the selected system.",
-            "StepRequirements": "Add ingredient sets, catalysts, and any visibility or timing requirements.",
+            "StepRequirements": "Add ingredient sets, tools, and any visibility or timing requirements.",
             "StepResults": "Define result groups and enable the recipe when it is ready for players.",
             "NoComponentsStepComponents": "Open Components and drop world, compendium, pack, or folder items into this system.",
             "NoComponentsStepOrganize": "Review component names, source links, tags, essences, and difficulty metadata.",
@@ -599,14 +853,14 @@
           "NoDifficulty": "No difficulty",
           "Salvage": "Salvage",
           "SalvageQuantity": "{count} required",
-          "SalvageCatalysts": "{count} catalysts",
+          "SalvageTools": "{count} tools",
           "SalvageResults": "{count} result groups",
           "SalvageOutcomes": "{count} outcomes",
           "SalvageTime": "time",
           "SalvageCost": "cost",
           "UsageIngredient": "Ingredient usage",
           "UsageResult": "Result usage",
-          "UsageCatalyst": "Catalyst usage",
+          "UsageTool": "Tool usage",
           "UsageGathering": "Gathering usage",
           "UsageSalvage": "Salvage usage",
           "Inspector": "Selected component inspector",
@@ -621,10 +875,10 @@
           "EmptySetup": {
             "Kicker": "Component setup",
             "Title": "Set up components",
-            "Hint": "Import item-backed components before recipes can reference ingredients, catalysts, results, or essence sources.",
+            "Hint": "Import item-backed components before recipes can reference ingredients, tools, results, or essence sources.",
             "StepImport": "Drop world, compendium, pack, or folder items into the component browser.",
             "StepOrganize": "Add tags, essences, source links, and difficulty metadata where the selected system uses them.",
-            "StepRecipes": "Use the managed components as recipe requirements, catalysts, and results.",
+            "StepRecipes": "Use the managed components as recipe requirements, tools, and results.",
             "Resources": "Component resources",
             "ComponentDocs": "Component docs",
             "Quickstart": "Quickstart"
@@ -856,7 +1110,7 @@
           "Subtitle": "Manage gathering environments for the selected crafting system.",
           "EditKicker": "Environment Edit",
           "EditTitle": "Edit environment",
-          "EditSubtitle": "Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.",
+          "EditSubtitle": "Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation in the workspace.",
           "EditBreadcrumb": "Edit environment",
           "Actions": "Environment actions",
           "Create": "Create environment",
@@ -975,6 +1229,9 @@
             "Description": "Description",
             "Image": "Image",
             "ChooseImage": "Choose task image",
+            "DefaultEnvironment": "Default environment (canvas drop)",
+            "DefaultEnvironmentNone": "None (ask on drop)",
+            "DefaultEnvironmentHint": "Used when a dropped node is not inside a tagged scene region. Hold Alt while dropping to always pick manually.",
             "Enabled": "Enabled",
             "EnabledHint": "Available to use in environments.",
             "DisabledHint": "Not available to use in environments.",
@@ -1312,7 +1569,6 @@
           },
           "TaskCount": "{count} tasks",
           "ResultCount": "{count} results",
-          "CatalystCount": "{count} catalysts",
           "Scene": "Scene",
           "SceneLinked": "Linked scene",
           "SceneMissing": "Scene unresolved",
@@ -1336,7 +1592,7 @@
             "GatheringDocs": "Gathering docs",
             "Quickstart": "Quickstart"
           },
-          "EditHint": "Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation through the existing draft callbacks.",
+          "EditHint": "Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation through the existing draft callbacks.",
           "Edit": "Edit environment",
           "Duplicate": "Duplicate environment",
           "Delete": "Delete environment",
@@ -1390,7 +1646,6 @@
           "TaskTabs": "Task editor tabs",
           "TaskTabDetails": "Task Details",
           "TaskTabResults": "Results",
-          "TaskTabCatalysts": "Catalysts",
           "TaskTabTools": "Tools",
           "TaskTabVisibility": "Visibility",
           "TaskTabTiming": "Timing",
@@ -1981,7 +2236,7 @@
         "Essences": "Essences",
         "Salvage": "Salvage",
         "SalvageQuantity": "Uses {count}",
-        "SalvageCatalysts": "Catalysts {count}",
+        "SalvageTools": "Tools {count}",
         "SalvageResults": "Result groups {count}",
         "SalvageOutcomes": "Outcomes {count}",
         "SalvageTime": "Time gate",
@@ -2039,8 +2294,8 @@
         "Advanced": "Advanced",
         "Ingredient": "ingredient",
         "Ingredients": "ingredients",
-        "Catalyst": "catalyst",
-        "Catalysts": "catalysts",
+        "Tool": "tool",
+        "Tools": "tools",
         "Edit": "Edit",
         "Duplicate": "Duplicate",
         "Delete": "Delete"
@@ -2096,7 +2351,6 @@
         "Timed": "Timed",
         "VisibilityConfigured": "Visibility configured",
         "VisibilityUnconfigured": "Visibility unconfigured",
-        "CatalystCount": "{count} catalysts",
         "ResultGroupCount": "{count} groups",
         "ResultCount": "{count} results",
         "TimeRequirement": "Time Requirement",
@@ -2159,15 +2413,6 @@
         "ProgressiveAwardEqual": "Equal",
         "ProgressiveAwardPartial": "Partial",
         "ProgressiveAwardExceed": "Exceed",
-        "NoCatalysts": "No catalysts configured.",
-        "NoCatalystsHint": "Add a catalyst when this task should require or consume a component.",
-        "AddCatalyst": "Add Catalyst",
-        "CatalystComponent": "Component",
-        "CatalystDegrades": "Degrades",
-        "CatalystDestroyWhenExhausted": "Destroy when exhausted",
-        "CatalystMaxUses": "Max uses",
-        "CatalystMaxUsesUnlimited": "Unlimited",
-        "DeleteCatalyst": "Delete Catalyst",
         "Tools": "Tools",
         "NoTools": "No tools configured.",
         "NoToolsHint": "Add a tool when this task should require equipment that can break or wear out.",
@@ -2264,7 +2509,7 @@
       "NoRecipe": "Recipe not found",
       "NoActor": "No actor selected",
       "MissingIngredients": "Missing required ingredients",
-      "MissingCatalysts": "Missing required catalysts",
+      "MissingTools": "Missing required tools",
       "InvalidRecipe": "Invalid recipe configuration",
       "CraftingFailed": "Crafting failed"
     },
@@ -2364,7 +2609,7 @@
       },
       "History": {
         "Title": "Recent History",
-        "SucceededSummary": "{results} results, {catalysts} catalysts used",
+        "SucceededSummary": "{results} results, {tools} tools used",
         "CharacterModifiers": {
           "Title": "Character Modifiers",
           "RowsHeading": "Drop rows",
@@ -2434,7 +2679,6 @@
         "SceneMissing": "View the linked scene before gathering here.",
         "TokenMissing": "Move the selected actor token to this environment scene before gathering.",
         "DuplicateActiveRun": "This actor already has an active gathering run for this task.",
-        "CatalystBlocked": "The selected actor is missing a required gathering catalyst.",
         "ToolBlocked": "One or more required tools are missing, broken, or fail their requirement.",
         "GamePaused": "Gathering is unavailable while the game is paused.",
         "MissingReference": "Gathering cannot start because a referenced record is missing.",
@@ -2466,7 +2710,7 @@
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",
-      "UnknownCatalyst": "Unknown Tool",
+      "UnknownTool": "Unknown Tool",
       "UnknownItem": "Unknown Item"
     },
     "ShoppingList": {
@@ -2483,7 +2727,7 @@
       "AllSatisfied": "All materials available",
       "MissingCount": "{count} material(s) still needed",
       "Essences": "Essences",
-      "Catalysts": "Required Tools"
+      "Tools": "Required Tools"
     },
     "Teaser": {
       "Title": "Teaser Mode",

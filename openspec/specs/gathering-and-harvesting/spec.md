@@ -79,7 +79,6 @@ This spec reuses the following structures from `002-data-models.md`:
 
 - `CraftingSystem`
 - `Component`
-- `Catalyst`
 - `Tool`
 - `ResultGroup`
 - `Result`
@@ -195,7 +194,7 @@ GatheringRules = {
 6. Limits normalize to positive integers.
 7. These rules are authoritative for d100 reward selection, hazard selection, hazard outcome, and tool breakage outcome once authored.
 8. Existing worlds without a system `rules` object may read legacy task/environment selection fields for backwards-compatible d100 behavior.
-9. `blindCandidateGate` controls the blind candidate pool: `attemptableOnly` (default) excludes tasks the character cannot currently attempt (unmet tool/catalyst/resource/visibility gates) so the generic gather never resolves to a doomed task; `allMatching` keeps every matching task in the pool. Unknown values normalize to `attemptableOnly`.
+9. `blindCandidateGate` controls the blind candidate pool: `attemptableOnly` (default) excludes tasks the character cannot currently attempt (unmet tool/resource/visibility gates) so the generic gather never resolves to a doomed task; `allMatching` keeps every matching task in the pool. Unknown values normalize to `attemptableOnly`.
 10. `revealPolicy`/`revealScope` control revealing a blind task after an attempt terminates for every environment in the system. Environments do not override them. Unknown values normalize to `never`/`actor`.
 
 ## Global Gathering Conditions
@@ -322,7 +321,7 @@ GatheringTaskDefinition = {
 8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
 9. `itemSelectionMode` is a legacy compatibility field. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 10. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
-11. Drop rows may reference per-system character modifiers. Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, catalyst gates, or attempt limits.
+11. Drop rows may reference per-system character modifiers. Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, tool gates, or attempt limits.
 12. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
 13. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
 14. Legacy Environment Tasks remain valid as inline compatibility tasks.
@@ -331,7 +330,7 @@ GatheringTaskDefinition = {
 
 ### Purpose
 
-Represent reusable Gathering Tools authored once per crafting system and referenced by gathering tasks through `toolIds`. This library lives next to the per-system task, hazard, and character modifier libraries and uses the existing Tool data model.
+Represent reusable Tools authored once per crafting system and referenced by gathering tasks through `toolIds`. Tools are **system-owned** (`system.tools`): this is the single canonical Tool library shared with crafting (recipe/step/ingredient-set/salvage `toolIds`), not a gathering-scoped store. It uses the unified `Tool` data model defined in `openspec/specs/data-models/spec.md`.
 
 ### Properties
 
@@ -362,13 +361,12 @@ GatheringToolLibraryEntry = {
 
 ### Requirements
 
-1. Tools are stored under `gatheringConfig.systems[systemId].tools`.
+1. Tools are **SYSTEM-OWNED**: the single canonical library is `system.tools` (the `craftingSystems` setting, normalized by `CraftingSystemManager._normalizeSystem`). There is **no** gathering-scoped tools store; the 0.7.0 migration (`migrateToolsToSystem.js`) reconciled any legacy UI-authored `gatheringConfig.systems[id].tools` onto the matching `system.tools` (dedupe by id, the system tool wins) and cleared the gathering-config copy.
 2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
-3. Legacy gathering configs without a `tools` array on a system normalize to `tools: []` on load. No migration runner entry is required.
-4. The Manager page authors tools through a draft (`toolsDraft`) parallel to the environment draft. Draft writes do not touch persistence until the GM saves; cancel/discard reverts to the live config.
-5. Save reads the live `systems[id].tools` immediately before writing and surfaces an overwrite-confirm dialog when the live array diverges from the draft baseline (concurrent-edit guard).
-6. The runtime `composeEnvironment` exposes a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`. Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
-7. The library is per crafting system. Tools are not shared across crafting systems.
+3. Crafting systems without a `tools` array normalize to `tools: []` on load.
+4. The Manager authors tools into the system-owned library; the same library backs the recipe/step/ingredient-set/salvage tool gate, the canvas interactable browser, and gathering.
+5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`. Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
+6. The library is per crafting system. Tools are not shared across crafting systems.
 
 ## Gathering Character Modifiers
 
@@ -475,8 +473,8 @@ GatheringTask = {
 
   resolutionMode: "progressive" | "routed" | "d100",
 
-  catalysts: Catalyst[],
-  toolIds: string[],  // references gatheringConfig.systems[systemId].tools[].id; legacy tasks default to []
+  toolIds: string[],  // references the system-owned Tools library (system.tools[].id, the craftingSystems setting); legacy tasks default to []
+  defaultEnvironmentId?: string | null,  // NEW optional field; drop-time env-resolution middle tier (placement hint only; see data-models Canvas Interactables)
   visibility?: GatheringVisibilityGate,
   timeRequirement?: {
     minutes?: number,
@@ -517,10 +515,12 @@ GatheringTask = {
 2. Gathering tasks have no ingredients. Any configuration that depends on `IngredientSet` or `ingredientSet` routing is invalid.
 3. `failureOutcome` is optional, but task failure must still be supported at runtime by applying default failure feedback when no special outcome is configured.
 4. `failureOutcome` applies whenever routed or progressive resolution ends in failure, including when a provider returns compatibility aliases from the former miss-family or hazard-family keyword sets.
-5. Invalid `failureOutcome` configuration must abort start-attempt validation before provider resolution, terminal history, result creation, catalyst usage, or failure feedback side effects.
+5. Invalid `failureOutcome` configuration must abort start-attempt validation before provider resolution, terminal history, result creation, tool usage, or failure feedback side effects.
 6. GM-facing helper text should document `fail` as the canonical special outcome keyword. Older aliases remain accepted for compatibility but are not the preferred authored form.
 7. Disabled tasks are ignored for normal player listing and may not be attempted.
 8. Optional node, attempt-limit, stamina, risk, and encounter configuration is applied only when the selected gathering economy and authored task settings enable it.
+9. Required-but-reusable, breakable prerequisites for a gathering task are expressed solely through **Tools** referenced by `task.toolIds` (resolved against the **system-owned** Tools library `system.tools`, composed onto the environment as `__libraryTools` by `GatheringRichStateService.composeEnvironment`). There is no gathering-side catalyst concept and no gathering-scoped tools store.
+10. `defaultEnvironmentId` is a **new optional field** (`string | null`) and a **placement hint only**. Tasks previously carried no environment reference (they are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskIds`). It normalizes to a trimmed string or `null` (empties dropped) in `adminStore._normalizeGatheringTask` and is preserved by `GatheringEnvironmentStore`. It serves as the middle tier of **drop-time** environment resolution for a canvas Gathering-Task Interactable; a stale id (no matching environment) falls through to the GM dialog rather than throwing. It does **not** participate in environment composition and is unrelated to `environment.sceneUuid` (the runtime gathering gate).
 
 ## D100 Gathering Resolution
 
@@ -865,7 +865,7 @@ In `targeted` mode:
 - the environment exposes one or more gathering tasks
 - the player chooses which visible task to attempt
 - task visibility gates determine which options appear for the selected actor
-- the chosen task determines catalysts, time requirement, and resolution behavior
+- the chosen task determines required tools, time requirement, and resolution behavior
 
 Targeted gathering is for intentional seeking, such as "forage for mooncap mushrooms" or "search for iron-rich ore".
 
@@ -898,7 +898,7 @@ Blind gathering simulates gathering from a place without player certainty about 
 ### Pause Rule
 
 Gathering cannot occur while the game is paused.
-If Foundry is paused, Fabricate must reject new gathering attempts before run-start, catalyst, or resolution logic are applied.
+If Foundry is paused, Fabricate must reject new gathering attempts before run-start, tool, or resolution logic are applied.
 
 ### Scene Association
 
@@ -929,10 +929,10 @@ For a given `viewer`, `actor`, and `environment`:
 5. If a task has a `visibility` gate, evaluate it for the selected actor.
 6. If the gate evaluates truthy, the task is visible.
 7. If the gate evaluates falsy, the task is hidden from normal player selection.
-8. Listing output separates visibility from attemptability so scene/token, duplicate active run, and catalyst blockers can keep otherwise visible entries listable with localized blocked reasons.
+8. Listing output separates visibility from attemptability so scene/token, duplicate active run, and tool blockers can keep otherwise visible entries listable with localized blocked reasons.
 
 In `blind` environments, if no task is visible, revealable, or selectable by configured blind-selection logic for an actor, that actor cannot gather from the environment.
-For non-GM users, unrevealed blind tasks remain opaque in listing output: generic localized labels replace task identity, images, visibility diagnostics, resolution metadata, and catalyst details. GMs may inspect the real blind task metadata.
+For non-GM users, unrevealed blind tasks remain opaque in listing output: generic localized labels replace task identity, images, visibility diagnostics, resolution metadata, and tool details. GMs may inspect the real blind task metadata.
 
 A disabled environment returns no player-visible tasks (requirement 1 above), but is surfaced as a locked identity-only listing to all viewers (players and GMs alike), carrying zero tasks. See *Player Environment Listing*.
 
@@ -950,27 +950,29 @@ Define the redaction-safe per-environment fields the player listing API surfaces
 4. `composedTaskCount` is the size of the environment's total composed task pool — the denominator (`y`) for a blind `(x/y)` discovery display. It is a pool size and is distinct from any GM-runtime "available right now" count, which additionally excludes condition-blocked records. A locked entry reports `0`.
 5. `discoveredTaskCount` is the count of tasks the requesting actor has revealed at the effective reveal scope — the numerator (`x`). It is `0` when the entry is locked or when the effective `revealPolicy === 'never'`.
 6. `discoveredTasks` is an array of transparent, individually-attemptable task models for the tasks a non-GM viewer has revealed in a `blind` environment, restricted to the intersection of revealed tasks with the entry's currently-visible tasks. Each model carries `discovered: true` and the same player-facing fields and localized `blockedReasons` as a normal targeted task row (real `requiredTimeOfDay` / `requiredWeather` / missing-tool data, not the redacted opaque form). It is always `[]` when the effective `revealPolicy === 'never'`, for targeted environments, for locked entries, and for GM viewers (who already receive the full transparent `tasks` list). It is built only from the already-computed visible-task set intersected with the revealed-id set, never from a fresh visibility pass, so it can never leak the identity of an unrevealed or hidden task. Because the intersection excludes revealed-but-currently-invisible tasks, `discoveredTasks.length` may legitimately be less than `discoveredTaskCount` (which counts all reveals at the effective scope). For a non-GM viewer of a `blind` environment the `tasks` array collapses to a single opaque `blindGather` action entry; the individually-attemptable revealed rows live only in `discoveredTasks`.
-7. Each transparent task model carries `successChance`: a `0`–`1` fraction OR `null`. It is a STATIC drop-rate approximation, `1 − ∏(1 − dropRate_i/100)` over the task's enabled drop rows, and is meaningful only for `resolutionMode === 'd100'`. It is `null` for progressive/routed resolution modes and when there are no enabled drop rows (so the UI hides the success-chance bar). It represents "chance at least one drop row rolls" — the chance the attempt finds something — and is NOT whole-attempt success: it ignores the d100 success threshold, condition/character modifiers, attempt/node/stamina/catalyst gates, and hazard policy. It is absent from the opaque `blindGather` entry, which must not leak any aggregate drop information.
+7. Each transparent task model carries `successChance`: a `0`–`1` fraction OR `null`. It is a STATIC drop-rate approximation, `1 − ∏(1 − dropRate_i/100)` over the task's enabled drop rows, and is meaningful only for `resolutionMode === 'd100'`. It is `null` for progressive/routed resolution modes and when there are no enabled drop rows (so the UI hides the success-chance bar). It represents "chance at least one drop row rolls" — the chance the attempt finds something — and is NOT whole-attempt success: it ignores the d100 success threshold, condition/character modifiers, attempt/node/stamina/tool gates, and hazard policy. It is absent from the opaque `blindGather` entry, which must not leak any aggregate drop information.
 8. `biomeTags` carries resolved biome display metadata (id, label, icon, and color token/custom color) so player biome chips render consistently with GM authoring. The per-system biome vocabulary takes precedence over the global vocabulary, then defaults.
 9. These listing fields are additive and redaction-safe: they must not leak hidden task identity, hidden result details, weights, provider diagnostics, or GM-only notes. Computing reveal/biome metadata is best-effort and must degrade to safe defaults (`0` / empty) rather than failing the listing.
 10. `hazardChance` is the aggregate static "chance of encountering a hazard", a `0`–`1` fraction computed as `1 − ∏(1 − dropRate_i/100)` over the environment's enabled hazards (ignoring actor/condition/character modifiers and hazard selection-mode/limit). It is `0` when no hazards are enabled. It is always emitted, including for blind environments, so the player UI can show the hazard meter even when individual hazards are redacted.
 11. `hazards` is an array of read-only hazard models the player UI lists alongside the tasks and inspects in a detail view. Each model carries player-facing identity (`id`, `name`, `description`, `img`), the hazard's `dangerTags` and a derived `risk` tier (the first danger tag, or `safe`), a static per-hazard `chance` (`dropRate/100`, clamped to `0`–`1`), the hazard's matching criteria (`weather`, `timeOfDay`, `biomes`, `regions` — each a string array where empty means "any"), resolved `biomeTags` display metadata (id/label/icon/colour, like the environment's biome tags) so biome chips render consistently, and an optional `linkedSceneUuid`. Modifier internals (hazard/condition/character modifiers) are NOT surfaced. Only enabled hazards are surfaced. It is `[]` for locked entries and — mirroring how the `tasks` list collapses — `[]` (redacted) for a non-GM viewer of a `blind` environment; targeted environments and GM viewers (including GM viewers of a blind environment) receive the full list. Hazard models are informational only: they carry no attempt action and no provider diagnostics.
 
-## Catalyst Semantics
+## Tool Usage Semantics
 
-- Gathering catalysts use the same structural shape as crafting catalysts.
-- A task may define zero or more required catalysts.
-- A catalyst is considered "used" only for a terminal attempt (`succeeded` or `failed`).
-- Blocked or misconfiguration-aborted attempts do not degrade or destroy catalysts.
-- Catalyst degradation and exhaustion follow the configured `degradesOnUse`, `destroyWhenExhausted`, and `maxUses` semantics.
-- Gathering tasks do not draw catalysts from component source actors; catalyst availability and terminal catalyst usage are both evaluated against the selected acting actor.
-- Terminal catalyst usage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
+Gathering required-but-reusable prerequisites are **Tools** (the retired gathering-catalyst concept is fully removed; the dead/vestigial `task.catalysts` field carried no authored data — see *Destructive Changes and Migrations*). Tool usage/breakage semantics for terminal gathering attempts:
+
+- A task may reference zero or more required Tools via `toolIds`.
+- A Tool's usage/breakage is applied only for a **terminal** attempt (`succeeded` or `failed`).
+- Blocked or misconfiguration-aborted attempts do not apply tool usage/breakage.
+- Usage tracking and breakage follow the Tool `breakage` / `onBreak` semantics (`limitedUses` / `breakageChance` / `diceExpression`).
+- Gathering tasks do not draw Tools from component source actors; tool presence and terminal tool usage/breakage are both evaluated against the selected acting actor.
+- Terminal tool usage/breakage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
+- A virtual-present Tool injected by a canvas Tool station (`presentTools`, system-scoped) satisfies the gate without an owned item and is excluded from usage/breakage.
 
 ## Gathering Task Tools
 
 ### Purpose
 
-Tools represent reusable per-system gathering tool library entries that tasks reference via `toolIds`. They may break across attempts and may need an actor-side requirement (for example a system-specific proficiency flag).
+Tools are the unified required-but-reusable, breakable prerequisite primitive (shared with crafting; the retired Catalyst concept folded into it). Gathering tasks reference **system-owned** library Tools (`system.tools`, the single canonical library) via `toolIds`; there is no separate gathering-scoped tools store (the 0.7.0 migration reconciles any legacy `gatheringConfig.systems[id].tools` onto the system). Composition exposes the library to the engine as the `__libraryTools` map on the composed environment. Tools may break across attempts and may need an actor-side requirement (for example a system-specific proficiency flag). The full `Tool` model and validation matrix are defined once in `openspec/specs/data-models/spec.md`.
 
 ### Properties
 
@@ -998,7 +1000,7 @@ Tool = {
 
 ### Requirements
 
-1. A task may reference zero or more required tools via `toolIds: string[]`. Each id references an entry in `gatheringConfig.systems[systemId].tools[]`; the composed environment's `__libraryTools` Map resolves each id to a `Tool` object at runtime. References whose id is no longer in the library, or that resolve to a disabled library tool, block start with `TOOL_BLOCKED` because the task's required equipment is misconfigured. Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth. All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing from the actor, broken, or fails its requirement.
+1. A task may reference zero or more required tools via `toolIds: string[]`. Each id references an entry in the system-owned library `system.tools[]` (the single canonical Tools library); the composed environment's `__libraryTools` Map (sourced from `system.tools` by `GatheringRichStateService.composeEnvironment`) resolves each id to a `Tool` object at runtime. References whose id is no longer in the library, or that resolve to a disabled library tool, block start with `TOOL_BLOCKED` because the task's required equipment is misconfigured. Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth. All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing from the actor, broken, or fails its requirement.
 2. Owned items with `flags.fabricate.toolBroken === true` do not satisfy tool presence; the gate must treat them as not-present until a GM clears the flag.
 3. The optional `requirement` is evaluated against the selected acting actor through the existing system-agnostic expression adapter. A system-provider truthy value (non-zero number, non-empty string, `true`) satisfies the requirement; macro returns may be a bare boolean or `{ allowed: boolean, description?: string }`.
 4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`.
@@ -1007,6 +1009,22 @@ Tool = {
 7. The terminal response includes a `usedTools` array describing each matched tool's breakage decision and on-break action.
 8. Legacy tasks without a `tools` field normalize to `tools: []` on load; no migration runner entry is required.
 9. Tool authoring is rejected when `componentId` is missing, when a `replaceWith` action uses the same id as the tool's component, or when mode-specific fields are absent or out of range (`maxUses` not a positive integer, `breakageChance` not an integer in `0..100`, `formula` empty, `threshold` non-finite).
+
+## Canvas Gathering-Task Interactables
+
+### Purpose
+
+A Gathering Task may be placed on the Foundry canvas as a **Scene Region** carrying a `fabricate.interactable` Region Behaviour; a linked Tile (or Drawing / existing Token) is a marker that holds no state of its own but **reflects** the shared env node's depleted state (image swap) and the interactable's concealment (hidden marker) — region-only is also supported. There is no synthetic actor or proxy token. Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (unless concealed); on Interact the gathering app opens scoped to that task and resolved environment, **auto-selecting both**. The behaviour `system` schema, env-resolution precedence, linked-visual model (including the env-node marker swap + concealment/lock visibility rules), and session-scoped tool injection are defined in `openspec/specs/data-models/spec.md` (Canvas Interactables). A gathering-task interactable is a pure `(environment, task)` shortcut — the gathering-runtime rules it imposes are:
+
+### Requirements
+
+1. **No per-interactable node pool — the environment owns node state.** A gathering-task interactable carries **no** `behavior.system.node`; it uses the environment's `nodeRuntime[taskId]` as the single source of truth for node counts, depletion, and respawn. Activating it reads/decrements that environment node exactly like opening gathering directly — it does not alter environment node availability beyond a normal gathering attempt. Tool requirements resolve from `task.toolIds` against `system.tools` at attempt time. **Removed (do not reintroduce):** the per-interactable/per-token node snapshot+adapter, the `nodeStateOverride` thread, the per-behaviour world-time respawn pass, and any precedence of a behaviour node over the environment node.
+2. **GM-routed activation; no node-state writes from the interactable.** Activation routes the request to the active GM, which validates and grants (the interactable performs no node-state write of its own; node depletion/respawn happen in the normal gathering attempt against the environment). When a player interacts and no active GM is connected, surface a graceful "a GM must be online to gather here" message rather than silently failing. A **denied** activation returns a localized reason (`FABRICATE.Canvas.Interactable.Denied.*`) to the requesting player.
+3. **Player-facing depleted state comes from the environment node.** Depleted + calendar-aware respawn-ETA state is whatever the environment's `nodeRuntime[taskId]` reports through the normal gathering listing — the interactable adds nothing to the listing on top of it.
+3a. **Env-node-driven linked-Tile marker swap (SHIPPED).** When the **SHARED** `environment.nodeRuntime[taskId]` is depleted (`current <= 0`) AND the task configures a `depletedBehavior.swapImage`, **every** linked Tile marker for that `(environment, task)` swaps its texture to that image; when the node recharges (respawns above `0`) all markers flip back to the available image (stashed at `flags.fabricate.markerAvailableImg` on the first swap, restored on recharge). This reflects the SHARED env node — there is still **no per-interactable node pool and no `nodeStateOverride`**. An idempotent, no-throw, active-GM sync (`syncInteractableMarkers` in `src/canvas/regions/interactableMarkerDepletion.js`) reconciles the markers on the `gatheringEnvironments` setting change (gather decrement + world-time respawn) and `canvasReady`; the pure decision is `resolveMarkerImage`. The behaviour-schema/linked-visual contract for this is defined in `openspec/specs/data-models/spec.md`.
+3b. **Concealment vs Lock visibility (SHIPPED).** A **DISABLED** (`state.enabled === false`) OR explicitly **HIDDEN** (`presentation.hidden === true`) gathering-task interactable is **concealed from players**: the on-enter prompt does not fire and the linked Tile marker is hidden (`tile.hidden = true`, GM-only) in the same active-GM reconcile (`resolveMarkerHidden`). A **LOCKED** (`state.locked === true`) interactable is **visible** — marker shown, prompt fires — but pressing Interact is **denied** with `FABRICATE.Canvas.Interactable.Denied.Locked`. The pure rules (`shouldPromptOnEnter` / `resolveMarkerHidden`) and the Interact-time eligibility gate are defined in `openspec/specs/data-models/spec.md`.
+4. **Drop-time environment resolution.** The interactable's `environmentId` is resolved at drop by the precedence chain (tagged Scene Region `flags.fabricate.environmentId` → task `defaultEnvironmentId` → GM dialog; Alt forces the dialog). This is a placement-time decision distinct from the runtime `environment.sceneUuid` gate.
+5. **Timed/waiting-run maturity decrements the environment node.** For a timed task started from an interactable, nothing decrements at start (correct for `onSuccess`); at maturity the decrement lands on the **environment** node (`environment.nodeRuntime[taskId]`), same as a timed task started from the gathering app directly. There is no behaviour-ref seam.
 
 ## Routed Task Resolution
 
@@ -1113,7 +1131,7 @@ Macro-based progressive checks return:
 
 Adapter-based progressive checks must resolve to an equivalent numeric result, with optional terminal status if the adapter supports it.
 Value-only check results are neutral and remain eligible for progressive award evaluation. They do not force a terminal success or failure status.
-Provider diagnostics from the check evaluator abort resolution as misconfiguration/provider errors; they do not create failed gathering history, failure feedback, catalyst usage, or result items.
+Provider diagnostics from the check evaluator abort resolution as misconfiguration/provider errors; they do not create failed gathering history, failure feedback, tool usage, or result items.
 
 ### Validation
 
@@ -1138,8 +1156,8 @@ There is no multi-step gathering state in this phase.
 5. Evaluate task visibility for the selected actor.
 6. For blind environments with unrevealed tasks, resolve the selected task through the configured blind-selection logic before task-specific spend, provider, or terminal resolution.
 7. Reject if the actor already has an active gathering run for the same `taskId`.
-8. Validate required catalysts against the selected acting actor.
-9. Evaluate attempt limits and node availability after visibility/access/catalyst guards and before stamina spend, provider execution, terminal history, or result creation.
+8. Validate required Tools (`task.toolIds`) against the selected acting actor.
+9. Evaluate attempt limits and node availability after visibility/access/tool guards and before stamina spend, provider execution, terminal history, or result creation.
 10. Resolve condition modifiers before check/provider execution when they affect check difficulty, yield, stamina cost, risk, encounter chance, or availability.
 11. Validate and spend stamina only after all earlier start guards pass and before accepted terminal or timed run creation.
 12. Validate the selected task's configuration for the chosen resolution mode, including `failureOutcome`, before invoking providers or writing terminal side effects.
@@ -1149,27 +1167,27 @@ There is no multi-step gathering state in this phase.
    - return `started: true`,
    - resolve the routed, progressive, or d100 terminal outcome,
    - do not create an active run,
-   - plan `createdResults`, `usedCatalysts`, and `checkResult` before post-history commits,
+   - plan `createdResults`, `usedTools`, and `checkResult` before post-history commits,
    - write exactly one terminal history entry for `succeeded` or `failed` outcomes with those planned refs,
-   - abort without result creation, catalyst usage, or failure feedback if terminal history persistence fails,
+   - abort without result creation, tool usage, or failure feedback if terminal history persistence fails,
    - create gathered result items on the selected actor only when the outcome is `succeeded` after terminal history persists,
    - do not create gathered result items when the outcome is `failed`,
-   - apply catalyst degradation or destruction for the terminal attempt after the outcome is known, terminal history persists, and only against the selected actor,
+   - apply tool usage/breakage for the terminal attempt after the outcome is known, terminal history persists, and only against the selected actor,
    - apply configured or default failure feedback on failed outcomes after terminal history persists,
    - apply accepted node depletion and encounter reporting only after the relevant state transition is persisted enough to avoid duplicate or uncommitted output,
-   - for non-GM blind attempts, redact task identity, result details, catalyst details, provider diagnostics, check internals, and sensitive encounter details from player-facing responses and persisted terminal history.
+   - for non-GM blind attempts, redact task identity, result details, tool details, provider diagnostics, check internals, and sensitive encounter details from player-facing responses and persisted terminal history.
 15. If `task.timeRequirement` is present after all start guards and task validation pass:
    - create exactly one active gathering run,
    - set run status to `waitingTime`,
    - persist a time gate derived from the declared duration,
    - persist the condition/economy snapshot needed to resolve or explain the run at completion,
    - return the in-progress run state to the UI,
-   - do not pass `usedCatalysts` or `createdResults` into waiting-run creation,
+   - do not pass `usedTools` or `createdResults` into waiting-run creation,
    - do not write terminal history,
-   - do not consume, degrade, or destroy catalysts,
+   - do not apply tool usage/breakage,
    - do not create result items.
 
-Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed catalyst side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task catalyst authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Catalyst authoring includes catalyst add/delete plus editing `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`; the environment-store validation boundary rejects blank catalyst components and rejects non-positive or fractional `maxUses` when degradation is enabled. Visibility authoring supports enable/clear plus `macro`, `dnd5e`, and `pf2e` provider fields, with incomplete provider input kept local until required fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus `macro`, `dnd5e`, and `pf2e` checks with optional thresholds for dnd5e/pf2e. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields. Task/result/catalyst/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
+Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed tool side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/tool/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task tool-reference (`toolIds`) authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Tool authoring references existing per-system library Tools by id (`toolIds`); inline Tool authoring on tasks is not supported (the per-system library is the single source of truth). Visibility authoring supports enable/clear plus `macro`, `dnd5e`, and `pf2e` provider fields, with incomplete provider input kept local until required fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus `macro`, `dnd5e`, and `pf2e` checks with optional thresholds for dnd5e/pf2e. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields. Task/result/tool/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 ### Completion Flow
 
@@ -1177,7 +1195,7 @@ When world time advances to or past a run's `timeGate.availableAt`, the backend 
 
 1. Re-resolve the environment, task, crafting system, and actor.
 2. If required references are missing, cancel the run and move it to history with a terminal status, with blind redaction where an opaque blind environment can still be resolved.
-3. If the task is misconfigured at resume time, clear the active run without terminal player history, result items, catalyst usage, or failure feedback, and require a fresh manual start after the task is repaired.
+3. If the task is misconfigured at resume time, clear the active run without terminal player history, result items, tool usage, or failure feedback, and require a fresh manual start after the task is repaired.
 4. Resolve completion-time condition/economy behavior from the persisted run snapshot unless the GM explicitly configured completion-time conditions.
 5. Resolve the terminal outcome:
    - routed result group

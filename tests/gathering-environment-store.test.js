@@ -47,7 +47,6 @@ function routedTask(overrides = {}) {
     img: 'icons/svg/item-bag.svg',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
     resultSelection: {
       provider: 'macroOutcome',
       macroUuid: 'Macro.outcome'
@@ -73,7 +72,6 @@ function progressiveTask(overrides = {}) {
     img: 'icons/svg/item-bag.svg',
     enabled: true,
     resolutionMode: 'progressive',
-    catalysts: [],
     check: {
       provider: 'dnd5e',
       formula: '@skills.sur.mod',

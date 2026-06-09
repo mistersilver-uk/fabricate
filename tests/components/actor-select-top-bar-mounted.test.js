@@ -354,4 +354,77 @@ describe('ActorSelectTopBar mounted behavior', () => {
       'loading'
     );
   });
+
+  it('renders the active station-tool chip in the right context cluster, before the conditions', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      region: 'Greenvale',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' }
+    });
+    await mountBar({
+      store,
+      activeTab: 'gathering',
+      activeCanvasTool: { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' }
+    });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.ok(right, 'right context cluster renders');
+    const chip = right.querySelector('.actor-bar-tool-chip');
+    assert.ok(chip, 'tool chip renders inside the right cluster');
+    assert.ok(chip.querySelector('i.fa-screwdriver-wrench'), 'chip uses the screwdriver-wrench icon');
+    assert.ok(chip.textContent.includes('Forge Anvil'), 'chip surfaces the tool label');
+    assert.ok(chip.querySelector('[aria-live="polite"]') || right.querySelector('[aria-live="polite"]'), 'chip lives in an aria-live region');
+    assert.equal(chip.getAttribute('title'), 'Forge Anvil', 'chip exposes the tool label via title');
+
+    // The chip sits at the leading edge of the right cluster, before the weather condition.
+    const weather = right.querySelector('.actor-bar-weather');
+    assert.ok(weather, 'weather condition still renders');
+    // DOCUMENT_POSITION_FOLLOWING (0x04): weather follows the chip in document order.
+    assert.ok(
+      chip.compareDocumentPosition(weather) & 0x04,
+      'the chip precedes the gathering conditions'
+    );
+  });
+
+  it('falls back to the localized label when the active tool carries no name', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', conditions: { weather: 'clear', timeOfDay: 'day' } });
+    await mountBar({
+      store,
+      activeTab: 'gathering',
+      activeCanvasTool: { componentId: 'comp-x', systemId: 'sysA', toolId: 'tool-2', label: '   ' }
+    });
+
+    const chip = target.querySelector('.actor-bar-tool-chip');
+    assert.ok(chip, 'chip renders even without a tool name');
+    assert.ok(chip.textContent.includes('FABRICATE.App.ActiveTool.Label'), 'falls back to the localized label');
+  });
+
+  it('omits the tool chip when no active canvas tool is set', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'day' }
+    });
+    await mountBar({ store, activeTab: 'gathering', activeCanvasTool: null });
+
+    assert.equal(target.querySelector('.actor-bar-tool-chip'), null, 'no chip without an active tool');
+    // The gathering conditions remain untouched.
+    assert.ok(target.querySelector('.actor-bar-weather'), 'gathering conditions still render');
+  });
+
+  it('surfaces the tool chip in the otherwise-empty right cluster on a non-gathering tab', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({
+      store,
+      activeTab: 'crafting',
+      activeCanvasTool: { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' }
+    });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.ok(right, 'right cluster renders on crafting when a tool is active');
+    assert.ok(right.querySelector('.actor-bar-tool-chip'), 'chip renders on the non-gathering tab');
+    // No gathering conditions on a non-gathering tab.
+    assert.equal(right.querySelector('.actor-bar-weather'), null, 'no gathering conditions off the gathering tab');
+  });
 });

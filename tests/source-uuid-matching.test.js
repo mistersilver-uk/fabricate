@@ -1,15 +1,15 @@
 /**
- * Integration tests for ingredient/catalyst/recipe-item matching with _stats.compendiumSource (T-087)
+ * Integration tests for ingredient/tool/recipe-item matching with _stats.compendiumSource (T-087)
  *
  * Covers:
  *   1. ingredientMatchesItem matches item with only _stats.compendiumSource
  *   2. ingredientMatchesItem still matches item with only flags.core.sourceId (legacy)
- *   3. _catalystMatchesItem matches item with only _stats.compendiumSource
- *   4. _catalystMatchesItem still matches item with only flags.core.sourceId (legacy)
+ *   3. _toolMatchesItem matches item with only _stats.compendiumSource
+ *   4. _toolMatchesItem still matches item with only flags.core.sourceId (legacy)
  *   5. "Craftable only" filtering includes recipe when actor has items matched via _stats.compendiumSource
  *   T7. ingredientMatchesItem matches canonical sourceItemUuid when the live sourceUuid differs
- *   T8. _catalystMatchesItem matches an item linked only by _stats.duplicateSource (drag-copied world item)
- *   T9. _catalystMatchesItem does NOT match on flags.fabricate.mythwrightId alone
+ *   T8. _toolMatchesItem matches an item linked only by _stats.duplicateSource (drag-copied world item)
+ *   T9. _toolMatchesItem does NOT match on flags.fabricate.mythwrightId alone
  */
 
 import test from 'node:test';
@@ -61,8 +61,8 @@ function makeIngredient(componentId, quantity = 1) {
   };
 }
 
-function makeCatalyst(componentId) {
-  return { componentId, name: `catalyst-${componentId}` };
+function makeTool(componentId) {
+  return { componentId, name: `tool-` };
 }
 
 function makeRecipe(overrides = {}) {
@@ -70,7 +70,6 @@ function makeRecipe(overrides = {}) {
     id: 'recipe-1',
     craftingSystemId: 'system-1',
     ingredientSets: [],
-    catalysts: [],
     ...overrides
   };
 }
@@ -141,17 +140,17 @@ test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (le
 });
 
 // ---------------------------------------------------------------------------
-// Test 3 — _catalystMatchesItem: _stats.compendiumSource
+// Test 3 — _toolMatchesItem: _stats.compendiumSource
 // ---------------------------------------------------------------------------
 
-test('T3 - _catalystMatchesItem: matches item that only has _stats.compendiumSource', () => {
+test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource', () => {
   const sourceUuid = 'Compendium.world.items.catalyst';
   const system = makeSystem('cat-1', sourceUuid);
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
   const recipe = makeRecipe();
-  const catalyst = makeCatalyst('cat-1');
+  const tool = makeTool('cat-1');
 
   const item = {
     uuid: 'world-catalyst-uuid',
@@ -160,21 +159,21 @@ test('T3 - _catalystMatchesItem: matches item that only has _stats.compendiumSou
     name: 'Catalyst Item'
   };
 
-  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), true);
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
 // ---------------------------------------------------------------------------
-// Test 4 — _catalystMatchesItem: legacy flags.core.sourceId still works
+// Test 4 — _toolMatchesItem: legacy flags.core.sourceId still works
 // ---------------------------------------------------------------------------
 
-test('T4 - _catalystMatchesItem: matches item with only flags.core.sourceId (legacy)', () => {
+test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)', () => {
   const sourceUuid = 'Compendium.world.items.legacycat';
   const system = makeSystem('cat-2', sourceUuid);
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
   const recipe = makeRecipe();
-  const catalyst = makeCatalyst('cat-2');
+  const tool = makeTool('cat-2');
 
   const item = {
     uuid: 'world-catalyst-uuid-v10',
@@ -182,7 +181,7 @@ test('T4 - _catalystMatchesItem: matches item with only flags.core.sourceId (leg
     name: 'Legacy Catalyst'
   };
 
-  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), true);
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -209,16 +208,16 @@ test('T5 - ingredientMatchesItem: no match when compendiumSource differs from co
 });
 
 // ---------------------------------------------------------------------------
-// Test 6 — _catalystMatchesItem does NOT match when source UUIDs differ
+// Test 6 — _toolMatchesItem does NOT match when source UUIDs differ
 // ---------------------------------------------------------------------------
 
-test('T6 - _catalystMatchesItem: no match when compendiumSource differs from component sourceUuid', () => {
+test('T6 - _toolMatchesItem: no match when compendiumSource differs from component sourceUuid', () => {
   const system = makeSystem('cat-6', 'Compendium.world.items.correct');
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
   const recipe = makeRecipe();
-  const catalyst = makeCatalyst('cat-6');
+  const tool = makeTool('cat-6');
 
   const item = {
     uuid: 'world-wrong',
@@ -227,14 +226,14 @@ test('T6 - _catalystMatchesItem: no match when compendiumSource differs from com
     name: 'Wrong Catalyst'
   };
 
-  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), false);
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
 });
 
 // ---------------------------------------------------------------------------
 // Test 8 — duplicate-source-only item matches a catalyst via sourceItemUuid
 // ---------------------------------------------------------------------------
 
-test('T8 - catalystMatchesItem: matches item linked only by _stats.duplicateSource', () => {
+test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource', () => {
   const system = makeSystemWithComponent({
     id: 'cat-8',
     sourceUuid: 'Compendium.world.items.pick-live',
@@ -245,7 +244,7 @@ test('T8 - catalystMatchesItem: matches item linked only by _stats.duplicateSour
 
   const manager = new RecipeManager();
   const recipe = makeRecipe();
-  const catalyst = makeCatalyst('cat-8');
+  const tool = makeTool('cat-8');
 
   // Drag-copied world item: compendiumSource null, link only in duplicateSource.
   const item = {
@@ -255,14 +254,14 @@ test('T8 - catalystMatchesItem: matches item linked only by _stats.duplicateSour
     name: 'Mining Pick'
   };
 
-  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), true);
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
 // ---------------------------------------------------------------------------
 // Test 9 — mythwrightId-only item does NOT match
 // ---------------------------------------------------------------------------
 
-test('T9 - catalystMatchesItem: does NOT match on flags.fabricate.mythwrightId alone', () => {
+test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId alone', () => {
   const system = makeSystemWithComponent({
     id: 'cat-9',
     sourceUuid: 'Compendium.world.items.pick-live',
@@ -273,7 +272,7 @@ test('T9 - catalystMatchesItem: does NOT match on flags.fabricate.mythwrightId a
 
   const manager = new RecipeManager();
   const recipe = makeRecipe();
-  const catalyst = makeCatalyst('cat-9');
+  const tool = makeTool('cat-9');
 
   const item = {
     uuid: 'Item.actor-seeded',
@@ -282,7 +281,7 @@ test('T9 - catalystMatchesItem: does NOT match on flags.fabricate.mythwrightId a
     name: 'Mining Pick'
   };
 
-  assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), false);
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
 });
 
 test('T7 - ingredientMatchesItem: matches canonical sourceItemUuid when live sourceUuid differs', () => {

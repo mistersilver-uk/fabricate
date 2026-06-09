@@ -107,7 +107,7 @@ export class SalvageRunManager {
       timeGate: undefined,
       checkResult: undefined,
       consumedComponents: [],
-      usedCatalysts: [],
+      usedTools: [],
       createdResults: [],
       failureReason: undefined,
       ...runData,

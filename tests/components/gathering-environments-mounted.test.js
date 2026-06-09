@@ -105,10 +105,27 @@ describe('GatheringView mounted behavior', () => {
       readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js'), 'utf8')
     );
 
+    // GatheringView also imports the pure scoped-selection helper (interactable
+    // env+task auto-select); copy it into the temp tree so the compiled component
+    // can resolve it at import time.
+    const scopedSelectionDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js');
+    writeFileSync(
+      scopedSelectionDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js'), 'utf8')
+    );
+
     // LinkedScene (in the detail tree) imports the scene-image helper.
     const sceneImagesDestination = join(tempRoot, 'src/ui/svelte/util/sceneImages.js');
     mkdirSync(dirname(sceneImagesDestination), { recursive: true });
     writeFileSync(sceneImagesDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8'));
+
+    // GatheringTaskDetail (in the detail tree) imports the calendar-aware
+    // respawn-ETA duration formatter, which imports the foundryCalendar helpers.
+    const formatDurationDestination = join(tempRoot, 'src/ui/svelte/util/formatDuration.js');
+    writeFileSync(formatDurationDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/formatDuration.js'), 'utf8'));
+    const foundryCalendarDestination = join(tempRoot, 'src/systems/foundryCalendar.js');
+    mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
+    writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');

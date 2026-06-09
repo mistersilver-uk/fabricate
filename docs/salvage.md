@@ -55,7 +55,7 @@ Configure `salvageCraftingCheck` on the system:
 | `successMacroUuid` | `string\|null` | `null` | Optional macro called after a successful salvage |
 | `failureMacroUuid` | `string\|null` | `null` | Optional macro called after a failed salvage |
 | `consumption.consumeComponentOnFail` | `boolean` | `true` | Whether the component being salvaged is consumed even when the check fails |
-| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Whether salvage catalysts are degraded even when the check fails |
+| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Whether salvage tools are broken/degraded even when the check fails (field name retained for backward compatibility; it now governs Tools) |
 | `progressive.awardMode` | `string` | `"equal"` | How results are awarded in progressive mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Whether players can reorder pending results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed outcome routing |
@@ -74,7 +74,7 @@ Hooks.once('fabricate.ready', async () => {
       failureMacroUuid: 'Macro.disenchant-failure-uuid',
       consumption: {
         consumeComponentOnFail: true,   // artefact is destroyed either way
-        consumeCatalystsOnFail: false   // enchanting focus survives a failed attempt
+        consumeCatalystsOnFail: false   // the enchanting focus tool survives a failed attempt
       },
       outcomes: ['critical', 'pass', 'fail']
     }
@@ -90,7 +90,7 @@ When `features.salvage` is `true` on a system, each component gains a `salvage` 
 |:------|:-----|:--------|:------------|
 | `enabled` | `boolean` | `false` | Whether this component can be salvaged |
 | `ingredientQuantity` | `integer` | `1` | How many of this component the actor must provide to begin salvage. Must be a positive integer; invalid values (zero, negative, non-numeric) fall back to `1`. |
-| `catalysts` | `array` | `[]` | Catalysts required for the salvage operation. Each entry has `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and `maxUses`. |
+| `toolIds` | `string[]` | `[]` | Library [Tool]({% link tools.md %}) ids required for the salvage operation. Coerced to trimmed, non-empty, deduped strings. |
 | `resultGroups` | `array` | `[]` | The possible sets of items produced by salvage. Each group has `id`, `name`, and a `results` array. Each result has `id`, `componentId`, `quantity`, and optionally `propertyMacroUuid`. |
 | `outcomeRouting` | `object` | omitted | Maps outcome labels to result group IDs. Required in routed mode. |
 | `timeRequirement` | `object` | omitted | Time duration fields (`minutes`, `hours`, `days`, `months`, `years`). Only positive finite values are kept. |
@@ -113,14 +113,9 @@ Hooks.once('fabricate.ready', async () => {
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [
-        {
-          componentId: 'acid-vial-component-id',
-          degradesOnUse: true,
-          destroyWhenExhausted: true,
-          maxUses: 1
-        }
-      ],
+      // Require a library Tool (e.g. an acid vial) to perform the salvage. Tools
+      // are authored in the system's Tools library and referenced by id here.
+      toolIds: ['acid-vial-tool-id'],
       resultGroups: [
         {
           id: 'rg-pristine',
@@ -158,5 +153,5 @@ Hooks.once('fabricate.ready', async () => {
 
 - [Crafting Systems]({% link crafting-systems.md %}) -- enable the `salvage` feature toggle and set the resolution mode for your system.
 - [Crafting Checks]({% link crafting-checks.md %}) -- the recipe crafting check pipeline works similarly to salvage checks; see also consumption-on-failure policies.
-- [Catalysts]({% link catalysts.md %}) -- configure the degradation and destruction behaviour of catalysts used during salvage.
+- [Tools]({% link tools.md %}) -- configure the requirement, breakage, and on-break behaviour of tools required during salvage.
 - [Macros]({% link macros/index.md %}) -- write salvage check macros and handle success and failure callbacks.

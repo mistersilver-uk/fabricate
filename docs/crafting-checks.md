@@ -149,17 +149,20 @@ When a crafting check fails, Fabricate can still consume some or all of the requ
 | Setting | Data path | Default | Description |
 |:--------|:----------|:--------|:------------|
 | `consumeIngredientsOnFail` | `system.craftingCheck.consumption.consumeIngredientsOnFail` | `true` | Remove ingredients from the actor's inventory even when the check fails |
-| `consumeCatalystsOnFail` | `system.craftingCheck.consumption.consumeCatalystsOnFail` | `false` | Increment catalyst usage (and possibly destroy the catalyst) even when the check fails |
+| `consumeCatalystsOnFail` | `system.craftingCheck.consumption.consumeCatalystsOnFail` | `false` | Apply tool breakage/usage (and possibly destroy a broken tool) even when the check fails |
 
-**When this applies.** These settings only take effect when a crafting check runs (whether built-in or macro) and that check returns a failure. They do not affect other failure paths such as missing ingredients, missing catalysts, or an invalid recipe configuration — in those cases nothing is ever consumed.
+{: .note }
+> The field name still reads `consumeCatalystsOnFail` for backward compatibility, but it now governs **Tool** breakage. (The Catalyst concept was retired in `0.6.0` — see [Tools]({% link tools.md %}).)
 
-**Example: punishing failure.** An Alchemy system where botched potions destroy materials but spare the alchemist's mortar and pestle:
+**When this applies.** These settings only take effect when a crafting check runs (whether built-in or macro) and that check returns a failure. They do not affect other failure paths such as missing ingredients, missing or unsatisfied tools, or an invalid recipe configuration — in those cases nothing is ever consumed.
+
+**Example: punishing failure.** An Alchemy system where botched potions destroy materials but spare the alchemist's mortar and pestle (a tool):
 
 ```javascript
 // Both defaults match this scenario — no explicit configuration needed.
 // system.craftingCheck.consumption = {
 //   consumeIngredientsOnFail: true,   // herbs are used up
-//   consumeCatalystsOnFail: false     // mortar and pestle survive
+//   consumeCatalystsOnFail: false     // the mortar and pestle tool survives
 // }
 ```
 
@@ -172,7 +175,7 @@ When a crafting check fails, Fabricate can still consume some or all of the requ
 // }
 ```
 
-**Example: high-stakes ritual.** A system where both reagents and the ritual focus are consumed regardless of outcome:
+**Example: high-stakes ritual.** A system where both reagents and the ritual focus tool break/degrade regardless of outcome:
 
 ```javascript
 // system.craftingCheck.consumption = {

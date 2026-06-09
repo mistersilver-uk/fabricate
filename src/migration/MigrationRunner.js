@@ -12,6 +12,8 @@ import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
+import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
+import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +83,25 @@ const MIGRATIONS = [
     migrate(data) {
       return migrateNodeRespawnIntervals(data.gatheringConfig, data.environments);
     }
+  },
+  {
+    version: '0.6.0',
+    label: 'Convert catalysts to shared library Tools',
+    migrate(data) {
+      const { recipes, systems, migratedCount } = migrateCatalystsToTools(data.recipes, data.systems);
+      // Surface the migrated-catalyst count so the runner can fire a one-time GM notice.
+      // (Spread-merged into the accumulated data; `_migratedCatalystCount` is consumed by
+      // the runner and never persisted as a setting.)
+      return { recipes, systems, _migratedCatalystCount: migratedCount };
+    }
+  },
+  {
+    version: '0.7.0',
+    label: 'Reconcile UI-authored library tools from gatheringConfig onto the crafting system',
+    migrate(data) {
+      const { systems, gatheringConfig } = migrateToolsToSystem(data.systems, data.gatheringConfig);
+      return { systems, gatheringConfig };
+    }
   }
   // Future migrations added here in version order
 ];
@@ -103,6 +124,9 @@ export class MigrationRunner {
    * Run all pending migrations in order.
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
+   *
+   * @returns {Promise<{ ran: number, migratedCatalystCount: number }>} a summary of the run
+   *   so the caller can fire one-time edge effects (e.g. the GM catalyst-migration notice).
    */
   async run() {
     const lastRunVersion = this._getSetting(SETTING_KEYS.MIGRATION_VERSION) ?? '0.0.0';
@@ -112,7 +136,7 @@ export class MigrationRunner {
       .sort((a, b) => compareSemver(a.version, b.version));
 
     if (pending.length === 0) {
-      return;
+      return { ran: 0, migratedCatalystCount: 0 };
     }
 
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
@@ -132,6 +156,7 @@ export class MigrationRunner {
       environments: rawEnvironments
     };
     let highestVersion = lastRunVersion;
+    let migratedCatalystCount = 0;
 
     for (const migration of pending) {
       try {
@@ -147,6 +172,14 @@ export class MigrationRunner {
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${err.message}`);
       }
     }
+
+    // The 0.6.0 catalyst→tool migration reports how many catalysts it converted via a
+    // transient `_migratedCatalystCount` field. Capture it for the GM notice and strip it
+    // so it is never persisted as part of any setting payload.
+    if (Number.isFinite(Number(data._migratedCatalystCount))) {
+      migratedCatalystCount = Number(data._migratedCatalystCount);
+    }
+    delete data._migratedCatalystCount;
 
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
@@ -169,5 +202,7 @@ export class MigrationRunner {
     await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
+
+    return { ran: pending.length, migratedCatalystCount };
   }
 }

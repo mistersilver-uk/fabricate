@@ -103,7 +103,7 @@ Completes a step successfully and advances to the next step.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
-| `payload` | `object` | `{ consumedIngredients, usedCatalysts, createdResults, checkResult }` |
+| `payload` | `object` | `{ consumedIngredients, usedTools, createdResults, checkResult }` |
 
 **Returns:** `Promise<object>`
 

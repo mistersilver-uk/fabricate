@@ -2,7 +2,7 @@
  * Unit tests for ItemPilesIntegration (T-086)
  *
  * Tests use node:test + node:assert/strict following the pattern in
- * catalyst-model.test.js.  The Item Piles API (game.itempiles.API) is fully
+ * tool-model.test.js.  The Item Piles API (game.itempiles.API) is fully
  * mocked — no real companion module is required.
  *
  * Test matrix:

@@ -30,6 +30,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _activeTab = DEFAULT_TAB;
   _services = null;
   _hookIds = null;
+  // Session-scoped canvas Tool. When the GM grants activation of a Tool-station
+  // interactable region (the controlling player walked their token in and clicked
+  // Interact), the station Tool is injected here as a virtual-present tool: a
+  // `{ componentId, systemId, toolId, label }` shape that crafting/gathering
+  // prerequisite checks treat as satisfied WITHOUT the actor owning the item,
+  // and which is excluded from breakage/usage. Cleared on close.
+  _activeCanvasTool = null;
+  // Session-scoped environment+task for a gathering-task interactable shortcut.
+  // When a gathering-task region activation is granted the gathering view
+  // auto-selects this environment+task on open. Cleared on close.
+  _scopedEnvironmentId = null;
+  _scopedTaskId = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
@@ -51,14 +63,45 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (VALID_TABS.has(options.activeTab)) {
       this._activeTab = options.activeTab;
     }
+    if (options.activeCanvasTool) {
+      this._activeCanvasTool = options.activeCanvasTool;
+    }
+    if (typeof options.environmentId === 'string') {
+      this._scopedEnvironmentId = options.environmentId;
+    }
+    if (typeof options.taskId === 'string') {
+      this._scopedTaskId = options.taskId;
+    }
   }
 
   _buildServices() {
+    // Derive the system-scoped virtual-present tool payload from the active
+    // canvas Tool. When a Tool station is active, BOTH its componentId AND its
+    // owning crafting system are threaded into the gathering listing/attempt API
+    // as `presentTools = { systemId, componentIds }`. The prerequisite check
+    // treats the componentId as present without an owned item, but ONLY for tasks
+    // in the matching crafting system — componentId is a per-system id, so a tool
+    // from system A must not satisfy a system-B task whose required tool shares
+    // the same componentId string. The engine excludes a virtual match from
+    // breakage/usage. This is the single app→engine threading boundary for the
+    // gathering surface. With no active tool the payload is null (inert).
+    const presentTools = () => {
+      const componentId = this._activeCanvasTool?.componentId;
+      const systemId = this._activeCanvasTool?.systemId;
+      return componentId && systemId ? { systemId, componentIds: [componentId] } : null;
+    };
     const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
-      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.(opts) ?? null,
-      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.(opts) ?? null,
+      getActiveCanvasTool: () => this._activeCanvasTool ?? null,
+      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.({
+        presentTools: presentTools(),
+        ...opts
+      }) ?? null,
+      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.({
+        presentTools: presentTools(),
+        ...opts
+      }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
@@ -86,7 +129,17 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       activeTab: this._activeTab,
       showAlchemy: isAlchemyTabAvailable(this._services),
       onSelectTab: (tab) => this._selectTab(tab),
-      services: this._services
+      services: this._services,
+      // Session-scoped canvas Tool, surfaced reactively so the shell can render a
+      // status chip naming the active station tool (Phase 4 SHOULD-FIX 3). Null
+      // when no Tool station is active.
+      activeCanvasTool: this._activeCanvasTool,
+      // Session-scoped environment + task for a gathering-task interactable
+      // shortcut: when a canvas gathering-task region activation is granted, the
+      // gathering view auto-selects this environment + task on open. Null on a
+      // plain manual open.
+      scopedEnvironmentId: this._scopedEnvironmentId,
+      scopedTaskId: this._scopedTaskId
     };
   }
 
@@ -141,6 +194,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   async close(options) {
     this._removeHooks();
+    // Destroy the session-scoped canvas-tool + scoped env/task context so the
+    // singleton does not leak them into the next manual open.
+    this._activeCanvasTool = null;
+    this._scopedEnvironmentId = null;
+    this._scopedTaskId = null;
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
@@ -149,23 +207,60 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   _onClose(options) {
     this._removeHooks();
+    this._activeCanvasTool = null; // safety net mirroring close().
+    this._scopedEnvironmentId = null;
+    this._scopedTaskId = null;
     super._onClose(options);
   }
 
   /**
    * Open (or re-focus) the shared Fabricate window on the requested tab.
+   *
+   * `activeCanvasTool` semantics: the active canvas tool is session-scoped and is
+   * REPLACED on every `show`, including re-show of the live singleton. An explicit
+   * `show('crafting', { activeCanvasTool })` sets it; a plain `show('crafting')`
+   * CLEARS it — a fresh manual open (or a manual re-open of the existing window)
+   * has no canvas tool, so it must not silently inherit a station tool from a
+   * prior interactable activation. The context is also cleared on close.
+   *
    * @param {string} [tab='crafting'] One of crafting/gathering/journal/inventory.
+   * @param {object} [options]
+   * @param {object|null} [options.activeCanvasTool] Virtual-present Tool injected
+   *   by a granted Tool-station region activation: `{ componentId, systemId, toolId, label }`.
+   * @param {string} [options.environmentId] Scoped environment (gathering-task region).
+   * @param {string} [options.taskId] Scoped task (gathering-task region).
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(tab = DEFAULT_TAB) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
+    const nextCanvasTool = activeCanvasTool ?? null;
+    const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
+    const nextTaskId = typeof taskId === 'string' ? taskId : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
+      // Re-show REPLACES the session-scoped canvas tool + scoped env/task context
+      // (set when supplied, cleared when not) so a manual re-open never inherits
+      // a stale station context.
+      existing._activeCanvasTool = nextCanvasTool;
+      existing._scopedEnvironmentId = nextEnvironmentId;
+      existing._scopedTaskId = nextTaskId;
+      // Push the replaced tool + scoped env/task to the mounted tree so the status
+      // chip updates and the gathering view re-auto-selects the scoped env+task.
+      existing.updateProps({
+        activeCanvasTool: nextCanvasTool,
+        scopedEnvironmentId: nextEnvironmentId,
+        scopedTaskId: nextTaskId
+      });
       existing._selectTab(initialTab);
       existing.bringToFront();
       return existing;
     }
-    const app = new SvelteFabricateApp({ activeTab: initialTab });
+    const app = new SvelteFabricateApp({
+      activeTab: initialTab,
+      activeCanvasTool: nextCanvasTool,
+      environmentId: nextEnvironmentId,
+      taskId: nextTaskId
+    });
     SvelteFabricateApp._instance = app;
     await app.render(true);
     return app;

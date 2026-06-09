@@ -56,7 +56,7 @@ CraftingSystem = {
     failureMacroUuid?: string,
     consumption: {
       consumeComponentOnFail: boolean,  // default true
-      consumeCatalystsOnFail: boolean,  // default false
+      consumeCatalystsOnFail: boolean,  // default false; LEGACY-NAMED key — now governs TOOL usage/breakage on fail (see note below)
     },
     outcomes?: string[],               // routed mode
     progressive?: {
@@ -73,7 +73,7 @@ CraftingSystem = {
 
     consumption: {
       consumeIngredientsOnFail: boolean, // default true
-      consumeCatalystsOnFail: boolean,   // default false
+      consumeCatalystsOnFail: boolean,   // default false; LEGACY-NAMED key — now governs TOOL usage/breakage on fail (see note below)
     },
 
     // Routed mode (macroOutcome provider may return one of these, optional)
@@ -150,6 +150,7 @@ CraftingSystem = {
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
+13. **`consumption.consumeCatalystsOnFail` is a legacy-named flag.** Following the Catalyst retirement, the persisted config key `consumption.consumeCatalystsOnFail` (on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`) was **retained by name** but now governs **Tool usage/breakage on a failed craft or salvage** (read it as "consume/break tools on fail"). It defaults to `false` (tools are not consumed/broken on failure unless enabled). The persisted key was deliberately **not** renamed because renaming a persisted setting key would require its own migration; the in-code semantics are tool-oriented while the wire key stays `consumeCatalystsOnFail`.
 
 ### Recipe Visibility Requirements
 
@@ -233,7 +234,7 @@ Represent one curated item entry available to recipes and salvage operations.
   salvage?: {
     enabled: boolean,              // default false
     ingredientQuantity: number,    // default 1
-    catalysts: Catalyst[],
+    toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
     outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
@@ -279,7 +280,7 @@ Recipe = {
   resultGroups?: ResultGroup[],
 
   transferEffects: boolean,
-  catalysts: Catalyst[], // defines catalysts that apply to all ingredient groups across all steps in a recipe
+  toolIds: string[], // references library Tools that apply to all ingredient sets across all steps in this recipe
 
   // Routed/alchemy result-group selection
   resultSelection?: {
@@ -392,7 +393,7 @@ Step = {
 
   ingredientSets: IngredientSet[],
   resultGroups: ResultGroup[],
-  catalysts: Catalyst[], // defines catalysts that apply to all ingredient sets in this step
+  toolIds: string[], // references library Tools that apply to all ingredient sets in this step
 
   timeRequirement?: {
     minutes?: number,
@@ -418,7 +419,7 @@ Step = {
 
 ### Purpose
 
-Represent one ingredient/catalyst bundle.
+Represent one ingredient bundle with optional per-set Tool prerequisites.
 
 ### Properties
 
@@ -428,7 +429,7 @@ IngredientSet = {
   name: string,
   ingredientGroups: IngredientGroup[],
   essences: { [essenceId: string]: number },
-  catalysts: Catalyst[],
+  toolIds: string[], // references library Tools required for this ingredient set
 
   // Routed/alchemy: used when resultSelection.provider === "ingredientSet"
   resultGroupId?: string,
@@ -440,6 +441,7 @@ IngredientSet = {
 1. `ingredientGroups` must contain at least one `IngredientGroup`, unless `essences` contains one or more positive requirements.
 2. Ingredient-set evaluation is always OR-across-sets at recipe/step level.
 3. AND-across-ingredient-sets is not supported.
+4. `toolIds` normalizes to `[]` when absent; each id coerces to a trimmed string and empties are dropped. The applicable Tool set for an ingredient set is the union of recipe-level, step-level, and ingredient-set-level `toolIds`, resolved against the per-system Tools library; ids that miss the library are logged and dropped.
 
 ## IngredientGroup
 
@@ -521,54 +523,17 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
    - conflicting recipes are rejected,
    - one aggregated conflict report is returned at completion.
 
-## Catalyst
-
-### Purpose
-
-Represent one non-consumable catalyst requirement.
-
-### Properties
-
-```js
-Catalyst = {
-  componentId: string,
-  degradesOnUse: boolean,
-  destroyWhenExhausted: boolean,
-  maxUses: number | null,
-}
-```
-
-### Requirements
-
-If present in the specification for a recipe, step, ingredient set, salvage definition, or gathering task, a catalyst is always required.
-
-1. `componentId` is required.
-2. If `degradesOnUse` is true, catalyst usage must be tracked on the owned item instance.
-3. `maxUses` validation is scoped to `degradesOnUse === true`:
-   - When `degradesOnUse` is true and `maxUses` is not null, `maxUses` must be a positive integer (>= 1).
-   - When `degradesOnUse` is true and `maxUses` is null, the catalyst degrades but has unlimited uses.
-   - When `degradesOnUse` is false, `maxUses` is ignored for validation purposes and has no runtime effect.
-4. `destroyWhenExhausted` only has runtime effect when `degradesOnUse` is true and `maxUses` is a positive integer.
-
-### Testing Requirements
-
-Unit tests must cover the full `degradesOnUse` x `maxUses` validation matrix:
-
-| `degradesOnUse` | `maxUses`        | Expected validity |
-|-----------------|------------------|-------------------|
-| `false`         | `null`           | valid             |
-| `false`         | positive integer | valid (ignored)   |
-| `false`         | `0` or negative  | valid (ignored)   |
-| `true`          | `null`           | valid (unlimited) |
-| `true`          | positive integer | valid             |
-| `true`          | `0` or negative  | invalid           |
-| `true`          | non-integer      | invalid           |
-
 ## Tool
 
 ### Purpose
 
-Represent one reusable gathering tool entry in a crafting system's per-system gathering tools library. Gathering tasks store `toolIds` references to these library entries; inline per-task tool authoring is not the canonical model. Tools may break across attempts and may require an actor-side expression to be truthy before they can be used.
+Represent one reusable, potentially-breakable prerequisite entry in a crafting system's
+per-system Tools library. A Tool is the single shared **required-but-not-always-consumed**
+primitive spanning **both** crafting (recipe / step / ingredient-set / salvage `toolIds`)
+**and** gathering (`task.toolIds`). It replaces the retired Catalyst concept. Tools may
+break across attempts and may require an actor-side expression to be truthy before they can
+be used. Inline per-recipe / per-task tool authoring is not the canonical model — references
+are always by id into the per-system library.
 
 ### Properties
 
@@ -597,14 +562,16 @@ Tool = {
 ### Requirements
 
 1. `componentId` is required.
-2. Tool entries are stored under `gatheringConfig.systems[systemId].tools` and are referenced from gathering tasks by `toolIds`.
-3. `requirement` is optional. When present, the provider must be `dnd5e`, `pf2e`, or `macro`. Macro requirements require a non-empty `macroUuid`; system requirements require a non-empty `formula`.
-4. Exactly one `breakage.mode` is configured per tool:
+2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`). Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering. Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy. The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
+3. A referenced Tool is always required: it must be present and pass its optional `requirement` before crafting or a gathering attempt may proceed. A reference whose id no longer resolves in its library, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED`.
+4. `requirement` is optional. When present, the provider must be `dnd5e`, `pf2e`, or `macro`. Macro requirements require a non-empty `macroUuid`; system requirements require a non-empty `formula`.
+5. Exactly one `breakage.mode` is configured per tool:
    - `limitedUses`: `maxUses` is null or a positive integer. Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`. The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
    - `breakageChance`: `breakageChance` is an integer in `0..100`. The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
    - `diceExpression`: `formula` is a non-empty Foundry roll formula evaluated against the actor's roll data; `threshold` is a finite number. The tool breaks when the numeric result is `< threshold`.
-5. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
-6. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
+6. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
+7. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
+8. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage. The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
 
 ### Validation Matrix
 
@@ -763,7 +730,7 @@ CraftingRunStepState = {
     itemUuid: string,
     quantity: number,
   }>,
-  usedCatalysts?: Array<{
+  usedTools?: Array<{
     actorUuid: string,
     itemUuid: string,
     quantity: number,
@@ -864,25 +831,6 @@ Requirements:
 4. When `timesUsed >= maxUses`, the item is exhausted.
 5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
 
-### Catalyst Item Usage Flag
-
-Tracks how many times an owned item instance of a catalyst has been used.
-
-```js
-Item.flags.fabricate.catalystItemUsage = {
-  timesUsed: number,
-}
-```
-
-Requirements:
-
-1. `timesUsed` must be a non-negative integer.
-2. Usage is tracked per owned item instance.
-3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, ingredient set, salvage definition, or gathering task). Usage tracking and exhaustion only apply when `degradesOnUse` is true.
-4. When `degradesOnUse` is true and `maxUses` is not null: the item is exhausted when `timesUsed >= maxUses`.
-5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
-6. When `degradesOnUse` is false, catalyst item usage flags are not written or evaluated.
-
 ### Tool Item Usage Flag
 
 Tracks how many times an owned tool item has been used. Written only by the `limitedUses` breakage mode.
@@ -898,6 +846,7 @@ Requirements:
 1. `timesUsed` must be a non-negative integer.
 2. Usage is tracked per owned item instance.
 3. The `breakageChance` and `diceExpression` breakage modes do not write this flag.
+4. **Legacy catalyst-usage fallback.** When `flags.fabricate.toolUsage` is absent, the runtime MUST fall back to reading the legacy `flags.fabricate.catalystItemUsage = { timesUsed }` flag so in-flight per-item usage counters survive the 0.6.0 Catalyst→Tool migration without an item-flag rewrite. This fallback is meaningful **only** for migrated `limitedUses` tools (mapped from `degradesOnUse: true`); presence-only tools (`breakageChance: 0`, mapped from `degradesOnUse: false`) never read or write usage. The first post-migration `applyUsage` on a `limitedUses` tool writes `toolUsage` (authoritative thereafter); the legacy `catalystItemUsage` flag is never back-filled or cleared — once `toolUsage` exists it wins and the fallback path is not re-entered. The legacy `catalystUses` bare-number flag is read and coerced to the `{ timesUsed }` shape under the same fallback.
 
 ### Tool Broken Flag
 
@@ -909,8 +858,116 @@ Item.flags.fabricate.toolBroken = true
 
 Requirements:
 
-1. When set to `true`, the item does not satisfy a gathering tool presence gate.
+1. When set to `true`, the item does not satisfy a crafting or gathering tool presence gate.
 2. The flag is not cleared by Fabricate; the GM clears it via the Foundry item flag editor (or future repair flow).
+
+## Canvas Interactables
+
+### Purpose
+
+Bring crafting/gathering onto the Foundry VTT canvas as **Interactables** — drag-and-drop placements for Tool stations and Gathering-Task resource nodes. A Fabricate Canvas Interactable is **region-first**: it is a **Scene Region** carrying a custom **`fabricate.interactable` Region Behaviour** (a `RegionBehaviorType`) that OWNS the authoritative state. A **linked visual** (Tile by default; optionally a Drawing or an existing GM-placed Token) is **presentation-only**. **No synthetic actor or proxy token is ever created.** A GM drags a Tool / Gathering-Task entry from the GM-only scene-control Interactable browser (or drags a tool-linked Item) onto the canvas; a Region + behaviour + linked Tile is spawned (or a **region-only** interactable with no visible marker). Spawning is **GM-only**. Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (see `gathering-and-harvesting` and `ui-integration` for the activation pipeline).
+
+### Interactable Region Behaviour (`fabricate.interactable`)
+
+The behaviour is registered via the module manifest (`documentTypes.RegionBehavior.interactable` + `"socket": true`) + `CONFIG.RegionBehavior.dataModels`. The behaviour subscribes to its region events through a schema `events` field (`_createEventsField`). All authoritative per-interactable state lives in the behaviour `system`:
+
+```js
+behavior.system = {
+  interactableType: "tool" | "gatheringTask",
+  sourceUuid: string,                 // the Fabricate Tool / Gathering Task source identity
+  systemId: string,
+  toolId: string|null,                // tool interactables
+  taskId: string|null,                // gatheringTask interactables
+  environmentId: string|null,         // resolved at drop (gatheringTask only)
+  name: string,
+  presentation: { promptText: string|null, hidden: boolean },
+  linkedVisual: {
+    uuid: string|null,
+    documentName: "Tile" | "Drawing" | "Token" | null,
+    mode: "marker" | "none",          // "none" = region-only (no visible marker)
+    missingPolicy: "ignore" | "warn" | "recreate"
+  },
+  // NOTE: there is NO `node` field. A gathering-task interactable carries no
+  // per-interactable node pool; the environment's nodeRuntime[taskId] is the
+  // single source of truth for counts/depletion/respawn.
+  state: {
+    enabled: boolean, consumed: boolean, locked: boolean,
+    uses: { max: number|null, used: number },
+    cooldown: { seconds: number|null, lastUsedWorldTime: number|null }
+  },
+  activation: { trigger: "regionEnter", audience: "players" | "all" }
+}
+```
+
+Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONFIG registration live in `src/canvas/regions/FabricateInteractableRegionBehavior.js`.
+
+Requirements:
+
+1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId` and `environmentId` are scoped by `interactableType`. A **Tool** interactable opens the **Crafting** tab and injects a session-scoped `activeCanvasTool` (virtual-present) on activation (the Crafting tab is currently a placeholder, so the active-tool chip is the visible effect). A **gathering-task** interactable is a pure `(environment, task)` shortcut: it opens the gathering app scoped to that environment + task, **auto-selecting both**, and reads/decrements the **environment's `nodeRuntime[taskId]`** exactly like opening gathering directly — there is **no per-interactable node pool and no node override**.
+2. Spawning is **GM-only**.
+3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported — the interactable works with no visible marker.
+4. **Visibility is split from eligibility (Lock vs Disable).** A **DISABLED** (`state.enabled === false`) OR explicitly **HIDDEN** (`presentation.hidden === true`) interactable is **concealed from players**: the on-enter prompt does NOT fire (pure rule `shouldPromptOnEnter`) and the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only; pure rule `resolveMarkerHidden`). A **LOCKED** (`state.locked === true`) interactable is **visible**: the marker stays shown and the prompt fires, but pressing Interact is **denied** with `FABRICATE.Canvas.Interactable.Denied.Locked` ("This is locked."). `evaluateActivationEligibility` still gates the actual activation (precedence DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN, denied at Interact time with the specific reason). These pure rules live in `src/canvas/regions/interactableRegionActivation.js`.
+
+### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
+
+The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning Region + Behaviour; it holds NO authoritative interactable state of its own (no node pool, no eligibility):
+
+```js
+visual.flags.fabricate = {
+  isInteractableVisual: true,
+  linkedRegionUuid: string,
+  linkedBehaviorId: string,
+  // Stashed on the FIRST env-node depletion image swap so the available state can
+  // be restored to the GM's actual marker texture on recharge (Tile markers only).
+  markerAvailableImg?: string
+}
+```
+
+Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef` in `src/canvas/regions/interactableRegionFlags.js`; created/relinked/recreated via `src/canvas/linkedVisuals/linkedInteractableVisual.js`. Marker reflection (image swap + concealment) is reconciled by `src/canvas/regions/interactableMarkerDepletion.js`.
+
+Requirements:
+
+1. The default marker is a **Tile**; a **Drawing** (labelled zone) and an **existing GM-placed Token** are also supported. The reverse flag makes a Tile/Token HUD "Configure Fabricate Interactable" entry resolve.
+2. The linked visual **never OWNS interactable state** — it carries no node pool and no per-interactable depletion state. It nevertheless **reflects two GM-controlled facts** about its owning behaviour (SHIPPED):
+   - **Env-node depletion image swap (Tile markers only).** When the **SHARED** `environment.nodeRuntime[taskId]` is depleted (`current <= 0`) AND the task configures a `depletedBehavior.swapImage`, every linked Tile marker for that `(environment, task)` swaps its texture to that image; when the node recharges (respawns above `0`) all markers flip back to the available image. The available image is stashed at `flags.fabricate.markerAvailableImg` on the first swap and restored on recharge. This reflects the env node — it is **not** a per-interactable/per-marker node pool, and there is no `nodeStateOverride`. The decision (`resolveMarkerImage`) is pure; the sync (`syncInteractableMarkers`) is **active-GM-gated, no-throw, and idempotent**, reacting to the `gatheringEnvironments` setting change (gather decrement + world-time respawn) and `canvasReady`. Every other client sees the change through normal Foundry document sync.
+   - **Concealment (all interactables).** When the interactable is DISABLED (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`), the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only), reconciled in the same active-GM pass (`resolveMarkerHidden`). A LOCKED interactable's marker stays visible.
+3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
+
+### Gathering-Task Node State — owned by the environment (no per-interactable pool; env-node-driven marker swap)
+
+A gathering-task interactable is a **pure `(environment, task)` shortcut**; it does **not** carry its own node pool. Node counts, depletion, and respawn are owned entirely by the environment's `nodeRuntime[taskId]` (see `gathering-and-harvesting` → Gathering Resource Nodes). The SHARED env node's depleted state is, however, reflected onto the linked Tile marker as an image swap (requirement 4 below).
+
+Requirements:
+
+1. The behaviour has **no `node` field**. Activating a gathering-task interactable opens the gathering app scoped to its `environmentId` + `taskId` (auto-selecting both) and reads/decrements the SAME `environment.nodeRuntime[taskId]` as opening gathering directly. It does not alter environment node availability beyond a normal gathering attempt.
+2. Tool requirements resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
+3. There is **no per-interactable/per-token node snapshot+adapter**, **no `nodeStateOverride`/`tileRef`/`resolveTileNodeState` engine seam**, and **no per-behaviour world-time respawn pass**. These were removed from the model. The timed/waiting-run maturity decrement lands on the **environment** node.
+4. **Env-node-driven marker image swap (SHIPPED).** The task-level `depletedBehavior.swapImage` drives the linked **Tile** marker: when the **SHARED** `environment.nodeRuntime[taskId]` is depleted (`current <= 0`), every linked Tile marker for that `(environment, task)` swaps to `swapImage`; on recharge they all flip back (available image stashed/restored via `flags.fabricate.markerAvailableImg`). This is reconciled by an idempotent, active-GM, no-throw sync (`syncInteractableMarkers` in `interactableMarkerDepletion.js`) reacting to the `gatheringEnvironments` setting change and `canvasReady`. The marker still has **no per-interactable node pool** — it reflects the SHARED environment node, driven by the env node (not a behaviour node). There is no `nodeStateOverride`.
+
+> **Removed (do not reintroduce).** The earlier drafts described a per-interactable `behavior.system.node` snapshot, a behaviour-backed node adapter threaded as a `nodeStateOverride`, and a per-behaviour world-time respawn pass. All were abandoned: a gathering-task interactable carries **no** per-interactable node pool, and the env node is the single source of truth for counts/depletion/respawn. **Not removed:** the env-node-driven linked-Tile marker image swap shipped (see requirement 4) — `depletedBehavior.swapImage` reflects the SHARED `environment.nodeRuntime[taskId]` onto the marker; it is not a per-interactable depletion pool.
+
+### Session-Scoped Active Canvas Tool (`activeCanvasTool`)
+
+Activating a Tool interactable injects a **virtual-present** tool into the crafting/gathering availability checks instead of minting a synthetic `Item`.
+
+Requirements:
+
+1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds }`. A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
+2. A virtual-present tool is treated as satisfied **without the actor owning the item** and is **excluded from breakage and usage** (it is the station's tool, not the actor's).
+3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance (set in `show(tab, { activeCanvasTool })`, cleared on close), system-scoped per the rule above, and never written to any persisted run record. With no active tool the payload is null (inert).
+4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`. The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
+
+### Drop-Time Environment Resolution Precedence
+
+When a Gathering-Task Interactable is dropped, its `environmentId` is resolved by this precedence chain (pure decision in `src/canvas/environmentResolution.js`):
+
+1. **Tagged Scene Region** — the drop point falls inside a Foundry Scene Region flagged `flags.fabricate.environmentId`. One unambiguous existing hit auto-resolves (a `ui.notifications.info` names the resolved environment); multiple hits are ambiguous and fall through to the dialog.
+2. **Task `defaultEnvironmentId`** — the task's new optional placement-hint field (a single existing id; a stale id falls through).
+3. **GM dialog** — neither auto-source resolved (or the region was ambiguous). Cancel **aborts the spawn** (no region is created).
+
+Holding **Alt** during the drop always **forces the GM dialog**, bypassing tiers 1 and 2.
+
+Note the two distinct uses of an environment id at different lifecycle stages: a **Scene Region `flags.fabricate.environmentId`** is a *drop-time placement* hint used only to resolve which environment a dropped interactable belongs to, whereas `environment.sceneUuid` is the *runtime gathering gate* that ties a composed environment to a scene during attempt validation. They are unrelated mechanisms.
 
 ## Macro Contracts
 
@@ -969,7 +1026,7 @@ Input context must include:
 - `craftingActor`
 - `ingredientPool`
 - `resolvedIngredients`
-- `resolvedCatalysts`
+- `resolvedTools`
 - `resolvedEssences`
 - `essenceSources`
 - `checkResult`
@@ -997,7 +1054,7 @@ Input context must include:
 - `step`
 - `selectedIngredientSet`
 - `consumedIngredients`
-- `consumedCatalysts`
+- `consumedTools`
 - `createdResults`
 - `checkResult`
 
@@ -1018,7 +1075,7 @@ Input context must include:
 - `failureReason`
 - `checkResult`
 - `consumedIngredients`
-- `consumedCatalysts`
+- `consumedTools`
 
 Return: optional side effects only.
 
@@ -1045,7 +1102,7 @@ The following canonical field names must be used in all new writes:
 
 | Model | Canonical Field | Description |
 |-------|----------------|-------------|
-| Catalyst | `componentId` | Managed item reference |
+| Tool | `componentId` | Managed item reference |
 | Ingredient | `match.type = "component"` | Match type for component-based ingredients |
 | Ingredient | `match.componentId` | Component reference inside match object |
 | Result | `componentId` | Produced item component reference |
@@ -1059,7 +1116,7 @@ The following canonical field names must be used in all new writes:
 | Component | `sourceItemUuid` | Template item reference |
 | RecipeItemDefinition | `sourceItemUuid` | Template item reference |
 | CraftingSystem | `itemTags` | Array of tag strings |
-| Item flag | `catalystItemUsage.timesUsed` | Catalyst usage tracking |
+| Item flag | `toolUsage.timesUsed` | Tool usage tracking (legacy `catalystItemUsage.timesUsed` read as fallback) |
 
 ### Legacy Read Aliases
 
@@ -1067,7 +1124,7 @@ The following legacy aliases are accepted by constructors and normalization func
 
 | Legacy Alias | Canonical Form | Context | Normalization |
 |-------------|---------------|---------|---------------|
-| `systemItemId` | `componentId` | Catalyst, Ingredient, Result | Constructor reads `systemItemId` as fallback; normalized to `componentId` |
+| `systemItemId` | `componentId` | Tool, Ingredient, Result | Constructor reads `systemItemId` as fallback; normalized to `componentId` |
 | `match.type = "systemItem"` | `match.type = "component"` | Ingredient.match | Constructor and migration rewrite type to `"component"` |
 | `match.systemItemId` | `match.componentId` | Ingredient.match | Constructor reads as fallback for `componentId` |
 | `managedItems` | `components` | CraftingSystem | Normalization and migration rename to `components` |
@@ -1076,7 +1133,7 @@ The following legacy aliases are accepted by constructors and normalization func
 | `associatedSystemItemId` | `sourceComponentId` | EssenceDefinition | Normalization reads as fallback for the managed source component reference |
 | `associatedSystemItemId` | `sourceItemUuid` | Component | Constructor reads as fallback for `sourceItemUuid` |
 | `tags` | `itemTags` | CraftingSystem | Normalization reads `tags` as fallback for `itemTags` |
-| `catalystUses` (bare number) | `catalystItemUsage.timesUsed` | Item flag | Runtime reads legacy flag and converts to `{ timesUsed }` shape |
+| `catalystItemUsage` / `catalystUses` (bare number) | `toolUsage.timesUsed` | Item flag | Runtime reads `toolUsage` first; when absent, falls back to `catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) so migrated `limitedUses` tools preserve in-flight usage. Legacy flag is never back-filled or cleared. |
 | `sourceUuid` | `sourceItemUuid` | Component | Normalization reads as fallback |
 | `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `sourceItemUuid` within the recipe's crafting system |
 
@@ -1084,7 +1141,7 @@ The following legacy aliases are accepted by constructors and normalization func
 
 The following aliases are currently emitted in `toJSON()` / normalization output alongside their canonical counterparts. These are transitional and will be removed in a future version once all dependent UI code paths have been updated:
 
-- `systemItemId` (emitted alongside `componentId` in Catalyst, Ingredient, Result)
+- `systemItemId` (emitted alongside `componentId` in Tool, Ingredient, Result)
 - `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
 - `results` (emitted alongside `resultGroups` in Recipe)
 - `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `sourceItemUuid` in Component)

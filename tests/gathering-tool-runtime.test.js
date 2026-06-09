@@ -7,7 +7,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { classifyGatheringToolStates, isToolBroken, matchGatheringTools } from '../src/gatheringToolRuntime.js';
+import {
+  classifyGatheringToolStates,
+  createGatheringToolAvailability,
+  isToolBroken,
+  matchGatheringTools
+} from '../src/gatheringToolRuntime.js';
+import { createToolBreakageRuntime } from '../src/toolBreakageRuntime.js';
 
 function makeRunManager() {
   let createdTerminal = null;
@@ -132,8 +138,6 @@ function makeSimpleEngine({
     isGamePaused: () => false,
     sceneAccess: { canAttempt: async () => ({ allowed: true }) },
     toolAvailability: makeAvailability({ missing: toolMissing, failedRequirements }),
-    catalystAvailability: { check: async () => ({ available: true, missing: [] }) },
-    catalystUsage: { plan: async () => [], apply: async () => [] },
     toolBreakage: breakage.impl,
     resultResolver: {
       async resolveRouted() {
@@ -158,7 +162,6 @@ function baseTask(overrides = {}) {
     name: 'Gather',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
     tools: [],
     resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.x' },
     resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }],
@@ -334,7 +337,6 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     evaluator: makeEvaluator(),
     getSystems: () => [system],
     getRunViewer: () => viewer,
-    catalystUsage: { plan: async () => [], apply: async () => [] },
     toolBreakage: breakage.impl,
     resultResolver: {
       async resolveRouted() {
@@ -431,7 +433,7 @@ test('isToolBroken detects every supported flag form and is false otherwise', ()
 });
 
 const matcher = {
-  catalystMatchesItem: (_recipe, tool, candidate) => Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
+  toolMatchesItem: (_recipe, tool, candidate) => Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
 };
 
 function inventoryItem(componentId, broken = false) {
@@ -537,4 +539,211 @@ test('matchGatheringTools: holding only the replaceWith broken variant stays mis
   });
   assert.equal(result.items.length, 0);
   assert.equal(result.missing.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Virtual-present tools (Phase 4: activeCanvasTool injection)
+// ---------------------------------------------------------------------------
+
+test('matchGatheringTools: a componentId in presentTools matches virtually with no owned item', () => {
+  const result = matchGatheringTools({
+    actor: { items: [] },
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe' }],
+    craftingSystemManager: matcher,
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
+  });
+  assert.equal(result.missing.length, 0, 'virtual-present satisfies the gate');
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].virtual, true);
+  assert.equal(result.items[0].item, null, 'no owned item backs a virtual match');
+});
+
+test('matchGatheringTools: a present tool from another system does NOT satisfy this system\'s task (cross-system collision)', () => {
+  // componentId is a PER-SYSTEM id. A station tool from system-A with componentId
+  // c-axe must NOT satisfy a system-B task whose required tool shares c-axe.
+  const result = matchGatheringTools({
+    actor: { items: [] },
+    system: { id: 'system-b' },
+    task: { id: 't', craftingSystemId: 'system-b' },
+    tools: [{ componentId: 'c-axe' }],
+    craftingSystemManager: matcher,
+    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] }
+  });
+  assert.equal(result.items.length, 0, 'out-of-system present tool is inert');
+  assert.deepEqual(result.missing, [{ componentId: 'c-axe' }]);
+});
+
+test('matchGatheringTools: same componentId AND same systemId IS satisfied (positive scope)', () => {
+  const result = matchGatheringTools({
+    actor: { items: [] },
+    system: { id: 'system-a' },
+    task: { id: 't', craftingSystemId: 'system-a' },
+    tools: [{ componentId: 'c-axe' }],
+    craftingSystemManager: matcher,
+    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] }
+  });
+  assert.equal(result.missing.length, 0, 'in-system present tool satisfies the gate');
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].virtual, true);
+});
+
+test('matchGatheringTools: WITHOUT the active tool the same requirement is missing (regression guard)', () => {
+  const result = matchGatheringTools({
+    actor: { items: [] },
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe' }],
+    craftingSystemManager: matcher,
+    presentTools: null
+  });
+  assert.equal(result.items.length, 0);
+  assert.deepEqual(result.missing, [{ componentId: 'c-axe' }]);
+});
+
+test('matchGatheringTools: an owned non-broken item takes precedence over a virtual match', () => {
+  const result = matchGatheringTools({
+    actor: { items: [inventoryItem('c-axe')] },
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe' }],
+    craftingSystemManager: matcher,
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
+  });
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].virtual, undefined, 'owned item wins, not virtual');
+  assert.ok(result.items[0].item, 'the real item backs the match');
+});
+
+test('createGatheringToolAvailability: virtual-present tool reports available and drops the null item', async () => {
+  const availability = createGatheringToolAvailability({
+    craftingSystemManager: matcher,
+    evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
+  });
+  const result = await availability.check({
+    actor: { items: [] },
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe' }],
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
+  });
+  assert.equal(result.available, true);
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.items, [], 'a virtual match contributes no owned item');
+});
+
+test('tool breakage runtime EXCLUDES a virtual-present tool from plan/apply (no item to mutate)', async () => {
+  const applied = [];
+  const runtime = createToolBreakageRuntime({
+    matchTools: ({ actor, system, task, tools, presentTools }) =>
+      matchGatheringTools({ actor, system, task, tools, craftingSystemManager: matcher, presentTools }),
+    buildItemRef: (_actor, item) => {
+      applied.push(item);
+      return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 };
+    }
+  });
+  const params = {
+    actor: { items: [] },
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } }],
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
+  };
+  const planned = await runtime.plan(params);
+  const evidence = await runtime.apply(params);
+  assert.deepEqual(planned, [], 'no plan entry for a virtual tool');
+  assert.deepEqual(evidence, [], 'no usage/breakage evidence for a virtual tool');
+  assert.equal(applied.length, 0, 'buildItemRef never runs for a virtual tool');
+});
+
+test('classifyGatheringToolStates: a virtual-present tool displays as present', () => {
+  const states = classifyGatheringToolStates({
+    actor: { items: [] },
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe' }, { componentId: 'c-saw' }],
+    craftingSystemManager: matcher,
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
+  });
+  assert.deepEqual(states.map(s => s.state), ['present', 'missing']);
+});
+
+test('classifyGatheringToolStates: an out-of-system present tool does NOT display as present', () => {
+  const states = classifyGatheringToolStates({
+    actor: { items: [] },
+    system: { id: 'system-b' },
+    task: { id: 't', craftingSystemId: 'system-b' },
+    tools: [{ componentId: 'c-axe' }],
+    craftingSystemManager: matcher,
+    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] }
+  });
+  assert.deepEqual(states.map(s => s.state), ['missing']);
+});
+
+test('startAttempt: an unowned tool present as activeCanvasTool gathers without breakage/usage', async () => {
+  // Build an engine wired with the REAL availability + breakage runtime so the
+  // virtual-present injection is exercised end to end (not via mocks).
+  const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
+  const task = baseTask({ tools: [tool] });
+  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const environment = {
+    id: 'env-a', craftingSystemId: 'system-a', enabled: true, selectionMode: 'targeted', tasks: [task]
+  };
+  Object.defineProperty(environment, '__libraryTools', { value: new Map(), enumerable: false });
+  const stores = makeStores({ environment, system });
+  const runManager = makeRunManager();
+  const buildRefs = [];
+  const engine = new GatheringEngine({
+    environmentStore: stores.environmentStore,
+    runManager,
+    richState: makeRichState({ toolBreakagePolicy: 'failureOnBreak' }),
+    evaluator: makeEvaluator(),
+    getSystems: stores.getSystems,
+    getSelectableActors: () => [{ id: 'actor-1', items: [] }],
+    isActorSelectable: () => true,
+    isGamePaused: () => false,
+    sceneAccess: { canAttempt: async () => ({ allowed: true }) },
+    toolAvailability: createGatheringToolAvailability({
+      craftingSystemManager: matcher,
+      evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
+    }),
+    toolBreakage: createToolBreakageRuntime({
+      matchTools: ({ actor, system: sys, task: t, tools, presentTools }) =>
+        matchGatheringTools({ actor, system: sys, task: t, tools, craftingSystemManager: matcher, presentTools }),
+      buildItemRef: (_actor, item) => { buildRefs.push(item); return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 }; }
+    }),
+    resultResolver: {
+      async resolveRouted() {
+        return { status: 'succeeded', resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }] };
+      }
+    },
+    resultCreator: { plan: async () => [], create: async () => [] },
+    failureFeedback: { apply: async () => null }
+  });
+
+  // WITHOUT the active tool the unowned requirement blocks the attempt.
+  const blocked = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  assert.equal(blocked.accepted, false);
+  assert.equal(blocked.blockedReasons[0].code, 'TOOL_BLOCKED');
+
+  // A present tool scoped to a DIFFERENT system is inert (cross-system collision
+  // guard): componentId comp-axe from system-zzz must not satisfy system-a's task.
+  const wrongSystem = await engine.startAttempt({
+    viewer, environmentId: 'env-a', taskId: 'task-a',
+    presentTools: { systemId: 'system-zzz', componentIds: ['comp-axe'] }
+  });
+  assert.equal(wrongSystem.accepted, false, 'an out-of-system station tool does not unlock the task');
+  assert.equal(wrongSystem.blockedReasons[0].code, 'TOOL_BLOCKED');
+
+  // WITH the active tool scoped to the matching system the attempt succeeds and
+  // applies no usage/breakage.
+  const ok = await engine.startAttempt({
+    viewer, environmentId: 'env-a', taskId: 'task-a',
+    presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] }
+  });
+  assert.equal(ok.accepted, true);
+  assert.equal(ok.state, 'succeeded');
+  assert.deepEqual(ok.usedTools, [], 'no usedTools evidence for the virtual canvas tool');
+  assert.equal(buildRefs.length, 0, 'breakage runtime never touched an owned item');
 });

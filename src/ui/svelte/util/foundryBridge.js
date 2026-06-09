@@ -4,9 +4,28 @@
  * both the Foundry runtime and Node test environments.
  */
 
+// A Fabricate-namespaced class so `styles/fabricate.css` can style the dialog
+// (button layout/padding) without bleeding into other modules' DialogV2s, and a
+// default width so multi-button confirm rows (e.g. "Unlink + delete marker") fit
+// cleanly instead of being crushed by DialogV2's narrow default.
+const FABRICATE_DIALOG_CLASSES = Object.freeze(['fabricate', 'fabricate-dialog']);
+const FABRICATE_DIALOG_DEFAULT_WIDTH = 420;
+
 function normalizeDialogOptions(options = {}) {
   const deepClone = globalThis.foundry?.utils?.deepClone ?? ((o) => JSON.parse(JSON.stringify(o)));
   const normalized = deepClone(options);
+
+  // Ensure the Fabricate dialog classes are present (idempotent) so the namespaced
+  // CSS applies and the buttons size to their content + wrap cleanly.
+  const existingClasses = Array.isArray(normalized.classes) ? normalized.classes : [];
+  normalized.classes = [...new Set([...existingClasses, ...FABRICATE_DIALOG_CLASSES])];
+
+  // Give the dialog a sensible minimum width so the button row isn't cramped.
+  // Respect an explicit caller width.
+  normalized.position = {
+    ...(normalized.position || {}),
+    width: normalized.position?.width ?? FABRICATE_DIALOG_DEFAULT_WIDTH
+  };
 
   if (normalized.title && !normalized.window?.title) {
     normalized.window = {

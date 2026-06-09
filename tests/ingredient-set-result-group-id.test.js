@@ -144,7 +144,7 @@ test('mapped mode uses resultGroupId to select the correct result group', () => 
   const system = buildMappedSystem();
   const service = buildService(system);
 
-  const ingredientSet = { id: 'set-1', resultGroupId: 'rg-2', ingredientGroups: [], catalysts: [] };
+  const ingredientSet = { id: 'set-1', resultGroupId: 'rg-2', ingredientGroups: [] };
   const step = buildStepWithGroups(ingredientSet);
   const recipe = buildMappedRecipe(step);
 
@@ -163,7 +163,6 @@ test('mapped mode falls back to resultMapping when resultGroupId is null', () =>
     resultGroupId: null,
     resultMapping: ['rg-1'],
     ingredientGroups: [],
-    catalysts: [],
   };
   const step = buildStepWithGroups(ingredientSet);
   const recipe = buildMappedRecipe(step);
@@ -183,7 +182,6 @@ test('mapped mode prefers resultGroupId over resultMapping when both are present
     resultGroupId: 'rg-2',
     resultMapping: ['rg-1'],
     ingredientGroups: [],
-    catalysts: [],
   };
   const step = buildStepWithGroups(ingredientSet);
   const recipe = buildMappedRecipe(step);
@@ -204,7 +202,6 @@ test('mapped mode falls back to selectedResultGroupId when ingredientSet has no 
     resultGroupId: null,
     resultMapping: [],
     ingredientGroups: [],
-    catalysts: [],
   };
   const step = buildStepWithGroups(ingredientSet);
   const recipe = buildMappedRecipe(step);
@@ -230,7 +227,6 @@ test('mapped mode falls back to first result group when no routing info is avail
     resultGroupId: null,
     resultMapping: [],
     ingredientGroups: [],
-    catalysts: [],
   };
   const step = buildStepWithGroups(ingredientSet);
   const recipe = buildMappedRecipe(step);
@@ -251,7 +247,6 @@ test('mapped mode returns empty array when resultGroupId references a nonexisten
     id: 'set-1',
     resultGroupId: 'rg-nonexistent',
     ingredientGroups: [],
-    catalysts: [],
   };
   const step = buildStepWithGroups(ingredientSet);
   const recipe = buildMappedRecipe(step);

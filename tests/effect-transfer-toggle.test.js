@@ -132,7 +132,6 @@ function buildFakeRecipe(ingredientSet, transferEffects) {
     craftingSystemId: 'sys-1',
     ingredientSets: [ingredientSet],
     resultGroups: [],
-    catalysts: [],
     outcomeRouting: null,
     transferEffects,
     getExecutionSteps: null,
@@ -167,10 +166,8 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
 
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], catalysts: [] } };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
     },
-    getCatalystsForSet() { return []; },
-    catalystMatchesItem() { return false; },
     ingredientMatchesItem(recipe, ingredient, item) { return item === ingredientItem; }
   };
 

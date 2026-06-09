@@ -37,6 +37,23 @@ describe('FabricateAppRoot shell', () => {
     assert.ok(rootSource.includes('FABRICATE.App.ComingSoon'), 'placeholder should localize a coming-soon hint');
   });
 
+  it('threads the active canvas tool into the shared header bar instead of a chip bar above the content', () => {
+    // The standalone chip bar above the tab content was removed; the chip now
+    // rides in ActorSelectTopBar's right-side context cluster.
+    assert.ok(
+      !rootSource.includes('fabricate-app-tool-chip-bar'),
+      'the standalone tool-chip bar should be gone from the app shell'
+    );
+    assert.ok(
+      rootSource.includes('{activeCanvasTool}') || rootSource.includes('activeCanvasTool={activeCanvasTool}'),
+      'the active canvas tool should be passed into ActorSelectTopBar'
+    );
+    assert.ok(
+      /<ActorSelectTopBar[^>]*activeCanvasTool/.test(rootSource),
+      'ActorSelectTopBar should receive the activeCanvasTool prop'
+    );
+  });
+
   it('exposes an accessible tablist driven by host state', () => {
     assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
     assert.ok(rootSource.includes('activeTab === tab.id'), 'active state should derive from the activeTab prop');
@@ -54,6 +71,73 @@ describe('SvelteFabricateApp shell window', () => {
     assert.ok(appSource.includes('static async show(tab'), 'show should accept a tab argument');
     assert.ok(appSource.includes('bringToFront()'), 'an already-open window should be brought to front');
     assert.ok(appSource.includes('updateProps({ activeTab'), 'tab switches should update props reactively');
+  });
+
+  describe('activeCanvasTool session context (Phase 4)', () => {
+    it('show accepts a two-arg { activeCanvasTool } options bag without breaking single-arg callers', () => {
+      assert.ok(
+        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId } = {})'),
+        'show should be the two-arg form with an options default so single-arg callers stay valid'
+      );
+      // existing single-arg call sites pass no options → activeCanvasTool undefined → null.
+      assert.ok(appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'), 'undefined options collapse to null');
+    });
+
+    it('show SETS the active canvas tool on a fresh open and REPLACES it on re-show', () => {
+      assert.ok(
+        appSource.includes('existing._activeCanvasTool = nextCanvasTool;'),
+        're-show of the live singleton replaces the active canvas tool'
+      );
+      assert.ok(
+        appSource.includes('new SvelteFabricateApp({') && appSource.includes('activeCanvasTool: nextCanvasTool'),
+        'a fresh open seeds the active canvas tool through the constructor'
+      );
+    });
+
+    it('a plain show(tab) CLEARS any existing active canvas tool (no stale station inherit)', () => {
+      // nextCanvasTool is null when no options are supplied, and re-show assigns it
+      // unconditionally — so a plain re-open clears a prior station context.
+      assert.ok(appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'), 'plain show resolves to null');
+    });
+
+    it('exposes the active canvas tool through the services bag', () => {
+      assert.ok(
+        appSource.includes('getActiveCanvasTool: () => this._activeCanvasTool ?? null'),
+        '_buildServices should expose getActiveCanvasTool'
+      );
+    });
+
+    it('clears the active canvas tool on close() and the _onClose safety net', () => {
+      const closeIdx = appSource.indexOf('async close(options)');
+      const onCloseIdx = appSource.indexOf('_onClose(options)');
+      assert.ok(closeIdx >= 0 && onCloseIdx >= 0, 'both close paths exist');
+      const closeBody = appSource.slice(closeIdx, onCloseIdx);
+      assert.ok(closeBody.includes('this._activeCanvasTool = null;'), 'close() clears the session context');
+      const onCloseBody = appSource.slice(onCloseIdx);
+      assert.ok(onCloseBody.includes('this._activeCanvasTool = null;'), '_onClose clears the session context too');
+    });
+
+    it('derives a system-scoped presentTools payload from the active canvas tool', () => {
+      assert.ok(
+        appSource.includes("const componentId = this._activeCanvasTool?.componentId;"),
+        'the threading boundary derives the present set from the active tool componentId'
+      );
+      assert.ok(
+        appSource.includes("const systemId = this._activeCanvasTool?.systemId;"),
+        'the threading boundary also reads the active tool systemId for scoping'
+      );
+      assert.ok(
+        appSource.includes('return componentId && systemId ? { systemId, componentIds: [componentId] } : null;'),
+        'the payload carries both systemId and componentIds so matching is system-scoped'
+      );
+    });
+
+    it('passes the active canvas tool through to the Svelte props', () => {
+      assert.ok(
+        appSource.includes('activeCanvasTool: this._activeCanvasTool'),
+        '_prepareSvelteProps should surface the active canvas tool reactively'
+      );
+    });
   });
 
   it('only accepts the known tabs', () => {

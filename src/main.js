@@ -23,8 +23,6 @@ import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
-import { Catalyst } from './models/Catalyst.js';
-import { Tool } from './models/Tool.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
@@ -38,22 +36,38 @@ import {
   createGatheringToolAvailability,
   matchGatheringTools
 } from './gatheringToolRuntime.js';
+import { createToolBreakageRuntime } from './toolBreakageRuntime.js';
 import {
   getFabricateAppClass,
-  getCraftingSystemManagerAppClass
+  getCraftingSystemManagerAppClass,
+  getInteractableBrowserAppClass,
+  getInteractableConfigAppClass
 } from './ui/appFactory.js';
+import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
+import { InteractableManager } from './canvas/InteractableManager.js';
+import { handleInteractableSocketMessage } from './canvas/interactableSocketBridge.js';
+import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
+import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
+import {
+  assignInteractableConfigSheet,
+  resolveInteractableConfigTarget,
+  shouldOfferInteractableConfigEntry
+} from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
+import './ui/InteractableBrowserApp.svelte.js';
+import './ui/InteractionPromptApp.svelte.js';
+import './ui/InteractableConfigApp.svelte.js';
 
 let gatheringEngine = null;
 
@@ -145,176 +159,15 @@ async function runGatheringMacro(macroUuid, context = {}) {
   return MacroExecutor.run(macroUuid, context);
 }
 
-function createGatheringCatalystAvailability(craftingSystemManager) {
-  return {
-    check({ actor, system, task, catalysts = [] } = {}) {
-      const matched = matchGatheringCatalysts({ actor, system, task, catalysts, craftingSystemManager });
-      return {
-        available: matched.missing.length === 0,
-        missing: matched.missing
-      };
-    }
-  };
-}
-
-function createGatheringCatalystUsage(craftingSystemManager) {
-  return {
-    plan({ actor, system, task, catalysts = [] } = {}) {
-      const matched = matchGatheringCatalysts({ actor, system, task, catalysts, craftingSystemManager });
-      return matched.items.map(({ item }) => gatheringRunItemRef(actor, item));
-    },
-
-    async apply({ actor, system, task, catalysts = [] } = {}) {
-      const matched = matchGatheringCatalysts({ actor, system, task, catalysts, craftingSystemManager });
-      for (const { catalyst, item } of matched.items) {
-        await Catalyst.fromJSON(catalyst).applyDegradation(item);
-      }
-      return matched.items.map(({ item }) => gatheringRunItemRef(actor, item));
-    }
-  };
-}
-
-function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression, resultCreator }) {
-  const pendingPlans = new Map();
-  return {
-    async plan({ actor, system, task, tools = [] } = {}) {
-      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
-      const planned = [];
-      for (const { tool, item } of matched.items) {
-        const model = Tool.fromJSON(tool);
-        const breakageResult = await evaluateToolBreakagePlan(model, { actor, item, evaluateExpression });
-        const entry = {
-          componentId: model.componentId,
-          itemRef: gatheringRunItemRef(actor, item),
-          mode: breakageResult.mode,
-          broken: breakageResult.broken,
-          evidence: breakageResult.evidence
-        };
-        if (breakageResult.broken) {
-          entry.onBreak = plannedToolBreakageOutcome(model);
-        }
-        planned.push(entry);
-      }
-      pendingPlans.set(gatheringToolPlanKey({ actor, task }), planned);
-      return planned;
-    },
-
-    async apply({ actor, system, environment, task, tools = [] } = {}) {
-      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
-      const planKey = gatheringToolPlanKey({ actor, task });
-      const plannedByItem = new Map((pendingPlans.get(planKey) || [])
-        .map(entry => [stringOrEmpty(entry?.itemRef?.itemUuid), entry]));
-      pendingPlans.delete(planKey);
-      const evidence = [];
-      for (const { tool: toolData, item } of matched.items) {
-        const tool = Tool.fromJSON(toolData);
-        await tool.applyUsage(item);
-        const itemRef = gatheringRunItemRef(actor, item);
-        const planned = plannedByItem.get(stringOrEmpty(itemRef.itemUuid));
-        const breakageResult = planned
-          ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
-          : await evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression });
-        const entry = {
-          componentId: tool.componentId,
-          itemRef,
-          mode: breakageResult.mode,
-          broken: breakageResult.broken,
-          evidence: breakageResult.evidence
-        };
-        if (breakageResult.broken) {
-          const breakOutcome = await tool.applyBreakage({
-            item,
-            actor,
-            createReplacement: async ({ actor: replacementActor, componentId }) => {
-              const source = resolveGatheringResultSource(
-                { componentId, quantity: 1 },
-                system,
-                craftingSystemManager
-              );
-              if (!source || typeof replacementActor?.createEmbeddedDocuments !== 'function') return;
-              const itemData = source.toObject?.() ?? {
-                name: source.name ?? 'Replacement Item',
-                img: source.img ?? 'icons/svg/item-bag.svg',
-                type: source.type ?? 'loot',
-                system: source.system ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system } : {}
-              };
-              itemData.system ??= {};
-              if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
-              if (source.uuid) {
-                globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-              }
-              await replacementActor.createEmbeddedDocuments('Item', [itemData]);
-            }
-          });
-          entry.onBreak = breakOutcome;
-        }
-        evidence.push(entry);
-      }
-      return evidence;
-    }
-  };
-}
-
-async function evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression } = {}) {
-  if (tool.breakage?.mode === 'limitedUses') {
-    const usage = readToolUsage(item);
-    const timesUsed = Number(usage?.timesUsed || 0) + 1;
-    const maxUses = tool.breakage.maxUses;
-    const broken = maxUses !== null && Number.isFinite(maxUses) && timesUsed >= maxUses;
-    return { broken, mode: 'limitedUses', evidence: { timesUsed, maxUses } };
-  }
-  return tool.evaluateBreakage({ actor, item, evaluateExpression });
-}
-
-function plannedToolBreakageOutcome(tool) {
-  if (tool.onBreak?.mode === 'destroy') return { action: 'destroyed' };
-  if (tool.onBreak?.mode === 'flagBroken') return { action: 'flagged' };
-  if (tool.onBreak?.mode === 'replaceWith') {
-    return {
-      action: 'replaced',
-      replacementComponentId: tool.onBreak.replacementComponentId
-    };
-  }
-  return { action: 'none' };
-}
-
-function readToolUsage(item) {
-  return item?.getFlag?.('fabricate', 'toolUsage')
-    ?? item?.getFlag?.('fabricate', 'fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage')
-    ?? { timesUsed: 0 };
-}
-
-function gatheringToolPlanKey({ actor, task } = {}) {
-  return `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
-}
-
-function stringOrEmpty(value) {
-  return value === null || value === undefined ? '' : String(value);
-}
-
-function matchGatheringCatalysts({ actor, system, task, catalysts = [], craftingSystemManager } = {}) {
-  const matchedItems = [];
-  const missing = [];
-  const syntheticRecipe = {
-    id: `gathering:${task?.id ?? 'task'}`,
-    craftingSystemId: system?.id ?? task?.craftingSystemId ?? null
-  };
-  const items = normalizeFoundryCollection(actor?.items);
-
-  for (const catalyst of catalysts) {
-    const item = items.find(candidate =>
-      craftingSystemManager?.catalystMatchesItem?.(syntheticRecipe, catalyst, candidate)
-    );
-    if (item) {
-      matchedItems.push({ catalyst, item });
-    } else {
-      missing.push(catalyst);
-    }
-  }
-
-  return { items: matchedItems, missing };
+function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression }) {
+  return createToolBreakageRuntime({
+    matchTools: ({ actor, system, task, tools = [], presentTools = null }) =>
+      matchGatheringTools({ actor, system, task, tools, craftingSystemManager, presentTools }),
+    buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
+    resolveReplacementSource: ({ componentId, system }) =>
+      resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
+    evaluateExpression
+  });
 }
 
 function createGatheringResultResolver(resolutionModeService) {
@@ -671,18 +524,15 @@ class Fabricate {
         getCurrentUser: () => game.user,
         getCurrentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
       }),
-      catalystAvailability: createGatheringCatalystAvailability(this.craftingSystemManager),
       toolAvailability: createGatheringToolAvailability({
         craftingSystemManager: this.craftingSystemManager,
         evaluator: this.gatheringGateAndCheckEvaluator
       }),
       resultResolver: createGatheringResultResolver(this.resolutionModeService),
       resultCreator: createGatheringResultCreator(this.craftingSystemManager),
-      catalystUsage: createGatheringCatalystUsage(this.craftingSystemManager),
       toolBreakage: createGatheringToolBreakage({
         craftingSystemManager: this.craftingSystemManager,
-        evaluateExpression: evaluateGatheringExpression,
-        resultCreator: createGatheringResultCreator(this.craftingSystemManager)
+        evaluateExpression: evaluateGatheringExpression
       }),
       failureFeedback: createGatheringFailureFeedback(),
       hazardSceneTrigger: createHazardSceneTrigger({
@@ -724,7 +574,17 @@ class Fabricate {
    */
   async _runMigrations() {
     const runner = new MigrationRunner({ getSetting, setSetting });
-    await runner.run();
+    const summary = await runner.run();
+
+    // One-time GM-facing notice: when the 0.6.0 migration actually converted catalysts into
+    // shared library Tools, tell the GM (so they know where the catalyst data went). GM-only
+    // and only when something was migrated; the pure migration stays free of edge effects.
+    const migratedCount = Number(summary?.migratedCatalystCount || 0);
+    if (migratedCount > 0 && game.user?.isGM) {
+      const message = game.i18n?.format?.('FABRICATE.Migration.CatalystsToTools.Notice', { count: migratedCount })
+        || `Fabricate migrated ${migratedCount} catalyst(s) to the Tools library. Find them under the Tools tab.`;
+      ui.notifications?.info?.(message);
+    }
   }
 
   /**
@@ -1168,8 +1028,45 @@ const fabricate = new Fabricate();
 Hooks.once('init', async () => {
   console.log('Fabricate | Init Hook');
 
+  // Register the region-first `fabricate.interactable` Region Behaviour data model
+  // + its type icon/label. Defensive + idempotent: no-ops when the Foundry region
+  // APIs are unavailable (e.g. an older core), so it is safe to call unconditionally.
+  registerInteractableRegionBehavior(CONFIG);
+
+  // Register the CORE schema-driven RegionBehaviorConfig as the document sheet for
+  // the `fabricate.interactable` RegionBehavior subtype (V13). Our rich
+  // `InteractableConfigApp` is an ApplicationV2 + SvelteApplicationMixin, NOT a
+  // DocumentSheet, so registering it left `behavior.sheet` null and broke the edit
+  // pencil. The core sheet renders our behaviour fields (plus the `events`
+  // multi-select) and makes `behavior.sheet` resolve. Our rich panel stays
+  // reachable via the Tile/Token HUD entry + scene-control opener
+  // (`getInteractableConfigAppClass().show(ref)`). Resolved defensively via
+  // globalThis — a no-op when the API shape differs, so it never throws into init.
+  try {
+    const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig
+      ?? globalThis.DocumentSheetConfig;
+    const RegionBehavior = foundry?.documents?.RegionBehavior
+      ?? CONFIG?.RegionBehavior?.documentClass
+      ?? globalThis.RegionBehavior;
+    const RegionBehaviorConfig = globalThis.foundry?.applications?.sheets?.RegionBehaviorConfig;
+    if (typeof RegionBehaviorConfig === 'function') {
+      assignInteractableConfigSheet({
+        registrar: DocumentSheetConfig,
+        RegionBehavior,
+        SheetClass: RegionBehaviorConfig
+      });
+    }
+  } catch (_error) {
+    // Defensive: a sheet-registration shape mismatch must not break init.
+  }
+
   // Make API available globally
   game.fabricate = fabricate;
+  // Expose the canvas interactable manager singleton so the region behaviour event
+  // handlers (`FabricateInteractableRegionBehavior.static events`) can resolve
+  // `game.fabricate.interactableManager` to dispatch onRegionEnter/onRegionExit.
+  // The handler bodies are added in Phase 1c; the reference must resolve now.
+  game.fabricate.interactableManager = InteractableManager.instance;
   game.fabricate.gathering = {
     getConditions: () => fabricate.getGatheringConditions(),
     setWeather: (weatherTag) => fabricate.setGatheringWeather(weatherTag),
@@ -1182,7 +1079,6 @@ Hooks.once('init', async () => {
     Recipe,
     Ingredient,
     IngredientGroup,
-    Catalyst,
     RecipeManager,
     CraftingEngine,
     getFabricateAppClass,
@@ -1236,12 +1132,40 @@ Hooks.once('ready', async () => {
   await fabricate.initialize();
   await processFabricateWorldTime();
 
-  game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => routeHazardSceneSocketMessage(payload, {
-    currentUserId: () => game.user?.id,
-    isActiveGM: () => game.user === game.users?.activeGM,
-    showPrompt: showHazardScenePrompt,
-    viewSceneForSelf: (uuid) => viewScene(uuid)
-  }));
+  // Wire the canvas Interactable foundation (region-first: drop interception
+  // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
+  // marker, the region-enter presence prompt, the controlToken re-trigger, and
+  // the "interact here" keybinding). Idempotent — register() no-ops on repeat
+  // calls.
+  InteractableManager.instance.register();
+
+  game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => {
+    // Defensive: the hazard router shares the `module.fabricate` channel with the
+    // canvas Interactable round-trip. Guard it so a throw on a hazard payload can
+    // never prevent a non-hazard Interactable payload from reaching
+    // handleInteractableSocketMessage below.
+    try {
+      routeHazardSceneSocketMessage(payload, {
+        currentUserId: () => game.user?.id,
+        isActiveGM: () => game.user === game.users?.activeGM,
+        showPrompt: showHazardScenePrompt,
+        viewSceneForSelf: (uuid) => viewScene(uuid)
+      });
+    } catch (_error) {
+      // Defensive: a hazard-route throw must never block the Interactable payload
+      // from reaching handleInteractableSocketMessage below.
+    }
+    // Same `module.fabricate` channel also carries the canvas Interactable
+    // node-update action (player → active GM token-flag write) AND the region-first
+    // activation round-trip. Only the active GM applies node/behaviour writes +
+    // validates activation; only the targeted user opens a granted session. The
+    // validate/grant + open bodies are the manager's region-first activation seams.
+    handleInteractableSocketMessage(payload, {
+      validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
+      openGrant: (grant) => InteractableManager.instance.openGrant(grant),
+      notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason)
+    });
+  });
 
   addModuleButtonsToItemsDirectory();
   Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());
@@ -1250,11 +1174,125 @@ Hooks.once('ready', async () => {
     void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
   });
 
+  // Env-node-driven marker swap: when an environment's task node depletes (or
+  // recharges) every linked Tile marker for that (environment, task) flips its
+  // image to/from the task's `depletedBehavior.swapImage`. The env `nodeRuntime`
+  // is persisted under the `fabricate.gatheringEnvironments` world setting — both a
+  // gather decrement and the world-time respawn write it — so reacting to that
+  // setting change covers depletion AND recharge. canvasReady does the initial sync
+  // to the current node state when a scene loads. Active-GM-gated inside the sync.
+  Hooks.on('updateSetting', (setting) => {
+    const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
+    if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
+      void runInteractableMarkerSync();
+    }
+  });
+  Hooks.on('canvasReady', () => {
+    void runInteractableMarkerSync();
+  });
+  void runInteractableMarkerSync();
+
   Hooks.callAll('fabricate.ready');
 });
 
+/**
+ * Run the env-node-driven marker image sync across all scenes. Resolves the live
+ * environment from the gathering env store and the library task from the gathering
+ * config setting (mirroring InteractableManager's task resolution), and applies the
+ * tile texture/flag write directly as the active GM (no-op for non-GM clients).
+ */
+async function runInteractableMarkerSync() {
+  try {
+    const environmentStore = fabricate?.getGatheringEnvironmentStore?.() ?? null;
+    await syncInteractableMarkers({
+      scenes: game.scenes,
+      isActiveGM: () => game.user === game.users?.activeGM,
+      resolveEnvironment: (environmentId) => environmentStore?.get?.(environmentId) ?? null,
+      resolveTask: (systemId, taskId) => {
+        const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
+        const tasks = config?.systems?.[systemId]?.tasks;
+        return (Array.isArray(tasks) ? tasks : []).find(task => task?.id === taskId) ?? null;
+      },
+      applyTileImage: (tile, update) => tile?.update?.(update)
+    });
+  } catch (_error) {
+    // Defensive: marker sync must never throw into a hook body.
+  }
+}
+
 Hooks.on('updateWorldTime', (worldTime) => {
   void processFabricateWorldTime(worldTime);
+});
+
+// GM-only scene-control button (Phase 7): adds a Fabricate control group whose
+// single button launches the Interactable browser app. Foundry V13 passes
+// `controls` as an OBJECT-of-controls (keyed record), NOT the pre-V13 array; the
+// pure `addInteractableSceneControl` seam mutates that record. The hook body
+// here is the thin edge supplying the GM gate, the localizer, and the launch
+// callback.
+Hooks.on('getSceneControlButtons', (controls) => {
+  addInteractableSceneControl(controls, {
+    isGM: game.user?.isGM === true,
+    onClick: () => getInteractableBrowserAppClass().show(),
+    localize: (key, fallback) => {
+      const out = game.i18n?.localize?.(key);
+      return out && out !== key ? out : fallback;
+    }
+  });
+});
+
+// GM-only discoverability: a "Configure Fabricate Interactable" button on a
+// placeable's HUD when that placeable is a linked Fabricate interactable visual.
+// It resolves the owning behaviour from the document's reverse linked-visual flags
+// and opens the rich config panel. The pure gate + target resolution live in
+// `interactableConfigSheet.js`; this helper is the thin Foundry edge shared by the
+// Tile HUD (Phase 2) and the Token HUD (Phase 5) — only the host HUD + the
+// localization key differ. This NEVER touches a token's actor: it only opens the
+// behaviour config panel.
+function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
+  try {
+    const document = hud?.object?.document ?? hud?.document ?? null;
+    if (!shouldOfferInteractableConfigEntry(document, { isGM: game.user?.isGM === true })) return;
+
+    const target = resolveInteractableConfigTarget(document, {
+      resolveRegion: (regionUuid) => {
+        const region = fromUuidSync?.(regionUuid) ?? null;
+        const regionId = region?.id ?? region?._id ?? null;
+        const sceneId = region?.parent?.id ?? region?.parent?._id ?? null;
+        return regionId && sceneId ? { sceneId, regionId } : null;
+      }
+    });
+    if (!target) return;
+
+    const root = element instanceof HTMLElement ? element : element?.[0] ?? null;
+    const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
+    if (!column?.appendChild) return;
+
+    const out = game.i18n?.localize?.(localizeKey);
+    const label = out && out !== localizeKey ? out : 'Configure Fabricate Interactable';
+
+    const button = window.document.createElement('button');
+    button.type = 'button';
+    button.className = 'control-icon fabricate-interactable-config-hud';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = '<i class="fas fa-sliders"></i>';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      void getInteractableConfigAppClass().show(target);
+    });
+    column.appendChild(button);
+  } catch (_error) {
+    // Defensive: a HUD augmentation must never throw into Foundry's render.
+  }
+}
+
+Hooks.on('renderTileHUD', (hud, element) => {
+  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromTile' });
+});
+
+Hooks.on('renderTokenHUD', (hud, element) => {
+  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken' });
 });
 
 /**

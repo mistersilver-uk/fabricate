@@ -3,6 +3,9 @@
 // chain that requires the Svelte compiler in Node test environments.
 let _fabricateApp = null;
 let _craftingSystemManagerApp = null;
+let _interactableBrowserApp = null;
+let _interactionPromptApp = null;
+let _interactableConfigApp = null;
 
 export function registerFabricateApp(cls) {
   _fabricateApp = cls;
@@ -10,6 +13,18 @@ export function registerFabricateApp(cls) {
 
 export function registerCraftingSystemManagerApp(cls) {
   _craftingSystemManagerApp = cls;
+}
+
+export function registerInteractableBrowserApp(cls) {
+  _interactableBrowserApp = cls;
+}
+
+export function registerInteractionPromptApp(cls) {
+  _interactionPromptApp = cls;
+}
+
+export function registerInteractableConfigApp(cls) {
+  _interactableConfigApp = cls;
 }
 
 export function getFabricateAppClass() {
@@ -24,4 +39,25 @@ export function getCraftingSystemManagerAppClass() {
     throw new Error('Fabricate | CraftingSystemManagerApp not registered. Ensure SvelteCraftingSystemManagerApp.svelte.js is imported.');
   }
   return _craftingSystemManagerApp;
+}
+
+export function getInteractableBrowserAppClass() {
+  if (!_interactableBrowserApp) {
+    throw new Error('Fabricate | InteractableBrowserApp not registered. Ensure InteractableBrowserApp.svelte.js is imported.');
+  }
+  return _interactableBrowserApp;
+}
+
+export function getInteractionPromptAppClass() {
+  if (!_interactionPromptApp) {
+    throw new Error('Fabricate | InteractionPromptApp not registered. Ensure InteractionPromptApp.svelte.js is imported.');
+  }
+  return _interactionPromptApp;
+}
+
+export function getInteractableConfigAppClass() {
+  if (!_interactableConfigApp) {
+    throw new Error('Fabricate | InteractableConfigApp not registered. Ensure InteractableConfigApp.svelte.js is imported.');
+  }
+  return _interactableConfigApp;
 }

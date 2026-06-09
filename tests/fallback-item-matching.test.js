@@ -1,13 +1,13 @@
 /**
  * Tests for T-097: Runtime fallback item ID matching in RecipeManager.
  *
- * Validates that ingredientMatchesItem() and _catalystMatchesItem() honor
+ * Validates that ingredientMatchesItem() and toolMatchesItem() honor
  * fallbackItemIds between the primary UUID check and name fallback.
  *
  * Tests:
  *   1. Primary UUID matches — existing behaviour unchanged
  *   2. Fallback ID matches when primary UUID fails (ingredient)
- *   3. Fallback ID checked for catalysts
+ *   3. Fallback ID checked for tools
  *   4. Name match still works as last resort (no sourceUuid, no fallbacks)
  *   5. Legacy UUID-only workflows unchanged (no fallbackItemIds field)
  */
@@ -69,16 +69,15 @@ function makeRecipe({ craftingSystemId = 'sys1', componentId = 'comp1' } = {}) {
   return {
     craftingSystemId,
     ingredientSets: [],
-    catalysts: [],
     resultGroups: [],
     validate: () => ({ valid: true, errors: [] })
   };
 }
 
 /**
- * Build a minimal catalyst referencing a component.
+ * Build a minimal tool referencing a component.
  */
-function makeCatalyst({ componentId = 'comp1' } = {}) {
+function makeTool({ componentId = 'comp1' } = {}) {
   return { componentId };
 }
 
@@ -158,7 +157,7 @@ test('T-097: fallback ID matches when primary UUID fails (ingredient)', () => {
     'Should match via fallbackItemIds when primary UUID fails');
 });
 
-test('T-097: fallback ID checked for catalysts', () => {
+test('T-097: fallback ID checked for tools', () => {
   const component = makeComponent({
     id: 'mortar',
     name: 'Mortar and Pestle',
@@ -169,7 +168,7 @@ test('T-097: fallback ID checked for catalysts', () => {
 
   const recipeManager = new RecipeManager();
   const recipe = makeRecipe({ craftingSystemId: 'sys1' });
-  const catalyst = makeCatalyst({ componentId: 'mortar' });
+  const tool = makeTool({ componentId: 'mortar' });
 
   // Item with old compendium source that matches fallback
   const item = makeItem({
@@ -178,8 +177,8 @@ test('T-097: fallback ID checked for catalysts', () => {
     compendiumSource: 'Compendium.world.tools.old-mortar'
   });
 
-  assert.ok(recipeManager.catalystMatchesItem(recipe, catalyst, item),
-    'Should match catalyst via fallbackItemIds using compendium source');
+  assert.ok(recipeManager.toolMatchesItem(recipe, tool, item),
+    'Should match tool via fallbackItemIds using compendium source');
 });
 
 test('T-097: name match still works as last resort (no sourceUuid, no fallbacks)', () => {

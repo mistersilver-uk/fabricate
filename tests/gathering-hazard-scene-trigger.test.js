@@ -14,7 +14,7 @@ const BASE = {
   actor: {},
   system: {},
   environment: {},
-  task: { id: 't', catalysts: [] }
+  task: { id: 't' }
 };
 
 test('terminal side effects forward triggered hazards to the scene trigger on success', async () => {

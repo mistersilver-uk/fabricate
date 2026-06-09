@@ -48,8 +48,7 @@ function makeRecipeData(overrides = {}) {
         name: 'Ingredients',
         options: [{ id: 'ingredient-1', itemUuid: 'Item.ingredient', quantity: 1 }]
       }],
-      essences: {},
-      catalysts: []
+      essences: {}
     }],
     resultGroups: [{
       id: 'result-group-1',
@@ -146,8 +145,7 @@ describe('RecipeManager notification controls', () => {
             name: 'Ingredients',
             options: [{ id: 'ingredient-2', itemUuid: 'Item.other-ingredient', quantity: 1 }]
           }],
-          essences: {},
-          catalysts: []
+          essences: {}
         }]
       })
     ]);

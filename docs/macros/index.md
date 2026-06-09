@@ -59,6 +59,8 @@ Called per result item when `features.propertyMacros` is enabled and a result ha
 | `recipe` | `object` | The recipe |
 | `result` | `object` | The result definition |
 | `craftingActor` | `Actor` | The crafting actor |
+| `resolvedIngredients` | `object[]` | Ingredients resolved for the craft, each `{ item, quantity, ingredient }` |
+| `resolvedTools` | `object[]` | Tools resolved for the craft, each `{ item, tool }` |
 | `checkResult` | `object` | The crafting check result (if any) |
 
 **Return value:** `{ [propertyPath]: value }`
@@ -95,7 +97,7 @@ Called after a step completes successfully. The return value of the macro is ign
 | `step` | `object` | The step that just completed |
 | `selectedIngredientSet` | `object` | The ingredient set that was used |
 | `consumedIngredients` | `object[]` | Items consumed, each `{ item, quantity, ingredient }` |
-| `consumedCatalysts` | `object[]` | Catalysts used, each `{ catalyst, item }` |
+| `consumedTools` | `object[]` | Tools used this attempt, each `{ tool, item }` |
 | `createdResults` | `Item[]` | Foundry Item documents created on the crafting actor |
 | `checkResult` | `object` | The crafting check result (`{ success, outcome, value, data }`) |
 
@@ -135,7 +137,7 @@ Called when a step fails due to a crafting check failure or a check-result valid
 | `failureReason` | `string` | A human-readable description of why the step failed |
 | `checkResult` | `object` | The crafting check result (`{ success, outcome, value, data }`) |
 | `consumedIngredients` | `object[]` | Items consumed on this failure path (may be empty if `consumeIngredientsOnFail` is `false`) |
-| `consumedCatalysts` | `object[]` | Catalysts degraded on this failure path (may be empty if `consumeCatalystsOnFail` is `false`) |
+| `consumedTools` | `object[]` | Tools broken/degraded on this failure path, each `{ tool, item }` (may be empty if `consumeCatalystsOnFail` is `false`) |
 
 {: .note }
 > `createdResults` is **not** present in the failure context because no result items are created on failure. If the macro throws an error, Fabricate logs it to the browser console and continues; the failure result returned to the caller is not affected.
@@ -145,7 +147,7 @@ Called when a step fails due to a crafting check failure or a check-result valid
 - After a crafting check macro returns `{ success: false }`.
 - After a successful check result fails resolution-mode validation (e.g. the outcome value does not satisfy the current progressive mode requirements or routed macroOutcome provider).
 
-Pre-check failures (missing ingredients, missing catalysts, invalid recipe, missing actor) return immediately **without** calling the failure macro.
+Pre-check failures (missing ingredients, missing or unsatisfied tools, invalid recipe, missing actor) return immediately **without** calling the failure macro.
 
 **Example:**
 

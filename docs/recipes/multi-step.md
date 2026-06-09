@@ -10,7 +10,7 @@ nav_order: 5
 {: .gm }
 > Requires the `multiStepRecipes` feature to be enabled on the crafting system.
 
-Multi-step recipes chain several steps that must be completed in sequence. Each step can have its own ingredients, catalysts, results, time requirements, and currency requirements.
+Multi-step recipes chain several steps that must be completed in sequence. Each step can have its own ingredients, tool references (`toolIds`), results, time requirements, and currency requirements.
 
 ---
 
@@ -38,7 +38,7 @@ Runs are stored on the crafting actor's flags and persist across sessions.
 A three-step recipe for creating enchanted plate armour:
 
 **Step 1: Forge the Plates**
-- Ingredients: 5x Steel Ingot, 1x Forge (catalyst)
+- Ingredients: 5x Steel Ingot; requires the Forge tool
 - Time: 4 hours of world time
 - Result: 1x Unfinished Plate Set
 
@@ -65,13 +65,15 @@ const recipe = new Recipe({
       name: 'Forge the Plates',
       description: 'Heat and hammer steel into armour plates.',
       timeRequirement: { hours: 4 },
+      // Require the Forge tool for this step. Tools are authored in the system's
+      // Tools library and referenced here by their library id.
+      toolIds: ['forge-tool-id'],
       ingredientSets: [{
         id: 'forge-input',
         ingredientGroups: [{
           id: 'steel', name: 'Steel',
           options: [{ quantity: 5, match: { type: 'component', componentId: 'steel-ingot-id' } }]
-        }],
-        catalysts: [{ componentId: 'forge-id', degradesOnUse: true, maxUses: 100 }]
+        }]
       }],
       resultGroups: [{
         id: 'plates-output',

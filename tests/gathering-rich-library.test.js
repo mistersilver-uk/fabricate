@@ -86,9 +86,6 @@ function makeEngine({ richState, env = environment(), environmentStore = null, p
     sceneAccess: {
       canAttempt: () => ({ allowed: true })
     },
-    catalystAvailability: {
-      check: () => ({ available: true, missing: [] })
-    },
     resultCreator: {
       plan: async ({ resultGroups }) => resultGroups.flatMap(group => group.results).map(result => ({
         actorUuid: actingActor.uuid,
@@ -103,10 +100,6 @@ function makeEngine({ richState, env = environment(), environmentStore = null, p
           quantity: result.quantity
         }));
       }
-    },
-    catalystUsage: {
-      plan: async () => [],
-      apply: async () => []
     },
     failureFeedback: {
       apply: async () => null
@@ -1041,19 +1034,18 @@ test('timed d100 missing-reference cancellation does not expose or persist runti
 });
 
 test('composeEnvironment exposes library tools through a non-enumerable __libraryTools Map', () => {
-  const { service } = makeRichState({
-    config: {
-      systems: {
-        'system-a': {
-          tools: [
-            { id: 'tool-axe', componentId: 'herb', label: 'Iron Pickaxe', breakage: { mode: 'limitedUses', maxUses: 10 } },
-            { id: 'tool-saw', componentId: 'herb', breakage: { mode: 'breakageChance', breakageChance: 25 } }
-          ]
-        }
-      }
-    }
-  });
-  const composed = service.composeEnvironment(environment(), system);
+  // Tools are now system-owned: the library is sourced from the normalized
+  // crafting system's `tools` (the second composeEnvironment arg), not the
+  // gathering config.
+  const { service } = makeRichState();
+  const systemWithTools = {
+    ...system,
+    tools: [
+      { id: 'tool-axe', componentId: 'herb', label: 'Iron Pickaxe', breakage: { mode: 'limitedUses', maxUses: 10 } },
+      { id: 'tool-saw', componentId: 'herb', breakage: { mode: 'breakageChance', breakageChance: 25 } }
+    ]
+  };
+  const composed = service.composeEnvironment(environment(), systemWithTools);
   assert.ok(composed.__libraryTools instanceof Map);
   assert.equal(composed.__libraryTools.size, 2);
   assert.equal(composed.__libraryTools.get('tool-axe').label, 'Iron Pickaxe');
@@ -1063,16 +1055,9 @@ test('composeEnvironment exposes library tools through a non-enumerable __librar
 });
 
 test('composeEnvironment skips library tools without an id', () => {
-  const { service } = makeRichState({
-    config: {
-      systems: {
-        'system-a': {
-          tools: [{ id: '', componentId: 'herb' }]
-        }
-      }
-    }
-  });
-  const composed = service.composeEnvironment(environment(), system);
+  const { service } = makeRichState();
+  const systemWithTools = { ...system, tools: [{ id: '', componentId: 'herb' }] };
+  const composed = service.composeEnvironment(environment(), systemWithTools);
   assert.ok(composed.__libraryTools instanceof Map);
   assert.equal(composed.__libraryTools.size, 0);
 });

@@ -114,7 +114,7 @@ Checks if a recipe can be crafted and reports what's missing.
 
 The `missing` object contains:
 - `missing.ingredients` -- array of `{ ingredient, need, have }`
-- `missing.catalysts` -- array of missing catalyst objects
+- `missing.tools` -- array of unmet required Tool objects (resolved from `toolIds`)
 - `missing.essences` -- array of `{ essenceId, need, have }`
 
 Use `resolveComponentName(recipe, ingredient.match.componentId)` to get a human-readable component name from a missing ingredient entry. `ingredient.getDescription()` returns generic text describing the ingredient match type (e.g. "component" or "specific item") and is not suitable for display.

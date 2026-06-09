@@ -33,7 +33,6 @@ function buildComponent(overrides = {}) {
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }],
     },
     ...overrides,
@@ -108,7 +107,6 @@ test('simple mode — exactly 1 result group → valid', () => {
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [{ id: 'rg-1', results: [] }],
     },
   });
@@ -126,7 +124,6 @@ test('simple mode — 0 result groups → invalid', () => {
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [],
     },
   });
@@ -147,7 +144,6 @@ test('simple mode — 2 result groups → invalid', () => {
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [
         { id: 'rg-1', results: [] },
         { id: 'rg-2', results: [] },
@@ -187,7 +183,6 @@ function buildRoutedComponent(outcomeRouting = { fail: 'rg-fail', pass: 'rg-pass
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [
         { id: 'rg-fail', results: [] },
         { id: 'rg-pass', results: [] },
@@ -339,7 +334,6 @@ function buildProgressiveComponent(results = []) {
     salvage: {
       enabled: true,
       ingredientQuantity: 1,
-      catalysts: [],
       resultGroups: [{ id: 'rg-1', results }],
     },
   });

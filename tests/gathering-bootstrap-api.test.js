@@ -223,10 +223,8 @@ test('bootstrap constructs gathering collaborators after systems load with expli
     'getSelectableActors: getGatheringSelectableActors',
     'isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer)',
     'sceneAccess: createGatheringSceneAccess({',
-    'catalystAvailability: createGatheringCatalystAvailability(this.craftingSystemManager)',
     'resultResolver: createGatheringResultResolver(this.resolutionModeService)',
     'resultCreator: createGatheringResultCreator(this.craftingSystemManager)',
-    'catalystUsage: createGatheringCatalystUsage(this.craftingSystemManager)',
     'failureFeedback: createGatheringFailureFeedback()',
     'getRunViewer: getGatheringRunViewer',
     'localize: localizeGathering'
@@ -425,7 +423,7 @@ test('tool availability injectable matches by componentId and skips broken-flagg
 test('tool availability injectable blocks when actor lacks a required library tool', async () => {
   const availability = createGatheringToolAvailability({
     craftingSystemManager: {
-      catalystMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
+      toolMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
     },
     evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
   });
@@ -444,7 +442,7 @@ test('tool availability injectable blocks when actor lacks a required library to
 test('tool availability injectable treats actor tools flagged broken as missing', async () => {
   const availability = createGatheringToolAvailability({
     craftingSystemManager: {
-      catalystMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
+      toolMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
     },
     evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
   });

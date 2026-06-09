@@ -2037,6 +2037,15 @@
   background: var(--fab-warning-soft);
 }
 
+/* Danger-active state: the depleted "delete the token" toggle carries `is-danger`
+   alongside `is-on` so the irreversible-delete signal lands on the toggle itself
+   (the adjacent `manager-chip is-danger` alert reinforces it). */
+.fabricate-manager .manager-status-toggle.is-danger {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
 .fabricate-manager .manager-status-toggle:hover {
   border-color: var(--fab-mv2-border-strong);
 }
@@ -5089,7 +5098,11 @@
   padding: 7px;
 }
 
-.fabricate-manager .manager-task-image-picker i {
+/* The edit/lock affordance (fa-pen, or fa-lock when the image is scene-locked)
+   is a small badge pinned to the bottom-right corner of the picker, on top of
+   either the <img> or the centered placeholder. */
+.fabricate-manager .manager-task-image-picker .fa-pen,
+.fabricate-manager .manager-task-image-picker .fa-lock {
   position: absolute;
   right: 5px;
   bottom: 5px;
@@ -5105,6 +5118,14 @@
   font-size: 0.72rem;
 }
 
+/* The "no image set" placeholder (fa-image) sits large and centered in the box;
+   it shares the picker's flex centering, so it must NOT be absolutely positioned
+   (that was the source of the bottom-right overlap with the pen badge). */
+.fabricate-manager .manager-task-image-picker .fa-image {
+  font-size: 1.8rem;
+  color: var(--fab-mv2-text-muted);
+}
+
 /* When a scene is linked, the identity image mirrors the (muted) scene thumbnail and is
    locked — it can't be edited until the scene is unlinked. */
 .fabricate-manager .manager-task-image-picker.is-scene-linked {
@@ -5117,7 +5138,8 @@
   filter: saturate(0.65) brightness(0.85);
 }
 
-.fabricate-manager .manager-task-image-picker.is-scene-linked i {
+.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-pen,
+.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock {
   color: var(--fab-mv2-text-muted);
 }
 
@@ -9689,4 +9711,153 @@
 
 .fabricate-gather-chat__stat-value {
   font-weight: 700;
+}
+
+/* Region-first player interaction prompt (InteractionPromptApp) — a small,
+   non-modal toast. The toast is a plain fixed-position DOM element appended to
+   <body>; its CRITICAL layout/positioning (fixed, bottom-center, z-index,
+   pointer-events, max-width) lives in INLINE styles on the element so it works
+   with zero external CSS. These rules are PURELY COSMETIC theming (colours,
+   padding, typography) — never positioning/visibility. Selectors are namespaced
+   under .fabricate-interaction-prompt so nothing bleeds into other sheets. */
+.fabricate-interaction-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--fab-border);
+  border-radius: 10px;
+  background: var(--fab-bg-2);
+  color: var(--fab-text);
+  box-shadow: var(--fab-shadow-lg);
+}
+
+.fabricate-interaction-prompt .fabricate-interaction-prompt__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 360px;
+}
+
+.fabricate-interaction-prompt .fabricate-interaction-prompt__name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.95em;
+}
+
+.fabricate-interaction-prompt .fabricate-interaction-prompt__text {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.85;
+}
+
+.fabricate-interaction-prompt .fabricate-interaction-prompt__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: auto;
+  min-height: 30px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.fabricate-interaction-prompt .fabricate-interaction-prompt__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  opacity: 0.6;
+}
+
+.fabricate-interaction-prompt .fabricate-interaction-prompt__close:hover {
+  opacity: 1;
+}
+
+/* ==========================================
+   Interactable config panel (rich GM behaviour sheet)
+   ==========================================
+   The rich GM config panel for a `fabricate.interactable` Region Behaviour. The
+   panel body + its component-scoped styles live in InteractableConfigRoot.svelte;
+   this block carries only the area-level focus-ring override (Foundry core paints
+   an orange ring that must be stripped on :focus and repainted on :focus-visible
+   per app surface) plus the Tile-HUD discoverability button. All selectors are
+   namespaced under the app root / HUD button class so nothing bleeds. */
+.fabricate-interactable-config-app button:focus,
+.fabricate-interactable-config-app input:focus,
+.fabricate-interactable-config-app select:focus,
+.fabricate-interactable-config-app textarea:focus,
+.fabricate-interactable-config-app [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-interactable-config-app button:focus-visible,
+.fabricate-interactable-config-app input:focus-visible,
+.fabricate-interactable-config-app select:focus-visible,
+.fabricate-interactable-config-app textarea:focus-visible,
+.fabricate-interactable-config-app [tabindex]:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-interactable-config-hud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Interactable Browser — paired area-level focus-ring override. The browser app
+   body lives in InteractableBrowserRoot.svelte; this block strips Foundry core's
+   orange :focus ring and repaints the accent ring on :focus-visible per app
+   surface (mirroring the config app block above), kept at single area-class
+   specificity so the component-scoped focus rings still win. */
+.fabricate-interactable-browser-app button:focus,
+.fabricate-interactable-browser-app input:focus,
+.fabricate-interactable-browser-app select:focus,
+.fabricate-interactable-browser-app textarea:focus,
+.fabricate-interactable-browser-app [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-interactable-browser-app button:focus-visible,
+.fabricate-interactable-browser-app input:focus-visible,
+.fabricate-interactable-browser-app select:focus-visible,
+.fabricate-interactable-browser-app textarea:focus-visible,
+.fabricate-interactable-browser-app [tabindex]:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================
+   Fabricate confirm dialogs (DialogV2)
+   ==========================================
+   Multi-button confirm dialogs (e.g. "Remove visual marker", "Delete
+   interactable") built via the `choiceDialog` → `renderDialog` bridge carry the
+   `.fabricate-dialog` class. DialogV2's default button row crushes 3 buttons
+   into a too-narrow strip, so long labels like "Unlink + delete marker" wrap
+   mid-word or clip. Let the buttons size to their content and wrap to a clean
+   column on a narrow dialog instead of truncating, with adequate padding. All
+   selectors are namespaced under `.fabricate-dialog` so nothing bleeds. */
+.fabricate-dialog .form-footer,
+.fabricate-dialog .dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: stretch;
+}
+
+.fabricate-dialog .form-footer button,
+.fabricate-dialog .dialog-buttons button {
+  flex: 1 1 auto;
+  min-width: max-content;
+  white-space: normal;
+  overflow-wrap: break-word;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  line-height: 1.2;
 }

@@ -6,6 +6,14 @@ import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from '../config/preferencesCleanup.js';
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
+import { TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST, TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST, TOOL_REQUIREMENT_PROVIDERS as TOOL_REQUIREMENT_PROVIDER_LIST } from '../models/Tool.js';
+
+// Membership sets derived from the canonical Tool model vocabularies, so the
+// system-owned tool normalizer enforces the exact same enumerations as the Tool
+// model and the adminStore editor without duplicating the literal lists.
+const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
+const TOOL_ON_BREAK_MODES = new Set(TOOL_ON_BREAK_MODE_LIST);
+const TOOL_REQUIREMENT_PROVIDERS = new Set(TOOL_REQUIREMENT_PROVIDER_LIST);
 
 export class CraftingSystemManager {
   constructor(recipeManager) {
@@ -95,8 +103,103 @@ export class CraftingSystemManager {
       enableEssences: features.essences === true,
       enableCategories: true,
       enableMultiStepRecipes: features.multiStepRecipes === true,
-      components: items
+      components: items,
+      // Canonical, system-owned library Tools. Populated here so every consumer
+      // (`getSystem(id).tools`) — the recipe tool gate, salvage, the canvas
+      // interactable browser, item-drop resolution, and gathering composition —
+      // reads a single source of truth. Mirrors how `components` is normalized.
+      tools: Array.isArray(system.tools) ? system.tools.map(t => this._normalizeTool(t)) : []
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Library Tool normalization (system-owned canonical shape:
+  //   { id, label, enabled, componentId, requirement, breakage, onBreak }).
+  // Field coercion mirrors the adminStore tool editor and the Tool model so a
+  // tool authored in the Manager, migrated from a catalyst, or hand-edited in
+  // settings loads to the same shape regardless of origin.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Normalize one system-owned library Tool to its canonical persisted shape:
+   * `{ id, label, enabled, componentId, requirement, breakage, onBreak }`.
+   *
+   * Tools are owned by the crafting system (`system.tools`), not by the gathering
+   * config; this normalizer is the single coercion point so a Tool authored in the
+   * Manager, migrated from a catalyst (0.6.0), reconciled off the gathering config
+   * (0.7.0), or hand-edited in settings all load to the same shape. A missing `id`
+   * is assigned a fresh `randomID()`; `enabled` defaults to `true` (only an
+   * explicit `false` disables); `componentId` is trimmed to a non-empty string or
+   * `null`. The `requirement` / `breakage` / `onBreak` sub-objects are delegated to
+   * their dedicated normalizers.
+   *
+   * @param {object} [tool] Raw tool entry (any origin).
+   * @returns {{ id: string, label: string, enabled: boolean, componentId: string|null,
+   *   requirement: object|null, breakage: object, onBreak: object }}
+   */
+  _normalizeTool(tool = {}) {
+    if (!tool || typeof tool !== 'object') tool = {};
+    const id = String(tool.id || foundry.utils.randomID());
+    const label = typeof tool.label === 'string' ? tool.label.trim() : '';
+    const componentId = typeof tool.componentId === 'string' && tool.componentId.trim()
+      ? tool.componentId.trim()
+      : null;
+    return {
+      id,
+      label,
+      enabled: tool.enabled !== false,
+      componentId,
+      requirement: this._normalizeToolRequirement(tool.requirement),
+      breakage: this._normalizeToolBreakage(tool.breakage),
+      onBreak: this._normalizeToolOnBreak(tool.onBreak)
+    };
+  }
+
+  _normalizeToolRequirement(input) {
+    if (input === null || input === undefined) return null;
+    if (typeof input !== 'object') return null;
+    const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
+    return {
+      provider,
+      formula: typeof input.formula === 'string' ? input.formula : '',
+      macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+    };
+  }
+
+  _normalizeToolBreakage(input) {
+    const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
+    if (mode === 'limitedUses') {
+      const raw = input?.maxUses;
+      let maxUses = null;
+      if (raw !== null && raw !== undefined && raw !== '') {
+        const numeric = Number(raw);
+        maxUses = Number.isFinite(numeric) ? numeric : null;
+      }
+      return { mode, maxUses };
+    }
+    if (mode === 'breakageChance') {
+      const raw = Number(input?.breakageChance);
+      return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
+    }
+    const threshold = Number(input?.threshold);
+    return {
+      mode,
+      formula: typeof input?.formula === 'string' ? input.formula : '',
+      threshold: Number.isFinite(threshold) ? threshold : 0
+    };
+  }
+
+  _normalizeToolOnBreak(input) {
+    const mode = TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
+    if (mode === 'replaceWith') {
+      return {
+        mode,
+        replacementComponentId: typeof input?.replacementComponentId === 'string'
+          ? input.replacementComponentId
+          : null
+      };
+    }
+    return { mode };
   }
 
   _normalizeFeatures(system = {}) {
@@ -546,7 +649,7 @@ export class CraftingSystemManager {
       return {
         enabled: false,
         ingredientQuantity: 1,
-        catalysts: [],
+        toolIds: [],
         resultGroups: []
       };
     }
@@ -559,9 +662,9 @@ export class CraftingSystemManager {
     return {
       enabled: salvage.enabled === true,
       ingredientQuantity,
-      catalysts: Array.isArray(salvage.catalysts)
-        ? salvage.catalysts.map(c => this._normalizeSalvageCatalyst(c)).filter(Boolean)
-        : [],
+      // Preserve migrated salvage tool references so they are not orphaned on the
+      // next system save. Coerced to trimmed, non-empty, deduped id strings.
+      toolIds: this._normalizeToolIds(salvage.toolIds),
       resultGroups: Array.isArray(salvage.resultGroups)
         ? salvage.resultGroups.map(g => this._normalizeSalvageResultGroup(g)).filter(Boolean)
         : [],
@@ -577,19 +680,23 @@ export class CraftingSystemManager {
     };
   }
 
-  _normalizeSalvageCatalyst(catalyst) {
-    if (!catalyst || typeof catalyst !== 'object') return null;
-    const compId = catalyst.componentId || catalyst.systemItemId;
-    if (!compId) return null;
-    return {
-      componentId: compId,
-      systemItemId: compId, // transitional alias
-      degradesOnUse: catalyst.degradesOnUse === true,
-      destroyWhenExhausted: catalyst.destroyWhenExhausted === true,
-      maxUses: Number.isFinite(Number(catalyst.maxUses)) && catalyst.maxUses !== null
-        ? Number(catalyst.maxUses)
-        : null
-    };
+  /**
+   * Normalize an array of library tool id strings: coerce to trimmed, non-empty,
+   * deduped strings. Tolerant of non-array / nullish input (returns []).
+   * @param {unknown} toolIds
+   * @returns {string[]}
+   */
+  _normalizeToolIds(toolIds) {
+    if (!Array.isArray(toolIds)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of toolIds) {
+      const id = String(raw ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
   }
 
   _normalizeSalvageResult(result) {
@@ -1468,8 +1575,7 @@ export class CraftingSystemManager {
               ((ing.match?.type === 'component' || ing.match?.type === 'systemItem') ? (ing.match.componentId || ing.match.systemItemId) : (ing.componentId || ing.systemItemId)) !== itemId
             )
           })).filter(group => (group.options || []).length > 0),
-          ingredients: (set.ingredients || []).filter(ing => (ing.componentId || ing.systemItemId) !== itemId),
-          catalysts: (set.catalysts || []).filter(cat => (cat.componentId || cat.systemItemId) !== itemId)
+          ingredients: (set.ingredients || []).filter(ing => (ing.componentId || ing.systemItemId) !== itemId)
         }))
         .map(set => ({
           ...set,
@@ -1482,7 +1588,6 @@ export class CraftingSystemManager {
           Object.keys(set.essences || {}).length > 0
         );
 
-      updated.catalysts = (updated.catalysts || []).filter(cat => (cat.componentId || cat.systemItemId) !== itemId);
       updated.resultGroups = (updated.resultGroups || [])
         .map(group => ({
           ...group,

@@ -14,6 +14,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { formatRespawnDuration } from '../../util/formatDuration.js';
   import GatheringTaskRequirements from './GatheringTaskRequirements.svelte';
   import GatheringTaskDrops from './GatheringTaskDrops.svelte';
   import SuccessChanceBar from './SuccessChanceBar.svelte';
@@ -45,7 +46,6 @@
   const BLOCK_LABEL_KEYS = {
     TOOL_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools',
     CONDITIONS_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Conditions',
-    CATALYST_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst',
     GAME_PAUSED: 'FABRICATE.App.Gathering.Detail.Callout.Paused',
     DUPLICATE_ACTIVE_RUN: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun',
     SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene',
@@ -62,6 +62,23 @@
   const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
     ? `${richNodes.current}/${richNodes.max}` : null);
   const nodeDepleted = $derived(richNodes != null && richNodes.available === false);
+  // Per-region node respawn ETA (canvas gathering-task region): the engine surfaces
+  // `rich.nodes.respawnEta = { nextWorldTime, secondsUntil }` only for a placed
+  // interactable whose node is under cap. Format `secondsUntil` into a calendar-aware
+  // human duration for the {duration}-interpolated lang key.
+  const respawnSecondsUntil = $derived(
+    richNodes?.respawnEta?.secondsUntil != null ? Number(richNodes.respawnEta.secondsUntil) : null
+  );
+  const respawnDuration = $derived(
+    respawnSecondsUntil != null
+      ? formatRespawnDuration(respawnSecondsUntil, globalThis.game?.time?.calendar ?? null)
+      : ''
+  );
+  const respawnEtaText = $derived(
+    respawnDuration !== ''
+      ? localize('FABRICATE.App.Gathering.Detail.NodeRespawnEta', { duration: respawnDuration })
+      : ''
+  );
   const blockReason = $derived.by(() => {
     if (!blocked) return '';
     const seen = new Set();
@@ -176,6 +193,23 @@
             {/if}
           </span>
         {/if}
+      </div>
+    {/if}
+
+    {#if nodeDepleted}
+      <!--
+        Player-facing depleted callout for a token-scoped node. Tone is carried by
+        the `is-depleted` class (not color alone) so the depleted state is legible
+        without relying on color, mirroring the row/economy depleted pattern.
+      -->
+      <div class="gathering-node-depleted-callout is-depleted" role="status" data-gathering-node-depleted>
+        <i class="fas fa-mountain-sun" aria-hidden="true"></i>
+        <span class="gathering-node-depleted-text">
+          {localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
+          {#if respawnEtaText !== ''}
+            <span class="gathering-node-respawn-eta" data-gathering-node-respawn-eta>{respawnEtaText}</span>
+          {/if}
+        </span>
       </div>
     {/if}
 
@@ -322,6 +356,34 @@
     font-weight: 600;
     background: var(--fab-warning-soft);
     border: 1px solid var(--fab-warning-border);
+  }
+
+  /* Token-scoped depleted callout: a tone-carrying banner (not color alone) with
+     the respawn ETA line. Reuses the warning palette like the depleted chip. */
+  .gathering-node-depleted-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    background: var(--fab-warning-soft);
+    border: 1px solid var(--fab-warning-border);
+    color: var(--fab-warning-text);
+  }
+
+  .gathering-node-depleted-callout.is-depleted {
+    color: var(--fab-warning-text);
+  }
+
+  .gathering-node-depleted-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .gathering-node-respawn-eta {
+    font-weight: 600;
   }
 
   /* Single column (full-width Attempt) by default; two equal columns with

@@ -68,8 +68,7 @@ function makeValidPayload(overrides = {}) {
             ]
           }
         ],
-        essences: {},
-        catalysts: []
+        essences: {}
       }
     ],
     resultGroups: [
@@ -149,8 +148,7 @@ test('RecipeManager.updateRecipe logs recipe name and ID after successful save',
         name: 'Group 1',
         options: [{ id: 'i-1', itemUuid: 'Item.herb', quantity: 1 }]
       }],
-      essences: {},
-      catalysts: []
+      essences: {}
     }],
     resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', itemUuid: 'Item.x', quantity: 1 }] }]
   });

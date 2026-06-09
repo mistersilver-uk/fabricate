@@ -11,7 +11,8 @@ These model classes are exported via `game.fabricate.api`:
 
 ```javascript
 const {
-  Recipe, Ingredient, IngredientGroup, Catalyst
+  Recipe, Ingredient, IngredientGroup, IngredientSet,
+  Result
 } = game.fabricate.api;
 ```
 
@@ -38,7 +39,7 @@ new Recipe({
   ingredientSets,        // Ingredient-set data[] (single-step)
   steps,                 // object[] (multi-step)
   resultGroups,          // object[]
-  catalysts,             // Catalyst[]
+  toolIds,               // string[] (library Tool ids required for crafting)
   transferEffects,       // boolean (default false)
   resultSelection: {     // object (routed mode only)
     provider,            // "ingredientSet" | "macroOutcome" | "rollTableOutcome"
@@ -58,7 +59,7 @@ new Recipe({
 |:-------|:--------|:------------|
 | `validate()` | `{valid, errors}` | Validates recipe structure |
 | `getResultDescription()` | `string` | Human-readable result summary |
-| `isSimpleRecipe()` | `boolean` | True if no tags/essences/catalysts/steps |
+| `isSimpleRecipe()` | `boolean` | True if no tags/essences/tools/steps |
 | `getExecutionSteps()` | `object[]` | Steps array (converts implicit step if single-step) |
 | `toJSON()` | `object` | Serialise to JSON |
 | `Recipe.fromJSON(data)` | `Recipe` | Deserialise from JSON |
@@ -74,7 +75,7 @@ new Recipe({
   name,              // string
   ingredientGroups,  // IngredientGroup[] -- all must be satisfied (AND)
   essences,          // { [essenceId]: quantity }
-  catalysts,         // Catalyst[]
+  toolIds,           // string[] (library Tool ids required for this set)
   resultGroupId      // string | null (routed ingredientSet provider routing)
 }
 ```
@@ -129,26 +130,28 @@ new Ingredient({
 
 ---
 
-## Catalyst
-
-```javascript
-new Catalyst({
-  componentId,          // string (required)
-  degradesOnUse,        // boolean (default false)
-  destroyWhenExhausted, // boolean (default false)
-  maxUses               // number | null (default null)
-})
-```
+## Tool
 
 {: .note }
-> The field was previously named `systemItemId`. Use `componentId` for all new data.
+> The standalone `Catalyst` model was removed in `0.6.0`. Tools are not constructed via `game.fabricate.api` — they are authored in the per-system Tools library through the Crafting System Manager and referenced by id (`toolIds`). See [Tools]({% link tools.md %}) for the full concept.
 
-**Key methods:**
+A Tool entry stored under `system.tools` (the `craftingSystems` setting) has this shape:
 
-| Method | Returns | Description |
-|:-------|:--------|:------------|
-| `validate()` | `{valid, errors}` | Validates structure |
-| `applyDegradation(item)` | `Promise<void>` | Increment usage, optionally delete |
+```javascript
+{
+  id,           // string (library id, referenced by toolIds)
+  componentId,  // string (required managed component reference)
+  label,        // string (optional display label)
+  requirement,  // null | { provider: 'dnd5e'|'pf2e'|'macro', formula?, macroUuid? }
+  breakage,     // { mode: 'limitedUses', maxUses } |
+                // { mode: 'breakageChance', breakageChance } |
+                // { mode: 'diceExpression', formula, threshold }
+  onBreak       // { mode: 'destroy' } | { mode: 'flagBroken' } |
+                // { mode: 'replaceWith', replacementComponentId }
+}
+```
+
+Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`; the `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
 
 ---
 

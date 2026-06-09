@@ -60,8 +60,8 @@
     return recipe?.ingredientCount ?? recipe?.ingredients?.length ?? 0;
   }
 
-  function catalystCount(recipe) {
-    return recipe?.catalystCount ?? recipe?.catalysts?.length ?? 0;
+  function toolCount(recipe) {
+    return recipe?.toolCount ?? recipe?.tools?.length ?? 0;
   }
 
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
@@ -77,7 +77,7 @@
         .replace('{count}', step.ingredientSetCount || step.ingredientSetSummaries?.length || 0);
     }
     const ingredients = step.ingredientCount || 0;
-    const catalysts = step.catalystCount || 0;
+    const tools = step.toolCount || 0;
     const ingredientLabel = formatCount(
       'FABRICATE.Admin.Manager.Recipe.Ingredient',
       'ingredient',
@@ -85,15 +85,15 @@
       'ingredients',
       ingredients
     );
-    if (catalysts <= 0) return ingredientLabel;
-    const catalystLabel = formatCount(
-      'FABRICATE.Admin.Manager.Recipe.Catalyst',
-      'catalyst',
-      'FABRICATE.Admin.Manager.Recipe.Catalysts',
-      'catalysts',
-      catalysts
+    if (tools <= 0) return ingredientLabel;
+    const toolLabel = formatCount(
+      'FABRICATE.Admin.Manager.Recipe.Tool',
+      'tool',
+      'FABRICATE.Admin.Manager.Recipe.Tools',
+      'tools',
+      tools
     );
-    return `${ingredientLabel}, ${catalystLabel}`;
+    return `${ingredientLabel}, ${toolLabel}`;
   }
 
   function requirementsSummary(recipe) {
@@ -105,7 +105,7 @@
     if (steps.length === 1) return stepRequirementSummary(steps[0]);
     return stepRequirementSummary({
       ingredientCount: ingredientCount(recipe),
-      catalystCount: catalystCount(recipe),
+      toolCount: toolCount(recipe),
       ingredientSetCount: 1
     });
   }

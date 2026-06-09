@@ -25,7 +25,7 @@ Every recipe has:
 | `craftingSystemId` | The system this recipe belongs to |
 | `ingredientSets` | One or more sets of required ingredients (single-step recipes only; multi-step recipes define these per step) |
 | `resultGroups` | One or more groups of produced items (single-step recipes only; multi-step recipes define these per step) |
-| `catalysts` | Non-consumable tools required for crafting; for multi-step recipes, recipe-level catalysts apply to every step |
+| `toolIds` | Library Tool ids required for crafting; for multi-step recipes, recipe-level tools apply to every step (step and ingredient-set `toolIds` also apply) |
 | `transferEffects` | Whether to copy active effects from ingredients to results |
 | `visibility` | Access control (restricted, allowedUserIds) |
 | `linkedRecipeItemUuid` | Item that teaches this recipe (for knowledge mode). In the recipe editor you can browse for an existing item, paste a UUID directly, or use **Create Recipe Item** to generate a new world item automatically. |
@@ -121,15 +121,15 @@ In routed mode, the `resultSelection.provider` field on a recipe controls how th
 
 ## Multi-Step Recipes
 
-When the `multiStepRecipes` feature is enabled, recipes can have multiple sequential steps. Each step has its own ingredient sets, result groups, catalysts, and optional time/currency requirements.
+When the `multiStepRecipes` feature is enabled, recipes can have multiple sequential steps. Each step has its own ingredient sets, result groups, tool references (`toolIds`), and optional time/currency requirements.
 
 See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
-## Catalysts
+## Tools
 
-Catalysts are items required for crafting but not consumed. A blacksmith's forge, an alchemist's cauldron, or a wizard's staff might be catalysts.
+Tools are items required for crafting but not consumed — a blacksmith's forge, an alchemist's cauldron, or a wizard's staff. A recipe requires Tools by referencing library Tool ids via `toolIds` at recipe, step, or ingredient-set granularity.
 
-See [Catalysts]({% link catalysts.md %}) for configuration and usage tracking.
+See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in `0.6.0`.)
 
 ## Current Crafting Surface
 

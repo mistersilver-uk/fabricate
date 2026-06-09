@@ -97,6 +97,41 @@ export function normalizeRespawn(data = null) {
   return { ...base, intervalSeconds: numberOrNull(data.intervalSeconds) ?? 0 };
 }
 
+function trimmedOrNull(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Normalize the `depletedBehavior` block on a node config.
+ *
+ * `depletedBehavior` describes what happens to a placed gathering-task
+ * interactable's LINKED VISUAL marker when its environment node depletes
+ * (`environment.nodeRuntime[taskId].current <= 0`); it is orthogonal to
+ * `depletionTiming` (`onStart`/`onSuccess`, which describes WHEN a node
+ * decrements). Two combinable axes:
+ *   - `swapImage`   : a marker-texture path applied to the Tile while depleted
+ *                     (flipped back to the available image when it respawns).
+ *   - `postfixName` : when true, append a "(depleted)" label (Drawing; a Tile has
+ *                     no nameplate so it is ignored there).
+ *
+ * Returns `null` when no behavior is configured (the default — no visual change on
+ * depletion).
+ *
+ * @param {object|null} data
+ * @returns {{ swapImage?: string, postfixName?: boolean }|null}
+ */
+export function normalizeDepletedBehavior(data = null) {
+  if (!data || typeof data !== 'object') return null;
+
+  const behavior = {};
+  const swapImage = trimmedOrNull(data.swapImage);
+  if (swapImage) behavior.swapImage = swapImage;
+  if (data.postfixName === true) behavior.postfixName = true;
+  return Object.keys(behavior).length > 0 ? behavior : null;
+}
+
 /**
  * Normalize a node config/state object, or `null` when there is no node config.
  * Preserves a stored `current` verbatim (callers seed `current = max` when first
@@ -117,6 +152,8 @@ export function normalizeNodeConfig(data = null) {
     respawn: normalizeRespawn(data.respawn)
   };
   if (data.showCountsToPlayers === true) config.showCountsToPlayers = true;
+  const depletedBehavior = normalizeDepletedBehavior(data.depletedBehavior);
+  if (depletedBehavior) config.depletedBehavior = depletedBehavior;
   return config.enabled ? config : null;
 }
 

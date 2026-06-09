@@ -52,7 +52,6 @@
   const CALLOUTS = {
     TOOL_BLOCKED: { icon: 'fa-screwdriver-wrench', key: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools', tone: 'warning' },
     CONDITIONS_BLOCKED: { icon: 'fa-cloud-sun', key: 'FABRICATE.App.Gathering.Detail.Callout.Conditions', tone: 'warning' },
-    CATALYST_BLOCKED: { icon: 'fa-flask', key: 'FABRICATE.App.Gathering.Detail.Callout.Catalyst', tone: 'warning' },
     GAME_PAUSED: { icon: 'fa-pause', key: 'FABRICATE.App.Gathering.Detail.Callout.Paused', tone: 'neutral' },
     DUPLICATE_ACTIVE_RUN: { icon: 'fa-hourglass-half', key: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun', tone: 'neutral' },
     NODE_DEPLETED: { icon: 'fa-mountain', key: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted', tone: 'warning' },

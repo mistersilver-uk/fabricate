@@ -64,16 +64,16 @@ Rows will be colour-coded:
 
 If any planned recipe requires essences, an **Essences** section will appear below the ingredients table. Each essence type will show current stock versus the total needed.
 
-### Required Tools (Catalysts)
+### Required Tools
 
-If any planned recipe requires catalysts, a **Required Tools** section will appear. Each catalyst will show whether it is currently available in the selected actor's inventory.
+If any planned recipe requires [Tools]({% link tools.md %}), a **Required Tools** section appears. Each tool shows whether a usable instance is currently available in your actor's inventory.
 
 ### Summary footer
 
 A summary line at the bottom will show whether all materials are ready:
 
 - **All materials available** — you can start all planned crafts right now.
-- **N material(s) still needed** — the count of ingredient types, essence types, or catalysts you are short on.
+- **N material(s) still needed** — the count of ingredient types, essence types, or required tools you are short on.
 
 ---
 
@@ -101,4 +101,4 @@ The planned shopping list will be stored in the Crafting tab's local state. It w
 
 - [Recipes]({% link recipes/index.md %}) — current recipe authoring and API crafting.
 - [Visibility & Knowledge]({% link visibility.md %}) — control which recipes are visible to which players.
-- [Catalysts]({% link catalysts.md %}) — configure the required tools that appear in the catalysts section.
+- [Tools]({% link tools.md %}) — configure the reusable, breakable tools that appear in the Required Tools section.

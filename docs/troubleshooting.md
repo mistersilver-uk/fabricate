@@ -60,28 +60,29 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 ---
 
-### Catalysts Not Degrading or Tracking Usage
+### Tools Not Breaking or Tracking Usage
 
-**Symptom:** A catalyst is used during crafting but its usage counter does not increment, or the catalyst is never destroyed when it should be exhausted.
+{: .note }
+> The standalone **Catalyst** concept was retired in `0.6.0`; required-but-reusable equipment is now modelled by [Tools]({% link tools.md %}). Existing catalyst data migrates to Tools automatically.
+
+**Symptom:** A tool is used during crafting or gathering but its usage counter does not increment, or the tool never breaks when you expect it to.
 
 **Likely causes:**
 
-- `degradesOnUse` is `false` on the catalyst definition. When disabled, no usage tracking occurs -- the catalyst is simply checked for presence and never modified.
-- `maxUses` is `null`. The usage counter increments but exhaustion never triggers because there is no maximum.
-- `destroyWhenExhausted` is `false`. The catalyst remains in inventory even after `timesUsed >= maxUses`. This may be intentional (e.g. a forge that needs repair rather than replacement).
-- On a failed crafting check, catalysts are **not** degraded by default. The setting `craftingCheck.consumption.consumeCatalystsOnFail` defaults to `false`.
-- The catalyst uses the legacy field name `systemItemId` instead of `componentId`. The engine supports both for reads but new configurations should use `componentId`.
+- The tool's breakage mode is **not** `limitedUses`. Only `limitedUses` tools track per-item usage; `breakageChance` and `diceExpression` tools never write a usage flag (they roll for breakage each attempt and write nothing otherwise).
+- `maxUses` is blank (unlimited). A `limitedUses` tool still increments its counter but never breaks because there is no maximum.
+- The tool's on-break action is `flagBroken` (the default for migrated non-degrading catalysts), so it is marked broken rather than destroyed. This may be intentional (e.g. a forge that needs repair rather than replacement).
+- On a failed crafting or salvage check, tools are **not** broken/degraded by default. The setting `craftingCheck.consumption.consumeCatalystsOnFail` (field name retained for backward compatibility) defaults to `false`.
 
 **Step-by-step checks:**
 
-1. Open the recipe in the recipe editor. In the catalyst entry, is **Degrades on use** enabled?
-2. If `degradesOnUse` is `true`, is **Max uses** set to a positive integer?
-3. If the catalyst should be destroyed on exhaustion, is **Destroy when exhausted** checked?
-4. Check the owned item's tracking flags in the browser console: `item.getFlag('fabricate', 'catalystItemUsage')`. Is `timesUsed` incrementing after each craft?
-5. If catalysts should degrade even on a failed check, open the system settings and check `craftingCheck.consumption.consumeCatalystsOnFail`. Set it to `true` if needed.
-6. Verify the catalyst configuration uses `componentId`, not the legacy `systemItemId`.
+1. Open the system's **Tools** page and select the tool. Is the breakage mode `limitedUses`?
+2. If so, is **Max uses** set to a positive integer (rather than left blank)?
+3. Check the owned item's tracking flag in the browser console: `item.getFlag('fabricate', 'toolUsage')`. Is `timesUsed` incrementing after each use? (Items migrated from a catalyst may still carry the legacy `catalystItemUsage` flag, which is read as a fallback until the first post-migration use writes `toolUsage`.)
+4. If a broken tool should be removed instead of flagged, set its on-break action to **Destroy item** (or **Replace with...**). A tool marked broken (`flags.fabricate.toolBroken === true`) fails its presence gate until a GM clears the flag.
+5. If tools should break even on a failed check, open the system settings and enable `craftingCheck.consumption.consumeCatalystsOnFail` (recipes) or `salvageCraftingCheck.consumption.consumeCatalystsOnFail` (salvage).
 
-**See also:** [Catalysts]({% link catalysts.md %}) -- catalyst properties, usage tracking, and exhaustion; [Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) -- consumption on failure settings.
+**See also:** [Tools]({% link tools.md %}) -- the system-owned Tool model: requirement gate, breakage modes, and on-break actions; [Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) -- consumption on failure settings.
 
 ---
 

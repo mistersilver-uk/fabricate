@@ -40,8 +40,8 @@ describe('Recipe._normalizeTeaser', () => {
   });
 
   it('accepts custom hiddenFields', () => {
-    const recipe = new Recipe({ name: 'Test', teaser: { hiddenFields: ['description', 'catalysts'] }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
-    assert.deepEqual(recipe.teaser.hiddenFields, ['description', 'catalysts']);
+    const recipe = new Recipe({ name: 'Test', teaser: { hiddenFields: ['description', 'tools'] }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    assert.deepEqual(recipe.teaser.hiddenFields, ['description', 'tools']);
   });
 
   it('filters out invalid hiddenFields values', () => {

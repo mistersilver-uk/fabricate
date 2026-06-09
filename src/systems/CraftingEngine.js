@@ -5,6 +5,9 @@ import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getItemSourceReferences, getComponentSourceReferences, itemMatchesComponentSource } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
+import { Tool } from '../models/Tool.js';
+import { applyToolUsageAndBreakage } from '../toolBreakageRuntime.js';
+import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 
 /**
  * Handles the actual crafting process
@@ -30,6 +33,14 @@ export class CraftingEngine {
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
     const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    // Virtual-present tools injected by an active canvas Tool station (Phase 4):
+    // a `{ systemId, componentIds }` payload. A componentId is satisfied without
+    // an owned item (and excluded from breakage/usage) ONLY when the active
+    // tool's systemId matches the recipe's crafting system — componentId is a
+    // per-system id, so a tool from system A must not satisfy a system-B recipe.
+    const presentTools = (options?.presentTools && !Array.isArray(options.presentTools))
+      ? options.presentTools
+      : null;
     // Validate inputs
     if (!craftingActor) {
       return {
@@ -98,7 +109,7 @@ export class CraftingEngine {
         name: 'Step 1',
         ingredientSets: recipe.ingredientSets || [],
         resultGroups: recipe.resultGroups || [],
-        catalysts: recipe.catalysts || [],
+        toolIds: recipe.toolIds || [],
         timeRequirement: null,
         outcomeRouting: recipe.outcomeRouting || null
       }];
@@ -142,7 +153,7 @@ export class CraftingEngine {
     const executionRecipe = this._buildStepRecipeView(recipe, step);
 
     // Check if recipe step can be crafted
-    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe);
+    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, { presentTools });
     if (!canCraftCheck.canCraft) {
       const missingMsg = this._formatMissingItems(canCraftCheck.missing);
       return {
@@ -168,14 +179,17 @@ export class CraftingEngine {
       ingredientSet = canCraftCheck.satisfiableSet;
     }
 
-    // Validate catalysts
-    const catalystsForSet = this.recipeManager.getCatalystsForSet(executionRecipe, ingredientSet);
-    const catalystValidation = await this._validateCatalysts(componentSourceActors, executionRecipe, catalystsForSet);
-    if (!catalystValidation.valid) {
+    // Validate tools: the recipe's resolved library Tools must be present
+    // (a matching, non-broken item) on the component source actors.
+    const toolsForSet = typeof this.recipeManager.getToolsForSet === 'function'
+      ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
+      : [];
+    const toolValidation = await this._validateTools(componentSourceActors, executionRecipe, toolsForSet, presentTools);
+    if (!toolValidation.valid) {
       return {
         success: false,
         results: null,
-        message: catalystValidation.message
+        message: toolValidation.message
       };
     }
 
@@ -208,14 +222,15 @@ export class CraftingEngine {
     if (!checkResult.success) {
       const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let consumedOnFail = [];
-      let degradedCatalysts = [];
+      let usedToolPairs = [];
+      let usedToolsOnFail = [];
       try {
         if (failurePolicy.consumeIngredientsOnFail) {
           consumedOnFail = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
         }
         if (failurePolicy.consumeCatalystsOnFail) {
-          await this._degradeCatalysts(catalystValidation.catalysts);
-          degradedCatalysts = catalystValidation.catalysts;
+          usedToolPairs = toolValidation.tools;
+          usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
         }
       } catch (consumptionError) {
         console.error('Fabricate | Error during failure-path consumption:', consumptionError);
@@ -235,11 +250,7 @@ export class CraftingEngine {
             itemUuid: item.uuid,
             quantity
           })),
-          usedCatalysts: degradedCatalysts.map(({ item }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity: 1
-          }))
+          usedTools: usedToolsOnFail
         });
       }
       // Execute failure macro (spec 002 Failure Macro Contract)
@@ -256,7 +267,7 @@ export class CraftingEngine {
           failureReason: checkResult.message || 'Crafting check failed',
           checkResult,
           consumedIngredients: consumedOnFail,
-          consumedCatalysts: degradedCatalysts
+          consumedTools: usedToolPairs
         });
       }
       await this._postCraftChatMessage({
@@ -264,7 +275,7 @@ export class CraftingEngine {
         craftingActor,
         recipe,
         consumedIngredients: consumedOnFail,
-        catalysts: degradedCatalysts,
+        tools: usedToolPairs,
         createdResults: [],
         failureReason: checkResult.message || 'Crafting check failed'
       });
@@ -278,14 +289,15 @@ export class CraftingEngine {
       const message = 'Crafting check result does not satisfy current resolution mode requirements';
       const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let consumedOnValidationFail = [];
-      let degradedCatalystsOnValidationFail = [];
+      let usedToolPairsOnValidationFail = [];
+      let usedToolsOnValidationFail = [];
       try {
         if (validationFailurePolicy.consumeIngredientsOnFail) {
           consumedOnValidationFail = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
         }
         if (validationFailurePolicy.consumeCatalystsOnFail) {
-          await this._degradeCatalysts(catalystValidation.catalysts);
-          degradedCatalystsOnValidationFail = catalystValidation.catalysts;
+          usedToolPairsOnValidationFail = toolValidation.tools;
+          usedToolsOnValidationFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
         }
       } catch (consumptionError) {
         console.error('Fabricate | Error during failure-path consumption:', consumptionError);
@@ -305,11 +317,7 @@ export class CraftingEngine {
             itemUuid: item.uuid,
             quantity
           })),
-          usedCatalysts: degradedCatalystsOnValidationFail.map(({ item }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity: 1
-          }))
+          usedTools: usedToolsOnValidationFail
         });
       }
       // Execute failure macro (spec 002 Failure Macro Contract)
@@ -326,7 +334,7 @@ export class CraftingEngine {
           failureReason: message,
           checkResult,
           consumedIngredients: consumedOnValidationFail,
-          consumedCatalysts: degradedCatalystsOnValidationFail
+          consumedTools: usedToolPairsOnValidationFail
         });
       }
       await this._postCraftChatMessage({
@@ -334,7 +342,7 @@ export class CraftingEngine {
         craftingActor,
         recipe,
         consumedIngredients: consumedOnValidationFail,
-        catalysts: degradedCatalystsOnValidationFail,
+        tools: usedToolPairsOnValidationFail,
         createdResults: [],
         failureReason: message
       });
@@ -382,8 +390,8 @@ export class CraftingEngine {
       }
     }
 
-    // Apply catalyst degradation
-    await this._degradeCatalysts(catalystValidation.catalysts);
+    // Apply tool usage/breakage for the recipe's resolved library Tools.
+    const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
 
     // Deduct Item Piles currency cost after ingredients are consumed to avoid
     // losing currency if ingredient consumption throws.
@@ -396,7 +404,7 @@ export class CraftingEngine {
       step,
       ingredientSet,
       consumedItems,
-      catalystValidation.catalysts,
+      toolValidation.tools,
       checkResult,
       options?.resultGroupId || null
     );
@@ -418,11 +426,7 @@ export class CraftingEngine {
             itemUuid: item.uuid,
             quantity
           })),
-          usedCatalysts: catalystValidation.catalysts.map(({ item }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity: 1
-          }))
+          usedTools
         });
       }
       {
@@ -438,7 +442,7 @@ export class CraftingEngine {
           failureReason: message,
           checkResult,
           consumedIngredients: consumedItems,
-          consumedCatalysts: catalystValidation.catalysts
+          consumedTools: toolValidation.tools
         });
       }
       await this._postCraftChatMessage({
@@ -446,7 +450,7 @@ export class CraftingEngine {
         craftingActor,
         recipe,
         consumedIngredients: consumedItems,
-        catalysts: catalystValidation.catalysts,
+        tools: toolValidation.tools,
         createdResults: [],
         failureReason: message,
         rollTableMeta
@@ -473,11 +477,7 @@ export class CraftingEngine {
           itemUuid: item.uuid,
           quantity
         })),
-        usedCatalysts: catalystValidation.catalysts.map(({ item }) => ({
-          actorUuid: item.parent?.uuid || null,
-          itemUuid: item.uuid,
-          quantity: 1
-        })),
+        usedTools,
         createdResults: (resultItems || []).map(item => ({
           actorUuid: craftingActor.uuid,
           itemUuid: item.uuid,
@@ -498,7 +498,7 @@ export class CraftingEngine {
         step,
         selectedIngredientSet: ingredientSet,
         consumedIngredients: consumedItems,
-        consumedCatalysts: catalystValidation.catalysts,
+        consumedTools: toolValidation.tools,
         createdResults: resultItems || [],
         checkResult
       });
@@ -520,7 +520,7 @@ export class CraftingEngine {
       craftingActor,
       recipe,
       consumedIngredients: consumedItems,
-      catalysts: catalystValidation.catalysts,
+      tools: toolValidation.tools,
       createdResults: resultItems,
       rollTableMeta
     });
@@ -707,37 +707,6 @@ export class CraftingEngine {
   }
 
   /**
-   * Validate that all required catalysts are available and usable
-   * @private
-   */
-  async _validateCatalysts(actors, recipe, catalysts = []) {
-    const catalystItems = [];
-
-    for (const catalyst of catalysts) {
-      let found = false;
-      let catalystItem = null;
-
-      // Search across all component source actors
-      for (const actor of actors) {
-        const matching = actor.items.find(item => this.recipeManager.catalystMatchesItem(recipe, catalyst, item));
-        if (matching) {
-          found = true;
-          catalystItem = matching;
-          break;
-        }
-      }
-
-      if (!found) {
-        return { valid: false, message: `Missing required catalyst (componentId: ${catalyst.componentId || catalyst.systemItemId})` };
-      }
-
-      catalystItems.push({ catalyst, item: catalystItem });
-    }
-
-    return { valid: true, catalysts: catalystItems };
-  }
-
-  /**
    * Consume ingredients from component source actors
    * @private
    */
@@ -778,20 +747,145 @@ export class CraftingEngine {
   }
 
   /**
-   * Apply degradation to catalysts that were used
+   * Validate that all required library Tools resolved for this recipe/step are
+   * present (a matching, non-broken item) on the component source actors.
+   *
+   * Returns the matched `{ tool, item }` pairs so the caller can apply
+   * usage/breakage on the success and failure-consumption paths.
+   *
+   * Virtual-present injection (Phase 4): a tool whose `componentId` is in the
+   * active canvas Tool's `presentTools` payload AND whose recipe crafting system
+   * matches the active tool's `systemId` is satisfied WITHOUT an owned item (the
+   * active canvas Tool station provides it). Its `{ tool, item: null, virtual:
+   * true }` pair is returned so {@link _applyToolBreakage} skips it — there is no
+   * owned item to use or break. An owned, non-broken item still takes precedence.
+   * The system scope is enforced via {@link resolvePresentComponentIds}: a
+   * present tool from system A never satisfies a system-B recipe.
+   *
+   * @private
+   * @param {Actor[]} actors
+   * @param {Recipe} recipe
+   * @param {Array<object>} tools - resolved library Tool objects
+   * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
+   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean}> }>}
+   */
+  async _validateTools(actors, recipe, tools = [], presentTools = null) {
+    const toolItems = [];
+    const presentSet = resolvePresentComponentIds({
+      presentTools,
+      systemId: recipe?.craftingSystemId ?? null
+    });
+
+    for (const tool of tools) {
+      let found = null;
+      for (const actor of actors) {
+        const matching = Array.from(actor?.items ?? []).find(item =>
+          !isToolBroken(item) && this.recipeManager.toolMatchesItem(recipe, tool, item)
+        );
+        if (matching) {
+          found = matching;
+          break;
+        }
+      }
+
+      if (found) {
+        toolItems.push({ tool, item: found });
+      } else if (presentSet.has(tool?.componentId)) {
+        // Virtual-present: satisfied by the active canvas Tool, no owned item.
+        toolItems.push({ tool, item: null, virtual: true });
+      } else {
+        return {
+          valid: false,
+          message: `Missing required tool (componentId: ${tool?.componentId || tool?.systemItemId})`
+        };
+      }
+    }
+
+    return { valid: true, tools: toolItems };
+  }
+
+  /**
+   * Apply usage and breakage to matched tools, delegating to the shared
+   * {@link applyToolUsageAndBreakage} runtime (the same plan/apply core the
+   * gathering tool breakage uses). Returns `usedTools` evidence in the
+   * run-record item-ref shape.
+   *
+   * @private
+   * @param {Recipe} recipe
+   * @param {Array<{tool: object, item: Item}>} toolItems
+   * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
+   */
+  async _applyToolBreakage(recipe, toolItems = []) {
+    const evidence = [];
+    for (const { tool: toolData, item, virtual } of toolItems) {
+      // Virtual-present (canvas-tool) matches have no owned item to use/break,
+      // and must not produce a consuming usedTools run-record entry.
+      if (virtual || !item) continue;
+      const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
+      const actor = item?.parent ?? null;
+      const entry = await applyToolUsageAndBreakage({
+        tool,
+        actor,
+        item,
+        buildItemRef: (_actor, breakItem) => ({
+          actorUuid: breakItem?.parent?.uuid || null,
+          itemUuid: breakItem?.uuid || null,
+          quantity: 1
+        }),
+        createReplacement: this._makeToolReplacementCreator(recipe)
+      });
+      evidence.push({
+        actorUuid: entry.itemRef?.actorUuid ?? null,
+        itemUuid: entry.itemRef?.itemUuid ?? null,
+        quantity: entry.itemRef?.quantity ?? 1,
+        componentId: entry.componentId ?? null,
+        broken: entry.broken === true
+      });
+    }
+    return evidence;
+  }
+
+  /**
+   * Build a `replaceWith` creator that resolves the replacement component from
+   * the recipe's crafting system and creates the item on the actor.
    * @private
    */
-  async _degradeCatalysts(catalystItems) {
-    for (const { catalyst, item } of catalystItems) {
-      await catalyst.applyDegradation(item);
-    }
+  _makeToolReplacementCreator(recipe) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(recipe?.craftingSystemId);
+    return async ({ actor, componentId }) => {
+      const component = (system?.components || []).find(entry => entry.id === componentId) || null;
+      if (!component || typeof actor?.createEmbeddedDocuments !== 'function') return;
+      let source = component;
+      if (component.sourceUuid && typeof globalThis.fromUuidSync === 'function') {
+        try {
+          source = globalThis.fromUuidSync(component.sourceUuid) ?? component;
+        } catch (_err) {
+          source = component;
+        }
+      }
+      const itemData = source.toObject?.() ?? {
+        name: source.name ?? 'Replacement Item',
+        img: source.img ?? 'icons/svg/item-bag.svg',
+        type: source.type ?? 'loot',
+        system: source.system
+          ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system }
+          : {}
+      };
+      itemData.system ??= {};
+      if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
+      if (source.uuid) {
+        globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+      }
+      await actor.createEmbeddedDocuments('Item', [itemData]);
+    };
   }
 
   /**
    * Create the result items based on recipe configuration
    * @private
    */
-  async _createResultItems(craftingActor, recipe, step, ingredientSet, consumedItems, catalystItems, checkResult = null, selectedResultGroupId = null) {
+  async _createResultItems(craftingActor, recipe, step, ingredientSet, consumedItems, toolItems, checkResult = null, selectedResultGroupId = null) {
     const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
 
     // Pre-resolve rollTableOutcome before calling resolveResultGroups
@@ -842,7 +936,7 @@ export class CraftingEngine {
           craftingActor,
           result,
           consumedItems,
-          catalystItems,
+          toolItems,
           recipe,
           {
             ...(checkResult || {}),
@@ -868,7 +962,7 @@ export class CraftingEngine {
    * Create a single result item
    * @private
    */
-  async _createSingleResult(craftingActor, result, consumedItems, catalystItems, recipe, checkResult = null, step = null) {
+  async _createSingleResult(craftingActor, result, consumedItems, toolItems, recipe, checkResult = null, step = null) {
     // Get the source item
     let sourceItem;
     let managedItem = null;
@@ -914,7 +1008,7 @@ export class CraftingEngine {
       craftingActor,
       result,
       consumedItems,
-      catalystItems,
+      toolItems,
       checkResult,
       step
     );
@@ -1510,12 +1604,12 @@ export class CraftingEngine {
    * @param {object}  params.craftingActor      - The actor performing the craft.
    * @param {object}  params.recipe             - The recipe being crafted.
    * @param {Array}   params.consumedIngredients - Array of { item, quantity } entries.
-   * @param {Array}   params.catalysts           - Array of { catalyst, item } entries.
+   * @param {Array}   params.tools               - Array of { tool, item } entries.
    * @param {Array}   params.createdResults      - Array of created Item documents (success only).
    * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
    * @private
    */
-  async _postCraftChatMessage({ success, craftingActor, recipe, consumedIngredients, catalysts, createdResults, failureReason, rollTableMeta = null }) {
+  async _postCraftChatMessage({ success, craftingActor, recipe, consumedIngredients, tools, createdResults, failureReason, rollTableMeta = null }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
     if (!system || system.features?.chatOutput !== true) return;
@@ -1548,9 +1642,9 @@ export class CraftingEngine {
         lines.push('</ul>');
       }
 
-      if (catalysts && catalysts.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Catalysts')}</strong></p><ul>`);
-        for (const { item } of catalysts) {
+      if (tools && tools.length > 0) {
+        lines.push(`<p><strong>${loc('FABRICATE.Chat.Tools')}</strong></p><ul>`);
+        for (const { item } of tools) {
           lines.push(`<li>${item?.name || ''}</li>`);
         }
         lines.push('</ul>');
@@ -1566,14 +1660,14 @@ export class CraftingEngine {
 
       const hasConsumed =
         (consumedIngredients && consumedIngredients.length > 0) ||
-        (catalysts && catalysts.length > 0);
+        (tools && tools.length > 0);
 
       if (hasConsumed) {
         lines.push(`<p><strong>${loc('FABRICATE.Chat.ConsumedOnFailure')}</strong></p><ul>`);
         for (const { item, quantity } of (consumedIngredients || [])) {
           lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
         }
-        for (const { item } of (catalysts || [])) {
+        for (const { item } of (tools || [])) {
           lines.push(`<li>${item?.name || ''}</li>`);
         }
         lines.push('</ul>');
@@ -1593,7 +1687,7 @@ export class CraftingEngine {
     }
   }
 
-  async _runPropertyMacro(macroUuid, recipe, craftingActor, result, consumedItems, catalystItems, checkResult = null, step = null) {
+  async _runPropertyMacro(macroUuid, recipe, craftingActor, result, consumedItems, toolItems, checkResult = null, step = null) {
     if (!macroUuid) return null;
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -1618,9 +1712,9 @@ export class CraftingEngine {
         quantity,
         ingredient
       })),
-      resolvedCatalysts: catalystItems.map(({ item, catalyst }) => ({
+      resolvedTools: toolItems.map(({ item, tool }) => ({
         item,
-        catalyst
+        tool
       })),
       resolvedEssences: essenceContext.resolvedEssences,
       essenceSources: essenceContext.essenceSources,
@@ -1703,8 +1797,8 @@ export class CraftingEngine {
       lines.push(`${type} essence: have ${have}, need ${need}`);
     }
 
-    for (const catalyst of missing.catalysts) {
-      lines.push(`Catalyst (componentId: ${catalyst.componentId || catalyst.systemItemId}): missing`);
+    for (const tool of (missing.tools || [])) {
+      lines.push(`Tool (componentId: ${tool.componentId || tool.systemItemId}): missing`);
     }
 
     return lines.join('\n');
@@ -1717,9 +1811,12 @@ export class CraftingEngine {
       resultGroups: step?.resultGroups || recipe.resultGroups || [],
       outcomeRouting: step?.outcomeRouting || recipe.outcomeRouting || null,
       resultSelection: step?.resultSelection || recipe.resultSelection || null,
-      catalysts: [
-        ...(Array.isArray(recipe?.catalysts) ? recipe.catalysts : []),
-        ...(Array.isArray(step?.catalysts) ? step.catalysts : [])
+      // Merge step-level toolIds with recipe-level so the union flows to
+      // RecipeManager.getToolsForSet via recipe.toolIds. getToolsForSet dedupes
+      // by id, so recipe/step overlap resolves once.
+      toolIds: [
+        ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
+        ...(Array.isArray(step?.toolIds) ? step.toolIds : [])
       ]
     };
   }
@@ -1748,7 +1845,7 @@ export class CraftingEngine {
    * Perform the salvage pipeline for a component.
    *
    * Resolves actor, system, and component from their IDs/UUIDs, then runs
-   * the full pipeline: validate -> ownership check -> catalyst check ->
+   * the full pipeline: validate -> ownership check -> tool check ->
    * salvage check -> failure policy -> consume -> create results -> record run.
    *
    * @param {string} actorUuid - UUID of the actor performing salvage.
@@ -1825,16 +1922,16 @@ export class CraftingEngine {
       };
     }
 
-    const salvageCatalysts = Array.isArray(component.salvage.catalysts) ? component.salvage.catalysts : [];
     const syntheticRecipe = { craftingSystemId, components: managedItems };
-    const catalystValidation = await this._validateCatalysts([actor], syntheticRecipe, salvageCatalysts);
-    if (!catalystValidation.valid) {
+    const salvageTools = this._resolveSalvageTools(system, component.salvage);
+    const toolValidation = await this._validateTools([actor], syntheticRecipe, salvageTools);
+    if (!toolValidation.valid) {
       if (salvageRunManager && salvageRun) {
         salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
-          failureReason: catalystValidation.message
+          failureReason: toolValidation.message
         });
       }
-      return { success: false, results: null, message: catalystValidation.message, salvageRun };
+      return { success: false, results: null, message: toolValidation.message, salvageRun };
     }
 
     const now = Number(game.time?.worldTime || 0);
@@ -1848,7 +1945,7 @@ export class CraftingEngine {
         componentName: component.name || componentId,
         status: 'inProgress',
         startedAt: now,
-        usedCatalysts: []
+        usedTools: []
       });
     }
 
@@ -1870,19 +1967,20 @@ export class CraftingEngine {
       salvageRun = await salvageRunManager.markRunInProgress(actor, salvageRun);
     }
 
-    const checkResult = await this._runSalvageCraftingCheck(component, system, actor, catalystValidation.catalysts);
+    const checkResult = await this._runSalvageCraftingCheck(component, system, actor, toolValidation.tools);
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
 
     if (!checkResult.success) {
       let consumedOnFail = [];
-      let degradedCatalysts = [];
+      let usedToolPairs = [];
+      let usedTools = [];
       try {
         if (failurePolicy.consumeComponentOnFail) {
           consumedOnFail = await this._consumeComponentItems(actor, componentItems, ingredientQuantity);
         }
         if (failurePolicy.consumeCatalystsOnFail) {
-          await this._degradeCatalysts(catalystValidation.catalysts);
-          degradedCatalysts = catalystValidation.catalysts;
+          usedToolPairs = toolValidation.tools;
+          usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
         }
       } catch (err) {
         console.error('Fabricate | Error during salvage failure-path consumption:', err);
@@ -1891,11 +1989,7 @@ export class CraftingEngine {
       if (salvageRunManager && salvageRun) {
         salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
           consumedComponents: consumedOnFail.map(({ item, quantity }) => ({ itemUuid: item.uuid, quantity })),
-          usedCatalysts: degradedCatalysts.map(({ item, catalyst }) => ({
-            itemUuid: item.uuid,
-            componentId: catalyst.componentId || catalyst.systemItemId,
-            degraded: true
-          })),
+          usedTools,
           createdResults: [],
           checkResult: {
             success: false,
@@ -1913,7 +2007,7 @@ export class CraftingEngine {
         craftingActor: actor,
         salvageInput: { componentId, quantity: ingredientQuantity },
         consumedComponents: consumedOnFail,
-        consumedCatalysts: degradedCatalysts,
+        consumedTools: usedToolPairs,
         createdResults: [],
         checkResult,
         failureReason: checkResult.message || 'Salvage check failed'
@@ -1929,7 +2023,7 @@ export class CraftingEngine {
 
     const resultGroups = this._resolveSalvageResultGroups(component, system, checkResult);
     const consumedItems = await this._consumeComponentItems(actor, componentItems, ingredientQuantity);
-    await this._degradeCatalysts(catalystValidation.catalysts);
+    const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
 
     const salvageRecipeView = this._buildSalvageRecipeView(component, system);
     const resultItems = [];
@@ -1939,7 +2033,7 @@ export class CraftingEngine {
           actor,
           result,
           consumedItems,
-          catalystValidation.catalysts,
+          toolValidation.tools,
           salvageRecipeView,
           checkResult,
           null
@@ -1951,11 +2045,7 @@ export class CraftingEngine {
     if (salvageRunManager && salvageRun) {
       salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
         consumedComponents: consumedItems.map(({ item, quantity }) => ({ itemUuid: item.uuid, quantity })),
-        usedCatalysts: catalystValidation.catalysts.map(({ item, catalyst }) => ({
-          itemUuid: item.uuid,
-          componentId: catalyst.componentId || catalyst.systemItemId,
-          degraded: true
-        })),
+        usedTools,
         createdResults: resultItems.map(item => ({
           itemUuid: item.uuid,
           componentId: null,
@@ -1977,7 +2067,7 @@ export class CraftingEngine {
       craftingActor: actor,
       salvageInput: { componentId, quantity: ingredientQuantity },
       consumedComponents: consumedItems,
-      consumedCatalysts: catalystValidation.catalysts,
+      consumedTools: toolValidation.tools,
       createdResults: resultItems,
       checkResult
     });
@@ -2135,10 +2225,34 @@ export class CraftingEngine {
   }
 
   /**
+   * Resolve a component's salvage `toolIds` to library Tool objects from the
+   * owning crafting system. Unknown ids are skipped (resolved to nothing) rather
+   * than throwing. Ids are deduped.
+   * @private
+   * @param {object} system - the owning crafting system
+   * @param {object} salvage - the component's salvage config
+   * @returns {Array<object>} resolved library Tool objects
+   */
+  _resolveSalvageTools(system, salvage) {
+    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
+    const library = Array.isArray(system?.tools) ? system.tools : [];
+    const seen = new Set();
+    const tools = [];
+    for (const rawId of ids) {
+      const id = String(rawId ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const tool = library.find(entry => entry?.id === id);
+      if (tool) tools.push(tool);
+    }
+    return tools;
+  }
+
+  /**
    * Run the salvage crafting check macro when configured.
    * @private
    */
-  async _runSalvageCraftingCheck(component, system, actor, catalystItems) {
+  async _runSalvageCraftingCheck(component, system, actor, toolItems) {
     const check = system?.salvageCraftingCheck;
     if (!check?.enabled && !check?.macroUuid) {
       return { success: true, outcome: null, value: null, data: {} };
@@ -2153,7 +2267,7 @@ export class CraftingEngine {
         component,
         craftingSystem: system,
         craftingActor: actor,
-        catalystItems
+        toolItems
       });
     } catch (err) {
       console.error(`Fabricate | Salvage check macro failed (${check.macroUuid})`, err);

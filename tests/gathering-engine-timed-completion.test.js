@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
+import { SETTING_KEYS } from '../src/config/settings.js';
 
 const viewer = { id: 'user-1', isGM: false };
 
@@ -48,7 +50,7 @@ function timedTask(overrides = {}) {
     name: 'Gather Iron',
     enabled: true,
     resolutionMode: 'routed',
-    catalysts: [],
+    toolIds: [],
     timeRequirement: { minutes: 1 },
     resultGroups: [{
       id: 'group-a',
@@ -60,8 +62,13 @@ function timedTask(overrides = {}) {
   };
 }
 
+const LIBRARY_TOOLS = [
+  { id: 'tool-pick', componentId: 'pick', enabled: true },
+  { id: 'tool-sickle', componentId: 'silver-sickle', enabled: true }
+];
+
 function environment(task = timedTask(), overrides = {}) {
-  return {
+  const env = {
     id: 'env-a',
     craftingSystemId: 'system-a',
     name: 'Old Mine',
@@ -71,6 +78,12 @@ function environment(task = timedTask(), overrides = {}) {
     tasks: [task],
     ...overrides
   };
+  Object.defineProperty(env, '__libraryTools', {
+    value: new Map(LIBRARY_TOOLS.map(t => [t.id, t])),
+    enumerable: false,
+    configurable: true
+  });
+  return env;
 }
 
 function system(overrides = {}) {
@@ -90,16 +103,17 @@ function makeEngine({
   systems = [system()],
   routedOutcome = null,
   createdResults = [],
-  usedCatalysts = [],
+  usedTools = [],
   calls = {},
-  getRunViewer = null
+  getRunViewer = null,
+  richState = null
 } = {}) {
   calls.resolveRouted = [];
   calls.evaluateCheck = [];
   calls.planResults = [];
   calls.createResults = [];
-  calls.planCatalysts = [];
-  calls.useCatalysts = [];
+  calls.planTools = [];
+  calls.applyTools = [];
   calls.failureFeedback = [];
 
   return new GatheringEngine({
@@ -108,6 +122,7 @@ function makeEngine({
       get: (environmentId) => environments.find(entry => entry.id === environmentId) ?? null
     },
     runManager,
+    richState,
     getSystems: () => systems,
     getSelectableActors: () => [actingActor],
     isActorSelectable: ({ actor: candidate }) => candidate?.id === actingActor.id || candidate?.uuid === actingActor.uuid,
@@ -121,7 +136,7 @@ function makeEngine({
       }
     },
     sceneAccess: { canAttempt: () => ({ allowed: true }) },
-    catalystAvailability: { check: () => ({ available: true, missing: [] }) },
+    toolAvailability: { check: () => ({ available: true, missing: [], failedRequirements: [] }) },
     resultResolver: {
       resolveRouted: async (payload) => {
         calls.resolveRouted.push(payload);
@@ -147,14 +162,14 @@ function makeEngine({
         return createdResults;
       }
     },
-    catalystUsage: {
+    toolBreakage: {
       plan: async (payload) => {
-        calls.planCatalysts.push(payload);
-        return usedCatalysts;
+        calls.planTools.push(payload);
+        return usedTools;
       },
       apply: async (payload) => {
-        calls.useCatalysts.push(payload);
-        return usedCatalysts;
+        calls.applyTools.push(payload);
+        return usedTools;
       }
     },
     failureFeedback: {
@@ -164,6 +179,47 @@ function makeEngine({
       }
     },
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
+  });
+}
+
+// A timed library task in nodes economy mode. Library tasks resolve as `d100`
+// (composeEnvironment forces it), so the per-attempt outcome status — and thus
+// node depletion under `onSuccess` — is driven by the drop/hazard rolls, not a
+// routed macro. `dropRate: 100` makes the find deterministic.
+function nodesLibraryTask(overrides = {}) {
+  return {
+    id: 'task-a',
+    name: 'Gather Iron',
+    enabled: true,
+    timeRequirement: { minutes: 1 },
+    dropRows: [{ id: 'row-a', componentId: 'comp-a', quantity: 2, dropRate: 100, enabled: true }],
+    nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onSuccess', respawn: { policy: 'manual' } },
+    ...overrides
+  };
+}
+
+// Build a real GatheringRichStateService in nodes economy mode, backed by the
+// supplied environments so its node-state writes mutate the same env objects the
+// engine reads at maturity. The store's `update` merges the patch in place so
+// `env.nodeRuntime` is observable after `commitAcceptedAttempt`. The library
+// `tasks`/`hazards` feed composeEnvironment, which the engine uses to resolve
+// the matured run's task (embedded `env.tasks` are ignored under richState).
+function makeNodesRichState(environments, { tasks = [nodesLibraryTask()], hazards = [], rules = null, rollD100 = () => 1 } = {}) {
+  const byId = new Map(environments.map(env => [env.id, env]));
+  const system = { economy: { mode: 'nodes' }, tasks, hazards };
+  if (rules) system.rules = rules;
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { 'system-a': system } }]]);
+  return new GatheringRichStateService({
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    environmentStore: {
+      get: id => byId.get(id) ?? environments[0],
+      list: () => environments,
+      update: async (id, patch) => { Object.assign(byId.get(id), patch); return byId.get(id); }
+    },
+    rollD100,
+    hooks: { callAll: () => {} }
   });
 }
 
@@ -216,16 +272,16 @@ test('processWorldTime completes matured failure without results and applies fee
     cancelRun: (...args) => realRunManager.cancelRun(...args)
   };
   const calls = {};
-  const usedCatalysts = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
   const task = timedTask({
-    catalysts: [{ componentId: 'pick', degradesOnUse: true }],
+    toolIds: ['tool-pick'],
     failureOutcome: { mode: 'text', text: 'The vein is exhausted.' }
   });
   const engine = makeEngine({
     runManager,
     environments: [environment(task)],
     routedOutcome: { status: 'failed', checkResult: { outcome: 'fail', provider: 'macroOutcome' } },
-    usedCatalysts,
+    usedTools,
     calls
   });
 
@@ -236,10 +292,10 @@ test('processWorldTime completes matured failure without results and applies fee
   assert.deepEqual(realRunManager.getActiveRuns(actor), []);
   assert.equal(realRunManager.getRunHistory(actor)[0].status, 'failed');
   assert.deepEqual(realRunManager.getRunHistory(actor)[0].createdResults, []);
-  assert.deepEqual(realRunManager.getRunHistory(actor)[0].usedCatalysts, usedCatalysts);
+  assert.deepEqual(realRunManager.getRunHistory(actor)[0].usedTools, usedTools);
   assert.deepEqual(calls.createResults, []);
-  assert.equal(calls.useCatalysts.length, 1);
-  assert.equal(calls.useCatalysts[0].actor, actor);
+  assert.equal(calls.applyTools.length, 1);
+  assert.equal(calls.applyTools[0].actor, actor);
   assert.equal(calls.failureFeedback.length, 1);
   assert.deepEqual(order, ['completeRun']);
 });
@@ -291,7 +347,7 @@ test('processWorldTime cancels matured runs whose references disappear before re
   }
 });
 
-test('resume-time misconfiguration clears active run without history, results, catalysts, or feedback', async () => {
+test('resume-time misconfiguration clears active run without history, results, tools, or feedback', async () => {
   resetActor();
   let worldTime = 1000;
   const runManager = makeRunManager({ now: () => worldTime });
@@ -302,7 +358,7 @@ test('resume-time misconfiguration clears active run without history, results, c
   const engine = makeEngine({
     runManager,
     environments: [environment(invalidTask)],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
     calls
   });
@@ -314,7 +370,7 @@ test('resume-time misconfiguration clears active run without history, results, c
   assert.deepEqual(runManager.getRunHistory(actor), []);
   assert.deepEqual(calls.resolveRouted, []);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 });
 
@@ -331,7 +387,7 @@ test('post-history timed side effects are blocked if completeRun persistence fai
     startedAtWorldTime: 1000,
     updatedAtWorldTime: 1000,
     timeGate: { requiredSeconds: 60, initiatedAt: 1000, availableAt: 1060 },
-    usedCatalysts: [],
+    usedTools: [],
     createdResults: []
   };
   const runManager = {
@@ -343,18 +399,18 @@ test('post-history timed side effects are blocked if completeRun persistence fai
   const calls = {};
   const engine = makeEngine({
     runManager,
-    environments: [environment(timedTask({ catalysts: [{ componentId: 'pick' }] }))],
+    environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
     routedOutcome: { status: 'failed', checkResult: { outcome: 'fail' } },
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     calls
   });
 
   const result = await engine.processWorldTime(1060);
 
   assert.equal(result.errors.length, 1);
-  assert.deepEqual(calls.planCatalysts.length, 1);
+  assert.deepEqual(calls.planTools.length, 1);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 });
 
@@ -371,7 +427,7 @@ test('post-history timed side effects are blocked when completeRun returns null'
     startedAtWorldTime: 1000,
     updatedAtWorldTime: 1000,
     timeGate: { requiredSeconds: 60, initiatedAt: 1000, availableAt: 1060 },
-    usedCatalysts: [],
+    usedTools: [],
     createdResults: []
   };
   const runManager = {
@@ -381,9 +437,9 @@ test('post-history timed side effects are blocked when completeRun returns null'
   const calls = {};
   const engine = makeEngine({
     runManager,
-    environments: [environment(timedTask({ catalysts: [{ componentId: 'pick' }] }))],
+    environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     calls
   });
 
@@ -393,9 +449,9 @@ test('post-history timed side effects are blocked when completeRun returns null'
   assert.equal(result.errors.length, 1);
   assert.equal(result.errors[0].code, 'TERMINAL_HISTORY_NOT_WRITTEN');
   assert.equal(calls.planResults.length, 1);
-  assert.equal(calls.planCatalysts.length, 1);
+  assert.equal(calls.planTools.length, 1);
   assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.useCatalysts, []);
+  assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
 });
 
@@ -456,7 +512,7 @@ test('non-GM blind missing-task timed cancellation history and result do not exp
   assert.equal(history[0].status, 'cancelled');
   assert.equal(history[0].taskId, 'blind');
   assert.deepEqual(history[0].createdResults, []);
-  assert.deepEqual(history[0].usedCatalysts, []);
+  assert.deepEqual(history[0].usedTools, []);
   assert.deepEqual(history[0].checkResult, { blind: true, status: 'cancelled' });
   for (const text of ['secret-task', 'Secret Mooncap Patch']) {
     assert.equal(serializedResult.includes(text), false, text);
@@ -471,7 +527,7 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
   const secretTask = timedTask({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    catalysts: [{ componentId: 'silver-sickle' }]
+    toolIds: ['tool-sickle']
   });
   await createWaitingRun(runManager, actor, { taskId: secretTask.id });
   worldTime = 1060;
@@ -480,7 +536,7 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
     runManager,
     environments: [environment(secretTask, { selectionMode: 'blind' })],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }],
-    usedCatalysts: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
     calls
   });
 
@@ -494,10 +550,60 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
   assert.equal(history.length, 1);
   assert.equal(history[0].taskId, 'blind');
   assert.deepEqual(history[0].createdResults, []);
-  assert.deepEqual(history[0].usedCatalysts, []);
+  assert.deepEqual(history[0].usedTools, []);
   assert.deepEqual(history[0].checkResult, { blind: true, status: 'succeeded' });
   for (const text of ['secret-mooncap-task', 'Secret Mooncap Patch', 'silver-sickle', 'secret-mooncap', 'macroOutcome']) {
     assert.equal(serializedResult.includes(text), false, text);
     assert.equal(serializedHistory.includes(text), false, text);
   }
+});
+
+test('timed nodes-mode maturity decrements the environment node on a successful onSuccess gather', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  // Library-driven env (composeEnvironment supplies the task); embedded tasks: [].
+  const env = environment([], { compositionMode: 'automatic', tasks: [] });
+  const environments = [env];
+  const richState = makeNodesRichState(environments);
+  await createWaitingRun(runManager);
+  worldTime = 1060;
+  const engine = makeEngine({ runManager, environments, richState });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  // A d100 gather with no triggered hazard matures as succeeded, so the
+  // onSuccess node pool depletes by one on the ENVIRONMENT (nodeRuntime[taskId]).
+  assert.equal(result.completed.length, 1);
+  assert.equal(result.completed[0].state, 'succeeded');
+  assert.equal(env.nodeRuntime['task-a'].current, 2, 'the environment node decremented by 1 at maturity');
+  assert.equal(env.nodeRuntime['task-a'].max, 3);
+  assert.equal(
+    result.completed[0].run.economyEvidence.node.remaining,
+    2,
+    'the committed rich evidence reflects the decremented environment pool'
+  );
+});
+
+test('timed nodes-mode maturity does not decrement the environment node on a failed onSuccess gather', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const env = environment([], { compositionMode: 'automatic', tasks: [], dangerTags: ['hazardous'] });
+  const environments = [env];
+  // A guaranteed hazard under a failureWithHazard policy forces the matured
+  // d100 outcome to 'failed', so the onSuccess pool must stay untouched.
+  const richState = makeNodesRichState(environments, {
+    hazards: [{ id: 'haz-a', name: 'Cave-in', enabled: true, dangerTags: ['hazardous'], dropRate: 100 }],
+    rules: { hazardSelectionMode: 'all', hazardPolicy: 'failureWithHazard' }
+  });
+  await createWaitingRun(runManager);
+  worldTime = 1060;
+  const engine = makeEngine({ runManager, environments, richState });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.completed.length, 1);
+  assert.equal(result.completed[0].state, 'failed');
+  assert.equal(env.nodeRuntime?.['task-a'], undefined, 'no node state is written for a failed onSuccess gather');
 });

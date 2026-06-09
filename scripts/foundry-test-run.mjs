@@ -1033,6 +1033,16 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
     };
     await game.settings.set('fabricate', 'gatheringConfig', config);
 
+    // Tools are SYSTEM-OWNED (the `craftingSystems` setting). The Tools manager
+    // (`getSystem(id).tools` → `enterToolsDraft`) and the gathering tool gate read
+    // tools from the crafting system, NOT from gatheringConfig (the 0.7.0
+    // reconciliation only runs at world-load, not after a later seed). Persist the
+    // seeded library tools onto the crafting system so the Tools view renders the
+    // row and tool-blocked gathering tasks resolve their requirement.
+    await game.fabricate.getCraftingSystemManager()?.updateSystem?.(sysId, {
+      tools: Array.isArray(config.systems?.[sysId]?.tools) ? config.systems[sysId].tools : []
+    });
+
     // Seed two environment-store fixtures so the player Gathering tab frame
     // exercises both the locked teaser path and the blind chip + "(x/y)"
     // discovered suffix:
@@ -2099,6 +2109,14 @@ async function main() {
               }]
             }
           }
+        });
+
+        // Tools are SYSTEM-OWNED (the `craftingSystems` setting) — the Tools
+        // manager and the gathering tool gate read getSystem(id).tools, not
+        // gatheringConfig. Mirror the canonical persist so the manager Tools view
+        // renders and tool-blocked tasks resolve their requirement.
+        await csm.updateSystem(systemId, {
+          tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
 
         return {

@@ -109,9 +109,6 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
     sceneAccess: {
       canAttempt: () => ({ allowed: true })
     },
-    catalystAvailability: {
-      check: () => ({ available: true, missing: [] })
-    },
     resultCreator: {
       plan: async ({ resultGroups }) => resultGroups.flatMap(group => group.results).map(result => ({
         actorUuid: actingActor.uuid,
@@ -126,10 +123,6 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
           quantity: result.quantity
         }));
       }
-    },
-    catalystUsage: {
-      plan: async () => [],
-      apply: async () => []
     },
     failureFeedback: {
       apply: async () => null

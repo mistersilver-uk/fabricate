@@ -52,7 +52,7 @@ function _mergeIngredient(existing, incoming, recipeId, recipeName, recipeQuanti
  * @returns {{
  *   ingredients: Array,
  *   essences: Array,
- *   catalysts: Array,
+ *   tools: Array,
  *   allSatisfied: boolean,
  *   totalRecipes: number,
  *   totalQuantity: number
@@ -63,7 +63,7 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
     return {
       ingredients: [],
       essences: [],
-      catalysts: [],
+      tools: [],
       allSatisfied: true,
       totalRecipes: 0,
       totalQuantity: 0
@@ -72,7 +72,7 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
 
   const ingredientMap = new Map();  // key -> aggregated ingredient entry
   const essenceMap = new Map();     // essenceType -> aggregated essence entry
-  const catalystMap = new Map();    // componentId -> catalyst entry
+  const toolMap = new Map();        // componentId -> tool entry
 
   let totalRecipes = 0;
   let totalQuantity = 0;
@@ -89,11 +89,11 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
 
     const evaluation = componentSourceActors && componentSourceActors.length > 0
       ? recipeManager.evaluateCraftability(componentSourceActors, recipe)
-      : { ingredientStates: [], essenceStates: [], catalystStates: [] };
+      : { ingredientStates: [], essenceStates: [], toolStates: [] };
 
     const ingredientStates = evaluation?.ingredientStates ?? [];
     const essenceStates = evaluation?.essenceStates ?? [];
-    const catalystStates = evaluation?.catalystStates ?? [];
+    const toolStates = evaluation?.toolStates ?? [];
 
     // --- Ingredients ---
     for (const ing of ingredientStates) {
@@ -126,19 +126,19 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
       existing.have = ess.have ?? 0;
     }
 
-    // --- Catalysts (non-consumable — no quantity multiplication, just deduplicate) ---
-    for (const cat of catalystStates) {
-      const key = cat.componentId ?? cat.name ?? 'unknown';
-      if (!catalystMap.has(key)) {
-        catalystMap.set(key, {
-          componentId: cat.componentId ?? null,
-          name: cat.name ?? cat.description ?? key,
-          available: cat.available ?? cat.satisfied ?? false
+    // --- Tools (required-but-reusable — no quantity multiplication, just deduplicate) ---
+    for (const tool of toolStates) {
+      const key = tool.componentId ?? tool.name ?? 'unknown';
+      if (!toolMap.has(key)) {
+        toolMap.set(key, {
+          componentId: tool.componentId ?? null,
+          name: tool.name ?? tool.description ?? key,
+          available: tool.available ?? tool.satisfied ?? false
         });
       }
       // Availability: if any evaluation shows it unavailable, mark unavailable
-      if (!(cat.available ?? cat.satisfied ?? false)) {
-        catalystMap.get(key).available = false;
+      if (!(tool.available ?? tool.satisfied ?? false)) {
+        toolMap.get(key).available = false;
       }
     }
   }
@@ -163,18 +163,18 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
     };
   });
 
-  // --- Finalise catalysts ---
-  const catalysts = Array.from(catalystMap.values());
+  // --- Finalise tools ---
+  const tools = Array.from(toolMap.values());
 
   const allSatisfied =
     ingredients.every(i => i.satisfied) &&
     essences.every(e => e.satisfied) &&
-    catalysts.every(c => c.available);
+    tools.every(t => t.available);
 
   return {
     ingredients,
     essences,
-    catalysts,
+    tools,
     allSatisfied,
     totalRecipes,
     totalQuantity
