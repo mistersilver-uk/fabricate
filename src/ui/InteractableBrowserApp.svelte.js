@@ -92,12 +92,15 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
         return Array.isArray(tasks) ? tasks : [];
       },
       // Click-to-place a11y fallback: route through the shared spawn pipeline at
-      // the current scene's view center. NOT a divergent placement path.
-      placeOnScene: ({ interactableType, systemId, referenceId } = {}) =>
+      // the current scene's view center. NOT a divergent placement path. A
+      // `visualMode:'none'` routes the SAME spawn as a region-only interactable
+      // (hidden, no marker); the default 'marker' creates the linked Tile.
+      placeOnScene: ({ interactableType, systemId, referenceId, visualMode = 'marker' } = {}) =>
         InteractableManager.instance?.placeInteractableAtViewCenter?.({
           interactableType,
           systemId,
-          referenceId
+          referenceId,
+          visualMode
         })
     };
   }

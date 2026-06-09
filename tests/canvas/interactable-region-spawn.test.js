@@ -115,6 +115,59 @@ test('buildRegionSpawnRequest defaults the tile texture + dimensions', () => {
   assert.equal(request.tile.height, 100);
 });
 
+test('buildRegionSpawnRequest (visualMode none) → hidden + linkedVisual.mode none + tile null', () => {
+  const request = buildRegionSpawnRequest({
+    classification: toolClassification(),
+    point: { x: 150, y: 250 },
+    gridSize: 100,
+    visualMode: 'none',
+    buildBehaviorSystem: builder
+  });
+
+  // Region + behaviour are still built; only the marker is suppressed.
+  assert.equal(request.interactableType, 'tool');
+  assert.equal(request.behaviorSystem.interactableType, 'tool');
+  assert.equal(request.region.shape.type, 'rectangle');
+
+  // Region-only: hidden, no linked visual.
+  assert.equal(request.behaviorSystem.presentation.hidden, true, 'hidden from players');
+  assert.equal(request.behaviorSystem.linkedVisual.mode, 'none', 'mode is none (intentional, not missing)');
+  assert.equal(request.behaviorSystem.linkedVisual.uuid, null);
+  assert.equal(request.behaviorSystem.linkedVisual.documentName, null);
+
+  // No Tile to create.
+  assert.equal(request.tile, null, 'tile is null for the no-marker variant');
+});
+
+test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the node + env', () => {
+  const node = { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } };
+  const request = buildRegionSpawnRequest({
+    classification: taskClassification(),
+    point: { x: 0, y: 0 },
+    environmentId: 'env-1',
+    node,
+    visualMode: 'none',
+    gridSize: 100,
+    buildBehaviorSystem: builder
+  });
+  assert.equal(request.tile, null);
+  assert.equal(request.behaviorSystem.presentation.hidden, true);
+  assert.equal(request.behaviorSystem.linkedVisual.mode, 'none');
+  assert.equal(request.behaviorSystem.environmentId, 'env-1', 'env still resolved');
+  assert.deepEqual(request.behaviorSystem.node, node, 'node snapshot still threaded');
+});
+
+test('buildRegionSpawnRequest defaults to the with-marker path (mode marker, tile present)', () => {
+  const request = buildRegionSpawnRequest({
+    classification: toolClassification(),
+    point: { x: 0, y: 0 },
+    buildBehaviorSystem: builder
+  });
+  assert.equal(request.behaviorSystem.linkedVisual.mode, 'marker');
+  assert.equal(request.behaviorSystem.presentation.hidden, false);
+  assert.ok(request.tile, 'the default with-marker path still shapes the tile data');
+});
+
 test('buildRegionSpawnRequest honors a multi-square regionGrid', () => {
   const request = buildRegionSpawnRequest({
     classification: toolClassification(),

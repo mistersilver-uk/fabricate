@@ -137,6 +137,34 @@ test('applyLinkedVisualDepleted is a no-op when the visual is missing', () => {
   assert.equal(deletes.length, 0);
 });
 
+test('applyLinkedVisualDepleted is a clean no-op for a region-only interactable (mode none)', () => {
+  // Region-only = `linkedVisual.mode:'none'`, uuid/documentName null. This is an
+  // INTENTIONAL "no marker" state (distinct from a missing marker): the depleted
+  // reflection resolves no visual and emits nothing — the interactable still works.
+  const updates = [];
+  const deletes = [];
+  withFromUuid({}, () => applyLinkedVisualDepleted({
+    behaviorSystem: {
+      linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' },
+      node: { depletedBehavior: { swapImage: 'd.webp' } }
+    },
+    depleted: true,
+    emitVisualUpdate: (a) => updates.push(a),
+    emitVisualDelete: (a) => deletes.push(a)
+  }));
+  assert.equal(updates.length, 0, 'no visual update is emitted with no marker');
+  assert.equal(deletes.length, 0, 'no visual delete is emitted with no marker');
+});
+
+test('planMissingPolicy reports none (not warn) for a region-only interactable', () => {
+  // The distinction the config panel relies on: mode 'none' is intentional, so it
+  // is `action:'none'` (no spurious "missing" warning), NOT a missing-policy warn.
+  assert.deepEqual(
+    planMissingPolicy({ linkedVisual: { mode: 'none', uuid: null, documentName: null, missingPolicy: 'warn' } }, false),
+    { action: 'none' }
+  );
+});
+
 test('applyLinkedVisualDepleted Drawing / Token branches are no-op stubs', () => {
   const updates = [];
   const deletes = [];

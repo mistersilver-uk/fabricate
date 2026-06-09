@@ -65,6 +65,25 @@ test('the serialized text/plain form parses back to the same payload Foundry han
   assert.equal(classification.referenceId, 'tool-1');
 });
 
+test('buildInteractableDragPayload (visualMode none) carries the region-only flag + still classifies', () => {
+  const payload = buildInteractableDragPayload({ interactableType: 'tool', systemId: 'sysA', referenceId: 'tool-1', visualMode: 'none' });
+  assert.deepEqual(payload, {
+    type: INTERACTABLE_DRAG_TYPE,
+    fabricate: { interactableType: 'tool', systemId: 'sysA', toolId: 'tool-1', visualMode: 'none' }
+  });
+  // Classification keys off type + ids only — the extra flag is ignored there.
+  const classification = classifyInteractableDrop(payload, deps);
+  assert.equal(classification.interactableType, 'tool');
+  assert.equal(classification.referenceId, 'tool-1');
+});
+
+test('buildInteractableDragPayload defaults to the with-marker variant (no visualMode key)', () => {
+  const payload = buildInteractableDragPayload({ interactableType: 'tool', systemId: 'sysA', referenceId: 'tool-1' });
+  assert.equal('visualMode' in payload.fabricate, false, 'an ordinary drag payload omits visualMode');
+  const explicit = buildInteractableDragPayload({ interactableType: 'tool', systemId: 'sysA', referenceId: 'tool-1', visualMode: 'marker' });
+  assert.equal('visualMode' in explicit.fabricate, false, 'explicit marker also omits the key (drop side defaults)');
+});
+
 test('buildInteractableDragPayload rejects invalid inputs (null, blank ids, unknown type)', () => {
   assert.equal(buildInteractableDragPayload({ interactableType: 'tool', systemId: '', referenceId: 'tool-1' }), null);
   assert.equal(buildInteractableDragPayload({ interactableType: 'tool', systemId: 'sysA', referenceId: '  ' }), null);

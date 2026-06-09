@@ -157,6 +157,20 @@ describe('summarizeInteractable', () => {
     assert.equal(view.referenceId, 'tool-1', 'referenceId is the toolId for a tool station');
   });
 
+  it('reports status none — NOT missing — for an explicit region-only interactable (mode none)', () => {
+    // Region-only = `linkedVisual.mode:'none'`. This is intentional, so the panel
+    // must show "region only", never the missing-visual warning — even though the
+    // resolver would return null (there is no marker to resolve).
+    const regionOnly = toolSystem({
+      presentation: { promptText: null, hidden: true },
+      linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' }
+    });
+    const view = summarizeInteractable(regionOnly, { resolveVisual: () => { throw new Error('resolver must NOT be consulted for mode none'); } });
+    assert.equal(view.linkedVisual.status, 'none', 'mode none → status none (distinct from missing)');
+    assert.equal(view.linkedVisual.mode, 'none');
+    assert.equal(view.presentation.hidden, true);
+  });
+
   it('returns null for a non-interactable system', () => {
     assert.equal(summarizeInteractable({ foo: 'bar' }, { resolveVisual: () => null }), null);
   });

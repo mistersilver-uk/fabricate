@@ -25,28 +25,39 @@ export const INTERACTABLE_DRAG_TYPE = 'fabricate-interactable';
 /**
  * Build the `dropCanvasData`-compatible drag payload for a browser row.
  *
+ * A `visualMode:'none'` is carried in the `fabricate` block ONLY for the
+ * region-only ("no marker") placement variant; a normal drag omits it (the drop
+ * side defaults to 'marker'). Classification keys off type + ids only, so the
+ * extra field is ignored by `classifyInteractableDrop` and read directly by the
+ * manager's spawn path.
+ *
  * @param {object} params
  * @param {'tool'|'gatheringTask'} params.interactableType
  * @param {string} params.systemId   Owning crafting system id.
  * @param {string} params.referenceId  Library Tool id (tool) or Task id (gatheringTask).
+ * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no marker).
  * @returns {{ type: string, fabricate: { interactableType: string, systemId: string,
- *   toolId?: string, taskId?: string } } | null}  Null when the inputs are invalid.
+ *   toolId?: string, taskId?: string, visualMode?: 'none' } } | null}  Null when the inputs are invalid.
  */
-export function buildInteractableDragPayload({ interactableType, systemId, referenceId } = {}) {
+export function buildInteractableDragPayload({ interactableType, systemId, referenceId, visualMode } = {}) {
   const sysId = typeof systemId === 'string' ? systemId.trim() : '';
   const refId = typeof referenceId === 'string' ? referenceId.trim() : '';
   if (!sysId || !refId) return null;
 
+  // Only stamp the no-marker variant; 'marker' (default) stays omitted so an
+  // ordinary drag payload is unchanged.
+  const visual = visualMode === 'none' ? { visualMode: 'none' } : {};
+
   if (interactableType === 'tool') {
     return {
       type: INTERACTABLE_DRAG_TYPE,
-      fabricate: { interactableType: 'tool', systemId: sysId, toolId: refId }
+      fabricate: { interactableType: 'tool', systemId: sysId, toolId: refId, ...visual }
     };
   }
   if (interactableType === 'gatheringTask') {
     return {
       type: INTERACTABLE_DRAG_TYPE,
-      fabricate: { interactableType: 'gatheringTask', systemId: sysId, taskId: refId }
+      fabricate: { interactableType: 'gatheringTask', systemId: sysId, taskId: refId, ...visual }
     };
   }
   return null;

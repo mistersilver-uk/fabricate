@@ -11,6 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { respawnInteractableRegionBehaviors } from '../../src/canvas/regions/interactableRegionWorldTime.js';
+import { buildLinkedVisualApply } from '../../src/canvas/interactableSocketBridge.js';
 
 function overTimeNode({ current, max = 5 }) {
   return {
@@ -95,6 +96,43 @@ test('skips non-interactable behaviours, tool behaviours, and unlimited nodes', 
   });
   assert.deepEqual(changed, []);
   assert.equal(applied.length, 0);
+});
+
+test('region-only behaviour respawns its node with a clean no-op linked-visual reflection (no marker)', async () => {
+  // A region-only interactable (`linkedVisual.mode:'none'`, uuid null) still owns
+  // its node + respawns it; the REAL `buildLinkedVisualApply` resolves no marker
+  // and emits nothing — no throw, no socket traffic. The interactable keeps working.
+  const savedSocket = globalThis.game;
+  const savedFromUuid = globalThis.fromUuidSync;
+  const emits = [];
+  globalThis.game = { socket: { emit: (channel, payload) => emits.push({ channel, payload }) }, user: {}, users: {} };
+  globalThis.fromUuidSync = () => null;
+  try {
+    const regionOnlyBehavior = {
+      id: 'b1',
+      type: 'fabricate.interactable',
+      system: {
+        interactableType: 'gatheringTask',
+        node: overTimeNode({ current: 1 }),
+        linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' }
+      }
+    };
+    const applied = [];
+    const changed = await respawnInteractableRegionBehaviors({
+      worldTime: 7200,
+      secondsPerUnit: SECONDS_PER_UNIT,
+      isActiveGM: () => true,
+      scenes: scenes([scene({ id: 's1', regions: [region({ id: 'r1', behaviors: [regionOnlyBehavior] })] })]),
+      applyBehaviorUpdate: (a) => applied.push(a),
+      applyLinkedVisual: buildLinkedVisualApply()
+    });
+    assert.deepEqual(changed, [{ sceneId: 's1', regionId: 'r1', behaviorId: 'b1' }], 'the node still respawns');
+    assert.equal(applied.length, 1, 'the node update is applied');
+    assert.equal(emits.length, 0, 'NO visual update/delete is emitted for a region-only interactable');
+  } finally {
+    globalThis.game = savedSocket;
+    globalThis.fromUuidSync = savedFromUuid;
+  }
 });
 
 test('returns an empty list for a non-finite world time', async () => {

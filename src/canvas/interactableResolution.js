@@ -272,10 +272,14 @@ export function buildSpawnRequest({ classification, point, environmentId, textur
  * @param {object|null} [params.node]               Node-config snapshot (gatheringTask only) or null.
  * @param {number} [params.gridSize]                Scene grid square size (scene units). Default 100.
  * @param {number} [params.regionGrid]              Region size in grid squares per side. Default 1.
+ * @param {'marker'|'none'} [params.visualMode]     Linked-visual mode. 'marker' (default)
+ *   creates a visible linked Tile; 'none' makes a hidden, region-only interactable
+ *   with NO marker (`presentation.hidden=true`, `linkedVisual.mode='none'`,
+ *   uuid/documentName null) and `tile: null` (the caller skips Tile creation).
  * @param {(spawn: object) => object} [params.buildBehaviorSystem]  Behaviour-system builder
  *   (`buildInteractableBehaviorSystem`); injected so this stays Foundry-free.
  * @returns {{ region: { name: string, shape: object }, behaviorSystem: object,
- *   tile: { texture: { src: string }, x: number, y: number, width: number, height: number },
+ *   tile: ({ texture: { src: string }, x: number, y: number, width: number, height: number } | null),
  *   interactableType: string, sourceUuid: string, name: string,
  *   environmentId: string|null } | null}
  */
@@ -290,12 +294,18 @@ export function buildRegionSpawnRequest({
   node,
   gridSize,
   regionGrid = 1,
+  visualMode = 'marker',
   buildBehaviorSystem
 } = {}) {
   if (!classification) return null;
   if (typeof buildBehaviorSystem !== 'function') {
     throw new Error('buildRegionSpawnRequest requires a buildBehaviorSystem builder');
   }
+
+  // Region-only: a hidden/abstract interactable with NO visible marker. The
+  // behaviour carries `presentation.hidden=true` + `linkedVisual.mode='none'`,
+  // and the request omits the Tile so the caller never creates one.
+  const regionOnly = visualMode === 'none';
 
   const grid = Number.isFinite(Number(gridSize)) && Number(gridSize) > 0 ? Number(gridSize) : 100;
   const span = Math.max(1, Math.floor(Number(regionGrid) || 1));
@@ -338,7 +348,10 @@ export function buildRegionSpawnRequest({
     taskId: classification.interactableType === 'gatheringTask' ? classification.referenceId : null,
     environmentId: resolvedEnvironmentId ?? undefined,
     name: resolvedName,
-    node: classification.interactableType === 'gatheringTask' && node ? node : null
+    node: classification.interactableType === 'gatheringTask' && node ? node : null,
+    // Region-only ⇒ hidden + no marker; the builder leaves uuid/documentName null.
+    presentation: regionOnly ? { hidden: true } : undefined,
+    linkedVisual: regionOnly ? { mode: 'none' } : undefined
   });
 
   return {
@@ -357,7 +370,8 @@ export function buildRegionSpawnRequest({
       }
     },
     behaviorSystem,
-    tile: {
+    // Region-only ⇒ no Tile: the caller skips Tile creation entirely.
+    tile: regionOnly ? null : {
       texture: { src: typeof texture === 'string' && texture.trim() ? texture.trim() : DEFAULT_REGION_TILE_IMG },
       x: tileX,
       y: tileY,

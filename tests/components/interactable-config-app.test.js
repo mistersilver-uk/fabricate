@@ -68,6 +68,14 @@ describe('InteractableConfigApp shell', () => {
     assert.ok(appSource.includes('applyMissingPolicy('), 'missing-visual recovery reuses applyMissingPolicy');
   });
 
+  it('upgrades a region-only interactable to a linked Tile via the Create-marker seam', () => {
+    assert.ok(appSource.includes('createMarker:'), 'declares the Create-marker service');
+    // The upgrade reuses recreateLinkedTile (GM-routed) and flips the behaviour
+    // back to a visible marker (mode marker, un-hidden) — not a divergent path.
+    assert.ok(appSource.includes("linkedVisual: { mode: 'marker' }"), 'flips linkedVisual.mode back to marker');
+    assert.ok(appSource.includes('presentation: { hidden: false }'), 'un-hides the upgraded interactable');
+  });
+
   it('confirms destructive actions through a 3-way DialogV2 choice (choiceDialog), never globalThis.confirm', () => {
     assert.ok(appSource.includes('choiceDialog('), 'uses the DialogV2 choice bridge');
     assert.ok(!appSource.includes('globalThis.confirm('), 'never uses globalThis.confirm');
@@ -118,6 +126,12 @@ describe('InteractableConfigRoot body', () => {
   it('shows the missing-visual recovery affordances behind the missing status', () => {
     assert.ok(rootSource.includes("visualStatus.severity === 'missing'"), 'gates recovery on the missing status');
     assert.ok(rootSource.includes('describeVisualStatus('), 'uses the pure visual-status helper');
+  });
+
+  it('offers a Create-marker upgrade for a region-only interactable (status none)', () => {
+    assert.ok(rootSource.includes("visualStatus.severity === 'none'"), 'gates the upgrade on the region-only status');
+    assert.ok(rootSource.includes('services?.createMarker?.()'), 'wires the Create-marker seam');
+    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.CreateMarker'), 'localized Create marker label');
   });
 
   it('localizes every string through the foundry bridge under the Config namespace', () => {

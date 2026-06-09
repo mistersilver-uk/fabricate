@@ -277,6 +277,57 @@ test('_spawnInteractableRegion creates a Region (with nested behaviour) + linked
   }
 });
 
+test('_spawnInteractableRegion SKIPS Tile creation for the region-only (no marker) variant', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdRegions, regionPayloads, createdTiles, behaviorUpdates } = installFakeFoundry({
+      isGM: true,
+      tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }],
+      components: [{ id: 'comp-axe', img: 'icons/tools/axe.webp' }]
+    });
+    const manager = new InteractableManager();
+
+    const classification = {
+      interactableType: 'tool', systemId: 'sysA', referenceId: 'tool-1',
+      sourceUuid: 'Fabricate.sysA.tool.tool-1',
+      entry: { id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }
+    };
+    // The pure builder returns `tile: null` for visualMode 'none'.
+    const spawnRequest = manager._buildRegionSpawnRequest({ classification, point: { x: 150, y: 250 }, visualMode: 'none' });
+    assert.equal(spawnRequest.tile, null, 'the spawn request omits the tile');
+
+    const region = await manager._spawnInteractableRegion(spawnRequest);
+
+    assert.equal(createdRegions.length, 1, 'the Region is still created');
+    assert.equal(region, createdRegions[0]);
+    assert.equal(regionPayloads[0].behaviors[0].system.presentation.hidden, true, 'behaviour is hidden');
+    assert.equal(regionPayloads[0].behaviors[0].system.linkedVisual.mode, 'none', 'mode is none');
+    assert.equal(createdTiles.length, 0, 'NO Tile is created (no orphan)');
+    assert.equal(behaviorUpdates.length, 0, 'NO linked-visual ref is written back');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('_onDrop region-only payload (visualMode none) spawns the Region with NO Tile', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { createdRegions, createdTiles, regionPayloads } = installFakeFoundry({ isGM: true });
+    const manager = new InteractableManager();
+    const result = manager._onDrop(globalThis.canvas, {
+      fabricate: { interactableType: 'tool', systemId: 'sysA', toolId: 'tool-1', visualMode: 'none' },
+      x: 100, y: 200
+    });
+    assert.equal(result, false);
+    await flushAsync();
+    assert.equal(createdRegions.length, 1);
+    assert.equal(createdTiles.length, 0, 'the no-marker drop creates no Tile');
+    assert.equal(regionPayloads[0].behaviors[0].system.linkedVisual.mode, 'none');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
 test('_spawnInteractableRegion rolls back the orphan Region when the linked Tile create fails', async () => {
   const saved = snapshotGlobals();
   try {

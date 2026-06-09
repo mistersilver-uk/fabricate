@@ -130,6 +130,20 @@ describe('InteractableBrowserRoot body', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.PlaceOnScene'), 'localized place label');
   });
 
+  it('each row exposes a region-only (no marker) placement affordance routing the same spawn', () => {
+    assert.ok(rootSource.includes('class="fab-ib-place-region"'), 'rows carry the region-only button');
+    assert.ok(rootSource.includes("place('tool', tool.id, 'none')"), 'tool rows can place region-only');
+    assert.ok(rootSource.includes("place('gatheringTask', task.id, 'none')"), 'task rows can place region-only');
+    assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.PlaceRegionOnly'), 'localized region-only label');
+  });
+
+  it('threads visualMode through placeOnScene to the shared spawn pipeline', () => {
+    assert.ok(
+      appSource.includes('visualMode') && appSource.includes('placeInteractableAtViewCenter'),
+      'placeOnScene forwards visualMode to the manager placement seam'
+    );
+  });
+
   it('resolves a tool row name/image from the managed component when the tool label is empty', () => {
     // Tools have no required name, so an empty `label` must fall back to the
     // managed component's name/img (mirroring ToolsBrowserView), NOT the

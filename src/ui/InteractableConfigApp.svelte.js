@@ -214,6 +214,30 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         if (tile) this._refresh();
         return tile;
       },
+      // Upgrade a region-only interactable (no marker, `linkedVisual.mode:'none'`)
+      // to a linked Tile: create the marker over the region center and flip the
+      // mode back to 'marker' so it resolves as a real linked visual. GM-routed.
+      createMarker: async () => {
+        if (!this._assertGM()) return null;
+        const behavior = this._resolveBehavior();
+        const scene = behavior?.parent?.parent ?? globalThis.canvas?.scene ?? null;
+        if (!behavior || !scene) return null;
+        const center = this._shapeCenter(behavior?.parent ?? null);
+        const size = this._gridSize();
+        const placement = center
+          ? { x: center.x - size / 2, y: center.y - size / 2, width: size, height: size }
+          : {};
+        const tile = await recreateLinkedTile(behavior, { scene, ...placement }, {
+          applyBehaviorUpdate: applyInteractableBehaviorUpdate,
+          identify: identifyRegionBehaviorRef
+        });
+        if (!tile) return null;
+        // `recreateLinkedTile` writes uuid + documentName but leaves the prior
+        // 'none' mode; flip it to 'marker' so the visual resolves + un-hides.
+        await writeBehavior({ linkedVisual: { mode: 'marker' }, presentation: { hidden: false } });
+        this._refresh();
+        return tile;
+      },
       removeVisualMarker: async () => {
         if (!this._assertGM()) return;
         const behavior = this._resolveBehavior();
@@ -383,6 +407,14 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
     const x = Number(doc?.x ?? 0) + Number(doc?.width ?? 0) / 2;
     const y = Number(doc?.y ?? 0) + Number(doc?.height ?? 0) / 2;
     void globalThis.canvas?.animatePan?.({ x, y });
+  }
+
+  /** The active scene's grid size (one square). Falls back to 100. */
+  _gridSize() {
+    const size = globalThis.canvas?.scene?.grid?.size
+      ?? globalThis.canvas?.grid?.size
+      ?? globalThis.canvas?.dimensions?.size;
+    return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;
   }
 
   _shapeCenter(region) {

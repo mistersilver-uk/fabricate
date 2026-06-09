@@ -172,15 +172,18 @@ class InteractableManager {
     }
 
     const point = this._dropPoint(canvas, data);
+    // Region-only (no marker): the browser's "Region only" action carries
+    // `fabricate.visualMode:'none'`. A normal drag/drop defaults to 'marker'.
+    const visualMode = data?.fabricate?.visualMode === 'none' ? 'none' : 'marker';
     if (classification.interactableType !== 'gatheringTask') {
-      const spawnRequest = this._buildRegionSpawnRequest({ classification, point });
+      const spawnRequest = this._buildRegionSpawnRequest({ classification, point, visualMode });
       void this._spawnInteractableRegion(spawnRequest);
       return false;
     }
 
     // Alt held during the drop forces the GM dialog (override tiers 1 + 2).
     const forceDialog = data?.altKey === true || globalThis.game?.keyboard?.isModifierActive?.('Alt') === true;
-    void this._spawnGatheringTask({ classification, point, forceDialog });
+    void this._spawnGatheringTask({ classification, point, forceDialog, visualMode });
     return false; // suppress Foundry's default item-drop handling.
   }
 
@@ -193,10 +196,11 @@ class InteractableManager {
    * @param {'tool'|'gatheringTask'} params.interactableType
    * @param {string} params.systemId
    * @param {string} params.referenceId
+   * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no marker).
    * @returns {boolean}
    */
-  placeInteractableAtViewCenter({ interactableType, systemId, referenceId } = {}) {
-    const payload = buildInteractableDragPayload({ interactableType, systemId, referenceId });
+  placeInteractableAtViewCenter({ interactableType, systemId, referenceId, visualMode = 'marker' } = {}) {
+    const payload = buildInteractableDragPayload({ interactableType, systemId, referenceId, visualMode });
     if (!payload) return false;
     const center = this._viewCenter();
     const data = { ...payload, x: center.x, y: center.y };
@@ -213,9 +217,10 @@ class InteractableManager {
    * @param {{x:number,y:number}} params.point
    * @param {string} [params.environmentId]
    * @param {object|null} [params.node]
+   * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no Tile).
    * @returns {object|null}
    */
-  _buildRegionSpawnRequest({ classification, point, environmentId, node } = {}) {
+  _buildRegionSpawnRequest({ classification, point, environmentId, node, visualMode = 'marker' } = {}) {
     return buildRegionSpawnRequest({
       classification,
       point,
@@ -225,6 +230,7 @@ class InteractableManager {
       height: this._gridSize(),
       gridSize: this._gridSize(),
       node: node ?? null,
+      visualMode,
       buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn)
     });
   }
@@ -237,7 +243,7 @@ class InteractableManager {
    * @param {object} args
    * @returns {Promise<object|null>}
    */
-  async _spawnGatheringTask({ classification, point, forceDialog }) {
+  async _spawnGatheringTask({ classification, point, forceDialog, visualMode = 'marker' }) {
     const deps = this._resolutionDeps();
     const task = deps.getTask({ systemId: classification.systemId, taskId: classification.referenceId });
     const environments = this._systemEnvironments(classification.systemId);
@@ -276,7 +282,8 @@ class InteractableManager {
       classification,
       point,
       environmentId: environmentId ?? undefined,
-      node: buildInteractableNodeSnapshot(classification.entry ?? null)
+      node: buildInteractableNodeSnapshot(classification.entry ?? null),
+      visualMode
     });
     return this._spawnInteractableRegion(spawnRequest);
   }
@@ -331,6 +338,14 @@ class InteractableManager {
     const behavior = this._firstInteractableBehavior(regionDoc);
     const regionUuid = typeof regionDoc?.uuid === 'string' ? regionDoc.uuid : null;
     const behaviorId = behavior?.id ?? behavior?._id ?? null;
+
+    // Region-only (no marker): the pure builder returns `tile: null` for
+    // `visualMode:'none'`. The behaviour already carries `linkedVisual.mode='none'`
+    // + `presentation.hidden=true`, so there is NO Tile to create, no orphan, and
+    // no linked-visual ref to write back — the Region itself is the interactable.
+    if (!tile) {
+      return regionDoc;
+    }
 
     // Create the linked Tile carrying the reverse flags. On failure, delete the
     // orphan Region so we never leave a region without its intended marker.

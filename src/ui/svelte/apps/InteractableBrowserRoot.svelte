@@ -112,8 +112,8 @@
     return buildInteractableDragPayload({ interactableType, systemId: selectedSystemId, referenceId });
   }
 
-  function place(interactableType, referenceId) {
-    services?.placeOnScene?.({ interactableType, systemId: selectedSystemId, referenceId });
+  function place(interactableType, referenceId, visualMode = 'marker') {
+    services?.placeOnScene?.({ interactableType, systemId: selectedSystemId, referenceId, visualMode });
   }
 </script>
 
@@ -122,6 +122,7 @@
     <h2 class="fab-ib-title">{text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}</h2>
     <p class="fab-ib-hint">{text('FABRICATE.Canvas.Browser.Hint', 'Drag an entry onto the canvas, or use Place on current scene.')}</p>
     <p class="fab-ib-hint fab-ib-hint-modifier">{text('FABRICATE.Canvas.Interactable.DropModifierHint', 'Hold Alt while dropping to always choose the environment manually.')}</p>
+    <p class="fab-ib-hint fab-ib-hint-region">{text('FABRICATE.Canvas.Browser.RegionOnlyHint', 'Use the square button to place a region only, with no visible marker.')}</p>
   </header>
 
   <div class="fab-ib-controls">
@@ -160,14 +161,25 @@
             >
               <img class="fab-ib-row-thumb" src={tool.img} alt="" />
               <span class="fab-ib-row-label">{tool.label}</span>
-              <button
-                type="button"
-                class="fab-ib-place"
-                onclick={() => place('tool', tool.id)}
-                aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-              >
-                {text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-              </button>
+              <div class="fab-ib-row-actions">
+                <button
+                  type="button"
+                  class="fab-ib-place"
+                  onclick={() => place('tool', tool.id)}
+                  aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
+                >
+                  {text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
+                </button>
+                <button
+                  type="button"
+                  class="fab-ib-place-region"
+                  onclick={() => place('tool', tool.id, 'none')}
+                  title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                  aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                >
+                  <i class="fas fa-vector-square" aria-hidden="true"></i>
+                </button>
+              </div>
             </li>
           {/each}
         </ul>
@@ -191,14 +203,25 @@
                 <i class="fas fa-leaf fab-ib-row-icon" aria-hidden="true"></i>
               {/if}
               <span class="fab-ib-row-label">{task.label}</span>
-              <button
-                type="button"
-                class="fab-ib-place"
-                onclick={() => place('gatheringTask', task.id)}
-                aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-              >
-                {text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-              </button>
+              <div class="fab-ib-row-actions">
+                <button
+                  type="button"
+                  class="fab-ib-place"
+                  onclick={() => place('gatheringTask', task.id)}
+                  aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
+                >
+                  {text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
+                </button>
+                <button
+                  type="button"
+                  class="fab-ib-place-region"
+                  onclick={() => place('gatheringTask', task.id, 'none')}
+                  title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                  aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                >
+                  <i class="fas fa-vector-square" aria-hidden="true"></i>
+                </button>
+              </div>
             </li>
           {/each}
         </ul>
@@ -320,12 +343,26 @@
     white-space: nowrap;
   }
 
+  .fab-ib-row-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
   .fab-ib-place {
     flex: 0 0 auto;
     white-space: nowrap;
   }
 
-  .fab-ib-place:focus-visible {
+  .fab-ib-place-region {
+    flex: 0 0 auto;
+    width: 2rem;
+    padding: 0;
+  }
+
+  .fab-ib-place:focus-visible,
+  .fab-ib-place-region:focus-visible {
     outline: 2px solid var(--color-shadow-primary, var(--color-border-highlight));
     outline-offset: 2px;
   }
