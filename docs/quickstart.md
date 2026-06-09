@@ -6,7 +6,7 @@ nav_order: 2
 
 # Quickstart
 
-This guide walks you through installing Fabricate, creating your first crafting system, and crafting your first item.
+This guide walks you through installing Fabricate, creating your first crafting system, authoring a recipe, and crafting an item through the public API.
 
 ---
 
@@ -26,12 +26,14 @@ Open Foundry's module settings for Fabricate and set **Fabricate Theme** to swit
 
 **Foundry Native** is a fixed Foundry-inspired Fabricate palette. It is designed to sit closer to Foundry's default visual language, but it does not dynamically follow your active Foundry skin or third-party Foundry theme.
 
-## Step 1: Open the Crafting UI
+## Step 1: Open Fabricate
 
 Open the **Items** sidebar on the left side of Foundry. You'll see two new header buttons:
 
-- **Crafting** (all users) -- opens the player crafting interface
+- **Craft Item** (all users) -- opens the unified Fabricate window. The Crafting tab is currently a placeholder while the player crafting UI is rebuilt.
 - **Manage Crafting Systems** (GM only) -- opens the GM admin panel
+
+When at least one crafting system has gathering enabled, players also see a **Gathering** button. The Gathering tab is the currently implemented player-facing runtime surface.
 
 ## Step 2: Create a Crafting System
 
@@ -86,14 +88,11 @@ await fabricate.createSimpleRecipe('Healing Potion', [
 });
 ```
 
-## Step 5: Craft an Item
+## Step 5: Craft an Item Through the API
 
-1. Click **Crafting** in the Items sidebar header
-2. Select which actor will craft (and optionally which actors supply ingredients)
-3. Browse or search recipes -- green borders mean you have the materials
-4. Click **Craft** on a recipe
+The player-facing recipe browser is not implemented in the current unified Fabricate window. To test a recipe today, call the API from a macro or the browser console.
 
-### Or use a macro
+Use the recipe ID from the GM recipe list:
 
 ```javascript
 const actor = game.user.character;
@@ -103,10 +102,22 @@ if (result.success) {
 }
 ```
 
+You can pass additional source actors when ingredients should come from shared inventories:
+
+```javascript
+const actor = game.user.character;
+const chest = game.actors.getName('Party Chest');
+const result = await fabricate.craft(actor, 'your-recipe-id', {
+  componentSourceActors: [actor, chest].filter(Boolean)
+});
+```
+
+The planned Crafting tab will provide recipe browsing, actor/source selection, craft buttons, favourites, recent recipes, and shopping-list planning in the UI.
+
 ## What's next?
 
 - [Crafting Systems]({% link crafting-systems.md %}) -- resolution modes, features, and system configuration
-- [Recipes]({% link recipes/index.md %}) -- ingredient sets, result groups, and all four resolution modes
+- [Recipes]({% link recipes/index.md %}) -- ingredient sets, result groups, current API usage, and planned player UI
 - [Macros & Examples]({% link macros/index.md %}) -- ready-to-use macros for common tasks
 - [API Reference]({% link api/index.md %}) -- full developer documentation
 - [Troubleshooting]({% link troubleshooting.md %}) -- solutions for common setup issues

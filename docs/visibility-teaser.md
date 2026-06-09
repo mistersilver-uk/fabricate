@@ -7,7 +7,7 @@ parent: Visibility & Knowledge
 
 # Teaser Mode
 
-Teaser mode is an optional layer on top of the standard [visibility modes]({% link visibility.md %}). When enabled on a crafting system, undiscovered recipes appear in the Crafting App as **teasers** — players can see a recipe exists (its name, category, and a short teaser description) without seeing its full ingredients, results, or details. As players gather fragments or reach discovery thresholds, hidden fields are progressively revealed until the recipe is fully unlocked.
+Teaser mode is an optional layer on top of the standard [visibility modes]({% link visibility.md %}). When enabled on a crafting system, the visibility service can return undiscovered recipes as **teasers** — players may be allowed to know a recipe exists, while full ingredients, results, or details remain hidden. As players gather fragments or reach discovery thresholds, hidden fields are progressively revealed until the recipe is fully unlocked.
 
 Use teaser mode when you want discovery to be gradual: players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragments away from learning it, but cannot yet see what it requires.
 
@@ -20,8 +20,8 @@ Use teaser mode when you want discovery to be gradual: players can see that "Phi
 
 1. The GM sets the crafting system's `listMode` to `"teaser"` in the **Recipe Visibility** card of the Crafting Admin panel.
 2. For each recipe, the GM configures a `teaser` block: which fields to hide, a `revealThreshold` (the discovery progress required to unlock the recipe fully), and an optional `teaserDescription` shown to players before unlock.
-3. Players see teaser recipes in the Crafting App with only the permitted fields visible and a progress bar showing how close they are to full discovery.
-4. When a player's discovery progress for a recipe reaches or exceeds `revealThreshold`, the recipe transitions to fully visible and craftable.
+3. API consumers receive teaser visibility state with only the permitted fields visible. The planned Crafting UI will use this state for teaser cards and progress bars.
+4. When a player's discovery progress for a recipe reaches or exceeds `revealThreshold`, the recipe transitions to fully visible and craftable through the visibility guard.
 
 ---
 
@@ -53,8 +53,11 @@ Each fragment definition has:
 
 | Field | Description |
 |:------|:------------|
+| `id` | Stable fragment ID. |
+| `name` | Optional GM-facing name. |
 | `linkedItemUuid` | UUID of the world or compendium item whose acquisition triggers discovery. |
-| `progressAmount` | How much discovery progress this fragment grants (default: `1`). |
+| `recipeIds` | Recipe IDs that receive progress when this fragment is found. |
+| `progressValue` | How much discovery progress this fragment grants (default: `1`). |
 | `description` | Optional label shown to the GM in the fragment editor. |
 
 ---
@@ -93,22 +96,22 @@ When `discoveryMode` is `threshold` or `both`, GMs can set discovery progress pe
 Progress is stored in actor flags:
 
 ```
-Actor.flags.fabricate.teaserProgress = {
+Actor.flags.fabricate.discoveryProgress = {
   "<recipeId>": <number>
 }
 ```
 
 ---
 
-## Player Experience
+## Planned Player Experience
 
-Players see teaser recipes in a distinct visual style in the Crafting App:
+The planned Crafting tab will show teaser recipes in a distinct visual style:
 
 - **Recipe name** and **category** are always shown.
 - **Teaser description** replaces the normal description (if set).
 - **Hidden fields** (ingredients, results, etc.) are replaced with a placeholder.
-- A **progress bar** overlay shows current progress versus `revealThreshold`.
-- When progress reaches the threshold, the progress bar is replaced by normal recipe content and the recipe becomes craftable.
+- A **progress bar** overlay will show current progress versus `revealThreshold`.
+- When progress reaches the threshold, the progress bar will be replaced by normal recipe content and the recipe becomes craftable.
 
 ---
 
@@ -126,8 +129,11 @@ Hooks.once('fabricate.ready', async () => {
         discoveryMode: 'fragments',
         fragments: [
           {
+            id: 'ancient-scroll-fragment',
+            name: 'Ancient Alchemical Scroll',
             linkedItemUuid: 'Item.abc123',  // UUID of "Ancient Alchemical Scroll"
-            progressAmount: 1,
+            recipeIds: ['philosophers-stone-recipe-id'],
+            progressValue: 1,
             description: 'Ancient Alchemical Scroll'
           }
         ]
@@ -141,9 +147,10 @@ Hooks.once('fabricate.ready', async () => {
 // Set manual discovery progress for a player actor
 Hooks.once('fabricate.ready', async () => {
   const visibilityService = game.fabricate.getRecipeVisibilityService();
-  // Grant 2 progress points toward "philosophers-stone-recipe-id" for actor "actor-uuid"
+  const actor = game.user.character;
+  // Grant 2 progress points toward "philosophers-stone-recipe-id"
   await visibilityService.setDiscoveryProgress(
-    'actor-uuid',
+    actor,
     'philosophers-stone-recipe-id',
     2
   );

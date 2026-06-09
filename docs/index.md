@@ -11,7 +11,7 @@ nav_order: 1
 A system-agnostic crafting module for Foundry Virtual Tabletop.
 {: .fs-6 .fw-300 }
 
-Fabricate lets GMs define crafting systems with recipes, ingredients, tools, and essences. Players craft items through an in-game UI with inventory-aware validation, optional skill checks, and multi-step workflows.
+Fabricate lets GMs define crafting systems with recipes, ingredients, tools, essences, gathering environments, tasks, and hazards. Crafting recipes can currently be authored in the GM manager and executed through the public API; the player-facing Crafting and Alchemy tabs in the unified Fabricate window are planned UI surfaces.
 
 ---
 
@@ -20,15 +20,15 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, tools, and
 | Feature | Description |
 |:--------|:------------|
 | **Crafting Systems** | Define independent systems with their own item libraries, essences, and rules |
-| **Resolution Modes** | Simple, routed, progressive, and alchemy crafting with optional skill checks |
+| **Resolution Modes** | Simple, routed, progressive, and alchemy crafting with optional skill checks through the recipe and crafting APIs |
 | **Multi-Step Recipes** | Chain steps that must be completed in sequence, with optional time gates |
 | **Tools** | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage |
 | **Gathering Environments** | GM-authored places where actors can gather configured component results |
 | **Canvas Interactables** | Place Tools and Gathering Tasks as Scene Regions players activate by walking a token in |
 | **Essences** | Abstract properties on items for flexible ingredient matching |
-| **Visibility & Knowledge** | Control which recipes players can see and learn |
-| **Teaser Mode** | Reveal recipes gradually — players see a recipe exists and track progress toward unlocking it |
-| **Shopping List** | Plan ahead by collecting recipes and viewing a consolidated missing-materials table |
+| **Visibility & Knowledge** | Control which recipes players can see, learn, or unlock through the visibility service |
+| **Teaser Mode** | Track discovery progress and return teaser visibility state through the API; player UI presentation is planned |
+| **Shopping List** | Planned player-facing UI; aggregation support exists as internal utility code |
 | **Effect Transfer** | Transfer active effects from ingredients to crafted items |
 | **Item Piles Integration** | Currency costs, merchant stock, and container inventory via Item Piles |
 | **Macro Integration** | Customise crafting checks, property generation, and success/failure hooks |
@@ -54,7 +54,7 @@ await fabricate.createSimpleRecipe('Healing Potion', [
 });
 ```
 
-Then open the crafting UI from the Items sidebar, select your character, and click **Craft**.
+Then craft from a macro or integration with `fabricate.craft(actor, recipeId)`. The Items sidebar **Craft Item** button currently opens the unified Fabricate shell; the Crafting tab is a planned player UI.
 
 ## Quickstart
 

@@ -101,7 +101,7 @@ No macros are required. See [Item Piles Integration]({% link item-piles.md %}) f
 
 ### Recipe Visibility
 
-Recipe visibility controls which players can see and access recipes in the crafting app. You configure this per crafting system in the **Recipe Visibility** feature card on the System tab of the Crafting Admin panel.
+Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI. You configure this per crafting system in the **Recipe Visibility** feature card on the System tab of the Crafting Admin panel.
 
 Fabricate supports three list modes:
 
@@ -115,7 +115,7 @@ For full details on each mode, knowledge sub-options, recipe items, the learn fl
 
 ### Alchemy Mode
 
-Alchemy mode is a special resolution mode where recipe names and ingredient lists are hidden from players. Players drag items into the Crafting App's Alchemy panel and submit them; Fabricate matches the combination against known recipe signatures. Set the resolution mode of a system to `alchemy` to enable this. See [Alchemy Mode]({% link recipes/alchemy.md %}) for configuration, signature matching, consume-on-fail, and learn-on-craft options.
+Alchemy mode is a special resolution mode where recipe names and ingredient lists are hidden from players. Macros and integrations can submit selected items to the alchemy engine; Fabricate matches the combination against known recipe signatures. Set the resolution mode of a system to `alchemy` to enable this. See [Alchemy Mode]({% link recipes/alchemy.md %}) for current API usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
 
 ---
 
@@ -264,7 +264,7 @@ Systems can optionally require time or currency for crafting.
 
 ### Time Requirements
 
-When enabled, individual recipe steps can specify time requirements using duration fields (`minutes`, `hours`, `days`, `months`, `years`). The step blocks until world time advances past the required duration.
+When enabled, individual recipe steps can specify time or currency requirements using duration fields (`minutes`, `hours`, `days`, `months`, `years`). The step blocks until world time advances past the required duration.
 
 Time gates are checked:
 - When a player tries to advance a step

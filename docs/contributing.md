@@ -125,11 +125,11 @@ Every profile boots a real Foundry instance, joins the `fabricate-smoke-ci` worl
 2. Launches the `fabricate-smoke-ci` world (auto-wiped from the fixture under `.foundry-e2e/worlds/fabricate-smoke-ci/` on every `test:foundry:up`).
 3. Waits for `game.ready` and `game.fabricate.ready`.
 4. Verifies the Fabricate module is active (`game.modules.get('fabricate')?.active === true`).
-5. Opens the Gathering app and completes one successful **Gather Meadow Herbs** task on Alara the Alchemist.
-6. Opens the Crafting app and crafts one **Healing Potion**, verifying it lands in Alara's inventory.
+5. Opens the unified Fabricate shell from the sidebar actions, verifies the shared navigation/actor bar, and completes one successful **Gather Meadow Herbs** task on Alara the Alchemist.
+6. Crafts one **Healing Potion** through the runtime API, verifying it lands in Alara's inventory.
 7. Fails if any non-ignored browser console errors were captured during the session.
 
-The `full` profile additionally captures the Crafting System Manager v2 + legacy Recipe Manager screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, and runs document cleanup.
+The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, and runs document cleanup.
 
 ### Smoke profiles (`rc` vs `full`)
 
@@ -137,11 +137,11 @@ A single orchestrator (`scripts/foundry-test.mjs`) and run script (`scripts/foun
 
 | Profile | When | Phases | Target |
 |---------|------|--------|--------|
-| `rc` | Release-candidate CI | Phase B → C → D2 (one Gathering success) → E (Healing Potion craft) → console-error check | < 20 min including cold setup |
+| `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 20 min including cold setup |
 | `ci` | Deprecated alias for `rc` (removed after one release) | same as `rc` | same |
-| `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), Phase D (legacy Recipe Manager), Phase D2 blocked/failure/timed gathering states, Phase D3 (non-GM redaction), Phase E2 (no-selectable actors), Phase F (cleanup) | ~10–15 min locally |
+| `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), extended Gathering states, non-GM redaction, no-selectable actors, Phase F (cleanup) | ~10–15 min locally |
 
-The `rc` profile captures a pinned screenshot budget (`world-loaded`, `crafting-app-opened`, `post-craft`, `alara-post-craft-inventory`, `gathering-targeted-ready`, `gathering-immediate-success`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
+The `rc` profile captures a pinned screenshot budget (`world-loaded`, `fabricate-app-shell`, `post-craft`, `alara-post-craft-inventory`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
 
 The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 15 minutes). On overrun, the run process is sent `SIGTERM` and the orchestrator proceeds to Docker teardown + artifact upload, so the 20-minute Actions budget can never preempt cleanup. Override locally if you need a longer or shorter cap:
 
