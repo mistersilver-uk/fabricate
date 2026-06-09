@@ -52,7 +52,23 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
 
   class FabricateInteractableRegionBehavior extends RegionBehaviorType {
     static defineSchema() {
-      return buildInteractableBehaviorSchema(fields);
+      const schema = buildInteractableBehaviorSchema(fields);
+      // SUBSCRIPTION (not dispatch): a V13 RegionBehaviorType only RECEIVES region
+      // events whose names are in its instance `events: Set<string>`, which Foundry
+      // populates from a schema field built by the base static
+      // `_createEventsField({ events, initial })`. Without this field the behaviour
+      // subscribes to nothing and the `static events` handlers below never fire.
+      // `events` restricts the selectable set; `initial` is the default-subscribed
+      // set. Resolved defensively so a missing/renamed API degrades to "no events
+      // field" rather than throwing (keeps the module import-safe).
+      if (typeof RegionBehaviorType._createEventsField === 'function') {
+        const subscribedEvents = ['tokenEnter', 'tokenExit'];
+        schema.events = RegionBehaviorType._createEventsField({
+          events: subscribedEvents,
+          initial: subscribedEvents
+        });
+      }
+      return schema;
     }
 
     static events = {

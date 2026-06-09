@@ -3,9 +3,14 @@
  * Interactable config panel (`InteractableConfigApp`).
  *
  * Two pure decisions live here so the live-Foundry edges stay thin + testable:
- *  - {@link assignInteractableConfigSheet}: register the panel as the config sheet
- *    for the `fabricate.interactable` RegionBehavior subtype, mutating/calling a
- *    fake registrar. Defensive (no-throw when the API shape differs) + idempotent.
+ *  - {@link assignInteractableConfigSheet}: register the document sheet for the
+ *    `fabricate.interactable` RegionBehavior subtype, mutating/calling a fake
+ *    registrar. The registered `SheetClass` is the CORE
+ *    `foundry.applications.sheets.RegionBehaviorConfig` (a real DocumentSheet) so
+ *    `behavior.sheet` resolves and the edit pencil opens — our rich
+ *    `InteractableConfigApp` is NOT a DocumentSheet and stays reachable via the
+ *    Tile/Token HUD entry + scene-control opener instead. Defensive (no-throw when
+ *    the API shape differs) + idempotent.
  *  - {@link resolveInteractableConfigTarget}: from a linked Tile (or Drawing /
  *    Token) document, resolve the owning behaviour's `{ sceneId, regionId,
  *    behaviorId }` so a Tile HUD / context-menu entry can open the panel against
@@ -30,7 +35,8 @@ import { INTERACTABLE_BEHAVIOR_SUBTYPE, readLinkedVisualRef } from './interactab
  * @param {object} deps.registrar  A `DocumentSheetConfig`-shaped object exposing
  *   `registerSheet(documentClass, scope, sheetClass, options)`.
  * @param {Function} deps.RegionBehavior  The `RegionBehavior` document class.
- * @param {Function} deps.SheetClass  The config-panel application class.
+ * @param {Function} deps.SheetClass  The document-sheet class to register (the
+ *   CORE `RegionBehaviorConfig`).
  * @param {string} [deps.scope]  Registration scope (defaults to 'fabricate').
  * @param {boolean} [deps.makeDefault]  Whether the sheet is the default (defaults to true).
  * @returns {boolean} Whether a registration was performed (false when skipped/no-op).

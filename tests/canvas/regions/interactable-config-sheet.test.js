@@ -18,7 +18,12 @@ import {
 } from '../../../src/canvas/regions/interactableConfigSheet.js';
 
 class FakeRegionBehavior {}
-class FakeSheet {}
+// Stands in for the CORE `foundry.applications.sheets.RegionBehaviorConfig`, which
+// is the document sheet now registered for `fabricate.interactable` so
+// `behavior.sheet` resolves (our rich Svelte InteractableConfigApp is NOT a
+// DocumentSheet and is reached via the Tile/Token HUD instead).
+class FakeRegionBehaviorConfig {}
+const FakeSheet = FakeRegionBehaviorConfig;
 
 function fakeRegistrar() {
   const calls = [];
@@ -31,15 +36,15 @@ function fakeRegistrar() {
 }
 
 describe('assignInteractableConfigSheet', () => {
-  it('registers the sheet for the fabricate.interactable subtype', () => {
+  it('registers the core RegionBehaviorConfig sheet for the fabricate.interactable subtype', () => {
     const registrar = fakeRegistrar();
-    const did = assignInteractableConfigSheet({ registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet });
+    const did = assignInteractableConfigSheet({ registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeRegionBehaviorConfig });
     assert.equal(did, true);
     assert.equal(registrar.calls.length, 1);
     const call = registrar.calls[0];
     assert.equal(call.documentClass, FakeRegionBehavior);
     assert.equal(call.scope, 'fabricate');
-    assert.equal(call.sheetClass, FakeSheet);
+    assert.equal(call.sheetClass, FakeRegionBehaviorConfig);
     assert.deepEqual(call.options.types, ['fabricate.interactable']);
     assert.equal(call.options.makeDefault, true);
   });

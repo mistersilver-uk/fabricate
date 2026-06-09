@@ -1075,21 +1075,29 @@ Hooks.once('init', async () => {
   // APIs are unavailable (e.g. an older core), so it is safe to call unconditionally.
   registerInteractableRegionBehavior(CONFIG);
 
-  // Register the rich GM config panel as the config sheet for the
-  // `fabricate.interactable` RegionBehavior subtype (V13). Resolved defensively
-  // via globalThis — a no-op when the DocumentSheetConfig / RegionBehavior API
-  // shape differs, so it never throws into init.
+  // Register the CORE schema-driven RegionBehaviorConfig as the document sheet for
+  // the `fabricate.interactable` RegionBehavior subtype (V13). Our rich
+  // `InteractableConfigApp` is an ApplicationV2 + SvelteApplicationMixin, NOT a
+  // DocumentSheet, so registering it left `behavior.sheet` null and broke the edit
+  // pencil. The core sheet renders our behaviour fields (plus the `events`
+  // multi-select) and makes `behavior.sheet` resolve. Our rich panel stays
+  // reachable via the Tile/Token HUD entry + scene-control opener
+  // (`getInteractableConfigAppClass().show(ref)`). Resolved defensively via
+  // globalThis — a no-op when the API shape differs, so it never throws into init.
   try {
     const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig
       ?? globalThis.DocumentSheetConfig;
     const RegionBehavior = foundry?.documents?.RegionBehavior
       ?? CONFIG?.RegionBehavior?.documentClass
       ?? globalThis.RegionBehavior;
-    assignInteractableConfigSheet({
-      registrar: DocumentSheetConfig,
-      RegionBehavior,
-      SheetClass: getInteractableConfigAppClass()
-    });
+    const RegionBehaviorConfig = globalThis.foundry?.applications?.sheets?.RegionBehaviorConfig;
+    if (typeof RegionBehaviorConfig === 'function') {
+      assignInteractableConfigSheet({
+        registrar: DocumentSheetConfig,
+        RegionBehavior,
+        SheetClass: RegionBehaviorConfig
+      });
+    }
   } catch (_error) {
     // Defensive: a sheet-registration shape mismatch must not break init.
   }

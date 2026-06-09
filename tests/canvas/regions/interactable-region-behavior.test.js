@@ -10,6 +10,17 @@ import { INTERACTABLE_BEHAVIOR_SUBTYPE } from '../../../src/canvas/regions/inter
 
 class FakeRegionBehaviorType {}
 
+// A base class whose static `_createEventsField` records its args and returns a
+// recognisable sentinel field, mirroring the V13 RegionBehaviorType seam Foundry
+// uses to populate the behaviour's `events` subscription Set.
+class FakeRegionBehaviorTypeWithEvents {
+  static lastEventsArgs = null;
+  static _createEventsField(args) {
+    FakeRegionBehaviorTypeWithEvents.lastEventsArgs = args;
+    return { kind: 'EventsField', args };
+  }
+}
+
 function makeFakeFields() {
   function makeFieldClass(kind) {
     return class FakeField {
@@ -55,6 +66,40 @@ test('factory builds a subclass whose defineSchema returns the behaviour schema'
   assert.ok(schema.interactableType);
   assert.ok(schema.state);
   assert.equal(schema.node.kind, 'ObjectField');
+});
+
+test('defineSchema subscribes to tokenEnter/tokenExit via the base events field', () => {
+  FakeRegionBehaviorTypeWithEvents.lastEventsArgs = null;
+  const Class = createInteractableRegionBehaviorClass({
+    RegionBehaviorType: FakeRegionBehaviorTypeWithEvents,
+    fields: makeFakeFields()
+  });
+  const schema = Class.defineSchema();
+  // The subscription field is built from the base static `_createEventsField`,
+  // restricting + defaulting the subscribed set to the token enter/exit events.
+  assert.equal(schema.events.kind, 'EventsField');
+  assert.deepEqual(FakeRegionBehaviorTypeWithEvents.lastEventsArgs, {
+    events: ['tokenEnter', 'tokenExit'],
+    initial: ['tokenEnter', 'tokenExit']
+  });
+  // The static `events` handler MAP (dispatch) is independent of the subscription
+  // field and still exposes both handlers.
+  assert.equal(typeof Class.events.tokenEnter, 'function');
+  assert.equal(typeof Class.events.tokenExit, 'function');
+});
+
+test('defineSchema degrades gracefully when _createEventsField is absent', () => {
+  // FakeRegionBehaviorType has no `_createEventsField`: no throw, schema returned
+  // without an `events` field (the behaviour simply subscribes to nothing).
+  const Class = createInteractableRegionBehaviorClass({
+    RegionBehaviorType: FakeRegionBehaviorType,
+    fields: makeFakeFields()
+  });
+  const schema = Class.defineSchema();
+  assert.ok(schema.interactableType);
+  assert.equal(schema.events, undefined);
+  assert.equal(typeof Class.events.tokenEnter, 'function');
+  assert.equal(typeof Class.events.tokenExit, 'function');
 });
 
 test('factory rejects a missing base class or fields namespace', () => {
