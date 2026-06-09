@@ -74,6 +74,13 @@ composed into environments many-to-many via `enabledTaskIds` / `forcedTaskIds`).
 > created.** The token/tile-flag schemas in the next two subsections are retained only as a
 > record of the abandoned draft; the canonical schema is the behaviour `system` defined in
 > `openspec/specs/data-models/spec.md` (Canvas Interactables).
+>
+> **Env-node correction (further-superseded).** The "Per-Behaviour Node State" and
+> "Depleted Behavior" subsections below were ALSO abandoned (`ae53384`, `4770a7f`). The shipped
+> gathering-task interactable carries **no `node` field**, **no `nodeStateOverride`**, and
+> **no per-marker depleted-behaviour**: it is a pure `(environment, task)` shortcut using
+> `environment.nodeRuntime[taskId]` as the single source of truth. A **Tool** interactable opens
+> the **Crafting** tab. Read those two subsections as a record of abandoned drafts.
 
 ### Interactable Region Behaviour (`fabricate.interactable`)
 
@@ -97,7 +104,7 @@ behavior.system = {
     mode: "marker"|"none",            // "none" = region-only, no visible marker
     missingPolicy: "ignore"|"warn"|"recreate"
   },
-  node: NodeState|null,               // gatheringTask only; per-behaviour node snapshot
+  // NO `node` field — env nodeRuntime[taskId] is the single source of truth (abandoned draft).
   state: {
     enabled: boolean, consumed: boolean, locked: boolean,
     uses: { max: number|null, used: number },
@@ -110,8 +117,10 @@ behavior.system = {
 Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONFIG
 registration live in `src/canvas/regions/FabricateInteractableRegionBehavior.js`.
 
-1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId`,
-   `environmentId`, and `node` are scoped by `interactableType`.
+1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId` and
+   `environmentId` are scoped by `interactableType`. A Tool interactable opens the Crafting tab
+   (virtual-present `activeCanvasTool`); a gathering-task interactable opens the gathering app
+   scoped to its `environmentId` + `taskId` using `environment.nodeRuntime[taskId]`.
 2. Spawning is **GM-only**: a GM-only scene-control browser drags/places interactables
    (Region + behaviour + linked Tile, or region-only).
 3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by
@@ -130,11 +139,20 @@ visual.flags.fabricate = {
 }
 ```
 
-Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef`. An existing GM-placed
-**Token** linked as a marker is the GM's own document: depletion **never** mutates or deletes
-it by default (see Depleted Behavior).
+Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef`. The linked visual is
+**presentation-only**: no per-interactable depletion mutation is applied to it in the shipped
+model (env-driven marker depletion is a possible FUTURE option).
 
-### Per-Behaviour Node State (`behavior.system.node`)
+### Per-Behaviour Node State (`behavior.system.node`) — ABANDONED
+
+> **REMOVED — do not implement (`ae53384`, `4770a7f`).** The behaviour has **no `node` field**.
+> A gathering-task interactable carries no per-interactable node pool; node counts, depletion,
+> and respawn are owned by `environment.nodeRuntime[taskId]`. There is no `nodeStateOverride`,
+> no behaviour-backed node adapter (`interactableRegionNodeAdapter.js` is now only a pure
+> `{sceneId,regionId,behaviorId}` ref resolver), no per-behaviour world-time respawn pass, and
+> no precedence of a behaviour node over the environment node. The timed/waiting-run maturity
+> decrement lands on the **environment** node. The subsection below is a record of the abandoned
+> draft.
 
 A gathering-task interactable owns its own depletion/respawn state on the behaviour
 (`behavior.system.node`), independent of `environment.nodeRuntime[taskId]`.
@@ -154,7 +172,11 @@ A gathering-task interactable owns its own depletion/respawn state on the behavi
    own write locally). A world-time respawn pass iterates placed region behaviours, active-GM
    only. Depletion reflects onto the linked visual (see Depleted Behavior).
 
-### Depleted Behavior (gathering-task node config)
+### Depleted Behavior (gathering-task node config) — ABANDONED as an interactable marker
+
+> **REMOVED as an interactable mechanism.** `depletedBehavior` is still authored/normalized as
+> task node config, but does NOT drive any per-interactable linked-visual transition in the
+> shipped model. The schema/decision below is a record of the abandoned draft.
 
 ```js
 depletedBehavior = {

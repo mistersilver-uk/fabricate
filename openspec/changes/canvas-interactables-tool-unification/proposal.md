@@ -12,6 +12,15 @@
 > 0.6.0 migration, `toolIds`, virtual-present tools) shipped as written. The canonical canvas
 > spec is `openspec/specs/data-models/spec.md` (Canvas Interactables); `design.md` carries the
 > detailed superseding notes. The token/tile wording below is left as the original record.
+>
+> **Further correction — env-node shortcut (post-pivot fixes).** Two later fixes also
+> abandoned the *per-behaviour node* model that the region-first pivot initially kept. The
+> shipped gathering-task interactable is a **pure `(environment, task)` shortcut**: it carries
+> **no `behavior.system.node`** and uses the environment's `nodeRuntime[taskId]` as the single
+> source of truth (no per-interactable pool, no `nodeStateOverride`, no per-behaviour respawn
+> pass, no per-marker depleted-behaviour swap). A **Tool** interactable opens the **Crafting**
+> tab. Any "per-behaviour/per-token node state" or "depleted behavior on the linked visual"
+> wording below is **abandoned**, not intended.
 
 Fabricate currently lives entirely in window-based UI; crafting and gathering are
 launched from the items directory, never from the Foundry canvas. This change brings
@@ -40,7 +49,10 @@ The work is delivered in eight phases (0..7), each independently shippable and g
 Catalyst→Tool migration (0.6.0), full Catalyst retirement (delete, no shim), the canvas
 Interactable foundation, session-scoped Tool tokens, per-token Gathering Task node state
 with GM-routed writes, depleted-behavior config + environment-resolution precedence, and
-the GM scene-control launch button + Interactable browser app.
+the GM scene-control launch button + Interactable browser app. *(Note: the per-token/
+per-behaviour Gathering-Task node state and the per-marker depleted-behavior phases below were
+later **abandoned** — the shipped gathering-task interactable is a pure env+task shortcut using
+the environment node; see the region-first + env-node correction notes above.)*
 
 ## Why
 
@@ -76,17 +88,18 @@ the GM scene-control launch button + Interactable browser app.
   virtual-present tool (keyed by `componentId`) into crafting/gathering so the actor need not
   own the item; the virtual tool is excluded from breakage and usage. *(Original draft:
   double-clicking the token — abandoned for region presence.)*
-- **Per-behaviour node state.** Gathering Task interactables own their own depletion/respawn
-  state on the behaviour (`behavior.system.node`), independent of
-  `environment.nodeRuntime[taskId]`, with calendar-aware world-time respawn. All writes are
-  routed through the active GM via the `module.fabricate` socket; depletion reflects onto the
-  linked visual. *(Original draft: `token.flags.fabricate.node` — now behaviour state.)*
-- **Depleted behavior + env precedence.** Task-level `depletedBehavior` reflects onto the
-  linked visual per its kind (Tile swap-image / terminal delete; Drawing reversible hide +
-  optional `(depleted)` label; Token safe no-op with a `tokenHide` opt-in); `deleteToken` is
-  terminal and mutually exclusive with `swapImage`/`postfixName`. Environment resolution on
-  drop follows Scene Region auto-detect → task default (new `defaultEnvironmentId` field) → GM
-  dialog, with an Alt-key override that forces the dialog.
+- **Gathering-task interactable = env+task shortcut (SHIPPED).** A gathering-task interactable
+  carries **no node pool**; activating it opens the gathering app scoped to its `environmentId`
+  + `taskId` (auto-selecting both) and reads/decrements the environment's `nodeRuntime[taskId]`
+  like opening gathering directly. *(Superseded drafts: per-token `token.flags.fabricate.node`,
+  then per-behaviour `behavior.system.node` with `nodeStateOverride` + a per-behaviour respawn
+  pass — both **abandoned**; the env node is the single source of truth.)*
+- **Depleted behavior is task config only (no interactable marker).** `depletedBehavior` remains
+  authorable on the task node config, but the **per-marker depleted-behaviour swap/hide/delete
+  was abandoned** — it does not drive any per-interactable linked-visual transition in the
+  shipped model. Environment resolution on drop follows Scene Region auto-detect → task default
+  (new `defaultEnvironmentId` field) → GM dialog, with an Alt-key override that forces the
+  dialog. *(Env-driven marker depletion is a possible FUTURE option, not current behaviour.)*
 - **GM tooling.** A GM-only scene-control browser drags/places interactables; a rich config
   panel (registered as the behaviour sheet, reachable from a Tile/Token HUD entry) offers
   Test-as-Player, Jump, Relink, Create/Recreate marker, Remove visual, Restock, Enable/Lock,
@@ -99,12 +112,14 @@ the GM scene-control launch button + Interactable browser app.
 ## Impact
 
 - **Affected specs:** `data-models` (Catalyst removed; Tool generalized to crafting +
-  gathering; recipe/step/IngredientSet `toolIds`; Interactable token flag schema;
-  `flags.fabricate.node`, `nodeOriginal`; `depletedBehavior`; catalyst→tool migration
-  table), `recipes-and-steps` (Tool prerequisite semantics replace catalysts),
-  `gathering-and-harvesting` (per-token node state, depleted behavior, env precedence,
-  virtual-present tools), `destructive-changes-and-migrations` (0.6.0 entry). Change-scoped
-  spec deltas are provided under `openspec/changes/canvas-interactables-tool-unification/specs/`.
+  gathering; recipe/step/IngredientSet `toolIds`; Interactable Region Behaviour `system`
+  schema **with no `node` field**; ~~`flags.fabricate.node`, `nodeOriginal`,
+  per-marker `depletedBehavior`~~ **abandoned**; catalyst→tool migration table),
+  `recipes-and-steps` (Tool prerequisite semantics replace catalysts),
+  `gathering-and-harvesting` (gathering-task interactable as a pure env+task shortcut using the
+  environment node, env precedence, virtual-present tools),
+  `destructive-changes-and-migrations` (0.6.0 entry). Change-scoped spec deltas are provided
+  under `openspec/changes/canvas-interactables-tool-unification/specs/`.
 - **Affected docs:** `DOMAIN.md` (remove the Catalyst entry; redefine **Tool** as the
   shared required-reusable-breakable prerequisite primitive spanning crafting + gathering)
   and `docs/agents/gathering-environment-data-model.md` (update stale catalyst references —
@@ -137,9 +152,12 @@ the GM scene-control launch button + Interactable browser app.
 2. **Auto-migrate existing recipe catalysts into shared library Tools** via a versioned
    `MigrationRunner` step (0.6.0); delete `Catalyst.js` and all catalyst code with **no**
    deprecation shim.
-3. **Gathering-task interactables own their own depletion state** on the Region Behaviour
-   (`behavior.system.node`; original draft said `token.flags.fabricate.node`), independent of
-   `environment.nodeRuntime[taskId]`, with their own world-time respawn.
+3. **Gathering-task interactables are a pure `(environment, task)` shortcut.** *(ABANDONED
+   decision — superseded.)* The original locked decision had them own their own depletion state
+   (`behavior.system.node`, draft: `token.flags.fabricate.node`) independent of
+   `environment.nodeRuntime[taskId]` with their own respawn. That was **dropped**: the shipped
+   interactable carries no node pool and uses the environment's `nodeRuntime[taskId]` as the
+   single source of truth, decrementing it through a normal gathering attempt.
 4. **Environment resolution on drop follows a precedence chain:** Scene Region auto-detect
    → task default (new optional `defaultEnvironmentId` field on the gathering library task)
    → GM dialog. A modifier-key override (hold Alt during drop) always forces the GM dialog.

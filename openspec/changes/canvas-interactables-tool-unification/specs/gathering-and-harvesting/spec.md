@@ -24,11 +24,17 @@ collapses into the already-existing `TOOL_BLOCKED`.
 > as a **Scene Region** carrying a `fabricate.interactable` Region Behaviour; a linked Tile
 > (or Drawing / existing Token) is a presentation-only marker. There is no synthetic actor or
 > proxy token. Activation is **token presence** in the region, not a marker double-click.
+>
+> **Env-node correction (further-superseded).** The interactable carries **no per-behaviour
+> node state and no `nodeStateOverride`** (`ae53384`, `4770a7f`). It is a pure
+> `(environment, task)` shortcut: it opens the gathering app scoped to its environment + task
+> (auto-selecting both) and reads/decrements `environment.nodeRuntime[taskId]` directly. The
+> "Scoped Attempt Flow" and "Depleted Behavior" subsections below are abandoned drafts.
 
 A gathering task may be placed on the canvas as an Interactable region (GM-only spawn). When
 a controlled token ENTERS the region, the controlling player is offered a non-blocking
-prompt; on Interact the gathering app opens for that task and environment, scoped by the
-per-behaviour node state (`nodeStateOverride`).
+prompt; on Interact the gathering app opens for that task and environment, auto-selecting both
+and using `environment.nodeRuntime[taskId]` as the single node source of truth.
 
 1. The interactable's environment is resolved at drop time by precedence: Scene Region
    auto-detect (region carrying `flags.fabricate.environmentId`) → task default (the new
@@ -39,8 +45,10 @@ per-behaviour node state (`nodeStateOverride`).
    bypassing the auto-resolve tiers.
 3. The GM dialog presents an environment select; **cancel aborts the spawn** (no region is
    created).
-4. The interactable owns its own depletion/respawn state in `behavior.system.node`,
-   independent of `environment.nodeRuntime[taskId]`.
+4. The interactable carries **no** per-interactable node state. Node counts, depletion, and
+   respawn are owned by `environment.nodeRuntime[taskId]`; activating the interactable
+   reads/decrements that environment node like opening gathering directly. *(Superseded: the
+   earlier `behavior.system.node` pool was abandoned.)*
 
 ### Gathering Task Default Environment
 
@@ -53,7 +61,14 @@ are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskId
 2. It is the middle tier of on-drop environment resolution; a stale id (no matching
    environment) falls through to the GM dialog rather than throwing.
 
-### Scoped Attempt Flow
+### Scoped Attempt Flow — ABANDONED (env node is the single source of truth)
+
+> **REMOVED — do not implement (`ae53384`, `4770a7f`).** There is no `nodeStateOverride`
+> adapter, no behaviour-backed node adapter threaded into the commit path, and no
+> per-interactable world-time respawn pass. A gathering-task interactable runs the **normal**
+> gathering attempt against `environment.nodeRuntime[taskId]`; the engine and
+> `GatheringRichStateService` are not parameterized by any interactable node override. The
+> subsection below is a record of the abandoned draft.
 
 1. `GatheringEngine.startAttempt` accepts an optional `nodeStateOverride` adapter threaded
    into the terminal commit path (`_commitTerminalSideEffects` / `_commitRichAttempt`). For a
@@ -73,7 +88,12 @@ are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskId
 2. A virtual-present Tool satisfies the task's tool gate without the actor owning the item
    and is excluded from breakage and usage.
 
-### Depleted Behavior
+### Depleted Behavior — ABANDONED as an interactable marker
+
+> **REMOVED as an interactable mechanism.** `depletedBehavior` remains authorable on the task
+> node config, but does NOT drive any per-interactable linked-visual transition in the shipped
+> model — the linked visual is presentation-only. Env-driven marker depletion is a possible
+> FUTURE option. The requirements below are a record of the abandoned draft.
 
 1. A gathering task may configure `depletedBehavior { swapImage?, postfixName?, deleteToken?,
    tokenHide? }` on its node config. A node is depleted when `node.current <= 0` (a single
@@ -100,7 +120,8 @@ are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskId
    controlling player's client shows a non-blocking interact prompt; a `controlToken` hook and
    a keybinding re-raise the prompt for a token already standing inside on scene load.
 2. When a player interacts at a gathering interactable and no active GM is connected, the
-   player sees a graceful "A GM must be online to gather here" message (all node-state writes
-   route through `activeGM`); the attempt fails cleanly rather than silently.
-3. The gathering app surfaces depleted + respawn-ETA state for a behaviour-scoped node (e.g.
-   "depleted, respawns in …") rather than presenting an empty list.
+   player sees a graceful "A GM must be online to gather here" message; the attempt fails
+   cleanly rather than silently. A **denied** activation returns a localized reason
+   (`FABRICATE.Canvas.Interactable.Denied.*`).
+3. Depleted + respawn-ETA state comes from the environment's `nodeRuntime[taskId]` via the
+   normal gathering listing — the interactable adds nothing on top.

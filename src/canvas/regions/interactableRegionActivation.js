@@ -14,10 +14,12 @@
  * still resolves, the current world time, GM status) are INJECTED, so the full
  * checklist is unit-testable without Foundry. No `globalThis` access.
  *
- * Single "exhausted" concept (see plan): node depletion (`node.current <= 0`) for
- * gathering tasks and the `consumed/locked/uses/cooldown` activation gate for
- * tool stations + GM locks fold into ONE eligibility model — no double
- * accounting.
+ * Activation eligibility is purely the behaviour's own
+ * `enabled/locked/consumed/uses/cooldown` gate (shared by tool stations and
+ * gathering-task shortcuts). A gathering-task interactable carries NO
+ * per-interactable node pool: node depletion/respawn is owned by the
+ * environment's `nodeRuntime[taskId]` and is enforced by the gathering engine
+ * when the scoped session is opened, not here.
  */
 
 const ACTIVATION_ACTION = 'interactableActivate';

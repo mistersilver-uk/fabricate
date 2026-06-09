@@ -297,7 +297,8 @@ class InteractableManager {
    * the linked Tile marker, transaction-like: if the Tile create fails after the
    * Region exists, the orphan Region is deleted (and vice-versa). After both
    * exist, the behaviour's `linkedVisual.{uuid,documentName}` is written back so
-   * depletion/respawn can reflect onto the marker. No-throw; GM-notify on failure.
+   * the marker can be resolved (relink / recreate / missing-policy). No-throw;
+   * GM-notify on failure.
    *
    * @param {object} spawnRequest  Result of {@link buildRegionSpawnRequest}.
    * @returns {Promise<object|null>} The created Region document, or null.

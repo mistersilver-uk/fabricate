@@ -14,12 +14,16 @@ into them** to interact.
 There are two kinds of interactable:
 
 - **Tool station** — a placed [Tool]({% link tools.md %}). Activating it opens the
-  Fabricate UI with that station's Tool **present as a virtual tool**, so a player can
-  use the Tool without owning a copy of the item (think: the forge belongs to the
-  smithy, not the smith).
-- **Gathering-task node** — a placed [Gathering Task]({% link gathering-environments.md %}).
-  Activating it opens the gathering UI scoped to that task, and the node tracks its own
-  depletion and respawn independently of the environment.
+  Fabricate **Crafting** tab with that station's Tool **present as a virtual tool**, so a
+  player can use the Tool without owning a copy of the item (think: the forge belongs to
+  the smithy, not the smith).
+- **Gathering-task shortcut** — a placed [Gathering Task]({% link gathering-environments.md %}).
+  Activating it opens the gathering UI **scoped to, and auto-selecting, a specific
+  (environment, task) pair**. It is a pure shortcut: it reads and decrements the
+  **environment's own node state** (`nodeRuntime[taskId]`), exactly as if the player had
+  opened gathering and picked that environment and task by hand. A placed shortcut has
+  **no node pool of its own** — two shortcuts pointing at the same (environment, task)
+  draw down the same shared environment node.
 
 {: .note }
 > **A canvas interactable is a Scene Region**, not a Token or an actor. The authoritative
@@ -47,9 +51,12 @@ Every canvas interactable is:
      `toolId` | `taskId`, `environmentId`, `name`
    - `presentation` — `{ promptText, hidden }`
    - `linkedVisual` — `{ uuid, documentName (Tile|Drawing|Token), mode (marker|none), missingPolicy }`
-   - `node` — the per-interactable depletion/respawn state (gathering-task only)
    - `state` — `{ enabled, consumed, locked, uses, cooldown }`
    - `activation` — `{ trigger: regionEnter, audience }`
+
+   There is **no `node` field** on the behaviour. A gathering-task interactable carries
+   only the `(environmentId, taskId)` pointer; depletion and respawn live entirely on the
+   environment's node runtime, never on the interactable.
 3. **An optional linked visual** — a **Tile** (default), a **Drawing**, or an existing
    **GM Token**. It is presentation-only: it carries reverse flags back to the region/
    behaviour, but deleting it never destroys the interactable.
@@ -79,7 +86,10 @@ Placing interactables is **GM-only**. There are three ways to place one:
 
 A dropped interactable snaps to the scene grid. When it has a marker, the linked Tile takes
 its image from the Tool component's icon (or the task's image), falling back to a generic
-bag icon. Spawning is **transaction-like**: if the marker fails to create after the region
+bag icon. A Tile renders **centred** on its stored point while a Region rectangle renders
+from its **top-left**, so the spawn deliberately offsets the region to **overlay** the
+marker on the drop point — a player walking onto the visible marker is reliably inside the
+region. Spawning is **transaction-like**: if the marker fails to create after the region
 exists, the orphan region is cleaned up (and vice-versa).
 
 If a non-GM attempts to drop an interactable, the drop is rejected with a notification —
@@ -87,12 +97,22 @@ only a GM can place them.
 
 ### Marker variants
 
+A marker is **presentation-only** in every variant: it gives the region a visible anchor
+on the map but owns no state, and the interactable keeps working even with no marker at
+all.
+
 | Variant | What it is | Notes |
 |:--------|:-----------|:------|
-| **Tile marker** (default) | A Foundry Tile linked to the behaviour | Depletion can swap its image or delete it. |
-| **Drawing marker** | A Foundry Drawing linked to the behaviour | Depletion can hide it (and optionally append a "(depleted)" label). |
-| **Token marker** | An *existing* GM Token you relink to the behaviour | **Never mutated or deleted** by depletion — it is the GM's own document (e.g. a merchant NPC). Depletion is a safe no-op. |
+| **Tile marker** (default) | A Foundry Tile linked to the behaviour | Created and centred on the drop point; takes its image from the Tool/task icon. |
+| **Drawing marker** | A Foundry Drawing linked to the behaviour | A labelled translucent rectangle "zone" marker. |
+| **Token marker** | An *existing* GM Token you relink to the behaviour | **Never mutated or deleted** — it is the GM's own document (e.g. a merchant NPC). |
 | **Region only** | No marker at all | The region itself is the interactable; `presentation.hidden = true`, `linkedVisual.mode = 'none'`. |
+
+In the current model a marker is **not auto-depleted**: because a gathering-task shortcut
+draws down the environment's shared node state rather than a per-marker pool, the marker's
+image is never swapped or deleted when the underlying environment node runs out. (Driving
+marker appearance from environment node depletion is a possible future option, not current
+behaviour.)
 
 A **missing** linked visual (e.g. the GM deleted the Tile) is governed by the behaviour's
 `linkedVisual.missingPolicy` and is otherwise a clean no-op — the interactable keeps
@@ -110,9 +130,11 @@ Players activate an interactable by **walking a controlled token into its region
 2. Clicking **Interact** routes an activation request to the **active GM**, who validates it
    (actor control, source still exists, environment exists, token still inside) and, on
    success, grants it — opening the Fabricate UI **on the player's client**:
-   - **Tool station** → the Fabricate app with the station Tool present as a virtual tool.
-   - **Gathering node** → the gathering UI scoped to that task, using the behaviour's own
-     node state.
+   - **Tool station** → the **Crafting** tab with the station Tool present as a virtual
+     tool (and the active station-tool chip in the header).
+   - **Gathering-task shortcut** → the gathering UI scoped to, and auto-selecting, the
+     interactable's `(environmentId, taskId)`. It reads and decrements that
+     **environment's** node state — there is no per-interactable node override.
 3. Leaving the region dismisses the prompt.
 
 {: .note }
@@ -132,9 +154,9 @@ region when the scene loads. Fabricate covers this two ways:
 
 ### A GM must be online
 
-Activation, depletion, respawn, and every other state write are routed through the **active
-GM**. If a player tries to activate while **no GM is connected**, the attempt is blocked
-cleanly with a message rather than hanging. A GM is their own applier and always passes.
+Activation and every other interactable state write are routed through the **active GM**. If
+a player tries to activate while **no GM is connected**, the attempt is blocked cleanly with
+a message rather than hanging. A GM is their own applier and always passes.
 
 ### Virtual-present (station) tools
 
@@ -144,51 +166,48 @@ satisfies the Tool's presence requirement without the actor owning the item, and
 is scoped to the station's own crafting system — a station Tool from one system never
 satisfies a same-id Tool required by a different system.
 
-{: .note }
-> **Interim Tool routing.** Activating a Tool station currently opens the **gathering** tab,
-> because the Svelte crafting tab is still a placeholder. The injected station Tool is
-> tab-agnostic, so this will route to (or offer) crafting once that tab ships.
+When the Crafting tab ships, a Tool-station activation will surface its crafting actions
+there directly; the injected station Tool is already tab-agnostic.
 
 ---
 
-## Gathering-task nodes
+## Gathering-task shortcuts
 
-A placed gathering-task behaviour owns its **own** depletion/respawn state in
-`system.node`, independent of the environment's per-task node runtime. At placement time the
-behaviour **snapshots the task's node config** (and its runtime); from then on it uses only
-its own node state. Two placements of the same task deplete independently.
+A placed gathering-task interactable is a **pure (environment, task) shortcut**. It does
+**not** carry a node pool of its own and it does **not** snapshot the task's node config at
+placement time. Activating it opens the gathering UI scoped to, and auto-selecting, its
+`(environmentId, taskId)`, then reads and decrements the **environment's** own node runtime
+(`nodeRuntime[taskId]`) — exactly as if the player had opened gathering and selected that
+environment and task manually.
+
+The consequences follow directly from there being a single source of truth:
+
+- Two interactables that point at the **same (environment, task)** draw down the **same**
+  shared environment node — they do not deplete independently.
+- Gathering through an interactable is an ordinary gather: it does not change the
+  environment's node availability beyond what a normal gather of that task would.
+- Editing the task, its required tools, or its node config in the library propagates to
+  every placed shortcut automatically, because nothing is snapshotted onto the
+  interactable.
+
+### Depletion and respawn
+
+Node depletion (when the environment node runs out) and respawn (as world time advances) are
+owned **entirely by the environment's node runtime** — see
+[Gathering Environments]({% link gathering-environments.md %}). The interactable plays no
+part in either: there is no per-interactable depletion, no per-behaviour respawn pass, and
+no depleted-marker auto-swap. The marker's appearance is fixed presentation and does not
+react to the environment node's state.
 
 {: .note }
-> Tool **requirements are not snapshotted** — a node still resolves `task.toolIds` against
-> the system Tools library at attempt time, so editing a Tool in the library propagates to
-> already-placed interactables.
-
-### Depleted behavior
-
-When a node depletes (`node.current <= 0`), the task's `depletedBehavior` config changes the
-**linked visual's** appearance. The field names keep their legacy `*Token` spelling but are
-interpreted per linked-visual kind:
-
-| Behavior | Tile marker | Drawing marker | Token marker |
-|:---------|:------------|:---------------|:-------------|
-| `swapImage` | Texture is swapped to the depleted image; the original is stashed and restored on respawn. | (not used) | safe no-op |
-| `postfixName` | (no nameplate — ignored) | Appends a "(depleted)" label, removed on respawn. | safe no-op |
-| `deleteToken` | **Terminal.** The Tile is removed; it cannot respawn. | **Terminal.** The Drawing is removed. | **Never** deletes the Token — safe no-op. |
-
-`deleteToken` is mutually exclusive with `swapImage` / `postfixName`. A linked existing
-Token is always treated as the GM's own document, so depletion never mutates or deletes it.
-
-### Respawn
-
-As world time advances, each placed node respawns on its own calendar-aware interval — the
-same respawn arithmetic the per-environment pass uses. This pass runs **active-GM only** so
-connected clients never double-apply, and it reflects the restored state onto the linked
-visual (e.g. restoring a Tile's swapped image).
+> Driving a marker's appearance from environment node depletion is a possible **future**
+> option, not current behaviour. Today the linked Tile/Drawing/Token is never mutated as the
+> environment node depletes or respawns.
 
 ### Environment resolution on placement
 
-A Tool station carries no environment, so it spawns immediately. A **gathering-task** node
-must resolve which environment it belongs to. Placement uses this precedence:
+A Tool station carries no environment, so it spawns immediately. A **gathering-task**
+shortcut must resolve which environment it belongs to. Placement uses this precedence:
 
 1. **Scene Region auto-detect.** If the drop point falls inside a single Scene Region flagged
    `flags.fabricate.environmentId`, that environment wins and a notification names it.
@@ -218,11 +237,14 @@ routes through the active-GM socket. From it a GM can:
 - **Create / Recreate marker** — make a fresh linked Tile or Drawing (e.g. after the
   original was deleted, or to add a marker to a region-only interactable).
 - **Remove** — drop the linked visual but keep the interactable region-only.
-- **Restock** — refill a depleted gathering node.
 - **Enable / Lock** — toggle the behaviour's `state.enabled` / `state.locked`.
 - **Delete** — remove the interactable (region + behaviour).
 - **Missing-visual recovery** — when the linked visual is gone, a status banner offers
   recreate / relink.
+
+The panel has **no node or restock controls**: a gathering-task shortcut has no node pool of
+its own, so node availability is managed on the **environment** (in the Crafting System
+Manager), not on the interactable.
 
 ---
 
@@ -230,6 +252,7 @@ routes through the active-GM socket. From it a GM can:
 
 - [Tools]({% link tools.md %}) — the system-owned Tool model that backs Tool stations.
 - [Gathering Environments]({% link gathering-environments.md %}) — author the tasks and
-  environments that gathering-task nodes reference.
+  environments that gathering-task shortcuts reference, and where node availability,
+  depletion, and respawn actually live.
 - [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) — a worked
   example of a tool that wears out.

@@ -869,7 +869,7 @@ Bring crafting/gathering onto the Foundry VTT canvas as **Interactables** — dr
 
 ### Interactable Region Behaviour (`fabricate.interactable`)
 
-The behaviour is registered via the module manifest (`documentTypes.RegionBehavior.interactable`) + `CONFIG.RegionBehavior.dataModels`. All authoritative per-interactable state lives in the behaviour `system`:
+The behaviour is registered via the module manifest (`documentTypes.RegionBehavior.interactable` + `"socket": true`) + `CONFIG.RegionBehavior.dataModels`. The behaviour subscribes to its region events through a schema `events` field (`_createEventsField`). All authoritative per-interactable state lives in the behaviour `system`:
 
 ```js
 behavior.system = {
@@ -887,7 +887,9 @@ behavior.system = {
     mode: "marker" | "none",          // "none" = region-only (no visible marker)
     missingPolicy: "ignore" | "warn" | "recreate"
   },
-  node: NodeState|null,               // gatheringTask only; per-behaviour node snapshot
+  // NOTE: there is NO `node` field. A gathering-task interactable carries no
+  // per-interactable node pool; the environment's nodeRuntime[taskId] is the
+  // single source of truth for counts/depletion/respawn.
   state: {
     enabled: boolean, consumed: boolean, locked: boolean,
     uses: { max: number|null, used: number },
@@ -901,7 +903,7 @@ Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONF
 
 Requirements:
 
-1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId`, `environmentId`, and `node` are scoped by `interactableType`. Tool interactables inject a session-scoped `activeCanvasTool` (virtual-present) on activation; gathering-task interactables open the gathering app for that task and environment, passing the per-behaviour node state as a `nodeStateOverride`.
+1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId` and `environmentId` are scoped by `interactableType`. A **Tool** interactable opens the **Crafting** tab and injects a session-scoped `activeCanvasTool` (virtual-present) on activation (the Crafting tab is currently a placeholder, so the active-tool chip is the visible effect). A **gathering-task** interactable is a pure `(environment, task)` shortcut: it opens the gathering app scoped to that environment + task, **auto-selecting both**, and reads/decrements the **environment's `nodeRuntime[taskId]`** exactly like opening gathering directly — there is **no per-interactable node pool and no node override**.
 2. Spawning is **GM-only**.
 3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported — the interactable works with no visible marker.
 
@@ -922,41 +924,20 @@ Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef` in `src/canvas/r
 Requirements:
 
 1. The default marker is a **Tile**; a **Drawing** (labelled zone) and an **existing GM-placed Token** are also supported. The reverse flag makes a Tile/Token HUD "Configure Fabricate Interactable" entry resolve.
-2. A linked **Token** is the GM's own document: depletion **never** mutates or deletes it by default (see Depleted Behavior).
+2. The linked visual is **purely presentation** in the current model: no per-interactable depletion mutation (swap/hide/delete) is applied to it. (Env-driven marker depletion is a possible FUTURE option, not current behaviour.)
 3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
 
-### Per-Behaviour Node State (`behavior.system.node`)
+### Gathering-Task Node State — owned by the environment (no per-interactable pool)
 
-A gathering-task interactable owns its own depletion/respawn state on the behaviour (`behavior.system.node`), **independent of** `environment.nodeRuntime[taskId]`.
-
-Requirements:
-
-1. `node` is a **snapshot of the task's node CONFIG at drop time** (`current` seeded to `max`), normalized through the existing `normalizeNodeConfig` / `normalizeRespawn` helpers, and using calendar-aware world-time respawn (same resolution as resource-node respawn). A task with no node config yields `null` — an UNLIMITED gathering point (no depletion, no respawn, no node writes).
-2. Tool requirements are **NOT** snapshotted into `node`; they resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
-3. The node is depleted when `node.current <= 0` — one shared definition used by both the count logic and the depleted-visual apply.
-4. When a per-behaviour node state is present for an attempt or listing, it takes precedence over `environment.nodeRuntime[taskId]` (threaded as a `nodeStateOverride`).
-5. All writes to `behavior.system.node` are routed through the active GM over the `module.fabricate` socket; only `game.users.activeGM` applies the behaviour update (a GM client applies its own write locally without a socket round-trip). A world-time respawn pass iterates placed region behaviours, active-GM only. Depletion reflects onto the linked visual (see Depleted Behavior).
-
-### Depleted Behavior (gathering-task node config)
-
-```js
-depletedBehavior = {
-  swapImage?: string | null,   // Tile texture swapped while depleted
-  postfixName?: boolean,       // append "(depleted)" label (Drawing label only)
-  deleteToken?: boolean,       // terminal: visual deleted on depletion (Tile/Drawing only)
-  tokenHide?: boolean,         // Token-only opt-in: reversibly hide the linked Token
-}
-```
+A gathering-task interactable is a **pure `(environment, task)` shortcut**; it does **not** carry its own node pool. Node counts, depletion, and respawn are owned entirely by the environment's `nodeRuntime[taskId]` (see `gathering-and-harvesting` → Gathering Resource Nodes).
 
 Requirements:
 
-1. `depletedBehavior` is authored on the gathering-task node config and normalized in the admin store (unknown/empty fields normalize away). It is **orthogonal** to `depletionTiming` (`onStart` / `onSuccess`): `depletedBehavior` describes what happens to the *linked visual* when the node is depleted, while `depletionTiming` describes *when* a node decrements. Both key off the same `node.current <= 0` trigger.
-2. The depleted DECISION is pure and reflects onto the linked visual per its `documentName`:
-   - **Tile** — `swapImage` swaps the texture (prior image stashed in `flags.fabricate.nodeOriginal`, restored on respawn).
-   - **Drawing** — depletion HIDES the drawing (`hidden:true`, reversible), optionally appending a `(depleted)` label.
-   - **Token** — **SAFE no-op by default**: a linked existing Token is the GM's own document and is NEVER mutated or deleted by depletion. `deleteToken` is deliberately IGNORED for a Token. The single opt-in is `tokenHide: true`, which reversibly hides the token on depletion and shows it again on respawn (the only state it ever touches; the prior `hidden` state is stashed in `flags.fabricate.nodeOriginal`).
-3. `deleteToken` is **terminal** (no revert; respawn no-ops against a deleted/missing visual) and **mutually exclusive** with `swapImage` / `postfixName`: when set those fields are dead config (the editor greys them out and the normalizer drops them). It deletes a Tile/Drawing only.
-4. All depleted-behavior visual mutations are applied through the active GM via the `module.fabricate` socket, on the same routing path as the node writes. A missing linked visual is a clean no-op.
+1. The behaviour has **no `node` field**. Activating a gathering-task interactable opens the gathering app scoped to its `environmentId` + `taskId` (auto-selecting both) and reads/decrements the SAME `environment.nodeRuntime[taskId]` as opening gathering directly. It does not alter environment node availability beyond a normal gathering attempt.
+2. Tool requirements resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
+3. There is **no per-interactable/per-token node snapshot+adapter**, **no `nodeStateOverride`/`tileRef`/`resolveTileNodeState` engine seam**, and **no per-behaviour world-time respawn pass**. These were removed from the model. The timed/waiting-run maturity decrement lands on the **environment** node.
+
+> **Removed (do not reintroduce).** The earlier drafts described a per-interactable `behavior.system.node` snapshot, a behaviour-backed node adapter threaded as a `nodeStateOverride`, a per-behaviour world-time respawn pass, and a per-marker `depletedBehavior` visual auto-swap. All were abandoned. The task-level `depletedBehavior` authoring still exists as config (normalized/editable in `gatheringNodeConfig.js` / `adminStore` / `GatheringTaskEditView.svelte`) but no longer drives any per-interactable marker transition.
 
 ### Session-Scoped Active Canvas Tool (`activeCanvasTool`)
 

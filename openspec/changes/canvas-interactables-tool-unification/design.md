@@ -24,19 +24,24 @@
 >   created.** Deleting the visual does NOT destroy the interactable (`missingPolicy`).
 >   **Region-only** (no marker) is supported.
 > - **Activation = token presence**: region `tokenEnter` (handlers run on EVERY client) →
->   eligibility check on the controlling player's client → non-blocking prompt → on Interact an
->   activation request routes to the **active GM**, which validates and grants back to the
->   requesting user, who opens the Fabricate UI locally (tool → virtual-present
->   `activeCanvasTool`; gatheringTask → scoped gathering via the behaviour-backed node adapter).
->   A `controlToken` hook + keybinding re-raise the prompt for a token already inside on scene
->   load. No active GM ⇒ fails cleanly.
-> - **Node state lives on the behaviour**; mutations route through the active GM over the
->   `module.fabricate` socket; depletion reflects onto the linked visual (Tile: swap-image/
->   delete; Drawing: reversible hide/label; **Token: safe no-op, never deleted by default**).
->   World-time respawn iterates region behaviours.
+>   eligibility check → non-blocking prompt shown on the mover's client AND the owning non-GM
+>   player's client → on Interact an activation request routes to the **active GM**, which
+>   validates and grants back to the requesting user, who opens the Fabricate UI locally
+>   (**tool → Crafting tab + virtual-present `activeCanvasTool`**; **gatheringTask → gathering
+>   app scoped to `environmentId` + `taskId`, auto-selecting both, using the environment node**).
+>   A denied activation returns a localized reason. A `controlToken` hook + keybinding re-raise
+>   the prompt for a token already inside on scene load. No active GM ⇒ fails cleanly.
+> - **Node state lives on the ENVIRONMENT, not the behaviour (FURTHER-CORRECTED).** The
+>   region-first pivot initially kept a per-behaviour `behavior.system.node`; two later fixes
+>   (`ae53384`, `4770a7f`) **removed** it. The shipped gathering-task interactable carries **no
+>   node pool**; node counts/depletion/respawn are owned by `environment.nodeRuntime[taskId]`.
+>   There is **no** `nodeStateOverride` thread, **no** behaviour-backed node adapter, **no**
+>   per-behaviour world-time respawn pass, and **no** per-marker depleted-behaviour swap. The
+>   linked visual is presentation-only. Sections 3 and 5 below are re-marked accordingly.
 > - **Retired:** the entire Tile-click interaction path (canvas-stage listener, hover/permission
 >   wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket
->   actions) AND the earlier actor-backed-token model.
+>   actions), the per-behaviour/per-token node adapter + `nodeStateOverride` seam + per-behaviour
+>   respawn pass + per-marker depleted-behaviour, AND the earlier actor-backed-token model.
 >
 > The original phase numbering below (8 phases, 0..7) is also superseded — the shipped canvas
 > phases are region-first (region behaviour foundation → linked visuals → activation pipeline →
@@ -87,18 +92,19 @@ client applies its own writes locally without round-tripping the socket. This mi
 existing `hazardSceneCoordinator` / `isActiveGM` pattern so authority semantics stay
 consistent across the module.
 
-### 3. Per-token attempt flow — AMENDED (behaviour-backed adapter)
+### 3. Per-token attempt flow — REMOVED (env node is the single source of truth)
 
-> **AMENDED for region-first.** The `nodeStateOverride` seam, snapshot semantics, listing-path
-> override, scoping leak-guard, single `nodeRespawnMath` respawn, and raw-roll chance seam all
-> shipped as described. The only substitution: the per-token tile adapter
-> (`src/canvas/tokenNodeStateAdapter.js`, the `tokenNodeRef = { sceneId, tokenId }`) became the
-> **behaviour-backed node adapter** `src/canvas/regions/interactableRegionNodeAdapter.js`, which
-> reads `behavior.system.node` and routes writes through the active GM. The engine ref
-> (`economyEvidence.tileNodeRef`, method `tileRef`) is kept as an OPAQUE seam name but now
-> carries `{ sceneId, regionId, behaviorId }`; `resolveTokenNodeStateForRef` rebuilds the
-> behaviour adapter from it at maturity. Read every "token flag" / "tile flag" below as
-> "behaviour `system.node`".
+> **ABANDONED — do not implement.** The entire per-attempt node-override mechanism described in
+> this section was **removed** (`ae53384` "interactables use the environment node state"; `4770a7f`
+> "remove orphaned per-attempt node-override seam"). There is **no** `nodeStateOverride` adapter,
+> **no** per-token/per-behaviour node snapshot, **no** behaviour-backed node adapter
+> (`interactableRegionNodeAdapter.js` is now only a pure `{sceneId,regionId,behaviorId}` ref
+> resolver), **no** listing-path override / scoping leak-guard, **no** per-behaviour respawn pass,
+> and **no** `tileNodeRef`/`tileRef`/`resolveTokenNodeStateForRef` engine seam. A gathering-task
+> interactable is a pure `(environment, task)` shortcut: it opens the gathering app scoped to its
+> environment + task and reads/decrements `environment.nodeRuntime[taskId]` exactly like opening
+> gathering directly, including the timed/waiting-run maturity decrement (which lands on the
+> **environment** node). The text below is retained only as a record of the abandoned draft.
 
 `GatheringEngine.startAttempt` takes an optional `nodeStateOverride` adapter. When present
 it is threaded into `_commitTerminalSideEffects` / `_commitRichAttempt`, and
@@ -158,13 +164,14 @@ satisfied without the actor owning the item, and is **excluded from breakage and
 `options.activeCanvasTool`, exposes it via `_buildServices` `getActiveCanvasTool`, sets it
 in `show(tab, { activeCanvasTool })`, and clears it on close.
 
-**Interim Tool routing.** Activating a Tool interactable routes to `show('gathering', …)`,
-not `crafting`: the Svelte crafting tab is still a "Coming Soon" placeholder, so routing there
-would dead-end with no visible effect, and gathering is the only live surface where the
-virtual-present tool has a visible effect (`describeGrant` returns `{ tab:'gathering' }` for a
-tool). The injected `activeCanvasTool` context is tab-agnostic on the app instance, so revisit
-this to route to (or offer a choice of) crafting once that tab ships. (Region-first: activation
-is token presence + interact prompt, not a token double-click.)
+**Tool routing — SHIPPED to Crafting.** Activating a Tool interactable routes to
+`show('crafting', { activeCanvasTool })`: `describeGrant` returns `{ tab: 'crafting' }` for a
+tool, because a Tool station belongs to crafting. The Svelte Crafting tab is still a placeholder,
+so the visible effect today is the **active station-tool chip** in the header right cluster (see
+the Active Canvas Tool entry in `DOMAIN.md`); the placeholder fills in when the Crafting route
+lands. *(The earlier interim draft routed tools to `show('gathering', …)` because gathering was
+the only live surface — that was superseded.)* (Region-first: activation is token presence +
+interact prompt, not a token double-click.)
 
 **System-scoped virtual-present matching.** `componentId` is a PER-SYSTEM id, so the
 virtual-present payload carries BOTH the active tool's `componentId` and its `systemId`:
@@ -180,16 +187,16 @@ across ALL systems with the same present set. With no active tool the payload is
 `{ activeCanvasTool }` (Phase 4) and `{ environmentId, taskId, nodeStateOverride }`
 (Phase 5). Existing single-arg callers remain valid (`options` defaults to `{}`).
 
-### 5. Depleted-behavior config
+### 5. Depleted-behavior config — REMOVED as an interactable-driven mechanism
 
-> **AMENDED for region-first.** Depletion reflects onto the **linked visual**, not a proxy
-> token. The shipped `depletedBehavior` is `{ swapImage?, postfixName?, deleteToken?,
-> tokenHide? }` and is per-visual-kind: **Tile** swap-image/terminal-delete; **Drawing**
-> reversible hide + optional `(depleted)` label / terminal delete; **Token** SAFE no-op by
-> default (`deleteToken` ignored — the GM's token is never deleted) with the single `tokenHide`
-> reversible-hide opt-in. The original visual state is stashed in
-> `flags.fabricate.nodeOriginal` on the linked visual. A MISSING linked visual is a clean
-> no-op. Read "token" below as "linked visual".
+> **ABANDONED — do not implement.** The per-interactable/per-marker depleted-behaviour
+> mechanism (reflecting depletion onto the linked visual: Tile swap/delete, Drawing hide/label,
+> Token hide, `flags.fabricate.nodeOriginal` revert stash, GM-routed visual writes) was **dropped**
+> alongside the per-behaviour node state. The linked visual is **presentation-only**; nothing
+> auto-swaps/hides/deletes it per attempt. The task-level `depletedBehavior` field still exists as
+> **authoring config** (normalized in `gatheringNodeConfig.js` / `adminStore` / `GatheringTaskEditView.svelte`)
+> but no longer drives any interactable marker. Env-driven marker depletion is a possible FUTURE
+> option, not current behaviour. The text below is retained only as a record of the abandoned draft.
 
 `depletedBehavior` is authored on the gathering-task node config:
 `{ swapImage?, postfixName?, deleteToken? }`. It is applied/reverted on the token via the
@@ -388,7 +395,11 @@ flags.fabricate = {
 }
 ```
 
-### `depletedBehavior` (gathering-task node config)
+### `depletedBehavior` (gathering-task node config) — config retained, interactable marker REMOVED
+
+> **ABANDONED as an interactable mechanism.** `depletedBehavior` is still authored/normalized as
+> task node config, but it does **NOT** drive any per-interactable linked-visual transition in the
+> shipped model. The schema below is retained only as a record of the abandoned token/marker draft.
 
 ```js
 depletedBehavior = {
@@ -399,10 +410,8 @@ depletedBehavior = {
 ```
 
 Normalized in `adminStore` and authored in the task editor under
-`CraftingSystemManagerRoot.svelte`. `deleteToken` is **mutually exclusive** with
-`swapImage` / `postfixName`: when delete is on, swap+postfix are dead config (the editor
-greys them out and the normalizer drops them). Triggered when `node.current <= 0`;
-orthogonal to `depletionTiming` (`onStart` / `onSuccess`).
+`CraftingSystemManagerRoot.svelte`. *(The mutual-exclusion / `node.current <= 0` marker-trigger
+semantics described here are abandoned; no interactable marker is driven by this config.)*
 
 ## Phase Boundaries & Test Seams
 
@@ -429,12 +438,14 @@ orthogonal to `depletionTiming` (`onStart` / `onSuccess`).
 3. **Terminal pipeline ordering.** Tool breakage for recipes must integrate with the
    existing crafting terminal flow without changing catalyst-era success/fail ordering for
    already-migrated data.
-4. **Socket authority races.** `interactableNodeUpdate` must apply only on
-   `game.users.activeGM`; concurrent depletion writes from multiple players against one
-   node must converge through the single GM applier (last-write-wins on the node state).
-5. **Respawn vs. depleted-behavior revert.** Calendar-aware respawn must restore
-   `nodeOriginal` image/name when un-depleting; `deleteToken` is terminal and has no revert
-   path, so respawn must no-op against a deleted token.
+4. **Socket authority races. — OBSOLETE.** The per-interactable `interactableNodeUpdate`/node
+   write was removed; interactables hold no node state to race on. Node depletion writes happen
+   in the normal gathering attempt against `environment.nodeRuntime[taskId]` (which the
+   activation pipeline already routes to the active GM via the grant). This risk no longer
+   applies to interactables.
+5. **Respawn vs. depleted-behavior revert. — OBSOLETE.** No per-interactable respawn or
+   `nodeOriginal` revert exists; environment node respawn is handled by the existing env-node
+   world-time path, unchanged by interactables.
 6. **Virtual-present tool exclusion.** A station-injected `activeCanvasTool` must never be
    counted toward breakage/usage; a regression here would consume/break an item the actor
    does not own.
@@ -451,15 +462,17 @@ Durable product behavior introduced by this change is recorded as change-scoped 
 deltas under `openspec/changes/canvas-interactables-tool-unification/specs/`:
 
 - `data-models/spec.md` — remove Catalyst; generalize Tool; add `toolIds` to
-  recipe/step/IngredientSet; add the new optional `task.defaultEnvironmentId` field; add
-  Interactable token flag schema, `flags.fabricate.node` (config+runtime snapshot),
-  `flags.fabricate.nodeOriginal`, and `depletedBehavior`; record the catalyst→tool
-  migration mapping (including the presence-only `breakageChance: 0` mapping) and the
-  `catalystItemUsage` → `toolUsage` fallback.
+  recipe/step/IngredientSet; add the new optional `task.defaultEnvironmentId` field; add the
+  Interactable Region Behaviour `system` schema (**no `node` field**). *(Superseded: the
+  per-interactable `flags.fabricate.node`/`behavior.system.node` snapshot, `nodeOriginal`
+  revert stash, and per-marker `depletedBehavior` were abandoned — the env node is the single
+  source of truth.)* Record the catalyst→tool migration mapping (including the presence-only
+  `breakageChance: 0` mapping) and the `catalystItemUsage` → `toolUsage` fallback.
 - `recipes-and-steps/spec.md` — Tool prerequisite semantics replace catalyst prerequisites
   on recipes/steps/ingredient sets.
-- `gathering-and-harvesting/spec.md` — per-token node state, depleted behavior, env
-  resolution precedence, and virtual-present (canvas tool) injection.
+- `gathering-and-harvesting/spec.md` — gathering-task interactable as a pure env+task shortcut
+  using `environment.nodeRuntime[taskId]` (no per-interactable node pool), env resolution
+  precedence, and virtual-present (canvas tool) injection.
 - `destructive-changes-and-migrations/spec.md` — the 0.6.0 Catalyst→Tool migration.
 
 These deltas are merged into the canonical `openspec/specs/*/spec.md` by the

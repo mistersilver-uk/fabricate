@@ -16,8 +16,8 @@
 
   Editable fields (name, prompt text, hidden, audience, missing-policy) write back
   via `services.updateBehavior(systemPatch)`. The non-trivial view logic (label
-  resolution, ETA formatting, the missing-visual warning state) is extracted into
-  the pure `interactableConfigView.js` helpers so it is unit-testable.
+  resolution, the activation gate summary, the missing-visual warning state) is
+  extracted into the pure `interactableConfigView.js` helpers so it is unit-testable.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';

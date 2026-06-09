@@ -146,20 +146,27 @@ before catalyst deletion in Phase 2).
 >   (`evaluateActivationEligibility`/`buildActivationRequest`/`validateActivationRequest`/`describeGrant`);
 >   region `tokenEnter` (every client) → controlling-player prompt → active-GM validate → grant →
 >   player opens the UI; `controlToken` hook + keybinding re-trigger.
-> - **Node state + GM-routed writes** — behaviour-backed adapter
->   `interactableRegionNodeAdapter.js` (reads `behavior.system.node`), `interactableSocket.js`,
->   `interactableSocketBridge.js`; the `nodeStateOverride`/`tileRef` engine seams kept but now
->   carry `{ sceneId, regionId, behaviorId }`.
-> - **Depleted/respawn** — `interactableRegionWorldTime.js` iterates region behaviours, active-GM
->   only; depletion reflects onto the linked visual.
+> - **Gathering-task interactable = env+task shortcut (FINAL).** A gathering-task interactable
+>   carries **no node pool**; `interactableRegionNodeAdapter.js` is now only a pure
+>   `{sceneId,regionId,behaviorId}` ref resolver. Activating it opens the gathering app scoped to
+>   its `environmentId` + `taskId` (auto-selecting both) and reads/decrements
+>   `environment.nodeRuntime[taskId]` like opening gathering directly. There is **no**
+>   `behavior.system.node`, **no** `nodeStateOverride`/`tileRef` engine seam, **no** per-behaviour
+>   world-time respawn pass, and **no** per-marker depleted-behaviour. *(The per-behaviour node
+>   state + GM-routed node writes + `interactableRegionWorldTime.js` respawn pass + linked-visual
+>   depletion described in the original Phase 5/6 bullets were **abandoned** — `ae53384`, `4770a7f`.)*
+> - **Tools open Crafting** — `describeGrant` returns `{ tab: 'crafting' }` for a tool; the active
+>   station-tool chip in the header right cluster is the visible effect until the Crafting route lands.
 > - **GM tooling** — `src/ui/interactableSceneControl.js` GM-only browser; the behaviour config
 >   panel (`InteractableConfigApp.svelte.js` / `InteractableConfigRoot.svelte`) registered as the
 >   behaviour sheet and reachable from a Tile/Token HUD entry.
 >
 > **Retired entirely:** the tile-CLICK interaction path (canvas-stage listener, hover/permission
-> wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket actions)
-> and the actor-backed-token + synthetic `"Fabricate Interactable"` actor. There is no
-> `interactableActor.js`, `interactableTokenFlags.js`, or `tokenNodeStateAdapter.js`.
+> wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket actions),
+> the per-behaviour/per-token node adapter + `nodeStateOverride` seam + per-behaviour respawn pass
+> (`interactableRegionWorldTime.js`) + per-marker depleted-behaviour, and the actor-backed-token +
+> synthetic `"Fabricate Interactable"` actor. There is no `interactableActor.js`,
+> `interactableTokenFlags.js`, `tokenNodeStateAdapter.js`, or `interactableRegionWorldTime.js`.
 
 ## Phase 3 — Canvas foundation
 
@@ -245,7 +252,16 @@ before catalyst deletion in Phase 2).
 - [ ] Gate: `npm test` && `npm run build`. Socket/respawn runtime validated via
       `npm run test:foundry`.
 
-### Phase 5 — post-implementation review fixes (applied)
+### Phase 5 — post-implementation review fixes (applied, then SUPERSEDED)
+
+> **SUPERSEDED.** MF-1..MF-4 and the two GAP fixes below all addressed the **per-interactable
+> node-override** mechanism, which was subsequently **removed** (`ae53384`, `4770a7f`). The
+> shipped gathering-task interactable uses `environment.nodeRuntime[taskId]` directly (no
+> `nodeStateOverride`, no behaviour-backed adapter, no listing override, no per-token respawn
+> math, no `tokenNodeRef` maturity seam). The modules and tests these items reference
+> (`tokenNodeStateAdapter`, `nodeStateOverrideScope`, `interactable-world-time`, the
+> `listing-node-override`/`timed-token-maturity`/`node-respawn-math` tests) no longer exist in
+> the shipped form. Retained only as a record of intermediate work.
 
 - [x] **MF-1 — timed `onSuccess` token decrement leaked to the env node.** Fixed by persisting
       the token ref (`economyEvidence.tokenNodeRef`, from `adapter.tokenRef()`) on the waiting

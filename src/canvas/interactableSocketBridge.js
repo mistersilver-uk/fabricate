@@ -49,7 +49,7 @@ function resolveRegionBehavior({ sceneId, regionId, behaviorId } = {}) {
 
 /**
  * Apply a behaviour-document update to a `fabricate.interactable` Region Behaviour
- * (the active-GM edge for `{ system: { node } }` and other behaviour writes).
+ * (the active-GM edge for `{ system: { state } }` and other behaviour writes).
  * No-throw.
  *
  * @param {{ sceneId: string, regionId: string, behaviorId: string, update: object }} args
@@ -91,8 +91,9 @@ function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {
 }
 
 /**
- * Apply a linked-visual update (the active-GM edge for reflecting depleted state
- * onto the marker). No-throw, no-op when the visual is missing.
+ * Apply a linked-visual update (the active-GM edge for writing a linked
+ * Tile/Drawing/Token, e.g. the relink reverse-flag write). No-throw, no-op when
+ * the visual is missing.
  *
  * @param {object} args
  * @returns {Promise<void>}
@@ -125,9 +126,9 @@ export async function applyInteractableVisualDelete({ sceneId, visualUuid, docId
 
 /**
  * GM-routed linked-visual UPDATE seam: local apply on the active GM, socket emit
- * otherwise. Used both for depleted-state reflection and for reverse linked-visual
- * flag writes (relink). Standalone export so the config panel's relink edge can
- * route the reverse-flag write/clear through the same active-GM seam.
+ * otherwise. Used for reverse linked-visual flag writes (relink). Standalone
+ * export so the config panel's relink edge can route the reverse-flag write/clear
+ * through the same active-GM seam.
  *
  * @param {{ sceneId: string, visualUuid: string, documentName: string, update: object }} args
  * @returns {void|Promise<void>}
@@ -205,7 +206,7 @@ export function emitInteractableBehaviorWrite(behavior) {
 export function handleInteractableSocketMessage(payload, deps = {}) {
   const action = payload?.action;
 
-  // Region-first behaviour write (player → active GM `{ system: { node } }`).
+  // Region-first behaviour write (e.g. GM config panel → active GM `{ system: { state } }`).
   if (action === INTERACTABLE_BEHAVIOR_UPDATE) {
     void routeInteractableBehaviorMessage(payload, {
       isActiveGM,
@@ -214,8 +215,9 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     return;
   }
 
-  // Linked-visual depleted reflection (active GM applies; local apply for the
-  // emitting GM is handled by the writer, so the inbound branch is GM-gated).
+  // Linked-visual write, e.g. the relink reverse-flag write (active GM applies;
+  // local apply for the emitting GM is handled by the writer, so the inbound
+  // branch is GM-gated).
   if (action === INTERACTABLE_VISUAL_UPDATE) {
     if (isActiveGM()) void applyInteractableVisualUpdate(payload);
     return;

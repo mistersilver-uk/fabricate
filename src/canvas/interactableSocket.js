@@ -1,14 +1,18 @@
 /**
  * GM-routed behaviour-state writes for canvas Interactables (region-first model).
  *
- * Players cannot write Region Behaviours they do not own, so node-state mutations
- * (depletion, respawn) and linked-visual depleted reflection are not written
- * directly by arbitrary clients. They emit an action over the existing
- * `module.fabricate` socket; only `game.users.activeGM` applies the
- * `behavior.update(...)` / linked-visual write. A GM client applies its OWN write
- * locally without round-tripping the socket (socket emits never reach the
- * emitter), so the GM-on-GM case must branch on `isActiveGM` exactly like
- * `hazardSceneCoordinator`.
+ * Players cannot write Region Behaviours they do not own, so behaviour-state
+ * mutations (the GM config panel's enable/lock/visual-link writes) and any
+ * linked-visual write are not written directly by arbitrary clients. They emit an
+ * action over the existing `module.fabricate` socket; only `game.users.activeGM`
+ * applies the `behavior.update(...)` / linked-visual write. A GM client applies
+ * its OWN write locally without round-tripping the socket (socket emits never
+ * reach the emitter), so the GM-on-GM case must branch on `isActiveGM` exactly
+ * like `hazardSceneCoordinator`.
+ *
+ * NOTE: a gathering-task interactable carries NO per-interactable node pool —
+ * depletion/respawn is owned by the environment's `nodeRuntime[taskId]`, so these
+ * behaviour writes never carry node state.
  *
  * This module holds the PURE routing decision (who applies, payload validation);
  * `main.js` registers the socket handler and injects the thin Foundry edges
@@ -17,9 +21,10 @@
 
 export const INTERACTABLE_SOCKET = 'module.fabricate';
 
-// Region-first model actions. The behaviour update routes a `{ system: { node } }`
-// (or other behaviour) write to the active GM; the visual update/delete reflect
-// depleted state onto a linked Tile/Drawing/Token; activate/granted carry the
+// Region-first model actions. The behaviour update routes a behaviour `system`
+// write (e.g. the GM config panel's `{ system: { state } }` / linked-visual link
+// edits) to the active GM; the visual update/delete write a linked
+// Tile/Drawing/Token (e.g. relink reverse-flag writes); activate/granted carry the
 // shared activation pipeline.
 export const INTERACTABLE_ACTIVATE = 'interactableActivate';
 export const INTERACTABLE_ACTIVATION_GRANTED = 'interactableActivationGranted';
@@ -43,7 +48,7 @@ function plainObjectOrNull(value) {
 /**
  * Validate an `interactableBehaviorUpdate` payload. Identifies a scene + region +
  * behaviour and carries an `update` object of behaviour-document changes to merge
- * (e.g. `{ system: { node } }`). Returns the normalized payload, or `null`.
+ * (e.g. `{ system: { state } }`). Returns the normalized payload, or `null`.
  *
  * @param {object} payload
  * @returns {{ action: string, sceneId: string, regionId: string, behaviorId: string, update: object } | null}
