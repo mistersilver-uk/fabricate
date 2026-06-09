@@ -1,10 +1,11 @@
 /**
  * Pure scoping predicate for the session-scoped per-token node-state override.
  *
- * When a player double-clicks a gathering-task token, the token's node adapter
- * is injected into the Fabricate app and scoped to exactly ONE environment+task.
+ * When a gathering-task region activation is granted (the player walked their
+ * token into the region and clicked Interact), the behaviour's node adapter is
+ * injected into the Fabricate app and scoped to exactly ONE environment+task.
  * The attempt service (`nodeStateOverrideFor`) and the listing service must only
- * apply that override to its OWN env+task — a token's node must never leak into
+ * apply that override to its OWN env+task — a region's node must never leak into
  * any OTHER environment/task. This is the single source of truth for that
  * decision (factored out of `SvelteFabricateApp._buildServices` so it is
  * directly unit-testable without constructing the Foundry application).

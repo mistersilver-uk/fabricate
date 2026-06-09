@@ -86,12 +86,16 @@ export class GatheringEngine {
     failureFeedback = null,
     hazardSceneTrigger = null,
     getRunViewer = null,
-    // Rebuild a per-tile node-state adapter from a persisted `{ sceneId, tileId }`
-    // ref. Injected so a TIMED `onSuccess` waiting run can, at MATURITY, route its
-    // node decrement onto the tile's `flags.fabricate.node` (via the GM socket)
-    // instead of `environment.nodeRuntime[taskId]`. Returns null when the tile is
-    // gone (deleted) or the ref is unresolvable, in which case maturity falls back
-    // to the env node — see {@link GatheringEngine#_resolveMaturedTileNodeState}.
+    // Rebuild a per-region node-state adapter from a persisted region-behaviour
+    // ref `{ sceneId, regionId, behaviorId }`. (The seam/field names keep their
+    // legacy `tile*` spelling — `resolveTileNodeState`, `tileNodeRef` — for
+    // data/back-compat; the payload is the region ref, not a `{ sceneId, tileId }`
+    // tile ref.) Injected so a TIMED `onSuccess` waiting run can, at MATURITY,
+    // route its node decrement onto the `fabricate.interactable` behaviour's
+    // `system.node` (via the GM socket) instead of `environment.nodeRuntime[taskId]`.
+    // Returns null when the region/behaviour is gone or the ref is unresolvable, in
+    // which case maturity falls back to the env node — see
+    // {@link GatheringEngine#_resolveMaturedTileNodeState}.
     resolveTileNodeState = null,
     random = Math.random,
     localize = defaultLocalize,
@@ -248,10 +252,11 @@ export class GatheringEngine {
     // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
     // ONLY for tasks in the matching crafting system — componentId is per-system.
     presentTools = null,
-    // Per-token node-state adapter injected by a canvas gathering-task token
-    // (Phase 5): when present the depletion gate, decrement, and listing node
-    // counts read/write the token's own `flags.fabricate.node` instead of
-    // `environment.nodeRuntime[taskId]`. Writes route through the active GM.
+    // Per-region node-state adapter injected by a granted canvas gathering-task
+    // region activation: when present the depletion gate, decrement, and listing
+    // node counts read/write the `fabricate.interactable` behaviour's own
+    // `system.node` instead of `environment.nodeRuntime[taskId]`. Writes route
+    // through the active GM.
     nodeStateOverride = null
   } = {}) {
     const resolved = await this._resolveStartContext({
@@ -515,10 +520,10 @@ export class GatheringEngine {
       });
     }
 
-    // Rebuild the per-tile node adapter when this waiting run was started from a
-    // canvas gathering-task tile, so a TIMED `onSuccess` decrement at maturity
-    // lands on the TILE's `flags.fabricate.node` (via the GM socket), not the
-    // shared `environment.nodeRuntime[taskId]`. Null (tile gone / no ref / no
+    // Rebuild the per-region node adapter when this waiting run was started from a
+    // canvas gathering-task region, so a TIMED `onSuccess` decrement at maturity
+    // lands on the behaviour's `system.node` (via the GM socket), not the shared
+    // `environment.nodeRuntime[taskId]`. Null (region/behaviour gone / no ref / no
     // seam) falls back to the env node.
     const nodeState = this._resolveMaturedTileNodeState(run);
     const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer, nodeState });
@@ -1727,16 +1732,16 @@ export class GatheringEngine {
   }
 
   /**
-   * Return the per-token node-state override ONLY for the env+task it is scoped
-   * to (a placed gathering-task token owns exactly one task's node), else null.
+   * Return the per-region node-state override ONLY for the env+task it is scoped
+   * to (a placed gathering-task region owns exactly one task's node), else null.
    * This is the listing-side leak guard mirroring the app's
-   * `nodeStateOverrideFor`: a token's node must never surface against any OTHER
-   * listed task. With no scope (no token session) the override is inert.
+   * `nodeStateOverrideFor`: a region's node must never surface against any OTHER
+   * listed task. With no scope (no region session) the override is inert.
    *
    * @param {object} args
    * @param {object} args.environment Composed environment.
    * @param {object} args.task Composed/normalized task.
-   * @param {object|null} args.nodeStateOverride The per-token adapter, or null.
+   * @param {object|null} args.nodeStateOverride The per-region adapter, or null.
    * @param {{environmentId?: string, taskId?: string}|null} args.nodeStateOverrideScope
    * @returns {object|null}
    */
@@ -1963,12 +1968,13 @@ export class GatheringEngine {
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id)
     };
-    // Persist the placed tile's scene+tile identity when this attempt was
-    // started from a canvas gathering-task tile. A per-tile node adapter is a
-    // live function object (not JSON-serializable), so the waiting run carries
-    // only the tile REF; the adapter is rebuilt at maturity (on the active GM)
-    // so a TIMED `onSuccess` decrement lands on the TILE flag, not the env
-    // nodeRuntime (see {@link GatheringEngine#_processMaturedWaitingRun}).
+    // Persist the placed region-behaviour identity when this attempt was started
+    // from a canvas gathering-task region. A per-region node adapter is a live
+    // function object (not JSON-serializable), so the waiting run carries only the
+    // behaviour REF `{ sceneId, regionId, behaviorId }` (under the back-compat
+    // `tileNodeRef` key); the adapter is rebuilt at maturity (on the active GM) so
+    // a TIMED `onSuccess` decrement lands on the behaviour's `system.node`, not the
+    // env nodeRuntime (see {@link GatheringEngine#_processMaturedWaitingRun}).
     const tileNodeRef = typeof nodeStateOverride?.tileRef === 'function'
       ? nodeStateOverride.tileRef()
       : null;
@@ -1981,8 +1987,9 @@ export class GatheringEngine {
       };
       Object.assign(runData, richPayload);
     } else if (tileNodeRef) {
-      // No rich snapshot for this task, but still persist the tile ref so the
-      // maturity commit can rebuild the per-tile adapter.
+      // No rich snapshot for this task, but still persist the behaviour ref (under
+      // the back-compat `tileNodeRef` key) so the maturity commit can rebuild the
+      // per-region adapter.
       runData.economyEvidence = {
         ...(runData.economyEvidence || {}),
         tileNodeRef

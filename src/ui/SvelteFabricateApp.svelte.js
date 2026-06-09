@@ -31,17 +31,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _activeTab = DEFAULT_TAB;
   _services = null;
   _hookIds = null;
-  // Session-scoped canvas Tool (Phase 4). When a player double-clicks a Tool
-  // station tile, the Tool is injected here as a virtual-present tool: a
+  // Session-scoped canvas Tool. When the GM grants activation of a Tool-station
+  // interactable region (the controlling player walked their token in and clicked
+  // Interact), the station Tool is injected here as a virtual-present tool: a
   // `{ componentId, systemId, toolId, label }` shape that crafting/gathering
   // prerequisite checks treat as satisfied WITHOUT the actor owning the item,
   // and which is excluded from breakage/usage. Cleared on close.
   _activeCanvasTool = null;
-  // Session-scoped per-tile node-state adapter (Phase 5). When a player
-  // double-clicks a gathering-task tile, the tile's own node adapter is
-  // injected here so the gathering listing/attempt read/write the tile's
-  // `flags.fabricate.node` (not `environment.nodeRuntime[taskId]`). The adapter
-  // also scopes the session to one environment+task. Cleared on close.
+  // Session-scoped per-region node-state adapter. When a gathering-task region
+  // activation is granted, the behaviour's own node adapter is injected here so
+  // the gathering listing/attempt read/write the behaviour's `system.node` state
+  // (not `environment.nodeRuntime[taskId]`). The adapter also scopes the session
+  // to one environment+task. Cleared on close.
   _nodeStateOverride = null;
   _scopedEnvironmentId = null;
   _scopedTaskId = null;
@@ -96,10 +97,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       const systemId = this._activeCanvasTool?.systemId;
       return componentId && systemId ? { systemId, componentIds: [componentId] } : null;
     };
-    // Inject the per-tile node-state adapter (Phase 5) into attempts (and
-    // listing) when the session is scoped to a placed gathering-task tile, but
-    // ONLY for the scoped environment+task — a tile's node must not leak into
-    // any other listed task. With no tile session the override is null (inert).
+    // Inject the per-region node-state adapter into attempts (and listing) when
+    // the session is scoped to a placed gathering-task region, but ONLY for the
+    // scoped environment+task — a region's node must not leak into any other listed
+    // task. With no region session the override is null (inert).
     const nodeStateOverrideFor = (opts = {}) => scopeNodeStateOverride({
       override: this._nodeStateOverride,
       scopedEnvironmentId: this._scopedEnvironmentId,
@@ -112,9 +113,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getActiveCanvasTool: () => this._activeCanvasTool ?? null,
       listGatheringForActor: (opts = {}) => {
-        // Thread the SCOPED per-tile node override into the listing so the
-        // tile's OWN current/max/depleted/respawnEta surface for the scoped
-        // task — without it, a depleted tile shows "available" then blocks on
+        // Thread the SCOPED per-region node override into the listing so the
+        // behaviour's OWN current/max/depleted/respawnEta surface for the scoped
+        // task — without it, a depleted node shows "available" then blocks on
         // attempt. The engine applies the override ONLY to the scoped env+task
         // (the guard below scopes it), so it never leaks into other listed tasks.
         const nodeStateOverride = this._nodeStateOverride ?? null;
@@ -226,7 +227,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   async close(options) {
     this._removeHooks();
-    // Destroy the session-scoped canvas-tool + per-tile node context so the
+    // Destroy the session-scoped canvas-tool + per-region node context so the
     // singleton does not leak them into the next manual open.
     this._activeCanvasTool = null;
     this._nodeStateOverride = null;
@@ -250,24 +251,23 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   /**
    * Open (or re-focus) the shared Fabricate window on the requested tab.
    *
-   * `activeCanvasTool` semantics (Phase 4): the active canvas tool is
-   * session-scoped and is REPLACED on every `show`, including re-show of the
-   * live singleton. An explicit `show('crafting', { activeCanvasTool })` sets
-   * it; a plain `show('crafting')` CLEARS it — a fresh manual open (or a manual
-   * re-open of the existing window) has no canvas tool, so it must not silently
-   * inherit a station tool from a prior double-click. The context is also
-   * cleared on close.
+   * `activeCanvasTool` semantics: the active canvas tool is session-scoped and is
+   * REPLACED on every `show`, including re-show of the live singleton. An explicit
+   * `show('crafting', { activeCanvasTool })` sets it; a plain `show('crafting')`
+   * CLEARS it — a fresh manual open (or a manual re-open of the existing window)
+   * has no canvas tool, so it must not silently inherit a station tool from a
+   * prior interactable activation. The context is also cleared on close.
    *
    * @param {string} [tab='crafting'] One of crafting/gathering/journal/inventory.
    * @param {object} [options]
    * @param {object|null} [options.activeCanvasTool] Virtual-present Tool injected
-   *   by a canvas Tool station: `{ componentId, systemId, toolId, label }`.
-   * @param {object|null} [options.nodeStateOverride] Per-tile node-state adapter
-   *   injected by a canvas gathering-task tile (Phase 5). Scopes the gathering
+   *   by a granted Tool-station region activation: `{ componentId, systemId, toolId, label }`.
+   * @param {object|null} [options.nodeStateOverride] Per-region node-state adapter
+   *   injected by a granted gathering-task region activation. Scopes the gathering
    *   session to one environment+task so the attempt/listing read/write the
-   *   tile's own `flags.fabricate.node` (routed through the active-GM socket).
-   * @param {string} [options.environmentId] Scoped environment (gathering-task tile).
-   * @param {string} [options.taskId] Scoped task (gathering-task tile).
+   *   behaviour's own `system.node` state (routed through the active-GM socket).
+   * @param {string} [options.environmentId] Scoped environment (gathering-task region).
+   * @param {string} [options.taskId] Scoped task (gathering-task region).
    * @returns {Promise<SvelteFabricateApp>}
    */
   static async show(tab = DEFAULT_TAB, { activeCanvasTool, nodeStateOverride, environmentId, taskId } = {}) {
@@ -278,7 +278,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     const nextTaskId = typeof taskId === 'string' ? taskId : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
-      // Re-show REPLACES the session-scoped canvas tool + per-tile node context
+      // Re-show REPLACES the session-scoped canvas tool + per-region node context
       // (set when supplied, cleared when not) so a manual re-open never inherits
       // a stale station context.
       existing._activeCanvasTool = nextCanvasTool;

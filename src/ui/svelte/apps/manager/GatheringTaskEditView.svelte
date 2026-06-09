@@ -427,11 +427,12 @@
     updateRespawn({ amountExpression: String(value ?? '') });
   }
 
-  // --- Depleted-behavior authoring (per-tile canvas visual on depletion). ------
+  // --- Depleted-behavior authoring (linked-marker canvas visual on depletion). -
+  // Applies to a placed gathering-task interactable's linked Tile marker.
   // deleteToken is MUTUALLY EXCLUSIVE with swapImage: when delete is on, the swap
   // control is greyed and its value is cleared on save (the normalizer drops it
-  // too). The `postfixName` mode is NOT offered for canvas tiles — tiles have no
-  // nameplate, so only swap-image and the terminal delete change a tile's look.
+  // too). The `postfixName` mode is NOT offered — a Tile marker has no nameplate,
+  // so only swap-image and the terminal delete change the marker's look.
   const depletedBehavior = $derived(nodes.depletedBehavior || {});
   const depletedDeleteToken = $derived(depletedBehavior.deleteToken === true);
   const depletedSwapImage = $derived(typeof depletedBehavior.swapImage === 'string' ? depletedBehavior.swapImage : '');
@@ -940,8 +941,8 @@
 
       <div class="manager-task-depleted-behavior" data-gathering-task-depleted-behavior>
         <div class="manager-task-drop-header-copy">
-          <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (canvas tile)')}</h4>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed canvas tile looks once this node runs out. Restored automatically when it respawns.')}</p>
+          <h4>{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorTitle', 'When depleted (linked marker)')}</h4>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.DepletedBehaviorHint', 'How a placed interactable\'s linked marker looks once this node runs out. Restored automatically when it respawns.')}</p>
         </div>
 
         <label class="manager-field manager-task-depleted-delete">
@@ -953,25 +954,25 @@
             data-gathering-task-depleted-delete
           >
             <i class={`fas ${depletedDeleteToken ? 'fa-trash' : 'fa-trash-can'}`} aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteToken', 'Delete the tile')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteToken', 'Delete the linked marker')}</span>
           </button>
         </label>
 
         {#if depletedDeleteToken}
           <span class="manager-chip is-danger" role="alert" data-gathering-task-depleted-warning>
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteWarning', 'Deleting is irreversible — a deleted tile never respawns.')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedDeleteWarning', 'Deleting is irreversible — a deleted marker never respawns.')}</span>
           </span>
         {/if}
 
         <div class="manager-task-depleted-visuals" class:is-disabled={depletedDeleteToken}>
           <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImage', 'Swap tile image')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Economy.DepletedSwapImage', 'Swap marker image')}</span>
             <div class="manager-task-depleted-image-row">
               <button
                 type="button"
                 class="manager-task-image-picker manager-task-depleted-image-picker"
-                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted tile image')}
+                aria-label={text('FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick', 'Choose depleted marker image')}
                 onclick={chooseDepletedImage}
                 disabled={depletedDeleteToken || typeof onPickImagePath !== 'function'}
                 data-gathering-task-depleted-image

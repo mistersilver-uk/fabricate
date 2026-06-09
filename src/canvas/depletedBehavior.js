@@ -1,15 +1,18 @@
 /**
- * Depleted-behavior apply/revert for placed gathering-task Interactable tiles.
+ * Depleted-behavior apply/revert for the TILE linked visual of a region-first
+ * `fabricate.interactable` (the Tile branch of `linkedInteractableVisual.js`).
  *
  * A gathering task may configure `depletedBehavior { swapImage?, deleteToken? }`
- * on its node config (normalized by `gatheringNodeConfig.js`). When the tile's
- * node transitions to depleted (`node.current <= 0`), the tile VISUAL changes;
- * when it respawns back above 0, the visual is reverted to the tile's original
- * image (captured in `flags.fabricate.nodeOriginal`).
+ * on its node config (normalized by `gatheringNodeConfig.js`). The authoritative
+ * node state lives on the Region Behaviour; when it transitions to depleted
+ * (`node.current <= 0`), the linked Tile's VISUAL changes; when the node respawns
+ * back above 0, the visual is reverted to the tile's original image (captured in
+ * `flags.fabricate.nodeOriginal`). A missing linked Tile is a clean no-op — the
+ * interactable still works region-only.
  *
- * A tile has NO nameplate, so the `postfixName` mode is NOT supported for tiles —
- * only swap-image and the terminal delete change a tile's appearance. (The
- * `postfixName` flag is ignored if present on a legacy/raw behavior config.)
+ * A tile has NO nameplate, so the `postfixName` mode is NOT supported for the Tile
+ * marker — only swap-image and the terminal delete change a tile's appearance.
+ * (The `postfixName` flag is ignored if present on a legacy/raw behavior config.)
  *
  * The DECISION — what tile mutation to apply/revert given the config + the
  * current tile state — is a PURE function ({@link planDepletedBehavior}). The

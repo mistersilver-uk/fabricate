@@ -22,8 +22,9 @@
     activeCanvasTool = null
   } = $props();
 
-  // The active station tool's display name, shown in a status chip when a Tool
-  // station was double-clicked on the canvas. Falls back to the localized label
+  // The active station tool's display name, shown in a status chip when the GM
+  // granted activation of a Tool-station interactable region (the player walked
+  // their token into it and clicked Interact). Falls back to the localized label
   // when the tool carries no name. Empty when no station tool is active.
   const activeToolName = $derived(
     activeCanvasTool
@@ -71,8 +72,8 @@
 
   <div class="fabricate-app-main">
     <!-- Session-scoped status chip: announces the active canvas station tool
-         (set by a Tool-token double-click). Hidden when no tool is active.
-         aria-live so screen readers announce it appearing/changing. -->
+         (set when a Tool-station region activation is granted). Hidden when no
+         tool is active. aria-live so screen readers announce it appearing/changing. -->
     <div class="fabricate-app-tool-chip-bar" aria-live="polite">
       {#if activeCanvasTool}
         <span class="fabricate-app-tool-chip" title={activeToolName}>

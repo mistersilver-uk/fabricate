@@ -865,63 +865,102 @@ Requirements:
 
 ### Purpose
 
-Bring crafting/gathering onto the Foundry VTT canvas as **Interactables** — drag-and-drop placements for Tool stations and Gathering-Task resource nodes. An Interactable is a **Foundry Tile** (a `TileDocument`), **not** an actor-backed Token: there is no backing actor, no token, and no sheet. All per-Interactable data lives in `tile.flags.fabricate`. A GM drags a Tool / Gathering-Task entry from the scene-control Interactable browser app (or drags a tool-linked compendium / items-directory Item) onto the canvas and a flagged tile is spawned. Spawning is **GM-only**. A player **double-clicks** the tile to open the Fabricate UI: the tile is made pointer-interactive and the double-click is intercepted directly (a tile has no `clickLeft2` actor hit event). Tiles have **no nameplate**, so a **canvas hover label / tooltip** shows the interactable's name (`flags.fabricate.name`).
+Bring crafting/gathering onto the Foundry VTT canvas as **Interactables** — drag-and-drop placements for Tool stations and Gathering-Task resource nodes. A Fabricate Canvas Interactable is **region-first**: it is a **Scene Region** carrying a custom **`fabricate.interactable` Region Behaviour** (a `RegionBehaviorType`) that OWNS the authoritative state. A **linked visual** (Tile by default; optionally a Drawing or an existing GM-placed Token) is **presentation-only**. **No synthetic actor or proxy token is ever created.** A GM drags a Tool / Gathering-Task entry from the GM-only scene-control Interactable browser (or drags a tool-linked Item) onto the canvas; a Region + behaviour + linked Tile is spawned (or a **region-only** interactable with no visible marker). Spawning is **GM-only**. Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (see `gathering-and-harvesting` and `ui-integration` for the activation pipeline).
 
-### Interactable Tile Flags
+### Interactable Region Behaviour (`fabricate.interactable`)
+
+The behaviour is registered via the module manifest (`documentTypes.RegionBehavior.interactable`) + `CONFIG.RegionBehavior.dataModels`. All authoritative per-interactable state lives in the behaviour `system`:
 
 ```js
-tile.flags.fabricate = {
-  isInteractable: true,
+behavior.system = {
   interactableType: "tool" | "gatheringTask",
-  sourceUuid: string,            // the Fabricate Tool / Gathering Task source identity
-  name?: string,                 // display name for the hover label (tiles have no nameplate)
-  environmentId?: string,        // resolved at drop (gatheringTask only)
-  node?: NodeState,              // gatheringTask only; per-tile depletion/respawn state
-  nodeOriginal?: {               // captured pre-depleted-behavior tile state (swap-image stash)
-    img?: string,
-  }
+  sourceUuid: string,                 // the Fabricate Tool / Gathering Task source identity
+  systemId: string,
+  toolId: string|null,                // tool interactables
+  taskId: string|null,                // gatheringTask interactables
+  environmentId: string|null,         // resolved at drop (gatheringTask only)
+  name: string,
+  presentation: { promptText: string|null, hidden: boolean },
+  linkedVisual: {
+    uuid: string|null,
+    documentName: "Tile" | "Drawing" | "Token" | null,
+    mode: "marker" | "none",          // "none" = region-only (no visible marker)
+    missingPolicy: "ignore" | "warn" | "recreate"
+  },
+  node: NodeState|null,               // gatheringTask only; per-behaviour node snapshot
+  state: {
+    enabled: boolean, consumed: boolean, locked: boolean,
+    uses: { max: number|null, used: number },
+    cooldown: { seconds: number|null, lastUsedWorldTime: number|null }
+  },
+  activation: { trigger: "regionEnter", audience: "players" | "all" }
 }
 ```
 
-Built/read via `src/canvas/interactableTileFlags.js`.
+Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONFIG registration live in `src/canvas/regions/FabricateInteractableRegionBehavior.js`.
 
 Requirements:
 
-1. `isInteractable`, `interactableType`, and `sourceUuid` are required on an Interactable tile. `name` applies to both types (the hover label). `environmentId`, `node`, and `nodeOriginal` apply to gathering-task tiles only.
-2. Double-clicking a Tool tile opens the relevant Fabricate app with the Tool injected as a session-scoped `activeCanvasTool` (virtual-present); double-clicking a gathering-task tile opens the gathering app for that task and environment, passing the per-tile node state as a `nodeStateOverride`.
+1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId`, `environmentId`, and `node` are scoped by `interactableType`. Tool interactables inject a session-scoped `activeCanvasTool` (virtual-present) on activation; gathering-task interactables open the gathering app for that task and environment, passing the per-behaviour node state as a `nodeStateOverride`.
+2. Spawning is **GM-only**.
+3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported — the interactable works with no visible marker.
 
-### Per-Tile Node State (`flags.fabricate.node`)
+### Linked Visual reverse flags (presentation-only)
 
-A gathering-task tile owns its own depletion/respawn state in `flags.fabricate.node`, **independent of** `environment.nodeRuntime[taskId]`.
+The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning Region + Behaviour; it holds NO interactable state of its own:
+
+```js
+visual.flags.fabricate = {
+  isInteractableVisual: true,
+  linkedRegionUuid: string,
+  linkedBehaviorId: string
+}
+```
+
+Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef` in `src/canvas/regions/interactableRegionFlags.js`; created/relinked/recreated via `src/canvas/linkedVisuals/linkedInteractableVisual.js`.
 
 Requirements:
 
-1. `node` is a **snapshot of the task's node CONFIG at drop time**, carrying **both** config and runtime, normalized through the existing `normalizeNodeConfig` / `normalizeRespawn` helpers, and using calendar-aware world-time respawn (same resolution as resource-node respawn). It is independent of any environment.
-2. Tool requirements are **NOT** snapshotted into `node`; they resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed tiles).
+1. The default marker is a **Tile**; a **Drawing** (labelled zone) and an **existing GM-placed Token** are also supported. The reverse flag makes a Tile/Token HUD "Configure Fabricate Interactable" entry resolve.
+2. A linked **Token** is the GM's own document: depletion **never** mutates or deletes it by default (see Depleted Behavior).
+3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
+
+### Per-Behaviour Node State (`behavior.system.node`)
+
+A gathering-task interactable owns its own depletion/respawn state on the behaviour (`behavior.system.node`), **independent of** `environment.nodeRuntime[taskId]`.
+
+Requirements:
+
+1. `node` is a **snapshot of the task's node CONFIG at drop time** (`current` seeded to `max`), normalized through the existing `normalizeNodeConfig` / `normalizeRespawn` helpers, and using calendar-aware world-time respawn (same resolution as resource-node respawn). A task with no node config yields `null` — an UNLIMITED gathering point (no depletion, no respawn, no node writes).
+2. Tool requirements are **NOT** snapshotted into `node`; they resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
 3. The node is depleted when `node.current <= 0` — one shared definition used by both the count logic and the depleted-visual apply.
-4. When a per-tile node state is present for an attempt or listing, it takes precedence over `environment.nodeRuntime[taskId]`.
-5. All writes to `flags.fabricate.node` are routed through the active GM (`module.fabricate` socket action `INTERACTABLE_NODE_UPDATE` / wire value `interactableNodeUpdate`); only `game.users.activeGM` applies `tile.update` (a GM client applies its own writes locally without a socket round-trip). The terminal `deleteToken` behaviour routes through `INTERACTABLE_NODE_DELETE` / `interactableNodeDelete`, deleting the tile. A per-tile respawn pass runs on world-time advance, active-GM only.
+4. When a per-behaviour node state is present for an attempt or listing, it takes precedence over `environment.nodeRuntime[taskId]` (threaded as a `nodeStateOverride`).
+5. All writes to `behavior.system.node` are routed through the active GM over the `module.fabricate` socket; only `game.users.activeGM` applies the behaviour update (a GM client applies its own write locally without a socket round-trip). A world-time respawn pass iterates placed region behaviours, active-GM only. Depletion reflects onto the linked visual (see Depleted Behavior).
 
 ### Depleted Behavior (gathering-task node config)
 
 ```js
 depletedBehavior = {
-  swapImage?: string | null,   // tile texture swapped while depleted
-  postfixName?: string | null, // name postfix — DOES NOT apply to tiles (see below)
-  deleteToken?: boolean,       // terminal: tile deleted on depletion, no revert (flag key retained for data compat)
+  swapImage?: string | null,   // Tile texture swapped while depleted
+  postfixName?: boolean,       // append "(depleted)" label (Drawing label only)
+  deleteToken?: boolean,       // terminal: visual deleted on depletion (Tile/Drawing only)
+  tokenHide?: boolean,         // Token-only opt-in: reversibly hide the linked Token
 }
 ```
 
 Requirements:
 
-1. `depletedBehavior` is authored on the gathering-task node config and normalized in the admin store (unknown/empty fields normalize away). It is **orthogonal** to `depletionTiming` (`onStart` / `onSuccess`): `depletedBehavior` describes what happens to the tile *visual* when the node is depleted, while `depletionTiming` describes *when* a node decrements. Both axes compose freely. The depleted visual is keyed on the same `node.current <= 0` trigger.
-2. For a TILE, only **swap-image** and the terminal **delete** change appearance: `postfixName` is **NOT supported for tiles** (a tile has no nameplate), so it is ignored if present on a legacy/raw config. `swapImage` captures the prior tile image into `flags.fabricate.nodeOriginal` on apply and restores it on revert (respawn). The capture records only the image (`img`); there is no name to capture.
-3. `deleteToken` (the persisted flag key, retained for data compatibility) deletes the **tile** and is **terminal** — once applied there is no revert, and the world-time respawn pass must no-op against a deleted/absent tile. It is **mutually exclusive** with `swapImage` / `postfixName`: when `deleteToken` is set those fields are dead config (the editor greys them out and the normalizer drops them).
-4. All depleted-behavior tile mutations (`tile.update` / `tile.delete`) are applied through the active GM via the `module.fabricate` socket, on the same routing path as the node writes.
+1. `depletedBehavior` is authored on the gathering-task node config and normalized in the admin store (unknown/empty fields normalize away). It is **orthogonal** to `depletionTiming` (`onStart` / `onSuccess`): `depletedBehavior` describes what happens to the *linked visual* when the node is depleted, while `depletionTiming` describes *when* a node decrements. Both key off the same `node.current <= 0` trigger.
+2. The depleted DECISION is pure and reflects onto the linked visual per its `documentName`:
+   - **Tile** — `swapImage` swaps the texture (prior image stashed in `flags.fabricate.nodeOriginal`, restored on respawn).
+   - **Drawing** — depletion HIDES the drawing (`hidden:true`, reversible), optionally appending a `(depleted)` label.
+   - **Token** — **SAFE no-op by default**: a linked existing Token is the GM's own document and is NEVER mutated or deleted by depletion. `deleteToken` is deliberately IGNORED for a Token. The single opt-in is `tokenHide: true`, which reversibly hides the token on depletion and shows it again on respawn (the only state it ever touches; the prior `hidden` state is stashed in `flags.fabricate.nodeOriginal`).
+3. `deleteToken` is **terminal** (no revert; respawn no-ops against a deleted/missing visual) and **mutually exclusive** with `swapImage` / `postfixName`: when set those fields are dead config (the editor greys them out and the normalizer drops them). It deletes a Tile/Drawing only.
+4. All depleted-behavior visual mutations are applied through the active GM via the `module.fabricate` socket, on the same routing path as the node writes. A missing linked visual is a clean no-op.
 
 ### Session-Scoped Active Canvas Tool (`activeCanvasTool`)
 
-A double-clicked Tool tile injects a **virtual-present** tool into the crafting/gathering availability checks instead of minting a synthetic `Item`.
+Activating a Tool interactable injects a **virtual-present** tool into the crafting/gathering availability checks instead of minting a synthetic `Item`.
 
 Requirements:
 
@@ -935,11 +974,11 @@ When a Gathering-Task Interactable is dropped, its `environmentId` is resolved b
 
 1. **Tagged Scene Region** — the drop point falls inside a Foundry Scene Region flagged `flags.fabricate.environmentId`. One unambiguous existing hit auto-resolves (a `ui.notifications.info` names the resolved environment); multiple hits are ambiguous and fall through to the dialog.
 2. **Task `defaultEnvironmentId`** — the task's new optional placement-hint field (a single existing id; a stale id falls through).
-3. **GM dialog** — neither auto-source resolved (or the region was ambiguous). Cancel **aborts the spawn** (no tile created).
+3. **GM dialog** — neither auto-source resolved (or the region was ambiguous). Cancel **aborts the spawn** (no region is created).
 
 Holding **Alt** during the drop always **forces the GM dialog**, bypassing tiers 1 and 2.
 
-Note the two distinct uses of an environment id at different lifecycle stages: a **Scene Region `flags.fabricate.environmentId`** is a *drop-time placement* hint used only to resolve which environment a dropped tile belongs to, whereas `environment.sceneUuid` is the *runtime gathering gate* that ties a composed environment to a scene during attempt validation. They are unrelated mechanisms.
+Note the two distinct uses of an environment id at different lifecycle stages: a **Scene Region `flags.fabricate.environmentId`** is a *drop-time placement* hint used only to resolve which environment a dropped interactable belongs to, whereas `environment.sceneUuid` is the *runtime gathering gate* that ties a composed environment to a scene during attempt validation. They are unrelated mechanisms.
 
 ## Macro Contracts
 

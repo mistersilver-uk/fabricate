@@ -24,7 +24,7 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, tools, and
 | **Multi-Step Recipes** | Chain steps that must be completed in sequence, with optional time gates |
 | **Tools** | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage |
 | **Gathering Environments** | GM-authored places where actors can gather configured component results |
-| **Canvas Interactables** | Drag Tools and Gathering Tasks onto the scene as interactive tiles players double-click |
+| **Canvas Interactables** | Place Tools and Gathering Tasks as Scene Regions players activate by walking a token in |
 | **Essences** | Abstract properties on items for flexible ingredient matching |
 | **Visibility & Knowledge** | Control which recipes players can see and learn |
 | **Teaser Mode** | Reveal recipes gradually — players see a recipe exists and track progress toward unlocking it |
@@ -70,7 +70,7 @@ GMs can define material-gathering locations in [Gathering Environments]({% link 
 
 ## Canvas Interactables
 
-GMs can place Tools and Gathering Tasks directly on the scene as interactive tiles. Players double-click a tile to open the Fabricate UI; hovering shows the tile's name. See [Canvas Interactables]({% link canvas-interactables.md %}).
+GMs can place Tools and Gathering Tasks directly on the scene as **Scene Region** interactables (with an optional on-canvas marker). Players activate them by walking a token into the region: a non-blocking prompt appears, and clicking **Interact** opens the Fabricate UI. See [Canvas Interactables]({% link canvas-interactables.md %}).
 
 ## Having trouble?
 

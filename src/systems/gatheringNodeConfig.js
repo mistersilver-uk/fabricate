@@ -104,15 +104,19 @@ function trimmedOrNull(value) {
 }
 
 /**
- * Normalize the per-token `depletedBehavior` block on a node config.
+ * Normalize the `depletedBehavior` block on a node config.
  *
- * `depletedBehavior` describes what happens to a placed gathering-task TOKEN's
- * visual when its node depletes (`node.current <= 0`); it is orthogonal to
- * `depletionTiming` (`onStart`/`onSuccess`, which describes WHEN a node
- * decrements). Three combinable axes:
- *   - `swapImage`   : a token-texture path applied while depleted.
- *   - `postfixName` : when true, the token name gets a "(depleted)" postfix.
- *   - `deleteToken` : terminal — the token is removed on depletion.
+ * `depletedBehavior` describes what happens to a placed gathering-task
+ * interactable's LINKED VISUAL marker when its node depletes (`node.current <= 0`);
+ * it is orthogonal to `depletionTiming` (`onStart`/`onSuccess`, which describes
+ * WHEN a node decrements). The field names keep their legacy `*Token` spelling but
+ * are interpreted per linked-visual kind (Tile: swap-image/delete; Drawing:
+ * hide/label; Token: safe no-op). Three combinable axes:
+ *   - `swapImage`   : a marker-texture path applied while depleted (Tile).
+ *   - `postfixName` : when true, append a "(depleted)" label (Drawing; a Tile has
+ *                     no nameplate so it is ignored there).
+ *   - `deleteToken` : terminal — the linked visual is removed on depletion (a
+ *                     linked existing Token is never deleted — safe no-op).
  *
  * `deleteToken` is MUTUALLY EXCLUSIVE with `swapImage`/`postfixName`: when delete
  * is on the swap/postfix fields are dead config, so they are DROPPED here (the

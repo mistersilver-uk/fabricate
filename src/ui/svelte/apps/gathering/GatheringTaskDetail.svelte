@@ -62,9 +62,9 @@
   const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
     ? `${richNodes.current}/${richNodes.max}` : null);
   const nodeDepleted = $derived(richNodes != null && richNodes.available === false);
-  // Per-token node respawn ETA (canvas gathering-task token): the engine surfaces
+  // Per-region node respawn ETA (canvas gathering-task region): the engine surfaces
   // `rich.nodes.respawnEta = { nextWorldTime, secondsUntil }` only for a placed
-  // token whose node is under cap. Format `secondsUntil` into a calendar-aware
+  // interactable whose node is under cap. Format `secondsUntil` into a calendar-aware
   // human duration for the {duration}-interpolated lang key.
   const respawnSecondsUntil = $derived(
     richNodes?.respawnEta?.secondsUntil != null ? Number(richNodes.respawnEta.secondsUntil) : null

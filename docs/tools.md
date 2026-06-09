@@ -132,5 +132,5 @@ In early gathering builds, Tools authored in the Manager were persisted under th
 
 - [Recipes overview]({% link recipes/index.md %}) — how Tools fit into recipe definitions and resolution modes.
 - [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) — a worked example of a gathering Tool that wears out.
-- [Canvas Interactables]({% link canvas-interactables.md %}) — place Tool stations on the canvas so players can use a Tool without owning it.
+- [Canvas Interactables]({% link canvas-interactables.md %}) — place Tool stations on the canvas as Scene Regions players activate by walking in, so they can use a Tool without owning it.
 - [Crafting Engine API]({% link api/crafting-engine.md %}) — programmatic control over crafting runs and Tool validation.

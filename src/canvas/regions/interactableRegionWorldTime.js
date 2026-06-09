@@ -79,7 +79,7 @@ export async function respawnInteractableRegionBehaviors({
           now,
           secondsPerUnit,
           // Raw 1..100 roll seam (the math hits on `roll <= chance*100`),
-          // identical to the per-environment + per-tile respawn paths.
+          // identical to the per-environment respawn path.
           rollChance: () => Number(rollD100()),
           rollExpression
         });

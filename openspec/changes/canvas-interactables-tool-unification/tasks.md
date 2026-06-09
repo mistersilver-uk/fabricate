@@ -126,6 +126,41 @@ before catalyst deletion in Phase 2).
       removed i18n keys / renamed markup.
 - [ ] Gate: full `npm test` && `npm run build`.
 
+---
+
+> ## Phases 3–7 — SUPERSEDED scope (region-first pivot)
+>
+> The canvas phases below were planned around the **abandoned** actor-backed-token model and a
+> short-lived tile-primary model. **What shipped is region-first** and the work was
+> re-sequenced accordingly. Treat the Phase 3–7 checklists below as the original (token/tile)
+> plan of record; the SHIPPED canvas phases are:
+>
+> - **Region behaviour foundation** — `src/canvas/regions/FabricateInteractableRegionBehavior.js`
+>   (`RegionBehaviorType` subtype, registered via manifest `documentTypes.RegionBehavior.interactable`
+>   + `CONFIG.RegionBehavior.dataModels`); pure schema/build/read in `interactableRegionFlags.js`;
+>   `dropCanvasData` spawns a Region + behaviour + linked Tile (transaction-like cleanup), GM-only.
+> - **Linked visuals** — `src/canvas/linkedVisuals/linkedInteractableVisual.js`: Tile (default),
+>   Drawing, and existing-Token markers; reverse flags only; region-only supported;
+>   resolve/relink/recreate/missing-policy; depletion reflection per visual kind (Token = safe no-op).
+> - **Activation pipeline** — `interactableRegionActivation.js`
+>   (`evaluateActivationEligibility`/`buildActivationRequest`/`validateActivationRequest`/`describeGrant`);
+>   region `tokenEnter` (every client) → controlling-player prompt → active-GM validate → grant →
+>   player opens the UI; `controlToken` hook + keybinding re-trigger.
+> - **Node state + GM-routed writes** — behaviour-backed adapter
+>   `interactableRegionNodeAdapter.js` (reads `behavior.system.node`), `interactableSocket.js`,
+>   `interactableSocketBridge.js`; the `nodeStateOverride`/`tileRef` engine seams kept but now
+>   carry `{ sceneId, regionId, behaviorId }`.
+> - **Depleted/respawn** — `interactableRegionWorldTime.js` iterates region behaviours, active-GM
+>   only; depletion reflects onto the linked visual.
+> - **GM tooling** — `src/ui/interactableSceneControl.js` GM-only browser; the behaviour config
+>   panel (`InteractableConfigApp.svelte.js` / `InteractableConfigRoot.svelte`) registered as the
+>   behaviour sheet and reachable from a Tile/Token HUD entry.
+>
+> **Retired entirely:** the tile-CLICK interaction path (canvas-stage listener, hover/permission
+> wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket actions)
+> and the actor-backed-token + synthetic `"Fabricate Interactable"` actor. There is no
+> `interactableActor.js`, `interactableTokenFlags.js`, or `tokenNodeStateAdapter.js`.
+
 ## Phase 3 — Canvas foundation
 
 - [ ] Add `src/canvas/InteractableManager.js`: `Hooks.on('dropCanvasData')` intercepts a

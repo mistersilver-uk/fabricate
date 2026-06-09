@@ -403,8 +403,8 @@ function localizeGathering(key, data = {}) {
 
 /**
  * Evaluate a dice expression to its integer total via Foundry's `Roll`, returning
- * 0 when `Roll` is unavailable or the expression is invalid. Shared by the per-tile
- * and per-region interactable respawn passes.
+ * 0 when `Roll` is unavailable or the expression is invalid. Shared by the
+ * per-environment and per-region interactable respawn passes.
  *
  * @param {string} expression
  * @returns {number}
@@ -1166,8 +1166,11 @@ Hooks.once('ready', async () => {
   await fabricate.initialize();
   await processFabricateWorldTime();
 
-  // Wire the canvas Interactable foundation (drop interception + double-click
-  // dispatch). Idempotent — register() no-ops on repeat calls.
+  // Wire the canvas Interactable foundation (region-first: drop interception
+  // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
+  // marker, the region-enter presence prompt, the controlToken re-trigger, and
+  // the "interact here" keybinding). Idempotent — register() no-ops on repeat
+  // calls.
   InteractableManager.instance.register();
 
   game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => {

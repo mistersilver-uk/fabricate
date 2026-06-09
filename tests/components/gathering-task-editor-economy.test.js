@@ -152,10 +152,10 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
 
   it('adds the depleted-behavior + default-environment + drop-dialog i18n keys', () => {
     const econ = lang.FABRICATE.Admin.Manager.Economy;
-    assert.equal(econ.DepletedBehaviorTitle, 'When depleted (canvas tile)');
-    assert.equal(econ.DepletedDeleteToken, 'Delete the tile');
+    assert.equal(econ.DepletedBehaviorTitle, 'When depleted (linked marker)');
+    assert.equal(econ.DepletedDeleteToken, 'Delete the linked marker');
     assert.ok(typeof econ.DepletedDeleteWarning === 'string' && econ.DepletedDeleteWarning.length > 0);
-    assert.equal(econ.DepletedSwapImage, 'Swap tile image');
+    assert.equal(econ.DepletedSwapImage, 'Swap marker image');
 
     const tasks = lang.FABRICATE.Admin.Manager.Environment.Tasks;
     assert.equal(tasks.DefaultEnvironment, 'Default environment (canvas drop)');

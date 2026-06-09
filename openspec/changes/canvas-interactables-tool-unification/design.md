@@ -1,5 +1,48 @@
 # Design: Canvas Interactables + Tool Unification
 
+> ## SUPERSEDED — region-first pivot (read this first)
+>
+> The canvas portions of this design (Tokens-not-Tiles, a synthetic `"Fabricate Interactable"`
+> world actor, per-token flag schemas, token adapters) were **ABANDONED** during
+> implementation. **What actually shipped is region-first.** The Tool-unification half
+> (Catalyst retirement, the 0.6.0 migration, recipe/step/ingredient-set `toolIds`,
+> virtual-present tools) shipped as designed and remains accurate.
+>
+> **Shipped canvas architecture (authoritative — see `openspec/specs/data-models/spec.md`
+> Canvas Interactables and the §§ below as amended):**
+>
+> - A Fabricate Canvas Interactable = a **Scene Region** carrying a custom
+>   **`fabricate.interactable` Region Behaviour** (a `RegionBehaviorType`, registered via the
+>   manifest `documentTypes.RegionBehavior.interactable` + `CONFIG.RegionBehavior.dataModels`).
+>   The **behaviour OWNS the authoritative state** (`behavior.system`:
+>   `interactableType`/`sourceUuid`/`systemId`/`toolId|taskId`/`environmentId`/`name`,
+>   `presentation`, `linkedVisual`, `node`, `state{enabled,consumed,locked,uses,cooldown}`,
+>   `activation{trigger:regionEnter,audience}`).
+> - A **linked visual** (Tile by default; optionally a Drawing, or an existing GM-placed Token)
+>   is **presentation-only**, carrying only reverse flags (`isInteractableVisual`,
+>   `linkedRegionUuid`, `linkedBehaviorId`). **No synthetic actor or proxy token is ever
+>   created.** Deleting the visual does NOT destroy the interactable (`missingPolicy`).
+>   **Region-only** (no marker) is supported.
+> - **Activation = token presence**: region `tokenEnter` (handlers run on EVERY client) →
+>   eligibility check on the controlling player's client → non-blocking prompt → on Interact an
+>   activation request routes to the **active GM**, which validates and grants back to the
+>   requesting user, who opens the Fabricate UI locally (tool → virtual-present
+>   `activeCanvasTool`; gatheringTask → scoped gathering via the behaviour-backed node adapter).
+>   A `controlToken` hook + keybinding re-raise the prompt for a token already inside on scene
+>   load. No active GM ⇒ fails cleanly.
+> - **Node state lives on the behaviour**; mutations route through the active GM over the
+>   `module.fabricate` socket; depletion reflects onto the linked visual (Tile: swap-image/
+>   delete; Drawing: reversible hide/label; **Token: safe no-op, never deleted by default**).
+>   World-time respawn iterates region behaviours.
+> - **Retired:** the entire Tile-click interaction path (canvas-stage listener, hover/permission
+>   wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket
+>   actions) AND the earlier actor-backed-token model.
+>
+> The original phase numbering below (8 phases, 0..7) is also superseded — the shipped canvas
+> phases are region-first (region behaviour foundation → linked visuals → activation pipeline →
+> node state → depleted/respawn → GM tooling), with the dead tile path removed mid-stream. See
+> `tasks.md` for the reconciled phase note.
+
 ## Ground-Truth Facts
 
 - Tools are already a shared per-crafting-system library at
@@ -20,7 +63,14 @@
 
 ## Key Technical Decisions
 
-### 1. V13 token spawning model
+### 1. V13 token spawning model — SUPERSEDED (region-first)
+
+> **ABANDONED.** No actor is provisioned and no token is spawned. An Interactable is a **Scene
+> Region** carrying a `fabricate.interactable` Region Behaviour; the marker is a presentation-
+> only **linked Tile** (or Drawing / existing Token), or region-only. There is no
+> `ensureInteractableActor()`, no `"Fabricate Interactable"` world actor, and no
+> `clickLeft2`/double-click activation. Activation is **token presence** in the region. The
+> original text below is retained only as a record of the abandoned draft.
 
 One auto-provisioned generic world actor `"Fabricate Interactable"` backs every
 Interactable. Spawned tokens are **unlinked**; all per-Interactable data lives in
@@ -37,7 +87,18 @@ client applies its own writes locally without round-tripping the socket. This mi
 existing `hazardSceneCoordinator` / `isActiveGM` pattern so authority semantics stay
 consistent across the module.
 
-### 3. Per-token attempt flow
+### 3. Per-token attempt flow — AMENDED (behaviour-backed adapter)
+
+> **AMENDED for region-first.** The `nodeStateOverride` seam, snapshot semantics, listing-path
+> override, scoping leak-guard, single `nodeRespawnMath` respawn, and raw-roll chance seam all
+> shipped as described. The only substitution: the per-token tile adapter
+> (`src/canvas/tokenNodeStateAdapter.js`, the `tokenNodeRef = { sceneId, tokenId }`) became the
+> **behaviour-backed node adapter** `src/canvas/regions/interactableRegionNodeAdapter.js`, which
+> reads `behavior.system.node` and routes writes through the active GM. The engine ref
+> (`economyEvidence.tileNodeRef`, method `tileRef`) is kept as an OPAQUE seam name but now
+> carries `{ sceneId, regionId, behaviorId }`; `resolveTokenNodeStateForRef` rebuilds the
+> behaviour adapter from it at maturity. Read every "token flag" / "tile flag" below as
+> "behaviour `system.node`".
 
 `GatheringEngine.startAttempt` takes an optional `nodeStateOverride` adapter. When present
 it is threaded into `_commitTerminalSideEffects` / `_commitRichAttempt`, and
@@ -89,7 +150,7 @@ removing the prior `Math.random()<chance` drift the reviewer flagged.
 
 ### 4. `activeCanvasTool` injection (virtual-present tools)
 
-Double-clicking a Tool station does not mint a synthetic `Item`. Instead it injects a
+Activating a Tool station does not mint a synthetic `Item`. Instead it injects a
 **virtual-present flag keyed by `componentId`** (`presentTools` / `presentToolComponentIds`)
 into the crafting and gathering availability checks. A virtual-present tool is treated as
 satisfied without the actor owning the item, and is **excluded from breakage and usage**
@@ -97,12 +158,13 @@ satisfied without the actor owning the item, and is **excluded from breakage and
 `options.activeCanvasTool`, exposes it via `_buildServices` `getActiveCanvasTool`, sets it
 in `show(tab, { activeCanvasTool })`, and clears it on close.
 
-**Interim Tool-token routing.** Double-clicking a Tool token routes to `show('gathering', …)`,
-not `crafting`: the Svelte crafting tab is still a "Coming Soon" placeholder, so routing a Tool
-token there would dead-end with no visible effect, and gathering is the only live surface where
-the virtual-present tool has a visible effect. The injected `activeCanvasTool` context is
-tab-agnostic on the app instance, so revisit this to route to (or offer a choice of) crafting once
-that tab ships.
+**Interim Tool routing.** Activating a Tool interactable routes to `show('gathering', …)`,
+not `crafting`: the Svelte crafting tab is still a "Coming Soon" placeholder, so routing there
+would dead-end with no visible effect, and gathering is the only live surface where the
+virtual-present tool has a visible effect (`describeGrant` returns `{ tab:'gathering' }` for a
+tool). The injected `activeCanvasTool` context is tab-agnostic on the app instance, so revisit
+this to route to (or offer a choice of) crafting once that tab ships. (Region-first: activation
+is token presence + interact prompt, not a token double-click.)
 
 **System-scoped virtual-present matching.** `componentId` is a PER-SYSTEM id, so the
 virtual-present payload carries BOTH the active tool's `componentId` and its `systemId`:
@@ -119,6 +181,15 @@ across ALL systems with the same present set. With no active tool the payload is
 (Phase 5). Existing single-arg callers remain valid (`options` defaults to `{}`).
 
 ### 5. Depleted-behavior config
+
+> **AMENDED for region-first.** Depletion reflects onto the **linked visual**, not a proxy
+> token. The shipped `depletedBehavior` is `{ swapImage?, postfixName?, deleteToken?,
+> tokenHide? }` and is per-visual-kind: **Tile** swap-image/terminal-delete; **Drawing**
+> reversible hide + optional `(depleted)` label / terminal delete; **Token** SAFE no-op by
+> default (`deleteToken` ignored — the GM's token is never deleted) with the single `tokenHide`
+> reversible-hide opt-in. The original visual state is stashed in
+> `flags.fabricate.nodeOriginal` on the linked visual. A MISSING linked visual is a clean
+> no-op. Read "token" below as "linked visual".
 
 `depletedBehavior` is authored on the gathering-task node config:
 `{ swapImage?, postfixName?, deleteToken? }`. It is applied/reverted on the token via the
@@ -285,7 +356,17 @@ referenced by both `recipe/step/ingredientSet.toolIds` and `task.toolIds`. A
 `toolMatchesItem` alias is kept during the Phase 0–1 transition and finalized (catalyst
 matcher rename) atomically in Phase 2.
 
-### Interactable token flag schema
+### Interactable schema — SUPERSEDED (behaviour `system`, not token flags)
+
+> **ABANDONED.** State lives on the **Region Behaviour** `system`, not in `token.flags`. There
+> is no `src/canvas/interactableTokenFlags.js`. The canonical schema is in
+> `openspec/specs/data-models/spec.md` (Interactable Region Behaviour). Summary:
+> `behavior.system = { interactableType, sourceUuid, systemId, toolId|taskId, environmentId,
+> name, presentation{promptText,hidden}, linkedVisual{uuid,documentName,mode,missingPolicy},
+> node|null, state{enabled,consumed,locked,uses,cooldown}, activation{trigger:regionEnter,
+> audience} }`. The linked visual carries only reverse flags `{ isInteractableVisual,
+> linkedRegionUuid, linkedBehaviorId }` plus its `nodeOriginal` depleted-revert stash. The
+> abandoned token-flag draft is retained below as a record.
 
 `token.flags.fabricate` (built/read via `src/canvas/interactableTokenFlags.js`):
 

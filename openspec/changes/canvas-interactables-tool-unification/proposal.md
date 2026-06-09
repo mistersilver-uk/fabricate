@@ -2,6 +2,17 @@
 
 ## Summary
 
+> **Note — region-first pivot.** The canvas half of this proposal originally described
+> drag-and-drop **tokens** backed by a synthetic world actor. That model was **abandoned**
+> during implementation. What shipped is **region-first**: a Canvas Interactable is a **Scene
+> Region** carrying a `fabricate.interactable` **Region Behaviour** (which owns the state) plus
+> an optional presentation-only **linked visual** (Tile by default; Drawing or existing Token;
+> or region-only). Activation is **token presence** in the region, not a marker double-click.
+> No synthetic actor/proxy token is created. The Tool-unification half (Catalyst retirement,
+> 0.6.0 migration, `toolIds`, virtual-present tools) shipped as written. The canonical canvas
+> spec is `openspec/specs/data-models/spec.md` (Canvas Interactables); `design.md` carries the
+> detailed superseding notes. The token/tile wording below is left as the original record.
+
 Fabricate currently lives entirely in window-based UI; crafting and gathering are
 launched from the items directory, never from the Foundry canvas. This change brings
 Fabricate onto the Foundry VTT V13 canvas as **Interactables** — drag-and-drop tokens
@@ -55,23 +66,31 @@ the GM scene-control launch button + Interactable browser app.
   mapping. Item-flag fallback reads `catalystItemUsage` when `toolUsage` is absent.
 - **Catalyst retirement.** `src/models/Catalyst.js` and all catalyst code/UI/localization
   deleted with no deprecation shim; the gathering matcher rename is finalized atomically.
-- **Canvas Interactables.** A `dropCanvasData` interceptor spawns flagged tokens for
-  Fabricate Tools and Gathering Tasks against one auto-provisioned generic world actor;
-  double-click opens the relevant Fabricate app.
-- **Session-scoped Tool tokens.** Double-clicking a Tool station injects a virtual-present
-  tool (keyed by `componentId`) into crafting/gathering so the actor need not own the item;
-  the virtual tool is excluded from breakage and usage.
-- **Per-token node state.** Gathering Task tokens own their own depletion/respawn state in
-  `flags.fabricate.node`, independent of `environment.nodeRuntime[taskId]`, with calendar-
-  aware world-time respawn. All token-flag writes are routed through the active GM via a
-  module socket.
-- **Depleted behavior + env precedence.** Task-level `depletedBehavior` (swap image /
-  postfix name / delete token, where delete is terminal and mutually exclusive with the
-  others); environment resolution on drop follows Scene Region auto-detect → task default
-  (new `defaultEnvironmentId` field) → GM dialog, with an Alt-key override that forces the
-  dialog.
-- **GM tooling.** A GM-only scene-control button launches an Interactable browser app
-  listing draggable Tools and Gathering Tasks.
+- **Canvas Interactables (region-first).** A `dropCanvasData` interceptor spawns a **Scene
+  Region** carrying a `fabricate.interactable` **Region Behaviour** for Fabricate Tools and
+  Gathering Tasks, plus an optional presentation-only **linked Tile** marker (Drawing or
+  existing Token also supported; region-only allowed). *(Original draft: flagged tokens against
+  an auto-provisioned world actor — abandoned.)*
+- **Activation by token presence + virtual-present Tool tokens.** A controlled token entering
+  the region prompts the controlling player; on Interact a Tool interactable injects a
+  virtual-present tool (keyed by `componentId`) into crafting/gathering so the actor need not
+  own the item; the virtual tool is excluded from breakage and usage. *(Original draft:
+  double-clicking the token — abandoned for region presence.)*
+- **Per-behaviour node state.** Gathering Task interactables own their own depletion/respawn
+  state on the behaviour (`behavior.system.node`), independent of
+  `environment.nodeRuntime[taskId]`, with calendar-aware world-time respawn. All writes are
+  routed through the active GM via the `module.fabricate` socket; depletion reflects onto the
+  linked visual. *(Original draft: `token.flags.fabricate.node` — now behaviour state.)*
+- **Depleted behavior + env precedence.** Task-level `depletedBehavior` reflects onto the
+  linked visual per its kind (Tile swap-image / terminal delete; Drawing reversible hide +
+  optional `(depleted)` label; Token safe no-op with a `tokenHide` opt-in); `deleteToken` is
+  terminal and mutually exclusive with `swapImage`/`postfixName`. Environment resolution on
+  drop follows Scene Region auto-detect → task default (new `defaultEnvironmentId` field) → GM
+  dialog, with an Alt-key override that forces the dialog.
+- **GM tooling.** A GM-only scene-control browser drags/places interactables; a rich config
+  panel (registered as the behaviour sheet, reachable from a Tile/Token HUD entry) offers
+  Test-as-Player, Jump, Relink, Create/Recreate marker, Remove visual, Restock, Enable/Lock,
+  Delete, and missing-visual recovery.
 - **One-time GM migration notice.** After the 0.6.0 migration runs, surface a one-time
   Foundry `ui.notifications` message to the GM stating that recipe catalysts have moved to
   the Tools library, including a **count** of migrated entries and a pointer to the Tools
@@ -118,8 +137,9 @@ the GM scene-control launch button + Interactable browser app.
 2. **Auto-migrate existing recipe catalysts into shared library Tools** via a versioned
    `MigrationRunner` step (0.6.0); delete `Catalyst.js` and all catalyst code with **no**
    deprecation shim.
-3. **Gathering-task tokens own their own depletion state** in `flags.fabricate.node`
-   (independent of `environment.nodeRuntime[taskId]`), with their own world-time respawn.
+3. **Gathering-task interactables own their own depletion state** on the Region Behaviour
+   (`behavior.system.node`; original draft said `token.flags.fabricate.node`), independent of
+   `environment.nodeRuntime[taskId]`, with their own world-time respawn.
 4. **Environment resolution on drop follows a precedence chain:** Scene Region auto-detect
    → task default (new optional `defaultEnvironmentId` field on the gathering library task)
    → GM dialog. A modifier-key override (hold Alt during drop) always forces the GM dialog.

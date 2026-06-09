@@ -65,67 +65,120 @@ composed into environments many-to-many via `enabledTaskIds` / `forcedTaskIds`).
 
 ## Added Requirements
 
-### Interactable Token Flags
+> **Region-first model (SUPERSEDES the token/tile drafts below).** This change shipped on a
+> **region-first** architecture, not the actor-backed-token model originally drafted here. A
+> Fabricate Canvas Interactable is a **Scene Region** carrying a custom
+> **`fabricate.interactable` Region Behaviour** (a `RegionBehaviorType`) that OWNS the
+> authoritative state. A **linked visual** (Tile by default; optionally a Drawing or an
+> existing GM-placed Token) is presentation-only. **No synthetic actor or proxy token is ever
+> created.** The token/tile-flag schemas in the next two subsections are retained only as a
+> record of the abandoned draft; the canonical schema is the behaviour `system` defined in
+> `openspec/specs/data-models/spec.md` (Canvas Interactables).
 
-A Fabricate Interactable is a token (not a tile) backed by one auto-provisioned generic
-world actor `"Fabricate Interactable"`; spawned tokens are unlinked and carry all per-
-Interactable data in `token.flags.fabricate`.
+### Interactable Region Behaviour (`fabricate.interactable`)
+
+A Fabricate Interactable is a **Scene Region** carrying a `fabricate.interactable` Region
+Behaviour. The behaviour is a `RegionBehaviorType` registered via the module manifest
+(`documentTypes.RegionBehavior.interactable`) + `CONFIG.RegionBehavior.dataModels`, and owns
+all authoritative per-interactable state in its `system`:
 
 ```js
-token.flags.fabricate = {
-  isInteractable: true,
+behavior.system = {
   interactableType: "tool" | "gatheringTask",
-  sourceUuid: string,            // the Fabricate Tool / Gathering Task source
-  environmentId?: string,        // resolved at drop (gatheringTask)
-  node?: NodeState,              // gatheringTask only; per-token depletion/respawn state
-  nodeOriginal?: {               // captured pre-depleted-behavior token state
-    img?: string,
-    name?: string,
-  }
+  sourceUuid: string,                 // the Fabricate Tool / Gathering Task source
+  systemId: string,
+  toolId|null, taskId|null,           // by interactableType
+  environmentId|null,                 // resolved at drop (gatheringTask)
+  name: string,
+  presentation: { promptText: string|null, hidden: boolean },
+  linkedVisual: {
+    uuid: string|null,
+    documentName: "Tile"|"Drawing"|"Token"|null,
+    mode: "marker"|"none",            // "none" = region-only, no visible marker
+    missingPolicy: "ignore"|"warn"|"recreate"
+  },
+  node: NodeState|null,               // gatheringTask only; per-behaviour node snapshot
+  state: {
+    enabled: boolean, consumed: boolean, locked: boolean,
+    uses: { max: number|null, used: number },
+    cooldown: { seconds: number|null, lastUsedWorldTime: number|null }
+  },
+  activation: { trigger: "regionEnter", audience: "players"|"all" }
 }
 ```
 
-1. `isInteractable`, `interactableType`, and `sourceUuid` are required on an Interactable
-   token; `environmentId`, `node`, and `nodeOriginal` apply to gathering-task tokens only.
-2. Token spawning is GM-only.
+Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONFIG
+registration live in `src/canvas/regions/FabricateInteractableRegionBehavior.js`.
 
-### Per-Token Node State (`flags.fabricate.node`)
+1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId`,
+   `environmentId`, and `node` are scoped by `interactableType`.
+2. Spawning is **GM-only**: a GM-only scene-control browser drags/places interactables
+   (Region + behaviour + linked Tile, or region-only).
+3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by
+   `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported.
 
-A gathering-task token owns its own depletion/respawn state in `flags.fabricate.node`,
-independent of `environment.nodeRuntime[taskId]`.
+### Linked Visual reverse flags (presentation-only)
 
-1. `node` is a **snapshot of the task's node CONFIG at drop time**, carrying **both** config
-   and runtime, normalized through the existing `normalizeNodeConfig` / `normalizeRespawn`
-   helpers, and uses calendar-aware world-time respawn (same resolution as resource-node
-   respawn). It is independent of any environment.
+The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning
+Region + Behaviour; it holds NO interactable state of its own:
+
+```js
+visual.flags.fabricate = {
+  isInteractableVisual: true,
+  linkedRegionUuid: string,
+  linkedBehaviorId: string
+}
+```
+
+Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef`. An existing GM-placed
+**Token** linked as a marker is the GM's own document: depletion **never** mutates or deletes
+it by default (see Depleted Behavior).
+
+### Per-Behaviour Node State (`behavior.system.node`)
+
+A gathering-task interactable owns its own depletion/respawn state on the behaviour
+(`behavior.system.node`), independent of `environment.nodeRuntime[taskId]`.
+
+1. `node` is a **snapshot of the task's node CONFIG at drop time** (`current` seeded to
+   `max`), normalized through the existing `normalizeNodeConfig` / `normalizeRespawn` helpers,
+   and uses calendar-aware world-time respawn. A task with no node config yields `null` — an
+   UNLIMITED gathering point (no depletion/respawn/writes).
 2. Tool requirements are **NOT** snapshotted into `node`; they resolve from `task.toolIds`
    against the per-system Tools library at attempt time.
 3. The node is depleted when `node.current <= 0` (one shared definition for count logic and
    depleted visuals).
-4. When a per-token node state is present for an attempt, it takes precedence over
-   `environment.nodeRuntime[taskId]`.
-5. All writes to `flags.fabricate.node` are routed through the active GM (`module.fabricate`
-   socket `interactableNodeUpdate`); only `game.users.activeGM` applies `token.update` (a GM
-   client applies its own writes locally without a socket round-trip).
+4. When a per-behaviour node state is present for an attempt or listing, it takes precedence
+   over `environment.nodeRuntime[taskId]` (threaded as a `nodeStateOverride`).
+5. All writes to `behavior.system.node` are routed through the active GM (`module.fabricate`
+   socket); only `game.users.activeGM` applies the behaviour update (a GM client applies its
+   own write locally). A world-time respawn pass iterates placed region behaviours, active-GM
+   only. Depletion reflects onto the linked visual (see Depleted Behavior).
 
 ### Depleted Behavior (gathering-task node config)
 
 ```js
 depletedBehavior = {
-  swapImage?: string | null,   // token texture swapped while depleted
-  postfixName?: string | null, // appended to token name while depleted
-  deleteToken?: boolean,       // terminal: token removed on depletion, no revert
+  swapImage?: string | null,   // Tile texture swapped while depleted
+  postfixName?: boolean,       // append "(depleted)" label (Drawing label only)
+  deleteToken?: boolean,       // terminal: visual deleted on depletion (Tile/Drawing only)
+  tokenHide?: boolean,         // Token-only opt-in: reversibly hide the linked Token
 }
 ```
 
-1. `depletedBehavior` is authored on the gathering-task node config and normalized in the
-   admin store (unknown/empty fields normalize away). It is orthogonal to `depletionTiming`
-   (`onStart` / `onSuccess`).
-2. `swapImage` / `postfixName` capture the prior token state into
-   `flags.fabricate.nodeOriginal` on apply and restore it on revert (respawn).
-3. `deleteToken` is terminal — once applied there is no revert, and respawn must no-op
-   against a deleted token. It is **mutually exclusive** with `swapImage` / `postfixName`:
-   when `deleteToken` is set those fields are dead config and the normalizer drops them.
+The depleted DECISION stays pure; the depletion reflects onto the linked visual per its
+`documentName`:
+
+1. **Tile** — `swapImage` swaps the texture (original captured in
+   `flags.fabricate.nodeOriginal`, restored on respawn); terminal `deleteToken` deletes the
+   tile (no revert). `deleteToken` is mutually exclusive with `swapImage`/`postfixName`.
+2. **Drawing** — depletion HIDES the drawing (`hidden:true`, reversible), optionally appending
+   a `(depleted)` label; terminal `deleteToken` deletes the drawing.
+3. **Token** — **SAFE no-op by default**: a linked existing Token is the GM's own document and
+   is NEVER mutated or deleted by depletion. `deleteToken` is deliberately IGNORED for a Token.
+   The only opt-in is `tokenHide: true`, which reversibly hides the token on depletion and
+   shows it again on respawn (the single state it ever touches).
+4. `depletedBehavior` is orthogonal to `depletionTiming` (`onStart` / `onSuccess`); both key
+   off the same `node.current <= 0` trigger. All visual mutations route through the active GM.
 
 ## Migration
 

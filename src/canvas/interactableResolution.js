@@ -2,10 +2,12 @@
  * Pure drop-classification + spawn-payload shaping for canvas Interactables.
  *
  * This module decides, from a `dropCanvasData` payload, whether a drop is a
- * Fabricate Tool or Gathering Task interactable, and shapes the data needed to
- * spawn its tile. It contains NO Foundry globals: every lookup against the
- * Fabricate libraries is injected, so the routing logic is unit-testable with
- * fakes.
+ * Fabricate Tool or Gathering Task interactable, and shapes the data the manager
+ * needs to spawn it. In the region-first model that shape is a Scene Region + a
+ * nested `fabricate.interactable` behaviour + (optionally) a linked marker, built
+ * by {@link buildRegionSpawnRequest}. It contains NO Foundry globals: every
+ * lookup against the Fabricate libraries is injected, so the routing logic is
+ * unit-testable with fakes.
  *
  * Fabricate Tools and Gathering Tasks are NOT Foundry documents — they are
  * library entries keyed by `id` under a crafting system (`systems[systemId].tools`
@@ -154,8 +156,9 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
  * Build the normalized `activeCanvasTool` payload from a resolved library Tool.
  *
  * This is the session-scoped virtual-present Tool injected into the Fabricate
- * app when a player double-clicks a Tool station tile (Phase 4). The shape is
- * deliberately simple/serializable: `{ componentId, systemId, toolId, label }`.
+ * app when a Tool-station region activation is granted (the player walked their
+ * token into the region and clicked Interact). The shape is deliberately
+ * simple/serializable: `{ componentId, systemId, toolId, label }`.
  * The crafting/gathering prerequisite checks treat `componentId` as present
  * without an owned item and exclude it from breakage/usage.
  *
@@ -182,14 +185,20 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
 }
 
 /**
- * Shape the data needed to spawn an interactable TILE from a classified drop.
- * Pure: returns the flag-build args plus the placement geometry; the caller wires
- * the actual TileDocument creation (and resolves the icon `texture`/grid `width`/
- * `height` at the Foundry edge, passing them in here).
+ * LEGACY (pre-region-first) standalone-tile spawn shaper. Superseded by
+ * {@link buildRegionSpawnRequest}, which shapes the Scene Region + nested
+ * `fabricate.interactable` behaviour + linked marker the manager actually spawns;
+ * the manager no longer calls this builder. Retained only for the unit tests that
+ * pin the legacy flag/geometry shape.
+ *
+ * Shape the data needed to spawn a standalone interactable TILE from a classified
+ * drop. Pure: returns the flag-build args plus the placement geometry; the caller
+ * wires the actual TileDocument creation (and resolves the icon `texture`/grid
+ * `width`/`height` at the Foundry edge, passing them in here).
  *
  * The request carries:
  *  - `name`: the tool's label or the task's name, stored in the tile flag for the
- *    hover tooltip (tiles have no nameplate) and resolution.
+ *    hover tooltip (a tile has no nameplate) and resolution.
  *  - `texture`: the icon path for the tile image (`texture.src`), resolved by the
  *    caller from the tool's component img / the task img with a sensible default.
  *  - `width`/`height`: the tile dimensions (default one grid square), resolved by
