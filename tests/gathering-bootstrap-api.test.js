@@ -259,7 +259,9 @@ test('world-time hooks dispatch gathering without coupling failures to existing 
   );
   assert.match(
     mainSource,
-    /Hooks\.once\('ready', async \(\) => \{\s*await fabricate\.initialize\(\);\s*await processFabricateWorldTime\(\);[\s\S]*Hooks\.callAll\('fabricate\.ready'\);/s,
+    // The ready hook may first re-run the idempotent init backstop (bindFabricateGlobal)
+    // to recover from a missed `init`, then must await initialize() → world-time → ready.
+    /Hooks\.once\('ready', async \(\) => \{[\s\S]*?await fabricate\.initialize\(\);\s*await processFabricateWorldTime\(\);[\s\S]*Hooks\.callAll\('fabricate\.ready'\);/s,
     'ready hook should await startup world-time processing before fabricate.ready'
   );
   assert.match(

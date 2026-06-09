@@ -42,7 +42,11 @@ export function fabricateDevProxy() {
 
 /**
  * Map a Fabricate module request from Foundry's module namespace to a Vite
- * project-root path. The root `main.js` shim is the canonical local-dev entry.
+ * project-root path. In dev we serve the source entry (`/src/main.js`) directly
+ * rather than the root `main.js` shim: the shim's `await import('./src/main.js')`
+ * adds an extra async hop before the real module evaluates, widening the window in
+ * which Foundry's `init` event can fire first (the cause of the manager's "still
+ * loading" stall). Going straight to the source removes that hop.
  *
  * @param {string | undefined} requestUrl
  * @returns {string | null}
@@ -57,7 +61,7 @@ export function rewriteFabricateModuleUrl(requestUrl) {
   const suffix = `${parsed.search}${parsed.hash}`;
 
   if (relativePath === 'main.js' || relativePath === 'dist/main.js') {
-    return `/main.js${suffix}`;
+    return `/src/main.js${suffix}`;
   }
 
   return `/${relativePath}${suffix}`;

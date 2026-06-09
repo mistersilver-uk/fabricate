@@ -28,7 +28,7 @@ A system-agnostic, flexible crafting and gathering module for Foundry Virtual Ta
 - **Macro Integration** — Hook into success and failure outcomes with custom macros.
 - **Time and Currency Requirements** — Optional time or currency costs per crafting system.
 - **Salvage** — Break down managed items into components.
-- ***Gathering** — Explore environments, attempt gathering tasks, avoid or encounter hazards and harvest resources.
+- **Gathering** — Explore environments, attempt gathering tasks, avoid or encounter hazards and harvest resources.
 
 ## Installation
 
@@ -106,7 +106,7 @@ See [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [openspec/RE
 
 ## License
 
-Licensed under the **Fabricate Community License v1.0** (`LicenseRef-Fabricate-Community-1.0`).
+Licensed under the [**PolyForm Noncommercial License 1.0.0**](https://polyformproject.org/licenses/noncommercial/1.0.0) (`PolyForm-Noncommercial-1.0.0`).
 Commercial use requires a separate commercial license.
 See `LICENSE`.
 
