@@ -75,12 +75,27 @@ composed into environments many-to-many via `enabledTaskIds` / `forcedTaskIds`).
 > record of the abandoned draft; the canonical schema is the behaviour `system` defined in
 > `openspec/specs/data-models/spec.md` (Canvas Interactables).
 >
-> **Env-node correction (further-superseded).** The "Per-Behaviour Node State" and
-> "Depleted Behavior" subsections below were ALSO abandoned (`ae53384`, `4770a7f`). The shipped
-> gathering-task interactable carries **no `node` field**, **no `nodeStateOverride`**, and
-> **no per-marker depleted-behaviour**: it is a pure `(environment, task)` shortcut using
-> `environment.nodeRuntime[taskId]` as the single source of truth. A **Tool** interactable opens
-> the **Crafting** tab. Read those two subsections as a record of abandoned drafts.
+> **Env-node correction (further-superseded).** The "Per-Behaviour Node State" subsection below
+> was ALSO abandoned (`ae53384`, `4770a7f`). The shipped gathering-task interactable carries
+> **no `node` field**, **no `nodeStateOverride`**, and **no per-interactable node pool**: it is a
+> pure `(environment, task)` shortcut using `environment.nodeRuntime[taskId]` as the single
+> source of truth. A **Tool** interactable opens the **Crafting** tab. Read the "Per-Behaviour
+> Node State" subsection as a record of an abandoned draft.
+>
+> **What DID ship — env-node-driven marker swap + concealment/lock visibility.** The
+> `depletedBehavior.swapImage` and concealment mechanisms below shipped, but in the SIMPLE,
+> SHARED-env-node form (NOT the per-interactable/per-marker form the old drafts described):
+> when the SHARED `environment.nodeRuntime[taskId]` depletes (`current <= 0`), every linked
+> **Tile** marker for that `(environment, task)` swaps to `swapImage` and flips back on
+> recharge, reconciled by an idempotent active-GM sync (`interactableMarkerDepletion.js`,
+> `syncInteractableMarkers` / `resolveMarkerImage`) on the `gatheringEnvironments` setting
+> change and `canvasReady`; the available image is stashed at `flags.fabricate.markerAvailableImg`.
+> Separately, **visibility is split from eligibility**: DISABLED (`state.enabled === false`) or
+> explicitly HIDDEN (`presentation.hidden === true`) conceals the interactable (no prompt;
+> `tile.hidden = true`, GM-only — `resolveMarkerHidden` / `shouldPromptOnEnter`), while LOCKED
+> (`state.locked === true`) stays visible but denies Interact with
+> `FABRICATE.Canvas.Interactable.Denied.Locked`. The "Depleted Behavior" subsection below is
+> rewritten to the shipped form.
 
 ### Interactable Region Behaviour (`fabricate.interactable`)
 
@@ -125,23 +140,46 @@ registration live in `src/canvas/regions/FabricateInteractableRegionBehavior.js`
    (Region + behaviour + linked Tile, or region-only).
 3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by
    `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported.
+4. **Visibility is split from eligibility (Lock vs Disable) — SHIPPED.** A DISABLED
+   (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`)
+   interactable is **concealed**: the on-enter prompt does not fire (`shouldPromptOnEnter`) and
+   the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only;
+   `resolveMarkerHidden`). A LOCKED (`state.locked === true`) interactable stays **visible**
+   (marker shown, prompt fires) but Interact is denied with
+   `FABRICATE.Canvas.Interactable.Denied.Locked`. `evaluateActivationEligibility` still gates
+   the activation at Interact time (DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN).
+   These pure rules live in `src/canvas/regions/interactableRegionActivation.js`.
 
-### Linked Visual reverse flags (presentation-only)
+### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
 
 The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning
-Region + Behaviour; it holds NO interactable state of its own:
+Region + Behaviour; it holds NO authoritative interactable state of its own (no node pool):
 
 ```js
 visual.flags.fabricate = {
   isInteractableVisual: true,
   linkedRegionUuid: string,
-  linkedBehaviorId: string
+  linkedBehaviorId: string,
+  markerAvailableImg?: string   // stashed on first env-node depletion swap; restored on recharge
 }
 ```
 
-Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef`. The linked visual is
-**presentation-only**: no per-interactable depletion mutation is applied to it in the shipped
-model (env-driven marker depletion is a possible FUTURE option).
+Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef`. The linked visual **never OWNS
+state**, but it now **reflects two GM-controlled facts** about its owning behaviour (SHIPPED):
+
+1. **Env-node depletion image swap (Tile markers only).** When the SHARED
+   `environment.nodeRuntime[taskId]` is depleted (`current <= 0`) AND the task configures a
+   `depletedBehavior.swapImage`, every linked Tile marker for that `(environment, task)` swaps
+   its texture to that image and flips back on recharge (available image stashed/restored via
+   `flags.fabricate.markerAvailableImg`). This reflects the SHARED env node — **not** a
+   per-interactable node pool, and there is no `nodeStateOverride`. The decision
+   (`resolveMarkerImage`) is pure; the sync (`syncInteractableMarkers` in
+   `src/canvas/regions/interactableMarkerDepletion.js`) is active-GM-gated, no-throw, and
+   idempotent, reacting to the `gatheringEnvironments` setting change and `canvasReady`.
+2. **Concealment (all interactables).** DISABLED (`state.enabled === false`) or explicitly
+   HIDDEN (`presentation.hidden === true`) hides the linked Tile marker from players
+   (`tile.hidden = true`, GM-only; `resolveMarkerHidden`) in the same active-GM pass. A LOCKED
+   interactable's marker stays visible.
 
 ### Per-Behaviour Node State (`behavior.system.node`) — ABANDONED
 
@@ -172,35 +210,39 @@ A gathering-task interactable owns its own depletion/respawn state on the behavi
    own write locally). A world-time respawn pass iterates placed region behaviours, active-GM
    only. Depletion reflects onto the linked visual (see Depleted Behavior).
 
-### Depleted Behavior (gathering-task node config) — ABANDONED as an interactable marker
+### Depleted Behavior (gathering-task node config) — SHIPPED as a SHARED env-node-driven Tile swap
 
-> **REMOVED as an interactable mechanism.** `depletedBehavior` is still authored/normalized as
-> task node config, but does NOT drive any per-interactable linked-visual transition in the
-> shipped model. The schema/decision below is a record of the abandoned draft.
+> **SHIPPED (simple first version).** The original per-interactable/per-marker form (Drawing
+> hide, terminal `deleteToken`, Token hide, `flags.fabricate.nodeOriginal` revert stash) was
+> abandoned. What shipped is the **simple, shared-env-node** form: `depletedBehavior.swapImage`
+> drives a **linked Tile** image swap, keyed off the SHARED `environment.nodeRuntime[taskId]`,
+> not a per-interactable node. The other fields (`postfixName`, `deleteToken`) remain authorable
+> task node config but drive no interactable marker in the shipped model.
 
 ```js
 depletedBehavior = {
-  swapImage?: string | null,   // Tile texture swapped while depleted
-  postfixName?: boolean,       // append "(depleted)" label (Drawing label only)
-  deleteToken?: boolean,       // terminal: visual deleted on depletion (Tile/Drawing only)
-  tokenHide?: boolean,         // Token-only opt-in: reversibly hide the linked Token
+  swapImage?: string | null,   // SHIPPED: linked Tile texture swapped while the env node is depleted
+  postfixName?: string | null, // authored config; drives no interactable marker in the shipped model
+  deleteToken?: boolean,       // authored config; drives no interactable marker in the shipped model
 }
 ```
 
-The depleted DECISION stays pure; the depletion reflects onto the linked visual per its
-`documentName`:
+Shipped semantics (`src/canvas/regions/interactableMarkerDepletion.js`):
 
-1. **Tile** — `swapImage` swaps the texture (original captured in
-   `flags.fabricate.nodeOriginal`, restored on respawn); terminal `deleteToken` deletes the
-   tile (no revert). `deleteToken` is mutually exclusive with `swapImage`/`postfixName`.
-2. **Drawing** — depletion HIDES the drawing (`hidden:true`, reversible), optionally appending
-   a `(depleted)` label; terminal `deleteToken` deletes the drawing.
-3. **Token** — **SAFE no-op by default**: a linked existing Token is the GM's own document and
-   is NEVER mutated or deleted by depletion. `deleteToken` is deliberately IGNORED for a Token.
-   The only opt-in is `tokenHide: true`, which reversibly hides the token on depletion and
-   shows it again on respawn (the single state it ever touches).
-4. `depletedBehavior` is orthogonal to `depletionTiming` (`onStart` / `onSuccess`); both key
-   off the same `node.current <= 0` trigger. All visual mutations route through the active GM.
+1. **Depletion trigger is the SHARED env node** — `environment.nodeRuntime[taskId].current <= 0`
+   (the pure `resolveMarkerImage` decision; `isNodeDepleted` falls back to the task's own node
+   `current`/`max` when the env runtime has no entry yet). There is **no per-interactable node
+   pool** and **no `nodeStateOverride`**.
+2. **Tile** — when depleted AND `swapImage` is configured, every linked **Tile** marker for that
+   `(environment, task)` swaps its texture to `swapImage`; on recharge (env node above `0`) it
+   flips back to the available image. The available image is stashed at
+   `flags.fabricate.markerAvailableImg` on the FIRST swap (preferring the GM's actual marker
+   texture) and restored on recharge.
+3. The swap is reconciled by an **idempotent, no-throw, active-GM** sync
+   (`syncInteractableMarkers`) that runs on the `gatheringEnvironments` setting change (gather
+   decrement + world-time respawn) and `canvasReady`; every other client sees the change via
+   normal Foundry document sync. The same pass reconciles marker concealment
+   (`resolveMarkerHidden`).
 
 ## Migration
 

@@ -140,21 +140,29 @@ before catalyst deletion in Phase 2).
 >   + `CONFIG.RegionBehavior.dataModels`); pure schema/build/read in `interactableRegionFlags.js`;
 >   `dropCanvasData` spawns a Region + behaviour + linked Tile (transaction-like cleanup), GM-only.
 > - **Linked visuals** — `src/canvas/linkedVisuals/linkedInteractableVisual.js`: Tile (default),
->   Drawing, and existing-Token markers; reverse flags only; region-only supported;
->   resolve/relink/recreate/missing-policy; depletion reflection per visual kind (Token = safe no-op).
+>   Drawing, and existing-Token markers; reverse flags only (the marker OWNS no state);
+>   region-only supported; resolve/relink/recreate/missing-policy. The marker reflects the SHARED
+>   env node (Tile image swap) + concealment (hidden marker) via
+>   `src/canvas/regions/interactableMarkerDepletion.js` (SHIPPED — see Phase 6).
 > - **Activation pipeline** — `interactableRegionActivation.js`
->   (`evaluateActivationEligibility`/`buildActivationRequest`/`validateActivationRequest`/`describeGrant`);
->   region `tokenEnter` (every client) → controlling-player prompt → active-GM validate → grant →
->   player opens the UI; `controlToken` hook + keybinding re-trigger.
+>   (`evaluateActivationEligibility`/`buildActivationRequest`/`validateActivationRequest`/`describeGrant`/
+>   `shouldPromptOnEnter`/`resolveMarkerHidden`); region `tokenEnter` (every client) →
+>   concealment-gated controlling-player prompt → active-GM validate → grant → player opens the
+>   UI; `controlToken` hook + keybinding re-trigger. **Lock vs Disable visibility (SHIPPED):**
+>   DISABLED/HIDDEN conceals (no prompt + hidden Tile marker), LOCKED stays visible but denies
+>   Interact with `FABRICATE.Canvas.Interactable.Denied.Locked`.
 > - **Gathering-task interactable = env+task shortcut (FINAL).** A gathering-task interactable
 >   carries **no node pool**; `interactableRegionNodeAdapter.js` is now only a pure
 >   `{sceneId,regionId,behaviorId}` ref resolver. Activating it opens the gathering app scoped to
 >   its `environmentId` + `taskId` (auto-selecting both) and reads/decrements
 >   `environment.nodeRuntime[taskId]` like opening gathering directly. There is **no**
->   `behavior.system.node`, **no** `nodeStateOverride`/`tileRef` engine seam, **no** per-behaviour
->   world-time respawn pass, and **no** per-marker depleted-behaviour. *(The per-behaviour node
->   state + GM-routed node writes + `interactableRegionWorldTime.js` respawn pass + linked-visual
->   depletion described in the original Phase 5/6 bullets were **abandoned** — `ae53384`, `4770a7f`.)*
+>   `behavior.system.node`, **no** `nodeStateOverride`/`tileRef` engine seam, and **no**
+>   per-behaviour world-time respawn pass. *(The per-behaviour node state + GM-routed node writes +
+>   `interactableRegionWorldTime.js` respawn pass were **abandoned** — `ae53384`, `4770a7f`.)*
+>   **DID ship:** the SHARED env-node-driven `depletedBehavior.swapImage` Tile marker swap (flips
+>   back on recharge; available image stashed at `flags.fabricate.markerAvailableImg`), reconciled
+>   by the idempotent active-GM `syncInteractableMarkers` on the `gatheringEnvironments` change +
+>   `canvasReady` — reflecting the SHARED env node, not a per-interactable pool.
 > - **Tools open Crafting** — `describeGrant` returns `{ tab: 'crafting' }` for a tool; the active
 >   station-tool chip in the header right cluster is the visible effect until the Crafting route lands.
 > - **GM tooling** — `src/ui/interactableSceneControl.js` GM-only browser; the behaviour config
@@ -164,9 +172,12 @@ before catalyst deletion in Phase 2).
 > **Retired entirely:** the tile-CLICK interaction path (canvas-stage listener, hover/permission
 > wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket actions),
 > the per-behaviour/per-token node adapter + `nodeStateOverride` seam + per-behaviour respawn pass
-> (`interactableRegionWorldTime.js`) + per-marker depleted-behaviour, and the actor-backed-token +
+> (`interactableRegionWorldTime.js`) + the abandoned per-marker
+> Drawing-hide/`deleteToken`/Token-hide/`nodeOriginal` depleted form, and the actor-backed-token +
 > synthetic `"Fabricate Interactable"` actor. There is no `interactableActor.js`,
 > `interactableTokenFlags.js`, `tokenNodeStateAdapter.js`, or `interactableRegionWorldTime.js`.
+> *(The SHARED env-node-driven Tile image swap + concealment/lock visibility DID ship — see the
+> gathering-task bullet above and Phase 6.)*
 
 ## Phase 3 — Canvas foundation
 
@@ -294,11 +305,22 @@ before catalyst deletion in Phase 2).
 
 ## Phase 6 — Depleted-behavior config + env-resolution precedence
 
+> **SHIPPED form (re-mark).** `depletedBehavior` config + the env-resolution precedence shipped.
+> The marker reflection that shipped is the **SIMPLE, SHARED-env-node** form: `swapImage` drives
+> a **linked Tile** image swap keyed off `environment.nodeRuntime[taskId].current <= 0`
+> (`resolveMarkerImage` / `isNodeDepleted` in `src/canvas/regions/interactableMarkerDepletion.js`),
+> reconciled — together with marker concealment (`resolveMarkerHidden`) — by the idempotent,
+> no-throw, **active-GM** `syncInteractableMarkers` on the `gatheringEnvironments` setting change
+> and `canvasReady`; the available image is stashed at `flags.fabricate.markerAvailableImg` (NOT
+> `nodeOriginal`) and restored on recharge. The per-token apply/revert via `nodeOriginal`, the
+> Drawing-hide / `deleteToken` / Token-hide forms, and the `deleteToken` mutual-exclusion below
+> were **abandoned** — `postfixName` / `deleteToken` remain authorable config but drive no marker.
+
 - [ ] Add `depletedBehavior { swapImage?, postfixName?, deleteToken? }` to the
-      gathering node config + normalization. `deleteToken` is **mutually exclusive** with
-      `swapImage` / `postfixName` (when delete is on, swap+postfix are dead config and are
-      dropped by the normalizer). `depletedBehavior` is orthogonal to `depletionTiming`
-      (`onStart` / `onSuccess`); depletion trigger is `node.current <= 0`.
+      gathering node config + normalization. *(Shipped: `swapImage` drives the SHARED env-node
+      Tile marker swap; `postfixName` / `deleteToken` are authored config only. The
+      `deleteToken` mutual-exclusion / `node.current <= 0` per-token trigger described below were
+      abandoned in favour of the shared env-node trigger.)*
 - [ ] Author `depletedBehavior` in `src/ui/svelte/stores/adminStore.js` +
       `CraftingSystemManagerRoot.svelte` task editor:
       - When `deleteToken` is enabled, **disable/grey** the swap-image and postfix-name
@@ -310,8 +332,14 @@ before catalyst deletion in Phase 2).
 - [ ] Author the new optional `defaultEnvironmentId` field on the gathering library task in
       the task editor (an optional environment `<select>`); normalize it in `adminStore`
       `_normalizeGatheringTask` and preserve it in `GatheringEnvironmentStore`.
-- [ ] Add `applyDepletedBehavior` / `revertDepletedBehavior` on the token via the GM socket
-      using `flags.fabricate.nodeOriginal` (`deleteToken` is terminal — no revert).
+- [x] **SHIPPED (env-node-driven Tile swap, not per-token apply/revert).** The marker swap is
+      driven by the SHARED env node: pure `resolveMarkerImage` + the active-GM
+      `syncInteractableMarkers` (`src/canvas/regions/interactableMarkerDepletion.js`) swap every
+      linked Tile marker for the depleted `(environment, task)` to `swapImage` and flip back on
+      recharge, stashing/restoring the available image at `flags.fabricate.markerAvailableImg`.
+      The same pass reconciles concealment (`resolveMarkerHidden`). *(Original
+      `applyDepletedBehavior` / `revertDepletedBehavior` per-token writes via `nodeOriginal` were
+      abandoned.)*
 - [ ] Author the on-drop env-resolution **dialog**: an environment `<select>`; **cancel =
       abort the spawn** (no token created). Add `lang/en.json` keys.
 - [ ] `_onDrop` env precedence: region (`flags.fabricate.environmentId`) → task
@@ -319,10 +347,13 @@ before catalyst deletion in Phase 2).
       (hold **Alt** during drop forces the dialog), including discoverability (hint text in
       the browser app + the gathering-environment data-model doc). When region auto-detect
       fires, emit `ui.notifications.info` naming the resolved environment.
-- [ ] Add tests: `depletedBehavior` normalization (including delete-token mutual-exclusion
-      dropping swap/postfix); apply/revert round-trip captures and restores `nodeOriginal`;
-      `deleteToken` terminal; env precedence resolution order (region → default → dialog);
-      Alt-override forces the dialog; `defaultEnvironmentId` normalization + preservation.
+- [ ] Add tests: `depletedBehavior` normalization; the pure `resolveMarkerImage` decision
+      (depleted with `swapImage` → swap; non-depleted → available/stash restore; no-swapImage →
+      never swap) and `syncInteractableMarkers` (active-GM-gated, idempotent, Tile-only,
+      `markerAvailableImg` stash/restore); `resolveMarkerHidden` / `shouldPromptOnEnter`
+      concealment (DISABLED/HIDDEN concealed; LOCKED visible); env precedence resolution order
+      (region → default → dialog); Alt-override forces the dialog; `defaultEnvironmentId`
+      normalization + preservation.
 - [ ] Gate: `npm test` && `npm run build`. UI authoring + depleted visuals validated via
       `npm run test:foundry` (UI smoke screenshots for the task editor **and** a depleted
       token on canvas — see Screenshots acceptance below).
@@ -363,8 +394,10 @@ before catalyst deletion in Phase 2).
       - Phase 7 must include: the GM scene-control button in the controls bar, the component
         browser first-render, **and** a spawned Interactable token on the canvas with its
         nameplate visible.
-      - Phase 6 must include: the depleted token visual on canvas (swapImage applied + the
-        "(depleted)" postfix), **not only** the task editor.
+      - Phase 6 must include: the depleted linked-Tile marker on canvas (the SHARED env node
+        depleted → `swapImage` applied to the linked Tile, flipping back on recharge) and a
+        concealed (DISABLED/HIDDEN) interactable's marker hidden from players, **not only** the
+        task editor.
 - [ ] **Docs loop — update `DOMAIN.md`:** remove the Catalyst entry; redefine **Tool** as the
       shared required-reusable-breakable prerequisite primitive spanning crafting +
       gathering.

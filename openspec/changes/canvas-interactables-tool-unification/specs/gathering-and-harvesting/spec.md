@@ -22,14 +22,24 @@ collapses into the already-existing `TOOL_BLOCKED`.
 
 > **Region-first (SUPERSEDES the token language).** A gathering task is placed on the canvas
 > as a **Scene Region** carrying a `fabricate.interactable` Region Behaviour; a linked Tile
-> (or Drawing / existing Token) is a presentation-only marker. There is no synthetic actor or
-> proxy token. Activation is **token presence** in the region, not a marker double-click.
+> (or Drawing / existing Token) is a marker that holds no state of its own. There is no
+> synthetic actor or proxy token. Activation is **token presence** in the region, not a marker
+> double-click.
 >
 > **Env-node correction (further-superseded).** The interactable carries **no per-behaviour
 > node state and no `nodeStateOverride`** (`ae53384`, `4770a7f`). It is a pure
 > `(environment, task)` shortcut: it opens the gathering app scoped to its environment + task
 > (auto-selecting both) and reads/decrements `environment.nodeRuntime[taskId]` directly. The
-> "Scoped Attempt Flow" and "Depleted Behavior" subsections below are abandoned drafts.
+> "Scoped Attempt Flow" subsection below is an abandoned draft.
+>
+> **What DID ship — env-node-driven Tile marker swap + concealment/lock visibility.** The
+> "Depleted Behavior" subsection below is **rewritten to the shipped form**: when the SHARED
+> `environment.nodeRuntime[taskId]` depletes (`current <= 0`) and the task configures
+> `depletedBehavior.swapImage`, every linked **Tile** marker for that `(environment, task)`
+> swaps to that image and flips back on recharge (idempotent active-GM sync in
+> `interactableMarkerDepletion.js`). Separately, DISABLED/HIDDEN interactables are concealed
+> (no prompt + hidden marker) and LOCKED interactables stay visible but deny Interact. These
+> reflect the SHARED env node + the behaviour state — there is no per-interactable node pool.
 
 A gathering task may be placed on the canvas as an Interactable region (GM-only spawn). When
 a controlled token ENTERS the region, the controlling player is offered a non-blocking
@@ -88,40 +98,49 @@ are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskId
 2. A virtual-present Tool satisfies the task's tool gate without the actor owning the item
    and is excluded from breakage and usage.
 
-### Depleted Behavior — ABANDONED as an interactable marker
+### Depleted Behavior — SHIPPED as a SHARED env-node-driven Tile marker swap
 
-> **REMOVED as an interactable mechanism.** `depletedBehavior` remains authorable on the task
-> node config, but does NOT drive any per-interactable linked-visual transition in the shipped
-> model — the linked visual is presentation-only. Env-driven marker depletion is a possible
-> FUTURE option. The requirements below are a record of the abandoned draft.
+> **SHIPPED (simple first version).** `depletedBehavior.swapImage` drives a **linked Tile**
+> image swap keyed off the SHARED `environment.nodeRuntime[taskId]` — NOT a per-interactable
+> node, and NOT the per-marker Drawing-hide / `deleteToken` / Token-hide / `nodeOriginal`-revert
+> form originally drafted (that form was abandoned). The behaviour-schema/linked-visual contract
+> is defined in `openspec/specs/data-models/spec.md`.
 
-1. A gathering task may configure `depletedBehavior { swapImage?, postfixName?, deleteToken?,
-   tokenHide? }` on its node config. A node is depleted when `node.current <= 0` (a single
-   shared definition used by both count logic and depleted-visual apply). `depletedBehavior`
-   is orthogonal to `depletionTiming` (`onStart` / `onSuccess`).
-2. Depletion reflects onto the **linked visual** (not a proxy token), per its `documentName`:
-   - **Tile** — `swapImage` swaps the texture (prior state stashed in
-     `flags.fabricate.nodeOriginal`, restored on respawn).
-   - **Drawing** — depletion hides the drawing (reversible), optionally with a `(depleted)`
-     label.
-   - **Token** — SAFE no-op by default (the GM's own document is never mutated/deleted);
-     `deleteToken` is ignored for a Token. The only opt-in is `tokenHide`, a reversible hide.
-3. `deleteToken` is terminal AND mutually exclusive with `swapImage` / `postfixName`: when
-   delete is enabled the swap/postfix fields are dead config (the editor greys them out and
-   the normalizer drops them). It deletes a Tile/Drawing visual on depletion with no revert;
-   respawn no-ops against a deleted/missing visual. A missing linked visual is a clean no-op —
-   the interactable still works.
-4. All depleted-behavior visual mutations are applied through the active GM via the
-   `module.fabricate` socket.
+1. **Depletion trigger is the SHARED env node** — `environment.nodeRuntime[taskId].current <= 0`
+   (`resolveMarkerImage` / `isNodeDepleted`, falling back to the task's own node `current`/`max`
+   when the env runtime has no entry yet). There is **no per-interactable node pool** and **no
+   `nodeStateOverride`**.
+2. **Tile marker swap.** When depleted AND `swapImage` is configured, every linked **Tile**
+   marker for that `(environment, task)` swaps its texture to `swapImage`; on recharge (env node
+   above `0`) it flips back to the available image. The available image is stashed at
+   `flags.fabricate.markerAvailableImg` on the FIRST swap and restored on recharge.
+3. The swap (and marker concealment, see Player-Facing Canvas Gathering) is reconciled by an
+   idempotent, no-throw, **active-GM** sync (`syncInteractableMarkers` in
+   `src/canvas/regions/interactableMarkerDepletion.js`) on the `gatheringEnvironments` setting
+   change (gather decrement + world-time respawn) and `canvasReady`; other clients see the
+   change via normal Foundry document sync. A missing linked visual is a clean no-op.
+4. The task's `postfixName` / `deleteToken` fields remain authorable node config but drive no
+   interactable marker in the shipped model.
 
 ### Player-Facing Canvas Gathering
 
 1. Activation is **token presence**: when a controlled token enters the region, the
-   controlling player's client shows a non-blocking interact prompt; a `controlToken` hook and
-   a keybinding re-raise the prompt for a token already standing inside on scene load.
+   controlling player's client shows a non-blocking interact prompt (unless concealed; see
+   req 4); a `controlToken` hook and a keybinding re-raise the prompt for a token already
+   standing inside on scene load.
 2. When a player interacts at a gathering interactable and no active GM is connected, the
    player sees a graceful "A GM must be online to gather here" message; the attempt fails
    cleanly rather than silently. A **denied** activation returns a localized reason
    (`FABRICATE.Canvas.Interactable.Denied.*`).
 3. Depleted + respawn-ETA state comes from the environment's `nodeRuntime[taskId]` via the
-   normal gathering listing — the interactable adds nothing on top.
+   normal gathering listing — the interactable adds nothing to the listing on top of it. The
+   depleted state IS reflected onto the linked Tile marker as an image swap (see Depleted
+   Behavior).
+4. **Concealment vs Lock visibility (SHIPPED).** A DISABLED (`state.enabled === false`) OR
+   explicitly HIDDEN (`presentation.hidden === true`) interactable is **concealed from
+   players**: no on-enter prompt fires and the linked Tile marker is hidden (`tile.hidden =
+   true`, GM-only). A LOCKED (`state.locked === true`) interactable stays **visible** (marker
+   shown, prompt fires) but pressing Interact is **denied** with
+   `FABRICATE.Canvas.Interactable.Denied.Locked`. The pure rules (`shouldPromptOnEnter` /
+   `resolveMarkerHidden`) and the Interact-time eligibility gate are defined in
+   `openspec/specs/data-models/spec.md`.

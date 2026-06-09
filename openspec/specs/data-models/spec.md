@@ -906,38 +906,45 @@ Requirements:
 1. `interactableType`, `sourceUuid`, and `systemId` are required; `toolId`/`taskId` and `environmentId` are scoped by `interactableType`. A **Tool** interactable opens the **Crafting** tab and injects a session-scoped `activeCanvasTool` (virtual-present) on activation (the Crafting tab is currently a placeholder, so the active-tool chip is the visible effect). A **gathering-task** interactable is a pure `(environment, task)` shortcut: it opens the gathering app scoped to that environment + task, **auto-selecting both**, and reads/decrements the **environment's `nodeRuntime[taskId]`** exactly like opening gathering directly — there is **no per-interactable node pool and no node override**.
 2. Spawning is **GM-only**.
 3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported — the interactable works with no visible marker.
+4. **Visibility is split from eligibility (Lock vs Disable).** A **DISABLED** (`state.enabled === false`) OR explicitly **HIDDEN** (`presentation.hidden === true`) interactable is **concealed from players**: the on-enter prompt does NOT fire (pure rule `shouldPromptOnEnter`) and the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only; pure rule `resolveMarkerHidden`). A **LOCKED** (`state.locked === true`) interactable is **visible**: the marker stays shown and the prompt fires, but pressing Interact is **denied** with `FABRICATE.Canvas.Interactable.Denied.Locked` ("This is locked."). `evaluateActivationEligibility` still gates the actual activation (precedence DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN, denied at Interact time with the specific reason). These pure rules live in `src/canvas/regions/interactableRegionActivation.js`.
 
-### Linked Visual reverse flags (presentation-only)
+### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
 
-The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning Region + Behaviour; it holds NO interactable state of its own:
+The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning Region + Behaviour; it holds NO authoritative interactable state of its own (no node pool, no eligibility):
 
 ```js
 visual.flags.fabricate = {
   isInteractableVisual: true,
   linkedRegionUuid: string,
-  linkedBehaviorId: string
+  linkedBehaviorId: string,
+  // Stashed on the FIRST env-node depletion image swap so the available state can
+  // be restored to the GM's actual marker texture on recharge (Tile markers only).
+  markerAvailableImg?: string
 }
 ```
 
-Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef` in `src/canvas/regions/interactableRegionFlags.js`; created/relinked/recreated via `src/canvas/linkedVisuals/linkedInteractableVisual.js`.
+Built/read via `buildLinkedVisualFlags` / `readLinkedVisualRef` in `src/canvas/regions/interactableRegionFlags.js`; created/relinked/recreated via `src/canvas/linkedVisuals/linkedInteractableVisual.js`. Marker reflection (image swap + concealment) is reconciled by `src/canvas/regions/interactableMarkerDepletion.js`.
 
 Requirements:
 
 1. The default marker is a **Tile**; a **Drawing** (labelled zone) and an **existing GM-placed Token** are also supported. The reverse flag makes a Tile/Token HUD "Configure Fabricate Interactable" entry resolve.
-2. The linked visual is **purely presentation** in the current model: no per-interactable depletion mutation (swap/hide/delete) is applied to it. (Env-driven marker depletion is a possible FUTURE option, not current behaviour.)
+2. The linked visual **never OWNS interactable state** — it carries no node pool and no per-interactable depletion state. It nevertheless **reflects two GM-controlled facts** about its owning behaviour (SHIPPED):
+   - **Env-node depletion image swap (Tile markers only).** When the **SHARED** `environment.nodeRuntime[taskId]` is depleted (`current <= 0`) AND the task configures a `depletedBehavior.swapImage`, every linked Tile marker for that `(environment, task)` swaps its texture to that image; when the node recharges (respawns above `0`) all markers flip back to the available image. The available image is stashed at `flags.fabricate.markerAvailableImg` on the first swap and restored on recharge. This reflects the env node — it is **not** a per-interactable/per-marker node pool, and there is no `nodeStateOverride`. The decision (`resolveMarkerImage`) is pure; the sync (`syncInteractableMarkers`) is **active-GM-gated, no-throw, and idempotent**, reacting to the `gatheringEnvironments` setting change (gather decrement + world-time respawn) and `canvasReady`. Every other client sees the change through normal Foundry document sync.
+   - **Concealment (all interactables).** When the interactable is DISABLED (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`), the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only), reconciled in the same active-GM pass (`resolveMarkerHidden`). A LOCKED interactable's marker stays visible.
 3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
 
-### Gathering-Task Node State — owned by the environment (no per-interactable pool)
+### Gathering-Task Node State — owned by the environment (no per-interactable pool; env-node-driven marker swap)
 
-A gathering-task interactable is a **pure `(environment, task)` shortcut**; it does **not** carry its own node pool. Node counts, depletion, and respawn are owned entirely by the environment's `nodeRuntime[taskId]` (see `gathering-and-harvesting` → Gathering Resource Nodes).
+A gathering-task interactable is a **pure `(environment, task)` shortcut**; it does **not** carry its own node pool. Node counts, depletion, and respawn are owned entirely by the environment's `nodeRuntime[taskId]` (see `gathering-and-harvesting` → Gathering Resource Nodes). The SHARED env node's depleted state is, however, reflected onto the linked Tile marker as an image swap (requirement 4 below).
 
 Requirements:
 
 1. The behaviour has **no `node` field**. Activating a gathering-task interactable opens the gathering app scoped to its `environmentId` + `taskId` (auto-selecting both) and reads/decrements the SAME `environment.nodeRuntime[taskId]` as opening gathering directly. It does not alter environment node availability beyond a normal gathering attempt.
 2. Tool requirements resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
 3. There is **no per-interactable/per-token node snapshot+adapter**, **no `nodeStateOverride`/`tileRef`/`resolveTileNodeState` engine seam**, and **no per-behaviour world-time respawn pass**. These were removed from the model. The timed/waiting-run maturity decrement lands on the **environment** node.
+4. **Env-node-driven marker image swap (SHIPPED).** The task-level `depletedBehavior.swapImage` drives the linked **Tile** marker: when the **SHARED** `environment.nodeRuntime[taskId]` is depleted (`current <= 0`), every linked Tile marker for that `(environment, task)` swaps to `swapImage`; on recharge they all flip back (available image stashed/restored via `flags.fabricate.markerAvailableImg`). This is reconciled by an idempotent, active-GM, no-throw sync (`syncInteractableMarkers` in `interactableMarkerDepletion.js`) reacting to the `gatheringEnvironments` setting change and `canvasReady`. The marker still has **no per-interactable node pool** — it reflects the SHARED environment node, driven by the env node (not a behaviour node). There is no `nodeStateOverride`.
 
-> **Removed (do not reintroduce).** The earlier drafts described a per-interactable `behavior.system.node` snapshot, a behaviour-backed node adapter threaded as a `nodeStateOverride`, a per-behaviour world-time respawn pass, and a per-marker `depletedBehavior` visual auto-swap. All were abandoned. The task-level `depletedBehavior` authoring still exists as config (normalized/editable in `gatheringNodeConfig.js` / `adminStore` / `GatheringTaskEditView.svelte`) but no longer drives any per-interactable marker transition.
+> **Removed (do not reintroduce).** The earlier drafts described a per-interactable `behavior.system.node` snapshot, a behaviour-backed node adapter threaded as a `nodeStateOverride`, and a per-behaviour world-time respawn pass. All were abandoned: a gathering-task interactable carries **no** per-interactable node pool, and the env node is the single source of truth for counts/depletion/respawn. **Not removed:** the env-node-driven linked-Tile marker image swap shipped (see requirement 4) — `depletedBehavior.swapImage` reflects the SHARED `environment.nodeRuntime[taskId]` onto the marker; it is not a per-interactable depletion pool.
 
 ### Session-Scoped Active Canvas Tool (`activeCanvasTool`)
 

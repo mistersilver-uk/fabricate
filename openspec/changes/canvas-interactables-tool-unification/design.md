@@ -35,13 +35,24 @@
 >   region-first pivot initially kept a per-behaviour `behavior.system.node`; two later fixes
 >   (`ae53384`, `4770a7f`) **removed** it. The shipped gathering-task interactable carries **no
 >   node pool**; node counts/depletion/respawn are owned by `environment.nodeRuntime[taskId]`.
->   There is **no** `nodeStateOverride` thread, **no** behaviour-backed node adapter, **no**
->   per-behaviour world-time respawn pass, and **no** per-marker depleted-behaviour swap. The
->   linked visual is presentation-only. Sections 3 and 5 below are re-marked accordingly.
+>   There is **no** `nodeStateOverride` thread, **no** behaviour-backed node adapter, and **no**
+>   per-behaviour world-time respawn pass. Section 3 below is re-marked accordingly.
+> - **Env-node-driven marker swap + Lock/Disable visibility DID ship (re-marked in §5).** The
+>   linked Tile marker, while it OWNS no state, now reflects the SHARED env node + behaviour
+>   state: (a) when `environment.nodeRuntime[taskId]` depletes and the task configures
+>   `depletedBehavior.swapImage`, every linked Tile marker for that `(environment, task)` swaps
+>   image and flips back on recharge (idempotent active-GM sync in `interactableMarkerDepletion.js`;
+>   available image stashed at `flags.fabricate.markerAvailableImg`); (b) DISABLED/HIDDEN
+>   interactables are concealed (no prompt + `tile.hidden = true`), LOCKED interactables stay
+>   visible but deny Interact (`shouldPromptOnEnter` / `resolveMarkerHidden` /
+>   `FABRICATE.Canvas.Interactable.Denied.Locked`). This is the SHARED-env-node form, NOT the
+>   abandoned per-marker/per-interactable form. §5 below is rewritten accordingly.
 > - **Retired:** the entire Tile-click interaction path (canvas-stage listener, hover/permission
 >   wraps, tile pointer enablement, tile node adapter, tile world-time pass, tile socket
 >   actions), the per-behaviour/per-token node adapter + `nodeStateOverride` seam + per-behaviour
->   respawn pass + per-marker depleted-behaviour, AND the earlier actor-backed-token model.
+>   respawn pass + the abandoned per-marker Drawing-hide/`deleteToken`/Token-hide/`nodeOriginal`
+>   depleted form, AND the earlier actor-backed-token model. *(The SHARED env-node-driven Tile
+>   image swap + concealment did ship — see §5.)*
 >
 > The original phase numbering below (8 phases, 0..7) is also superseded — the shipped canvas
 > phases are region-first (region behaviour foundation → linked visuals → activation pipeline →
@@ -187,35 +198,38 @@ across ALL systems with the same present set. With no active tool the payload is
 `{ activeCanvasTool }` (Phase 4) and `{ environmentId, taskId, nodeStateOverride }`
 (Phase 5). Existing single-arg callers remain valid (`options` defaults to `{}`).
 
-### 5. Depleted-behavior config — REMOVED as an interactable-driven mechanism
+### 5. Depleted-behavior config — SHIPPED as a SHARED env-node-driven Tile marker swap (+ concealment/lock)
 
-> **ABANDONED — do not implement.** The per-interactable/per-marker depleted-behaviour
-> mechanism (reflecting depletion onto the linked visual: Tile swap/delete, Drawing hide/label,
-> Token hide, `flags.fabricate.nodeOriginal` revert stash, GM-routed visual writes) was **dropped**
-> alongside the per-behaviour node state. The linked visual is **presentation-only**; nothing
-> auto-swaps/hides/deletes it per attempt. The task-level `depletedBehavior` field still exists as
-> **authoring config** (normalized in `gatheringNodeConfig.js` / `adminStore` / `GatheringTaskEditView.svelte`)
-> but no longer drives any interactable marker. Env-driven marker depletion is a possible FUTURE
-> option, not current behaviour. The text below is retained only as a record of the abandoned draft.
+> **SHIPPED (simple first version).** The original per-interactable/per-marker form (Drawing
+> hide/label, terminal `deleteToken`, Token hide, `flags.fabricate.nodeOriginal` revert stash,
+> per-behaviour node trigger) was abandoned alongside the per-behaviour node state. What shipped
+> is the **simple, SHARED-env-node** form, plus a distinct Lock-vs-Disable visibility split.
 
-`depletedBehavior` is authored on the gathering-task node config:
-`{ swapImage?, postfixName?, deleteToken? }`. It is applied/reverted on the token via the
-GM socket. The original token state is captured under `flags.fabricate.nodeOriginal` so a
-respawn can restore image/name. `deleteToken` is **terminal** — once the token is deleted
-there is nothing to revert.
+**Env-node-driven Tile marker swap.** `depletedBehavior.swapImage` (authored on the gathering-task
+node config; normalized in `gatheringNodeConfig.js` / `adminStore` / `GatheringTaskEditView.svelte`)
+drives the linked **Tile** marker. The pure decision `resolveMarkerImage` (in
+`src/canvas/regions/interactableMarkerDepletion.js`) keys off the SHARED env node — the node is
+depleted when `environment.nodeRuntime[taskId].current <= 0` (`isNodeDepleted`, falling back to
+the task's own `nodes.current`/`max` when the env runtime has no entry yet). When depleted AND a
+`swapImage` is configured, every linked Tile marker for that `(environment, task)` swaps its
+texture; on recharge it flips back to the available image. The available image is stashed at
+`flags.fabricate.markerAvailableImg` on the FIRST swap (preferring the GM's actual marker texture)
+and restored on recharge. There is **no per-interactable node pool** and **no `nodeStateOverride`**.
 
-- **Orthogonal to depletion timing.** `depletedBehavior` describes what happens to the
-  token *visual* when the node is depleted; it is independent of `depletionTiming`
-  (`onStart` / `onSuccess`), which describes *when* a node decrements. Both axes compose
-  freely.
-- **`deleteToken` is mutually exclusive with `swapImage` / `postfixName`.** When
-  `deleteToken` is on, the token is removed, so `swapImage` and `postfixName` are **dead
-  config**. The task editor disables/greys the swap+postfix controls when delete is enabled,
-  and the normalizer drops them.
-- **Depletion trigger.** Both the count logic and the depleted visuals key off a single
-  shared definition: the node is depleted when `node.current <= 0`. There is one source of
-  truth for "is this node depleted", reused by the respawn pass and the depleted-visual
-  apply.
+**Concealment vs Lock visibility.** Visibility is split from eligibility (pure rules in
+`interactableRegionActivation.js`): a DISABLED (`state.enabled === false`) or explicitly HIDDEN
+(`presentation.hidden === true`) interactable is **concealed** — `shouldPromptOnEnter` returns
+false (no on-enter prompt) and `resolveMarkerHidden` returns true (the linked Tile is hidden from
+players, `tile.hidden = true`, GM-only). A LOCKED (`state.locked === true`) interactable stays
+**visible** (marker shown, prompt fires) but `evaluateActivationEligibility` denies Interact with
+`FABRICATE.Canvas.Interactable.Denied.Locked`.
+
+**Active-GM reconcile.** Both the image swap and the concealment hidden-state are reconciled by
+one idempotent, no-throw, **active-GM** pass (`syncInteractableMarkers`) over every
+`fabricate.interactable` behaviour with a linked Tile, run on the `gatheringEnvironments` setting
+change (gather decrement + world-time respawn) and `canvasReady`. Other clients see the changes via
+normal Foundry document sync. The `postfixName` / `deleteToken` fields remain authorable node
+config but drive no interactable marker.
 
 ### 6. Environment resolution precedence on drop
 
@@ -395,23 +409,28 @@ flags.fabricate = {
 }
 ```
 
-### `depletedBehavior` (gathering-task node config) — config retained, interactable marker REMOVED
+### `depletedBehavior` (gathering-task node config) — `swapImage` drives a SHARED env-node Tile marker swap (SHIPPED)
 
-> **ABANDONED as an interactable mechanism.** `depletedBehavior` is still authored/normalized as
-> task node config, but it does **NOT** drive any per-interactable linked-visual transition in the
-> shipped model. The schema below is retained only as a record of the abandoned token/marker draft.
+> **SHIPPED (simple first version).** `depletedBehavior.swapImage` drives the linked **Tile**
+> marker, keyed off the SHARED `environment.nodeRuntime[taskId]` (NOT a per-interactable node and
+> NOT the `flags.fabricate.nodeOriginal`/per-token-texture form drafted above — that was
+> abandoned). `postfixName` / `deleteToken` remain authorable config but drive no interactable
+> marker. See Key Technical Decision §5 for the full shipped semantics.
 
 ```js
 depletedBehavior = {
-  swapImage?: string | null,     // token texture swapped while depleted
-  postfixName?: string | null,   // appended to token name while depleted
-  deleteToken?: boolean,         // terminal: token removed on depletion, no revert
+  swapImage?: string | null,     // SHIPPED: linked Tile texture swapped while the env node is depleted
+  postfixName?: string | null,   // authored config; drives no interactable marker in the shipped model
+  deleteToken?: boolean,         // authored config; drives no interactable marker in the shipped model
 }
 ```
 
 Normalized in `adminStore` and authored in the task editor under
-`CraftingSystemManagerRoot.svelte`. *(The mutual-exclusion / `node.current <= 0` marker-trigger
-semantics described here are abandoned; no interactable marker is driven by this config.)*
+`CraftingSystemManagerRoot.svelte`. The depleted trigger is the SHARED env node
+(`environment.nodeRuntime[taskId].current <= 0`, via `resolveMarkerImage`/`isNodeDepleted` in
+`interactableMarkerDepletion.js`); the available image is stashed at
+`flags.fabricate.markerAvailableImg` (NOT `nodeOriginal`) on the first swap and restored on
+recharge.
 
 ## Phase Boundaries & Test Seams
 
@@ -464,15 +483,18 @@ deltas under `openspec/changes/canvas-interactables-tool-unification/specs/`:
 - `data-models/spec.md` — remove Catalyst; generalize Tool; add `toolIds` to
   recipe/step/IngredientSet; add the new optional `task.defaultEnvironmentId` field; add the
   Interactable Region Behaviour `system` schema (**no `node` field**). *(Superseded: the
-  per-interactable `flags.fabricate.node`/`behavior.system.node` snapshot, `nodeOriginal`
-  revert stash, and per-marker `depletedBehavior` were abandoned — the env node is the single
-  source of truth.)* Record the catalyst→tool migration mapping (including the presence-only
+  per-interactable `flags.fabricate.node`/`behavior.system.node` snapshot + `nodeOriginal`
+  revert stash were abandoned — the env node is the single source of truth.)* Record the
+  SHIPPED SHARED env-node-driven `depletedBehavior.swapImage` Tile marker swap (with the
+  `markerAvailableImg` stash) and the SHIPPED Lock-vs-Disable visibility split (concealed vs
+  visible-but-denied). Record the catalyst→tool migration mapping (including the presence-only
   `breakageChance: 0` mapping) and the `catalystItemUsage` → `toolUsage` fallback.
 - `recipes-and-steps/spec.md` — Tool prerequisite semantics replace catalyst prerequisites
   on recipes/steps/ingredient sets.
 - `gathering-and-harvesting/spec.md` — gathering-task interactable as a pure env+task shortcut
-  using `environment.nodeRuntime[taskId]` (no per-interactable node pool), env resolution
-  precedence, and virtual-present (canvas tool) injection.
+  using `environment.nodeRuntime[taskId]` (no per-interactable node pool), the env-node-driven
+  Tile marker swap + concealment/lock visibility, env resolution precedence, and virtual-present
+  (canvas tool) injection.
 - `destructive-changes-and-migrations/spec.md` — the 0.6.0 Catalyst→Tool migration.
 
 These deltas are merged into the canonical `openspec/specs/*/spec.md` by the

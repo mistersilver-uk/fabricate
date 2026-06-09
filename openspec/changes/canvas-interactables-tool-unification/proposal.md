@@ -18,9 +18,19 @@
 > shipped gathering-task interactable is a **pure `(environment, task)` shortcut**: it carries
 > **no `behavior.system.node`** and uses the environment's `nodeRuntime[taskId]` as the single
 > source of truth (no per-interactable pool, no `nodeStateOverride`, no per-behaviour respawn
-> pass, no per-marker depleted-behaviour swap). A **Tool** interactable opens the **Crafting**
-> tab. Any "per-behaviour/per-token node state" or "depleted behavior on the linked visual"
-> wording below is **abandoned**, not intended.
+> pass). A **Tool** interactable opens the **Crafting** tab. Any "per-behaviour/per-token node
+> state" wording below is **abandoned**, not intended.
+>
+> **Two features that DID ship (the canonical specs reflect these as SHIPPED).** (1)
+> **Env-node-driven Tile marker swap** — when the SHARED `environment.nodeRuntime[taskId]`
+> depletes, every linked Tile marker for that `(environment, task)` swaps to the task's
+> `depletedBehavior.swapImage` and flips back on recharge (idempotent active-GM sync in
+> `interactableMarkerDepletion.js`; available image stashed at `flags.fabricate.markerAvailableImg`).
+> This reflects the SHARED env node, NOT a per-interactable pool. (2) **Concealment vs Lock
+> visibility** — DISABLED/HIDDEN interactables are concealed from players (no prompt + hidden
+> marker), LOCKED interactables stay visible but deny Interact with
+> `FABRICATE.Canvas.Interactable.Denied.Locked`. Earlier wording calling marker swap "abandoned"
+> or "a FUTURE option" is itself superseded by these shipped features.
 
 Fabricate currently lives entirely in window-based UI; crafting and gathering are
 launched from the items directory, never from the Foundry canvas. This change brings
@@ -94,12 +104,20 @@ the environment node; see the region-first + env-node correction notes above.)*
   like opening gathering directly. *(Superseded drafts: per-token `token.flags.fabricate.node`,
   then per-behaviour `behavior.system.node` with `nodeStateOverride` + a per-behaviour respawn
   pass — both **abandoned**; the env node is the single source of truth.)*
-- **Depleted behavior is task config only (no interactable marker).** `depletedBehavior` remains
-  authorable on the task node config, but the **per-marker depleted-behaviour swap/hide/delete
-  was abandoned** — it does not drive any per-interactable linked-visual transition in the
-  shipped model. Environment resolution on drop follows Scene Region auto-detect → task default
-  (new `defaultEnvironmentId` field) → GM dialog, with an Alt-key override that forces the
-  dialog. *(Env-driven marker depletion is a possible FUTURE option, not current behaviour.)*
+- **Depleted behavior drives a SHARED env-node Tile marker swap (SHIPPED).** `depletedBehavior`
+  is authorable on the task node config; its `swapImage` drives the linked **Tile** marker:
+  when the SHARED `environment.nodeRuntime[taskId]` depletes (`current <= 0`), every linked Tile
+  marker for that `(environment, task)` swaps to `swapImage` and flips back on recharge
+  (idempotent active-GM sync). This is the SIMPLE first version — it reflects the SHARED env
+  node, NOT a per-interactable pool. The original per-marker Drawing-hide / `deleteToken` /
+  Token-hide / `nodeOriginal`-revert form was abandoned. Environment resolution on drop follows
+  Scene Region auto-detect → task default (new `defaultEnvironmentId` field) → GM dialog, with
+  an Alt-key override that forces the dialog.
+- **Distinct Lock vs Disable visibility (SHIPPED).** Visibility is split from eligibility:
+  DISABLED (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`)
+  conceals the interactable from players (no prompt + hidden Tile marker); LOCKED
+  (`state.locked === true`) stays visible but denies Interact with
+  `FABRICATE.Canvas.Interactable.Denied.Locked`.
 - **GM tooling.** A GM-only scene-control browser drags/places interactables; a rich config
   panel (registered as the behaviour sheet, reachable from a Tile/Token HUD entry) offers
   Test-as-Player, Jump, Relink, Create/Recreate marker, Remove visual, Restock, Enable/Lock,
@@ -113,11 +131,14 @@ the environment node; see the region-first + env-node correction notes above.)*
 
 - **Affected specs:** `data-models` (Catalyst removed; Tool generalized to crafting +
   gathering; recipe/step/IngredientSet `toolIds`; Interactable Region Behaviour `system`
-  schema **with no `node` field**; ~~`flags.fabricate.node`, `nodeOriginal`,
-  per-marker `depletedBehavior`~~ **abandoned**; catalyst→tool migration table),
+  schema **with no `node` field**; ~~`flags.fabricate.node`, `nodeOriginal`, per-interactable
+  node pool~~ **abandoned**; the SHIPPED SHARED env-node-driven `depletedBehavior.swapImage`
+  Tile marker swap + `markerAvailableImg` stash; the SHIPPED Lock-vs-Disable visibility split
+  (concealed vs visible-but-denied); catalyst→tool migration table),
   `recipes-and-steps` (Tool prerequisite semantics replace catalysts),
   `gathering-and-harvesting` (gathering-task interactable as a pure env+task shortcut using the
-  environment node, env precedence, virtual-present tools),
+  environment node, the env-node-driven Tile marker swap + concealment/lock visibility, env
+  precedence, virtual-present tools),
   `destructive-changes-and-migrations` (0.6.0 entry). Change-scoped spec deltas are provided
   under `openspec/changes/canvas-interactables-tool-unification/specs/`.
 - **Affected docs:** `DOMAIN.md` (remove the Catalyst entry; redefine **Tool** as the
