@@ -4,7 +4,7 @@
  * When a GM drags a real Item (from a compendium or the items directory) onto the
  * canvas, the `dropCanvasData` payload carries `{ type: 'Item', uuid }`. If that
  * item is the source of a managed component that a crafting system's Tool library
- * references (`tool.componentId`), we want the drop to spawn a TOOL token — the
+ * references (`tool.componentId`), we want the drop to spawn a TOOL tile — the
  * same outcome as dragging the Tool row from the browser.
  *
  * The matching reuses the shared {@link itemMatchesComponentSource} +

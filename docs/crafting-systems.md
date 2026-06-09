@@ -58,17 +58,17 @@ When `chatOutput` is enabled (the default), Fabricate automatically posts a chat
 - Recipe name
 - Items created, with quantities
 - Ingredients consumed, with quantities
-- Catalysts used
+- Tools used (and any that broke)
 
 **Failure messages** include:
 - Crafter name
 - Recipe name
 - Failure reason
-- Any ingredients or catalysts consumed as part of the failure policy
+- Any ingredients consumed or tools broken as part of the failure policy
 
 Chat messages appear as if spoken by the crafting actor, using `ChatMessage.getSpeaker({ actor })`.
 
-**When chat output does not fire.** Chat messages are only posted for craft attempts that reach the engine's resolution step. Early validation failures — missing actor, missing ingredients, missing catalysts, invalid recipe configuration — do not post a chat message, because the craft never started.
+**When chat output does not fire.** Chat messages are only posted for craft attempts that reach the engine's resolution step. Early validation failures — missing actor, missing ingredients, missing or unsatisfied tools, invalid recipe configuration — do not post a chat message, because the craft never started.
 
 **Avoiding duplicate output.** If you have custom success or failure macros that already post chat results, disable `chatOutput` for that system to prevent double messages:
 
@@ -137,7 +137,7 @@ When the salvage feature is enabled, players can dismantle components to recover
 
 When the gathering feature is enabled, GMs can author environments and gathering tasks for the system's managed components. If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app. The action is removed again when no systems have gathering enabled.
 
-See [Gathering Environments]({% link gathering-environments.md %}) for the current GM editor fields, routed/progressive task authoring, player app behavior, active/history surfaces, catalyst-row rules, and validation behavior.
+See [Gathering Environments]({% link gathering-environments.md %}) for the current GM editor fields, routed/progressive task authoring, player app behavior, active/history surfaces, required-tool references, and validation behavior.
 
 ---
 

@@ -74,7 +74,7 @@ Legacy per-task item selection, per-environment hazard selection, and per-enviro
 
 A `blind` environment hides its tasks from players and presents a single generic gather action. On each attempt the runtime resolves one concrete task for the actor:
 
-1. **Candidate pool** — start from the environment's visible, enabled tasks. The system **Blind candidate gate** then decides eligibility: `attemptableOnly` (default) drops tasks the character cannot currently attempt (missing tools/catalysts, depleted nodes, exhausted attempts, failed gates) so the generic gather never resolves to a task that would immediately fail; `allMatching` keeps every matching task. If the gated pool is empty, the player gets an opaque "nothing you can gather here" response.
+1. **Candidate pool** — start from the environment's visible, enabled tasks. The system **Blind candidate gate** then decides eligibility: `attemptableOnly` (default) drops tasks the character cannot currently attempt (missing or broken tools, depleted nodes, exhausted attempts, failed gates) so the generic gather never resolves to a task that would immediately fail; `allMatching` keeps every matching task. If the gated pool is empty, the player gets an opaque "nothing you can gather here" response.
 2. **Selection** — a weighted random draw over the gated pool, using per-task **Weight** values set on the Tasks tab rows (default `1`; `0` excludes a task). There are no other strategies and no per-environment configuration — blind selection is always weighted random.
 3. **Reveal** — after the attempt resolves, the task may be revealed to the player so it can be recognised later. The **Blind reveal** policy (`never`/`onSuccess`/`onAttempt`) and **Reveal scope** are set at the system level only — environments cannot override them. `never` keeps the task hidden; `onSuccess` reveals only after a successful gather; `onAttempt` reveals after success or failure.
 
@@ -109,7 +109,7 @@ Each library tool record carries:
 
 Tool authoring rejects entries with no component, with `replaceWith` and the same replacement as primary component, with out-of-range breakage chance, or with empty dice formulas. The Save button is disabled until every tool is valid; hovering it reveals the first failing reason.
 
-Library tools persist under `gatheringConfig.systems[systemId].tools[]`. Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported. If a task references a missing or disabled library tool, the runtime blocks the attempt with `TOOL_BLOCKED` before actor inventory checks.
+Library tools are **system-owned** — they persist as `system.tools[]` on the crafting system (the `craftingSystems` setting), authored on the Manager's dedicated **Tools** page, and a gathering task only references them by id. (Worlds that authored tools under the gathering config before `0.7.0` are reconciled onto the system by that migration.) Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported. If a task references a missing or disabled library tool, the runtime blocks the attempt with `TOOL_BLOCKED` before actor inventory checks.
 
 ## Gathering Task And Hazard Libraries
 
@@ -169,8 +169,7 @@ An environment contains one or more Environment Tasks. The current GM editor sup
 | Failure outcome | Leave clear for Fabricate's default failure feedback, or configure custom text or macro handling |
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results with `componentId` and `quantity` |
-| Catalysts | Add and delete catalyst rows; edit `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and `maxUses` |
-| Tools | Add and delete tool rows; edit `componentId`, the optional tool requirement, the breakage mechanic (limited uses, % chance, or dice expression), and the on-break action (destroy, mark broken, or replace) |
+| Required tools | Reference the system's Tools library by id (`task.toolIds`). Tools themselves — `componentId`, the optional requirement, the breakage mechanic, and the on-break action — are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
 
 Progressive task result difficulty comes from the selected managed component's `difficulty`; result rows do not store their own difficulty value.
 
@@ -270,7 +269,7 @@ Blind environments show a mask **blind** chip. When the system's effective revea
 
 Visible environments and tasks remain listed even when they are blocked by attemptability gates. Scene-linked entries stay visible when the selected actor is not on the linked scene or has no active token there, and the app shows the localized blocked reason returned by the runtime. Active timed runs, last-attempt feedback, and recent terminal history remain visible for the selected actor even when browsing is empty or blocked.
 
-Targeted task rows can show task labels, task descriptions, active-run timing, terminal status, result counts, catalyst counts, and check-derived history metadata returned by the runtime. For non-GM users, blind rows and missing-environment history remain redacted: the app uses a generic localized label and does not expose task IDs, result details, catalyst details, diagnostics, or check internals. GMs can inspect real blind task names through GM-facing surfaces.
+Targeted task rows can show task labels, task descriptions, active-run timing, terminal status, result counts, required-tool counts, and check-derived history metadata returned by the runtime. For non-GM users, blind rows and missing-environment history remain redacted: the app uses a generic localized label and does not expose task IDs, result details, tool details, diagnostics, or check internals. GMs can inspect real blind task names through GM-facing surfaces.
 
 ### Detail Column
 
@@ -285,26 +284,13 @@ The success-chance bar reflects the listing's per-task `successChance` field: a 
 
 Current player-app scope covers actor selection, visible/blocked listing, blind task labels, runtime-backed starts, last-attempt feedback, active timed runs, recent terminal history, blind redaction, and one-column active/history layout when the app container narrows. Runtime integration coverage includes scene-linked gathering through the production environment store, run manager, evaluator, and a scene adapter, plus hook-driven timed completion and a regression guard confirming harvesting has no standalone runtime/app/store/settings path.
 
-## Catalyst Rows
-
-Gathering catalysts use the same component identifiers and degradation fields as crafting catalysts:
-
-| Field | Description |
-|:------|:------------|
-| `componentId` | Required component from the current crafting system's managed item list |
-| `degradesOnUse` | Tracks usage on terminal gathering attempts when enabled |
-| `destroyWhenExhausted` | Destroys the owned catalyst item when it reaches its usage limit |
-| `maxUses` | Optional positive integer usage limit; blank means unlimited |
-
-Save validation rejects catalyst rows without a `componentId`. `maxUses` is nullable and is validated as a positive integer only when `degradesOnUse` is enabled.
-
 ## Tools
 
-Gathering tasks may declare one or more required tools by referencing the selected system's Gathering Tools library, separate from catalysts. All referenced tools must resolve to enabled library entries, and all resolved tools must be present in the actor's inventory and pass their requirement before the attempt may start.
+Gathering tasks declare their required equipment as **Tools**. There is no separate catalyst concept on gathering tasks — earlier builds carried a vestigial `task.catalysts` field that was never authored and is gone. A task simply references the **system's** [Tools]({% link tools.md %}) library by id (`task.toolIds`); the tools themselves are authored on the system's Tools page. All referenced tools must resolve to enabled library entries, and all resolved tools must be present in the actor's inventory and pass their requirement before the attempt may start.
 
 | Field | Description |
 |:------|:------------|
-| `toolIds` | Required tool references stored on the task; each id points at `gatheringConfig.systems[systemId].tools[]` |
+| `toolIds` | Required tool references stored on the task; each id points at the system-owned Tools library (`craftingSystemManager.getSystem(systemId).tools`) |
 | `componentId` | Required component from the current crafting system's managed item list on the library tool |
 | `requirement` | Optional Foundry expression (per provider) or macro UUID; must evaluate truthy for the actor to use the tool |
 | `breakage.mode` | One of `limitedUses`, `breakageChance`, or `diceExpression` |
@@ -318,7 +304,7 @@ The system-level Gathering Rules setting **Tool breakage outcome** controls what
 
 Missing or disabled library references block with `TOOL_BLOCKED`, as do missing actor-owned tools, owned tools with `flags.fabricate.toolBroken === true`, and failed tool requirements.
 
-A tool (like a catalyst or ingredient) is recognised whether the actor owns the tool component's source world item directly or owns a copy dragged or duplicated from it. Fabricate matches the owned item's live UUID, its compendium-source UUID, and its world-duplicate source UUID against the tool's component, so dropping a copy of the source item onto the actor still satisfies the requirement.
+A tool (like an ingredient) is recognised whether the actor owns the tool component's source world item directly or owns a copy dragged or duplicated from it. Fabricate matches the owned item's live UUID, its compendium-source UUID, and its world-duplicate source UUID against the tool's component, so dropping a copy of the source item onto the actor still satisfies the requirement.
 
 In the player app, a tool whose component is missing from inventory shows as **Missing**. A tool the actor holds but cannot use shows as **Broken** — this covers both an owned tool already flagged `flags.fabricate.toolBroken === true` and an owned `Replace with...` broken-variant component for that tool. The **Broken** state is display-only; the attempt stays blocked with `TOOL_BLOCKED` either way, and holding a working copy of the tool alongside a broken one still reads as available.
 
@@ -367,7 +353,7 @@ Concurrent callers share one in-flight discard confirmation. If multiple navigat
 
 ## Maintainer Notes
 
-The Environments tab currently delegates draft changes to the admin store and saves through the gathering environment store validation boundary. Store-owned callbacks preserve unrelated nested task configuration when editing task results, catalysts, visibility, routed result selection, progressive award mode, checks, time requirements, or failure outcomes. Failed save attempts leave `environmentDraftDirty` set and populate a validation state with summary text, field paths, selectors, and a first-invalid target for the component to focus. The tab does not perform Foundry lookups; managed component, Script Macro, scene, and RollTable options are prepared by the admin store/root and passed into the component, and Foundry FilePicker access stays at the application service edge.
+The Environments tab currently delegates draft changes to the admin store and saves through the gathering environment store validation boundary. Store-owned callbacks preserve unrelated nested task configuration when editing task results, required tools, visibility, routed result selection, progressive award mode, checks, time requirements, or failure outcomes. Failed save attempts leave `environmentDraftDirty` set and populate a validation state with summary text, field paths, selectors, and a first-invalid target for the component to focus. The tab does not perform Foundry lookups; managed component, Script Macro, scene, and RollTable options are prepared by the admin store/root and passed into the component, and Foundry FilePicker access stays at the application service edge.
 
 The player Gathering app is a dedicated `SvelteGatheringApp` registered through the app factory, not a branch of `SvelteCraftingApp`. Its store receives Foundry/runtime access through injected services so listing, start, feedback, active-run, and history behavior can be tested without Foundry globals. The Items Directory button helper is idempotent and removes stale duplicate Gathering buttons while syncing the feature-gated action.
 

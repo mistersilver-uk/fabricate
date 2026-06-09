@@ -13,12 +13,12 @@ How do I require an actor to wield a tool for a gathering task, have that tool w
 
 ## Short answer
 
-Author the tool once on the **Gathering → Tools** page. Pick one of three breakage mechanics (limited uses, breakage chance, or dice expression), pick what happens when it breaks (destroy, mark broken, or replace with another component), require that tool from the relevant Gathering Task, and set the system-level **Tool breakage outcome** policy in the gathering rules.
+Author the tool once on the crafting system's top-level **Tools** page (Tools are system-owned, shared across crafting, gathering, and salvage). Pick one of three breakage mechanics (limited uses, breakage chance, or dice expression), pick what happens when it breaks (destroy, mark broken, or replace with another component), require that tool from the relevant Gathering Task via `task.toolIds`, and set the system-level **Tool breakage outcome** policy in the gathering rules.
 
 ## Steps
 
 1. **Define the tool component.** In the crafting system's Items tab, add the tool item as a managed component. If you plan to use the `Replace with` on-break action, also add the broken-tool variant as a separate managed component.
-2. **Open the Tools page.** In Manager V2, expand the **Gathering** menu and pick **Tools**. The page lists the per-system library of reusable tools and opens an in-memory draft you can edit before saving.
+2. **Open the Tools page.** In Manager V2, with the crafting system selected, click the top-level **Tools** navigation entry (a sibling of Components, Essences, and the Gathering group — it is *not* nested under Gathering, because Tools belong to the system, not the gathering config). The page lists the system's library of reusable tools and opens an in-memory draft you can edit before saving.
 3. **Add a tool.** Click *Add tool*. Pick the tool component from the picker (drag-drop from the Items directory or use the dropdown). Optionally set a display label.
 4. **(Optional) Add a tool requirement.** Click *Add requirement* to require an actor-side condition. The requirement is a Foundry expression; if it does not evaluate truthy when the player attempts a task that uses this tool, the attempt is blocked. Examples:
    - dnd5e: `@flags.dnd5e.proficient` (set on actors that have the relevant proficiency)
@@ -44,5 +44,6 @@ Author the tool once on the **Gathering → Tools** page. Pick one of three brea
 
 ## Learn more
 
-- [Catalysts]({% link catalysts.md %}) — same persistence pattern, but for recipes.
+- [Tools]({% link tools.md %}) — the full system-owned Tool model: requirement gate, breakage modes, and on-break actions.
 - [Degrading Tools]({% link how-to/degrading-tools.md %}) — the recipe-side equivalent.
+- [Canvas Interactables]({% link canvas-interactables.md %}) — place a Tool station on the canvas so players can use a Tool without owning it.

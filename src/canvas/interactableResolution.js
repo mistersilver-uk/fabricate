@@ -3,7 +3,7 @@
  *
  * This module decides, from a `dropCanvasData` payload, whether a drop is a
  * Fabricate Tool or Gathering Task interactable, and shapes the data needed to
- * spawn its token. It contains NO Foundry globals: every lookup against the
+ * spawn its tile. It contains NO Foundry globals: every lookup against the
  * Fabricate libraries is injected, so the routing logic is unit-testable with
  * fakes.
  *
@@ -154,7 +154,7 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
  * Build the normalized `activeCanvasTool` payload from a resolved library Tool.
  *
  * This is the session-scoped virtual-present Tool injected into the Fabricate
- * app when a player double-clicks a Tool station token (Phase 4). The shape is
+ * app when a player double-clicks a Tool station tile (Phase 4). The shape is
  * deliberately simple/serializable: `{ componentId, systemId, toolId, label }`.
  * The crafting/gathering prerequisite checks treat `componentId` as present
  * without an owned item and exclude it from breakage/usage.

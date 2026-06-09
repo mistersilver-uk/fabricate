@@ -97,7 +97,7 @@ The returned system object also includes the following top-level salvage fields,
 | `successMacroUuid` | `string\|null` | `null` | UUID of the macro called on salvage success |
 | `failureMacroUuid` | `string\|null` | `null` | UUID of the macro called on salvage failure |
 | `consumption.consumeComponentOnFail` | `boolean` | `true` | Consume the source component even when the check fails |
-| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Degrade salvage catalysts even when the check fails |
+| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Apply salvage tool breakage even when the check fails (field name retained for backward compatibility; governs Tools) |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing |
@@ -118,7 +118,7 @@ The `craftingCheck` field is always present on the returned system object. It co
 | `builtIn.dc` | `number` | `15` | Difficulty class for the built-in check. Must be a positive integer; invalid values fall back to `15`. |
 | `builtIn.advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"`. |
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
-| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Degrade catalysts when the check fails. |
+| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Apply tool breakage when the check fails (field name retained for backward compatibility; governs Tools). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing. |
@@ -413,11 +413,11 @@ Normalises the `craftingCheck.builtIn` sub-object. Coerces `ability` and `skill`
 
 Normalises the `salvage` sub-object for a single component. Called by `_normalizeComponent` when `features.salvage` is `true` on the system.
 
-Applies defaults: `enabled: false`, `ingredientQuantity: 1`, `catalysts: []`, `resultGroups: []`. The optional fields `outcomeRouting`, `timeRequirement`, and `currencyRequirement` are included only when present and non-null in the input.
+Applies defaults: `enabled: false`, `ingredientQuantity: 1`, `toolIds: []`, `resultGroups: []`. The optional fields `outcomeRouting`, `timeRequirement`, and `currencyRequirement` are included only when present and non-null in the input.
 
-### _normalizeSalvageCatalyst(catalyst)
+### _normalizeToolIds(toolIds)
 
-Normalises a single entry in salvage.catalysts. Uses componentId as the identifier field. Returns null for any entry where the field is absent; null entries are filtered out of the array.
+Normalises `salvage.toolIds` (the library [Tool]({% link tools.md %}) ids required for the salvage operation). Coerces to trimmed, non-empty, deduped strings; tolerant of non-array / nullish input (returns `[]`).
 
 ### _normalizeSalvageResult(result)
 

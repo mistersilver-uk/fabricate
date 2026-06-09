@@ -12,7 +12,7 @@
  */
 
 /**
- * Prompt the GM to pick a gathering environment for a dropped task token.
+ * Prompt the GM to pick a gathering environment for a dropped task tile.
  *
  * @param {object} args
  * @param {Array<{ id: string, name: string }>} args.environments  Selectable

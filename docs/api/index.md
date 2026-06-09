@@ -63,7 +63,7 @@ fabricate.listCraftingSystems()
 
 ```javascript
 const {
-  Recipe, Ingredient, IngredientGroup, Catalyst,
+  Recipe, Ingredient, IngredientGroup,
   RecipeManager, CraftingEngine, CraftingSystemManager,
   CraftingRunManager, SalvageRunManager,
   GatheringEnvironmentStore, GatheringRunManager,
@@ -97,7 +97,7 @@ Hooks.once('fabricate.ready', async () => {
 });
 ```
 
-`listGatheringForActor` returns the current browsing state plus `activeRuns` and recent `history` for the selected actor. Those run lists are retained even when no environment/task rows are currently browseable because the actor is blocked, the environment list is empty, or visibility gates hide all tasks. For non-GM blind or missing-environment rows, the runtime redacts task IDs, result details, catalyst details, diagnostics, and check internals.
+`listGatheringForActor` returns the current browsing state plus `activeRuns` and recent `history` for the selected actor. Those run lists are retained even when no environment/task rows are currently browseable because the actor is blocked, the environment list is empty, or visibility gates hide all tasks. For non-GM blind or missing-environment rows, the runtime redacts task IDs, result details, tool details, diagnostics, and check internals.
 
 When `rememberedActorId` is omitted from `listGatheringForActor` options, it defaults to the persisted last-gathering selection (`getSelectedGatheringActorId()`), so a fresh listing honors the remembered actor. Passing an explicit `rememberedActorId` always overrides that default — including an explicit `null`, which forces no remembered actor.
 
@@ -146,7 +146,8 @@ Fabricate stores data in Foundry's settings and flags:
 | Actor flag | `fabricate.gatheringRuns.active` | In-progress gathering runs |
 | Actor flag | `fabricate.gatheringRuns.history` | Completed gathering runs |
 | Actor flag | `fabricate.learnedRecipes` | Learned recipe records |
-| Item flag | `fabricate.catalystItemUsage` | `{ timesUsed }` for catalyst tracking |
+| Item flag | `fabricate.toolUsage` | `{ timesUsed }` for `limitedUses` tool tracking (falls back to legacy `fabricate.catalystItemUsage` when absent) |
+| Item flag | `fabricate.toolBroken` | `true` when a tool's `flagBroken` on-break action has fired |
 | Item flag | `fabricate.recipeItemUsage` | `{ timesUsed }` for recipe item tracking |
 
 ## Hooks

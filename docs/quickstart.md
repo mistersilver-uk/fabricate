@@ -63,7 +63,7 @@ Fabricate recipes reference *components* -- items curated into your crafting sys
    - **Result Group**: add a result referencing your Healing Potion component
 4. Save
 
-If the Recipes screen says the system has no components yet, open **Components** first and add item-backed components. Recipes use those components for ingredients, catalysts, and results.
+If the Recipes screen says the system has no components yet, open **Components** first and add item-backed components. Recipes use those components for ingredients, tools, and results.
 
 ### Or use a macro
 

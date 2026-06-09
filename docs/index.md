@@ -11,7 +11,7 @@ nav_order: 1
 A system-agnostic crafting module for Foundry Virtual Tabletop.
 {: .fs-6 .fw-300 }
 
-Fabricate lets GMs define crafting systems with recipes, ingredients, catalysts, and essences. Players craft items through an in-game UI with inventory-aware validation, optional skill checks, and multi-step workflows.
+Fabricate lets GMs define crafting systems with recipes, ingredients, tools, and essences. Players craft items through an in-game UI with inventory-aware validation, optional skill checks, and multi-step workflows.
 
 ---
 
@@ -22,8 +22,9 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, catalysts,
 | **Crafting Systems** | Define independent systems with their own item libraries, essences, and rules |
 | **Resolution Modes** | Simple, routed, progressive, and alchemy crafting with optional skill checks |
 | **Multi-Step Recipes** | Chain steps that must be completed in sequence, with optional time gates |
-| **Catalysts** | Non-consumable tools and workstations with usage tracking |
+| **Tools** | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage |
 | **Gathering Environments** | GM-authored places where actors can gather configured component results |
+| **Canvas Interactables** | Drag Tools and Gathering Tasks onto the scene as interactive tiles players double-click |
 | **Essences** | Abstract properties on items for flexible ingredient matching |
 | **Visibility & Knowledge** | Control which recipes players can see and learn |
 | **Teaser Mode** | Reveal recipes gradually — players see a recipe exists and track progress toward unlocking it |
@@ -59,9 +60,17 @@ Then open the crafting UI from the Items sidebar, select your character, and cli
 
 Head to [Quickstart]({% link quickstart.md %}) for installation and your first recipe.
 
+## Tools
+
+Recipes, gathering tasks, and salvage all require reusable, breakable equipment through the shared [Tools]({% link tools.md %}) concept (which replaced the retired Catalyst concept in `0.6.0`).
+
 ## Gathering
 
 GMs can define material-gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the `gathering` feature.
+
+## Canvas Interactables
+
+GMs can place Tools and Gathering Tasks directly on the scene as interactive tiles. Players double-click a tile to open the Fabricate UI; hovering shows the tile's name. See [Canvas Interactables]({% link canvas-interactables.md %}).
 
 ## Having trouble?
 

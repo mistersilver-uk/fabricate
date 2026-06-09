@@ -34,21 +34,21 @@ The main crafting method. Runs the full pipeline for a single step.
 When `craft()` is called, the engine:
 
 1. **Validates ingredients** -- checks all groups in the selected ingredient set are satisfiable
-2. **Validates catalysts** -- checks all required catalysts are present in the source actors' inventories
+2. **Validates tools** -- checks all required tools (resolved from `toolIds`) are present in the source actors' inventories and pass their requirement
 3. **Validates essences** -- if essences are enabled, checks essence requirements
 4. **Runs crafting check** -- if enabled, executes the check (built-in or macro) and interprets the result per the resolution mode. See [Crafting Checks]({% link crafting-checks.md %}) for both modes.
-5. **Applies failure consumption policy** -- if the check fails, consumes ingredients and/or degrades catalysts according to `craftingCheck.consumption` settings. By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and catalysts are not degraded (`consumeCatalystsOnFail: false`). See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure).
+5. **Applies failure consumption policy** -- if the check fails, consumes ingredients and/or applies tool breakage according to `craftingCheck.consumption` settings. By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and tools are not broken (`consumeCatalystsOnFail: false` — field name retained for backward compatibility). See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure).
 6. **Runs failure macro** -- if the check failed (step 4) or check-result validation failed (step 5), calls `system.craftingCheck.failureMacroUuid` with the failure context. See [Failure Macro]({% link macros/index.md %}#failure-macro). Macro errors are caught and logged; they do not affect the returned result.
 7. **Resolves result groups** -- determines which result group(s) to create based on mode and check result
 8. **Consumes ingredients** -- removes consumed items from source actors
-9. **Degrades catalysts** -- increments usage on catalyst items (if `degradesOnUse`)
+9. **Applies tool breakage** -- runs each tool's breakage mechanic (`limitedUses` / `breakageChance` / `diceExpression`) and its on-break action, recording `usedTools` evidence
 10. **Creates results** -- creates new items on the crafting actor
 11. **Applies property macros** -- if enabled, runs property macros on created items
 12. **Transfers effects** -- if `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing essence definition and copies them to the result item. See [Effect Transfer]({% link effect-transfer.md %}).
 13. **Runs success macro** -- calls `system.craftingCheck.successMacroUuid` with the full success context. See [Success Macro]({% link macros/index.md %}#success-macro). Macro errors are caught and logged; the crafting result is still returned as a success.
 
 {: .note }
-> Steps 5–6 only execute when the crafting check returns a failure result or check-result validation fails. Pre-check failures (missing ingredients, missing catalysts, invalid recipe, missing actor) return immediately without consuming anything and without calling either macro.
+> Steps 5–6 only execute when the crafting check returns a failure result or check-result validation fails. Pre-check failures (missing ingredients, missing or unsatisfied tools, invalid recipe, missing actor) return immediately without consuming anything and without calling either macro.
 
 ---
 

@@ -65,11 +65,11 @@ For each recipe, the GM configures a `teaser` block in the recipe editor's **Tea
 
 | Field | Description |
 |:------|:------------|
-| `teaser.hiddenFields` | Array of field names hidden from players until the recipe is unlocked. Supported values: `"ingredientSets"`, `"resultGroups"`, `"description"`, `"catalysts"`. |
+| `teaser.hiddenFields` | Array of field names hidden from players until the recipe is unlocked. Supported values: `"ingredients"`, `"results"`, `"description"`, `"tools"`, `"essences"` (any other value is dropped on load). |
 | `teaser.revealThreshold` | Numeric progress value required for full discovery. When a player's progress reaches this value, all `hiddenFields` are shown and the recipe becomes craftable. |
 | `teaser.teaserDescription` | Flavour text shown to players in place of the real description while the recipe is still locked. |
 
-**Example:** A recipe with `hiddenFields: ["ingredientSets", "resultGroups"]` and `revealThreshold: 3` shows the recipe name and teaser description to players, but hides the ingredient list and result list until they accumulate 3 discovery progress points.
+**Example:** A recipe with `hiddenFields: ["ingredients", "results"]` and `revealThreshold: 3` shows the recipe name and teaser description to players, but hides the ingredient list and result list until they accumulate 3 discovery progress points.
 
 ---
 

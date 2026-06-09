@@ -120,6 +120,23 @@ export class CraftingSystemManager {
   // settings loads to the same shape regardless of origin.
   // ---------------------------------------------------------------------------
 
+  /**
+   * Normalize one system-owned library Tool to its canonical persisted shape:
+   * `{ id, label, enabled, componentId, requirement, breakage, onBreak }`.
+   *
+   * Tools are owned by the crafting system (`system.tools`), not by the gathering
+   * config; this normalizer is the single coercion point so a Tool authored in the
+   * Manager, migrated from a catalyst (0.6.0), reconciled off the gathering config
+   * (0.7.0), or hand-edited in settings all load to the same shape. A missing `id`
+   * is assigned a fresh `randomID()`; `enabled` defaults to `true` (only an
+   * explicit `false` disables); `componentId` is trimmed to a non-empty string or
+   * `null`. The `requirement` / `breakage` / `onBreak` sub-objects are delegated to
+   * their dedicated normalizers.
+   *
+   * @param {object} [tool] Raw tool entry (any origin).
+   * @returns {{ id: string, label: string, enabled: boolean, componentId: string|null,
+   *   requirement: object|null, breakage: object, onBreak: object }}
+   */
   _normalizeTool(tool = {}) {
     if (!tool || typeof tool !== 'object') tool = {};
     const id = String(tool.id || foundry.utils.randomID());

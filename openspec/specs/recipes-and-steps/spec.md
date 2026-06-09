@@ -16,10 +16,10 @@ This spec does not redefine mode semantics; mode-specific resolution is defined 
 When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**. The following rules apply:
 
 - Recipe-level `ingredientSets` and `resultGroups` MAY be empty arrays or absent entirely.
-- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `catalysts`, `timeRequirement`, and `currencyRequirement`.
+- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `toolIds`, `timeRequirement`, and `currencyRequirement`.
 - Recipe-level fields serve as fallback ONLY for implicit single-step recipes (where `steps` is empty and the recipe-level fields form one implicit step).
 - Step-level fields always take priority. Recipe-level fields are never merged into or combined with step-level fields.
-- Recipe-level `catalysts` defined outside any step are additive: they apply to every step in addition to each step's own catalysts.
+- Recipe-level `toolIds` defined outside any step are additive: they apply to every step in addition to each step's own `toolIds`.
 
 ### Validation Contracts
 
@@ -46,7 +46,7 @@ Each step can define:
 - optional `timeRequirement`
 - optional `currencyRequirement`
 
-## Ingredient and Catalyst Semantics
+## Ingredient and Tool Semantics
 
 - A recipe/step is craftable when at least one `IngredientSet` is satisfied (OR across sets).
 - Within an `IngredientSet`, all `ingredientGroups` must be satisfied (AND across groups).
@@ -54,8 +54,9 @@ Each step can define:
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
 - Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.
-- Catalysts are defined at the recipe level, step level, and inside each `IngredientSet.catalysts`.
-- Catalyst degradation/usage is tracked on owned item instances.
+- **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts). They are referenced by id at recipe level, step level, and ingredient-set level via `toolIds`; the applicable set for an ingredient set is the union of those ids resolved against the per-system Tools library (`RecipeManager.getToolsForSet`). Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
+- `CraftingEngine` validates Tools (`_validateTools`) and, on a committed craft, applies tool usage/breakage through the shared breakage runtime (`src/toolBreakageRuntime.js`), recording `usedTools` evidence. Tool usage/breakage is tracked on owned item instances.
+- A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
 
 ## Execution Lifecycle
 
@@ -67,7 +68,7 @@ Each step can define:
 
 ### Pre-Resolution Validation
 
-1. Validate ingredient/catalyst availability.
+1. Validate ingredient/tool availability.
 2. Validate optional essence requirements when enabled.
 3. Validate step-level time/currency requirements when enabled.
 
@@ -78,7 +79,7 @@ Each step can define:
 
 ### Apply Effects
 
-1. Consume ingredients and destroy exhausted catalysts according to success/failure policy.
+1. Consume ingredients and apply tool usage/breakage (destroying or flagging-broken exhausted tools) according to success/failure policy.
 2. Build result item payloads.
 3. Apply property macros per result item when enabled.
 4. Create result items.
@@ -194,11 +195,11 @@ Salvage has a single implicit ingredient: `N × this component`, where `N = Comp
 
 Salvage is a single-step operation (no multi-step salvage):
 
-1. **Validate**: Confirm the actor owns sufficient quantity of the component and all required catalysts.
+1. **Validate**: Confirm the actor owns sufficient quantity of the component and all required Tools (`salvage.toolIds`).
 2. **Time Gate** (if `Component.salvage.timeRequirement` is present): Create an active salvage run in `waitingTime` status and defer completion until the required world time has elapsed.
 3. **Check** (if `salvageCraftingCheck.enabled`): Execute the salvage crafting check macro.
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
-5. **Consume**: `ingredientQuantity` is always 1 for salvage. Remove that many instances of the component from the actor's inventory. Degrade/exhaust catalysts as applicable.
+5. **Consume**: `ingredientQuantity` is always 1 for salvage. Remove that many instances of the component from the actor's inventory. Apply tool usage/breakage as applicable.
 6. **Create**: Create result items on the actor.
 
 If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
@@ -223,7 +224,7 @@ Success and failure macros follow the same contracts as crafting, substituting `
 ### Failure Consumption Policy
 
 - `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
-- `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: if false (default), catalysts are not degraded on failure.
+- `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: a **legacy-named** key (retained to avoid a persisted-key migration); if false (default), Tools are not consumed/broken on failure. Read it as "consume/break tools on fail".
 
 When `Component.salvage.timeRequirement` is present, these policies are evaluated when the timed salvage run completes, not when it is first started.
 
@@ -273,7 +274,7 @@ SalvageRun = {
     itemUuid: string,
     quantity: number,
   }>,
-  usedCatalysts?: Array<{
+  usedTools?: Array<{
     actorUuid: string,
     itemUuid: string,
     quantity: number,

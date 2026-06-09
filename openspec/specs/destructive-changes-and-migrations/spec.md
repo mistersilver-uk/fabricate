@@ -228,6 +228,31 @@ The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUui
 5. When multiple recipes in one system share the same legacy UUID, they must reuse the same generated `RecipeItemDefinition`.
 6. Remove `linkedRecipeItemUuid` from canonical migrated recipe output.
 
+### Catalyst → Tool Migration (`0.6.0`)
+
+The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`. It is automatic, versioned, idempotent, and by-reference.
+
+1. Walk **recipe**-level, step-level, ingredient-set-level, and salvage-definition catalysts. Dedupe them into per-system library Tools written onto the crafting system (`system.tools`, the `craftingSystems` setting) and replace the inline catalyst arrays with `toolIds` references.
+2. The gathering `task.catalysts` field is **dead/vestigial** — never authored, only read, always empty. It is **not** walked and there is **no** gathering-task migration; `gatheringConfig` is not mutated by this migration.
+3. Catalyst → Tool mapping:
+   - `degradesOnUse: false` (presence-only, never consumed) → `breakage { mode: breakageChance, breakageChance: 0 }` + `onBreak { mode: flagBroken }`. This is a deliberate modeling choice (a 0% break chance writes NO item usage flag), preserving the never-consumed behavior. The migration is **behavior-preserving**, not strictly structurally lossless, for this case.
+   - `degradesOnUse: true`, `maxUses: N`, `destroyWhenExhausted: true` → `breakage { mode: limitedUses, maxUses: N }` + `onBreak { mode: destroy }`.
+   - `degradesOnUse: true`, `maxUses: N`, `destroyWhenExhausted: false` → `breakage { mode: limitedUses, maxUses: N }` + `onBreak { mode: flagBroken }`.
+4. Dedup keys on the **full** catalyst shape (componentId + degradesOnUse + maxUses + destroyWhenExhausted) so semantically different catalysts are NOT merged into one library Tool.
+5. Recipes whose crafting system is missing are **skipped, not thrown** — log and continue.
+6. Mutated setting keys are `recipes` and `craftingSystems` (`systems[id].tools`); `gatheringConfig` is untouched.
+7. **Item-flag fallback (migrated `limitedUses` tools only).** At runtime, tool usage reads `flags.fabricate.toolUsage` and falls back to the legacy `flags.fabricate.catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) when `toolUsage` is absent, so in-flight per-item usage counters survive the cutover without an item-flag rewrite. The first post-migration `applyUsage` writes `toolUsage` (authoritative thereafter); the legacy flag is never back-filled or cleared. This fallback is meaningless for presence-only (`breakageChance: 0`) tools, which never read or write usage.
+8. After the pass, a one-time GM `ui.notifications` notice states that recipe catalysts moved to the Tools library, including a count of migrated entries and a pointer to the Tools tab. The migrated count is surfaced through the runner (`_migratedCatalystCount`) and is never persisted as a setting.
+
+### Tools-to-System Reconciliation (`0.7.0`)
+
+Tools are **system-owned**: every consumer reads `system.tools`. The `0.7.0` migration (`src/migration/migrateToolsToSystem.js`) reconciles any UI-authored gathering-scoped tools — persisted under `gatheringConfig.systems[id].tools` before tools became system-owned — onto the matching crafting system's `tools`, the single canonical source. It is pure, idempotent, and version-gated.
+
+1. For each `gatheringConfig.systems[id].tools` array, MOVE its tools onto the matching `system.tools` and clear the gathering-config copy (`delete systemConfig.tools`).
+2. Dedupe by tool `id`: when the same id exists on both the system and the gathering config, the **existing system tool wins** (the gathering copy is dropped, not merged), so a re-author on the system is never clobbered. Tools without an `id` are skipped.
+3. A gathering-config tools array whose `systemId` has **no matching crafting system** is left in place rather than dropping authored data.
+4. Mutated setting keys are `craftingSystems` (`systems[].tools`) and `gatheringConfig` (`systems[id].tools` cleared). Idempotent: once the config arrays are emptied/removed a re-run is a no-op.
+
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.

@@ -175,7 +175,7 @@ const rules = [
   { match: 'Mithril Ingot', tags: ['metal', 'metal:mithril'], tier: 'rare' },
   { match: /Wood|Lumber/,  tags: ['wood', 'material'], tier: 'common' },
   { match: /Herb/,         tags: ['herb', 'ingredient'], tier: 'common' },
-  { match: /Forge/,        tags: ['tool:forge', 'catalyst'], tier: null }
+  { match: /Forge/,        tags: ['tool:forge'], tier: null }
 ];
 
 let tagged = 0;
