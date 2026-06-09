@@ -16,15 +16,18 @@ import {
   INTERACTABLE_VISUAL_DELETE,
   INTERACTABLE_ACTIVATE,
   INTERACTABLE_ACTIVATION_GRANTED,
+  INTERACTABLE_ACTIVATION_DENIED,
   validateBehaviorUpdatePayload,
   validateVisualUpdatePayload,
   validateVisualDeletePayload,
   validateActivatePayload,
   validateActivationGrantedPayload,
+  validateActivationDeniedPayload,
   createInteractableBehaviorWriter,
   routeInteractableBehaviorMessage,
   routeInteractableActivateMessage,
-  routeInteractableActivationGranted
+  routeInteractableActivationGranted,
+  routeInteractableActivationDenied
 } from '../../src/canvas/interactableSocket.js';
 
 const NODE_UPDATE = { system: { node: { current: 1 } } };
@@ -158,4 +161,31 @@ test('granted routes to openGrant only for the targeted local user', () => {
   const ignored = [];
   assert.equal(routeInteractableActivationGranted(payload, { isLocalUser: (id) => id === 'someoneElse', openGrant: (g) => ignored.push(g) }), false);
   assert.equal(ignored.length, 0);
+});
+
+// --- denied validation + routing --------------------------------------------
+
+test('validateActivationDeniedPayload requires the action + userId and normalizes the reason', () => {
+  const ok = validateActivationDeniedPayload({ action: INTERACTABLE_ACTIVATION_DENIED, userId: 'u1', reason: 'LOCKED' });
+  assert.deepEqual(ok, { action: INTERACTABLE_ACTIVATION_DENIED, userId: 'u1', reason: 'LOCKED' });
+  // A blank/absent reason normalizes to null (the receiver maps it to the generic key).
+  assert.equal(validateActivationDeniedPayload({ action: INTERACTABLE_ACTIVATION_DENIED, userId: 'u1' }).reason, null);
+  assert.equal(validateActivationDeniedPayload({ action: INTERACTABLE_ACTIVATION_DENIED, userId: 'u1', reason: '  ' }).reason, null);
+  // Rejected: wrong action, missing user, non-object.
+  assert.equal(validateActivationDeniedPayload({ action: 'other', userId: 'u1' }), null);
+  assert.equal(validateActivationDeniedPayload({ action: INTERACTABLE_ACTIVATION_DENIED, userId: '' }), null);
+  assert.equal(validateActivationDeniedPayload(null), null);
+});
+
+test('denied routes to notifyDenied only for the targeted local user; bad payloads are dropped', () => {
+  const notified = [];
+  const payload = { action: INTERACTABLE_ACTIVATION_DENIED, userId: 'u1', reason: 'COOLDOWN' };
+  assert.equal(routeInteractableActivationDenied(payload, { isLocalUser: (id) => id === 'u1', notifyDenied: (r) => notified.push(r) }), true);
+  assert.deepEqual(notified, ['COOLDOWN']);
+
+  const ignored = [];
+  assert.equal(routeInteractableActivationDenied(payload, { isLocalUser: (id) => id === 'someoneElse', notifyDenied: (r) => ignored.push(r) }), false);
+  assert.equal(ignored.length, 0);
+
+  assert.equal(routeInteractableActivationDenied({ action: 'other' }, { isLocalUser: () => true, notifyDenied: () => {} }), false);
 });

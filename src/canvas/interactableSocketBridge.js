@@ -17,10 +17,12 @@ import {
   INTERACTABLE_VISUAL_DELETE,
   INTERACTABLE_ACTIVATE,
   INTERACTABLE_ACTIVATION_GRANTED,
+  INTERACTABLE_ACTIVATION_DENIED,
   createInteractableBehaviorWriter,
   routeInteractableBehaviorMessage,
   routeInteractableActivateMessage,
-  routeInteractableActivationGranted
+  routeInteractableActivationGranted,
+  routeInteractableActivationDenied
 } from './interactableSocket.js';
 import {
   createRegionNodeStateAdapter,
@@ -305,6 +307,18 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
       void routeInteractableActivationGranted(payload, {
         isLocalUser: (userId) => globalThis.game?.user?.id === userId,
         openGrant: deps.openGrant
+      });
+    }
+    return;
+  }
+
+  // Activation denied → the targeted local user is told WHY (localized). The
+  // notify body is injected by main.js.
+  if (action === INTERACTABLE_ACTIVATION_DENIED) {
+    if (typeof deps.notifyDenied === 'function') {
+      void routeInteractableActivationDenied(payload, {
+        isLocalUser: (userId) => globalThis.game?.user?.id === userId,
+        notifyDenied: deps.notifyDenied
       });
     }
   }

@@ -1204,7 +1204,8 @@ Hooks.once('ready', async () => {
     // validate/grant + open bodies are the manager's region-first activation seams.
     handleInteractableSocketMessage(payload, {
       validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
-      openGrant: (grant) => InteractableManager.instance.openGrant(grant)
+      openGrant: (grant) => InteractableManager.instance.openGrant(grant),
+      notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason)
     });
   });
 

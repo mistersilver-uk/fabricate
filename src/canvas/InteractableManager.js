@@ -47,7 +47,8 @@ import {
   evaluateActivationEligibility,
   buildActivationRequest,
   validateActivationRequest,
-  describeGrant
+  describeGrant,
+  activationDenialMessageKey
 } from './regions/interactableRegionActivation.js';
 import {
   createRegionNodeStateAdapter,
@@ -61,7 +62,8 @@ import {
 import {
   INTERACTABLE_SOCKET,
   INTERACTABLE_ACTIVATE,
-  INTERACTABLE_ACTIVATION_GRANTED
+  INTERACTABLE_ACTIVATION_GRANTED,
+  INTERACTABLE_ACTIVATION_DENIED
 } from './interactableSocket.js';
 import { resolveDropEnvironment } from './environmentResolution.js';
 import { regionEnvironmentIdsAtPoint, interactableBehaviorsContainingToken } from './regionHitTest.js';
@@ -441,9 +443,10 @@ class InteractableManager {
 
   /**
    * `fabricate.interactable` `tokenEnter` seam (runs on every client). Shows the
-   * prompt ONLY on the controlling player's client (guard: `event.user ===
-   * game.user` AND the token is owned/controlled here) when the behaviour is
-   * `regionEnter`-triggered and currently eligible. Avoids N prompts.
+   * prompt on the MOVER's client AND on a non-GM OWNING player's client (see
+   * {@link _shouldPromptForEnter}) when the behaviour is `regionEnter`-triggered
+   * and currently eligible. A GM dragging a player's token prompts BOTH the GM and
+   * that player; a player's autonomous move does NOT spam the GM.
    *
    * @param {object} event   The region-behaviour event ({ user, data:{ token } }).
    * @param {object} behavior  The triggering behaviour (the handler's `this`).
@@ -454,7 +457,7 @@ class InteractableManager {
     if (system.activation?.trigger !== 'regionEnter') return;
 
     const token = this._eventToken(event);
-    if (!this._controlsTriggeringToken(event, token)) return;
+    if (!this._shouldPromptForEnter(event, token)) return;
 
     const now = Number(globalThis.game?.time?.worldTime || 0);
     const eligibility = evaluateActivationEligibility(system, { now, isGM: globalThis.game?.user?.isGM === true });
@@ -475,14 +478,17 @@ class InteractableManager {
 
   /**
    * `fabricate.interactable` `tokenExit` seam: dismiss the prompt for this region
-   * (only when it matches the live prompt).
+   * UNCONDITIONALLY (no mover gate). `PromptApp.dismiss(ref)` is ref-matched and a
+   * no-op when this client is not showing that region's prompt — so whichever
+   * client(s) showed the prompt dismiss it on the token's exit, regardless of who
+   * moves it out. This fixes the stale-prompt case where the GM staged a player's
+   * token in the region and the player walks it out (the GM/player showing the
+   * prompt must drop it even though they did not move the token).
    *
    * @param {object} event
    * @param {object} behavior
    */
-  onRegionExit(event, behavior) {
-    const token = this._eventToken(event);
-    if (!this._controlsTriggeringToken(event, token)) return;
+  onRegionExit(_event, behavior) {
     const ref = identifyRegionBehaviorRef(behavior);
     if (!ref) return;
     const PromptApp = this._getPromptAppClass?.();
@@ -605,6 +611,9 @@ class InteractableManager {
     const behavior = this._resolveBehavior(request);
     const system = readInteractableBehaviorSystem(behavior);
     if (!system) {
+      // The request resolved no behaviour system (deleted region, etc.). Tell the
+      // requester WHY (generic) rather than failing silently.
+      this._routeActivationDenied(request.userId, null);
       return false;
     }
 
@@ -631,6 +640,8 @@ class InteractableManager {
       tokenInside
     });
     if (!validation.ok) {
+      // Tell the requesting user WHY (localized) instead of failing silently.
+      this._routeActivationDenied(request.userId, validation.reason);
       return false;
     }
 
@@ -720,6 +731,42 @@ class InteractableManager {
     }
   }
 
+  /**
+   * Route an activation DENIAL back to the requesting user the same way grants are
+   * routed: when the GM IS the requester (own/"as player" local request) notify
+   * here directly (a socket emit never reaches the emitter); otherwise emit the
+   * denied payload so the requesting player's client maps + shows the localized
+   * notice. No-throw.
+   *
+   * @param {string|null} userId  The requesting user id.
+   * @param {string|null} reason  The validation reason (mapped to a localized key).
+   */
+  _routeActivationDenied(userId, reason) {
+    if (globalThis.game?.user?.id === userId) {
+      this.notifyActivationDenied(reason);
+      return;
+    }
+    globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
+      action: INTERACTABLE_ACTIVATION_DENIED,
+      userId: userId ?? null,
+      reason: reason ?? null
+    });
+  }
+
+  /**
+   * Local-user body for the `interactableActivationDenied` socket route (and the
+   * local-GM fast path): warn the user WHY their activation was rejected, using the
+   * pure reason→key mapping resolved through the localizer. No-throw.
+   *
+   * @param {string|null} reason  A validation reason string (unknown ⇒ generic key).
+   */
+  notifyActivationDenied(reason) {
+    const key = activationDenialMessageKey(reason);
+    const localize = globalThis.game?.i18n?.localize;
+    const message = typeof localize === 'function' ? localize.call(globalThis.game.i18n, key) : key;
+    globalThis.ui?.notifications?.warn?.(message);
+  }
+
   // --- Foundry-edge helpers (activation) -------------------------------------
 
   _resolveBehavior({ sceneId, regionId, behaviorId } = {}) {
@@ -733,25 +780,28 @@ class InteractableManager {
   }
 
   /**
-   * Whether THIS client's user is the triggering user AND controls/owns the
-   * triggering token. The dual gate is the N-prompt guard: even though the region
-   * handler runs on every client, only the controlling player's client shows the
-   * prompt.
+   * Region-enter prompt guard. The region handler runs on EVERY connected client;
+   * this decides which client(s) show the prompt. The prompt appears for:
+   *  - the user who MOVED the token (`event.user === game.user`); AND
+   *  - a NON-GM player who OWNS the token (so a GM dragging a player's token
+   *    prompts BOTH the GM-as-mover and the absent player's client).
    *
-   * @param {object} event
-   * @param {object} token
+   * It deliberately does NOT use the GM-owns-everything ownership case: a GM
+   * "owns" every token, so promoting that path would spam the GM on every
+   * autonomous player move. The GM is prompted only when the GM is the mover.
+   *
+   * @param {object} event  The region-behaviour event ({ user, data:{ token } }).
+   * @param {object} token  The triggering token (placeable or document).
    * @returns {boolean}
    */
-  _controlsTriggeringToken(event, token) {
-    // Live-Foundry assumption (per plan): V13 `tokenEnter` carries the
-    // triggering `event.user`. If a future build delivers a falsy `event.user`,
-    // this controlling-user gate is skipped and we fall through to the
-    // owns-token check alone — accepted edge, behaviour intentionally unchanged.
-    if (event?.user && globalThis.game?.user && event.user !== globalThis.game.user) {
-      // The triggering user is identified and is not us.
-      if (event.user?.id && event.user.id !== globalThis.game.user?.id) return false;
-    }
-    return this._ownsToken(token);
+  _shouldPromptForEnter(event, token) {
+    const me = globalThis.game?.user;
+    const isMover = !!(event?.user && me && String(event.user.id) === String(me.id));
+    // Non-GM owner: prompt the controlling player even when someone else moved the
+    // token. (Deliberately NOT the GM-owns-everything case — that would spam the
+    // GM on every player move.)
+    const isOwningPlayer = me?.isGM !== true && this._ownsToken(token);
+    return isMover || isOwningPlayer;
   }
 
   /**

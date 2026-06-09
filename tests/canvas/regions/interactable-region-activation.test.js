@@ -5,7 +5,8 @@ import {
   evaluateActivationEligibility,
   buildActivationRequest,
   validateActivationRequest,
-  describeGrant
+  describeGrant,
+  activationDenialMessageKey
 } from '../../../src/canvas/regions/interactableRegionActivation.js';
 
 function baseState(overrides = {}) {
@@ -218,4 +219,38 @@ test('describeGrant encodes tab + context shape per type', () => {
   });
   assert.equal(describeGrant({ interactableType: 'mystery' }), null);
   assert.equal(describeGrant(null), null);
+});
+
+// --- activationDenialMessageKey (denial reason → localization key) -----------
+
+test('activationDenialMessageKey maps every reason to a non-default key', () => {
+  // Every reason validateActivationRequest / evaluateActivationEligibility can
+  // return resolves to a dedicated (non-generic) key.
+  const cases = {
+    DISABLED: 'FABRICATE.Canvas.Interactable.Denied.Disabled',
+    LOCKED: 'FABRICATE.Canvas.Interactable.Denied.Locked',
+    CONSUMED: 'FABRICATE.Canvas.Interactable.Denied.Consumed',
+    USES_EXHAUSTED: 'FABRICATE.Canvas.Interactable.Denied.UsesExhausted',
+    COOLDOWN: 'FABRICATE.Canvas.Interactable.Denied.Cooldown',
+    NODE_DEPLETED: 'FABRICATE.Canvas.Interactable.Denied.NodeDepleted',
+    CANNOT_CONTROL_ACTOR: 'FABRICATE.Canvas.Interactable.Denied.CannotControl',
+    TOKEN_NOT_INSIDE: 'FABRICATE.Canvas.Interactable.Denied.NotInside',
+    SOURCE_MISSING: 'FABRICATE.Canvas.Interactable.Denied.SourceMissing',
+    ENVIRONMENT_MISSING: 'FABRICATE.Canvas.Interactable.Denied.EnvironmentMissing'
+  };
+  const generic = 'FABRICATE.Canvas.Interactable.Denied.Generic';
+  for (const [reason, key] of Object.entries(cases)) {
+    assert.equal(activationDenialMessageKey(reason), key, `${reason} maps to its dedicated key`);
+    assert.notEqual(activationDenialMessageKey(reason), generic, `${reason} is not the generic fallback`);
+  }
+});
+
+test('activationDenialMessageKey falls back to the generic key for unknown/blank reasons', () => {
+  const generic = 'FABRICATE.Canvas.Interactable.Denied.Generic';
+  assert.equal(activationDenialMessageKey('NO_BEHAVIOR'), generic, 'internal NO_BEHAVIOR has no player copy ⇒ generic');
+  assert.equal(activationDenialMessageKey('TYPE_MISMATCH'), generic, 'internal TYPE_MISMATCH ⇒ generic');
+  assert.equal(activationDenialMessageKey('something-unmapped'), generic);
+  assert.equal(activationDenialMessageKey(''), generic);
+  assert.equal(activationDenialMessageKey(null), generic);
+  assert.equal(activationDenialMessageKey(undefined), generic);
 });

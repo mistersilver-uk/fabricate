@@ -465,30 +465,100 @@ const TOOL_SYSTEM = {
   activation: { trigger: 'regionEnter', audience: 'players' }
 };
 
-test('onRegionEnter shows the prompt ONLY for the controlling user; a foreign user is ignored', () => {
+test('onRegionEnter shows the prompt when the controlling user is the mover (and carries the prompt shape)', () => {
   const saved = snapshotGlobals();
   try {
     installFakeFoundry({ isGM: false });
     const shows = [];
     const manager = new InteractableManager({ getPromptAppClass: () => ({ show: (args) => shows.push(args), dismiss: () => {} }) });
 
-    const me = { id: 'u-1' };
-    const other = { id: 'u-2' };
+    const me = { id: 'u-1', isGM: false };
     globalThis.game.user = me;
     const ownedToken = { document: { isOwner: true, actor: { id: 'actor-1' }, actorId: 'actor-1' } };
     const behavior = interactableBehavior({ system: TOOL_SYSTEM });
 
-    // Foreign user's enter event → ignored (no N prompts).
-    manager.onRegionEnter({ user: other, data: { token: ownedToken } }, behavior);
-    assert.equal(shows.length, 0, 'a foreign user does not show a prompt on this client');
-
-    // The controlling user's enter event → one prompt.
     manager.onRegionEnter({ user: me, data: { token: ownedToken } }, behavior);
-    assert.equal(shows.length, 1, 'the controlling user sees exactly one prompt');
+    assert.equal(shows.length, 1, 'the controlling user (mover) sees exactly one prompt');
     assert.equal(shows[0].name, 'Forge Anvil');
     assert.equal(shows[0].promptText, 'Use the forge');
     assert.equal(shows[0].behaviorRef, 'scene-1.region-1.beh-1');
     assert.equal(typeof shows[0].onInteract, 'function');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+// --- _shouldPromptForEnter guard matrix -------------------------------------
+
+test('_shouldPromptForEnter matrix: mover, non-GM owner, GM autonomous-player move, non-owner', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: false });
+    const manager = new InteractableManager();
+
+    const me = { id: 'u-1', isGM: false };
+    const gmMe = { id: 'gm-1', isGM: true };
+    const other = { id: 'u-2', isGM: false };
+    const ownedToken = { document: { isOwner: true, actor: { id: 'actor-1' }, actorId: 'actor-1' } };
+    const foreignToken = { document: { isOwner: false, actor: { id: 'actor-9' }, actorId: 'actor-9' } };
+
+    // GM is the mover of any token → show.
+    globalThis.game.user = gmMe;
+    assert.equal(manager._shouldPromptForEnter({ user: gmMe }, foreignToken), true, 'GM-as-mover shows');
+
+    // Player-as-mover of their own token → show.
+    globalThis.game.user = me;
+    assert.equal(manager._shouldPromptForEnter({ user: me }, ownedToken), true, 'player-as-mover shows');
+
+    // Non-GM owner when SOMEONE ELSE (e.g. the GM) moved the token → show.
+    globalThis.game.user = me;
+    assert.equal(manager._shouldPromptForEnter({ user: other }, ownedToken), true, 'non-GM owner shows even when another user moved it');
+
+    // GM when a PLAYER autonomously moved their OWN token → NO show (no GM spam).
+    globalThis.game.user = gmMe;
+    assert.equal(manager._shouldPromptForEnter({ user: other }, ownedToken), false, 'GM is NOT prompted on a player autonomous move');
+
+    // Non-owner player when someone else moved a token they do not own → NO show.
+    globalThis.game.user = me;
+    assert.equal(manager._shouldPromptForEnter({ user: other }, foreignToken), false, 'a non-owner non-mover sees nothing');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('onRegionEnter prompts a NON-GM owner even when the GM moved the token (dual prompt)', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: false });
+    const shows = [];
+    const manager = new InteractableManager({ getPromptAppClass: () => ({ show: (a) => shows.push(a), dismiss: () => {} }) });
+    const me = { id: 'u-1', isGM: false };
+    const gm = { id: 'gm-1', isGM: true };
+    globalThis.game.user = me;
+    const ownedToken = { document: { isOwner: true, actor: { id: 'actor-1' }, actorId: 'actor-1' } };
+
+    // The GM moved the player's token; the player's client still shows the prompt.
+    manager.onRegionEnter({ user: gm, data: { token: ownedToken } }, interactableBehavior({ system: TOOL_SYSTEM }));
+    assert.equal(shows.length, 1, 'the owning player is prompted even though the GM moved the token');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('onRegionEnter does NOT spam the GM when a player autonomously moves their own token', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: true });
+    const shows = [];
+    const manager = new InteractableManager({ getPromptAppClass: () => ({ show: (a) => shows.push(a), dismiss: () => {} }) });
+    const gm = { id: 'gm-1', isGM: true };
+    const player = { id: 'u-1', isGM: false };
+    globalThis.game.user = gm;
+    // The GM "owns" everything, but the player is the mover of their own token.
+    const playerToken = { document: { isOwner: true, actor: { id: 'actor-1' }, actorId: 'actor-1' } };
+
+    manager.onRegionEnter({ user: player, data: { token: playerToken } }, interactableBehavior({ system: TOOL_SYSTEM }));
+    assert.equal(shows.length, 0, 'the GM is not prompted on a player autonomous move');
   } finally {
     restoreGlobals(saved);
   }
@@ -530,7 +600,7 @@ test('onRegionEnter uses the ENTERING token actor, never the linked Token marker
     };
     // The region-enter event's `data.token` is the entering TokenDocument: its
     // actor info lives directly on it (that is where onRegionEnter reads actorId),
-    // while `_controlsTriggeringToken` reads ownership off `.document`.
+    // while `_shouldPromptForEnter` reads ownership off `.document`.
     const enteringToken = {
       isOwner: true,
       actor: { id: 'player-actor' },
@@ -556,16 +626,20 @@ test('onRegionEnter uses the ENTERING token actor, never the linked Token marker
   }
 });
 
-test('onRegionExit dismisses the prompt for the matching behaviour ref', () => {
+test('onRegionExit dismisses the prompt by ref UNCONDITIONALLY (no mover gate)', () => {
   const saved = snapshotGlobals();
   try {
     installFakeFoundry({ isGM: false });
     const dismisses = [];
     const manager = new InteractableManager({ getPromptAppClass: () => ({ show: () => {}, dismiss: (ref) => dismisses.push(ref) }) });
-    const me = { id: 'u-1' };
+    const me = { id: 'u-1', isGM: false };
+    const other = { id: 'u-2', isGM: false };
     globalThis.game.user = me;
+    // A DIFFERENT user (e.g. the GM staged the token and the player walks it out)
+    // moved the token out; this client still dismisses by ref. dismiss() is itself
+    // ref-matched + a no-op when this client is not showing the prompt.
     manager.onRegionExit(
-      { user: me, data: { token: { document: { isOwner: true } } } },
+      { user: other, data: { token: { document: { isOwner: false } } } },
       interactableBehavior({ system: TOOL_SYSTEM })
     );
     assert.deepEqual(dismisses, ['scene-1.region-1.beh-1']);
@@ -696,8 +770,86 @@ test('validateAndGrant REJECTS a non-GM requester who does NOT control the named
     });
 
     assert.equal(ok, false, 'the request is rejected (CANNOT_CONTROL_ACTOR)');
-    assert.equal(emits.length, 0, 'no INTERACTABLE_ACTIVATION_GRANTED is emitted');
+    assert.equal(emits.filter((e) => e.payload.action === 'interactableActivationGranted').length, 0, 'no INTERACTABLE_ACTIVATION_GRANTED is emitted');
     assert.equal(opened, null, 'nothing is opened locally');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant EMITS a denied notice (with reason) to a remote requesting player on rejection', async () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }] });
+    const emits = [];
+    globalThis.game.user = { id: 'gm-1', isGM: true };
+    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: (id) => (id === 'u-1' ? { id: 'u-1', isGM: false } : null) };
+    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
+    // Non-owning player ⇒ CANNOT_CONTROL_ACTOR.
+    globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => false } : null) };
+    const behavior = interactableBehavior({ system: TOOL_SYSTEM });
+    globalThis.game.scenes = { get: () => ({ regions: { get: () => behavior.parent } }) };
+    behavior.parent.behaviors = { get: () => behavior };
+
+    const manager = new InteractableManager();
+    const ok = await manager.validateAndGrant({
+      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
+      interactableType: 'tool', actorId: 'a1', userId: 'u-1', ts: 7
+    });
+
+    assert.equal(ok, false);
+    assert.equal(emits.length, 1, 'the requesting player is told WHY (denied notice emitted)');
+    assert.equal(emits[0].payload.action, 'interactableActivationDenied');
+    assert.equal(emits[0].payload.userId, 'u-1');
+    assert.equal(emits[0].payload.reason, 'CANNOT_CONTROL_ACTOR');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant notifies LOCALLY (no socket) when the GM requester is denied', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { warnings } = installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe' }] });
+    const emits = [];
+    globalThis.game.user = { id: 'gm-1', isGM: true };
+    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: () => ({ id: 'gm-1', isGM: true }) };
+    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
+    globalThis.game.actors = { get: () => ({ id: 'a1', testUserPermission: () => true }) };
+    // A LOCKED interactable ⇒ rejection even for the GM requester.
+    const lockedBehavior = interactableBehavior({ system: { ...TOOL_SYSTEM, state: { ...TOOL_SYSTEM.state, locked: true } } });
+    globalThis.game.scenes = { get: () => ({ regions: { get: () => lockedBehavior.parent } }) };
+    lockedBehavior.parent.behaviors = { get: () => lockedBehavior };
+
+    const manager = new InteractableManager();
+    const ok = await manager.validateAndGrant({
+      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
+      interactableType: 'tool', actorId: 'a1', userId: 'gm-1', ts: 1
+    });
+
+    assert.equal(ok, false);
+    assert.equal(emits.length, 0, 'no socket emit when the GM is the requester');
+    assert.deepEqual(warnings, ['FABRICATE.Canvas.Interactable.Denied.Locked'], 'the GM is warned locally with the localized denial key');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('notifyActivationDenied warns with the mapped key; an unknown reason uses the generic key', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { warnings } = installFakeFoundry({ isGM: false });
+    const manager = new InteractableManager();
+
+    manager.notifyActivationDenied('NODE_DEPLETED');
+    manager.notifyActivationDenied('totally-unknown');
+    manager.notifyActivationDenied(null);
+
+    assert.deepEqual(warnings, [
+      'FABRICATE.Canvas.Interactable.Denied.NodeDepleted',
+      'FABRICATE.Canvas.Interactable.Denied.Generic',
+      'FABRICATE.Canvas.Interactable.Denied.Generic'
+    ]);
   } finally {
     restoreGlobals(saved);
   }

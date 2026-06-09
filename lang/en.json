@@ -27,6 +27,19 @@
           "Interact": "Interact",
           "Close": "Dismiss"
         },
+        "Denied": {
+          "Disabled": "This isn't active right now.",
+          "Locked": "This is locked.",
+          "Consumed": "This has already been used up.",
+          "UsesExhausted": "There's nothing left to use here.",
+          "Cooldown": "This isn't ready yet.",
+          "NodeDepleted": "This resource is depleted.",
+          "CannotControl": "You don't control that token.",
+          "NotInside": "Your token must be inside the area.",
+          "SourceMissing": "This interactable is no longer available.",
+          "EnvironmentMissing": "This gathering point's environment is missing.",
+          "Generic": "You can't interact here right now."
+        },
         "Keybinding": {
           "Name": "Fabricate: interact here",
           "Hint": "Re-open the Fabricate interactable your controlled token is standing in."

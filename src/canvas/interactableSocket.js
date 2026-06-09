@@ -23,6 +23,7 @@ export const INTERACTABLE_SOCKET = 'module.fabricate';
 // shared activation pipeline.
 export const INTERACTABLE_ACTIVATE = 'interactableActivate';
 export const INTERACTABLE_ACTIVATION_GRANTED = 'interactableActivationGranted';
+export const INTERACTABLE_ACTIVATION_DENIED = 'interactableActivationDenied';
 export const INTERACTABLE_BEHAVIOR_UPDATE = 'interactableBehaviorUpdate';
 export const INTERACTABLE_VISUAL_UPDATE = 'interactableVisualUpdate';
 export const INTERACTABLE_VISUAL_DELETE = 'interactableVisualDelete';
@@ -158,6 +159,23 @@ export function validateActivationGrantedPayload(payload) {
 }
 
 /**
+ * Validate an activation-denied payload (active-GM → requesting player). Carries
+ * the target user + the denial `reason` (a validation reason string the receiving
+ * client maps to a localized notice). Returns the normalized payload, or `null`.
+ *
+ * @param {object} payload
+ * @returns {{ action: string, userId: string, reason: string|null } | null}
+ */
+export function validateActivationDeniedPayload(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  if (payload.action !== INTERACTABLE_ACTIVATION_DENIED) return null;
+  const userId = trimString(payload.userId);
+  if (!userId) return null;
+  const reason = trimString(payload.reason);
+  return { action: INTERACTABLE_ACTIVATION_DENIED, userId, reason: reason || null };
+}
+
+/**
  * Build the behaviour-update router: the active GM applies the behaviour update
  * locally (no socket round-trip, because an emit never reaches the emitter); any
  * other client emits the socket message for the active GM to apply.
@@ -251,5 +269,25 @@ export function routeInteractableActivationGranted(payload, { isLocalUser, openG
   if (!normalized) return false;
   if (typeof isLocalUser === 'function' && isLocalUser(normalized.userId) !== true) return false;
   openGrant?.(normalized);
+  return true;
+}
+
+/**
+ * Route an inbound activation-denied message: only the targeted local user is
+ * notified WHY the activation was rejected. The `notifyDenied` collaborator shows
+ * the localized warning on this client. Mirrors {@link routeInteractableActivationGranted}.
+ * Returns `true` when this client notified the user, `false` otherwise.
+ *
+ * @param {object} payload
+ * @param {object} deps
+ * @param {(userId: string) => boolean} deps.isLocalUser
+ * @param {(reason: string|null) => (void|Promise<void>)} deps.notifyDenied
+ * @returns {boolean}
+ */
+export function routeInteractableActivationDenied(payload, { isLocalUser, notifyDenied } = {}) {
+  const normalized = validateActivationDeniedPayload(payload);
+  if (!normalized) return false;
+  if (typeof isLocalUser === 'function' && isLocalUser(normalized.userId) !== true) return false;
+  notifyDenied?.(normalized.reason);
   return true;
 }

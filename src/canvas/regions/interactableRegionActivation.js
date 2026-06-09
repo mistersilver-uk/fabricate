@@ -174,6 +174,43 @@ function fail(reason) {
 }
 
 /**
+ * Map an activation denial `reason` (as returned by {@link validateActivationRequest}
+ * or {@link evaluateActivationEligibility}) to a player-facing localization key under
+ * `FABRICATE.Canvas.Interactable.Denied.*`. PURE — no Foundry, no localization here
+ * (the caller resolves the key). Any unknown/blank reason falls back to the generic
+ * key so a denied request is never silent.
+ *
+ * @param {string|null|undefined} reason
+ * @returns {string} A `FABRICATE.Canvas.Interactable.Denied.*` key.
+ */
+export function activationDenialMessageKey(reason) {
+  const key = DENIAL_MESSAGE_KEYS[reason];
+  return key ?? DENIAL_MESSAGE_KEYS.__default;
+}
+
+const DENIAL_PREFIX = 'FABRICATE.Canvas.Interactable.Denied';
+
+/**
+ * Every reason {@link validateActivationRequest}/{@link evaluateActivationEligibility}
+ * can return → a non-default key. `__default` is the generic fallback for any
+ * unmapped/blank reason (NO_BEHAVIOR + TYPE_MISMATCH are internal mismatches with
+ * no dedicated player copy, so they intentionally resolve to the generic key).
+ */
+const DENIAL_MESSAGE_KEYS = {
+  DISABLED: `${DENIAL_PREFIX}.Disabled`,
+  LOCKED: `${DENIAL_PREFIX}.Locked`,
+  CONSUMED: `${DENIAL_PREFIX}.Consumed`,
+  USES_EXHAUSTED: `${DENIAL_PREFIX}.UsesExhausted`,
+  COOLDOWN: `${DENIAL_PREFIX}.Cooldown`,
+  NODE_DEPLETED: `${DENIAL_PREFIX}.NodeDepleted`,
+  CANNOT_CONTROL_ACTOR: `${DENIAL_PREFIX}.CannotControl`,
+  TOKEN_NOT_INSIDE: `${DENIAL_PREFIX}.NotInside`,
+  SOURCE_MISSING: `${DENIAL_PREFIX}.SourceMissing`,
+  ENVIRONMENT_MISSING: `${DENIAL_PREFIX}.EnvironmentMissing`,
+  __default: `${DENIAL_PREFIX}.Generic`
+};
+
+/**
  * Describe WHICH tab + context shape the granted player client should open. PURE.
  * The manager fills in the live `activeCanvasTool` (built by `buildActiveCanvasTool`)
  * and the node adapter (`nodeStateOverride`) in 1c — this only encodes the shape.
