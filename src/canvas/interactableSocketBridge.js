@@ -125,6 +125,48 @@ export async function applyInteractableVisualDelete({ sceneId, visualUuid, docId
 }
 
 /**
+ * GM-routed linked-visual UPDATE seam: local apply on the active GM, socket emit
+ * otherwise. Used both for depleted-state reflection and for reverse linked-visual
+ * flag writes (relink). Standalone export so the config panel's relink edge can
+ * route the reverse-flag write/clear through the same active-GM seam.
+ *
+ * @param {{ sceneId: string, visualUuid: string, documentName: string, update: object }} args
+ * @returns {void|Promise<void>}
+ */
+export function emitInteractableVisualUpdate({ sceneId, visualUuid, documentName, update } = {}) {
+  if (isActiveGM()) {
+    return applyInteractableVisualUpdate({ sceneId, visualUuid, documentName, update });
+  }
+  return globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
+    action: INTERACTABLE_VISUAL_UPDATE,
+    sceneId,
+    visualUuid,
+    documentName,
+    update
+  });
+}
+
+/**
+ * GM-routed linked-visual DELETE seam: local apply on the active GM, socket emit
+ * otherwise. Standalone export so the config panel's remove/delete edges can route
+ * the visual delete through the same active-GM seam.
+ *
+ * @param {{ sceneId: string, visualUuid: string, documentName: string }} args
+ * @returns {void|Promise<void>}
+ */
+export function emitInteractableVisualDelete({ sceneId, visualUuid, documentName } = {}) {
+  if (isActiveGM()) {
+    return applyInteractableVisualDelete({ sceneId, visualUuid, documentName });
+  }
+  return globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
+    action: INTERACTABLE_VISUAL_DELETE,
+    sceneId,
+    visualUuid,
+    documentName
+  });
+}
+
+/**
  * Build the GM-routed linked-visual depleted applier seam:
  * `({ behaviorSystem, depleted }) => void`. It reflects the behaviour's depleted
  * state onto the linked visual, routing the visual update/delete through the
@@ -133,34 +175,11 @@ export async function applyInteractableVisualDelete({ sceneId, visualUuid, docId
  * @returns {(args: { behaviorSystem: object, depleted: boolean }) => (void|Promise<void>)}
  */
 export function buildLinkedVisualApply() {
-  const emitVisualUpdate = ({ sceneId, visualUuid, documentName, update }) => {
-    if (isActiveGM()) {
-      return applyInteractableVisualUpdate({ sceneId, visualUuid, documentName, update });
-    }
-    return globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
-      action: INTERACTABLE_VISUAL_UPDATE,
-      sceneId,
-      visualUuid,
-      documentName,
-      update
-    });
-  };
-  const emitVisualDelete = ({ sceneId, visualUuid, documentName }) => {
-    if (isActiveGM()) {
-      return applyInteractableVisualDelete({ sceneId, visualUuid, documentName });
-    }
-    return globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
-      action: INTERACTABLE_VISUAL_DELETE,
-      sceneId,
-      visualUuid,
-      documentName
-    });
-  };
   return ({ behaviorSystem, depleted } = {}) => applyLinkedVisualDepleted({
     behaviorSystem,
     depleted,
-    emitVisualUpdate,
-    emitVisualDelete
+    emitVisualUpdate: emitInteractableVisualUpdate,
+    emitVisualDelete: emitInteractableVisualDelete
   });
 }
 

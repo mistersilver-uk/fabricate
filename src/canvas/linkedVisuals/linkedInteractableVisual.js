@@ -229,24 +229,88 @@ function resolveDocumentName(doc) {
 }
 
 /**
+ * Build the reverse-flag CLEAR patch for a previously-linked visual: nulls out the
+ * `flags.fabricate.{isInteractableVisual,linkedRegionUuid,linkedBehaviorId}` block
+ * so a stale marker no longer reports itself as an interactable visual. PURE.
+ *
+ * @returns {{ flags: { fabricate: { isInteractableVisual: null, linkedRegionUuid: null, linkedBehaviorId: null } } }}
+ */
+export function buildClearLinkedVisualFlags() {
+  return {
+    flags: {
+      fabricate: {
+        isInteractableVisual: null,
+        linkedRegionUuid: null,
+        linkedBehaviorId: null
+      }
+    }
+  };
+}
+
+/**
  * Relink a behaviour to a GM-selected document. EDGE: computes the pure relink
  * patch ({@link planRelinkVisual}) and persists it through the injected
- * `applyBehaviorUpdate` seam (the active-GM behaviour write). Returns the applied
- * patch, or null when the selection was unusable.
+ * `applyBehaviorUpdate` seam (the active-GM behaviour write), THEN writes the
+ * reverse linked-visual flag block onto the newly-selected document and CLEARS the
+ * reverse flags off the previously-linked document (when one exists and differs).
+ * Without the reverse flag, `readLinkedVisualRef` returns null and the Tile-HUD
+ * "Configure Fabricate Interactable" entry never appears on a relinked tile.
+ * Returns the applied behaviour patch, or null when the selection was unusable.
  *
- * @param {object} behavior        The owning behaviour (carries the ref).
+ * @param {object} behavior        The owning behaviour (carries the ref + the
+ *   previously-linked uuid via `behavior.system.linkedVisual`).
  * @param {object} selectedDoc     The GM-selected document.
  * @param {object} deps
  * @param {(args: object) => (void|Promise<void>)} deps.applyBehaviorUpdate
+ *   Persist the behaviour `{ system: { linkedVisual } }` patch (active-GM routed).
  * @param {(behavior: object) => ({sceneId,regionId,behaviorId}|null)} deps.identify
+ * @param {(args: { sceneId: string, visualUuid: string, documentName: string, update: object }) => (void|Promise<void>)} [deps.applyVisualUpdate]
+ *   Write a visual document update (the reverse-flag write/clear), active-GM routed.
  * @returns {Promise<object|null>}
  */
-export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate, identify } = {}) {
+export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate, identify, applyVisualUpdate } = {}) {
   const patch = planRelinkVisual(selectedDoc);
   if (!patch) return null;
   const ref = identify?.(behavior);
   if (!ref) return null;
+
   await applyBehaviorUpdate?.({ ...ref, update: { system: patch } });
+
+  // Write the reverse linked-visual flag onto the newly-selected document so the
+  // Tile-HUD entry resolves; and clear it off the previously-linked document.
+  if (typeof applyVisualUpdate === 'function') {
+    const region = behavior?.parent ?? null;
+    const regionUuid = typeof region?.uuid === 'string' ? region.uuid : null;
+    const behaviorId = behavior?.id ?? behavior?._id ?? null;
+    const newUuid = patch.linkedVisual.uuid;
+    const newDocumentName = patch.linkedVisual.documentName;
+
+    const prior = behavior?.system?.linkedVisual ?? null;
+    const priorUuid = typeof prior?.uuid === 'string' && prior.uuid.trim() ? prior.uuid.trim() : null;
+    const priorDocumentName = typeof prior?.documentName === 'string' ? prior.documentName : null;
+
+    // Clear the OLD marker first (when one exists and is a different document).
+    if (priorUuid && priorUuid !== newUuid) {
+      await applyVisualUpdate({
+        sceneId: ref.sceneId,
+        visualUuid: priorUuid,
+        documentName: priorDocumentName ?? newDocumentName,
+        update: buildClearLinkedVisualFlags()
+      });
+    }
+
+    // Write the reverse flag onto the NEW marker. `buildLinkedVisualFlags`
+    // returns the `{ fabricate }` block; wrap it as a `{ flags }` document patch.
+    if (regionUuid && behaviorId) {
+      await applyVisualUpdate({
+        sceneId: ref.sceneId,
+        visualUuid: newUuid,
+        documentName: newDocumentName,
+        update: { flags: buildLinkedVisualFlags({ regionUuid, behaviorId }) }
+      });
+    }
+  }
+
   return patch;
 }
 

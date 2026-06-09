@@ -40,7 +40,8 @@ import { createToolBreakageRuntime } from './toolBreakageRuntime.js';
 import {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass,
-  getInteractableBrowserAppClass
+  getInteractableBrowserAppClass,
+  getInteractableConfigAppClass
 } from './ui/appFactory.js';
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
@@ -56,11 +57,17 @@ import { InteractableManager } from './canvas/InteractableManager.js';
 import { handleInteractableSocketMessage, resolveInteractableNodeStateForRef } from './canvas/interactableSocketBridge.js';
 import { respawnInteractableRegionBehaviors } from './canvas/regions/interactableRegionWorldTime.js';
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
+import {
+  assignInteractableConfigSheet,
+  resolveInteractableConfigTarget,
+  shouldOfferInteractableConfigEntry
+} from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
+import './ui/InteractableConfigApp.svelte.js';
 
 let gatheringEngine = null;
 
@@ -1068,6 +1075,25 @@ Hooks.once('init', async () => {
   // APIs are unavailable (e.g. an older core), so it is safe to call unconditionally.
   registerInteractableRegionBehavior(CONFIG);
 
+  // Register the rich GM config panel as the config sheet for the
+  // `fabricate.interactable` RegionBehavior subtype (V13). Resolved defensively
+  // via globalThis — a no-op when the DocumentSheetConfig / RegionBehavior API
+  // shape differs, so it never throws into init.
+  try {
+    const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig
+      ?? globalThis.DocumentSheetConfig;
+    const RegionBehavior = foundry?.documents?.RegionBehavior
+      ?? CONFIG?.RegionBehavior?.documentClass
+      ?? globalThis.RegionBehavior;
+    assignInteractableConfigSheet({
+      registrar: DocumentSheetConfig,
+      RegionBehavior,
+      SheetClass: getInteractableConfigAppClass()
+    });
+  } catch (_error) {
+    // Defensive: a sheet-registration shape mismatch must not break init.
+  }
+
   // Make API available globally
   game.fabricate = fabricate;
   // Expose the canvas interactable manager singleton so the region behaviour event
@@ -1191,6 +1217,53 @@ Hooks.on('getSceneControlButtons', (controls) => {
       return out && out !== key ? out : fallback;
     }
   });
+});
+
+// GM-only discoverability (Phase 2): a "Configure Fabricate Interactable" button
+// on the Tile HUD for a tile that is a Fabricate interactable visual. It resolves
+// the owning behaviour from the tile's reverse linked-visual flags and opens the
+// rich config panel. The pure gate + target resolution live in
+// `interactableConfigSheet.js`; this hook body is the thin Foundry edge.
+Hooks.on('renderTileHUD', (hud, element) => {
+  try {
+    const tile = hud?.object?.document ?? hud?.document ?? null;
+    if (!shouldOfferInteractableConfigEntry(tile, { isGM: game.user?.isGM === true })) return;
+
+    const target = resolveInteractableConfigTarget(tile, {
+      resolveRegion: (regionUuid) => {
+        const region = fromUuidSync?.(regionUuid) ?? null;
+        const regionId = region?.id ?? region?._id ?? null;
+        const sceneId = region?.parent?.id ?? region?.parent?._id ?? null;
+        return regionId && sceneId ? { sceneId, regionId } : null;
+      }
+    });
+    if (!target) return;
+
+    const root = element instanceof HTMLElement ? element : element?.[0] ?? null;
+    const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
+    if (!column?.appendChild) return;
+
+    const label = (() => {
+      const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Config.OpenFromTile');
+      return out && out !== 'FABRICATE.Canvas.Interactable.Config.OpenFromTile'
+        ? out
+        : 'Configure Fabricate Interactable';
+    })();
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'control-icon fabricate-interactable-config-hud';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = '<i class="fas fa-sliders"></i>';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      void getInteractableConfigAppClass().show(target);
+    });
+    column.appendChild(button);
+  } catch (_error) {
+    // Defensive: a HUD augmentation must never throw into Foundry's render.
+  }
 });
 
 /**

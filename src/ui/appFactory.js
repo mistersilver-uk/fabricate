@@ -5,6 +5,7 @@ let _fabricateApp = null;
 let _craftingSystemManagerApp = null;
 let _interactableBrowserApp = null;
 let _interactionPromptApp = null;
+let _interactableConfigApp = null;
 
 export function registerFabricateApp(cls) {
   _fabricateApp = cls;
@@ -20,6 +21,10 @@ export function registerInteractableBrowserApp(cls) {
 
 export function registerInteractionPromptApp(cls) {
   _interactionPromptApp = cls;
+}
+
+export function registerInteractableConfigApp(cls) {
+  _interactableConfigApp = cls;
 }
 
 export function getFabricateAppClass() {
@@ -48,4 +53,11 @@ export function getInteractionPromptAppClass() {
     throw new Error('Fabricate | InteractionPromptApp not registered. Ensure InteractionPromptApp.svelte.js is imported.');
   }
   return _interactionPromptApp;
+}
+
+export function getInteractableConfigAppClass() {
+  if (!_interactableConfigApp) {
+    throw new Error('Fabricate | InteractableConfigApp not registered. Ensure InteractableConfigApp.svelte.js is imported.');
+  }
+  return _interactableConfigApp;
 }

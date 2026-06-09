@@ -17,6 +17,7 @@ import {
   createLinkedTile,
   planRelinkVisual,
   relinkVisual,
+  buildClearLinkedVisualFlags,
   recreateLinkedTile,
   planMissingPolicy,
   applyMissingPolicy
@@ -233,6 +234,91 @@ test('relinkVisual persists the relink patch through the behaviour-update seam',
   assert.deepEqual(updates[0], {
     sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1',
     update: { system: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' } } }
+  });
+});
+
+test('relinkVisual writes the reverse flag onto the new tile and clears it off the old tile', async () => {
+  const behaviorUpdates = [];
+  const visualUpdates = [];
+  const behavior = {
+    id: 'beh-1',
+    parent: { uuid: 'Scene.s1.Region.r1' },
+    // Previously linked to a different tile.
+    system: { linkedVisual: { uuid: 'Scene.s1.Tile.old', documentName: 'Tile' } }
+  };
+  const patch = await relinkVisual(
+    behavior,
+    { uuid: 'Scene.s1.Tile.new', documentName: 'Tile' },
+    {
+      applyBehaviorUpdate: (a) => behaviorUpdates.push(a),
+      identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' }),
+      applyVisualUpdate: (a) => visualUpdates.push(a)
+    }
+  );
+
+  // Forward patch on the behaviour.
+  assert.deepEqual(patch, { linkedVisual: { uuid: 'Scene.s1.Tile.new', documentName: 'Tile' } });
+  assert.equal(behaviorUpdates.length, 1);
+  assert.deepEqual(behaviorUpdates[0].update, {
+    system: { linkedVisual: { uuid: 'Scene.s1.Tile.new', documentName: 'Tile' } }
+  });
+
+  // Two visual writes: clear the OLD tile first, then set the reverse flag on NEW.
+  assert.equal(visualUpdates.length, 2);
+  const [clearOld, setNew] = visualUpdates;
+  assert.equal(clearOld.visualUuid, 'Scene.s1.Tile.old');
+  assert.equal(clearOld.update.flags.fabricate.isInteractableVisual, null);
+  assert.equal(clearOld.update.flags.fabricate.linkedRegionUuid, null);
+  assert.equal(clearOld.update.flags.fabricate.linkedBehaviorId, null);
+
+  assert.equal(setNew.visualUuid, 'Scene.s1.Tile.new');
+  assert.equal(setNew.documentName, 'Tile');
+  assert.deepEqual(setNew.update.flags.fabricate, {
+    isInteractableVisual: true,
+    linkedRegionUuid: 'Scene.s1.Region.r1',
+    linkedBehaviorId: 'beh-1'
+  });
+});
+
+test('relinkVisual writes the reverse flag on the new tile and skips the clear when there was no prior link', async () => {
+  const visualUpdates = [];
+  const behavior = { id: 'beh-1', parent: { uuid: 'Scene.s1.Region.r1' }, system: { linkedVisual: { uuid: null, documentName: null } } };
+  await relinkVisual(
+    behavior,
+    { uuid: 'Scene.s1.Tile.new', documentName: 'Tile' },
+    {
+      applyBehaviorUpdate: () => {},
+      identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' }),
+      applyVisualUpdate: (a) => visualUpdates.push(a)
+    }
+  );
+  // Only the reverse-flag write on the new tile; no clear (no prior link).
+  assert.equal(visualUpdates.length, 1);
+  assert.equal(visualUpdates[0].visualUuid, 'Scene.s1.Tile.new');
+  assert.equal(visualUpdates[0].update.flags.fabricate.isInteractableVisual, true);
+});
+
+test('relinkVisual does not re-clear when the selection matches the prior link', async () => {
+  const visualUpdates = [];
+  const behavior = { id: 'beh-1', parent: { uuid: 'Scene.s1.Region.r1' }, system: { linkedVisual: { uuid: 'Scene.s1.Tile.same', documentName: 'Tile' } } };
+  await relinkVisual(
+    behavior,
+    { uuid: 'Scene.s1.Tile.same', documentName: 'Tile' },
+    {
+      applyBehaviorUpdate: () => {},
+      identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' }),
+      applyVisualUpdate: (a) => visualUpdates.push(a)
+    }
+  );
+  // Same tile: just refresh the reverse flag, no clear of a different tile.
+  assert.equal(visualUpdates.length, 1);
+  assert.equal(visualUpdates[0].visualUuid, 'Scene.s1.Tile.same');
+  assert.equal(visualUpdates[0].update.flags.fabricate.isInteractableVisual, true);
+});
+
+test('buildClearLinkedVisualFlags nulls the reverse flag block', () => {
+  assert.deepEqual(buildClearLinkedVisualFlags(), {
+    flags: { fabricate: { isInteractableVisual: null, linkedRegionUuid: null, linkedBehaviorId: null } }
   });
 });
 
