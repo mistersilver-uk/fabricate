@@ -126,12 +126,14 @@
         "TasksHeading": "Gathering tasks",
         "PlaceOnScene": "Place region + Tile",
         "PlaceRegionOnly": "Place region only (no marker)",
-        "RegionOnlyHint": "Use the square button to place a region only, with no visible marker.",
+        "RegionOnlyHint": "The cubes button places a region with a tile marker; the outlined-square button places a region only, with no visible marker.",
         "UnnamedTask": "Unnamed task",
         "UnnamedTool": "Unnamed tool",
         "NoSystems": "No crafting systems available.",
         "NoTools": "No tools in this system.",
-        "NoTasks": "No gathering tasks in this system."
+        "NoTasks": "No gathering tasks in this system.",
+        "NoMatchingTools": "No matching tools.",
+        "NoMatchingTasks": "No matching gathering tasks."
       }
     },
     "RegionBehavior": {

@@ -110,6 +110,36 @@ describe('InteractableBrowserRoot body', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.TasksHeading'), 'renders a Gathering Tasks section');
   });
 
+  it('splits Tools and Gathering Tasks into an accessible two-tab switcher', () => {
+    // A real tablist of two keyboard-operable <button> tabs, each with
+    // aria-selected reflecting the active tab and a controlled tabpanel.
+    assert.ok(rootSource.includes("let activeTab = $state('tools')"), 'tracks the active tab in runes state');
+    assert.ok(rootSource.includes('role="tablist"'), 'renders a tablist container');
+    assert.ok((rootSource.match(/role="tab"/g) || []).length === 2, 'exactly two tabs');
+    assert.ok(rootSource.includes("aria-selected={activeTab === 'tools'}"), 'tools tab reflects selection');
+    assert.ok(rootSource.includes("aria-selected={activeTab === 'tasks'}"), 'tasks tab reflects selection');
+    assert.ok(rootSource.includes('role="tabpanel"'), 'each section is a tabpanel');
+    assert.ok(rootSource.includes('onkeydown={onTabKeydown}'), 'tabs are keyboard-operable (arrow/Home/End)');
+    assert.ok(rootSource.includes("{#if activeTab === 'tools'}"), 'only the active tab section renders');
+  });
+
+  it('filters BOTH tools and tasks by the shared search box', () => {
+    // matchesSearch is wired into both derived lists; with tabs the search
+    // applies to whichever tab is active (both kinds are filtered).
+    assert.ok(
+      rootSource.includes('.filter((tool) => tool.id && matchesSearch(tool.label))'),
+      'tools list filters by the search term'
+    );
+    assert.ok(
+      rootSource.includes('.filter((task) => task.id && matchesSearch(task.label))'),
+      'tasks list filters by the search term'
+    );
+    assert.ok(
+      rootSource.includes('the search box applies to both kinds'),
+      'a note records that the search filters both tools and tasks'
+    );
+  });
+
   it('reads the libraries through the injected services bag (no duplicate data access)', () => {
     assert.ok(rootSource.includes('services?.listSystems?.()'), 'systems via services');
     assert.ok(rootSource.includes('services?.listToolsForSystem?.('), 'tools via services');
@@ -128,6 +158,29 @@ describe('InteractableBrowserRoot body', () => {
     assert.ok(rootSource.includes("place('tool', tool.id)"), 'tool rows place tools');
     assert.ok(rootSource.includes("place('gatheringTask', task.id)"), 'task rows place gathering tasks');
     assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.PlaceOnScene'), 'localized place label');
+  });
+
+  it('renders the place button icon-only (fa-cubes) with the PlaceOnScene title + aria-label, no visible text', () => {
+    // The "Place region + Tile" text moved off the button face into the tooltip
+    // and accessible name; the face is the Foundry Tiles control cubes icon.
+    const placeButtonBlocks = rootSource.split('class="fab-ib-place"').slice(1);
+    assert.ok(placeButtonBlocks.length === 2, 'exactly two place buttons (tools + tasks rows)');
+    for (const block of placeButtonBlocks) {
+      const button = block.slice(0, block.indexOf('</button>'));
+      assert.ok(
+        button.includes('title={text(\'FABRICATE.Canvas.Browser.PlaceOnScene'),
+        'place button uses PlaceOnScene as the tooltip'
+      );
+      assert.ok(
+        button.includes('aria-label={text(\'FABRICATE.Canvas.Browser.PlaceOnScene'),
+        'place button uses PlaceOnScene as the accessible name'
+      );
+      assert.ok(button.includes('<i class="fas fa-cubes" aria-hidden="true">'), 'face is the cubes icon');
+      assert.ok(
+        !/\{text\('FABRICATE\.Canvas\.Browser\.PlaceOnScene[^}]*\)\}\s*<\/button>/.test(button),
+        'no visible PlaceOnScene text rendered on the button face'
+      );
+    }
   });
 
   it('each row exposes a region-only (no marker) placement affordance routing the same spawn', () => {

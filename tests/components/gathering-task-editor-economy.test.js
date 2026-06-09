@@ -10,8 +10,11 @@ const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEd
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
+const cssPath = resolve(repoRoot, 'styles/fabricate.css');
+
 const editorSource = readFileSync(editorPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+const cssSource = readFileSync(cssPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('Gathering task editor — economy sections are mode-gated and carded', () => {
@@ -144,6 +147,42 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     // Right-click on the thumbnail clears it (oncontextmenu prevents the default menu).
     assert.match(editorSource, /oncontextmenu=\{onDepletedImageContextMenu\}/, 'the thumbnail wires a context-menu (right-click) clear');
     assert.match(editorSource, /function onDepletedImageContextMenu\(event\)\s*\{[\s\S]*?event\.preventDefault\(\)/, 'the context-menu handler prevents the default menu');
+  });
+
+  it('positions the depleted picker pen as a corner badge and the empty-state placeholder centered (no overlap)', () => {
+    // Empty state: a centered fa-image placeholder shown only when no swap image
+    // is set; the fa-pen edit affordance is the bottom-right badge over either
+    // the placeholder or the <img>. The fix is in the SHARED .manager-task-image-picker
+    // rule so every picker (task identity, hazard, depleted) gets the same treatment.
+    const pickerIdx = editorSource.indexOf('manager-task-depleted-image-picker');
+    const pickerBlock = editorSource.slice(pickerIdx, editorSource.indexOf('</button>', pickerIdx));
+    assert.ok(
+      pickerBlock.includes('{#if depletedSwapImage}') && pickerBlock.includes('<img src={depletedSwapImage}'),
+      'the picker renders the swap <img> when an image is set'
+    );
+    assert.ok(
+      pickerBlock.includes('<i class="fas fa-image" aria-hidden="true">'),
+      'the picker renders the fa-image placeholder when no image is set'
+    );
+    assert.ok(
+      pickerBlock.includes('<i class="fas fa-pen" aria-hidden="true">'),
+      'the picker always renders the fa-pen edit affordance'
+    );
+
+    // Shared CSS: the pen (and the scene-locked variant) is the absolutely-positioned
+    // corner badge; the placeholder is centered+large and NOT absolutely positioned.
+    assert.match(
+      cssSource,
+      /\.manager-task-image-picker \.fa-pen[\s\S]*?position:\s*absolute[\s\S]*?bottom:\s*5px/,
+      'the pen badge is pinned to the bottom-right corner in the shared rule'
+    );
+    const placeholderRule = cssSource.slice(cssSource.indexOf('.manager-task-image-picker .fa-image'));
+    const placeholderBlock = placeholderRule.slice(0, placeholderRule.indexOf('}'));
+    assert.ok(
+      !placeholderBlock.includes('position: absolute'),
+      'the fa-image placeholder is centered (shares picker flex centering), not absolutely positioned'
+    );
+    assert.match(placeholderBlock, /font-size:\s*1\.8rem/, 'the placeholder icon is larger than the corner badge');
   });
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {

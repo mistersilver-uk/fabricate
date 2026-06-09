@@ -48,6 +48,12 @@
 
   let search = $state('');
 
+  // Two tabs: 'tools' | 'tasks'. Only the active tab's section renders, but the
+  // search filter (matchesSearch) is wired into BOTH the `tools` and `tasks`
+  // derived lists below, so whichever tab is active filters live by the search
+  // term — the search box applies to both kinds of entry.
+  let activeTab = $state('tools');
+
   function matchesSearch(label) {
     const needle = search.trim().toLowerCase();
     if (!needle) return true;
@@ -115,6 +121,34 @@
   function place(interactableType, referenceId, visualMode = 'marker') {
     services?.placeOnScene?.({ interactableType, systemId: selectedSystemId, referenceId, visualMode });
   }
+
+  // Tab button refs so roving keyboard nav can move DOM focus to the newly
+  // selected tab (WAI-ARIA roving-tabindex pattern).
+  let toolsTabEl = null;
+  let tasksTabEl = null;
+
+  function focusActiveTab() {
+    const el = activeTab === 'tools' ? toolsTabEl : tasksTabEl;
+    el?.focus?.();
+  }
+
+  // Roving keyboard navigation across the two-tab tablist (Left/Right/Home/End):
+  // switch the active tab AND move focus onto it.
+  function onTabKeydown(event) {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      activeTab = activeTab === 'tools' ? 'tasks' : 'tools';
+      focusActiveTab();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      activeTab = 'tools';
+      focusActiveTab();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      activeTab = 'tasks';
+      focusActiveTab();
+    }
+  }
 </script>
 
 <div class="fabricate-interactable-browser">
@@ -122,7 +156,7 @@
     <h2 class="fab-ib-title">{text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}</h2>
     <p class="fab-ib-hint">{text('FABRICATE.Canvas.Browser.Hint', 'Drag an entry onto the canvas, or use Place on current scene.')}</p>
     <p class="fab-ib-hint fab-ib-hint-modifier">{text('FABRICATE.Canvas.Interactable.DropModifierHint', 'Hold Alt while dropping to always choose the environment manually.')}</p>
-    <p class="fab-ib-hint fab-ib-hint-region">{text('FABRICATE.Canvas.Browser.RegionOnlyHint', 'Use the square button to place a region only, with no visible marker.')}</p>
+    <p class="fab-ib-hint fab-ib-hint-region">{text('FABRICATE.Canvas.Browser.RegionOnlyHint', 'The cubes button places a region with a tile marker; the outlined-square button places a region only, with no visible marker.')}</p>
   </header>
 
   <div class="fab-ib-controls">
@@ -148,85 +182,140 @@
   {#if systems.length === 0}
     <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoSystems', 'No crafting systems available.')}</p>
   {:else}
-    <section class="fab-ib-section" aria-label={text('FABRICATE.Canvas.Browser.ToolsHeading', 'Tools')}>
-      <h3 class="fab-ib-section-title">{text('FABRICATE.Canvas.Browser.ToolsHeading', 'Tools')}</h3>
-      {#if tools.length === 0}
-        <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoTools', 'No tools in this system.')}</p>
-      {:else}
-        <ul class="fab-ib-list">
-          {#each tools as tool (tool.id)}
-            <li
-              class="fab-ib-row"
-              use:dragSource={{ getPayload: () => dragPayload('tool', tool.id) }}
-            >
-              <img class="fab-ib-row-thumb" src={tool.img} alt="" />
-              <span class="fab-ib-row-label">{tool.label}</span>
-              <div class="fab-ib-row-actions">
-                <button
-                  type="button"
-                  class="fab-ib-place"
-                  onclick={() => place('tool', tool.id)}
-                  aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-                >
-                  {text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-                </button>
-                <button
-                  type="button"
-                  class="fab-ib-place-region"
-                  onclick={() => place('tool', tool.id, 'none')}
-                  title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
-                  aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
-                >
-                  <i class="fas fa-vector-square" aria-hidden="true"></i>
-                </button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
+    <div class="fab-ib-tabs" role="tablist" aria-label={text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}>
+      <button
+        type="button"
+        role="tab"
+        id="fab-ib-tab-tools"
+        class="fab-ib-tab"
+        class:is-active={activeTab === 'tools'}
+        aria-selected={activeTab === 'tools'}
+        aria-controls="fab-ib-panel-tools"
+        tabindex={activeTab === 'tools' ? 0 : -1}
+        bind:this={toolsTabEl}
+        onclick={() => activeTab = 'tools'}
+        onkeydown={onTabKeydown}
+      >
+        {text('FABRICATE.Canvas.Browser.ToolsHeading', 'Tools')}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="fab-ib-tab-tasks"
+        class="fab-ib-tab"
+        class:is-active={activeTab === 'tasks'}
+        aria-selected={activeTab === 'tasks'}
+        aria-controls="fab-ib-panel-tasks"
+        tabindex={activeTab === 'tasks' ? 0 : -1}
+        bind:this={tasksTabEl}
+        onclick={() => activeTab = 'tasks'}
+        onkeydown={onTabKeydown}
+      >
+        {text('FABRICATE.Canvas.Browser.TasksHeading', 'Gathering tasks')}
+      </button>
+    </div>
 
-    <section class="fab-ib-section" aria-label={text('FABRICATE.Canvas.Browser.TasksHeading', 'Gathering tasks')}>
-      <h3 class="fab-ib-section-title">{text('FABRICATE.Canvas.Browser.TasksHeading', 'Gathering tasks')}</h3>
-      {#if tasks.length === 0}
-        <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoTasks', 'No gathering tasks in this system.')}</p>
-      {:else}
-        <ul class="fab-ib-list">
-          {#each tasks as task (task.id)}
-            <li
-              class="fab-ib-row"
-              use:dragSource={{ getPayload: () => dragPayload('gatheringTask', task.id) }}
-            >
-              {#if task.img}
-                <img class="fab-ib-row-thumb" src={task.img} alt="" />
-              {:else}
-                <i class="fas fa-leaf fab-ib-row-icon" aria-hidden="true"></i>
-              {/if}
-              <span class="fab-ib-row-label">{task.label}</span>
-              <div class="fab-ib-row-actions">
-                <button
-                  type="button"
-                  class="fab-ib-place"
-                  onclick={() => place('gatheringTask', task.id)}
-                  aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-                >
-                  {text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place on current scene')}
-                </button>
-                <button
-                  type="button"
-                  class="fab-ib-place-region"
-                  onclick={() => place('gatheringTask', task.id, 'none')}
-                  title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
-                  aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
-                >
-                  <i class="fas fa-vector-square" aria-hidden="true"></i>
-                </button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
+    {#if activeTab === 'tools'}
+      <div
+        class="fab-ib-section"
+        id="fab-ib-panel-tools"
+        role="tabpanel"
+        aria-labelledby="fab-ib-tab-tools"
+        tabindex="0"
+      >
+        {#if tools.length === 0}
+          {#if search.trim()}
+            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoMatchingTools', 'No matching tools.')}</p>
+          {:else}
+            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoTools', 'No tools in this system.')}</p>
+          {/if}
+        {:else}
+          <ul class="fab-ib-list">
+            {#each tools as tool (tool.id)}
+              <li
+                class="fab-ib-row"
+                use:dragSource={{ getPayload: () => dragPayload('tool', tool.id) }}
+              >
+                <img class="fab-ib-row-thumb" src={tool.img} alt="" />
+                <span class="fab-ib-row-label">{tool.label}</span>
+                <div class="fab-ib-row-actions">
+                  <button
+                    type="button"
+                    class="fab-ib-place"
+                    onclick={() => place('tool', tool.id)}
+                    title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
+                    aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
+                  >
+                    <i class="fas fa-cubes" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="fab-ib-place-region"
+                    onclick={() => place('tool', tool.id, 'none')}
+                    title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                    aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                  >
+                    <i class="fas fa-vector-square" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    {:else}
+      <div
+        class="fab-ib-section"
+        id="fab-ib-panel-tasks"
+        role="tabpanel"
+        aria-labelledby="fab-ib-tab-tasks"
+        tabindex="0"
+      >
+        {#if tasks.length === 0}
+          {#if search.trim()}
+            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoMatchingTasks', 'No matching gathering tasks.')}</p>
+          {:else}
+            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoTasks', 'No gathering tasks in this system.')}</p>
+          {/if}
+        {:else}
+          <ul class="fab-ib-list">
+            {#each tasks as task (task.id)}
+              <li
+                class="fab-ib-row"
+                use:dragSource={{ getPayload: () => dragPayload('gatheringTask', task.id) }}
+              >
+                {#if task.img}
+                  <img class="fab-ib-row-thumb" src={task.img} alt="" />
+                {:else}
+                  <i class="fas fa-leaf fab-ib-row-icon" aria-hidden="true"></i>
+                {/if}
+                <span class="fab-ib-row-label">{task.label}</span>
+                <div class="fab-ib-row-actions">
+                  <button
+                    type="button"
+                    class="fab-ib-place"
+                    onclick={() => place('gatheringTask', task.id)}
+                    title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
+                    aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
+                  >
+                    <i class="fas fa-cubes" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="fab-ib-place-region"
+                    onclick={() => place('gatheringTask', task.id, 'none')}
+                    title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                    aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                  >
+                    <i class="fas fa-vector-square" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -287,11 +376,6 @@
     gap: 0.4rem;
   }
 
-  .fab-ib-section-title {
-    margin: 0;
-    font-size: 0.95rem;
-  }
-
   .fab-ib-list {
     list-style: none;
     margin: 0;
@@ -350,11 +434,9 @@
     gap: 0.3rem;
   }
 
-  .fab-ib-place {
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-
+  /* Icon-only placement buttons — both size as a 2rem square (padding 0) so the
+     cubes "place region + Tile" button matches the vector-square region-only one. */
+  .fab-ib-place,
   .fab-ib-place-region {
     flex: 0 0 auto;
     width: 2rem;
@@ -363,6 +445,37 @@
 
   .fab-ib-place:focus-visible,
   .fab-ib-place-region:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  /* Tab switcher (Tools / Gathering Tasks) — segmented control styling. */
+  .fab-ib-tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--color-border-light-tertiary);
+  }
+
+  .fab-ib-tab {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0.35rem 0.85rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 4px 4px 0 0;
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0.7;
+  }
+
+  .fab-ib-tab.is-active {
+    border-bottom-color: var(--fab-accent);
+    opacity: 1;
+    font-weight: 600;
+  }
+
+  .fab-ib-tab:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }

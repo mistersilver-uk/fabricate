@@ -5098,7 +5098,11 @@
   padding: 7px;
 }
 
-.fabricate-manager .manager-task-image-picker i {
+/* The edit/lock affordance (fa-pen, or fa-lock when the image is scene-locked)
+   is a small badge pinned to the bottom-right corner of the picker, on top of
+   either the <img> or the centered placeholder. */
+.fabricate-manager .manager-task-image-picker .fa-pen,
+.fabricate-manager .manager-task-image-picker .fa-lock {
   position: absolute;
   right: 5px;
   bottom: 5px;
@@ -5114,6 +5118,14 @@
   font-size: 0.72rem;
 }
 
+/* The "no image set" placeholder (fa-image) sits large and centered in the box;
+   it shares the picker's flex centering, so it must NOT be absolutely positioned
+   (that was the source of the bottom-right overlap with the pen badge). */
+.fabricate-manager .manager-task-image-picker .fa-image {
+  font-size: 1.8rem;
+  color: var(--fab-mv2-text-muted);
+}
+
 /* When a scene is linked, the identity image mirrors the (muted) scene thumbnail and is
    locked — it can't be edited until the scene is unlinked. */
 .fabricate-manager .manager-task-image-picker.is-scene-linked {
@@ -5126,7 +5138,8 @@
   filter: saturate(0.65) brightness(0.85);
 }
 
-.fabricate-manager .manager-task-image-picker.is-scene-linked i {
+.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-pen,
+.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock {
   color: var(--fab-mv2-text-muted);
 }
 
