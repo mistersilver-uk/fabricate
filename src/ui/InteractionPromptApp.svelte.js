@@ -1,5 +1,3 @@
-import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
-import InteractionPromptRoot from './svelte/apps/InteractionPromptRoot.svelte';
 import { registerInteractionPromptApp } from './appFactory.js';
 import { planPromptDismiss, buildPromptBehaviorRef } from './interactionPromptSingleton.js';
 
@@ -7,10 +5,19 @@ import { planPromptDismiss, buildPromptBehaviorRef } from './interactionPromptSi
  * The non-blocking, SINGLETON player prompt for a Fabricate interactable region
  * (region-first model). When the controlling player's token enters an eligible
  * `fabricate.interactable` region, the manager calls
- * {@link InteractionPromptApp.show} to raise a small, NOT-modal ApplicationV2
- * anchored bottom-center carrying the interactable's name, an optional prompt
- * line, and an "Interact" button. On token exit the manager calls
+ * {@link InteractionPromptApp.show} to raise a small, NOT-modal toast anchored
+ * bottom-center carrying the interactable's name, an optional prompt line, and
+ * an "Interact" button. On token exit the manager calls
  * {@link InteractionPromptApp.dismiss}.
+ *
+ * ROBUSTNESS contract: this is a PLAIN fixed-position DOM toast appended to
+ * `document.body` — NOT an ApplicationV2. ApplicationV2 applies its own inline
+ * positioning (overriding our stylesheet) and on the Vite dev server the module
+ * stylesheet may not even be loaded, so a frameless ApplicationV2 prompt landed
+ * mispositioned/unstyled and could overlay the sidebar. All CRITICAL layout
+ * (fixed, bottom-center, non-blocking) lives in INLINE styles on the toast so it
+ * works with zero external CSS; the `fabricate-interaction-prompt` class remains
+ * for purely cosmetic theming via `styles/fabricate.css`.
  *
  * SINGLETON contract: only ONE prompt exists at a time. `show()` REPLACES the
  * live prompt (a fresh region-enter supersedes a stale one); the most recently
@@ -19,65 +26,31 @@ import { planPromptDismiss, buildPromptBehaviorRef } from './interactionPromptSi
  * must not tear down a newer prompt). A bare `dismiss()` always closes.
  *
  * Registered via the app factory (NOT a static import chain) so Node test
- * environments never pull the Svelte compiler. The pure show/dismiss singleton
- * decision is extracted into {@link planPromptDismiss} for unit testing without
- * a live ApplicationV2.
+ * environments never pull a render dependency. The pure show/dismiss singleton
+ * decision is extracted into {@link planPromptDismiss} for unit testing.
  */
-export class InteractionPromptApp extends SvelteApplicationMixin(
-  foundry.applications.api.ApplicationV2
-) {
-  static SVELTE_COMPONENT = InteractionPromptRoot;
 
-  // The single live prompt instance + the behaviour ref it is showing.
+/**
+ * Localize a key through the Foundry i18n bridge, falling back to plain English
+ * when the bridge or the key is unavailable (Node test env, missing lang).
+ *
+ * @param {string} key
+ * @param {string} fallback
+ * @returns {string}
+ */
+function localizeLabel(key, fallback) {
+  try {
+    const translated = globalThis.game?.i18n?.localize?.(key);
+    return translated && translated !== key ? translated : fallback;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+export class InteractionPromptApp {
+  // The single live toast element + the behaviour ref it is showing.
   static _instance = null;
   static _behaviorRef = null;
-
-  _name = '';
-  _promptText = null;
-  _onInteract = null;
-
-  static DEFAULT_OPTIONS = {
-    id: 'fabricate-interaction-prompt',
-    classes: ['fabricate', 'fabricate-interaction-prompt-app'],
-    tag: 'div',
-    window: {
-      frame: false,
-      positioned: true
-    },
-    position: {
-      width: 'auto',
-      height: 'auto'
-    }
-  };
-
-  _prepareSvelteProps() {
-    return {
-      name: this._name,
-      promptText: this._promptText,
-      onInteract: () => {
-        const fn = this._onInteract;
-        // Fire the interaction, then dismiss this prompt (one-shot).
-        try { fn?.(); } finally { void this.close(); }
-      },
-      onClose: () => { void this.close(); }
-    };
-  }
-
-  async close(options) {
-    if (InteractionPromptApp._instance === this) {
-      InteractionPromptApp._instance = null;
-      InteractionPromptApp._behaviorRef = null;
-    }
-    return super.close(options);
-  }
-
-  _onClose(options) {
-    if (InteractionPromptApp._instance === this) {
-      InteractionPromptApp._instance = null;
-      InteractionPromptApp._behaviorRef = null;
-    }
-    super._onClose(options);
-  }
 
   /**
    * Show (or REPLACE) the singleton prompt for one interactable region.
@@ -89,22 +62,82 @@ export class InteractionPromptApp extends SvelteApplicationMixin(
    * @param {string} [params.name]       Interactable display name.
    * @param {string|null} [params.promptText]  Optional prompt line.
    * @param {() => void} [params.onInteract]   Invoked when the player clicks Interact.
-   * @returns {Promise<InteractionPromptApp>}
+   * @returns {HTMLElement|null} The toast element, or null when no DOM is available.
    */
-  static async show({ behaviorRef, name = '', promptText = null, onInteract = null } = {}) {
+  static show({ behaviorRef, name = '', promptText = null, onInteract = null } = {}) {
     // Replace any live prompt (a fresh enter supersedes a stale one).
-    const existing = InteractionPromptApp._instance;
-    if (existing) {
-      try { await existing.close(); } catch (_error) { /* tolerate a dead prompt. */ }
+    InteractionPromptApp._removeInstance();
+
+    const doc = globalThis.document;
+    if (!doc?.createElement || !doc.body?.appendChild) return null;
+
+    const fn = typeof onInteract === 'function' ? onInteract : null;
+
+    const toast = doc.createElement('div');
+    toast.className = 'fabricate fabricate-interaction-prompt';
+    toast.setAttribute('role', 'dialog');
+    toast.setAttribute('aria-live', 'polite');
+    // CRITICAL layout/positioning lives INLINE so the toast works with zero
+    // external CSS: fixed, bottom-center, above most UI, non-blocking.
+    toast.style.cssText = [
+      'position:fixed',
+      'left:50%',
+      'bottom:96px',
+      'transform:translateX(-50%)',
+      'z-index:70',
+      'max-width:min(90vw,420px)',
+      'pointer-events:auto'
+    ].join(';');
+
+    // Close affordance.
+    const closeBtn = doc.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'fabricate-interaction-prompt__close';
+    closeBtn.setAttribute('aria-label', localizeLabel('FABRICATE.Canvas.Interactable.Prompt.Close', 'Dismiss'));
+    closeBtn.innerHTML = '<i class="fas fa-xmark"></i>';
+    closeBtn.addEventListener('click', () => InteractionPromptApp._removeInstance());
+
+    // Body: name + optional prompt line.
+    const body = doc.createElement('div');
+    body.className = 'fabricate-interaction-prompt__body';
+    if (name) {
+      const nameEl = doc.createElement('p');
+      nameEl.className = 'fabricate-interaction-prompt__name';
+      nameEl.textContent = name;
+      body.appendChild(nameEl);
     }
-    const app = new InteractionPromptApp();
-    app._name = name ?? '';
-    app._promptText = promptText ?? null;
-    app._onInteract = typeof onInteract === 'function' ? onInteract : null;
-    InteractionPromptApp._instance = app;
+    if (promptText) {
+      const textEl = doc.createElement('p');
+      textEl.className = 'fabricate-interaction-prompt__text';
+      textEl.textContent = promptText;
+      body.appendChild(textEl);
+    }
+
+    // Interact action (one-shot: fire, then dismiss).
+    const actionBtn = doc.createElement('button');
+    actionBtn.type = 'button';
+    actionBtn.className = 'fabricate-interaction-prompt__action';
+    const actionLabel = localizeLabel('FABRICATE.Canvas.Interactable.Prompt.Interact', 'Interact');
+    actionBtn.innerHTML = `<i class="fas fa-hand-pointer"></i><span></span>`;
+    const actionSpan = actionBtn.querySelector('span');
+    if (actionSpan) actionSpan.textContent = actionLabel;
+    actionBtn.addEventListener('click', () => {
+      try { fn?.(); } finally { InteractionPromptApp._removeInstance(); }
+    });
+
+    toast.appendChild(closeBtn);
+    toast.appendChild(body);
+    toast.appendChild(actionBtn);
+
+    try {
+      doc.body.appendChild(toast);
+    } catch (_error) {
+      return null;
+    }
+
+    InteractionPromptApp._instance = toast;
     InteractionPromptApp._behaviorRef = behaviorRef ?? null;
-    await app.render(true);
-    return app;
+    return toast;
   }
 
   /**
@@ -113,18 +146,33 @@ export class InteractionPromptApp extends SvelteApplicationMixin(
    * ref, always closes the live prompt.
    *
    * @param {string} [behaviorRef]
-   * @returns {Promise<void>}
+   * @returns {void}
    */
-  static async dismiss(behaviorRef) {
+  static dismiss(behaviorRef) {
     if (!planPromptDismiss(InteractionPromptApp._behaviorRef, behaviorRef)) return;
-    const app = InteractionPromptApp._instance;
-    if (!app) return;
-    try { await app.close(); } catch (_error) { /* tolerate. */ }
+    InteractionPromptApp._removeInstance();
+  }
+
+  /**
+   * Tear down the live toast element (defensive/no-throw) and clear singleton
+   * state. Safe to call when nothing is showing or when no DOM is available.
+   */
+  static _removeInstance() {
+    const el = InteractionPromptApp._instance;
+    InteractionPromptApp._instance = null;
+    InteractionPromptApp._behaviorRef = null;
+    if (!el) return;
+    try {
+      el.remove?.();
+      if (el.parentNode?.removeChild && el.parentNode.contains?.(el)) {
+        el.parentNode.removeChild(el);
+      }
+    } catch (_error) { /* tolerate a detached/dead node. */ }
   }
 }
 
 export { planPromptDismiss, buildPromptBehaviorRef };
 
 // Register with the factory so the manager can resolve this class without a
-// static import chain that requires the Svelte compiler in Node.
+// static import chain.
 registerInteractionPromptApp(InteractionPromptApp);

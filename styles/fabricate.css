@@ -9701,19 +9701,13 @@
 }
 
 /* Region-first player interaction prompt (InteractionPromptApp) — a small,
-   non-modal, frameless toast anchored bottom-center. All selectors are
-   namespaced under the app root class so nothing bleeds into other sheets. */
-.fabricate-interaction-prompt-app {
-  left: 50% !important;
-  right: auto !important;
-  top: auto !important;
-  bottom: 96px !important;
-  transform: translateX(-50%);
-  width: auto !important;
-  height: auto !important;
-}
-
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt {
+   non-modal toast. The toast is a plain fixed-position DOM element appended to
+   <body>; its CRITICAL layout/positioning (fixed, bottom-center, z-index,
+   pointer-events, max-width) lives in INLINE styles on the element so it works
+   with zero external CSS. These rules are PURELY COSMETIC theming (colours,
+   padding, typography) — never positioning/visibility. Selectors are namespaced
+   under .fabricate-interaction-prompt so nothing bleeds into other sheets. */
+.fabricate-interaction-prompt {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -9723,29 +9717,28 @@
   background: var(--fab-bg-2);
   color: var(--fab-text);
   box-shadow: var(--fab-shadow-lg);
-  pointer-events: auto;
 }
 
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt__body {
+.fabricate-interaction-prompt .fabricate-interaction-prompt__body {
   display: flex;
   flex-direction: column;
   gap: 2px;
   max-width: 360px;
 }
 
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt__name {
+.fabricate-interaction-prompt .fabricate-interaction-prompt__name {
   margin: 0;
   font-weight: 700;
   font-size: 0.95em;
 }
 
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt__text {
+.fabricate-interaction-prompt .fabricate-interaction-prompt__text {
   margin: 0;
   font-size: 0.85em;
   opacity: 0.85;
 }
 
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt__action {
+.fabricate-interaction-prompt .fabricate-interaction-prompt__action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -9755,7 +9748,7 @@
   white-space: nowrap;
 }
 
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt__close {
+.fabricate-interaction-prompt .fabricate-interaction-prompt__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -9768,7 +9761,7 @@
   opacity: 0.6;
 }
 
-.fabricate-interaction-prompt-app .fabricate-interaction-prompt__close:hover {
+.fabricate-interaction-prompt .fabricate-interaction-prompt__close:hover {
   opacity: 1;
 }
 
