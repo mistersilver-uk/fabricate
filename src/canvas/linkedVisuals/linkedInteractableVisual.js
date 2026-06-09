@@ -10,15 +10,18 @@
  * interactable still works — the key advantage of the region-first pivot).
  *
  * The DECISION of what to do to the visual stays PURE: for a Tile we reuse
- * `planDepletedBehavior` from `depletedBehavior.js` (none/apply/revert/delete).
- * Only the resolve (`globalThis.fromUuidSync` / scene lookup) and the emit
- * (routed via the injected GM-socket seams) are edges. Drawing / Token branches
- * are Phase 4/5 no-op stubs.
+ * `planDepletedBehavior` from `depletedBehavior.js` (none/apply/revert/delete);
+ * for a Drawing we use the analogous PURE `planDrawingDepleted` (none/apply/
+ * revert/delete) which hides the drawing when depleted (and optionally appends a
+ * "(depleted)" label) and shows it on respawn. Only the resolve
+ * (`globalThis.fromUuidSync` / scene lookup) and the emit (routed via the injected
+ * GM-socket seams) are edges. The Token branch is a Phase 5 no-op stub.
  *
- * This pass (Phase 1b) implements the Tile branch only.
+ * This pass (Phase 4) implements the Tile + Drawing branches.
  */
 
 import { planDepletedBehavior } from '../depletedBehavior.js';
+import { normalizeDepletedBehavior } from '../../systems/gatheringNodeConfig.js';
 import { buildLinkedVisualFlags, readInteractableBehaviorSystem } from '../regions/interactableRegionFlags.js';
 
 /**
@@ -78,7 +81,10 @@ function lookupEmbedded(scene, documentName, docId) {
  *  - Tile   : reuse the PURE `planDepletedBehavior({ behavior, depleted, tile })`
  *             (none/apply/revert/delete) and route via `emitVisualUpdate` /
  *             `emitVisualDelete`.
- *  - Drawing/Token : Phase 4/5 — no-op stub.
+ *  - Drawing: use the PURE `planDrawingDepleted({ behavior, depleted, drawing })`
+ *             (hide-on-deplete / show-on-respawn, optional "(depleted)" label,
+ *             terminal delete) and route via the same seams.
+ *  - Token  : Phase 5 — no-op stub.
  *  - Missing visual : no-op.
  *
  * The depleted DECISION stays pure (delegated to `planDepletedBehavior`); only
@@ -108,21 +114,99 @@ export function applyLinkedVisualDepleted({
 
   const { doc, documentName } = resolved;
 
+  const behavior = behaviorSystem?.node?.depletedBehavior ?? null;
+  const sceneId = String(doc?.parent?.id ?? doc?.scene?.id ?? scene?.id ?? '');
+  const visualUuid = typeof doc?.uuid === 'string' ? doc.uuid : (behaviorSystem?.linkedVisual?.uuid ?? '');
+
   if (documentName === 'Tile') {
-    const behavior = behaviorSystem?.node?.depletedBehavior ?? null;
     const plan = planDepletedBehavior({ behavior, depleted, tile: doc });
     if (plan.action === 'none') return undefined;
-
-    const sceneId = String(doc?.parent?.id ?? doc?.scene?.id ?? scene?.id ?? '');
-    const visualUuid = typeof doc?.uuid === 'string' ? doc.uuid : (behaviorSystem?.linkedVisual?.uuid ?? '');
     if (plan.action === 'delete') {
       return emitVisualDelete?.({ sceneId, visualUuid, documentName });
     }
     return emitVisualUpdate?.({ sceneId, visualUuid, documentName, update: plan.update });
   }
 
-  // Phase 4/5: Drawing / Token depleted-visual mapping — no-op stub.
+  if (documentName === 'Drawing') {
+    const plan = planDrawingDepleted({ behavior, depleted, drawing: doc });
+    if (plan.action === 'none') return undefined;
+    if (plan.action === 'delete') {
+      return emitVisualDelete?.({ sceneId, visualUuid, documentName });
+    }
+    return emitVisualUpdate?.({ sceneId, visualUuid, documentName, update: plan.update });
+  }
+
+  // Phase 5: Token depleted-visual mapping — no-op stub.
   return undefined;
+}
+
+/**
+ * Decide the Drawing mutation for a depleted-behavior transition. PURE — no
+ * Foundry globals, no mutation; returns a plan the caller's thin edge enacts.
+ * Analogous to {@link planDepletedBehavior} for Tiles, but a Drawing has no
+ * texture to swap — instead the DEFAULT depleted visual is to HIDE the drawing
+ * (`hidden:true`) and SHOW it again on respawn. When the node's
+ * `depletedBehavior` configures a `swapImage` (i.e. the GM wants a visible
+ * "depleted" cue) OR `postfixName`, the drawing's `text` is additionally
+ * decorated with a " (depleted)" suffix; that decoration is reversible (the
+ * original text is stashed in `flags.fabricate.nodeOriginal.text`).
+ *
+ * `deleteToken` is TERMINAL: depleted + deleteToken deletes the drawing.
+ *
+ * All plans are idempotent — a re-run in the same visual state returns
+ * `{ action: 'none' }`.
+ *
+ *  - `{ action: 'none' }`            — nothing to do.
+ *  - `{ action: 'delete' }`          — terminal delete (depleted + deleteToken).
+ *  - `{ action: 'apply', update }`   — hide (+ optional label decoration);
+ *      `update` carries `hidden:true`, the freshly-stashed
+ *      `flags.fabricate.nodeOriginal` (only stashed when not already present),
+ *      and (when label decoration applies) the decorated `text`.
+ *  - `{ action: 'revert', update }`  — show again + restore the original text;
+ *      `update` carries `hidden:false` and clears the stash.
+ *
+ * @param {object} args
+ * @param {{ swapImage?: string, postfixName?: boolean, deleteToken?: boolean }|null} args.behavior
+ * @param {boolean} args.depleted
+ * @param {object} args.drawing  The Drawing doc (for current `text`/`hidden` +
+ *   the existing `flags.fabricate.nodeOriginal` stash).
+ * @returns {{ action: 'none' } | { action: 'delete' } | { action: 'apply', update: object } | { action: 'revert', update: object }}
+ */
+export function planDrawingDepleted({ behavior, depleted, drawing } = {}) {
+  const normalized = normalizeDepletedBehavior(behavior);
+  const existingOriginal = drawing?.flags?.fabricate?.nodeOriginal ?? null;
+
+  if (depleted) {
+    if (normalized?.deleteToken === true) {
+      return { action: 'delete' };
+    }
+    // Already hidden+stashed ⇒ the depleted visual is applied; re-run is a no-op.
+    if (existingOriginal) return { action: 'none' };
+
+    const original = { hidden: drawing?.hidden === true };
+    const currentText = typeof drawing?.text === 'string' ? drawing.text : '';
+    const wantLabel = Boolean(normalized && (normalized.swapImage || normalized.postfixName));
+    if (wantLabel) original.text = currentText;
+
+    const update = { hidden: true, flags: { fabricate: { nodeOriginal: original } } };
+    if (wantLabel) {
+      const suffix = ' (depleted)';
+      update.text = currentText.endsWith(suffix) ? currentText : `${currentText}${suffix}`;
+    }
+    return { action: 'apply', update };
+  }
+
+  // Not depleted ⇒ revert: show again + restore the original text/hidden state.
+  // Idempotent: no stash means nothing was applied, so nothing to revert.
+  if (!existingOriginal) return { action: 'none' };
+  const update = {
+    hidden: existingOriginal.hidden === true,
+    flags: { fabricate: { nodeOriginal: null } }
+  };
+  if (typeof existingOriginal.text === 'string') {
+    update.text = existingOriginal.text;
+  }
+  return { action: 'revert', update };
 }
 
 /**
@@ -156,6 +240,117 @@ export function buildLinkedTileData({ regionUuid, behaviorId, texture, x, y, wid
 
 const DEFAULT_LINKED_TILE_IMG = 'icons/svg/item-bag.svg';
 const DEFAULT_LINKED_TILE_SIZE = 100;
+
+const DEFAULT_LINKED_DRAWING_SIZE = 200;
+// A labelled translucent rectangle with a visible boundary stroke — a sensible
+// default "zone" marker for a Drawing-backed interactable.
+const DEFAULT_DRAWING_STROKE = '#ffaa00';
+const DEFAULT_DRAWING_FILL = '#ffaa00';
+
+/**
+ * Build the Drawing-document create payload for a linked interactable visual.
+ * PURE: shapes a labelled rectangle (`shape.type='r'`) with a boundary stroke +
+ * translucent fill, plus the reverse linked-visual flag block that points back at
+ * the owning Region + Behaviour (via {@link buildLinkedVisualFlags}). The caller
+ * performs the actual `DrawingDocument.create` at the edge.
+ *
+ * @param {object} params
+ * @param {string} params.regionUuid  The owning Region's uuid.
+ * @param {string} params.behaviorId  The owning behaviour's id.
+ * @param {string} [params.text]        The drawing label (default: empty).
+ * @param {string} [params.strokeColor] Hex stroke colour.
+ * @param {string} [params.fillColor]   Hex fill colour.
+ * @param {number} [params.x]
+ * @param {number} [params.y]
+ * @param {number} [params.width]
+ * @param {number} [params.height]
+ * @returns {object} The Drawing-document create data.
+ */
+export function buildLinkedDrawingData({
+  regionUuid,
+  behaviorId,
+  text,
+  strokeColor,
+  fillColor,
+  x,
+  y,
+  width,
+  height
+} = {}) {
+  const { fabricate } = buildLinkedVisualFlags({ regionUuid, behaviorId });
+  const w = Number.isFinite(Number(width)) && Number(width) > 0 ? Number(width) : DEFAULT_LINKED_DRAWING_SIZE;
+  const h = Number.isFinite(Number(height)) && Number(height) > 0 ? Number(height) : DEFAULT_LINKED_DRAWING_SIZE;
+  const stroke = typeof strokeColor === 'string' && strokeColor.trim() ? strokeColor.trim() : DEFAULT_DRAWING_STROKE;
+  const fill = typeof fillColor === 'string' && fillColor.trim() ? fillColor.trim() : DEFAULT_DRAWING_FILL;
+  return {
+    x: Number(x ?? 0),
+    y: Number(y ?? 0),
+    shape: { type: 'r', width: w, height: h },
+    text: typeof text === 'string' ? text : '',
+    strokeColor: stroke,
+    strokeWidth: 2,
+    fillType: 1, // CONST.DRAWING_FILL_TYPES.SOLID
+    fillColor: fill,
+    fillAlpha: 0.15,
+    fontSize: 24,
+    textColor: stroke,
+    flags: { fabricate }
+  };
+}
+
+/**
+ * Create the linked Drawing marker for a behaviour. EDGE: builds the create
+ * payload via {@link buildLinkedDrawingData} and performs the real
+ * `DrawingDocument.create` (preferring the V13-namespaced class, then a scene
+ * `createEmbeddedDocuments` fallback). Returns the created DrawingDocument, or
+ * null when it could not be created (no-throw).
+ *
+ * @param {object} params
+ * @param {object} params.scene       The scene to create the Drawing in.
+ * @param {object} params.behavior    The owning `fabricate.interactable` behaviour.
+ * @param {number} [params.x]
+ * @param {number} [params.y]
+ * @param {number} [params.width]
+ * @param {number} [params.height]
+ * @param {string} [params.text]       The drawing label (defaults to the interactable name).
+ * @param {string} [params.strokeColor]
+ * @param {string} [params.fillColor]
+ * @returns {Promise<object|null>}
+ */
+export async function createLinkedDrawing({ scene, behavior, x, y, width, height, text, strokeColor, fillColor } = {}) {
+  if (!scene) return null;
+  const region = behavior?.parent ?? null;
+  const regionUuid = typeof region?.uuid === 'string' ? region.uuid : null;
+  const behaviorId = behavior?.id ?? behavior?._id ?? null;
+  if (!regionUuid || !behaviorId) return null;
+
+  // Default the label to the interactable name when no explicit text is given.
+  const label = typeof text === 'string'
+    ? text
+    : (typeof behavior?.system?.name === 'string' ? behavior.system.name : '');
+
+  let drawingData;
+  try {
+    drawingData = buildLinkedDrawingData({ regionUuid, behaviorId, text: label, strokeColor, fillColor, x, y, width, height });
+  } catch (_error) {
+    return null;
+  }
+
+  try {
+    const DrawingDocument = globalThis.foundry?.documents?.DrawingDocument
+      ?? globalThis.CONFIG?.Drawing?.documentClass;
+    if (DrawingDocument?.create) {
+      return await DrawingDocument.create(drawingData, { parent: scene }) ?? null;
+    }
+    if (scene.createEmbeddedDocuments) {
+      const [created] = await scene.createEmbeddedDocuments('Drawing', [drawingData]);
+      return created ?? null;
+    }
+  } catch (_error) {
+    return null;
+  }
+  return null;
+}
 
 /**
  * Create the linked Tile marker for a behaviour. EDGE: builds the create payload
@@ -342,6 +537,39 @@ export async function recreateLinkedTile(behavior, { scene, texture, x, y, width
     await applyBehaviorUpdate?.({ ...ref, update: { system: { linkedVisual: { uuid, documentName: 'Tile' } } } });
   }
   return tile;
+}
+
+/**
+ * Recreate the linked Drawing for a behaviour (e.g. after the GM deleted the
+ * marker, or to upgrade a region-only interactable to a Drawing marker). EDGE:
+ * creates a fresh Drawing via {@link createLinkedDrawing}, then writes the new
+ * uuid + `documentName:'Drawing'` back onto the behaviour system through the
+ * injected `applyBehaviorUpdate` seam. Returns the created Drawing, or null.
+ *
+ * @param {object} behavior
+ * @param {object} params
+ * @param {object} params.scene
+ * @param {number} [params.x]
+ * @param {number} [params.y]
+ * @param {number} [params.width]
+ * @param {number} [params.height]
+ * @param {string} [params.text]
+ * @param {string} [params.strokeColor]
+ * @param {string} [params.fillColor]
+ * @param {object} deps
+ * @param {(args: object) => (void|Promise<void>)} deps.applyBehaviorUpdate
+ * @param {(behavior: object) => ({sceneId,regionId,behaviorId}|null)} deps.identify
+ * @returns {Promise<object|null>}
+ */
+export async function recreateLinkedDrawing(behavior, { scene, x, y, width, height, text, strokeColor, fillColor } = {}, { applyBehaviorUpdate, identify } = {}) {
+  const drawing = await createLinkedDrawing({ scene, behavior, x, y, width, height, text, strokeColor, fillColor });
+  if (!drawing) return null;
+  const ref = identify?.(behavior);
+  const uuid = typeof drawing?.uuid === 'string' ? drawing.uuid : null;
+  if (ref && uuid) {
+    await applyBehaviorUpdate?.({ ...ref, update: { system: { linkedVisual: { uuid, documentName: 'Drawing' } } } });
+  }
+  return drawing;
 }
 
 /**

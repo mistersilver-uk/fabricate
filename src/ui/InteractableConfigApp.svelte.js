@@ -20,6 +20,7 @@ import {
 import {
   relinkVisual,
   recreateLinkedTile,
+  recreateLinkedDrawing,
   applyMissingPolicy,
   resolveLinkedVisual
 } from '../canvas/linkedVisuals/linkedInteractableVisual.js';
@@ -186,12 +187,16 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
       },
       jumpToRegion: () => this._panToRegion(),
       jumpToVisual: () => this._panToVisual(),
-      relinkSelectedTile: async () => {
+      // Generic "Relink selected" — relinks to a controlled Tile OR Drawing OR
+      // Token (whichever the GM has selected on the canvas). `relinkVisual` derives
+      // the documentName from the selected document's own type, so a single seam
+      // covers all kinds.
+      relinkSelected: async () => {
         if (!this._assertGM()) return null;
         const behavior = this._resolveBehavior();
-        const selected = this._controlledTile();
+        const selected = this._controlledVisual();
         if (!behavior || !selected) {
-          this._warn('FABRICATE.Canvas.Interactable.Config.NoTileSelected');
+          this._warn('FABRICATE.Canvas.Interactable.Config.NoSelection');
           return null;
         }
         const patch = await relinkVisual(behavior, selected, {
@@ -213,6 +218,30 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         });
         if (tile) this._refresh();
         return tile;
+      },
+      // Create a Drawing marker (an alternative to a Tile) over the region centre,
+      // then flip the behaviour back to a visible marker. Works both as a
+      // missing-visual recovery and as a region-only upgrade. GM-routed.
+      createDrawingMarker: async () => {
+        if (!this._assertGM()) return null;
+        const behavior = this._resolveBehavior();
+        const scene = behavior?.parent?.parent ?? globalThis.canvas?.scene ?? null;
+        if (!behavior || !scene) return null;
+        const center = this._shapeCenter(behavior?.parent ?? null);
+        const size = this._gridSize() * 2;
+        const placement = center
+          ? { x: center.x - size / 2, y: center.y - size / 2, width: size, height: size }
+          : {};
+        const drawing = await recreateLinkedDrawing(behavior, { scene, ...placement }, {
+          applyBehaviorUpdate: applyInteractableBehaviorUpdate,
+          identify: identifyRegionBehaviorRef
+        });
+        if (!drawing) return null;
+        // `recreateLinkedDrawing` writes uuid + documentName but leaves the prior
+        // mode; flip it to 'marker' so the visual resolves + un-hides.
+        await writeBehavior({ linkedVisual: { mode: 'marker' }, presentation: { hidden: false } });
+        this._refresh();
+        return drawing;
       },
       // Upgrade a region-only interactable (no marker, `linkedVisual.mode:'none'`)
       // to a linked Tile: create the marker over the region center and flip the
@@ -374,10 +403,25 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
     return Array.isArray(tasks) ? tasks : [];
   }
 
-  _controlledTile() {
-    const controlled = globalThis.canvas?.tiles?.controlled ?? [];
-    const tile = (Array.isArray(controlled) ? controlled : [])[0] ?? null;
-    return tile?.document ?? tile ?? null;
+  /**
+   * Resolve the first controlled linked-visual document on the canvas, preferring
+   * a Tile, then a Drawing, then a Token. Generic so "Relink selected" works for
+   * any supported marker kind. Returns the document (not the placeable), or null.
+   *
+   * @returns {object|null}
+   */
+  _controlledVisual() {
+    const layers = [
+      globalThis.canvas?.tiles?.controlled,
+      globalThis.canvas?.drawings?.controlled,
+      globalThis.canvas?.tokens?.controlled
+    ];
+    for (const controlled of layers) {
+      const placeable = (Array.isArray(controlled) ? controlled : [])[0] ?? null;
+      const doc = placeable?.document ?? placeable ?? null;
+      if (doc) return doc;
+    }
+    return null;
   }
 
   _controlledActorId() {

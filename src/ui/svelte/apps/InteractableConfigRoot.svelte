@@ -183,19 +183,29 @@
           <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createReplacementTile?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RecreateTile', 'Recreate tile')}
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelectedTile?.())}>
-            {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected tile')}
+          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createDrawingMarker?.())}>
+            {text('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker', 'Create drawing marker')}
+          </button>
+          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelected?.())}>
+            {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
           </button>
           <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.ClearVisualLink', 'Clear visual link')}
           </button>
         </div>
       {:else if visualStatus.severity === 'none'}
-        <!-- Region-only (no marker): offer an upgrade to a linked Tile. -->
+        <!-- Region-only (no marker): offer an upgrade to a linked Tile or Drawing. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
           <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createMarker?.())}>
             <i class="fas fa-map-pin" aria-hidden="true"></i>
             <span>{text('FABRICATE.Canvas.Interactable.Config.CreateMarker', 'Create marker')}</span>
+          </button>
+          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createDrawingMarker?.())}>
+            <i class="fas fa-draw-polygon" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker', 'Create drawing marker')}</span>
+          </button>
+          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelected?.())}>
+            {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
           </button>
         </div>
       {/if}

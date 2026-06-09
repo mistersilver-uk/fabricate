@@ -59,8 +59,10 @@ describe('InteractableConfigApp shell', () => {
   it('wires the action seams to their live edges', () => {
     assert.ok(appSource.includes('_requestActivation?.(behavior, {') && appSource.includes("activationSource: 'gmTest'"), 'test-as-player runs the activation pipeline with gmTest');
     assert.ok(appSource.includes('canvas?.animatePan?.('), 'jump pans the camera');
-    assert.ok(appSource.includes('relinkVisual(behavior, selected'), 'relink uses the selected tile');
+    assert.ok(appSource.includes('relinkVisual(behavior, selected'), 'relink uses the selected visual');
+    assert.ok(appSource.includes('this._controlledVisual()'), 'relink resolves a controlled Tile/Drawing/Token generically');
     assert.ok(appSource.includes('recreateLinkedTile(behavior'), 'recreate creates a replacement tile');
+    assert.ok(appSource.includes('recreateLinkedDrawing(behavior'), 'create-drawing-marker uses recreateLinkedDrawing');
     assert.ok(appSource.includes('planClearVisualLink('), 'remove clears the visual link');
     assert.ok(appSource.includes('planRestock(system)'), 'restock uses the pure planner');
     assert.ok(appSource.includes('planSetEnabled(') && appSource.includes('planSetLocked('), 'enable/lock toggles use the pure planners');
@@ -74,6 +76,18 @@ describe('InteractableConfigApp shell', () => {
     // back to a visible marker (mode marker, un-hidden) — not a divergent path.
     assert.ok(appSource.includes("linkedVisual: { mode: 'marker' }"), 'flips linkedVisual.mode back to marker');
     assert.ok(appSource.includes('presentation: { hidden: false }'), 'un-hides the upgraded interactable');
+  });
+
+  it('offers a Create-drawing-marker seam (Phase 4) that flips the behaviour to a visible marker', () => {
+    assert.ok(appSource.includes('createDrawingMarker:'), 'declares the Create-drawing-marker service');
+    assert.ok(appSource.includes('recreateLinkedDrawing(behavior'), 'creates a Drawing via recreateLinkedDrawing (GM-routed)');
+    assert.ok(/createDrawingMarker:[\s\S]*?_assertGM\(\)/.test(appSource), 'GM-guarded');
+  });
+
+  it('relinks generically (Tile OR Drawing OR Token) via a single Relink-selected seam', () => {
+    assert.ok(appSource.includes('relinkSelected:'), 'declares the generic relinkSelected service');
+    assert.ok(appSource.includes('canvas?.drawings?.controlled'), 'considers a controlled Drawing for relink');
+    assert.ok(appSource.includes('canvas?.tokens?.controlled'), 'considers a controlled Token for relink');
   });
 
   it('confirms destructive actions through a 3-way DialogV2 choice (choiceDialog), never globalThis.confirm', () => {
@@ -114,8 +128,9 @@ describe('InteractableConfigRoot body', () => {
   it('exposes every action button wired to its services seam', () => {
     assert.ok(rootSource.includes('services?.testAsPlayer?.()'), 'Test as player');
     assert.ok(rootSource.includes('services?.jumpToRegion?.()') && rootSource.includes('services?.jumpToVisual?.()'), 'Jump buttons');
-    assert.ok(rootSource.includes('services?.relinkSelectedTile?.()'), 'Relink selected');
+    assert.ok(rootSource.includes('services?.relinkSelected?.()'), 'Relink selected (generic)');
     assert.ok(rootSource.includes('services?.createReplacementTile?.()'), 'Create replacement tile');
+    assert.ok(rootSource.includes('services?.createDrawingMarker?.()'), 'Create drawing marker');
     assert.ok(rootSource.includes('services?.removeVisualMarker?.()'), 'Remove visual marker');
     assert.ok(rootSource.includes('services?.restockNode?.()'), 'Restock');
     assert.ok(rootSource.includes('services?.setEnabled?.(!view.state.enabled)'), 'Enable/Disable toggle');
@@ -132,6 +147,7 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes("visualStatus.severity === 'none'"), 'gates the upgrade on the region-only status');
     assert.ok(rootSource.includes('services?.createMarker?.()'), 'wires the Create-marker seam');
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.CreateMarker'), 'localized Create marker label');
+    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker'), 'localized Create drawing marker label');
   });
 
   it('localizes every string through the foundry bridge under the Config namespace', () => {

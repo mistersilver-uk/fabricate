@@ -61,7 +61,8 @@
           "VisualNone": "No marker (region only).",
           "RecreateTile": "Recreate tile",
           "CreateMarker": "Create marker",
-          "RelinkSelected": "Relink selected tile",
+          "CreateDrawingMarker": "Create drawing marker",
+          "RelinkSelected": "Relink selected",
           "ClearVisualLink": "Clear visual link",
           "MissingPolicyLabel": "If the marker is missing",
           "MissingIgnore": "Ignore",
@@ -96,6 +97,7 @@
           "RemoveVisualDelete": "Unlink + delete tile",
           "RemoveVisualCancel": "Cancel",
           "NoTileSelected": "Select a tile on the canvas first.",
+          "NoSelection": "Select a tile, drawing, or token on the canvas first.",
           "NoVisual": "This interactable has no linked marker to jump to."
         }
       },
