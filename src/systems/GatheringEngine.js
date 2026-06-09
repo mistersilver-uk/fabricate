@@ -86,17 +86,6 @@ export class GatheringEngine {
     failureFeedback = null,
     hazardSceneTrigger = null,
     getRunViewer = null,
-    // Rebuild a per-region node-state adapter from a persisted region-behaviour
-    // ref `{ sceneId, regionId, behaviorId }`. (The seam/field names keep their
-    // legacy `tile*` spelling — `resolveTileNodeState`, `tileNodeRef` — for
-    // data/back-compat; the payload is the region ref, not a `{ sceneId, tileId }`
-    // tile ref.) Injected so a TIMED `onSuccess` waiting run can, at MATURITY,
-    // route its node decrement onto the `fabricate.interactable` behaviour's
-    // `system.node` (via the GM socket) instead of `environment.nodeRuntime[taskId]`.
-    // Returns null when the region/behaviour is gone or the ref is unresolvable, in
-    // which case maturity falls back to the env node — see
-    // {@link GatheringEngine#_resolveMaturedTileNodeState}.
-    resolveTileNodeState = null,
     random = Math.random,
     localize = defaultLocalize,
     // Stamina regen / node respawn run on world-time advance and write shared
@@ -121,7 +110,6 @@ export class GatheringEngine {
     this.failureFeedback = failureFeedback;
     this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
-    this.resolveTileNodeState = typeof resolveTileNodeState === 'function' ? resolveTileNodeState : null;
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
@@ -251,13 +239,7 @@ export class GatheringEngine {
     // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
     // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
     // ONLY for tasks in the matching crafting system — componentId is per-system.
-    presentTools = null,
-    // Per-region node-state adapter injected by a granted canvas gathering-task
-    // region activation: when present the depletion gate, decrement, and listing
-    // node counts read/write the `fabricate.interactable` behaviour's own
-    // `system.node` instead of `environment.nodeRuntime[taskId]`. Writes route
-    // through the active GM.
-    nodeStateOverride = null
+    presentTools = null
   } = {}) {
     const resolved = await this._resolveStartContext({
       viewer,
@@ -413,8 +395,7 @@ export class GatheringEngine {
       viewer,
       system,
       environment,
-      task,
-      nodeState: nodeStateOverride
+      task
     });
     if (richAttempt.blockedReasons.length > 0) {
       return this._blockedStart({
@@ -444,12 +425,11 @@ export class GatheringEngine {
     if (hasTimeRequirement(task)) {
       // Waiting runs mature later (no open session / canvas tool), so terminal
       // tool side-effects use no virtual-present set; the gate above already
-      // passed for this attempt. The per-token node override is still threaded so
-      // the waiting run's commit decrements the token node (not env nodeRuntime).
-      return this._startWaitingAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt, nodeStateOverride });
+      // passed for this attempt.
+      return this._startWaitingAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt });
     }
 
-    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt, presentTools, nodeStateOverride });
+    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt, presentTools });
   }
 
   async _processMaturedWaitingRun({ actor, run }) {
@@ -520,13 +500,7 @@ export class GatheringEngine {
       });
     }
 
-    // Rebuild the per-region node adapter when this waiting run was started from a
-    // canvas gathering-task region, so a TIMED `onSuccess` decrement at maturity
-    // lands on the behaviour's `system.node` (via the GM socket), not the shared
-    // `environment.nodeRuntime[taskId]`. Null (region/behaviour gone / no ref / no
-    // seam) falls back to the env node.
-    const nodeState = this._resolveMaturedTileNodeState(run);
-    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer, nodeState });
+    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer });
     const completedRunWithRichEvidence = richEvidence && typeof richEvidence === 'object'
       ? {
           ...completedRun,
@@ -619,7 +593,7 @@ export class GatheringEngine {
    * @param {string|null} [args.rememberedActorId] Previously selected actor id.
    * @returns {Promise<object>} The gathering listing model.
    */
-  async listForActor({ viewer = null, actor = null, rememberedActorId = null, presentTools = null, nodeStateOverride = null, nodeStateOverrideScope = null } = {}) {
+  async listForActor({ viewer = null, actor = null, rememberedActorId = null, presentTools = null } = {}) {
     const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
     if (selectableActors.length === 0) {
       return this._emptyListing({
@@ -663,9 +637,7 @@ export class GatheringEngine {
         system: systems.get(environment.craftingSystemId),
         viewer,
         actor: selectedActor,
-        presentTools,
-        nodeStateOverride,
-        nodeStateOverrideScope
+        presentTools
       });
       if (model.visible) {
         environmentModels.push(model);
@@ -976,7 +948,7 @@ export class GatheringEngine {
     return environment;
   }
 
-  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null, nodeStateOverride = null, nodeStateOverrideScope = null }) {
+  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null }) {
     // Disabled environments surface to every viewer (players and GMs alike) as
     // non-interactive "locked" teasers. Build them before any task-visibility
     // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
@@ -1035,11 +1007,7 @@ export class GatheringEngine {
       viewer,
       visibility: entry.visibility,
       blockedReasons: entry.blockedReasons,
-      tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools }),
-      // Scope the per-token node override to its OWN env+task so the listing
-      // reflects the token's current/max/depleted/respawnEta there and ONLY
-      // there — other tasks read the env/library node, never the token's.
-      nodeState: this._scopedNodeStateOverride({ environment, task: entry.task, nodeStateOverride, nodeStateOverrideScope })
+      tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools })
     }));
     // Refine the displayed stamina cost to the viewing character's effective
     // cost (base + per-actor modifiers); the sync model carries the base.
@@ -1061,7 +1029,7 @@ export class GatheringEngine {
       ? (taskModels.length > 0 ? [taskModels[0]] : [])
       : taskModels;
     const discoveredTasks = blindForViewer
-      ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools, nodeStateOverride, nodeStateOverrideScope })
+      ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools })
       : [];
 
     // The GM-configured hazard visibility tier further restricts what a non-GM
@@ -1136,7 +1104,7 @@ export class GatheringEngine {
    * @param {object[]} args.environmentBlockedReasons Shared environment-level reasons.
    * @returns {Promise<object[]>} Transparent discovered task models (each with `discovered: true`).
    */
-  async _discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools = null, nodeStateOverride = null, nodeStateOverrideScope = null }) {
+  async _discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools = null }) {
     const { policy, scope } = this._resolveRevealPolicy(environment);
     if (policy === 'never') return [];
     const revealedIds = new Set(this._listRevealedTaskIds({ actor, environmentId: environment.id, scope }));
@@ -1165,8 +1133,7 @@ export class GatheringEngine {
         visibility: entry.visibility,
         blockedReasons,
         forceVisible: true,
-        tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools }),
-        nodeState: this._scopedNodeStateOverride({ environment, task: entry.task, nodeStateOverride, nodeStateOverrideScope })
+        tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools })
       });
       await this._applyListingStaminaCost(model, { system, environment, actor, viewer, task: entry.task });
       discovered.push({ ...model, discovered: true });
@@ -1679,13 +1646,13 @@ export class GatheringEngine {
    *   key is safe.
    * @returns {object} The task model.
    */
-  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons, forceVisible = false, tools = null, nodeState = null }) {
+  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons, forceVisible = false, tools = null }) {
     const blind = environment.selectionMode === 'blind';
     // `forceVisible` builds a transparent model for an already-revealed blind
     // task (the "Discovered Tasks" list) — it bypasses the opaque collapse that
     // otherwise hides task identity from non-GM viewers of a blind environment.
     const opaqueBlind = !forceVisible && this._isOpaqueBlindTask({ environment, viewer });
-    const rich = this._richListingMetadata({ environment, task, actor, viewer, nodeState });
+    const rich = this._richListingMetadata({ environment, task, actor, viewer });
 
     if (opaqueBlind) {
       return {
@@ -1731,34 +1698,9 @@ export class GatheringEngine {
     };
   }
 
-  /**
-   * Return the per-region node-state override ONLY for the env+task it is scoped
-   * to (a placed gathering-task region owns exactly one task's node), else null.
-   * This is the listing-side leak guard mirroring the app's
-   * `nodeStateOverrideFor`: a region's node must never surface against any OTHER
-   * listed task. With no scope (no region session) the override is inert.
-   *
-   * @param {object} args
-   * @param {object} args.environment Composed environment.
-   * @param {object} args.task Composed/normalized task.
-   * @param {object|null} args.nodeStateOverride The per-region adapter, or null.
-   * @param {{environmentId?: string, taskId?: string}|null} args.nodeStateOverrideScope
-   * @returns {object|null}
-   */
-  _scopedNodeStateOverride({ environment, task, nodeStateOverride = null, nodeStateOverrideScope = null }) {
-    if (!nodeStateOverride) return null;
-    const envId = stringOrNull(nodeStateOverrideScope?.environmentId);
-    const taskId = stringOrNull(nodeStateOverrideScope?.taskId);
-    if (!envId || !taskId) return null;
-    if (stringOrNull(environment?.id) === envId && stringOrNull(task?.id) === taskId) {
-      return nodeStateOverride;
-    }
-    return null;
-  }
-
-  _richListingMetadata({ environment, task, actor = null, viewer = null, nodeState = null }) {
+  _richListingMetadata({ environment, task, actor = null, viewer = null }) {
     if (typeof this.richState?.buildListingMetadata === 'function') {
-      return this.richState.buildListingMetadata({ environment, task, actor, viewer, nodeState });
+      return this.richState.buildListingMetadata({ environment, task, actor, viewer });
     }
     return {
       nodes: task?.nodes ? {
@@ -1789,11 +1731,11 @@ export class GatheringEngine {
    * @returns {Promise<{blockedReasons: object[], evidence: object}>} Mapped
    *   blocked reasons and the rich-listing evidence.
    */
-  async _evaluateRichAttempt({ actor, viewer, system, environment, task, transparent = false, nodeState = null }) {
+  async _evaluateRichAttempt({ actor, viewer, system, environment, task, transparent = false }) {
     if (typeof this.richState?.evaluateStart !== 'function') {
-      return { blockedReasons: [], evidence: this._richListingMetadata({ environment, task, actor, viewer, nodeState }) };
+      return { blockedReasons: [], evidence: this._richListingMetadata({ environment, task, actor, viewer }) };
     }
-    const result = await this.richState.evaluateStart({ actor, viewer, system, environment, task, nodeState });
+    const result = await this.richState.evaluateStart({ actor, viewer, system, environment, task });
     const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     return {
       blockedReasons: normalizeList(result?.blockedReasons).map(reason => this._blockedReason(reason.code || 'BLOCKED', {
@@ -1950,7 +1892,7 @@ export class GatheringEngine {
     };
   }
 
-  async _startWaitingAttempt({ viewer, actor, system, environment, task, richAttempt = null, nodeStateOverride = null }) {
+  async _startWaitingAttempt({ viewer, actor, system, environment, task, richAttempt = null }) {
     if (typeof this.runManager?.createWaitingRun !== 'function') {
       return this._blockedStart({
         viewer,
@@ -1968,32 +1910,13 @@ export class GatheringEngine {
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id)
     };
-    // Persist the placed region-behaviour identity when this attempt was started
-    // from a canvas gathering-task region. A per-region node adapter is a live
-    // function object (not JSON-serializable), so the waiting run carries only the
-    // behaviour REF `{ sceneId, regionId, behaviorId }` (under the back-compat
-    // `tileNodeRef` key); the adapter is rebuilt at maturity (on the active GM) so
-    // a TIMED `onSuccess` decrement lands on the behaviour's `system.node`, not the
-    // env nodeRuntime (see {@link GatheringEngine#_processMaturedWaitingRun}).
-    const tileNodeRef = typeof nodeStateOverride?.tileRef === 'function'
-      ? nodeStateOverride.tileRef()
-      : null;
     if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
       const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
       richPayload.economyEvidence = {
         ...(richPayload.economyEvidence || {}),
-        runtimeSnapshot: this._runtimeSnapshot({ environment, task }),
-        ...(tileNodeRef ? { tileNodeRef } : {})
+        runtimeSnapshot: this._runtimeSnapshot({ environment, task })
       };
       Object.assign(runData, richPayload);
-    } else if (tileNodeRef) {
-      // No rich snapshot for this task, but still persist the behaviour ref (under
-      // the back-compat `tileNodeRef` key) so the maturity commit can rebuild the
-      // per-region adapter.
-      runData.economyEvidence = {
-        ...(runData.economyEvidence || {}),
-        tileNodeRef
-      };
     }
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
 
@@ -2017,7 +1940,7 @@ export class GatheringEngine {
         });
       }
 
-      const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome: { status: 'waitingTime' }, viewer, nodeState: nodeStateOverride });
+      const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome: { status: 'waitingTime' }, viewer });
       const waitingRun = richEvidence && typeof richEvidence === 'object'
         ? {
             ...run,
@@ -2046,7 +1969,7 @@ export class GatheringEngine {
     }
   }
 
-  async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null, presentTools = null, nodeStateOverride = null }) {
+  async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null, presentTools = null }) {
     const outcome = task.resolutionMode === 'd100'
       ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
       : (task.resolutionMode === 'progressive'
@@ -2124,7 +2047,7 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer, nodeState: nodeStateOverride });
+    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer });
     if (richEvidence && typeof richEvidence === 'object') {
       run = {
         ...run,
@@ -2270,47 +2193,9 @@ export class GatheringEngine {
     };
   }
 
-  async _commitRichAttempt({ actor, system, environment, task, outcome, viewer = null, nodeState = null }) {
+  async _commitRichAttempt({ actor, system, environment, task, outcome, viewer = null }) {
     if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
-    return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome, viewer, nodeState });
-  }
-
-  /**
-   * Rebuild a node-state adapter for a matured waiting run that was started from a
-   * placed canvas gathering-task interactable. The run persists only the node REF
-   * (`economyEvidence.tileNodeRef`) because the live adapter is a function object
-   * that cannot survive serialization; this reconstructs it on the active GM via
-   * the injected `resolveTileNodeState` seam so the maturity commit decrements the
-   * authoritative node (not the shared env nodeRuntime).
-   *
-   * The ref is treated as OPAQUE and passed THROUGH to the widened resolver
-   * unchanged. A legacy tile run record carries `{ sceneId, tileId }`; a
-   * region-first run record carries `{ sceneId, regionId, behaviorId }`. The seam
-   * accepts either shape and rebuilds the matching adapter, so the engine does not
-   * hard-require `tileId` (which would break the region ref). We only require the
-   * ref to be a non-empty object so a junk record falls back to the env node.
-   *
-   * Returns null — falling back to the env node — when there is no node ref, no
-   * seam injected, or the node can no longer be resolved (e.g. deleted).
-   *
-   * @param {object} run The matured waiting run record.
-   * @returns {object|null} A node-state adapter, or null.
-   */
-  _resolveMaturedTileNodeState(run) {
-    if (typeof this.resolveTileNodeState !== 'function') return null;
-    const ref = plainObjectOrNull(run?.economyEvidence?.tileNodeRef);
-    if (!ref) return null;
-    const sceneId = stringOrNull(ref.sceneId);
-    // Require a scene + at least one node identity (legacy tileId OR a region
-    // behaviorId); pass the persisted ref THROUGH unchanged so a region ref
-    // ({ sceneId, regionId, behaviorId }) rebuilds a region adapter.
-    const hasTarget = stringOrNull(ref.tileId) || stringOrNull(ref.behaviorId);
-    if (!sceneId || !hasTarget) return null;
-    try {
-      return this.resolveTileNodeState({ ...ref }) || null;
-    } catch (_err) {
-      return null;
-    }
+    return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome, viewer });
   }
 
   async _commitTerminalSideEffects({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {

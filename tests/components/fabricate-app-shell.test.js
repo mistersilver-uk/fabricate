@@ -76,7 +76,7 @@ describe('SvelteFabricateApp shell window', () => {
   describe('activeCanvasTool session context (Phase 4)', () => {
     it('show accepts a two-arg { activeCanvasTool } options bag without breaking single-arg callers', () => {
       assert.ok(
-        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, nodeStateOverride, environmentId, taskId } = {})'),
+        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId } = {})'),
         'show should be the two-arg form with an options default so single-arg callers stay valid'
       );
       // existing single-arg call sites pass no options → activeCanvasTool undefined → null.

@@ -721,22 +721,17 @@ export class GatheringRichStateService {
     return environment ? cloneJson(environment) : null;
   }
 
-  buildListingMetadata({ environment, task, actor, viewer, nodeState = null }) {
+  buildListingMetadata({ environment, task, actor, viewer }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
     const mode = this._economyMode(environment?.craftingSystemId);
-    // A per-token node override takes precedence over the composed task node so a
-    // placed gathering-task token reflects ITS OWN counts + respawn ETA.
-    const overrideNode = this._readOverrideNode(nodeState);
-    const displayNode = overrideNode ?? (task?.nodes ?? null);
-    const showNodeCounts = displayNode?.showCountsToPlayers === true || task?.nodes?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
-    const respawnEta = overrideNode && typeof nodeState?.respawnEta === 'function' ? nodeState.respawnEta() : null;
+    const displayNode = task?.nodes ?? null;
+    const showNodeCounts = displayNode?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
     const nodes = mode === 'nodes' && displayNode ? {
       enabled: true,
       available: Number(displayNode.current || 0) > 0,
       depleted: Number(displayNode.current || 0) <= 0,
       current: showNodeCounts ? Number(displayNode.current || 0) : null,
-      max: showNodeCounts ? Number(displayNode.max || 0) : null,
-      ...(respawnEta ? { respawnEta } : {})
+      max: showNodeCounts ? Number(displayNode.max || 0) : null
     } : null;
     const stamina = mode === 'stamina' && Number(task?.staminaCost || 0) > 0 ? {
       cost: Number(task.staminaCost || 0),
@@ -933,15 +928,8 @@ export class GatheringRichStateService {
    * The current node object for a task in an environment: the per-environment
    * runtime pool if present, else a fresh full pool seeded from the library
    * task's node config. Null when the task has no node config.
-   *
-   * When a per-token `nodeState` adapter is injected (a canvas gathering-task
-   * token owns its own depletion/respawn state), it takes precedence over
-   * `environment.nodeRuntime[taskId]` — the token's `flags.fabricate.node` is the
-   * only node state that attempt uses.
    */
-  _currentNodeState(environment, taskId, nodeState = null) {
-    const overridden = this._readOverrideNode(nodeState);
-    if (overridden) return overridden;
+  _currentNodeState(environment, taskId) {
     const runtime = environment?.nodeRuntime?.[taskId];
     if (runtime) return runtime;
     const libraryTasks = this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
@@ -950,26 +938,11 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Read the current node from an injected per-token override adapter, or `null`
-   * when there is no override (so callers fall back to `nodeRuntime`).
+   * Persist a node object for a task into the per-environment `nodeRuntime` map
+   * (reading the raw stored environment so a composed/runtime environment is
+   * never written).
    */
-  _readOverrideNode(nodeState) {
-    if (!nodeState || typeof nodeState.read !== 'function') return null;
-    return nodeState.read() || null;
-  }
-
-  /**
-   * Persist a node object for a task. When a per-token `nodeState` adapter is
-   * injected the write routes through it (the GM socket), leaving
-   * `environment.nodeRuntime[taskId]` untouched. Otherwise it writes the
-   * per-environment `nodeRuntime` map (reading the raw stored environment so a
-   * composed/runtime environment is never written).
-   */
-  async _writeNodeState({ environmentId, taskId, node, nodeState = null }) {
-    if (nodeState && typeof nodeState.write === 'function') {
-      await nodeState.write(node);
-      return node;
-    }
+  async _writeNodeState({ environmentId, taskId, node }) {
     const stored = this.environmentStore?.get?.(environmentId);
     if (!stored) return null;
     return this.environmentStore.update(environmentId, {
@@ -1381,16 +1354,13 @@ export class GatheringRichStateService {
     return ids.map(id => optionsById.get(id) ?? normalizeVocabularyOption('biomes', id));
   }
 
-  async evaluateStart({ actor, system, environment, task, viewer, nodeState = null } = {}) {
+  async evaluateStart({ actor, system, environment, task, viewer } = {}) {
     const blockedReasons = [];
-    const evidence = this.buildListingMetadata({ environment, task, actor, viewer, nodeState });
+    const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
     const systemId = system?.id || environment?.craftingSystemId;
     const mode = this._economyMode(systemId);
 
-    // A per-token node override (canvas gathering-task token) takes precedence
-    // over the composed task's per-environment node for the depletion gate.
-    const overrideNode = this._readOverrideNode(nodeState);
-    const gateNode = overrideNode ?? (task?.nodes ?? null);
+    const gateNode = task?.nodes ?? null;
     if (mode === 'nodes' && gateNode && Number(gateNode.current || 0) <= 0) {
       blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
     }
@@ -1413,7 +1383,7 @@ export class GatheringRichStateService {
     return { blockedReasons, evidence };
   }
 
-  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null, nodeState = null } = {}) {
+  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
       risk: task?.riskOverride || environment?.risk || 'safe',
@@ -1429,16 +1399,11 @@ export class GatheringRichStateService {
     const systemId = system?.id || environment?.craftingSystemId;
     const mode = this._economyMode(systemId);
 
-    // A per-token node override (canvas gathering-task token) takes precedence
-    // over the composed task's per-environment node: decrement and persist the
-    // TOKEN's own `flags.fabricate.node` via the GM socket, leaving
-    // `environment.nodeRuntime[taskId]` untouched.
-    const overrideNode = this._readOverrideNode(nodeState);
-    const depletionSource = overrideNode ?? (task?.nodes ?? null);
+    const depletionSource = task?.nodes ?? null;
     if (mode === 'nodes' && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
       // Persist the full node object (config + respawn timers) with one consumed,
-      // so the per-environment pool (nodeRuntime for library tasks) — or the
-      // per-token node — is seeded and decremented in a single write.
+      // so the per-environment pool (nodeRuntime for library tasks) is seeded and
+      // decremented in a single write.
       const max = Number(depletionSource.max || 0);
       const current = Math.min(max, Math.max(0, Number(depletionSource.current || 0) - 1));
       const node = { ...cloneJson(depletionSource), current };
@@ -1449,7 +1414,7 @@ export class GatheringRichStateService {
       if (node.respawn?.policy === 'overTime' && node.respawn.lastEvaluatedWorldTime == null) {
         node.respawn = { ...node.respawn, lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0) };
       }
-      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node, nodeState });
+      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
 

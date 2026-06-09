@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
+import { SETTING_KEYS } from '../src/config/settings.js';
 
 const viewer = { id: 'user-1', isGM: false };
 
@@ -103,7 +105,8 @@ function makeEngine({
   createdResults = [],
   usedTools = [],
   calls = {},
-  getRunViewer = null
+  getRunViewer = null,
+  richState = null
 } = {}) {
   calls.resolveRouted = [];
   calls.evaluateCheck = [];
@@ -119,6 +122,7 @@ function makeEngine({
       get: (environmentId) => environments.find(entry => entry.id === environmentId) ?? null
     },
     runManager,
+    richState,
     getSystems: () => systems,
     getSelectableActors: () => [actingActor],
     isActorSelectable: ({ actor: candidate }) => candidate?.id === actingActor.id || candidate?.uuid === actingActor.uuid,
@@ -175,6 +179,47 @@ function makeEngine({
       }
     },
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
+  });
+}
+
+// A timed library task in nodes economy mode. Library tasks resolve as `d100`
+// (composeEnvironment forces it), so the per-attempt outcome status — and thus
+// node depletion under `onSuccess` — is driven by the drop/hazard rolls, not a
+// routed macro. `dropRate: 100` makes the find deterministic.
+function nodesLibraryTask(overrides = {}) {
+  return {
+    id: 'task-a',
+    name: 'Gather Iron',
+    enabled: true,
+    timeRequirement: { minutes: 1 },
+    dropRows: [{ id: 'row-a', componentId: 'comp-a', quantity: 2, dropRate: 100, enabled: true }],
+    nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onSuccess', respawn: { policy: 'manual' } },
+    ...overrides
+  };
+}
+
+// Build a real GatheringRichStateService in nodes economy mode, backed by the
+// supplied environments so its node-state writes mutate the same env objects the
+// engine reads at maturity. The store's `update` merges the patch in place so
+// `env.nodeRuntime` is observable after `commitAcceptedAttempt`. The library
+// `tasks`/`hazards` feed composeEnvironment, which the engine uses to resolve
+// the matured run's task (embedded `env.tasks` are ignored under richState).
+function makeNodesRichState(environments, { tasks = [nodesLibraryTask()], hazards = [], rules = null, rollD100 = () => 1 } = {}) {
+  const byId = new Map(environments.map(env => [env.id, env]));
+  const system = { economy: { mode: 'nodes' }, tasks, hazards };
+  if (rules) system.rules = rules;
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { 'system-a': system } }]]);
+  return new GatheringRichStateService({
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    environmentStore: {
+      get: id => byId.get(id) ?? environments[0],
+      list: () => environments,
+      update: async (id, patch) => { Object.assign(byId.get(id), patch); return byId.get(id); }
+    },
+    rollD100,
+    hooks: { callAll: () => {} }
   });
 }
 
@@ -511,4 +556,54 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
     assert.equal(serializedResult.includes(text), false, text);
     assert.equal(serializedHistory.includes(text), false, text);
   }
+});
+
+test('timed nodes-mode maturity decrements the environment node on a successful onSuccess gather', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  // Library-driven env (composeEnvironment supplies the task); embedded tasks: [].
+  const env = environment([], { compositionMode: 'automatic', tasks: [] });
+  const environments = [env];
+  const richState = makeNodesRichState(environments);
+  await createWaitingRun(runManager);
+  worldTime = 1060;
+  const engine = makeEngine({ runManager, environments, richState });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  // A d100 gather with no triggered hazard matures as succeeded, so the
+  // onSuccess node pool depletes by one on the ENVIRONMENT (nodeRuntime[taskId]).
+  assert.equal(result.completed.length, 1);
+  assert.equal(result.completed[0].state, 'succeeded');
+  assert.equal(env.nodeRuntime['task-a'].current, 2, 'the environment node decremented by 1 at maturity');
+  assert.equal(env.nodeRuntime['task-a'].max, 3);
+  assert.equal(
+    result.completed[0].run.economyEvidence.node.remaining,
+    2,
+    'the committed rich evidence reflects the decremented environment pool'
+  );
+});
+
+test('timed nodes-mode maturity does not decrement the environment node on a failed onSuccess gather', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const env = environment([], { compositionMode: 'automatic', tasks: [], dangerTags: ['hazardous'] });
+  const environments = [env];
+  // A guaranteed hazard under a failureWithHazard policy forces the matured
+  // d100 outcome to 'failed', so the onSuccess pool must stay untouched.
+  const richState = makeNodesRichState(environments, {
+    hazards: [{ id: 'haz-a', name: 'Cave-in', enabled: true, dangerTags: ['hazardous'], dropRate: 100 }],
+    rules: { hazardSelectionMode: 'all', hazardPolicy: 'failureWithHazard' }
+  });
+  await createWaitingRun(runManager);
+  worldTime = 1060;
+  const engine = makeEngine({ runManager, environments, richState });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.completed.length, 1);
+  assert.equal(result.completed[0].state, 'failed');
+  assert.equal(env.nodeRuntime?.['task-a'], undefined, 'no node state is written for a failed onSuccess gather');
 });

@@ -1,12 +1,10 @@
 /**
- * Unit coverage for linked-visual resolution + depleted-state reflection.
+ * Unit coverage for linked-visual resolution + creation/relink/missing-policy.
  *
- * The Tile branch reuses the PURE `planDepletedBehavior` (none/apply/revert/
- * delete) and routes apply/revert via `emitVisualUpdate` and the terminal delete
- * via `emitVisualDelete`. A missing visual is a no-op. The Drawing branch
- * (hide-on-deplete / show-on-respawn + terminal delete) and the Token branch
- * (safe-default no-op + opt-in reversible hide, never delete) are both
- * implemented. The resolve edge (`globalThis.fromUuidSync`) is faked.
+ * Covers resolving a linked Tile/Drawing/Token by uuid and via the scene-embedded
+ * fallback, building/creating linked markers, relinking (with reverse-flag write +
+ * old-marker clear), recreation, and the missing-linked-visual policy decisions.
+ * The resolve edge (`globalThis.fromUuidSync`) is faked.
  */
 
 import test from 'node:test';
@@ -14,14 +12,11 @@ import assert from 'node:assert/strict';
 
 import {
   resolveLinkedVisual,
-  applyLinkedVisualDepleted,
   buildLinkedTileData,
   createLinkedTile,
   buildLinkedDrawingData,
   createLinkedDrawing,
   recreateLinkedDrawing,
-  planDrawingDepleted,
-  planTokenDepleted,
   planRelinkVisual,
   relinkVisual,
   buildClearLinkedVisualFlags,
@@ -107,95 +102,6 @@ test('resolveLinkedVisual resolves a Token by uuid and via scene.tokens.get fall
   assert.equal(byScene.doc, doc);
 });
 
-test('applyLinkedVisualDepleted Tile branch routes a swap-image APPLY via emitVisualUpdate', () => {
-  const updates = [];
-  const deletes = [];
-  const doc = tileDoc({ src: 'orig.webp' });
-  const behaviorSystem = {
-    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' },
-    node: { depletedBehavior: { swapImage: 'depleted.webp' } }
-  };
-  withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => applyLinkedVisualDepleted({
-    behaviorSystem,
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(deletes.length, 0);
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].documentName, 'Tile');
-  assert.equal(updates[0].update.texture.src, 'depleted.webp');
-  assert.equal(updates[0].update.flags.fabricate.nodeOriginal.img, 'orig.webp');
-});
-
-test('applyLinkedVisualDepleted Tile branch routes a REVERT via emitVisualUpdate', () => {
-  const updates = [];
-  const doc = tileDoc({ src: 'depleted.webp', original: { img: 'orig.webp' } });
-  const behaviorSystem = {
-    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' },
-    node: { depletedBehavior: { swapImage: 'depleted.webp' } }
-  };
-  withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => applyLinkedVisualDepleted({
-    behaviorSystem,
-    depleted: false,
-    emitVisualUpdate: (a) => updates.push(a)
-  }));
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].update.texture.src, 'orig.webp');
-  assert.equal(updates[0].update.flags.fabricate.nodeOriginal, null);
-});
-
-test('applyLinkedVisualDepleted Tile branch routes a terminal DELETE via emitVisualDelete', () => {
-  const updates = [];
-  const deletes = [];
-  const doc = tileDoc();
-  const behaviorSystem = {
-    linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' },
-    node: { depletedBehavior: { deleteToken: true } }
-  };
-  withFromUuid({ 'Scene.s1.Tile.t1': doc }, () => applyLinkedVisualDepleted({
-    behaviorSystem,
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(updates.length, 0);
-  assert.equal(deletes.length, 1);
-  assert.equal(deletes[0].documentName, 'Tile');
-});
-
-test('applyLinkedVisualDepleted is a no-op when the visual is missing', () => {
-  const updates = [];
-  const deletes = [];
-  withFromUuid({}, () => applyLinkedVisualDepleted({
-    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Tile.gone', documentName: 'Tile' }, node: { depletedBehavior: { swapImage: 'd.webp' } } },
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(updates.length, 0);
-  assert.equal(deletes.length, 0);
-});
-
-test('applyLinkedVisualDepleted is a clean no-op for a region-only interactable (mode none)', () => {
-  // Region-only = `linkedVisual.mode:'none'`, uuid/documentName null. This is an
-  // INTENTIONAL "no marker" state (distinct from a missing marker): the depleted
-  // reflection resolves no visual and emits nothing — the interactable still works.
-  const updates = [];
-  const deletes = [];
-  withFromUuid({}, () => applyLinkedVisualDepleted({
-    behaviorSystem: {
-      linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' },
-      node: { depletedBehavior: { swapImage: 'd.webp' } }
-    },
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(updates.length, 0, 'no visual update is emitted with no marker');
-  assert.equal(deletes.length, 0, 'no visual delete is emitted with no marker');
-});
-
 test('planMissingPolicy reports none (not warn) for a region-only interactable', () => {
   // The distinction the config panel relies on: mode 'none' is intentional, so it
   // is `action:'none'` (no spurious "missing" warning), NOT a missing-policy warn.
@@ -203,206 +109,6 @@ test('planMissingPolicy reports none (not warn) for a region-only interactable',
     planMissingPolicy({ linkedVisual: { mode: 'none', uuid: null, documentName: null, missingPolicy: 'warn' } }, false),
     { action: 'none' }
   );
-});
-
-// --- Token depleted decision (pure) — SAFE no-op default (Phase 5) -----------
-
-function tokenDoc({ uuid = 'Scene.s1.Token.k1', hidden = false, nodeOriginal = null } = {}) {
-  return {
-    uuid,
-    parent: { id: 's1' },
-    hidden,
-    flags: nodeOriginal ? { fabricate: { nodeOriginal } } : {}
-  };
-}
-
-test('planTokenDepleted: deplete with no opt-in is a SAFE no-op (the GM token is not ours)', () => {
-  assert.deepEqual(planTokenDepleted({ behavior: {}, depleted: true, token: tokenDoc() }), { action: 'none' });
-  assert.deepEqual(planTokenDepleted({ behavior: null, depleted: true, token: tokenDoc() }), { action: 'none' });
-});
-
-test('planTokenDepleted: respawn with no opt-in is a no-op', () => {
-  assert.deepEqual(planTokenDepleted({ behavior: {}, depleted: false, token: tokenDoc() }), { action: 'none' });
-});
-
-test('planTokenDepleted: terminal deleteToken NEVER deletes a Token marker (no-op)', () => {
-  // The non-negotiable guarantee: even the terminal `deleteToken` flag is ignored
-  // for a Token, so depletion can never destroy the GM's token.
-  assert.deepEqual(planTokenDepleted({ behavior: { deleteToken: true }, depleted: true, token: tokenDoc() }), { action: 'none' });
-});
-
-test('planTokenDepleted: {tokenHide:true, deleteToken:true} hides (apply), never deletes', () => {
-  // The opt-in hide wins and `deleteToken` stays ignored: the combo yields a
-  // reversible 'apply' hide, never a delete of the GM's token.
-  const plan = planTokenDepleted({
-    behavior: { tokenHide: true, deleteToken: true },
-    depleted: true,
-    token: tokenDoc({ hidden: false })
-  });
-  assert.equal(plan.action, 'apply');
-  assert.equal(plan.update.hidden, true);
-});
-
-test('planTokenDepleted: explicit tokenHide opt-in reversibly hides on deplete + shows on respawn', () => {
-  // EXPLICIT, separately-named opt-in: the most a Token depletion may ever do.
-  const applyPlan = planTokenDepleted({ behavior: { tokenHide: true }, depleted: true, token: tokenDoc({ hidden: false }) });
-  assert.equal(applyPlan.action, 'apply');
-  assert.equal(applyPlan.update.hidden, true);
-  assert.deepEqual(applyPlan.update.flags.fabricate.nodeOriginal, { hidden: false });
-
-  const revertPlan = planTokenDepleted({
-    behavior: { tokenHide: true },
-    depleted: false,
-    token: tokenDoc({ hidden: true, nodeOriginal: { hidden: false } })
-  });
-  assert.equal(revertPlan.action, 'revert');
-  assert.equal(revertPlan.update.hidden, false);
-  assert.equal(revertPlan.update.flags.fabricate.nodeOriginal, null);
-});
-
-test('planTokenDepleted: opt-in tokenHide is idempotent (apply + revert)', () => {
-  // Already-stashed ⇒ re-applying the hide is a no-op.
-  assert.deepEqual(
-    planTokenDepleted({ behavior: { tokenHide: true }, depleted: true, token: tokenDoc({ nodeOriginal: { hidden: false } }) }),
-    { action: 'none' }
-  );
-  // Nothing stashed ⇒ nothing to revert.
-  assert.deepEqual(
-    planTokenDepleted({ behavior: { tokenHide: true }, depleted: false, token: tokenDoc() }),
-    { action: 'none' }
-  );
-});
-
-test('applyLinkedVisualDepleted Token branch emits NOTHING by default (deplete, respawn, terminal)', () => {
-  const token = tokenDoc();
-  for (const { depleted, behavior } of [
-    { depleted: true, behavior: { swapImage: 'd.webp' } },   // depleted, swap-image configured
-    { depleted: false, behavior: { swapImage: 'd.webp' } },  // respawn
-    { depleted: true, behavior: { deleteToken: true } }      // terminal — must NOT delete
-  ]) {
-    const updates = [];
-    const deletes = [];
-    withFromUuid({ 'Scene.s1.Token.k1': token }, () => applyLinkedVisualDepleted({
-      behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' }, node: { depletedBehavior: behavior } },
-      depleted,
-      emitVisualUpdate: (a) => updates.push(a),
-      emitVisualDelete: (a) => deletes.push(a)
-    }));
-    assert.equal(updates.length, 0, `no update emitted (depleted=${depleted})`);
-    assert.equal(deletes.length, 0, `no delete emitted for a Token marker (depleted=${depleted})`);
-  }
-});
-
-test('applyLinkedVisualDepleted Token branch routes an opt-in hide via emitVisualUpdate (never delete)', () => {
-  const updates = [];
-  const deletes = [];
-  const token = tokenDoc({ hidden: false });
-  withFromUuid({ 'Scene.s1.Token.k1': token }, () => applyLinkedVisualDepleted({
-    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Token.k1', documentName: 'Token' }, node: { depletedBehavior: { tokenHide: true } } },
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(deletes.length, 0, 'opt-in hide never deletes the token');
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].documentName, 'Token');
-  assert.equal(updates[0].update.hidden, true);
-});
-
-// --- Drawing depleted decision (pure) + apply edge ---------------------------
-
-function drawingDoc({ uuid = 'Scene.s1.Drawing.d1', text = 'Herb patch', hidden = false, nodeOriginal = null } = {}) {
-  return {
-    uuid,
-    parent: { id: 's1' },
-    text,
-    hidden,
-    flags: nodeOriginal ? { fabricate: { nodeOriginal } } : {}
-  };
-}
-
-test('planDrawingDepleted: default deplete HIDES the drawing and stashes the original hidden state', () => {
-  const plan = planDrawingDepleted({ behavior: {}, depleted: true, drawing: drawingDoc({ hidden: false }) });
-  assert.equal(plan.action, 'apply');
-  assert.equal(plan.update.hidden, true);
-  assert.deepEqual(plan.update.flags.fabricate.nodeOriginal, { hidden: false });
-  assert.equal(plan.update.text, undefined, 'no label decoration without swapImage/postfix');
-});
-
-test('planDrawingDepleted: with swapImage/postfix configured it also appends a "(depleted)" label', () => {
-  const plan = planDrawingDepleted({ behavior: { swapImage: 'depleted.webp' }, depleted: true, drawing: drawingDoc({ text: 'Herb patch' }) });
-  assert.equal(plan.action, 'apply');
-  assert.equal(plan.update.hidden, true);
-  assert.equal(plan.update.text, 'Herb patch (depleted)');
-  assert.equal(plan.update.flags.fabricate.nodeOriginal.text, 'Herb patch');
-});
-
-test('planDrawingDepleted: apply is idempotent — an already-stashed drawing is a no-op', () => {
-  const plan = planDrawingDepleted({ behavior: {}, depleted: true, drawing: drawingDoc({ nodeOriginal: { hidden: false } }) });
-  assert.deepEqual(plan, { action: 'none' });
-});
-
-test('planDrawingDepleted: respawn SHOWS the drawing again and restores the original text/hidden', () => {
-  const plan = planDrawingDepleted({
-    behavior: { swapImage: 'depleted.webp' },
-    depleted: false,
-    drawing: drawingDoc({ text: 'Herb patch (depleted)', hidden: true, nodeOriginal: { hidden: false, text: 'Herb patch' } })
-  });
-  assert.equal(plan.action, 'revert');
-  assert.equal(plan.update.hidden, false);
-  assert.equal(plan.update.text, 'Herb patch');
-  assert.equal(plan.update.flags.fabricate.nodeOriginal, null);
-});
-
-test('planDrawingDepleted: revert is idempotent — nothing stashed means nothing to revert', () => {
-  assert.deepEqual(planDrawingDepleted({ behavior: {}, depleted: false, drawing: drawingDoc() }), { action: 'none' });
-});
-
-test('planDrawingDepleted: deleteToken on deplete is terminal', () => {
-  assert.deepEqual(planDrawingDepleted({ behavior: { deleteToken: true }, depleted: true, drawing: drawingDoc() }), { action: 'delete' });
-});
-
-test('applyLinkedVisualDepleted Drawing branch routes a hide APPLY via emitVisualUpdate', () => {
-  const updates = [];
-  const deletes = [];
-  const doc = drawingDoc({ hidden: false });
-  withFromUuid({ 'Scene.s1.Drawing.d1': doc }, () => applyLinkedVisualDepleted({
-    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' }, node: { depletedBehavior: {} } },
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(deletes.length, 0);
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].documentName, 'Drawing');
-  assert.equal(updates[0].update.hidden, true);
-});
-
-test('applyLinkedVisualDepleted Drawing branch routes a SHOW revert via emitVisualUpdate', () => {
-  const updates = [];
-  const doc = drawingDoc({ hidden: true, nodeOriginal: { hidden: false } });
-  withFromUuid({ 'Scene.s1.Drawing.d1': doc }, () => applyLinkedVisualDepleted({
-    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' }, node: { depletedBehavior: {} } },
-    depleted: false,
-    emitVisualUpdate: (a) => updates.push(a)
-  }));
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].update.hidden, false);
-});
-
-test('applyLinkedVisualDepleted Drawing branch routes a terminal DELETE via emitVisualDelete', () => {
-  const updates = [];
-  const deletes = [];
-  const doc = drawingDoc();
-  withFromUuid({ 'Scene.s1.Drawing.d1': doc }, () => applyLinkedVisualDepleted({
-    behaviorSystem: { linkedVisual: { uuid: 'Scene.s1.Drawing.d1', documentName: 'Drawing' }, node: { depletedBehavior: { deleteToken: true } } },
-    depleted: true,
-    emitVisualUpdate: (a) => updates.push(a),
-    emitVisualDelete: (a) => deletes.push(a)
-  }));
-  assert.equal(updates.length, 0);
-  assert.equal(deletes.length, 1);
-  assert.equal(deletes[0].documentName, 'Drawing');
 });
 
 // --- buildLinkedTileData / createLinkedTile (create) -------------------------
