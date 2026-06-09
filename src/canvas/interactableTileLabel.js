@@ -19,14 +19,33 @@
 const LABEL_KEY = '_fabricateTileLabel';
 
 /**
+ * Resolve Foundry's `PreciseText` class from the live build, preferring the V13
+ * namespace `foundry.canvas.containers.PreciseText` (the bare `PreciseText`
+ * global is deprecated in V13), then the legacy global. Mirrors the defensive
+ * `resolveTileClass` candidate-chain pattern in `InteractableManager.js`.
+ *
+ * @returns {Function|null}
+ */
+function resolvePreciseTextClass() {
+  const candidates = [
+    globalThis.foundry?.canvas?.containers?.PreciseText,
+    globalThis.PreciseText
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'function') return candidate;
+  }
+  return null;
+}
+
+/**
  * Resolve a PIXI text constructor from the live build, preferring Foundry's
- * double-resolution `PreciseText` (sharper on the canvas), then a bare
- * `PIXI.Text`.
+ * double-resolution `PreciseText` (sharper on the canvas, V13 namespace first),
+ * then a bare `PIXI.Text`.
  *
  * @returns {Function|null}
  */
 function resolveTextClass() {
-  const candidates = [globalThis.PreciseText, globalThis.PIXI?.Text];
+  const candidates = [resolvePreciseTextClass(), globalThis.PIXI?.Text];
   for (const candidate of candidates) {
     if (typeof candidate === 'function') return candidate;
   }
@@ -54,7 +73,7 @@ function buildLabelStyle() {
     dropShadowDistance: 0,
     align: 'center'
   };
-  const PreciseTextClass = globalThis.PreciseText;
+  const PreciseTextClass = resolvePreciseTextClass();
   if (typeof PreciseTextClass?.getTextStyle === 'function') {
     try {
       return PreciseTextClass.getTextStyle(overrides);

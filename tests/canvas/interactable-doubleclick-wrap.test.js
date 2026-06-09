@@ -1,57 +1,41 @@
 /**
- * The V13 Tile `_onClickLeft2` double-click wrap + the interaction-permission
- * wrap for canvas interactable TILES.
+ * The V13 interaction-permission wrap + the Tile hover wrap for canvas
+ * interactable TILES.
  *
- * In Foundry V13 a double-click on a placeable runs `PlaceableObject#_onClickLeft2`
- * (inherited by the Tile class). A Fabricate interactable is a TILE (no actor, no
- * sheet), so we wrap that handler: interactable tiles route to the Fabricate
- * dispatcher and SUPPRESS the default (both GM and player); other placeables
- * delegate to the original. Whether the interaction is even delivered is gated by
- * `MouseInteractionManager#can`, which we also wrap so a non-GM player's
- * double-click / hover is PERMITTED on interactable tiles only.
+ * The double-click is NO LONGER delivered through an `_onClickLeft2` wrap — for a
+ * non-controllable tile placeable the MouseInteractionManager click-sequence
+ * never runs `_onClickLeft2` (hover DOES fire). The double-click is delivered by a
+ * raw PIXI pointer listener with our own detection (covered in
+ * `interactable-tile-interactivity.test.js`). What remains here:
  *
- * The PURE decisions ({@link decideInteractableDoubleClick} /
- * {@link shouldPermitInteractableAction}) are tested directly. The install +
- * suppress/delegate behaviour is tested against a fake Tile class with a spy
- * `_onClickLeft2`.
+ *  - the PURE permission decision {@link shouldPermitInteractableAction} (permits
+ *    hover on interactable tiles only; never clickLeft2 anymore);
+ *  - the install resolving the V13 Tile / MouseInteractionManager classes
+ *    defensively and the permission gate permitting/delegating against a fake
+ *    MouseInteractionManager;
+ *  - the hover wrap installing on the resolved Tile class.
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  decideInteractableDoubleClick,
-  shouldPermitInteractableAction
-} from '../../src/canvas/interactableDoubleClickWrap.js';
+import { shouldPermitInteractableAction } from '../../src/canvas/interactableDoubleClickWrap.js';
 import { InteractableManager } from '../../src/canvas/InteractableManager.js';
-
-// --- pure double-click decision ---------------------------------------------
-
-test('decideInteractableDoubleClick → "dispatch" for an interactable tile', () => {
-  const decision = decideInteractableDoubleClick({ flags: { fabricate: { isInteractable: true } } }, () => true);
-  assert.equal(decision, 'dispatch');
-});
-
-test('decideInteractableDoubleClick → "delegate" for a non-interactable tile', () => {
-  const decision = decideInteractableDoubleClick({ flags: {} }, () => false);
-  assert.equal(decision, 'delegate');
-});
-
-test('decideInteractableDoubleClick → "delegate" when no predicate is supplied (defensive)', () => {
-  assert.equal(decideInteractableDoubleClick({}, undefined), 'delegate');
-});
 
 // --- pure permission decision -----------------------------------------------
 
-test('shouldPermitInteractableAction permits clickLeft2 + hover on an interactable tile', () => {
+test('shouldPermitInteractableAction permits hover on an interactable tile', () => {
   const yes = () => true;
-  assert.equal(shouldPermitInteractableAction('clickLeft2', { flags: {} }, yes), true);
   assert.equal(shouldPermitInteractableAction('hoverIn', { flags: {} }, yes), true);
   assert.equal(shouldPermitInteractableAction('hoverOut', { flags: {} }, yes), true);
 });
 
+test('shouldPermitInteractableAction NO LONGER permits clickLeft2 (delivered by the raw pointer listener)', () => {
+  assert.equal(shouldPermitInteractableAction('clickLeft2', { flags: {} }, () => true), null);
+});
+
 test('shouldPermitInteractableAction delegates (null) for a non-interactable placeable', () => {
-  assert.equal(shouldPermitInteractableAction('clickLeft2', { flags: {} }, () => false), null);
+  assert.equal(shouldPermitInteractableAction('hoverIn', { flags: {} }, () => false), null);
 });
 
 test('shouldPermitInteractableAction delegates (null) for a non-permitted action even on an interactable tile', () => {
@@ -60,10 +44,10 @@ test('shouldPermitInteractableAction delegates (null) for a non-permitted action
 });
 
 test('shouldPermitInteractableAction delegates (null) when no predicate is supplied (defensive)', () => {
-  assert.equal(shouldPermitInteractableAction('clickLeft2', { flags: {} }, undefined), null);
+  assert.equal(shouldPermitInteractableAction('hoverIn', { flags: {} }, undefined), null);
 });
 
-// --- install + suppress/delegate behaviour against a fake V13 Tile -----------
+// --- install + hover/permission wraps against a fake V13 Tile ----------------
 
 const GLOBAL_KEYS = ['foundry', 'CONFIG', 'Tile', 'MouseInteractionManager'];
 
@@ -80,15 +64,16 @@ function restore(saved) {
 }
 
 /**
- * A fake V13 Tile class exposing the wrapped methods. `originalCalls` records
- * each `_onClickLeft2` delegation (with the bound `this`) so we can prove
- * suppression. Hover handlers are present so the hover wrap installs cleanly.
+ * A fake V13 Tile class exposing the wrapped hover handlers. `hoverCalls` records
+ * each `_onHoverIn` delegation (with the bound `this`) so we can prove the wrap
+ * delegates to the original. `_onClickLeft2` is present so a Tile placeable shape
+ * is realistic, but it is NOT wrapped anymore.
  */
-function makeFakeTileClass(originalCalls) {
+function makeFakeTileClass(hoverCalls) {
   return class FakeTile {
     constructor(document) { this.document = document; }
-    _onClickLeft2(...args) { originalCalls.push({ self: this, args }); }
-    _onHoverIn() {}
+    _onClickLeft2() {}
+    _onHoverIn(...args) { hoverCalls.push({ self: this, args }); }
     _onHoverOut() {}
   };
 }
@@ -100,62 +85,59 @@ function plainDoc() {
   return { flags: {} };
 }
 
-test('install wraps Tile#_onClickLeft2 once and routes an interactable double-click to dispatch (original NOT called)', () => {
+test('install wraps Tile#_onHoverIn once and shows the tooltip for an interactable tile (idempotent)', () => {
   const saved = snapshot();
   try {
-    const originalCalls = [];
-    const FakeTile = makeFakeTileClass(originalCalls);
+    const hoverCalls = [];
+    const FakeTile = makeFakeTileClass(hoverCalls);
     globalThis.foundry = { canvas: { placeables: { Tile: FakeTile } } };
 
-    // Capture the manager dispatch.
-    const dispatched = [];
-    const realOnDoubleClick = InteractableManager.instance._onDoubleClick;
-    InteractableManager.instance._onDoubleClick = (doc) => dispatched.push(doc);
+    const tooltips = [];
+    const realShow = InteractableManager.instance._showTooltip;
+    InteractableManager.instance._showTooltip = (placeable) => tooltips.push(placeable);
 
     try {
       const manager = new InteractableManager();
-      manager.register(); // installs the wrap on FakeTile.prototype
+      manager.register();
       manager.register(); // idempotent — must not double-wrap.
 
       const tile = new FakeTile(interactableDoc());
-      tile._onClickLeft2({ type: 'dblclick' });
+      tile._onHoverIn({ type: 'pointerover' });
 
-      assert.equal(dispatched.length, 1, 'an interactable double-click dispatches to the Fabricate handler');
-      assert.equal(dispatched[0], tile.document, 'the tile document is routed');
-      assert.equal(originalCalls.length, 0, 'the V13 default is SUPPRESSED for an interactable tile');
+      assert.equal(hoverCalls.length, 1, 'the original hover handler is still invoked');
+      assert.equal(hoverCalls[0].self, tile, 'with the Tile as `this`');
+      assert.equal(tooltips.length, 1, 'an interactable hover shows the tooltip');
+      assert.equal(tooltips[0], tile, 'the placeable is routed to the tooltip');
     } finally {
-      InteractableManager.instance._onDoubleClick = realOnDoubleClick;
+      InteractableManager.instance._showTooltip = realShow;
     }
   } finally {
     restore(saved);
   }
 });
 
-test('a non-interactable double-click delegates to the original V13 handler with the correct this/args', () => {
+test('a non-interactable hover delegates to the original handler without showing a tooltip', () => {
   const saved = snapshot();
   try {
-    const originalCalls = [];
-    const FakeTile = makeFakeTileClass(originalCalls);
+    const hoverCalls = [];
+    const FakeTile = makeFakeTileClass(hoverCalls);
     globalThis.foundry = { canvas: { placeables: { Tile: FakeTile } } };
 
-    const dispatched = [];
-    const realOnDoubleClick = InteractableManager.instance._onDoubleClick;
-    InteractableManager.instance._onDoubleClick = (doc) => dispatched.push(doc);
+    const tooltips = [];
+    const realShow = InteractableManager.instance._showTooltip;
+    InteractableManager.instance._showTooltip = (placeable) => tooltips.push(placeable);
 
     try {
       const manager = new InteractableManager();
       manager.register();
 
       const tile = new FakeTile(plainDoc());
-      const event = { type: 'dblclick' };
-      tile._onClickLeft2(event);
+      tile._onHoverIn({ type: 'pointerover' });
 
-      assert.equal(dispatched.length, 0, 'a plain tile does not route to the Fabricate dispatcher');
-      assert.equal(originalCalls.length, 1, 'the original V13 handler is invoked');
-      assert.equal(originalCalls[0].self, tile, 'the original is called with the Tile as `this`');
-      assert.deepEqual(originalCalls[0].args, [event], 'the original receives the forwarded event args');
+      assert.equal(hoverCalls.length, 1, 'the original hover handler runs for a plain tile');
+      assert.equal(tooltips.length, 0, 'no tooltip is shown for a plain tile');
     } finally {
-      InteractableManager.instance._onDoubleClick = realOnDoubleClick;
+      InteractableManager.instance._showTooltip = realShow;
     }
   } finally {
     restore(saved);
@@ -165,16 +147,16 @@ test('a non-interactable double-click delegates to the original V13 handler with
 test('install resolves the Tile class from CONFIG.Tile.objectClass when foundry.canvas is absent', () => {
   const saved = snapshot();
   try {
-    const originalCalls = [];
-    const FakeTile = makeFakeTileClass(originalCalls);
+    const hoverCalls = [];
+    const FakeTile = makeFakeTileClass(hoverCalls);
     globalThis.CONFIG = { Tile: { objectClass: FakeTile } };
 
     const manager = new InteractableManager();
     manager.register();
 
     const tile = new FakeTile(plainDoc());
-    tile._onClickLeft2();
-    assert.equal(originalCalls.length, 1, 'the wrap installed on the CONFIG-resolved class and delegates plain tiles');
+    tile._onHoverIn();
+    assert.equal(hoverCalls.length, 1, 'the hover wrap installed on the CONFIG-resolved class and delegates plain tiles');
   } finally {
     restore(saved);
   }
@@ -190,41 +172,23 @@ test('install prefers the ACTIVE CONFIG.Tile.objectClass subclass over the base 
     const subclassCalls = [];
     class SystemTile extends BaseTile {
       constructor(document) { super(document); }
-      _onClickLeft2(...args) { subclassCalls.push({ self: this, args }); }
+      _onHoverIn(...args) { subclassCalls.push({ self: this, args }); }
     }
     globalThis.CONFIG = { Tile: { objectClass: SystemTile } };
 
-    const dispatched = [];
-    const realOnDoubleClick = InteractableManager.instance._onDoubleClick;
-    InteractableManager.instance._onDoubleClick = (doc) => dispatched.push(doc);
+    const manager = new InteractableManager();
+    manager.register();
 
-    try {
-      const manager = new InteractableManager();
-      manager.register();
+    assert.notEqual(
+      SystemTile.prototype._onHoverIn,
+      BaseTile.prototype._onHoverIn,
+      'the wrap replaced the subclass hover method, not the (untouched) base method'
+    );
 
-      assert.notEqual(
-        SystemTile.prototype._onClickLeft2,
-        BaseTile.prototype._onClickLeft2,
-        'the wrap replaced the subclass method, not the (untouched) base method'
-      );
-
-      const interactableTile = new SystemTile(interactableDoc());
-      interactableTile._onClickLeft2({ type: 'dblclick' });
-      assert.equal(dispatched.length, 1, 'the interactable double-click routes to dispatch via the subclass wrap');
-      assert.equal(subclassCalls.length, 0, 'the subclass override is SUPPRESSED for an interactable tile');
-
-      const plainTile = new SystemTile(plainDoc());
-      plainTile._onClickLeft2({ type: 'dblclick' });
-      assert.equal(subclassCalls.length, 1, 'a plain tile delegates to the subclass override');
-      assert.equal(subclassCalls[0].self, plainTile, 'the subclass override keeps the correct `this`');
-
-      const baseTile = new BaseTile(interactableDoc());
-      baseTile._onClickLeft2({ type: 'dblclick' });
-      assert.equal(dispatched.length, 1, 'the base class is untouched (no extra dispatch)');
-      assert.equal(baseCalls.length, 1, 'the base method runs unwrapped');
-    } finally {
-      InteractableManager.instance._onDoubleClick = realOnDoubleClick;
-    }
+    const plainTile = new SystemTile(plainDoc());
+    plainTile._onHoverIn({ type: 'pointerover' });
+    assert.equal(subclassCalls.length, 1, 'a plain tile delegates to the subclass override');
+    assert.equal(subclassCalls[0].self, plainTile, 'the subclass override keeps the correct `this`');
   } finally {
     restore(saved);
   }
@@ -246,7 +210,7 @@ test('install is a no-op (no throw) when no Tile class is available', () => {
 
 // --- the MouseInteractionManager#can permission wrap -------------------------
 
-test('the permission wrap permits clickLeft2 on an interactable tile and delegates otherwise', () => {
+test('the permission wrap permits hover on an interactable tile and delegates otherwise', () => {
   const saved = snapshot();
   try {
     const FakeTile = makeFakeTileClass([]);
@@ -262,18 +226,18 @@ test('the permission wrap permits clickLeft2 on an interactable tile and delegat
     const manager = new InteractableManager();
     manager.register();
 
-    // An interactable tile: clickLeft2 is permitted WITHOUT calling the original.
+    // An interactable tile: hoverIn is permitted WITHOUT calling the original.
     const interactiveMgr = new FakeMouseInteractionManager(new FakeTile(interactableDoc()));
-    assert.equal(interactiveMgr.can('clickLeft2'), true, 'clickLeft2 is permitted for an interactable tile');
+    assert.equal(interactiveMgr.can('hoverIn'), true, 'hoverIn is permitted for an interactable tile');
     assert.equal(originalCanCalls.length, 0, 'the original gate is not consulted when we permit');
 
-    // A non-permitted action on an interactable tile delegates to the original.
-    assert.equal(interactiveMgr.can('clickLeft1'), false, 'a non-permitted action delegates to the (denying) original');
-    assert.equal(originalCanCalls.length, 1, 'the original gate decided the non-permitted action');
+    // clickLeft2 is NO LONGER permitted here — it delegates to the original.
+    assert.equal(interactiveMgr.can('clickLeft2'), false, 'clickLeft2 delegates to the (denying) original');
+    assert.equal(originalCanCalls.length, 1, 'the original gate decided clickLeft2');
 
     // A plain placeable always delegates.
     const plainMgr = new FakeMouseInteractionManager(new FakeTile(plainDoc()));
-    assert.equal(plainMgr.can('clickLeft2'), false, 'a plain placeable delegates to the original gate');
+    assert.equal(plainMgr.can('hoverIn'), false, 'a plain placeable delegates to the original gate');
     assert.equal(originalCanCalls.length, 2);
   } finally {
     restore(saved);

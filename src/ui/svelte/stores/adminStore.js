@@ -45,6 +45,7 @@ import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js'
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
+import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -81,7 +82,6 @@ const TASK_CHECK_PROVIDERS = new Set(['macro', 'dnd5e', 'pf2e']);
 const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
-const DEFAULT_GATHERING_TASK_IMG = 'icons/svg/item-bag.svg';
 const GATHERING_CONFIG_SETTING = 'gatheringConfig';
 const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({

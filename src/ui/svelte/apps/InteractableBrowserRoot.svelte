@@ -22,6 +22,7 @@
   import { localize } from '../util/foundryBridge.js';
   import { dragSource } from '../actions/dragSource.js';
   import { buildInteractableDragPayload } from '../../../canvas/interactableDragPayload.js';
+  import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 
   let { services = null } = $props();
 
@@ -87,11 +88,22 @@
       .filter((tool) => tool.id && matchesSearch(tool.label))
   );
 
+  // A task with no custom image persists the DEFAULT_GATHERING_TASK_IMG
+  // placeholder (stamped by `_normalizeGatheringTask`). Treat that placeholder OR
+  // an empty value as "no image" → show the leaf; render the task's own <img>
+  // only for a REAL custom image.
+  function taskCustomImage(img) {
+    const trimmed = String(img ?? '').trim();
+    if (!trimmed || trimmed === DEFAULT_GATHERING_TASK_IMG) return '';
+    return trimmed;
+  }
+
   const tasks = $derived(
     (services?.listTasksForSystem?.(selectedSystemId) ?? [])
       .map((task) => ({
         id: String(task?.id ?? ''),
-        label: String(task?.name || '').trim() || text('FABRICATE.Canvas.Browser.UnnamedTask', 'Unnamed task')
+        label: String(task?.name || '').trim() || text('FABRICATE.Canvas.Browser.UnnamedTask', 'Unnamed task'),
+        img: taskCustomImage(task?.img)
       }))
       .filter((task) => task.id && matchesSearch(task.label))
   );
@@ -173,7 +185,11 @@
               class="fab-ib-row"
               use:dragSource={{ getPayload: () => dragPayload('gatheringTask', task.id) }}
             >
-              <i class="fas fa-leaf fab-ib-row-icon" aria-hidden="true"></i>
+              {#if task.img}
+                <img class="fab-ib-row-thumb" src={task.img} alt="" />
+              {:else}
+                <i class="fas fa-leaf fab-ib-row-icon" aria-hidden="true"></i>
+              {/if}
               <span class="fab-ib-row-label">{task.label}</span>
               <button
                 type="button"
@@ -272,7 +288,14 @@
     cursor: grab;
   }
 
-  .fab-ib-row.fab-dragging {
+  /*
+    `fab-dragging` is applied at runtime by the `dragSource` action, so Svelte's
+    static analysis cannot see it and flags the rule as unused. A component-scoped
+    `:global` keeps the selector specific (still `fab-ib-*`, no bleed) while
+    silencing the warning. (Does not affect tests/styles-namespacing.test.js,
+    which only scans styles/fabricate.css.)
+  */
+  :global(.fab-ib-row.fab-dragging) {
     opacity: 0.5;
   }
 

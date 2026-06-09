@@ -160,6 +160,32 @@ describe('InteractableBrowserRoot body', () => {
     );
   });
 
+  it('renders a gathering task row image for a custom image, falling back to the leaf for the default/empty placeholder', () => {
+    // The tasks $derived mapping must carry `img` (it was discarded before).
+    assert.ok(
+      rootSource.includes('img: taskCustomImage(task?.img)'),
+      'the task mapping carries a resolved custom image'
+    );
+    // "No image" = empty OR the DEFAULT_GATHERING_TASK_IMG placeholder → leaf.
+    assert.ok(
+      rootSource.includes("import { DEFAULT_GATHERING_TASK_IMG }"),
+      'references the shared default-image constant rather than hardcoding the string'
+    );
+    assert.ok(
+      rootSource.includes('trimmed === DEFAULT_GATHERING_TASK_IMG'),
+      'treats the default placeholder as "no image"'
+    );
+    // The row renders <img> when a custom image is present, else the fa-leaf.
+    assert.ok(
+      rootSource.includes('{#if task.img}') && rootSource.includes('<img class="fab-ib-row-thumb" src={task.img}'),
+      'task row renders <img> for a custom image'
+    );
+    assert.ok(
+      rootSource.includes('{:else}') && rootSource.includes('class="fas fa-leaf fab-ib-row-icon"'),
+      'task row falls back to the leaf icon when there is no custom image'
+    );
+  });
+
   it('surfaces a search filter and the Alt-override discoverability hint', () => {
     assert.ok(rootSource.includes('type="search"'), 'search input present');
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.DropModifierHint'), 'Alt-override hint shown in the browser');

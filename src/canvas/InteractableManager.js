@@ -5,22 +5,22 @@
  *  - `dropCanvasData` intercepts a dropped Fabricate Tool / Gathering Task,
  *    suppresses the default drop, and spawns a flagged TileDocument (no actor,
  *    no sheet).
- *  - a one-time wrap of the V13 Tile `_onClickLeft2` handler intercepts a
- *    double-click on an interactable tile, suppressing Foundry's default and
- *    routing to the Fabricate dispatcher.
+ *  - a draw-time enablement (`drawTile` + a `canvasReady` sweep) makes
+ *    interactable tiles pointer-eventful for ALL users AND attaches a raw PIXI
+ *    pointer listener implementing our own double-click detection (the
+ *    MouseInteractionManager click-sequence never runs `_onClickLeft2` for a
+ *    non-controllable tile placeable, so wrapping it is the wrong mechanism); the
+ *    listener calls {@link InteractableManager#_onDoubleClick} directly. A
+ *    `destroyTile` hook detaches the listener.
  *  - a one-time wrap of the V13 `MouseInteractionManager#can` permission gate
- *    permits a non-GM player's double-click / hover on an interactable tile
- *    (tiles are not natively pointer-interactive for players).
+ *    permits a non-GM player's hover on an interactable tile (tiles are not
+ *    natively pointer-interactive for players; the tooltip relies on this).
  *  - a one-time wrap of the Tile hover handlers shows a discoverability tooltip
  *    (tiles have no nameplate) — rendered as a canvas-native PIXI label child,
  *    NOT via the DOM TooltipManager (a Tile has no DOM element).
- *  - a draw-time enablement (`drawTile` + a `canvasReady` sweep) makes
- *    interactable tiles pointer-eventful for ALL users, so a non-GM player's
- *    double-click / hover actually reaches the placeable's MouseInteractionManager
- *    (a Tile is GM scenery and is not natively pointer-interactive for players).
  *
  * All decision logic (drop classification, spawn-payload shaping, double-click
- * routing, permission, tooltip text) lives in the pure modules
+ * dispatch, permission, tooltip text) lives in the pure modules
  * `interactableResolution.js`, `interactableDispatch.js`,
  * `interactableDoubleClickWrap.js`, and `interactableTooltip.js`; the hook/wrap
  * bodies here are the thin Foundry/PIXI edge. Spawning is GM-only.
@@ -33,17 +33,15 @@ import {
   parseInteractableSourceUuid
 } from './interactableResolution.js';
 import { resolveItemUuidToTool } from './interactableItemResolution.js';
-import {
-  decideInteractableDoubleClick,
-  shouldPermitInteractableAction
-} from './interactableDoubleClickWrap.js';
+import { shouldPermitInteractableAction } from './interactableDoubleClickWrap.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
 import { buildInteractableTileFlags, isInteractableTile } from './interactableTileFlags.js';
 import { interactableTooltipText } from './interactableTooltip.js';
 import { showInteractableTileLabel, hideInteractableTileLabel } from './interactableTileLabel.js';
 import {
   enableInteractableTilePointerEvents,
-  enableInteractableTilesIn
+  enableInteractableTilesIn,
+  detachDoubleClickPointerListener
 } from './interactableTileInteractivity.js';
 import { dispatchInteractableDoubleClick } from './interactableDispatch.js';
 import { buildTileNodeSnapshot, createTileNodeStateAdapter } from './tileNodeStateAdapter.js';
@@ -64,18 +62,18 @@ const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
  * scope because the wraps mutate shared class prototypes, not a per-instance
  * binding.
  */
-const DOUBLE_CLICK_WRAP_FLAG = '_fabricateInteractableDoubleClickWrapped';
 const HOVER_WRAP_FLAG = '_fabricateInteractableHoverWrapped';
 const PERMISSION_WRAP_FLAG = '_fabricateInteractablePermissionWrapped';
 
 /**
- * Resolve the V13 Tile placeable class whose `_onClickLeft2` / hover handlers we
- * wrap, mirroring the prior token-class resolution.
+ * Resolve the V13 Tile placeable class whose hover handlers we wrap, mirroring
+ * the prior token-class resolution.
  *
  * We prefer `CONFIG.Tile.objectClass` — the class Foundry actually INSTANTIATES
  * for canvas tiles — FIRST, so we wrap the most-derived live class. We then fall
  * back to the V13 base placeable `foundry.canvas.placeables.Tile`, then to a bare
- * `Tile` global, returning the first whose prototype owns `_onClickLeft2`.
+ * `Tile` global, returning the first whose prototype owns `_onHoverIn` (the
+ * handler the discoverability-tooltip wrap hooks).
  *
  * @returns {Function|null} The Tile class, or null when none is resolvable.
  */
@@ -86,7 +84,7 @@ function resolveTileClass() {
     globalThis.Tile
   ];
   for (const candidate of candidates) {
-    if (typeof candidate === 'function' && typeof candidate.prototype?._onClickLeft2 === 'function') {
+    if (typeof candidate === 'function' && typeof candidate.prototype?._onHoverIn === 'function') {
       return candidate;
     }
   }
@@ -110,35 +108,6 @@ function resolveMouseInteractionManagerClass() {
     }
   }
   return null;
-}
-
-/**
- * Install a one-time, idempotent wrap of the V13 Tile `_onClickLeft2` handler.
- *
- * The wrapper consults the pure {@link decideInteractableDoubleClick}: for an
- * interactable tile it routes to {@link InteractableManager#_onDoubleClick} and
- * SUPPRESSES the V13 default; for any other tile it delegates to the captured
- * original handler with the correct `this` and arguments. Defensive: no-throw
- * when the class/method is absent.
- */
-function installInteractableDoubleClickWrap() {
-  const TileClass = resolveTileClass();
-  if (!TileClass) return; // canvas placeables not available yet — tolerate.
-  const proto = TileClass.prototype;
-  if (proto[DOUBLE_CLICK_WRAP_FLAG] === true) return; // already wrapped once.
-
-  const original = proto._onClickLeft2;
-  if (typeof original !== 'function') return;
-
-  proto._onClickLeft2 = function wrappedOnClickLeft2(...args) {
-    const decision = decideInteractableDoubleClick(this?.document, isInteractableTile);
-    if (decision === 'dispatch') {
-      InteractableManager.instance?._onDoubleClick?.(this.document);
-      return; // suppress the V13 default for BOTH GM and player.
-    }
-    return original.apply(this, args);
-  };
-  proto[DOUBLE_CLICK_WRAP_FLAG] = true;
 }
 
 /**
@@ -178,8 +147,10 @@ function installInteractableHoverWrap() {
 
 /**
  * Install a one-time, idempotent wrap of the V13 `MouseInteractionManager#can`
- * permission gate so a non-GM player's `clickLeft2` / hover is PERMITTED on
- * interactable tiles (tiles are not natively pointer-interactive for players).
+ * permission gate so a non-GM player's hover (`hoverIn`/`hoverOut`) is PERMITTED
+ * on interactable tiles (tiles are not natively pointer-interactive for players).
+ * Double-click is handled by a raw `pointerdown` listener (see
+ * interactableTileInteractivity.js), not this gate.
  *
  * The wrapper consults the pure {@link shouldPermitInteractableAction}: it only
  * ADDS permission for interactable tiles + the allowed actions, and otherwise
@@ -242,24 +213,25 @@ class InteractableManager {
     const hooks = globalThis.Hooks;
     if (hooks?.on) {
       hooks.on('dropCanvasData', this._onDrop);
-      // Make interactable tiles pointer-eventful for ALL users. A Tile is GM
-      // scenery and is NOT natively pointer-interactive for a non-GM player, so
-      // without this the player's double-click / hover never reaches the
-      // placeable's MouseInteractionManager and the permission/double-click wraps
-      // below are never even consulted. `drawTile` catches each tile as it is
-      // drawn; the `canvasReady` sweep catches tiles drawn before this hook was
-      // installed and re-applies after a scene swap. Both delegate to the pure-
-      // decision-gated, defensive enablement edge.
+      // Make interactable tiles pointer-eventful for ALL users AND attach the raw
+      // PIXI double-click pointer listener. A Tile is GM scenery and is NOT in the
+      // active control layer for a non-GM player, so the MouseInteractionManager
+      // click-sequence never runs `_onClickLeft2` for it (hover DOES fire) — so
+      // the double-click is delivered by our own pointer listener instead.
+      // `drawTile` catches each tile as it is drawn; the `canvasReady` sweep
+      // catches tiles drawn before this hook was installed and re-applies after a
+      // scene swap; `destroyTile` detaches the listener. Both enablement paths
+      // delegate to the pure-decision-gated, defensive edge.
       hooks.on('drawTile', (placeable) => enableInteractableTilePointerEvents(placeable));
       hooks.on('canvasReady', () => enableInteractableTilesIn(globalThis.canvas?.tiles?.placeables));
+      hooks.on('destroyTile', (placeable) => detachDoubleClickPointerListener(placeable));
     }
-    // Wrap the V13 Tile double-click handler so interactable tiles route to the
-    // Fabricate dispatcher and SUPPRESS the default; wrap the interaction
-    // permission so a non-GM player's double-click / hover is permitted on
-    // interactable tiles; wrap the Tile hover so a discoverability tooltip shows.
-    // Installed once, defensively, and independently of Hooks availability (the
-    // prototype wraps are their own concern).
-    installInteractableDoubleClickWrap();
+    // Wrap the interaction permission so a non-GM player's hover is permitted on
+    // interactable tiles (the tooltip relies on it); wrap the Tile hover so a
+    // discoverability tooltip shows. Installed once, defensively, and
+    // independently of Hooks availability (the prototype wraps are their own
+    // concern). The double-click is delivered by the raw pointer listener above —
+    // NOT by an `_onClickLeft2` wrap.
     installInteractablePermissionWrap();
     installInteractableHoverWrap();
     this._registered = true;

@@ -131,7 +131,7 @@ test('no-throw and no label when the PIXI text class is unavailable', () => {
   }
 });
 
-test('prefers PreciseText when available', () => {
+test('prefers the legacy global PreciseText when available', () => {
   const savedPixi = globalThis.PIXI;
   const savedPrecise = globalThis.PreciseText;
   let usedPrecise = false;
@@ -148,5 +148,36 @@ test('prefers PreciseText when available', () => {
   } finally {
     if (savedPixi === undefined) delete globalThis.PIXI; else globalThis.PIXI = savedPixi;
     if (savedPrecise === undefined) delete globalThis.PreciseText; else globalThis.PreciseText = savedPrecise;
+  }
+});
+
+test('prefers the V13-namespaced PreciseText (foundry.canvas.containers) over the legacy global', () => {
+  const savedPixi = globalThis.PIXI;
+  const savedPrecise = globalThis.PreciseText;
+  const savedFoundry = globalThis.foundry;
+  let usedNamespaced = false;
+  let usedLegacy = false;
+  class NamespacedPrecise {
+    static getTextStyle(opts) { return { ...opts, _namespaced: true }; }
+    constructor(text, style) { usedNamespaced = true; this.text = text; this.style = style; this.anchor = { set() {} }; this.position = { set() {} }; }
+  }
+  class LegacyPrecise {
+    static getTextStyle(opts) { return { ...opts, _legacy: true }; }
+    constructor(text, style) { usedLegacy = true; this.text = text; this.style = style; this.anchor = { set() {} }; this.position = { set() {} }; }
+  }
+  globalThis.PIXI = { Text: class { constructor() { this.anchor = { set() {} }; this.position = { set() {} }; } } };
+  // Both present: the V13 namespace must win over the deprecated global.
+  globalThis.foundry = { canvas: { containers: { PreciseText: NamespacedPrecise } } };
+  globalThis.PreciseText = LegacyPrecise;
+  try {
+    const tile = fakeTile();
+    const label = showInteractableTileLabel(tile, 'Iron Vein');
+    assert.equal(usedNamespaced, true, 'the V13-namespaced PreciseText is preferred');
+    assert.equal(usedLegacy, false, 'the deprecated global PreciseText is NOT used');
+    assert.equal(label.style?._namespaced, true, 'the style also resolves via the namespaced getTextStyle');
+  } finally {
+    if (savedPixi === undefined) delete globalThis.PIXI; else globalThis.PIXI = savedPixi;
+    if (savedPrecise === undefined) delete globalThis.PreciseText; else globalThis.PreciseText = savedPrecise;
+    if (savedFoundry === undefined) delete globalThis.foundry; else globalThis.foundry = savedFoundry;
   }
 });

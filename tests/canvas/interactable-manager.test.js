@@ -111,9 +111,8 @@ test('register() binds the canvas hooks exactly once across repeated calls', () 
   try {
     const registrations = [];
     globalThis.Hooks = { on: (hook, fn) => registrations.push({ hook, fn }) };
-    // No Tile class available ⇒ the double-click / hover / permission wrap
-    // installs are no-ops (they are exercised directly in
-    // interactable-doubleclick-wrap.test.js).
+    // No Tile class available ⇒ the hover / permission wrap installs are no-ops
+    // (they are exercised directly in interactable-doubleclick-wrap.test.js).
 
     const manager = new InteractableManager();
     manager.register();
@@ -121,9 +120,10 @@ test('register() binds the canvas hooks exactly once across repeated calls', () 
 
     const hooks = registrations.map(r => r.hook);
     // dropCanvasData (drop interception) + drawTile / canvasReady (the
-    // pointer-interactivity enablement for interactable tiles).
-    assert.deepEqual(hooks.sort(), ['canvasReady', 'drawTile', 'dropCanvasData']);
-    assert.equal(registrations.length, 3, 'each canvas hook is bound only once');
+    // pointer-interactivity enablement + raw double-click listener for
+    // interactable tiles) + destroyTile (detaches the listener on teardown).
+    assert.deepEqual(hooks.sort(), ['canvasReady', 'destroyTile', 'drawTile', 'dropCanvasData']);
+    assert.equal(registrations.length, 4, 'each canvas hook is bound only once');
     assert.equal(manager._registered, true);
   } finally {
     restoreGlobals(saved);

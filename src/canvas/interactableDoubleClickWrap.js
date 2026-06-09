@@ -1,45 +1,34 @@
 /**
- * Pure decisions for the V13 Tile double-click + interaction-permission wraps.
+ * Pure decision for the V13 interaction-permission wrap on canvas interactable
+ * TILES.
  *
  * Fabricate interactables are Foundry TILES (no actor, no sheet). In Foundry V13
- * a double-click on a placeable runs `PlaceableObject#_onClickLeft2` (inherited
- * by the Tile class), and whether a pointer interaction is even DELIVERED is
- * gated by `MouseInteractionManager#can(action, event)`. A non-GM player has no
- * native double-click on a tile, so we must both:
+ * whether a pointer interaction is DELIVERED is gated by
+ * `MouseInteractionManager#can(action, event)`. A Tile is GM scenery and is not
+ * natively pointer-interactive for a non-GM player, so we PERMIT the hover
+ * interaction for interactable tiles ({@link shouldPermitInteractableAction}) so a
+ * player's `hoverIn`/`hoverOut` reaches the handler and the discoverability
+ * tooltip shows.
  *
- *  1. PERMIT the interaction for interactable tiles ({@link shouldPermitInteractableAction}),
- *     so a player's `clickLeft2` (and `hoverIn` for the tooltip) reaches the handler.
- *  2. INTERCEPT the double-click ({@link decideInteractableDoubleClick}): for an
- *     interactable tile, dispatch to the Fabricate UI and SUPPRESS the default;
- *     for any other placeable, delegate to the captured original handler.
+ * The double-click itself is NOT routed through this permission gate or an
+ * `_onClickLeft2` wrap — for a non-controllable tile placeable the
+ * MouseInteractionManager click-sequence never runs `_onClickLeft2`. The
+ * double-click is delivered by a raw PIXI pointer listener with our own
+ * double-click detection (see `interactableTileInteractivity.js`).
  *
- * Both DECISIONS are pure and live here, tested with fake Tile-like objects and
- * no live Foundry. The actual install (resolving the V13 Tile class +
- * MouseInteractionManager defensively, capturing methods, binding `this`,
- * suppressing) is the thin Foundry edge in {@link InteractableManager}.
+ * The DECISION is pure and lives here, tested with fake Tile-like objects and no
+ * live Foundry. The actual install (resolving the V13 MouseInteractionManager
+ * defensively, capturing the method, delegating) is the thin Foundry edge in
+ * {@link InteractableManager}.
  */
-
-/**
- * Decide what the wrapped `_onClickLeft2` should do for a given tile.
- *
- * @param {object} tileDocument                       The tile's document.
- * @param {(document: object) => boolean} isInteractable Predicate (the shared
- *   `isInteractableTile` flag check).
- * @returns {'dispatch'|'delegate'} `'dispatch'` ⇒ route to the Fabricate
- *   double-click handler and SUPPRESS the V13 default (for BOTH GM and player);
- *   `'delegate'` ⇒ call the captured original V13 handler.
- */
-export function decideInteractableDoubleClick(tileDocument, isInteractable) {
-  if (typeof isInteractable !== 'function') return 'delegate';
-  return isInteractable(tileDocument) === true ? 'dispatch' : 'delegate';
-}
 
 /**
  * The interaction actions we permit on an interactable tile for ALL users
- * (including non-GM players): the double-click that opens the Fabricate UI, plus
- * the hover that surfaces the discoverability tooltip.
+ * (including non-GM players): the hover that surfaces the discoverability
+ * tooltip. (The double-click is delivered by the raw PIXI pointer listener, not
+ * through this gate.)
  */
-const PERMITTED_INTERACTABLE_ACTIONS = Object.freeze(['clickLeft2', 'hoverIn', 'hoverOut']);
+const PERMITTED_INTERACTABLE_ACTIONS = Object.freeze(['hoverIn', 'hoverOut']);
 
 /**
  * Decide whether to PERMIT a pointer interaction `action` on a placeable. Returns
