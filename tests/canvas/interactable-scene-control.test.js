@@ -15,7 +15,8 @@ import {
   addInteractableSceneControl,
   FABRICATE_SCENE_CONTROL_NAME,
   FABRICATE_INTERACTABLE_TOOL_NAME,
-  FABRICATE_SCENE_CONTROL_ICON
+  FABRICATE_SCENE_CONTROL_ICON,
+  FABRICATE_INTERACTABLE_TOOL_ICON
 } from '../../src/ui/interactableSceneControl.js';
 
 // A minimal V13 object-of-controls record (keyed by control name), as the hook
@@ -54,7 +55,7 @@ test('the group exposes a button tool (click action, not a toggle mode) in the V
   assert.ok(tool, 'the browser tool is keyed by its name');
   assert.equal(tool.name, FABRICATE_INTERACTABLE_TOOL_NAME);
   assert.equal(tool.button, true, 'a button tool is a one-shot click action, not a toggle');
-  assert.equal(tool.icon, FABRICATE_SCENE_CONTROL_ICON);
+  assert.equal(tool.icon, FABRICATE_INTERACTABLE_TOOL_ICON, 'the place-interactables tool uses the map icon (group keeps mortar-pestle)');
 });
 
 test('the group declares NO activeTool (a button-only group must not pin a persistent tool)', () => {

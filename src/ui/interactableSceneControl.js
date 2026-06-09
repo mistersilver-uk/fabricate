@@ -20,8 +20,10 @@
 /** Control-group + tool ids. Stable, namespaced so they cannot collide. */
 export const FABRICATE_SCENE_CONTROL_NAME = 'fabricate';
 export const FABRICATE_INTERACTABLE_TOOL_NAME = 'fabricate-interactables';
-/** FontAwesome icon for the control group + its launch button. */
+/** FontAwesome icon for the top-level Fabricate control GROUP. */
 export const FABRICATE_SCENE_CONTROL_ICON = 'fas fa-mortar-pestle';
+/** FontAwesome icon for the "Place interactables" tool button (map/region pin). */
+export const FABRICATE_INTERACTABLE_TOOL_ICON = 'fas fa-map-location-dot';
 
 /**
  * Add the GM-only Fabricate Interactable-browser control to a V13
@@ -61,7 +63,7 @@ export function addInteractableSceneControl(controls, { isGM, onClick, localize 
       [FABRICATE_INTERACTABLE_TOOL_NAME]: {
         name: FABRICATE_INTERACTABLE_TOOL_NAME,
         title: toolTitle,
-        icon: FABRICATE_SCENE_CONTROL_ICON,
+        icon: FABRICATE_INTERACTABLE_TOOL_ICON,
         // A click action (one-shot), NOT a toggle mode.
         button: true,
         visible: true,
