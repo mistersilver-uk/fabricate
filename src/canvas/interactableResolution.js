@@ -195,9 +195,11 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
  * builder at the edge and injects them here.
  *
  * Region geometry: a rectangle sized `regionGrid` grid squares per side
- * (default 1), CENTERED on the drop point, then snapped so it tiles cleanly with
- * the scene grid. The linked Tile is sized `width`/`height` (default one grid
- * square) and TOP-LEFT-anchored at the same center, so the visible marker sits
+ * (default 1), CENTERED on the drop point. A Region rectangle SHAPE renders
+ * TOP-LEFT at its stored `x/y`, so we anchor the top-left at `center - size/2`.
+ * The linked Tile is sized `width`/`height` (default one grid square) and stores
+ * its CENTER as `x/y` (Foundry renders tiles centered on `x/y`), so the tile's
+ * center and the region's center both land on the drop point and the marker sits
  * inside the region.
  *
  * @param {object} params
@@ -261,20 +263,23 @@ export function buildRegionSpawnRequest({
   const cx = Number(point?.x ?? 0);
   const cy = Number(point?.y ?? 0);
 
-  // Linked Tile: top-left-anchored so its CENTER sits at the drop point.
-  const tileX = cx - tileWidth / 2;
-  const tileY = cy - tileHeight / 2;
+  // Linked Tile: Foundry renders a Tile CENTERED on its stored `x/y` (empirically
+  // confirmed against live V13 bounds: `tile.object.bounds.x === doc.x - width/2`).
+  // So to put the tile's CENTER at the drop point we store the drop point itself
+  // as the tile's `x/y` — NOT `cx - width/2`. The previous code top-left-anchored
+  // the tile, which rendered the marker half a tile down-right of the drop point.
+  const tileX = cx;
+  const tileY = cy;
 
-  // Region: a `span`-square rectangle that is CONCENTRIC with the tile (same
-  // center), so a player who walks onto the visible marker is inside the region.
-  // For the default single-square region the rectangle COINCIDES with the tile
-  // exactly (same x/y/width/height). For a multi-square region it stays centered
-  // on the tile's center and encloses it. Previously the region top-left was
-  // grid-snapped while the tile was raw-anchored, which shifted the interactable
-  // area ~half a tile down-right of the visible marker.
+  // Region: a `span`-square rectangle whose CENTER sits on the drop point. Unlike
+  // a Tile, a Region rectangle SHAPE renders TOP-LEFT at its stored `x/y` (also
+  // confirmed live: a region doc x maps 1:1 to its rendered bounds x). So to
+  // center the rectangle on the drop point we anchor its top-left at
+  // `(cx - regionW/2, cy - regionH/2)`. Net effect: tile center == region center
+  // == drop point. The manager re-derives the region rect from the tile footprint
+  // when a tile exists; this shape is the source of truth for the region-only case.
   const regionW = grid * span;
   const regionH = grid * span;
-  // Concentric: tile center is at (cx, cy); place the region's center there too.
   const regionX = cx - regionW / 2;
   const regionY = cy - regionH / 2;
 

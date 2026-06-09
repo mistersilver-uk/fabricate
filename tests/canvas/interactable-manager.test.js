@@ -263,10 +263,15 @@ test('_spawnInteractableRegion creates a Region (with nested behaviour) + linked
     assert.equal(regionPayload.shapes[0].type, 'rectangle');
 
     assert.equal(createdTiles.length, 1, 'one linked Tile created');
-    // CONCENTRIC: the created Region rectangle and the linked Tile share the same
-    // x/y/width/height so the visible marker and the interactable area coincide.
-    assert.equal(regionPayload.shapes[0].x, createdTiles[0].x);
-    assert.equal(regionPayload.shapes[0].y, createdTiles[0].y);
+    // The linked Tile is CENTERED on its stored x/y (Foundry renders tiles
+    // centered), so the tile's stored x/y IS the drop point.
+    assert.equal(createdTiles[0].x, 150, 'tile center == drop point x');
+    assert.equal(createdTiles[0].y, 250, 'tile center == drop point y');
+    // The Region rectangle renders TOP-LEFT at its x/y, so to OVERLAY the tile it
+    // is created at the tile's top-left (`tile.x - width/2`, `tile.y - height/2`)
+    // with the tile's width/height — i.e. the region covers the tile's footprint.
+    assert.equal(regionPayload.shapes[0].x, createdTiles[0].x - createdTiles[0].width / 2);
+    assert.equal(regionPayload.shapes[0].y, createdTiles[0].y - createdTiles[0].height / 2);
     assert.equal(regionPayload.shapes[0].width, createdTiles[0].width);
     assert.equal(regionPayload.shapes[0].height, createdTiles[0].height);
     assert.equal(createdTiles[0].texture.src, 'icons/tools/axe.webp');

@@ -60,22 +60,17 @@ test('buildRegionSpawnRequest (tool) shapes region geometry + behaviour system +
   assert.equal(request.name, 'Forge Anvil');
   assert.equal(request.environmentId, null, 'tools carry no environment');
 
-  // Region: a 1-grid-square rectangle CONCENTRIC with the tile (centered on the
-  // drop point), so the visible marker and the interactable area coincide.
+  // Region shape: a 1-grid-square rectangle whose TOP-LEFT is anchored at
+  // `center - size/2`, so the rectangle is CENTERED on the drop point. (A Region
+  // rectangle renders top-left at its stored x/y; a Tile renders centered on its
+  // x/y — so the two store different x/y but their CENTERS both land on the drop.)
   assert.equal(request.region.shape.type, 'rectangle');
   assert.equal(request.region.shape.width, 100);
   assert.equal(request.region.shape.height, 100);
-  // center (150,250) - half(50,50) = (100,200) — same as the tile's top-left.
+  // center (150,250) - half(50,50) = (100,200) — the rect's top-left.
   assert.equal(request.region.shape.x, 100);
   assert.equal(request.region.shape.y, 200);
   assert.equal(request.region.name, 'Forge Anvil');
-
-  // CONCENTRIC: the region rect and the tile rect share the same x/y/width/height
-  // so a player who walks onto the marker is inside the region.
-  assert.equal(request.region.shape.x, request.tile.x);
-  assert.equal(request.region.shape.y, request.tile.y);
-  assert.equal(request.region.shape.width, request.tile.width);
-  assert.equal(request.region.shape.height, request.tile.height);
 
   // Behaviour system: built by the injected builder; tool-shaped.
   assert.equal(request.behaviorSystem.interactableType, 'tool');
@@ -83,12 +78,18 @@ test('buildRegionSpawnRequest (tool) shapes region geometry + behaviour system +
   assert.equal(request.behaviorSystem.taskId, null);
   assert.equal(request.behaviorSystem.activation.trigger, 'regionEnter');
 
-  // Linked tile: top-left-anchored so its center sits at the drop point.
+  // Linked tile: Foundry renders tiles CENTERED on x/y, so the stored x/y IS the
+  // drop point (the tile's center). NOT `cx - w/2`.
   assert.deepEqual(request.tile.texture, { src: 'icons/tools/axe.webp' });
   assert.equal(request.tile.width, 100);
   assert.equal(request.tile.height, 100);
-  assert.equal(request.tile.x, 100); // 150 - 50
-  assert.equal(request.tile.y, 200); // 250 - 50
+  assert.equal(request.tile.x, 150); // tile center == drop point x
+  assert.equal(request.tile.y, 250); // tile center == drop point y
+
+  // The tile's CENTER and the region's CENTER coincide on the drop point: the
+  // region top-left + half-size == the tile's stored x/y.
+  assert.equal(request.region.shape.x + request.region.shape.width / 2, request.tile.x);
+  assert.equal(request.region.shape.y + request.region.shape.height / 2, request.tile.y);
 });
 
 test('buildRegionSpawnRequest (gatheringTask) carries environmentId into the behaviour system (no per-interactable node)', () => {
@@ -109,16 +110,19 @@ test('buildRegionSpawnRequest (gatheringTask) carries environmentId into the beh
   assert.equal(request.behaviorSystem.environmentId, 'env-1');
   assert.equal('node' in request.behaviorSystem, false, 'no per-interactable node is seeded on the behaviour');
 
-  // CONCENTRIC: a gathering-task region rect coincides with its tile rect too.
-  assert.equal(request.region.shape.x, request.tile.x);
-  assert.equal(request.region.shape.y, request.tile.y);
+  // The gathering-task tile center and region center both land on the drop point.
+  assert.equal(request.tile.x, 0); // tile center == drop point x
+  assert.equal(request.tile.y, 0); // tile center == drop point y
+  assert.equal(request.region.shape.x + request.region.shape.width / 2, request.tile.x);
+  assert.equal(request.region.shape.y + request.region.shape.height / 2, request.tile.y);
   assert.equal(request.region.shape.width, request.tile.width);
   assert.equal(request.region.shape.height, request.tile.height);
 });
 
-test('buildRegionSpawnRequest keeps the region rect coincident with the tile at an off-grid drop point', () => {
-  // An off-grid drop must still place the region exactly on the marker — the
-  // region top-left is NOT independently grid-snapped away from the tile.
+test('buildRegionSpawnRequest centers BOTH the tile and the region on an off-grid drop point', () => {
+  // An off-grid drop must still center the marker AND the region on the cursor —
+  // the region top-left is NOT independently grid-snapped, and the tile stores the
+  // raw drop point as its center.
   const request = buildRegionSpawnRequest({
     classification: toolClassification(),
     point: { x: 137, y: 213 },
@@ -127,10 +131,14 @@ test('buildRegionSpawnRequest keeps the region rect coincident with the tile at 
     gridSize: 100,
     buildBehaviorSystem: builder
   });
-  assert.equal(request.tile.x, 87); // 137 - 50
-  assert.equal(request.tile.y, 163); // 213 - 50
-  assert.equal(request.region.shape.x, request.tile.x);
-  assert.equal(request.region.shape.y, request.tile.y);
+  // Tile center == raw drop point.
+  assert.equal(request.tile.x, 137);
+  assert.equal(request.tile.y, 213);
+  // Region rect top-left == drop point - half size; its center == the drop point.
+  assert.equal(request.region.shape.x, 87); // 137 - 50
+  assert.equal(request.region.shape.y, 163); // 213 - 50
+  assert.equal(request.region.shape.x + request.region.shape.width / 2, request.tile.x);
+  assert.equal(request.region.shape.y + request.region.shape.height / 2, request.tile.y);
   assert.equal(request.region.shape.width, request.tile.width);
   assert.equal(request.region.shape.height, request.tile.height);
 });

@@ -308,16 +308,20 @@ class InteractableManager {
     if (!scene?.createEmbeddedDocuments) return null;
 
     const { region, behaviorSystem, tile } = spawnRequest;
-    // The region area and the linked Tile marker must COINCIDE so a player walking
-    // onto the visible marker is inside the region. When there is a marker, the
-    // region rectangle is set to the tile's exact geometry (concentric/coincident);
-    // do NOT independently re-snap the region, which would shift it off the marker.
-    // For a region-only interactable (no tile) use the pure builder's already
-    // concentric region shape directly.
+    // The region area and the linked Tile marker must OVERLAY so a player walking
+    // onto the visible marker is inside the region. The two anchor DIFFERENTLY in
+    // Foundry V13 (empirically confirmed against live bounds): a Tile renders
+    // CENTERED on its stored `x/y` (`tile.object.bounds.x === doc.x - width/2`),
+    // while a Region rectangle SHAPE renders TOP-LEFT at its stored `x/y`. So when
+    // a marker exists, the region rectangle's top-left must be the tile's top-left
+    // — i.e. `tile.x - tile.width/2` — to cover the tile's footprint
+    // (`[tile.x - w/2 .. tile.x + w/2]`). Anchoring the region at `tile.x` would
+    // shift it half a tile down-right of the marker. For a region-only interactable
+    // (no tile) the pure builder's already-centered region shape is used directly.
     const { x, y, width, height } = tile
       ? {
-          x: Number(tile.x ?? region.shape?.x ?? 0),
-          y: Number(tile.y ?? region.shape?.y ?? 0),
+          x: Number(tile.x ?? 0) - Number(tile.width ?? this._gridSize()) / 2,
+          y: Number(tile.y ?? 0) - Number(tile.height ?? this._gridSize()) / 2,
           width: Number(tile.width ?? region.shape?.width ?? this._gridSize()),
           height: Number(tile.height ?? region.shape?.height ?? this._gridSize())
         }

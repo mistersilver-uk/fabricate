@@ -71,8 +71,9 @@ test('placeInteractableAtViewCenter routes a Tool through the SAME region-spawn 
     assert.equal(spawned[0].interactableType, 'tool');
     assert.equal(spawned[0].sourceUuid, 'Fabricate.sysA.tool.tool-1');
     assert.equal(spawned[0].behaviorSystem.interactableType, 'tool', 'the region-spawn carries the behaviour system');
-    // View center = scene dimensions midpoint (no PIXI stage installed). The
-    // region shape is centered on it; the linked Tile is top-left-anchored.
+    // View center = scene dimensions midpoint (no PIXI stage installed). Both the
+    // region shape and the linked Tile are centered on it (the tile stores the
+    // center as x/y; the region rect stores center - half-size as its top-left).
     assert.equal(spawned[0].region.shape.type, 'rectangle');
     assert.equal(typeof spawned[0].tile.x, 'number');
   } finally {

@@ -124,7 +124,7 @@
         "SearchPlaceholder": "Search entries…",
         "ToolsHeading": "Tools",
         "TasksHeading": "Gathering tasks",
-        "PlaceOnScene": "Place on current scene",
+        "PlaceOnScene": "Place region + Tile",
         "PlaceRegionOnly": "Place region only (no marker)",
         "RegionOnlyHint": "Use the square button to place a region only, with no visible marker.",
         "UnnamedTask": "Unnamed task",
