@@ -363,7 +363,7 @@
 
   .fab-ib-place:focus-visible,
   .fab-ib-place-region:focus-visible {
-    outline: 2px solid var(--color-shadow-primary, var(--color-border-highlight));
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 

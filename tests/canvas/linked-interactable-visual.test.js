@@ -3,8 +3,10 @@
  *
  * The Tile branch reuses the PURE `planDepletedBehavior` (none/apply/revert/
  * delete) and routes apply/revert via `emitVisualUpdate` and the terminal delete
- * via `emitVisualDelete`. A missing visual is a no-op. Drawing/Token are Phase
- * 4/5 stubs (no-op). The resolve edge (`globalThis.fromUuidSync`) is faked.
+ * via `emitVisualDelete`. A missing visual is a no-op. The Drawing branch
+ * (hide-on-deplete / show-on-respawn + terminal delete) and the Token branch
+ * (safe-default no-op + opt-in reversible hide, never delete) are both
+ * implemented. The resolve edge (`globalThis.fromUuidSync`) is faked.
  */
 
 import test from 'node:test';
@@ -227,6 +229,18 @@ test('planTokenDepleted: terminal deleteToken NEVER deletes a Token marker (no-o
   // The non-negotiable guarantee: even the terminal `deleteToken` flag is ignored
   // for a Token, so depletion can never destroy the GM's token.
   assert.deepEqual(planTokenDepleted({ behavior: { deleteToken: true }, depleted: true, token: tokenDoc() }), { action: 'none' });
+});
+
+test('planTokenDepleted: {tokenHide:true, deleteToken:true} hides (apply), never deletes', () => {
+  // The opt-in hide wins and `deleteToken` stays ignored: the combo yields a
+  // reversible 'apply' hide, never a delete of the GM's token.
+  const plan = planTokenDepleted({
+    behavior: { tokenHide: true, deleteToken: true },
+    depleted: true,
+    token: tokenDoc({ hidden: false })
+  });
+  assert.equal(plan.action, 'apply');
+  assert.equal(plan.update.hidden, true);
 });
 
 test('planTokenDepleted: explicit tokenHide opt-in reversibly hides on deplete + shows on respawn', () => {
@@ -646,6 +660,42 @@ test('relinkVisual writes the reverse flag onto the new tile and clears it off t
     linkedRegionUuid: 'Scene.s1.Region.r1',
     linkedBehaviorId: 'beh-1'
   });
+});
+
+test('relinkVisual clears the OLD marker even when applyBehaviorUpdate mutates behavior.system in place (live Foundry)', async () => {
+  // Live Foundry's behaviour update mutates `behavior.system.linkedVisual` IN
+  // PLACE — so by the time the forward await resolves, `behavior.system` already
+  // carries the NEW uuid. If `relinkVisual` read the prior link AFTER the await it
+  // would see the new uuid and never clear the OLD document's reverse flag. This
+  // simulates that mutation and asserts the OLD marker's reverse flag IS cleared.
+  const visualUpdates = [];
+  const behavior = {
+    id: 'beh-1',
+    parent: { uuid: 'Scene.s1.Region.r1' },
+    system: { linkedVisual: { uuid: 'Scene.s1.Tile.old', documentName: 'Tile' } }
+  };
+  const applyBehaviorUpdate = async ({ update }) => {
+    // Mutate the live behaviour system in place, exactly like Foundry's update.
+    behavior.system.linkedVisual = { ...behavior.system.linkedVisual, ...update.system.linkedVisual };
+  };
+
+  await relinkVisual(
+    behavior,
+    { uuid: 'Scene.s1.Tile.new', documentName: 'Tile' },
+    {
+      applyBehaviorUpdate,
+      identify: () => ({ sceneId: 's1', regionId: 'r1', behaviorId: 'beh-1' }),
+      applyVisualUpdate: (a) => visualUpdates.push(a)
+    }
+  );
+
+  // The OLD marker's reverse flag MUST still be cleared despite the in-place mutation.
+  assert.equal(visualUpdates.length, 2);
+  const [clearOld, setNew] = visualUpdates;
+  assert.equal(clearOld.visualUuid, 'Scene.s1.Tile.old');
+  assert.equal(clearOld.update.flags.fabricate.isInteractableVisual, null);
+  assert.equal(setNew.visualUuid, 'Scene.s1.Tile.new');
+  assert.equal(setNew.update.flags.fabricate.isInteractableVisual, true);
 });
 
 test('relinkVisual writes the reverse flag on the new tile and skips the clear when there was no prior link', async () => {

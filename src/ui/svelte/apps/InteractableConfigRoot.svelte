@@ -213,6 +213,17 @@
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
           </button>
         </div>
+      {:else if visualStatus.severity === 'ok'}
+        <!-- Resolved (healthy) marker: still offer relink-to-a-different-doc and
+             remove-from-panel, mirroring the missing-state affordances. -->
+        <div class="fab-ic-actions fab-ic-actions-inline">
+          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelected?.())}>
+            {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
+          </button>
+          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.removeVisualMarker?.())}>
+            {text('FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker', 'Remove visual marker')}
+          </button>
+        </div>
       {/if}
 
       <label class="fab-ic-field">

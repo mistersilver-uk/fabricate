@@ -282,7 +282,7 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
           { action: 'unlink', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualUnlink', 'Unlink only'), icon: 'fas fa-link-slash' }
         ];
         if (!isToken) {
-          choices.push({ action: 'delete', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualDelete', 'Unlink + delete tile'), icon: 'fas fa-trash' });
+          choices.push({ action: 'delete', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualDelete', 'Unlink + delete marker'), icon: 'fas fa-trash' });
         }
         choices.push({ action: 'cancel', label: this._t('FABRICATE.Canvas.Interactable.Config.RemoveVisualCancel', 'Cancel'), icon: 'fas fa-xmark' });
 

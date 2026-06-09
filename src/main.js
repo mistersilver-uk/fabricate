@@ -1219,17 +1219,20 @@ Hooks.on('getSceneControlButtons', (controls) => {
   });
 });
 
-// GM-only discoverability (Phase 2): a "Configure Fabricate Interactable" button
-// on the Tile HUD for a tile that is a Fabricate interactable visual. It resolves
-// the owning behaviour from the tile's reverse linked-visual flags and opens the
-// rich config panel. The pure gate + target resolution live in
-// `interactableConfigSheet.js`; this hook body is the thin Foundry edge.
-Hooks.on('renderTileHUD', (hud, element) => {
+// GM-only discoverability: a "Configure Fabricate Interactable" button on a
+// placeable's HUD when that placeable is a linked Fabricate interactable visual.
+// It resolves the owning behaviour from the document's reverse linked-visual flags
+// and opens the rich config panel. The pure gate + target resolution live in
+// `interactableConfigSheet.js`; this helper is the thin Foundry edge shared by the
+// Tile HUD (Phase 2) and the Token HUD (Phase 5) — only the host HUD + the
+// localization key differ. This NEVER touches a token's actor: it only opens the
+// behaviour config panel.
+function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
   try {
-    const tile = hud?.object?.document ?? hud?.document ?? null;
-    if (!shouldOfferInteractableConfigEntry(tile, { isGM: game.user?.isGM === true })) return;
+    const document = hud?.object?.document ?? hud?.document ?? null;
+    if (!shouldOfferInteractableConfigEntry(document, { isGM: game.user?.isGM === true })) return;
 
-    const target = resolveInteractableConfigTarget(tile, {
+    const target = resolveInteractableConfigTarget(document, {
       resolveRegion: (regionUuid) => {
         const region = fromUuidSync?.(regionUuid) ?? null;
         const regionId = region?.id ?? region?._id ?? null;
@@ -1243,14 +1246,10 @@ Hooks.on('renderTileHUD', (hud, element) => {
     const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
     if (!column?.appendChild) return;
 
-    const label = (() => {
-      const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Config.OpenFromTile');
-      return out && out !== 'FABRICATE.Canvas.Interactable.Config.OpenFromTile'
-        ? out
-        : 'Configure Fabricate Interactable';
-    })();
+    const out = game.i18n?.localize?.(localizeKey);
+    const label = out && out !== localizeKey ? out : 'Configure Fabricate Interactable';
 
-    const button = document.createElement('button');
+    const button = window.document.createElement('button');
     button.type = 'button';
     button.className = 'control-icon fabricate-interactable-config-hud';
     button.title = label;
@@ -1264,54 +1263,14 @@ Hooks.on('renderTileHUD', (hud, element) => {
   } catch (_error) {
     // Defensive: a HUD augmentation must never throw into Foundry's render.
   }
+}
+
+Hooks.on('renderTileHUD', (hud, element) => {
+  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromTile' });
 });
 
-// GM-only discoverability (Phase 5): the same "Configure Fabricate Interactable"
-// button on the Token HUD for a Token that is a linked Fabricate interactable
-// visual (`linkedVisual.documentName:'Token'`). The Token carries the SAME reverse
-// linked-visual flags as a Tile/Drawing, so the pure gate + target resolution from
-// `interactableConfigSheet.js` generalize unchanged — only the host HUD differs.
-// This NEVER touches the token's actor: it only opens the behaviour config panel.
 Hooks.on('renderTokenHUD', (hud, element) => {
-  try {
-    const token = hud?.object?.document ?? hud?.document ?? null;
-    if (!shouldOfferInteractableConfigEntry(token, { isGM: game.user?.isGM === true })) return;
-
-    const target = resolveInteractableConfigTarget(token, {
-      resolveRegion: (regionUuid) => {
-        const region = fromUuidSync?.(regionUuid) ?? null;
-        const regionId = region?.id ?? region?._id ?? null;
-        const sceneId = region?.parent?.id ?? region?.parent?._id ?? null;
-        return regionId && sceneId ? { sceneId, regionId } : null;
-      }
-    });
-    if (!target) return;
-
-    const root = element instanceof HTMLElement ? element : element?.[0] ?? null;
-    const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
-    if (!column?.appendChild) return;
-
-    const label = (() => {
-      const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Config.OpenFromToken');
-      return out && out !== 'FABRICATE.Canvas.Interactable.Config.OpenFromToken'
-        ? out
-        : 'Configure Fabricate Interactable';
-    })();
-
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'control-icon fabricate-interactable-config-hud';
-    button.title = label;
-    button.setAttribute('aria-label', label);
-    button.innerHTML = '<i class="fas fa-sliders"></i>';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      void getInteractableConfigAppClass().show(target);
-    });
-    column.appendChild(button);
-  } catch (_error) {
-    // Defensive: a HUD augmentation must never throw into Foundry's render.
-  }
+  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken' });
 });
 
 /**

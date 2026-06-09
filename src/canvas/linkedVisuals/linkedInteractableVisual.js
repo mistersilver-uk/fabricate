@@ -557,6 +557,15 @@ export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate,
   const ref = identify?.(behavior);
   if (!ref) return null;
 
+  // Capture the PRIOR linked visual BEFORE awaiting the forward update. In live
+  // Foundry `applyBehaviorUpdate` mutates `behavior.system.linkedVisual` in place,
+  // so reading `prior` after the await would already see the NEW uuid and the OLD
+  // marker's reverse flag would never be cleared (a stale `isInteractableVisual`
+  // marker would linger). Snapshot it first.
+  const prior = behavior?.system?.linkedVisual ?? null;
+  const priorUuid = typeof prior?.uuid === 'string' && prior.uuid.trim() ? prior.uuid.trim() : null;
+  const priorDocumentName = typeof prior?.documentName === 'string' ? prior.documentName : null;
+
   await applyBehaviorUpdate?.({ ...ref, update: { system: patch } });
 
   // Write the reverse linked-visual flag onto the newly-selected document so the
@@ -567,10 +576,6 @@ export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate,
     const behaviorId = behavior?.id ?? behavior?._id ?? null;
     const newUuid = patch.linkedVisual.uuid;
     const newDocumentName = patch.linkedVisual.documentName;
-
-    const prior = behavior?.system?.linkedVisual ?? null;
-    const priorUuid = typeof prior?.uuid === 'string' && prior.uuid.trim() ? prior.uuid.trim() : null;
-    const priorDocumentName = typeof prior?.documentName === 'string' ? prior.documentName : null;
 
     // Clear the OLD marker first (when one exists and is a different document).
     if (priorUuid && priorUuid !== newUuid) {

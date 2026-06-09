@@ -150,6 +150,11 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker'), 'localized Create drawing marker label');
   });
 
+  it('offers Relink + Remove affordances for a resolved (ok) marker', () => {
+    assert.ok(rootSource.includes("visualStatus.severity === 'ok'"), 'gates the resolved-marker actions on the ok status');
+    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker'), 'localized Remove visual marker label');
+  });
+
   it('localizes every string through the foundry bridge under the Config namespace', () => {
     assert.ok(rootSource.includes("import { localize }"), 'imports the localize bridge');
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.'), 'uses Config-namespaced keys');

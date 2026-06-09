@@ -70,6 +70,7 @@
           "CreateDrawingMarker": "Create drawing marker",
           "RelinkSelected": "Relink selected",
           "ClearVisualLink": "Clear visual link",
+          "RemoveVisualMarker": "Remove visual marker",
           "MissingPolicyLabel": "If the marker is missing",
           "MissingIgnore": "Ignore",
           "MissingWarn": "Warn",
@@ -100,9 +101,8 @@
           "RemoveVisualTitle": "Remove visual marker",
           "RemoveVisualPrompt": "How would you like to remove the linked marker?",
           "RemoveVisualUnlink": "Unlink only",
-          "RemoveVisualDelete": "Unlink + delete tile",
+          "RemoveVisualDelete": "Unlink + delete marker",
           "RemoveVisualCancel": "Cancel",
-          "NoTileSelected": "Select a tile on the canvas first.",
           "NoSelection": "Select a tile, drawing, or token on the canvas first.",
           "NoVisual": "This interactable has no linked marker to jump to."
         }

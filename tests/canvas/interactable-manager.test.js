@@ -506,6 +506,49 @@ test('onRegionEnter does not prompt for an ineligible (locked) interactable', ()
   }
 });
 
+test('onRegionEnter uses the ENTERING token actor, never the linked Token marker actor (actor isolation)', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: false });
+    const shows = [];
+    const manager = new InteractableManager({ getPromptAppClass: () => ({ show: (a) => shows.push(a), dismiss: () => {} }) });
+    const me = { id: 'u-1' };
+    globalThis.game.user = me;
+
+    // The interactable links a Token marker owned by a DIFFERENT actor (e.g. a
+    // merchant NPC the GM placed). The entering player drives their OWN token.
+    const linkedTokenSystem = {
+      ...TOOL_SYSTEM,
+      linkedVisual: { uuid: 'Scene.scene-1.Token.merchant', documentName: 'Token', mode: 'marker', missingPolicy: 'warn' }
+    };
+    // The region-enter event's `data.token` is the entering TokenDocument: its
+    // actor info lives directly on it (that is where onRegionEnter reads actorId),
+    // while `_controlsTriggeringToken` reads ownership off `.document`.
+    const enteringToken = {
+      isOwner: true,
+      actor: { id: 'player-actor' },
+      actorId: 'player-actor',
+      document: { isOwner: true, actor: { id: 'player-actor' }, actorId: 'player-actor' }
+    };
+
+    // Capture the request ctx the prompt's onInteract forwards to _requestActivation.
+    let requestedCtx = null;
+    manager._requestActivation = (_behavior, ctx) => { requestedCtx = ctx; };
+
+    manager.onRegionEnter({ user: me, data: { token: enteringToken } }, interactableBehavior({ system: linkedTokenSystem }));
+    assert.equal(shows.length, 1, 'the controlling user sees the prompt');
+
+    // Invoking the prompt fires the activation request — its actorId must be the
+    // ENTERING token's actor, never the linked merchant Token's actor.
+    shows[0].onInteract();
+    assert.ok(requestedCtx, 'the prompt drives an activation request');
+    assert.equal(requestedCtx.actorId, 'player-actor', 'activation uses the entering token actor');
+    assert.notEqual(requestedCtx.actorId, 'merchant', 'activation never adopts the linked Token marker actor');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
 test('onRegionExit dismisses the prompt for the matching behaviour ref', () => {
   const saved = snapshotGlobals();
   try {

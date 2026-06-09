@@ -9804,3 +9804,26 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Interactable Browser — paired area-level focus-ring override. The browser app
+   body lives in InteractableBrowserRoot.svelte; this block strips Foundry core's
+   orange :focus ring and repaints the accent ring on :focus-visible per app
+   surface (mirroring the config app block above), kept at single area-class
+   specificity so the component-scoped focus rings still win. */
+.fabricate-interactable-browser-app button:focus,
+.fabricate-interactable-browser-app input:focus,
+.fabricate-interactable-browser-app select:focus,
+.fabricate-interactable-browser-app textarea:focus,
+.fabricate-interactable-browser-app [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-interactable-browser-app button:focus-visible,
+.fabricate-interactable-browser-app input:focus-visible,
+.fabricate-interactable-browser-app select:focus-visible,
+.fabricate-interactable-browser-app textarea:focus-visible,
+.fabricate-interactable-browser-app [tabindex]:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
