@@ -967,6 +967,7 @@ Requirements:
 1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds }`. A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
 2. A virtual-present tool is treated as satisfied **without the actor owning the item** and is **excluded from breakage and usage** (it is the station's tool, not the actor's).
 3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance (set in `show(tab, { activeCanvasTool })`, cleared on close), system-scoped per the rule above, and never written to any persisted run record. With no active tool the payload is null (inert).
+4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`. The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
 
 ### Drop-Time Environment Resolution Precedence
 

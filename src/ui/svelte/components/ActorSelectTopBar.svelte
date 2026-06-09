@@ -19,7 +19,7 @@
     getWeatherLabelKey
   } from '../util/gatheringConditionIcons.js';
 
-  let { store = null, activeTab = 'crafting', onActorChange = null } = $props();
+  let { store = null, activeTab = 'crafting', onActorChange = null, activeCanvasTool = null } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
 
@@ -32,6 +32,24 @@
   const selectedActor = $derived(store?.selectedActor ?? null);
   const hasActors = $derived(selectableActors.length > 0);
   const isGathering = $derived(activeTab === 'gathering');
+
+  // The active station tool's display name, shown in a status chip in the
+  // right-side context cluster when the GM granted activation of a Tool-station
+  // interactable region (the player walked their token into it and clicked
+  // Interact). Falls back to the localized label when the tool carries no name.
+  // Empty when no station tool is active.
+  const activeToolName = $derived(
+    activeCanvasTool
+      ? (typeof activeCanvasTool.label === 'string' && activeCanvasTool.label.trim()
+        ? activeCanvasTool.label.trim()
+        : localize('FABRICATE.App.ActiveTool.Label'))
+      : ''
+  );
+
+  // The right-side context cluster renders when there is gathering context to
+  // show OR an active station tool chip to surface (forward-compatible: the chip
+  // appears on whatever tab is active, e.g. crafting's otherwise-empty right).
+  const hasRightContext = $derived(isGathering || Boolean(activeCanvasTool));
 
   // The bar is "ready" once its selectable list and conditions have loaded, so
   // the smoke harness can wait on a mounted, conditions-loaded bar.
@@ -182,33 +200,49 @@
     {/if}
   </div>
 
-  {#if isGathering}
+  {#if hasRightContext}
     <div class="actor-bar-right">
-      {#if hasStamina}
-        <span class="actor-bar-stamina" title={localize('FABRICATE.App.ActorBar.Stamina')} data-actor-bar-stamina>
-          <i class="fas fa-bolt" aria-hidden="true"></i>
-          <span class="actor-bar-stamina-track">
-            <span class="actor-bar-stamina-fill" style={`width:${staminaPct}%`}></span>
+      <!-- Session-scoped status chip: announces the active canvas station tool
+           (set when a Tool-station region activation is granted). Sits at the
+           leading edge of the right context cluster, before the gathering
+           conditions. aria-live so screen readers announce it appearing. -->
+      <span class="actor-bar-tool-chip-slot" aria-live="polite">
+        {#if activeCanvasTool}
+          <span class="actor-bar-condition actor-bar-tool-chip" title={activeToolName}>
+            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+            <span class="actor-bar-condition-label"
+              >{localize('FABRICATE.App.ActiveTool.Named', { label: activeToolName })}</span
+            >
           </span>
-          <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
+        {/if}
+      </span>
+      {#if isGathering}
+        {#if hasStamina}
+          <span class="actor-bar-stamina" title={localize('FABRICATE.App.ActorBar.Stamina')} data-actor-bar-stamina>
+            <i class="fas fa-bolt" aria-hidden="true"></i>
+            <span class="actor-bar-stamina-track">
+              <span class="actor-bar-stamina-fill" style={`width:${staminaPct}%`}></span>
+            </span>
+            <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
+          </span>
+        {/if}
+        <span class="actor-bar-condition actor-bar-weather">
+          <i class={weatherIcon} aria-hidden="true"></i>
+          <span class="actor-bar-condition-label">{weatherLabel}</span>
+        </span>
+        <span class="actor-bar-condition actor-bar-time">
+          <i class={timeOfDayIcon} aria-hidden="true"></i>
+          <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
+        </span>
+        <span class="actor-bar-condition actor-bar-region">
+          <i
+            class="fas fa-map-location-dot"
+            aria-hidden="true"
+            title={localize('FABRICATE.App.ActorBar.Region.Label')}
+          ></i>
+          <span class="actor-bar-condition-label" title={store?.region || ''}>{regionLabel}</span>
         </span>
       {/if}
-      <span class="actor-bar-condition actor-bar-weather">
-        <i class={weatherIcon} aria-hidden="true"></i>
-        <span class="actor-bar-condition-label">{weatherLabel}</span>
-      </span>
-      <span class="actor-bar-condition actor-bar-time">
-        <i class={timeOfDayIcon} aria-hidden="true"></i>
-        <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
-      </span>
-      <span class="actor-bar-condition actor-bar-region">
-        <i
-          class="fas fa-map-location-dot"
-          aria-hidden="true"
-          title={localize('FABRICATE.App.ActorBar.Region.Label')}
-        ></i>
-        <span class="actor-bar-condition-label" title={store?.region || ''}>{regionLabel}</span>
-      </span>
     </div>
   {/if}
 </div>
@@ -328,6 +362,28 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--fab-text);
+  }
+
+  /* aria-live wrapper for the station-tool chip. display:contents keeps the
+     wrapper out of the flex layout so an empty slot (no active tool) adds no
+     gap, while the chip child becomes a direct flex item of .actor-bar-right. */
+  .actor-bar-tool-chip-slot {
+    display: contents;
+  }
+
+  /* Active station-tool chip. Sits alongside the gathering condition chips but
+     takes the accent pill treatment so it reads as the active session context. */
+  .actor-bar-tool-chip {
+    flex: 0 1 auto;
+    padding: 3px 10px;
+    color: var(--fab-accent);
+    background: var(--fab-accent-soft);
+    border: 1px solid var(--fab-accent);
+    border-radius: 999px;
+  }
+
+  .actor-bar-tool-chip .actor-bar-condition-label {
+    color: var(--fab-accent);
   }
 
   /* Contextual stamina bar (gathering tab, stamina mode only). */

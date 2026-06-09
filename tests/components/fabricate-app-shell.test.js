@@ -37,6 +37,23 @@ describe('FabricateAppRoot shell', () => {
     assert.ok(rootSource.includes('FABRICATE.App.ComingSoon'), 'placeholder should localize a coming-soon hint');
   });
 
+  it('threads the active canvas tool into the shared header bar instead of a chip bar above the content', () => {
+    // The standalone chip bar above the tab content was removed; the chip now
+    // rides in ActorSelectTopBar's right-side context cluster.
+    assert.ok(
+      !rootSource.includes('fabricate-app-tool-chip-bar'),
+      'the standalone tool-chip bar should be gone from the app shell'
+    );
+    assert.ok(
+      rootSource.includes('{activeCanvasTool}') || rootSource.includes('activeCanvasTool={activeCanvasTool}'),
+      'the active canvas tool should be passed into ActorSelectTopBar'
+    );
+    assert.ok(
+      /<ActorSelectTopBar[^>]*activeCanvasTool/.test(rootSource),
+      'ActorSelectTopBar should receive the activeCanvasTool prop'
+    );
+  });
+
   it('exposes an accessible tablist driven by host state', () => {
     assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
     assert.ok(rootSource.includes('activeTab === tab.id'), 'active state should derive from the activeTab prop');
