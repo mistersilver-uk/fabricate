@@ -1,8 +1,17 @@
 /**
- * Environment-node-driven marker image swap for `fabricate.interactable`
- * gathering-task markers.
+ * Active-GM marker reconcile for `fabricate.interactable` linked Tile markers.
  *
- * The feature: when an environment's node for a task is depleted
+ * Two reconciles run in one pass over every `fabricate.interactable` behaviour
+ * with a linked Tile:
+ *
+ *  - VISIBILITY (ALL interactables — tool AND gatheringTask): the marker tile's
+ *    `hidden` is set to {@link resolveMarkerHidden} — true when the interactable
+ *    is DISABLED or explicitly HIDDEN (so only the GM sees the marker), false
+ *    otherwise (a LOCKED interactable stays visible to players). This runs on
+ *    `canvasReady` too, so a disabled/hidden interactable loads hidden for players.
+ *  - IMAGE-SWAP (gatheringTask only): the env-node depletion image swap below.
+ *
+ * The image-swap feature: when an environment's node for a task is depleted
  * (`environment.nodeRuntime[taskId].current <= 0`) AND the task configures a
  * `depletedBehavior.swapImage`, EVERY linked Tile marker for that
  * `(environment, task)` shows the swap image; when the node recharges (respawns
@@ -17,6 +26,7 @@
  */
 
 import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
+import { resolveMarkerHidden } from './interactableRegionActivation.js';
 
 /**
  * Read the depleted state for an environment's node for a task.
@@ -103,12 +113,13 @@ function normalizeSystem(behaviorSystem) {
 }
 
 /**
- * Sync EVERY gathering-task Tile marker's image to its environment node state.
- * EDGE: active-GM-only (else no-op). Iterates `scenes` → `scene.regions` →
- * `region.behaviors`, filtering to `fabricate.interactable` gatheringTask
- * behaviours that link a Tile visual. For each, resolves the live tile, the
- * environment, and the task, computes {@link resolveMarkerImage}, and — when the
- * tile's current texture differs from the desired image — writes the new texture.
+ * Sync EVERY `fabricate.interactable` Tile marker to its current state. EDGE:
+ * active-GM-only (else no-op). Iterates `scenes` → `scene.regions` →
+ * `region.behaviors`, filtering to `fabricate.interactable` behaviours that link a
+ * Tile visual. For each it reconciles the tile's `hidden` from
+ * {@link resolveMarkerHidden} (ALL interactables) and, for a gatheringTask, swaps
+ * the texture from {@link resolveMarkerImage} against the resolved environment +
+ * task — writing only the fields that changed.
  *
  * On the FIRST depletion swap the tile's current texture src is stashed at
  * `flags.fabricate.markerAvailableImg` so the available state is restored to the
@@ -147,36 +158,52 @@ export async function syncInteractableMarkers({ scenes, resolveEnvironment, reso
 async function syncOneBehavior(behavior, scene, { resolveEnvironment, resolveTask, applyTileImage }) {
   try {
     const system = readInteractableBehaviorSystem(behavior);
-    if (!system || system.interactableType !== 'gatheringTask') return;
+    if (!system) return;
+    // Marker reconcile applies to EVERY linked-Tile interactable (BOTH tool and
+    // gatheringTask). The image-swap below is gathering-only; the hidden-reconcile
+    // is universal.
     if (system.linkedVisual?.documentName !== 'Tile' || !system.linkedVisual?.uuid) return;
 
     const tile = resolveTile(system.linkedVisual.uuid, scene);
     if (!tile) return;
 
-    const environment = system.environmentId ? resolveEnvironment?.(system.environmentId) ?? null : null;
-    const task = system.systemId && system.taskId ? resolveTask?.(system.systemId, system.taskId) ?? null : null;
-    if (!environment || !task) return;
-
-    // Prefer a previously-stashed available image; else the current tile texture
-    // (when available) so a non-depleted tile's restore target is the GM's actual
-    // marker; finally the task img.
-    const stashed = tile?.flags?.fabricate?.markerAvailableImg;
-    const currentSrc = tile?.texture?.src ?? null;
-    const availableImg = (typeof stashed === 'string' && stashed.trim())
-      ? stashed.trim()
-      : (typeof currentSrc === 'string' && currentSrc.trim() ? currentSrc.trim() : (task?.img ?? ''));
-
-    const decision = resolveMarkerImage({ behaviorSystem: system, environment, task, availableImg });
-    if (!decision) return;
-
     const update = {};
-    if (decision.desiredImg && decision.desiredImg !== currentSrc) {
-      update.texture = { src: decision.desiredImg };
+
+    // Visibility reconcile (ALL interactables): a disabled or explicitly-hidden
+    // interactable's marker is hidden from players (`tile.hidden = true`); a locked
+    // (or otherwise concealed-but-visible) interactable's marker stays visible.
+    const desiredHidden = resolveMarkerHidden(system);
+    if ((tile?.hidden === true) !== desiredHidden) {
+      update.hidden = desiredHidden;
     }
-    // Stash the available image on the FIRST depletion swap so a later restore
-    // targets the GM's actual marker texture (only when not already stashed).
-    if (decision.depleted && !(typeof stashed === 'string' && stashed.trim()) && availableImg) {
-      update.flags = { fabricate: { markerAvailableImg: availableImg } };
+
+    // Image-swap reconcile (gatheringTask only): env-node depletion drives the
+    // marker texture between the available and `depletedBehavior.swapImage`.
+    if (system.interactableType === 'gatheringTask') {
+      const environment = system.environmentId ? resolveEnvironment?.(system.environmentId) ?? null : null;
+      const task = system.systemId && system.taskId ? resolveTask?.(system.systemId, system.taskId) ?? null : null;
+      if (environment && task) {
+        // Prefer a previously-stashed available image; else the current tile texture
+        // (when available) so a non-depleted tile's restore target is the GM's actual
+        // marker; finally the task img.
+        const stashed = tile?.flags?.fabricate?.markerAvailableImg;
+        const currentSrc = tile?.texture?.src ?? null;
+        const availableImg = (typeof stashed === 'string' && stashed.trim())
+          ? stashed.trim()
+          : (typeof currentSrc === 'string' && currentSrc.trim() ? currentSrc.trim() : (task?.img ?? ''));
+
+        const decision = resolveMarkerImage({ behaviorSystem: system, environment, task, availableImg });
+        if (decision) {
+          if (decision.desiredImg && decision.desiredImg !== currentSrc) {
+            update.texture = { src: decision.desiredImg };
+          }
+          // Stash the available image on the FIRST depletion swap so a later restore
+          // targets the GM's actual marker texture (only when not already stashed).
+          if (decision.depleted && !(typeof stashed === 'string' && stashed.trim()) && availableImg) {
+            update.flags = { fabricate: { markerAvailableImg: availableImg } };
+          }
+        }
+      }
     }
 
     if (Object.keys(update).length > 0) {

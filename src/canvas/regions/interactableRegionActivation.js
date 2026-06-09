@@ -80,6 +80,56 @@ function blocked(reason) {
 }
 
 /**
+ * Decide whether the on-enter prompt should fire for an interactable, based on
+ * its VISIBILITY (not its full activation eligibility). PURE.
+ *
+ * An interactable is concealed from players — and therefore raises NO prompt —
+ * when it is DISABLED (`state.enabled === false`) OR explicitly HIDDEN
+ * (`presentation.hidden === true`). In every other case the prompt fires: a
+ * LOCKED / consumed / uses-exhausted / cooling-down interactable still SHOWS the
+ * prompt, and the Interact-time validation (`validateActivationRequest`) is what
+ * denies the actual activation with the specific reason.
+ *
+ * This is deliberately distinct from {@link evaluateActivationEligibility}: the
+ * prompt is gated by visibility, the ACTIVATION is gated by eligibility. That is
+ * what gives Lock real teeth (prompt + "This is locked." denial) separate from
+ * Disable (no prompt + concealed marker).
+ *
+ * @param {object} system  A behaviour system (raw or normalized view).
+ * @returns {boolean}
+ */
+export function shouldPromptOnEnter(system) {
+  return !isConcealed(system);
+}
+
+/**
+ * Decide whether the linked marker tile should be HIDDEN from players. PURE.
+ *
+ * The marker is hidden (Foundry `tile.hidden = true`, so only the GM sees it)
+ * exactly when the interactable is concealed — DISABLED (`state.enabled === false`)
+ * OR explicitly HIDDEN (`presentation.hidden === true`). A LOCKED interactable is
+ * NOT hidden: it stays visible to players (the prompt fires and Interact is denied).
+ *
+ * @param {object} system  A behaviour system (raw or normalized view).
+ * @returns {boolean}
+ */
+export function resolveMarkerHidden(system) {
+  return isConcealed(system);
+}
+
+/**
+ * Whether an interactable is concealed from players: DISABLED or explicitly
+ * HIDDEN. Shared by {@link shouldPromptOnEnter} (no prompt) and
+ * {@link resolveMarkerHidden} (hidden marker) so the two decisions can never drift.
+ *
+ * @param {object} system
+ * @returns {boolean}
+ */
+function isConcealed(system) {
+  return system?.state?.enabled === false || system?.presentation?.hidden === true;
+}
+
+/**
  * Build the activation request payload emitted over the module socket when a
  * player presses "Interact". PURE; no Foundry. The shape matches the plan exactly.
  *

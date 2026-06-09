@@ -104,16 +104,18 @@ describe('syncInteractableMarkers (edge)', () => {
   let updates;
   let scenes;
 
-  function makeTile(src = 'icons/available.webp', flags = {}) {
+  function makeTile(src = 'icons/available.webp', flags = {}, hidden = false) {
     return {
       uuid: TILE_UUID,
       texture: { src },
       flags,
+      hidden,
       update(update) {
         updates.push(update);
         // Mimic Foundry applying the patch so a repeat sync is idempotent.
         if (update.texture?.src) this.texture = { ...this.texture, src: update.texture.src };
         if (update.flags?.fabricate) this.flags = { ...this.flags, fabricate: { ...this.flags.fabricate, ...update.flags.fabricate } };
+        if (typeof update.hidden === 'boolean') this.hidden = update.hidden;
       }
     };
   }
@@ -190,5 +192,122 @@ describe('syncInteractableMarkers (edge)', () => {
   it('no-throw when applyTileImage is missing', async () => {
     scenes = makeScenes(gatheringSystem());
     await assert.doesNotReject(syncInteractableMarkers({ scenes, ...deps({ applyTileImage: undefined }) }));
+  });
+});
+
+describe('syncInteractableMarkers — tile.hidden reconcile (Lock-vs-Disable visibility)', () => {
+  let tileDoc;
+  let updates;
+
+  function makeTile(src = 'icons/available.webp', flags = {}, hidden = false) {
+    return {
+      uuid: TILE_UUID,
+      texture: { src },
+      flags,
+      hidden,
+      update(update) {
+        updates.push(update);
+        if (update.texture?.src) this.texture = { ...this.texture, src: update.texture.src };
+        if (update.flags?.fabricate) this.flags = { ...this.flags, fabricate: { ...this.flags.fabricate, ...update.flags.fabricate } };
+        if (typeof update.hidden === 'boolean') this.hidden = update.hidden;
+      }
+    };
+  }
+
+  function makeScenes(behaviorSystem) {
+    return [{
+      tiles: { get: (id) => (id === 't1' ? tileDoc : null) },
+      regions: [{ behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }] }]
+    }];
+  }
+
+  function toolSystem(overrides = {}) {
+    return {
+      interactableType: 'tool',
+      sourceUuid: 'sys.tool.0',
+      systemId: 'sys1',
+      toolId: 'tool1',
+      taskId: null,
+      environmentId: null,
+      name: 'Forge',
+      linkedVisual: { uuid: TILE_UUID, documentName: 'Tile', mode: 'marker', missingPolicy: 'warn' },
+      state: { enabled: true, consumed: false, locked: false, uses: { max: null, used: 0 }, cooldown: {} },
+      ...overrides
+    };
+  }
+
+  // A non-gathering env/task resolver (irrelevant for the hidden reconcile, which
+  // applies to ALL interactables — the image swap is gathering-only).
+  const baseDeps = (over = {}) => ({
+    isActiveGM: () => true,
+    resolveEnvironment: () => null,
+    resolveTask: () => null,
+    applyTileImage: (tile, update) => tile.update(update),
+    ...over
+  });
+
+  beforeEach(() => { updates = []; globalThis.fromUuidSync = () => tileDoc; });
+  afterEach(() => { delete globalThis.fromUuidSync; });
+
+  it('DISABLED tool interactable → tile.hidden set true (concealed from players)', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, false);
+    await syncInteractableMarkers({ scenes: makeScenes(toolSystem({ state: { enabled: false } })), ...baseDeps() });
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].hidden, true);
+  });
+
+  it('explicitly HIDDEN tool interactable → tile.hidden set true', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, false);
+    await syncInteractableMarkers({
+      scenes: makeScenes(toolSystem({ presentation: { hidden: true } })),
+      ...baseDeps()
+    });
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].hidden, true);
+  });
+
+  it('LOCKED tool interactable → tile stays visible (no hidden write)', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, false);
+    await syncInteractableMarkers({
+      scenes: makeScenes(toolSystem({ state: { enabled: true, locked: true } })),
+      ...baseDeps()
+    });
+    assert.equal(updates.length, 0, 'a locked interactable does not hide its marker');
+  });
+
+  it('re-enabled interactable whose tile was hidden → tile.hidden set false (un-conceal)', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, true);
+    await syncInteractableMarkers({ scenes: makeScenes(toolSystem({ state: { enabled: true } })), ...baseDeps() });
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].hidden, false);
+  });
+
+  it('idempotent: a disabled interactable already hidden → no update', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, true);
+    await syncInteractableMarkers({ scenes: makeScenes(toolSystem({ state: { enabled: false } })), ...baseDeps() });
+    assert.equal(updates.length, 0);
+  });
+
+  it('non-GM → no hidden write', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, false);
+    await syncInteractableMarkers({
+      scenes: makeScenes(toolSystem({ state: { enabled: false } })),
+      ...baseDeps({ isActiveGM: () => false })
+    });
+    assert.equal(updates.length, 0);
+  });
+
+  it('DISABLED gathering-task → hides the marker AND swaps the depleted image in one update', async () => {
+    tileDoc = makeTile('icons/available.webp', {}, false);
+    await syncInteractableMarkers({
+      scenes: makeScenes(gatheringSystem({ state: { enabled: false, consumed: false, locked: false, uses: { max: null, used: 0 }, cooldown: {} } })),
+      ...baseDeps({
+        resolveEnvironment: () => ({ id: 'env1', nodeRuntime: { task1: { current: 0 } } }),
+        resolveTask: () => taskWithSwap()
+      })
+    });
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].hidden, true, 'hidden reconcile (universal)');
+    assert.equal(updates[0].texture.src, 'icons/depleted.webp', 'image swap (gathering-only)');
   });
 });

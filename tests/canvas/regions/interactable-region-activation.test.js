@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   evaluateActivationEligibility,
+  shouldPromptOnEnter,
+  resolveMarkerHidden,
   buildActivationRequest,
   validateActivationRequest,
   describeGrant,
@@ -43,6 +45,74 @@ function taskSystem({ stateOverrides = {} } = {}) {
     state: baseState(stateOverrides)
   };
 }
+
+// --- Visibility decisions (prompt + marker hidden) --------------------------
+//
+// shouldPromptOnEnter / resolveMarkerHidden are VISIBILITY decisions, distinct
+// from evaluateActivationEligibility. Concealed = DISABLED OR explicitly HIDDEN.
+// A LOCKED interactable is VISIBLE: prompt fires + marker visible (the LOCKED
+// denial is enforced at Interact time by validateActivationRequest).
+
+function withPresentation(system, presentation) {
+  return { ...system, presentation };
+}
+
+test('shouldPromptOnEnter: enabled + unlocked → prompt', () => {
+  assert.equal(shouldPromptOnEnter(toolSystem()), true);
+});
+
+test('shouldPromptOnEnter: LOCKED → still prompt (lock has teeth at Interact, not the prompt)', () => {
+  assert.equal(shouldPromptOnEnter(toolSystem({ locked: true })), true);
+});
+
+test('shouldPromptOnEnter: consumed / uses-exhausted / cooldown → still prompt (denied at Interact)', () => {
+  assert.equal(shouldPromptOnEnter(toolSystem({ consumed: true })), true, 'consumed still prompts');
+  assert.equal(shouldPromptOnEnter(toolSystem({ uses: { max: 1, used: 1 } })), true, 'uses-exhausted still prompts');
+  assert.equal(
+    shouldPromptOnEnter(toolSystem({ cooldown: { seconds: 60, lastUsedWorldTime: 100 } })),
+    true,
+    'cooldown still prompts'
+  );
+});
+
+test('shouldPromptOnEnter: DISABLED → no prompt', () => {
+  assert.equal(shouldPromptOnEnter(toolSystem({ enabled: false })), false);
+});
+
+test('shouldPromptOnEnter: explicitly HIDDEN → no prompt', () => {
+  assert.equal(shouldPromptOnEnter(withPresentation(toolSystem(), { hidden: true })), false);
+});
+
+test('shouldPromptOnEnter: locked + disabled → disabled wins (no prompt)', () => {
+  assert.equal(shouldPromptOnEnter(toolSystem({ enabled: false, locked: true })), false);
+});
+
+test('resolveMarkerHidden: enabled + unlocked → visible', () => {
+  assert.equal(resolveMarkerHidden(toolSystem()), false);
+});
+
+test('resolveMarkerHidden: LOCKED → still visible (locked stays visible to players)', () => {
+  assert.equal(resolveMarkerHidden(toolSystem({ locked: true })), false);
+});
+
+test('resolveMarkerHidden: DISABLED → hidden', () => {
+  assert.equal(resolveMarkerHidden(toolSystem({ enabled: false })), true);
+});
+
+test('resolveMarkerHidden: explicitly HIDDEN → hidden', () => {
+  assert.equal(resolveMarkerHidden(withPresentation(toolSystem(), { hidden: true })), true);
+});
+
+test('resolveMarkerHidden: locked + disabled → disabled wins (hidden)', () => {
+  assert.equal(resolveMarkerHidden(toolSystem({ enabled: false, locked: true })), true);
+});
+
+test('visibility decisions tolerate a missing/empty system shape (no throw)', () => {
+  assert.equal(shouldPromptOnEnter(undefined), true);
+  assert.equal(shouldPromptOnEnter({}), true);
+  assert.equal(resolveMarkerHidden(undefined), false);
+  assert.equal(resolveMarkerHidden({}), false);
+});
 
 test('eligibility: eligible when no gate trips', () => {
   assert.deepEqual(

@@ -44,7 +44,7 @@ import {
   buildLinkedVisualFlags
 } from './regions/interactableRegionFlags.js';
 import {
-  evaluateActivationEligibility,
+  shouldPromptOnEnter,
   buildActivationRequest,
   validateActivationRequest,
   describeGrant,
@@ -453,9 +453,12 @@ class InteractableManager {
     const token = this._eventToken(event);
     if (!this._shouldPromptForEnter(event, token)) return;
 
-    const now = Number(globalThis.game?.time?.worldTime || 0);
-    const eligibility = evaluateActivationEligibility(system, { now, isGM: globalThis.game?.user?.isGM === true });
-    if (!eligibility.eligible) return;
+    // Gate the PROMPT on VISIBILITY, not full eligibility: a LOCKED interactable
+    // is visible, so it still shows the prompt; pressing Interact then routes the
+    // localized "This is locked." denial via `_requestActivation` →
+    // `validateActivationRequest` (LOCKED). Only a DISABLED or explicitly HIDDEN
+    // interactable is concealed and suppresses the prompt.
+    if (!shouldPromptOnEnter(system)) return;
 
     const ref = identifyRegionBehaviorRef(behavior);
     if (!ref) return;
@@ -530,12 +533,13 @@ class InteractableManager {
       token: tokenPlaceable,
       isInteractableBehavior: isInteractableRegionBehavior
     });
-    const now = Number(globalThis.game?.time?.worldTime || 0);
-    const isGM = globalThis.game?.user?.isGM === true;
     for (const { behavior } of matches) {
       const system = readInteractableBehaviorSystem(behavior);
       if (!system || system.activation?.trigger !== 'regionEnter') continue;
-      if (!evaluateActivationEligibility(system, { now, isGM }).eligible) continue;
+      // VISIBILITY gate (mirrors onRegionEnter): a locked interactable still
+      // re-prompts; only disabled/hidden are concealed. Interact-time validation
+      // enforces the actual eligibility (locked → "This is locked.").
+      if (!shouldPromptOnEnter(system)) continue;
       const ref = identifyRegionBehaviorRef(behavior);
       if (!ref) continue;
       const actorId = tokenDoc?.actor?.id ?? tokenDoc?.actorId ?? null;

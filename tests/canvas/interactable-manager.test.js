@@ -569,7 +569,7 @@ test('onRegionEnter does NOT spam the GM when a player autonomously moves their 
   }
 });
 
-test('onRegionEnter does not prompt for an ineligible (locked) interactable', () => {
+test('onRegionEnter SHOWS the prompt for a LOCKED interactable (lock has teeth at Interact time, not the prompt)', () => {
   const saved = snapshotGlobals();
   try {
     installFakeFoundry({ isGM: false });
@@ -582,7 +582,48 @@ test('onRegionEnter does not prompt for an ineligible (locked) interactable', ()
       { user: me, data: { token: { document: { isOwner: true, actor: { id: 'a1' } } } } },
       interactableBehavior({ system: lockedSystem })
     );
-    assert.equal(shows.length, 0, 'a locked interactable raises no prompt');
+    // A locked interactable is VISIBLE: the prompt fires; the LOCKED denial is
+    // routed only when the player presses Interact (validateActivationRequest).
+    assert.equal(shows.length, 1, 'a locked interactable still raises the prompt');
+    assert.equal(typeof shows[0].onInteract, 'function', 'and Interact is wired (the denial routes from there)');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('onRegionEnter SUPPRESSES the prompt for a DISABLED interactable (concealed from players)', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: false });
+    const shows = [];
+    const manager = new InteractableManager({ getPromptAppClass: () => ({ show: (a) => shows.push(a), dismiss: () => {} }) });
+    const me = { id: 'u-1' };
+    globalThis.game.user = me;
+    const disabledSystem = { ...TOOL_SYSTEM, state: { ...TOOL_SYSTEM.state, enabled: false } };
+    manager.onRegionEnter(
+      { user: me, data: { token: { document: { isOwner: true, actor: { id: 'a1' } } } } },
+      interactableBehavior({ system: disabledSystem })
+    );
+    assert.equal(shows.length, 0, 'a disabled interactable raises no prompt');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('onRegionEnter SUPPRESSES the prompt for an explicitly HIDDEN interactable (concealed from players)', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: false });
+    const shows = [];
+    const manager = new InteractableManager({ getPromptAppClass: () => ({ show: (a) => shows.push(a), dismiss: () => {} }) });
+    const me = { id: 'u-1' };
+    globalThis.game.user = me;
+    const hiddenSystem = { ...TOOL_SYSTEM, presentation: { ...TOOL_SYSTEM.presentation, hidden: true } };
+    manager.onRegionEnter(
+      { user: me, data: { token: { document: { isOwner: true, actor: { id: 'a1' } } } } },
+      interactableBehavior({ system: hiddenSystem })
+    );
+    assert.equal(shows.length, 0, 'an explicitly hidden interactable raises no prompt');
   } finally {
     restoreGlobals(saved);
   }

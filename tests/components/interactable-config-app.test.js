@@ -115,6 +115,24 @@ describe('InteractableConfigApp shell', () => {
   it('self-registers via the app factory (no static import where avoidable)', () => {
     assert.ok(appSource.includes('registerInteractableConfigApp(InteractableConfigApp)'), 'registers with the factory');
   });
+
+  it('reconciles the linked tile hidden on enable/disable + hidden toggles, but NOT on lock', () => {
+    // setEnabled + setHidden reconcile the marker's player visibility (concealed
+    // ⇒ tile.hidden = true) immediately after the behaviour write; setLocked must
+    // NOT touch tile.hidden (a locked interactable stays visible to players).
+    assert.ok(appSource.includes('_reconcileMarkerHidden()'), 'declares the hidden reconcile helper');
+    assert.ok(appSource.includes('resolveMarkerHidden(system)'), 'uses the pure resolveMarkerHidden decision');
+    assert.ok(appSource.includes('setHidden: (hidden)'), 'declares a dedicated setHidden service that reconciles');
+    // Both setEnabled and setHidden call the reconcile; setLocked does not.
+    const setEnabledBlock = appSource.slice(appSource.indexOf('setEnabled: (enabled)'), appSource.indexOf('setHidden: (hidden)'));
+    assert.ok(setEnabledBlock.includes('_reconcileMarkerHidden()'), 'setEnabled reconciles the tile hidden');
+    const setLockedStart = appSource.indexOf('setLocked: (locked)');
+    const setLockedBlock = appSource.slice(setLockedStart, appSource.indexOf('applyMissingVisualPolicy:', setLockedStart));
+    assert.ok(!setLockedBlock.includes('_reconcileMarkerHidden()'), 'setLocked does NOT reconcile tile hidden (locked stays visible)');
+    // The reconcile routes through the active-GM visual-update edge (not a direct write).
+    assert.ok(/_reconcileMarkerHidden\(\)\s*\{[\s\S]*?emitInteractableVisualUpdate\(/.test(appSource), 'reconcile routes the active-GM visual-update edge');
+    assert.ok(/_reconcileMarkerHidden\(\)\s*\{[\s\S]*?update: \{ hidden: desiredHidden \}/.test(appSource), 'reconcile writes the tile hidden flag');
+  });
 });
 
 describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)', () => {
@@ -189,6 +207,7 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('services?.removeVisualMarker?.()'), 'Remove visual marker');
     assert.ok(rootSource.includes('services?.setEnabled?.(!view.state.enabled)'), 'Enable/Disable toggle');
     assert.ok(rootSource.includes('services?.setLocked?.(!view.state.locked)'), 'Lock/Unlock toggle');
+    assert.ok(rootSource.includes('services?.setHidden?.('), 'Hidden toggle routes through the setHidden service (reconciles the tile)');
     assert.ok(rootSource.includes('services?.deleteInteractable?.()'), 'Delete');
   });
 

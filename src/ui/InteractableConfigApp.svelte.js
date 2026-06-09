@@ -23,6 +23,7 @@ import {
 } from '../canvas/linkedVisuals/linkedInteractableVisual.js';
 import { identifyRegionBehaviorRef } from '../canvas/regions/interactableRegionNodeAdapter.js';
 import { readInteractableBehaviorSystem } from '../canvas/regions/interactableRegionFlags.js';
+import { resolveMarkerHidden } from '../canvas/regions/interactableRegionActivation.js';
 import { choiceDialog, localize } from './svelte/util/foundryBridge.js';
 
 /**
@@ -102,6 +103,45 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
     const scene = globalThis.game?.scenes?.get?.(String(ref.sceneId));
     const region = scene?.regions?.get?.(String(ref.regionId));
     return region?.behaviors?.get?.(String(ref.behaviorId)) ?? null;
+  }
+
+  /**
+   * Reconcile the linked Tile marker's `hidden` to match the behaviour's current
+   * concealment ({@link resolveMarkerHidden}: disabled OR explicitly hidden ⇒
+   * hidden from players; locked ⇒ stays visible). Routes through the active-GM
+   * visual-update edge and only writes when `hidden` actually differs. No-throw;
+   * a no-op when there is no linked Tile. Called right after a setEnabled/setHidden
+   * write so the GM sees the visibility change immediately and players receive it.
+   *
+   * @returns {void|Promise<void>}
+   */
+  _reconcileMarkerHidden() {
+    try {
+      const behavior = this._resolveBehavior();
+      const system = readInteractableBehaviorSystem(behavior);
+      if (!system) return undefined;
+      // Only a linked Tile is reconciled here (the marker-hidden semantics mirror
+      // the active-GM marker sync, which is Tile-scoped).
+      if (system.linkedVisual?.documentName !== 'Tile') return undefined;
+      const scene = behavior?.parent?.parent ?? null;
+      const resolved = resolveLinkedVisual(system, { scene });
+      const tile = resolved?.documentName === 'Tile' ? resolved.doc : null;
+      if (!tile) return undefined;
+      const desiredHidden = resolveMarkerHidden(system);
+      if ((tile?.hidden === true) === desiredHidden) return undefined; // already correct.
+      const ref = identifyRegionBehaviorRef(behavior);
+      const visualUuid = typeof tile?.uuid === 'string' ? tile.uuid : null;
+      if (!ref || !visualUuid) return undefined;
+      return emitInteractableVisualUpdate({
+        sceneId: ref.sceneId,
+        visualUuid,
+        documentName: 'Tile',
+        update: { hidden: desiredHidden }
+      });
+    } catch (_error) {
+      // Defensive: a visibility reconcile must never break the config panel.
+      return undefined;
+    }
   }
 
   /**
@@ -317,8 +357,24 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         const patch = planSetEnabled(readInteractableBehaviorSystem(behavior), enabled);
         if (!patch) return undefined;
         const result = writeBehavior(patch.system);
-        if (result && typeof result.then === 'function') return result.then(() => this._refresh());
-        this._refresh();
+        // Enabling/disabling changes the marker's player visibility — reconcile the
+        // linked tile's `hidden` immediately after the behaviour write so the GM
+        // sees the effect at once and players get the document update.
+        const after = () => { void this._reconcileMarkerHidden(); this._refresh(); };
+        if (result && typeof result.then === 'function') return result.then(after);
+        after();
+        return result;
+      },
+      // Toggle "Hidden from players". Hidden genuinely conceals the marker (the
+      // linked tile is hidden) AND suppresses the on-enter prompt — so after the
+      // behaviour write, reconcile the linked tile's `hidden`. (Locking does NOT
+      // route through here; a locked interactable stays visible.)
+      setHidden: (hidden) => {
+        if (!this._assertGM()) return undefined;
+        const result = writeBehavior({ presentation: { hidden: hidden === true } });
+        const after = () => { void this._reconcileMarkerHidden(); this._refresh(); };
+        if (result && typeof result.then === 'function') return result.then(after);
+        after();
         return result;
       },
       setLocked: (locked) => {

@@ -85,8 +85,9 @@
   }
 
   function setHidden(hidden) {
-    services?.updateBehavior?.({ presentation: { hidden: hidden === true } });
-    refresh();
+    // `setHidden` writes the behaviour AND reconciles the linked tile's `hidden`
+    // (hidden conceals the marker + suppresses the prompt). The service refreshes.
+    services?.setHidden?.(hidden === true);
   }
 
   function setAudience(audience) {
