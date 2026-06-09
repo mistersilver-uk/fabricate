@@ -599,13 +599,27 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       if (!SvelteCraftingSystemManagerApp._pendingReadyOpen) {
         SvelteCraftingSystemManagerApp._pendingReadyOpen = true;
         const openWhenReady = () => {
+          // Clear the latch FIRST so an early/missed readiness signal can never
+          // permanently block future launches. Re-check readiness before opening:
+          // a stale signal just leaves the gate re-armable on the next click.
           SvelteCraftingSystemManagerApp._pendingReadyOpen = false;
-          if (!game.user.isGM) return;
+          if (!game.user?.isGM) return;
+          if (!SvelteCraftingSystemManagerApp._isFabricateReady()) return;
           const app = new SvelteCraftingSystemManagerApp();
           app.render(true);
         };
+        // Prefer the replay-safe readiness promise so a launch attempted AFTER
+        // startup already finished still resolves and opens — the one-shot
+        // `fabricate.ready` Hook would have been spent and never fire again, which is
+        // exactly the "still loading" stall this guards against. Fall back to the
+        // Hook (then to clearing the latch) when the promise API is unavailable.
+        const whenReady = game?.fabricate?.whenReady;
         const hooks = globalThis.Hooks;
-        if (typeof hooks?.once === 'function') {
+        if (typeof whenReady === 'function') {
+          Promise.resolve(whenReady.call(game.fabricate))
+            .then(openWhenReady)
+            .catch(() => { SvelteCraftingSystemManagerApp._pendingReadyOpen = false; });
+        } else if (typeof hooks?.once === 'function') {
           hooks.once('fabricate.ready', openWhenReady);
         } else {
           SvelteCraftingSystemManagerApp._pendingReadyOpen = false;

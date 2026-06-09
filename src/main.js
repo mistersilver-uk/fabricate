@@ -448,6 +448,22 @@ class Fabricate {
     this.itemPilesIntegration = null;
     this.compendiumImporter = null;
     this.ready = false;
+    // Replay-safe readiness signal: resolves once `initialize()` completes and
+    // `this.ready` flips true. Unlike the one-shot `fabricate.ready` Hook, awaiting
+    // this settled promise works even when readiness was reached before the caller
+    // subscribed — so a late manager launch can never latch on a spent event.
+    this._readyPromise = new Promise((resolve) => {
+      this._resolveReady = resolve;
+    });
+  }
+
+  /**
+   * Replay-safe readiness: resolves when the module has finished initializing.
+   * Resolves immediately if startup already completed.
+   * @returns {Promise<void>}
+   */
+  whenReady() {
+    return this._readyPromise;
   }
 
   /**
@@ -566,6 +582,7 @@ class Fabricate {
     registerItemSheetRecipeLearnControl(this.recipeVisibilityService);
 
     this.ready = true;
+    this._resolveReady?.();
     console.log('Fabricate | Ready');
   }
 
@@ -1024,10 +1041,14 @@ class Fabricate {
 // Create global instance
 const fabricate = new Fabricate();
 
-// Hook into Foundry's initialization
-Hooks.once('init', async () => {
-  console.log('Fabricate | Init Hook');
-
+// Register the init-time Foundry CONFIG entries for the canvas Interactable
+// foundation. Defensive + idempotent: every call no-ops when the underlying API is
+// missing or already registered, so it is safe to run from BOTH the `init` and
+// `ready` hooks — the latter is a backstop for when a late module evaluation (e.g.
+// the Vite dev server delivering the source entry after Foundry's `init` event)
+// causes the `init` hook callback to be registered for an already-spent event and
+// never run.
+function registerFabricateConfig() {
   // Register the region-first `fabricate.interactable` Region Behaviour data model
   // + its type icon/label. Defensive + idempotent: no-ops when the Foundry region
   // APIs are unavailable (e.g. an older core), so it is safe to call unconditionally.
@@ -1059,7 +1080,15 @@ Hooks.once('init', async () => {
   } catch (_error) {
     // Defensive: a sheet-registration shape mismatch must not break init.
   }
+}
 
+// Bind the public Fabricate API onto the live `game.fabricate` global. Pure
+// assignment, so it is idempotent and safe to call from BOTH the `init` and `ready`
+// hooks. The `ready` call is the backstop that fixes the "still loading" stall: if a
+// late module evaluation makes the `init` hook callback fire-for-an-already-spent
+// event (so `game.fabricate` is never assigned), the manager would otherwise read an
+// undefined global forever despite `fabricate.initialize()` having completed.
+function bindFabricateGlobal() {
   // Make API available globally
   game.fabricate = fabricate;
   // Expose the canvas interactable manager singleton so the region behaviour event
@@ -1124,11 +1153,25 @@ Hooks.once('init', async () => {
       overwriteExisting: options.overwriteExisting || false
     });
   };
+}
 
+// Hook into Foundry's initialization
+Hooks.once('init', async () => {
+  console.log('Fabricate | Init Hook');
+  registerFabricateConfig();
+  bindFabricateGlobal();
 });
 
 // Hook into Foundry's ready event
 Hooks.once('ready', async () => {
+  // Backstop for a missed `init` (e.g. the Vite dev server evaluating the source
+  // entry after Foundry's `init` event already fired, so the `init` hook callback
+  // was registered for a spent event and never ran). Both helpers are idempotent, so
+  // re-running them here guarantees `game.fabricate` and the canvas Interactable
+  // CONFIG are always present before `initialize()` flips readiness — otherwise the
+  // manager would read an undefined global and stall on "still loading" forever.
+  registerFabricateConfig();
+  bindFabricateGlobal();
   await fabricate.initialize();
   await processFabricateWorldTime();
 
