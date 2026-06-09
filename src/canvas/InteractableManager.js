@@ -596,11 +596,26 @@ class InteractableManager {
       ts: Date.now()
     });
 
+    // TODO(diagnostic): remove
+    console.warn('Fabricate | activation requested', {
+      isActiveGM: isActiveGM(),
+      hasActiveGM: !!globalThis.game?.users?.activeGM,
+      userId: request.userId,
+      actorId: request.actorId,
+      sceneId: request.sceneId,
+      regionId: request.regionId,
+      behaviorId: request.behaviorId
+    });
+
     if (isActiveGM()) {
+      // TODO(diagnostic): remove
+      console.warn('Fabricate | activation requested → validate locally');
       void this.validateAndGrant(request);
       return;
     }
     if (!globalThis.game?.users?.activeGM) {
+      // TODO(diagnostic): remove
+      console.warn('Fabricate | activation requested → no active GM, abort');
       // Permanent, low-noise diagnostic alongside the player-facing notify: an
       // activation that aborts for lack of an active GM must not be silent.
       console.warn('Fabricate | activation aborted: no active GM', {
@@ -612,6 +627,8 @@ class InteractableManager {
       );
       return;
     }
+    // TODO(diagnostic): remove
+    console.warn('Fabricate | activation requested → emit socket');
     globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, request);
   }
 
@@ -701,6 +718,11 @@ class InteractableManager {
         taskId: system.taskId ?? null
       }
     };
+    // TODO(diagnostic): remove
+    console.warn('Fabricate | activation granted', {
+      toUserId: request.userId,
+      local: globalThis.game?.user?.id === request.userId
+    });
     // The requesting user opens the session locally. When the GM IS the requester
     // (GM activated their own token), open it here (a socket emit never reaches
     // the emitter).
@@ -723,14 +745,31 @@ class InteractableManager {
    * @param {object} payload  A validated `interactableActivationGranted` payload.
    */
   openGrant(payload) {
+    // TODO(diagnostic): remove
+    console.warn('Fabricate | openGrant', {
+      interactableType: payload?.grant?.interactableType,
+      hasAppShow: !!this._getAppClass?.()?.show
+    });
     const grant = payload?.grant;
-    if (!grant || typeof grant !== 'object') return;
+    if (!grant || typeof grant !== 'object') {
+      // TODO(diagnostic): remove
+      console.warn('Fabricate | openGrant → abort: no grant');
+      return;
+    }
     const AppClass = this._getAppClass?.();
-    if (!AppClass?.show) return;
+    if (!AppClass?.show) {
+      // TODO(diagnostic): remove
+      console.warn('Fabricate | openGrant → abort: no AppClass');
+      return;
+    }
 
     if (grant.interactableType === 'tool') {
       const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
-      if (!activeCanvasTool) return;
+      if (!activeCanvasTool) {
+        // TODO(diagnostic): remove
+        console.warn('Fabricate | openGrant → abort: missing activeCanvasTool');
+        return;
+      }
       void AppClass.show('gathering', { activeCanvasTool });
       return;
     }
@@ -738,7 +777,11 @@ class InteractableManager {
     if (grant.interactableType === 'gatheringTask') {
       const environmentId = grant.environmentId ?? grant.context?.environmentId ?? null;
       const taskId = grant.taskId ?? grant.context?.taskId ?? null;
-      if (!environmentId || !taskId) return;
+      if (!environmentId || !taskId) {
+        // TODO(diagnostic): remove
+        console.warn('Fabricate | openGrant → abort: missing env/task', { environmentId, taskId });
+        return;
+      }
       const behavior = this._resolveBehavior(grant.ref ?? {});
       const nodeStateOverride = behavior
         ? createRegionNodeStateAdapter({

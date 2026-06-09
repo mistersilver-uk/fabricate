@@ -1182,12 +1182,21 @@ Hooks.once('ready', async () => {
   InteractableManager.instance.register();
 
   game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => {
-    routeHazardSceneSocketMessage(payload, {
-      currentUserId: () => game.user?.id,
-      isActiveGM: () => game.user === game.users?.activeGM,
-      showPrompt: showHazardScenePrompt,
-      viewSceneForSelf: (uuid) => viewScene(uuid)
-    });
+    // Defensive: the hazard router shares the `module.fabricate` channel with the
+    // canvas Interactable round-trip. Guard it so a throw on a hazard payload can
+    // never prevent a non-hazard Interactable payload from reaching
+    // handleInteractableSocketMessage below.
+    try {
+      routeHazardSceneSocketMessage(payload, {
+        currentUserId: () => game.user?.id,
+        isActiveGM: () => game.user === game.users?.activeGM,
+        showPrompt: showHazardScenePrompt,
+        viewSceneForSelf: (uuid) => viewScene(uuid)
+      });
+    } catch (error) {
+      // TODO(diagnostic): remove
+      console.warn('Fabricate | hazard socket route threw', error);
+    }
     // Same `module.fabricate` channel also carries the canvas Interactable
     // node-update action (player → active GM token-flag write) AND the region-first
     // activation round-trip. Only the active GM applies node/behaviour writes +
