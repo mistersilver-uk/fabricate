@@ -827,6 +827,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-task-row'
       || metric.selector === '.manager-gathering-hazard-row'
       || metric.selector === '.manager-tools-row'
+      || metric.selector === '.manager-travel-party-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-system-edit-form'
@@ -2365,6 +2366,37 @@ async function main() {
           await csm.updateSystem(sysId, { features: { essences: true, gathering: true } });
         }, craftingSetup.systemId);
         await seedSmokeGatheringLibrary(page, craftingSetup);
+        // Travel route (#257): seed a region and an enabled party BEFORE the
+        // manager opens so the initial store refresh picks them up and the Travel
+        // route renders real content (a party row plus a current-region override)
+        // instead of the empty setup-checklist state. Seeding must precede the
+        // app .show() because entering the Travel tab does not itself re-read the
+        // party store. Idempotent across reruns: clears any prior party first.
+        await page.evaluate(async (sysId) => {
+          const regionStore = game.fabricate.getGatheringRegionStore?.();
+          const partyStore = game.fabricate.getGatheringPartyStore?.();
+          if (!regionStore || !partyStore) {
+            throw new Error('Gathering region/party stores unavailable for Travel seeding.');
+          }
+          const alara = game.actors.getName('Alara the Alchemist');
+          const bromm = game.actors.getName('Bromm the Blacksmith');
+          if (!alara) {
+            throw new Error('Smoke actor "Alara the Alchemist" not found for Travel seeding.');
+          }
+          for (const party of partyStore.list()) {
+            await partyStore.delete(party.id);
+          }
+          const existingRegion = regionStore.listBySystem(sysId)
+            .find(region => region.name === 'Northreach Vale');
+          const region = existingRegion
+            || await regionStore.create(sysId, { name: 'Northreach Vale', enabled: true });
+          const party = await partyStore.create({ name: 'The Smoke Wardens' });
+          await partyStore.addMember(party.id, alara.uuid);
+          if (bromm) await partyStore.addMember(party.id, bromm.uuid);
+          await partyStore.setTravelActor(party.id, alara.uuid);
+          await partyStore.setEnabled(party.id, true);
+          await partyStore.setCurrentRegionOverride(party.id, sysId, [region.id]);
+        }, craftingSetup.systemId);
         await page.evaluate(() => {
           globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
@@ -2624,6 +2656,8 @@ async function main() {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager #manager-gathering-nav-travel').first().click();
         await page.locator('.fabricate-manager .manager-travel-view').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager .manager-travel-party-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertManagerLayoutStable(page, 'gathering travel normal');
         await assertNoScreenshotOverlays(page);
