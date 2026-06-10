@@ -10012,6 +10012,33 @@
   border-bottom-right-radius: 8px;
 }
 
+.fabricate-manager .manager-travel-regions-row.is-selected {
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-success-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+/* Region inspector environment / party summaries. */
+.fabricate-manager .manager-travel-region-environments,
+.fabricate-manager .manager-travel-region-parties {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-travel-region-environments li,
+.fabricate-manager .manager-travel-region-parties li {
+  padding: 6px 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+  color: var(--fab-mv2-text);
+  font-size: 0.88rem;
+}
+
 /* Grid (toolbar / scrollable list / pagination) so the accordion list scrolls
    within the panel while the search and pagination stay pinned. Relies on
    .manager-gathering-panel's display:grid + min-height:0 + overflow:hidden. */

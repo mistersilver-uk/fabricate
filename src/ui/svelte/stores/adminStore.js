@@ -2043,12 +2043,15 @@ export function createAdminStore(services) {
         const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
         return Array.isArray(all) ? all : [];
       })();
-      const regionEnvironmentCount = (regionId) => regionEnvList.filter(env =>
-        Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId)).length;
-      const regionPartyCount = (regionId) => parties.filter(party => {
-        const override = party?.currentRegionOverrides?.[systemId];
-        return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
-      }).length;
+      const regionEnvironments = (regionId) => regionEnvList
+        .filter(env => Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId))
+        .map(env => ({ id: env.id, name: env.name }));
+      const regionParties = (regionId) => parties
+        .filter(party => {
+          const override = party?.currentRegionOverrides?.[systemId];
+          return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
+        })
+        .map(party => ({ id: party.id, name: party.name }));
 
       return {
         travelParties,
@@ -2056,17 +2059,23 @@ export function createAdminStore(services) {
         travelSaving: get(travelSaving),
         travelError: get(travelError),
         travelFieldErrors: _clonePlain(get(travelFieldErrors)),
-        selectedSystemRegions: regions.map(region => ({
-          id: region.id,
-          name: region.name,
-          description: String(region.description || ''),
-          img: region.img || null,
-          enabled: region.enabled !== false,
-          secret: region.secret === true,
-          biomes: Array.isArray(region.biomes) ? region.biomes : [],
-          environmentCount: regionEnvironmentCount(region.id),
-          partyCount: regionPartyCount(region.id)
-        })),
+        selectedSystemRegions: regions.map(region => {
+          const environments = regionEnvironments(region.id);
+          const partiesInRegion = regionParties(region.id);
+          return {
+            id: region.id,
+            name: region.name,
+            description: String(region.description || ''),
+            img: region.img || null,
+            enabled: region.enabled !== false,
+            secret: region.secret === true,
+            biomes: Array.isArray(region.biomes) ? region.biomes : [],
+            environmentCount: environments.length,
+            partyCount: partiesInRegion.length,
+            environments,
+            parties: partiesInRegion
+          };
+        }),
         gatheringRegionSettings: (systemId && regionStore?.getRegionSettings)
           ? regionStore.getRegionSettings(systemId)
           : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },

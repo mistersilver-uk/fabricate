@@ -10,6 +10,7 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringHazardEditView from './GatheringHazardEditView.svelte';
+  import RegionNameField from './RegionNameField.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -576,6 +577,13 @@
   const selectedTravelPartyId = $derived($viewState.selectedPartyId || '');
   const selectedTravelParty = $derived(
     travelParties.find(party => party.id === selectedTravelPartyId) || null
+  );
+  // Region selection is UI-local (no store resolution needed); the inspector
+  // reads the selected region from the system-region projection.
+  let selectedTravelRegionId = $state('');
+  const travelSystemRegions = $derived($viewState.selectedSystemRegions || []);
+  const selectedTravelRegion = $derived(
+    travelSystemRegions.find(region => region.id === selectedTravelRegionId) || null
   );
   const gatheringNavCounts = $derived({
     environments: environmentList.length,
@@ -3168,6 +3176,8 @@
         travelFieldErrors={$viewState.travelFieldErrors || {}}
         travelActorOptions={$viewState.actorOptions || []}
         travelSystemRegions={$viewState.selectedSystemRegions || []}
+        travelSelectedRegionId={selectedTravelRegionId}
+        onSelectRegion={(id) => selectedTravelRegionId = id}
         onSelectParty={(id) => store.selectParty?.(id)}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
@@ -4286,7 +4296,65 @@
                 <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>
               {/if}
             {:else if activeTravelTab === 'regions'}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RegionsPlaceholder', 'Select a region to see its details.')}</p>
+              {#if selectedTravelRegion}
+                <div class="manager-inspector-title-row">
+                  <span class="manager-inspector-icon" aria-hidden="true">
+                    <i class="fas fa-map-location-dot"></i>
+                  </span>
+                  <div class="manager-inspector-copy">
+                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.Regions.InspectorKicker', 'Selected region')}</p>
+                    <h2 class="manager-inspector-name">{selectedTravelRegion.name}</h2>
+                  </div>
+                </div>
+
+                <div class="manager-travel-inspector-actions">
+                  <button
+                    type="button"
+                    class="manager-button is-danger"
+                    disabled={$viewState.travelSaving === true}
+                    onclick={() => store.deleteRegion?.(selectedSystemId, selectedTravelRegion.id)}
+                  >
+                    <i class="fas fa-trash" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.Travel.Regions.Delete', 'Delete region')}</span>
+                  </button>
+                </div>
+
+                <section class="manager-inspector-card">
+                  <RegionNameField
+                    name={selectedTravelRegion.name}
+                    disabled={$viewState.travelSaving === true}
+                    onRename={(name) => store.renameRegion?.(selectedSystemId, selectedTravelRegion.id, name)}
+                  />
+                </section>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.Regions.EnvironmentsCardTitle', 'Environments')}</h3>
+                  {#if selectedTravelRegion.environments.length > 0}
+                    <ul class="manager-travel-region-environments">
+                      {#each selectedTravelRegion.environments as environment (environment.id)}
+                        <li>{environment.name}</li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Regions.NoEnvironments', 'No environments include this region yet.')}</p>
+                  {/if}
+                </section>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.Regions.PartiesCardTitle', 'Parties in this region')}</h3>
+                  {#if selectedTravelRegion.parties.length > 0}
+                    <ul class="manager-travel-region-parties">
+                      {#each selectedTravelRegion.parties as party (party.id)}
+                        <li>{party.name}</li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Regions.NoParties', 'No parties are currently in this region.')}</p>
+                  {/if}
+                </section>
+              {:else}
+                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RegionsPlaceholder', 'Select a region to see its details.')}</p>
+              {/if}
             {:else if activeTravelTab === 'map'}
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder', 'Select a region to map it to Scene Regions.')}</p>
             {/if}

@@ -209,7 +209,7 @@ describe('adminStore travel section', () => {
     assert.equal(state.travelParties.length, 1);
     assert.equal(state.travelParties[0].name, 'Vanguard');
     assert.equal(state.selectedSystemRegions.length, 1);
-    // The Travel view-model carries the full authoring projection plus per-region counts.
+    // The Travel view-model carries the full authoring projection plus per-region counts and lists.
     assert.deepEqual(state.selectedSystemRegions[0], {
       id: 'r1',
       name: 'Verdant',
@@ -219,14 +219,16 @@ describe('adminStore travel section', () => {
       secret: false,
       biomes: ['forest'],
       environmentCount: 0,
-      partyCount: 0
+      partyCount: 0,
+      environments: [],
+      parties: []
     });
     assert.equal(state.actorOptions.length, 1);
     assert.equal(state.selectedPartyId, 'p1');
     store.destroy();
   });
 
-  it('selectedSystemRegions includes per-region environment and party counts', async () => {
+  it('selectedSystemRegions includes per-region environment and party counts and lists', async () => {
     const { services } = createServices({
       parties: [
         { id: 'p1', name: 'A', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
@@ -251,6 +253,11 @@ describe('adminStore travel section', () => {
     assert.equal(r1.partyCount, 1);
     assert.equal(r2.environmentCount, 1);
     assert.equal(r2.partyCount, 0);
+    // Lists carry the referencing environment / party identities for the inspector.
+    assert.deepEqual(r1.environments.map(e => e.name).sort(), ['Glade', 'Grove']);
+    assert.deepEqual(r1.parties.map(p => p.id), ['p1']);
+    assert.deepEqual(r2.environments.map(e => e.name), ['Glade']);
+    assert.deepEqual(r2.parties, []);
     store.destroy();
   });
 

@@ -71,6 +71,8 @@
     travelFieldErrors = {},
     travelActorOptions = [],
     travelSystemRegions = [],
+    travelSelectedRegionId = '',
+    onSelectRegion = () => {},
     onSelectParty = () => {},
     onCreateParty = () => {},
     onRenameParty = () => {},
@@ -861,7 +863,11 @@
           onClearTravelActor={onClearPartyTravelActor}
         />
       {:else if activeTravelTab === 'regions'}
-        <GatheringRegionsTab regions={travelSystemRegions} />
+        <GatheringRegionsTab
+          regions={travelSystemRegions}
+          selectedRegionId={travelSelectedRegionId}
+          {onSelectRegion}
+        />
       {:else if activeTravelTab === 'map'}
         <div
           class="manager-travel-panel"

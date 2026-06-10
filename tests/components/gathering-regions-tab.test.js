@@ -46,7 +46,10 @@ function makeRegions(count) {
 async function mountTab(props) {
   target = document.createElement('div');
   document.body.appendChild(target);
-  mounted = mount(GatheringRegionsTab, { target, props: { regions: [], ...props } });
+  mounted = mount(GatheringRegionsTab, {
+    target,
+    props: { regions: [], selectedRegionId: '', onSelectRegion: () => {}, ...props }
+  });
   flushSync();
   await tick();
   flushSync();
@@ -131,24 +134,41 @@ describe('GatheringRegionsTab mounted behavior', () => {
     remount();
   });
 
-  it('expands and collapses a row accordion (blank body) on header activation', async () => {
-    await mountTab({ regions: [makeRegion({ id: 'r1', name: 'Northreach' })] });
-    const header = target.querySelector('.manager-travel-regions-header');
+  it('selects a region on header activation and reflects the selection as the expanded row', async () => {
+    const selections = [];
+    // Collapsed: clicking the header requests selection of the row's region.
+    await mountTab({
+      regions: [makeRegion({ id: 'r1', name: 'Northreach' })],
+      selectedRegionId: '',
+      onSelectRegion: (id) => selections.push(id)
+    });
+    let header = target.querySelector('.manager-travel-regions-header');
     assert.equal(header.getAttribute('aria-expanded'), 'false');
     assert.equal(target.querySelector('[data-manager-region-editor]'), null);
     header.click();
     flushSync();
-    await tick();
-    flushSync();
+    assert.deepEqual(selections, ['r1']);
+    remount();
+
+    // Selected: the matching row renders expanded (with its blank body) and marked selected.
+    await mountTab({ regions: [makeRegion({ id: 'r1', name: 'Northreach' })], selectedRegionId: 'r1' });
+    header = target.querySelector('.manager-travel-regions-header');
     assert.equal(header.getAttribute('aria-expanded'), 'true');
+    assert.ok(target.querySelector('.manager-travel-regions-row.is-selected'));
     assert.ok(target.querySelector('[data-manager-region-editor]'));
-    // body is blank
     assert.equal(target.querySelector('[data-manager-region-editor]').textContent.trim(), '');
-    header.click();
+    remount();
+
+    // Clicking the already-selected row toggles selection off.
+    const toggles = [];
+    await mountTab({
+      regions: [makeRegion({ id: 'r1', name: 'Northreach' })],
+      selectedRegionId: 'r1',
+      onSelectRegion: (id) => toggles.push(id)
+    });
+    target.querySelector('.manager-travel-regions-header').click();
     flushSync();
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('[data-manager-region-editor]'), null);
+    assert.deepEqual(toggles, ['']);
     remount();
   });
 });

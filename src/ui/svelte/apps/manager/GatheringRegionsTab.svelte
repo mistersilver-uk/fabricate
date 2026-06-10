@@ -4,15 +4,18 @@
   of the selected system's gathering regions, mirroring the Parties tab. Each
   row header shows a fixed region icon, the region name, and chips for the
   number of environments that include the region and the number of parties
-  whose current region is set to it. The expanded body is intentionally blank
-  for now (region detail editing is a later iteration).
+  whose current region is set to it. Selecting a row (which also expands it)
+  surfaces the region's details in the inspector; the expanded body itself is
+  intentionally blank.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
 
   let {
-    regions = []
+    regions = [],
+    selectedRegionId = '',
+    onSelectRegion = () => {}
   } = $props();
 
   const PAGE_SIZE = 6;
@@ -20,7 +23,6 @@
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
-  let expandedRegionId = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -43,14 +45,14 @@
 
   const pagedRegions = $derived(filteredRegions.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE));
 
-  function toggleExpand(regionId) {
-    expandedRegionId = expandedRegionId === regionId ? '' : regionId;
+  function selectRow(regionId) {
+    onSelectRegion(regionId === selectedRegionId ? '' : regionId);
   }
 
   function onRowKeydown(event, regionId) {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
-    toggleExpand(regionId);
+    selectRow(regionId);
   }
 
   function countLabel(count, oneKey, oneFallback, manyKey, manyFallback) {
@@ -103,9 +105,9 @@
   {:else}
     <div class="manager-travel-regions-list" role="list">
       {#each pagedRegions as region (region.id)}
-        {@const isExpanded = expandedRegionId === region.id}
+        {@const isExpanded = region.id === selectedRegionId}
         <div
-          class={`manager-travel-regions-row ${isExpanded ? 'is-expanded' : ''}`}
+          class={`manager-travel-regions-row ${isExpanded ? 'is-expanded is-selected' : ''}`}
           role="listitem"
           data-manager-travel-region-id={region.id}
         >
@@ -114,7 +116,7 @@
             role="button"
             tabindex="0"
             aria-expanded={isExpanded}
-            onclick={() => toggleExpand(region.id)}
+            onclick={() => selectRow(region.id)}
             onkeydown={(event) => onRowKeydown(event, region.id)}
           >
             <div class="manager-travel-regions-left">
