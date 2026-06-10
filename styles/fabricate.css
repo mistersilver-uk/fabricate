@@ -10031,12 +10031,42 @@
 
 .fabricate-manager .manager-travel-region-environments li,
 .fabricate-manager .manager-travel-region-parties li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 6px 8px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
   color: var(--fab-mv2-text);
   font-size: 0.88rem;
+}
+
+.fabricate-manager .manager-travel-region-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 5px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-mv2-text-muted);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-travel-region-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-travel-region-item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Grid (toolbar / scrollable list / pagination) so the accordion list scrolls

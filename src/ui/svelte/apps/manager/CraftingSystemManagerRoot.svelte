@@ -585,6 +585,15 @@
   const selectedTravelRegion = $derived(
     travelSystemRegions.find(region => region.id === selectedTravelRegionId) || null
   );
+  // Mirror the Parties tab: keep a region selected whenever one exists, falling
+  // back to the first region when nothing is selected or the selection is gone.
+  $effect(() => {
+    if (travelSystemRegions.length === 0) {
+      if (selectedTravelRegionId) selectedTravelRegionId = '';
+    } else if (!travelSystemRegions.some(region => region.id === selectedTravelRegionId)) {
+      selectedTravelRegionId = travelSystemRegions[0].id;
+    }
+  });
   const gatheringNavCounts = $derived({
     environments: environmentList.length,
     tasks: gatheringTaskDefinitions.length,
@@ -2896,11 +2905,18 @@
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Create', 'Create gathering hazard')}</span>
         </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
         <button type="button" class="manager-button is-primary" onclick={() => store.createParty?.()} disabled={!canShowEnvironments || $viewState.travelSaving}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
         </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'regions'}
+        <button type="button" class="manager-button is-primary" onclick={() => store.createRegionQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRegionName', 'New region'))} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Travel.CreateRegion', 'Create region')}</span>
+        </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+        <!-- Map Region Links tab has no create action. -->
       {:else if currentView === 'environments'}
         <button type="button" class="manager-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -4328,11 +4344,16 @@
                 </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.Regions.EnvironmentsCardTitle', 'Environments')}</h3>
+                  <h3 class="manager-card-title"><i class="fas fa-seedling" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.EnvironmentsCardTitle', 'Environments')}</h3>
                   {#if selectedTravelRegion.environments.length > 0}
                     <ul class="manager-travel-region-environments">
                       {#each selectedTravelRegion.environments as environment (environment.id)}
-                        <li>{environment.name}</li>
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true">
+                            {#if environment.img}<img src={environment.img} alt="" />{:else}<i class="fas fa-seedling"></i>{/if}
+                          </span>
+                          <span class="manager-travel-region-item-name">{environment.name}</span>
+                        </li>
                       {/each}
                     </ul>
                   {:else}
@@ -4341,11 +4362,16 @@
                 </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.Regions.PartiesCardTitle', 'Parties in this region')}</h3>
+                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.PartiesCardTitle', 'Parties in this region')}</h3>
                   {#if selectedTravelRegion.parties.length > 0}
                     <ul class="manager-travel-region-parties">
                       {#each selectedTravelRegion.parties as party (party.id)}
-                        <li>{party.name}</li>
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true">
+                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
+                          </span>
+                          <span class="manager-travel-region-item-name">{party.name}</span>
+                        </li>
                       {/each}
                     </ul>
                   {:else}

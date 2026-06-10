@@ -231,15 +231,16 @@ describe('adminStore travel section', () => {
   it('selectedSystemRegions includes per-region environment and party counts and lists', async () => {
     const { services } = createServices({
       parties: [
-        { id: 'p1', name: 'A', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
+        { id: 'p1', name: 'A', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
         { id: 'p2', name: 'B', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }
       ],
       regions: [
         { id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] },
         { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [] }
       ],
+      actors: [{ uuid: 'Actor.t', id: 't', name: 'Marker', img: 'marker.webp' }],
       environments: [
-        { id: 'e1', name: 'Grove', includedRegionIds: ['r1'] },
+        { id: 'e1', name: 'Grove', img: 'grove.webp', includedRegionIds: ['r1'] },
         { id: 'e2', name: 'Glade', includedRegionIds: ['r1', 'r2'] },
         { id: 'e3', name: 'Bare', includedRegionIds: [] }
       ]
@@ -253,11 +254,14 @@ describe('adminStore travel section', () => {
     assert.equal(r1.partyCount, 1);
     assert.equal(r2.environmentCount, 1);
     assert.equal(r2.partyCount, 0);
-    // Lists carry the referencing environment / party identities for the inspector.
+    // Lists carry the referencing environment / party identities (with images) for the inspector.
     assert.deepEqual(r1.environments.map(e => e.name).sort(), ['Glade', 'Grove']);
     assert.deepEqual(r1.parties.map(p => p.id), ['p1']);
     assert.deepEqual(r2.environments.map(e => e.name), ['Glade']);
     assert.deepEqual(r2.parties, []);
+    // Environment image flows through; party image resolves from the travel-marker actor.
+    assert.equal(r1.environments.find(e => e.name === 'Grove').img, 'grove.webp');
+    assert.equal(r1.parties[0].img, 'marker.webp');
     store.destroy();
   });
 

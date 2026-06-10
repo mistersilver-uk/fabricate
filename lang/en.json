@@ -2046,6 +2046,8 @@
           "DisabledChip": "Disabled",
           "CreateParty": "Create party",
           "DefaultPartyName": "New party",
+          "CreateRegion": "Create region",
+          "DefaultRegionName": "New region",
           "SelectParty": "Select party",
           "SelectPartyHint": "Select a party to manage its members, travel actor, and current region.",
           "RenameLabel": "Party name",

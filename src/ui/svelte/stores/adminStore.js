@@ -2045,13 +2045,13 @@ export function createAdminStore(services) {
       })();
       const regionEnvironments = (regionId) => regionEnvList
         .filter(env => Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId))
-        .map(env => ({ id: env.id, name: env.name }));
+        .map(env => ({ id: env.id, name: env.name, img: env.img || '' }));
       const regionParties = (regionId) => parties
         .filter(party => {
           const override = party?.currentRegionOverrides?.[systemId];
           return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
         })
-        .map(party => ({ id: party.id, name: party.name }));
+        .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
 
       return {
         travelParties,
