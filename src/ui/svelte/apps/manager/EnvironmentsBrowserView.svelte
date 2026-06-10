@@ -847,9 +847,16 @@
           systemId={selectedSystemId}
           systemRegions={travelSystemRegions}
           selectedPartyId={travelSelectedPartyId}
+          actorOptions={travelActorOptions}
+          saving={travelSaving}
           {onSelectParty}
           onSetRegionOverride={onSetPartyRegionOverride}
           onClearRegionOverride={onClearPartyRegionOverride}
+          onAddMember={onAddPartyMember}
+          onRemoveMember={onRemovePartyMember}
+          onMoveMember={onMovePartyMember}
+          onSetTravelActor={onSetPartyTravelActor}
+          onClearTravelActor={onClearPartyTravelActor}
         />
       {:else if activeTravelTab === 'regions'}
         <div

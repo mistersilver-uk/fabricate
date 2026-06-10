@@ -2120,6 +2120,31 @@ export function createAdminStore(services) {
       async addPartyMember(partyId, actorUuid) {
         return withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members');
       },
+      async addOrMovePartyMember(targetPartyId, actorUuid) {
+        const partyStore = getPartyStore();
+        if (!partyStore) return false;
+        const uuid = String(actorUuid ?? '');
+        const source = (partyStore.list?.() || []).find((party) =>
+          party.id !== targetPartyId
+          && Array.isArray(party.memberActorUuids)
+          && party.memberActorUuids.includes(uuid));
+        if (source) {
+          const actorName = _escapeHtml(getActorOptions().find((actor) => actor.uuid === uuid)?.name || uuid);
+          const sourceName = _escapeHtml(source.name || source.id);
+          const targetName = _escapeHtml(partyStore.get?.(targetPartyId)?.name || targetPartyId);
+          const confirmed = await services.confirmDialog?.({
+            title: services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberTitle', { actor: actorName })
+              || `Move ${actorName}?`,
+            content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberContent', { actor: actorName, from: sourceName, to: targetName })
+              || `Move <strong>${actorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`}</p>`,
+            yes: () => true,
+            no: () => false
+          });
+          if (!confirmed) return false;
+          return withSave((store) => store.moveMember(source.id, targetPartyId, uuid), 'members');
+        }
+        return withSave((store) => store.addMember(targetPartyId, uuid), 'members');
+      },
       async removePartyMember(partyId, actorUuid) {
         return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members');
       },
@@ -5222,6 +5247,7 @@ export function createAdminStore(services) {
     setPartyEnabled: travel.setPartyEnabled,
     deleteParty: travel.deleteParty,
     addPartyMember: travel.addPartyMember,
+    addOrMovePartyMember: travel.addOrMovePartyMember,
     removePartyMember: travel.removePartyMember,
     movePartyMember: travel.movePartyMember,
     setPartyTravelActor: travel.setPartyTravelActor,

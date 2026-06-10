@@ -20,15 +20,23 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RegionOverridePicker from './RegionOverridePicker.svelte';
+  import PartyExpandedBody from './PartyExpandedBody.svelte';
 
   let {
     parties = [],
     systemId = '',
     systemRegions = [],
     selectedPartyId = '',
+    actorOptions = [],
+    saving = false,
     onSelectParty = () => {},
     onSetRegionOverride = () => {},
-    onClearRegionOverride = () => {}
+    onClearRegionOverride = () => {},
+    onAddMember = () => {},
+    onRemoveMember = () => {},
+    onMoveMember = () => {},
+    onSetTravelActor = () => {},
+    onClearTravelActor = () => {}
   } = $props();
 
   const PAGE_SIZE = 6;
@@ -166,7 +174,19 @@
           </div>
 
           {#if isExpanded}
-            <div class="manager-travel-parties-editor" data-manager-travel-party-editor></div>
+            <div class="manager-travel-parties-editor" data-manager-travel-party-editor>
+              <PartyExpandedBody
+                {party}
+                {parties}
+                {actorOptions}
+                {saving}
+                {onAddMember}
+                {onRemoveMember}
+                {onMoveMember}
+                {onSetTravelActor}
+                {onClearTravelActor}
+              />
+            </div>
           {/if}
         </div>
       {/each}

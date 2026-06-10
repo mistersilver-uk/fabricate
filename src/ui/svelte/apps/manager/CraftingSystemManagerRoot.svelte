@@ -10,7 +10,7 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringHazardEditView from './GatheringHazardEditView.svelte';
-  import GatheringTravelView from './GatheringTravelView.svelte';
+  import PartyNameField from './PartyNameField.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -3174,7 +3174,7 @@
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
         onSetPartyEnabled={(id, enabled) => store.setPartyEnabled?.(id, enabled)}
         onDeleteParty={(id) => store.deleteParty?.(id)}
-        onAddPartyMember={(id, uuid) => store.addPartyMember?.(id, uuid)}
+        onAddPartyMember={(id, uuid) => store.addOrMovePartyMember?.(id, uuid)}
         onRemovePartyMember={(id, uuid) => store.removePartyMember?.(id, uuid)}
         onMovePartyMember={(from, to, uuid) => store.movePartyMember?.(from, to, uuid)}
         onSetPartyTravelActor={(id, uuid) => store.setPartyTravelActor?.(id, uuid)}
@@ -4231,6 +4231,14 @@
                 </div>
 
                 <section class="manager-inspector-card">
+                  <PartyNameField
+                    name={selectedTravelParty.name}
+                    disabled={$viewState.travelSaving === true}
+                    onRename={(name) => store.renameParty?.(selectedTravelParty.id, name)}
+                  />
+                </section>
+
+                <section class="manager-inspector-card">
                   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current region')}</h3>
                   {#if selectedTravelParty.currentRegionEvidence.regions.length > 0}
                     <ul class="manager-travel-evidence-regions">
@@ -4247,6 +4255,18 @@
                     <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRegions', 'No current region set for this system.')}</p>
                   {/if}
                 </section>
+
+                <div class="manager-travel-inspector-actions">
+                  <button
+                    type="button"
+                    class="manager-button is-danger"
+                    disabled={$viewState.travelSaving === true}
+                    onclick={() => store.deleteParty?.(selectedTravelParty.id)}
+                  >
+                    <i class="fas fa-trash" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Delete', 'Delete party')}</span>
+                  </button>
+                </div>
               {:else}
                 <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>
               {/if}

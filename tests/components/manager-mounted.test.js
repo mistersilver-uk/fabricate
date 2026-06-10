@@ -48,7 +48,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');

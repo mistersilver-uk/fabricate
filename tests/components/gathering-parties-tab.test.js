@@ -85,10 +85,14 @@ describe('GatheringPartiesTab mounted behavior', () => {
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     writeRawModule('src/ui/svelte/util/iconPickerPopover.js');
+    writeRawModule('src/ui/svelte/util/dropUtils.js');
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
     writeRawModule('src/ui/svelte/actions/portal.js');
+    writeRawModule('src/ui/svelte/actions/dragDrop.js');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte.js')).href);
     GatheringPartiesTab = mod.default;

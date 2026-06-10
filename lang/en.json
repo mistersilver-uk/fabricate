@@ -2004,8 +2004,34 @@
             "OverrideStale": "Unknown region",
             "OverrideSearchPlaceholder": "Search regions...",
             "OverrideSearchLabel": "Search regions",
-            "NoRegionMatches": "No regions match your search."
+            "NoRegionMatches": "No regions match your search.",
+            "NameLabel": "Party name",
+            "Delete": "Delete party"
           },
+          "Members": {
+            "SectionLabel": "Party members",
+            "AddLabel": "Add members",
+            "AddSearchPlaceholder": "Search characters...",
+            "AddSearchLabel": "Search characters to add",
+            "NoAddMatches": "No characters match your search.",
+            "NoActors": "No character actors exist in this world yet.",
+            "MoveLabel": "Move member to another party",
+            "MoveSearchPlaceholder": "Search parties...",
+            "MoveSearchLabel": "Search parties",
+            "NoOtherParties": "No other parties to move to.",
+            "RemoveLabel": "Remove member",
+            "Empty": "No members yet."
+          },
+          "Marker": {
+            "SectionLabel": "Travel marker",
+            "Label": "Travel marker",
+            "DropLabel": "Drop an actor to set the travel marker",
+            "DropHint": "Drag an actor here to set the travel marker. Right-click to clear.",
+            "Empty": "Drag an actor here",
+            "Clear": "Clear"
+          },
+          "MoveMemberTitle": "Move {actor}?",
+          "MoveMemberContent": "Move <strong>{actor}</strong> from <strong>{from}</strong> to <strong>{to}</strong>?",
           "WorldScopeNote": "Parties are shared across every crafting system. Only the current-region override below is specific to this system.",
           "PartyListLabel": "Parties",
           "PartyListEmpty": "No parties yet.",

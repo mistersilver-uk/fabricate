@@ -151,7 +151,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             uuid: actor.uuid,
             id: actor.id,
             name: actor.name,
-            img: actor.img || ''
+            img: actor.img || '',
+            type: actor.type || ''
           }))
           .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),

@@ -305,6 +305,58 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
+  it('addOrMovePartyMember adds directly when the actor is in no other party', async () => {
+    const { services, calls, confirmCalls } = createServices({
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
+      actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }]
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.addOrMovePartyMember('p1', 'Actor.a');
+    await flush();
+    assert.deepEqual(calls.addMember, [{ id: 'p1', uuid: 'Actor.a' }]);
+    assert.equal(calls.moveMember.length, 0);
+    assert.equal(confirmCalls.length, 0);
+    store.destroy();
+  });
+
+  it('addOrMovePartyMember confirms and moves when the actor is already in another party', async () => {
+    const { services, calls, confirmCalls } = createServices({
+      parties: [
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRegionOverrides: {} }
+      ],
+      actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.addOrMovePartyMember('p1', 'Actor.a');
+    await flush();
+    assert.equal(confirmCalls.length, 1);
+    assert.deepEqual(calls.moveMember, [{ from: 'p2', to: 'p1', uuid: 'Actor.a' }]);
+    assert.equal(calls.addMember.length, 0);
+    store.destroy();
+  });
+
+  it('addOrMovePartyMember does nothing when the move is declined', async () => {
+    const { services, calls } = createServices({
+      parties: [
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRegionOverrides: {} }
+      ],
+      actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.addOrMovePartyMember('p1', 'Actor.a');
+    await flush();
+    assert.equal(calls.moveMember.length, 0);
+    assert.equal(calls.addMember.length, 0);
+    store.destroy();
+  });
+
   it('deleteParty confirms via confirmDialog before deleting', async () => {
     const { services, calls, confirmCalls } = createServices({
       parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }]

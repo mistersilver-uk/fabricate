@@ -10044,6 +10044,146 @@
   border-bottom-right-radius: 8px;
 }
 
+/* Travel > Parties expanded body: members (2/3) + travel marker (1/3). */
+.fabricate-manager .manager-party-body {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.fabricate-manager .manager-party-members,
+.fabricate-manager .manager-party-travel-marker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-party-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-party-add-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-party-member-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-party-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-party-member-row.is-stale {
+  border-color: var(--fab-warning-border);
+}
+
+.fabricate-manager .manager-party-member-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-party-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-party-member-empty {
+  list-style: none;
+}
+
+.fabricate-manager .manager-party-marker-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px dashed var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  text-align: center;
+  cursor: copy;
+}
+
+.fabricate-manager .manager-party-marker-dropzone.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-success-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-party-marker-portrait img {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: 1px solid var(--fab-mv2-border);
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-party-marker-icon {
+  font-size: 1.4rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-party-marker-name {
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.fabricate-manager .manager-party-marker-name.is-stale {
+  color: var(--fab-warning-text);
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-party-marker-hint {
+  font-size: 0.82rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-party-marker-clear {
+  align-self: stretch;
+  justify-content: center;
+}
+
+.fabricate-manager .manager-travel-inspector-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 720px) {
   .fabricate-manager .manager-travel-parties-header {
     flex-wrap: wrap;
@@ -10052,6 +10192,10 @@
   .fabricate-manager .manager-travel-parties-right {
     margin-left: 0;
     flex-wrap: wrap;
+  }
+
+  .fabricate-manager .manager-party-body {
+    grid-template-columns: 1fr;
   }
 }
 
