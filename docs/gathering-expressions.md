@@ -8,7 +8,7 @@ nav_order: 8.1
 
 Several gathering fields accept a **formula** instead of a plain number:
 
-- **Maximum stamina** and **Starting stamina** (system Settings → Stamina mode)
+- **Maximum stamina** and **Starting stamina** (system Settings → Limitation, with the **Stamina** toggle on)
 - **Amount per interval** (stamina regeneration)
 - **Stamina cost** modifiers on a gathering task
 - **Character modifier** library entries (used by drop chances and costs)

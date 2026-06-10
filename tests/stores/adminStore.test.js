@@ -4132,20 +4132,22 @@ describe('createAdminStore', () => {
 });
 
 describe('createAdminStore — gathering economy', () => {
-  it('preserves the per-system economy block in the normalized gathering config', async () => {
+  it('preserves the per-system economy block (two flags) in the normalized gathering config', async () => {
     // Regression: the normalizer used to drop systems[id].economy, so the task
-    // editor (which reads economy.mode reactively) lost its limitation mode.
-    const gatheringConfig = { systems: { sys1: { economy: { mode: 'stamina', stamina: { max: '40', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } } } } } };
+    // editor (which reads the limitation flags reactively) lost its gating.
+    const gatheringConfig = { systems: { sys1: { economy: { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } } } } };
     const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
     const store = createAdminStore(services);
     await store.refresh();
     const vs = get(store.viewState);
-    assert.equal(vs.gatheringConfig.systems.sys1.economy.mode, 'stamina');
+    // The two flags are preserved verbatim by the store normalizer.
+    assert.equal(vs.gatheringConfig.systems.sys1.economy.stamina.enabled, true);
+    assert.equal(vs.gatheringConfig.systems.sys1.economy.nodes.enabled, false);
     assert.equal(vs.gatheringConfig.systems.sys1.economy.stamina.max, '40');
   });
 
   it('preserves a library task node config through normalization (so it survives save)', async () => {
-    const gatheringConfig = { systems: { sys1: { economy: { mode: 'nodes' }, tasks: [{ id: 't1', name: 'Mine', nodes: { enabled: true, max: 4, current: 4, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 } } }] } } };
+    const gatheringConfig = { systems: { sys1: { economy: { nodes: { enabled: true } }, tasks: [{ id: 't1', name: 'Mine', nodes: { enabled: true, max: 4, current: 4, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 } } }] } } };
     const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
     const store = createAdminStore(services);
     await store.refresh();
@@ -4156,18 +4158,18 @@ describe('createAdminStore — gathering economy', () => {
     assert.equal(node.respawn.gainMode, 'guaranteed');
   });
 
-  it('refreshGatheringConfig re-reads the setting so a mode change reflects without reopening', async () => {
+  it('refreshGatheringConfig re-reads the setting so a flag change reflects without reopening', async () => {
     // The economy panel persists via the game service, not the store, so the
     // store's viewState would otherwise stay stale until the app reopens.
-    let gatheringConfig = { systems: { sys1: { economy: { mode: 'stamina', stamina: { regen: { policy: 'none', unit: 'hours', amount: '' } } } } } };
+    let gatheringConfig = { systems: { sys1: { economy: { stamina: { enabled: true, regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } } } } };
     const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
     const store = createAdminStore(services);
     await store.refresh();
-    assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.mode, 'stamina');
+    assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, true);
 
-    // External write changes the persisted mode; refresh pulls it into viewState.
-    gatheringConfig = { systems: { sys1: { economy: { mode: 'none', stamina: { regen: { policy: 'none', unit: 'hours', amount: '' } } } } } };
+    // External write disables stamina; refresh pulls the new flags into viewState.
+    gatheringConfig = { systems: { sys1: { economy: { stamina: { enabled: false, regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } } } } };
     store.refreshGatheringConfig();
-    assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.mode, 'none');
+    assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, false);
   });
 });

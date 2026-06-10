@@ -8,7 +8,8 @@
 
   let {
     task = null,
-    economyMode = 'none',
+    staminaEnabled = false,
+    nodesEnabled = false,
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -341,7 +342,7 @@
     return (characterModifierLibrary || []).find(entry => entry.id === modifierId) || null;
   }
 
-  // Stamina cost authoring (enforced only when the system uses stamina mode).
+  // Stamina cost authoring (enforced only when the system has stamina enabled).
   const staminaCostValue = $derived(Number(task?.staminaCost ?? 0));
   const staminaCostModifiers = $derived(Array.isArray(task?.staminaCostModifiers) ? task.staminaCostModifiers : []);
 
@@ -369,7 +370,7 @@
     return value === null || value === undefined ? '' : value;
   }
 
-  // Resource-node authoring (enforced only when the system uses nodes mode).
+  // Resource-node authoring (enforced only when the system has resource nodes enabled).
   const DEFAULT_NODES = { enabled: false, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual', intervalUnit: 'hours', intervalAmount: 0, gainMode: 'guaranteed', chance: 0, amountExpression: '' } };
   const RESPAWN_UNITS = { minutes: 60, hours: 3600, days: 86400, weeks: 604800 };
 
@@ -790,12 +791,12 @@
       </div>
     </section>
 
-    {#if economyMode === 'stamina'}
+    {#if staminaEnabled}
     <section class="manager-task-stamina-card" data-gathering-task-stamina>
       <div class="manager-task-card-header">
         <div class="manager-task-drop-header-copy">
           <h3>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskStaminaHint', 'Stamina spent per attempt when this system uses stamina mode.')}</p>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Economy.TaskStaminaHint', 'Stamina spent per attempt when this system has stamina enabled.')}</p>
         </div>
       </div>
 
@@ -839,7 +840,7 @@
     </section>
     {/if}
 
-    {#if economyMode === 'nodes'}
+    {#if nodesEnabled}
     <section class="manager-task-nodes-card" data-gathering-task-nodes>
       <div class="manager-task-card-header">
         <div class="manager-task-drop-header-copy">
@@ -984,7 +985,7 @@
       </div>
       <p class="manager-muted manager-task-nodes-hint-text">
         <i class="fas fa-circle-info" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodesEconomyHint', 'Canvas per-token depletion and depleted-token behavior are only available when this system\'s gathering economy is set to "nodes". Switch the gathering economy mode in the system\'s Economy settings to author a resource node here.')}</span>
+        <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodesEconomyHint', 'Canvas per-token depletion and depleted-token behavior are only available when this system has resource nodes enabled. Turn on the Resource nodes toggle in the system\'s Economy settings to author a resource node here.')}</span>
       </p>
     </section>
     {/if}
@@ -1403,7 +1404,7 @@
     align-items: end;
   }
 
-  /* Guidance shown in the node area when the system is NOT in nodes economy. */
+  /* Guidance shown in the node area when the system does NOT have resource nodes enabled. */
   .manager-task-nodes-hint-text {
     display: flex;
     align-items: flex-start;

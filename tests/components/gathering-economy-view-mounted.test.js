@@ -79,19 +79,66 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('shows three modes and marks the active one from the loaded economy', async () => {
-    const { services } = makeServices({ mode: 'none', stamina: { regen: { policy: 'none' } } });
+  it('shows two toggle pills; neither active = no limit (with an empty-state hint)', async () => {
+    const { services } = makeServices({ stamina: { enabled: false, regen: { policy: 'none' } }, nodes: { enabled: false } });
     await mountView({ services, systemId: 'sys-1' });
     const options = target.querySelectorAll('[data-economy-mode-option]');
-    assert.equal(options.length, 3);
-    const active = target.querySelector('[data-economy-mode-option].is-active');
-    assert.equal(active.getAttribute('data-economy-mode-option'), 'none');
+    assert.equal(options.length, 2); // stamina + nodes only — no explicit "none"
+    const values = Array.from(options).map(o => o.getAttribute('data-economy-mode-option')).sort();
+    assert.deepEqual(values, ['nodes', 'stamina']);
+    // No pill active and the muted no-limit hint is shown.
+    assert.equal(target.querySelector('[data-economy-mode-option].is-active'), null);
+    options.forEach(o => assert.equal(o.getAttribute('aria-pressed'), 'false'));
+    assert.ok(target.querySelector('[data-economy-no-limit-hint]'));
     unmount(mounted); mounted = null; target.remove();
   });
 
-  it('persists a mode change and reveals regen + actor controls in stamina mode', async () => {
+  it('marks both pills active when both flags are on (anti-dogpiling combination)', async () => {
+    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: true } });
+    await mountView({ services, systemId: 'sys-1' });
+    const stamina = target.querySelector('[data-economy-mode-option="stamina"]');
+    const nodes = target.querySelector('[data-economy-mode-option="nodes"]');
+    assert.ok(stamina.classList.contains('is-active'));
+    assert.ok(nodes.classList.contains('is-active'));
+    assert.equal(stamina.getAttribute('aria-pressed'), 'true');
+    assert.equal(nodes.getAttribute('aria-pressed'), 'true');
+    // Both sub-blocks render at once.
+    assert.ok(target.querySelector('[data-economy-regen-card]'));
+    assert.ok(target.querySelector('[data-economy-nodes-note]'));
+    // No empty-state hint when at least one is on.
+    assert.equal(target.querySelector('[data-economy-no-limit-hint]'), null);
+    unmount(mounted); mounted = null; target.remove();
+  });
+
+  it('toggles each flag independently and persists via setStamina/setNodes', async () => {
+    const { services, calls } = makeServices({ stamina: { enabled: false, regen: { policy: 'none' } }, nodes: { enabled: false } });
+    await mountView({ services, systemId: 'sys-1' });
+
+    // Turn stamina on: persists stamina.enabled = true, nodes still off.
+    target.querySelector('[data-economy-mode-option="stamina"]').click();
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.enabled, true);
+    assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, false);
+
+    // Turn nodes on too: both now enabled.
+    target.querySelector('[data-economy-mode-option="nodes"]').click();
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.enabled, true);
+    assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
+
+    // Toggle stamina back off: nodes stays on (independent toggles).
+    target.querySelector('[data-economy-mode-option="stamina"]').click();
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.enabled, false);
+    assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
+    // No legacy `mode` key is ever written.
+    assert.equal('mode' in calls.setEconomy.at(-1).economy, false);
+    unmount(mounted); mounted = null; target.remove();
+  });
+
+  it('persists config edits and reveals regen + actor controls when stamina is enabled', async () => {
     const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }];
-    const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: '2' } } }, actors);
+    const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: '2' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
     // Stamina mode reveals the regen card and the actor list.
@@ -130,10 +177,11 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.equal(calls.roll.at(-1).actorId, 'a1');
     assert.equal(calls.roll.at(-1).systemId, 'sys-1');
 
-    // Switching mode calls setGatheringEconomy with the new mode.
+    // Enabling the nodes pill (with stamina still on) persists both flags on.
     target.querySelector('[data-economy-mode-option="nodes"]').click();
     flushSync();
-    assert.equal(calls.setEconomy.at(-1).economy.mode, 'nodes');
+    assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.enabled, true);
     unmount(mounted); mounted = null; target.remove();
   });
 
@@ -142,7 +190,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       { actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' },
       { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, provider: 'fabricate' } // un-rolled
     ];
-    const { services, calls } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
+    const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
     // Set an override on the rolled character, then bulk-save from the header.
@@ -168,7 +216,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }, // rolled
       { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, provider: 'fabricate' } // un-rolled
     ];
-    const { services } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
+    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
     // Un-rolled: inputs disabled, dice button emphasised.
@@ -192,7 +240,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, rolledMax: 5, maxOverride: null, provider: 'fabricate' },
       { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, rolledMax: 8, maxOverride: null, provider: 'fabricate' }
     ];
-    const { services } = makeServices({ mode: 'stamina', stamina: { regen: { policy: 'none' } } }, actors);
+    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
     assert.equal(target.querySelectorAll('[data-economy-actor-id]').length, 2);
 

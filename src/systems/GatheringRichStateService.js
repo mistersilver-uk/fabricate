@@ -60,7 +60,9 @@ const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
-// System-level gathering limitation mode (per crafting system).
+// Legacy system-level limitation mode values, retained only for the read-time
+// compat mapping in normalizeGatheringEconomy (legacy `mode` ⇒ stamina/nodes
+// flags). The canonical state is the two independent booleans, not this enum.
 const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
 // Stamina regeneration over world time.
 const STAMINA_REGEN_POLICIES = new Set(['none', 'elapsedTime']);
@@ -723,17 +725,18 @@ export class GatheringRichStateService {
 
   buildListingMetadata({ environment, task, actor, viewer }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
-    const mode = this._economyMode(environment?.craftingSystemId);
+    const staminaEnabled = this.staminaEnabled(environment?.craftingSystemId);
+    const nodesEnabled = this.nodesEnabled(environment?.craftingSystemId);
     const displayNode = task?.nodes ?? null;
     const showNodeCounts = displayNode?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
-    const nodes = mode === 'nodes' && displayNode ? {
+    const nodes = nodesEnabled && displayNode ? {
       enabled: true,
       available: Number(displayNode.current || 0) > 0,
       depleted: Number(displayNode.current || 0) <= 0,
       current: showNodeCounts ? Number(displayNode.current || 0) : null,
       max: showNodeCounts ? Number(displayNode.max || 0) : null
     } : null;
-    const stamina = mode === 'stamina' && Number(task?.staminaCost || 0) > 0 ? {
+    const stamina = staminaEnabled && Number(task?.staminaCost || 0) > 0 ? {
       cost: Number(task.staminaCost || 0),
       state: this.getActorStamina(actor, environment?.craftingSystemId)
     } : null;
@@ -779,8 +782,8 @@ export class GatheringRichStateService {
    * Materialize a character's stamina pool from the system `max`/`start`
    * expression templates, rolling them once and persisting the resulting
    * numbers. Idempotent: a character that already has a pool keeps it unless
-   * `force` is set (the GM Roll/Reset path). No-ops outside stamina mode or when
-   * the max template is blank/non-finite (⇒ no pool, stamina unenforced).
+   * `force` is set (the GM Roll/Reset path). No-ops when stamina is disabled or
+   * when the max template is blank/non-finite (⇒ no pool, stamina unenforced).
    *
    * @param {object} payload
    * @returns {Promise<object|null>} The materialized pool, or null on no-op.
@@ -788,7 +791,7 @@ export class GatheringRichStateService {
   async seedActorStaminaIfNeeded({ actor, systemId, system = null, environment = null, force = false } = {}) {
     const key = systemId || 'default';
     const econ = this._systemEconomy(key);
-    if (econ.mode !== 'stamina') return null;
+    if (econ.stamina?.enabled !== true) return null;
 
     const state = readState(actor);
     const existing = state.stamina?.[key];
@@ -956,7 +959,7 @@ export class GatheringRichStateService {
    * `regen.unit` elapsed since the last evaluation, clamps to the pool max, and
    * advances the persisted anchor by exactly the consumed intervals so the
    * fractional remainder accrues toward the next tick. No-ops when the system
-   * is not in stamina mode, regen is off, the pool has no max, or world time
+   * does not have stamina enabled, regen is off, the pool has no max, or world time
    * has not advanced a full interval (re-anchoring on backwards jumps).
    *
    * @param {object} payload
@@ -965,7 +968,7 @@ export class GatheringRichStateService {
   async regenerateActorStamina({ actor, systemId, system = null, environment = null, worldTime } = {}) {
     const key = systemId || 'default';
     const econ = this._systemEconomy(key);
-    if (econ.mode !== 'stamina') return null;
+    if (econ.stamina?.enabled !== true) return null;
     const regen = econ.stamina?.regen || {};
     if (regen.policy !== 'elapsedTime') return null;
     const interval = this._durationToSeconds(1, regen.unit);
@@ -1016,7 +1019,7 @@ export class GatheringRichStateService {
 
   /**
    * Respawn finite resource nodes for one environment as world time passes
-   * (nodes-mode systems only). For each task with an `overTime` respawn policy,
+   * (systems with `nodes.enabled` only). For each task with an `overTime` respawn policy,
    * adds nodes per elapsed interval per the gain mode: `guaranteed` (+1),
    * `chance` (a persisted d100 roll per interval), or `expression` (roll
    * `amountExpression` per interval and add the rolled total), clamped to the
@@ -1029,7 +1032,7 @@ export class GatheringRichStateService {
    */
   async respawnNodes({ environment, worldTime } = {}) {
     if (!environment) return null;
-    if (this._economyMode(environment.craftingSystemId) !== 'nodes') return null;
+    if (!this.nodesEnabled(environment.craftingSystemId)) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
 
@@ -1078,11 +1081,13 @@ export class GatheringRichStateService {
   /**
    * Merge a per-environment runtime node (`stored`) onto the current library node
    * CONFIG so respawn/listing always use the authoritative policy, gain mode,
-   * interval, and depletion timing, while preserving the per-environment STATE:
-   * the `current` count, the per-environment `max` (a GM may overstock one
-   * environment via `restockNode({max})`), and the respawn anchor/roll. Falls back
-   * to `stored` when the library task has no node config (e.g. the task was
-   * deleted).
+   * interval, depletion timing, AND capacity (`max`) from the library task, while
+   * preserving only the per-environment STATE: the `current` count (clamped to the
+   * library `max`) and the respawn anchor/roll. `max` is config, not state — a
+   * persisted snapshot (seeded on first depletion) must never shadow a later
+   * library edit, or raising a task's node count would have no effect in
+   * environments that had already gathered it. Falls back to `stored` when the
+   * library task has no node config (e.g. the task was deleted).
    *
    * @param {object|null} libNode Authoritative library node config.
    * @param {object} stored The persisted per-environment node entry.
@@ -1091,11 +1096,17 @@ export class GatheringRichStateService {
   _mergeNodeConfigState(libNode, stored) {
     if (!libNode) return stored;
     const storedRespawn = stored?.respawn || {};
+    // Capacity is library config and authoritative — `...cloneJson(libNode)`
+    // already supplies `max`, so we never read a stale `stored.max`.
+    const max = Number(libNode.max);
+    const storedCurrent = Number(stored?.current);
     const merged = {
       ...cloneJson(libNode),
-      // STATE stays per-environment: the live count and any GM `max` override.
-      current: Number.isFinite(Number(stored?.current)) ? Number(stored.current) : libNode.current,
-      max: Number.isFinite(Number(stored?.max)) ? Number(stored.max) : libNode.max,
+      // STATE stays per-environment: the live count, clamped to the library cap so
+      // a lowered cap can't leave `current` above `max`.
+      current: Number.isFinite(storedCurrent)
+        ? (Number.isFinite(max) ? Math.min(storedCurrent, max) : storedCurrent)
+        : libNode.current,
       respawn: {
         ...cloneJson(libNode.respawn || { policy: 'manual' }),
         lastEvaluatedWorldTime: numberOrNullStrict(storedRespawn.lastEvaluatedWorldTime),
@@ -1358,14 +1369,15 @@ export class GatheringRichStateService {
     const blockedReasons = [];
     const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
     const systemId = system?.id || environment?.craftingSystemId;
-    const mode = this._economyMode(systemId);
+    const staminaEnabled = this.staminaEnabled(systemId);
+    const nodesEnabled = this.nodesEnabled(systemId);
 
     const gateNode = task?.nodes ?? null;
-    if (mode === 'nodes' && gateNode && Number(gateNode.current || 0) <= 0) {
+    if (nodesEnabled && gateNode && Number(gateNode.current || 0) <= 0) {
       blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
     }
 
-    if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+    if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {
       await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
       const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
       const stamina = this.getActorStamina(actor, systemId);
@@ -1397,10 +1409,11 @@ export class GatheringRichStateService {
     };
 
     const systemId = system?.id || environment?.craftingSystemId;
-    const mode = this._economyMode(systemId);
+    const staminaEnabled = this.staminaEnabled(systemId);
+    const nodesEnabled = this.nodesEnabled(systemId);
 
     const depletionSource = task?.nodes ?? null;
-    if (mode === 'nodes' && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
+    if (nodesEnabled && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
       // Persist the full node object (config + respawn timers) with one consumed,
       // so the per-environment pool (nodeRuntime for library tasks) is seeded and
       // decremented in a single write.
@@ -1418,7 +1431,7 @@ export class GatheringRichStateService {
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
     }
 
-    if (mode === 'stamina' && Number(task?.staminaCost || 0) > 0) {
+    if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {
       await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
       // Only spend when a pool exists (max configured); no max ⇒ no stamina limit.
       if (this.getActorStamina(actor, systemId).max != null) {
@@ -1550,8 +1563,9 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Persist a crafting system's gathering economy block (mode + stamina regen)
-   * into the raw config, merging beside the system's other library state.
+   * Persist a crafting system's gathering economy block (the two independent
+   * limitation flags — stamina + resource nodes — plus stamina regen) into the
+   * raw config, merging beside the system's other library state.
    *
    * @param {{systemId: string, economy: object}} payload
    * @returns {Promise<object|null>} The normalized economy block, or null.
@@ -1569,43 +1583,65 @@ export class GatheringRichStateService {
   }
 
   /**
-   * The normalized economy block for a crafting system (mode + stamina regen).
-   * Always returns a fully-defaulted block so callers never branch on absence.
+   * The normalized economy block for a crafting system (two limitation flags +
+   * stamina regen). Always returns a fully-defaulted block so callers never
+   * branch on absence.
    *
    * @param {string} systemId Crafting system id.
-   * @returns {{mode: string, stamina: {regen: object}}}
+   * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
    */
   _systemEconomy(systemId) {
-    return this._config().systems?.[String(systemId || '')]?.economy || normalizeGatheringEconomy(null);
+    const economy = this._config().systems?.[String(systemId || '')]?.economy;
+    // Normalize on read so persisted-but-not-yet-migrated worlds (legacy `mode`)
+    // resolve to the two flags via the read-time compat mapping.
+    return economy ? normalizeGatheringEconomy(economy) : normalizeGatheringEconomy(null);
   }
 
   /**
-   * The active limitation mode for a crafting system: `none`, `stamina`, or
-   * `nodes`.
+   * Whether the per-actor stamina limitation is enabled for a crafting system.
    *
    * @param {string} systemId Crafting system id.
-   * @returns {string}
+   * @returns {boolean}
    */
-  _economyMode(systemId) {
-    return this._systemEconomy(systemId).mode || 'none';
+  staminaEnabled(systemId) {
+    return this._systemEconomy(systemId).stamina?.enabled === true;
   }
 
   /**
-   * Public accessor for a system's limitation mode (`none`/`stamina`/`nodes`),
-   * used by the engine's world-time drivers and the service layer.
+   * Whether the finite resource-node limitation is enabled for a crafting
+   * system.
    *
    * @param {string} systemId Crafting system id.
-   * @returns {string}
+   * @returns {boolean}
+   */
+  nodesEnabled(systemId) {
+    return this._systemEconomy(systemId).nodes?.enabled === true;
+  }
+
+  /**
+   * Thin derived back-compat accessor for a system's limitation "mode". The two
+   * independent flags are the canonical state; this collapses them to a single
+   * string for any external/API consumer. Returns `'both'` when both flags are
+   * on (a value the old enum never had), `'stamina'` / `'nodes'` when only one
+   * is, and `'none'` when neither is. No internal caller relies on it.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {'both'|'stamina'|'nodes'|'none'}
    */
   economyMode(systemId) {
-    return this._economyMode(systemId);
+    const stamina = this.staminaEnabled(systemId);
+    const nodes = this.nodesEnabled(systemId);
+    if (stamina && nodes) return 'both';
+    if (stamina) return 'stamina';
+    if (nodes) return 'nodes';
+    return 'none';
   }
 
   /**
    * Public accessor for a system's normalized economy block.
    *
    * @param {string} systemId Crafting system id.
-   * @returns {{mode: string, stamina: {regen: object}}}
+   * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
    */
   systemEconomy(systemId) {
     return cloneJson(this._systemEconomy(systemId));
@@ -1657,8 +1693,8 @@ export class GatheringRichStateService {
 
   /**
    * The effective per-actor stamina cost to surface in a player listing, or
-   * `null` when there is nothing to refine (the system is not in stamina mode,
-   * or the task has no base cost). The synchronous listing build shows the base
+   * `null` when there is nothing to refine (the system does not have stamina
+   * enabled, or the task has no base cost). The synchronous listing build shows the base
    * cost; callers use this to replace it with the modifier-adjusted value for
    * the viewing character.
    *
@@ -1666,16 +1702,16 @@ export class GatheringRichStateService {
    * @returns {Promise<number|null>}
    */
   async listingStaminaCost({ actor, system = null, environment, task, viewer = null } = {}) {
-    if (this._economyMode(environment?.craftingSystemId) !== 'stamina') return null;
+    if (!this.staminaEnabled(environment?.craftingSystemId)) return null;
     if (!(Number(task?.staminaCost || 0) > 0)) return null;
     return this._effectiveStaminaCost({ actor, system, environment, task, viewer });
   }
 
   /**
-   * The stamina an actor regenerates per elapsed `regen.unit`: a fixed
-   * `regen.amount` or a `regen.formula` (which wins when set), adjusted by the
-   * regen `characterModifiers`. Floored at 0 and rounded to an integer so
-   * multi-interval catch-up is deterministic.
+   * The stamina an actor regenerates per elapsed `regen.unit`: `regen.amount`
+   * evaluated per actor as a single expression (a plain number or a formula
+   * with character references, e.g. "1 + @abilities.con.mod"). Floored at 0 and
+   * rounded to an integer so multi-interval catch-up is deterministic.
    *
    * @param {object} payload
    * @returns {Promise<number>} Non-negative integer amount per interval.
@@ -1740,20 +1776,34 @@ function shouldDepleteNode(task, outcome) {
 
 
 /**
- * Normalize a per-system gathering economy block. The `mode` selects the
- * limitation model (`none` legacy behaviour, `stamina` actor pools, `nodes`
- * finite resource nodes). Stamina regen is system-level: a fixed `amount` or a
- * `formula` (which wins when set), optionally adjusted by character modifiers,
- * applied once per `unit` of elapsed world time when `policy === 'elapsedTime'`.
+ * Normalize a per-system gathering economy block. Two independent boolean
+ * flags select the limitation models: `stamina.enabled` (per-actor stamina
+ * pools) and `nodes.enabled` (finite resource nodes). Both can be on at once
+ * (the anti-dogpiling combination); neither on means no limit. Stamina regen is
+ * system-level: `amount` is a single expression (a plain number or a formula
+ * with character references) evaluated per actor and applied once per `unit` of
+ * elapsed world time when `policy === 'elapsedTime'`.
+ *
+ * Read-time legacy compat: when neither new flag KEY is present but a legacy
+ * `mode` string is, it is mapped to the flags (`stamina` ⇒ stamina.enabled,
+ * `nodes` ⇒ nodes.enabled, else both false). Present flags always win over a
+ * stale `mode`, so a stale `mode` can never resurrect a disabled limitation.
  *
  * @param {object} raw Raw economy block.
- * @returns {{mode: string, stamina: {regen: object}}}
+ * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
  */
 function normalizeGatheringEconomy(raw = {}) {
   const regen = raw?.stamina?.regen || {};
+  // "New flags present" means the KEY exists (not merely truthy). Only when
+  // neither key exists do we fall back to mapping a legacy `mode`.
+  const hasStaminaFlag = raw?.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
+  const hasNodesFlag = raw?.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
+  const legacyMode = ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none';
+  const staminaEnabled = hasStaminaFlag ? raw.stamina.enabled === true : legacyMode === 'stamina';
+  const nodesEnabled = hasNodesFlag ? raw.nodes.enabled === true : legacyMode === 'nodes';
   return {
-    mode: ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none',
     stamina: {
+      enabled: staminaEnabled,
       // Expression templates (number or formula, e.g. "40" or "4 * @abilities.con.mod"),
       // rolled once per character at seed time. `start` blank ⇒ start full at max.
       max: stringOrFallback(raw?.stamina?.max, ''),
@@ -1766,7 +1816,8 @@ function normalizeGatheringEconomy(raw = {}) {
         amount: stringOrFallback(regen.amount, ''),
         lastRoll: regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null
       }
-    }
+    },
+    nodes: { enabled: nodesEnabled }
   };
 }
 

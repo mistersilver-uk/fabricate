@@ -130,6 +130,32 @@ Hooks.once('fabricate.ready', () => {
 - `getSelectedGatheringActorId()` reads the persisted remembered selection from the `fabricate.lastGatheringActor` client setting, returning `''` when unset.
 - `setSelectedGatheringActorId(id)` persists the remembered selection to that same client setting.
 
+### Gathering Economy Block
+
+`getGatheringEconomy({ systemId })` returns the normalized per-system limitation block, and `setGatheringEconomy({ systemId, economy })` (GM-only) persists it. The block carries **two independent boolean flags** — there is no single `mode` field:
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const systemId = game.fabricate.listCraftingSystems()[0]?.id;
+
+  // Normalized shape — stamina and resource-node limitations toggle independently.
+  const economy = game.fabricate.getGatheringEconomy({ systemId });
+  // -> {
+  //      stamina: { enabled: false, max: '', start: '', regen: { policy, unit, amount, lastRoll } },
+  //      nodes:   { enabled: false }
+  //    }
+
+  // Anti-dogpiling: turn BOTH limits on. One accepted attempt then both depletes
+  // the node pool and spends stamina; neither flag on means no limit.
+  await game.fabricate.setGatheringEconomy({
+    systemId,
+    economy: { stamina: { enabled: true }, nodes: { enabled: true } }
+  });
+});
+```
+
+The flags map onto the rich-state service accessors `staminaEnabled(systemId)` and `nodesEnabled(systemId)` (the single read used by enforcement, world-time regen/respawn drivers, and every UI surface). The derived `economyMode(systemId)` accessor is retained for back-compat and now returns `'both' | 'stamina' | 'nodes' | 'none'` (the `'both'` value is new in `0.8.0`). Worlds upgraded from before `0.8.0` have their legacy `economy.mode` enum migrated into these flags automatically (see [Gathering Limitations]({% link gathering-environments.md %}#gathering-limitations)).
+
 ## Data Persistence
 
 Fabricate stores data in Foundry's settings and flags:

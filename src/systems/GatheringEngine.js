@@ -178,14 +178,14 @@ export class GatheringEngine {
   }
 
   /**
-   * Regenerate stamina for every actor that owns a pool in a stamina-mode
+   * Regenerate stamina for every actor that owns a pool in a stamina-enabled
    * system. Per-actor failures are swallowed so one bad actor cannot abort the
    * world-time tick. Returns the list of `{actorId, systemId}` actually changed.
    */
   async _processStaminaRegen(worldTime) {
     if (typeof this.richState?.regenerateActorStamina !== 'function') return [];
     const staminaSystems = Array.from(this._enabledGatheringSystems().values())
-      .filter(system => this.richState.economyMode?.(system.id) === 'stamina');
+      .filter(system => this.richState.staminaEnabled?.(system.id) === true);
     if (staminaSystems.length === 0) return [];
     const actors = normalizeList(this.getActors?.());
     const changed = [];
@@ -206,7 +206,7 @@ export class GatheringEngine {
   }
 
   /**
-   * Respawn nodes for every environment owned by a nodes-mode system. Per-
+   * Respawn nodes for every environment owned by a nodes-enabled system. Per-
    * environment failures are swallowed. Returns the changed environment ids.
    */
   async _processNodeRespawn(worldTime) {
@@ -215,7 +215,7 @@ export class GatheringEngine {
     const changed = [];
     for (const environment of normalizeList(this.environmentStore?.list?.())) {
       if (!systems.has(environment?.craftingSystemId)) continue;
-      if (this.richState.economyMode?.(environment.craftingSystemId) !== 'nodes') continue;
+      if (!this.richState.nodesEnabled?.(environment.craftingSystemId)) continue;
       try {
         const updated = await this.richState.respawnNodes({ environment, worldTime });
         if (updated) changed.push({ environmentId: String(environment.id) });
@@ -542,7 +542,9 @@ export class GatheringEngine {
    *
    * Each entry in the returned `environments` array carries the environment
    * identity (`id`, `name`, `img`, `region`, `biome(s)`, `dangerTags`, `risk`,
-   * `economyMode`, `conditions`, `selectionMode`, `sceneUuid`), interaction
+   * the two independent limitation flags `staminaEnabled` / `nodesEnabled`
+   * (either, both, or neither may be on) plus the derived back-compat
+   * `economyMode` string, `conditions`, `selectionMode`, `sceneUuid`), interaction
    * state (`visible`, `attemptable`, `blockedReasons`, `tasks`,
    * `discoveredTasks`), and the shared player-listing fields produced by
    * {@link GatheringEngine#_playerListingFields}:
@@ -961,7 +963,7 @@ export class GatheringEngine {
     // Auto-seed the acting character's stamina pool on first sight of a stamina
     // system (e.g. opening the gathering tab), so the displayed pool reflects the
     // rolled max/start. Idempotent — the dice roll persists once.
-    if (actor && this.richState?.economyMode?.(environment.craftingSystemId) === 'stamina') {
+    if (actor && this.richState?.staminaEnabled?.(environment.craftingSystemId) === true) {
       try {
         await this.richState?.seedActorStaminaIfNeeded?.({ actor, systemId: environment.craftingSystemId, system });
       } catch (error) { /* display-only: never block the listing on a seed failure */ }
@@ -1064,7 +1066,9 @@ export class GatheringEngine {
       dangerTags,
       risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
       economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
-      staminaPool: this.richState?.economyMode?.(environment.craftingSystemId) === 'stamina' && actor
+      staminaEnabled: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true,
+      nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
+      staminaPool: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true && actor
         ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) || null
         : null,
       conditions: plainObjectOrNull(environment.conditions) || {},
@@ -1179,6 +1183,8 @@ export class GatheringEngine {
       dangerTags,
       risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
       economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
+      staminaEnabled: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true,
+      nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
       staminaPool: null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',

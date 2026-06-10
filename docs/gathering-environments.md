@@ -17,6 +17,26 @@ Gathering is opt-in per crafting system. Open the system in the Crafting Admin p
 
 When at least one crafting system has gathering enabled, players also see a dedicated **Gathering** action in the Items Directory header. This action opens the player Gathering app; it is separate from the Crafting app route and does not reuse the crafting actor-selection store. Fabricate resyncs the header action when crafting systems change and when the Items Directory rerenders, so disabling gathering on every system removes the action.
 
+## Gathering Limitations
+
+Each crafting system decides how often its gathering tasks can be attempted through **two independent limitations**, set on the system's gathering **Settings** tab under **Limitation**:
+
+| Limitation | Toggle | What it caps |
+|:-----------|:-------|:-------------|
+| **Stamina** | `Stamina` pill | A per-character stamina pool. Each attempt spends the task's stamina cost; a character can keep going only while they have stamina, which regenerates as world time passes. |
+| **Resource nodes** | `Resource nodes` pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node; once a pool is empty the task is blocked until its nodes respawn over world time. |
+
+The two toggles are **independent, not a single choice** — each can be on or off on its own:
+
+- **Neither on** — no limit. Tasks can be attempted freely (subject only to tools, conditions, and any [time requirements]({% link gathering-environments.md %}#time-requirements), which are always orthogonal to the limitation toggles).
+- **One on** — only that limitation applies.
+- **Both on** — both limits apply at once. A single accepted attempt both depletes the node pool **and** spends the character's stamina. This is the **anti-dogpiling** combination: finite resource nodes cap the *total* pulls until they respawn, so a large, high-stamina party cannot strip a task in a single visit no matter how much collective stamina it has.
+
+Stamina enforcement only kicks in once a character actually has a pool (a non-blank **Maximum stamina** rolled for them); a task with no stamina cost is never gated by stamina. Resource-node enforcement applies per task only where you author a node pool on that task. Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles — the toggles only decide whether each limitation is *active* for the system.
+
+{: .note }
+> Worlds created before `0.8.0` stored a single mutually-exclusive limitation `mode` (`none` / `stamina` / `nodes`). On upgrade, a versioned `0.8.0` migration rewrites that value into the two independent flags (`stamina` ⇒ Stamina on, `nodes` ⇒ Resource nodes on, otherwise both off) and drops the old field. The same mapping is applied on read, so un-migrated worlds keep working until the migration runs. There is no longer a value that turns both limits on at once except enabling both toggles.
+
 ## Environment Fields
 
 Each environment belongs to one crafting system and stores:

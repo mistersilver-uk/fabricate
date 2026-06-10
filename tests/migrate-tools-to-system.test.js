@@ -113,7 +113,8 @@ test('0.7.0 runs from 0.6.0 and moves config tools onto the system, bumping the 
   const config = settings.store.get('gatheringConfig');
   assert.deepEqual(systems[0].tools.map(t => t.id), ['t1']);
   assert.equal('tools' in config.systems['sys-1'], false);
-  assert.equal(settings.store.get('migrationVersion'), '0.7.0');
+  // The full runner also applies the later 0.8.0 economy-toggle migration.
+  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
 });
 
 test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7.0', async () => {
@@ -126,8 +127,14 @@ test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7
 
   await runner.run();
 
-  // Gate blocks the run entirely — config tools untouched, nothing persisted.
+  // The 0.7.0 tool-reconciliation is gated out (config tools untouched). The
+  // later 0.8.0 economy-toggle migration is still pending and runs, but with no
+  // legacy economy `mode` to rewrite it is a data no-op — only the version bumps.
   const config = settings.store.get('gatheringConfig');
-  assert.ok('tools' in config.systems['sys-1'], 'config tools untouched when gate blocks the run');
-  assert.equal(settings.calls.set.length, 0);
+  assert.ok('tools' in config.systems['sys-1'], 'config tools untouched when the 0.7.0 gate blocks the run');
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted');
+  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (0.8.0 is a data no-op here)');
+  assert.deepEqual(setKeys, ['migrationVersion'], 'only the version advances');
+  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
 });

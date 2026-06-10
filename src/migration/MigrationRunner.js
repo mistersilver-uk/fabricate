@@ -14,6 +14,7 @@ import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
+import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,13 @@ const MIGRATIONS = [
     migrate(data) {
       const { systems, gatheringConfig } = migrateToolsToSystem(data.systems, data.gatheringConfig);
       return { systems, gatheringConfig };
+    }
+  },
+  {
+    version: '0.8.0',
+    label: 'Replace gathering economy mode enum with independent stamina/nodes toggles',
+    migrate(data) {
+      return migrateGatheringLimitationToggles(data.gatheringConfig);
     }
   }
   // Future migrations added here in version order

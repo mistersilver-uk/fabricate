@@ -253,6 +253,14 @@ Tools are **system-owned**: every consumer reads `system.tools`. The `0.7.0` mig
 3. A gathering-config tools array whose `systemId` has **no matching crafting system** is left in place rather than dropping authored data.
 4. Mutated setting keys are `craftingSystems` (`systems[].tools`) and `gatheringConfig` (`systems[id].tools` cleared). Idempotent: once the config arrays are emptied/removed a re-run is a no-op.
 
+### Gathering Limitation Toggles (`0.8.0`)
+
+The gathering economy limitation moved from a single mutually-exclusive `mode` enum (`none` | `stamina` | `nodes`) to two independent boolean toggles (`stamina.enabled` / `nodes.enabled`). The `0.8.0` migration (`src/migration/migrateGatheringLimitationToggles.js`) rewrites the legacy `mode` into the toggles. It is pure, idempotent, by-reference, and version-gated.
+
+1. For each `gatheringConfig.systems[id].economy` still carrying a legacy `mode`, write `stamina.enabled = (mode === 'stamina')` and `nodes.enabled = (mode === 'nodes')`, then delete `mode`.
+2. Already-migrated economies (no `mode`, toggles present) are left untouched, so a re-run is a no-op.
+3. Mutated setting key is `gatheringConfig` (`systems[id].economy`). A read-time normalizer applies the same `mode → toggles` mapping (gated on the toggle KEY being absent) so an un-migrated world behaves identically before the migration runs.
+
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.
