@@ -135,6 +135,15 @@ describe('GatheringRegionsTab mounted behavior', () => {
     remount();
   });
 
+  it('pages to the selected region when it is on a later page', async () => {
+    // 8 regions (2 pages of 6); r8 is on page 2. Selecting it should reveal it.
+    await mountTab({ regions: makeRegions(8), selectedRegionId: 'r8' });
+    const names = Array.from(target.querySelectorAll('.manager-travel-regions-name')).map(n => n.textContent.trim());
+    assert.ok(names.includes('Region 8'), 'the selected region on page 2 is visible');
+    assert.ok(target.querySelector('.manager-travel-regions-row.is-selected'));
+    remount();
+  });
+
   it('selects a region on header activation and reflects the selection as the expanded row', async () => {
     const selections = [];
     // Collapsed: clicking the header requests selection of the row's region.

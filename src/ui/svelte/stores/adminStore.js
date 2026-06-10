@@ -2221,8 +2221,9 @@ export function createAdminStore(services) {
         travelSaving.set(true);
         patch();
         try {
-          await regionStore.create(systemId, { name: String(name ?? '').trim() });
-          return true;
+          const created = await regionStore.create(systemId, { name: String(name ?? '').trim() });
+          // Return the new region id so callers can select it; fall back to true.
+          return created?.id || true;
         } catch (err) {
           applyError(err);
           return false;

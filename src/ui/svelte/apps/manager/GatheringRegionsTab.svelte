@@ -28,6 +28,7 @@
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
+  let lastNavigatedSelection = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -46,6 +47,17 @@
     if (pageIndex > 0 && pageIndex * PAGE_SIZE >= filteredRegions.length) {
       pageIndex = 0;
     }
+  });
+
+  // When the selection changes (e.g. a freshly created region is auto-selected),
+  // page to it so it's visible. Guarded so manual pagination/search isn't fought.
+  $effect(() => {
+    if (!selectedRegionId || selectedRegionId === lastNavigatedSelection) return;
+    lastNavigatedSelection = selectedRegionId;
+    const index = filteredRegions.findIndex(region => region.id === selectedRegionId);
+    if (index < 0) return;
+    const targetPage = Math.floor(index / PAGE_SIZE);
+    if (targetPage !== pageIndex) pageIndex = targetPage;
   });
 
   const pagedRegions = $derived(filteredRegions.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE));

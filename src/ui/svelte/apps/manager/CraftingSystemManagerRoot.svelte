@@ -2911,7 +2911,7 @@
           <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
         </button>
       {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'regions'}
-        <button type="button" class="manager-button is-primary" onclick={() => store.createRegionQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRegionName', 'New region'))} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
+        <button type="button" class="manager-button is-primary" onclick={async () => { const created = await store.createRegionQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRegionName', 'New region')); if (typeof created === 'string' && created) selectedTravelRegionId = created; }} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Travel.CreateRegion', 'Create region')}</span>
         </button>

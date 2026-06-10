@@ -265,6 +265,22 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
+  it('createRegionQuick appends a region to the selected system view-model', async () => {
+    const { services, calls } = createServices({
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }]
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+    assert.equal(get(store.viewState).selectedSystemRegions.length, 1);
+    const result = await store.createRegionQuick('system-a', 'New region');
+    await flush();
+    assert.equal(calls.regionCreate.length, 1);
+    assert.equal(calls.regionCreate[0].data.name, 'New region');
+    assert.ok(result);
+    assert.equal(get(store.viewState).selectedSystemRegions.length, 2);
+    store.destroy();
+  });
+
   it('createParty calls through and selects the created party', async () => {
     const { services, calls } = createServices();
     const store = createAdminStore(services);
