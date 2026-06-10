@@ -54,13 +54,15 @@ Requirements:
 
 A versioned, idempotent migration:
 
-1. Derives a `GatheringRegion` (`{ id, name: label || id, enabled: true }`) for each legacy region-vocabulary entry not already present on the system's `gatheringRegions[]`.
-2. Maps each environment's non-empty legacy `region` to `includedRegionIds` when `includedRegionIds` is empty.
-3. Strips `region` / `regions` from gathering-config tasks and hazards.
-4. Clears the region vocabulary.
-5. Leaves `gatheringRegionSettings.enabled` unset (normalizes to `false`) and emits a one-time GM notice naming affected systems.
+1. Correlates `gatheringConfig.systems[sysId].vocabularies.regions`, crafting `systems[sysId]`, and environments by crafting-system id.
+2. Derives a `GatheringRegion` (`{ id, name: label || id, enabled: true }`) for each legacy region-vocabulary entry not already present on the system's `gatheringRegions[]` (distinct ids with duplicate labels → distinct regions; a config system id with no matching crafting system is skipped).
+3. Maps each environment's non-empty legacy `region` to `includedRegionIds` when `includedRegionIds` is empty AND a derived region with that id exists. Orphan fallback: an `environment.region` with no matching derived region leaves `includedRegionIds` empty and the inert `region` string in place (no stale reference, no data loss).
+4. Strips `region` / `regions` from gathering-config tasks and hazards.
+5. Clears each system's region vocabulary.
+6. Leaves `gatheringRegionSettings.enabled` unset (normalizes to `false`) and emits a one-time GM notice (runner transient-field pattern) naming affected systems and warning that region-scoped records may now appear in more environments.
 
 Requirements:
 
-1. The migration is idempotent: re-running it makes no further changes.
-2. Imports do not re-run the migration; pre-unification imports upgrade on the next startup.
+1. The migration is idempotent: re-running it makes no further changes (id-dedupe, empty-`includedRegionIds` guard, orphan-leave-inert, cleared vocabulary).
+2. It runs at a higher version than the 0.2.0 `migrateGatheringConfig` (which preserves per-system region vocab); that preservation assertion is superseded here.
+3. Imports do not re-run the migration; pre-unification imports upgrade on the next startup.

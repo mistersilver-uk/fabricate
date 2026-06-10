@@ -38,8 +38,8 @@ Requirements:
 
 Requirements:
 
-1. A versioned, idempotent migration derives `GatheringRegion` records from the legacy region vocabulary, maps `environment.region` → `includedRegionIds`, strips task/hazard region tags, and clears the region vocabulary.
-2. Migrated systems remain disabled by default; a one-time GM notice names systems that had regions.
+1. A versioned, idempotent migration derives `GatheringRegion` records from the legacy region vocabulary (correlated by crafting-system id), maps `environment.region` → `includedRegionIds` (orphan free-text region left inert), strips task/hazard region tags, and clears the region vocabulary.
+2. Migrated systems remain disabled by default; a one-time GM notice names systems that had regions and warns that region-scoped tasks/hazards may now appear in more environments (an empty-biome record that was narrowed only by region now matches any biome).
 3. Re-running the migration makes no further changes; imports upgrade on next startup.
 
 ## Testing Requirements
