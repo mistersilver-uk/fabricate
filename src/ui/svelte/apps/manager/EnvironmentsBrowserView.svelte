@@ -852,6 +852,7 @@
           {onSelectParty}
           onSetRegionOverride={onSetPartyRegionOverride}
           onClearRegionOverride={onClearPartyRegionOverride}
+          {onRenameParty}
           onAddMember={onAddPartyMember}
           onRemoveMember={onRemovePartyMember}
           onMoveMember={onMovePartyMember}

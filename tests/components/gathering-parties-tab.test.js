@@ -92,6 +92,7 @@ describe('GatheringPartiesTab mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte.js')).href);

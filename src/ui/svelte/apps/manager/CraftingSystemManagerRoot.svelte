@@ -10,7 +10,6 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringHazardEditView from './GatheringHazardEditView.svelte';
-  import PartyNameField from './PartyNameField.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -4229,14 +4228,6 @@
                     <h2 class="manager-inspector-name">{selectedTravelParty.name}</h2>
                   </div>
                 </div>
-
-                <section class="manager-inspector-card">
-                  <PartyNameField
-                    name={selectedTravelParty.name}
-                    disabled={$viewState.travelSaving === true}
-                    onRename={(name) => store.renameParty?.(selectedTravelParty.id, name)}
-                  />
-                </section>
 
                 <section class="manager-inspector-card">
                   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current region')}</h3>

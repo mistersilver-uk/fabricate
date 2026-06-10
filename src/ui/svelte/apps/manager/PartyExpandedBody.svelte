@@ -17,12 +17,14 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import SearchablePopover from './SearchablePopover.svelte';
+  import PartyNameField from './PartyNameField.svelte';
 
   let {
     party = null,
     parties = [],
     actorOptions = [],
     saving = false,
+    onRename = () => {},
     onAddMember = () => {},
     onRemoveMember = () => {},
     onMoveMember = () => {},
@@ -82,22 +84,29 @@
 {#if party}
   <div class="manager-party-body" data-manager-party-body={party.id}>
     <section class="manager-party-members" aria-label={text('FABRICATE.Admin.Manager.Travel.Members.SectionLabel', 'Party members')}>
-      <div class="manager-party-add" data-manager-party-add>
-        <span class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}</span>
-        <SearchablePopover
-          options={addableOptions}
+      <div class="manager-party-members-head">
+        <PartyNameField
+          name={party.name}
           disabled={saving}
-          triggerClass="manager-button manager-party-add-trigger"
-          triggerIcon="fas fa-user-plus"
-          triggerLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddTrigger', 'Add member')}
-          showChevron={false}
-          triggerAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}
-          dialogAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}
-          searchPlaceholder={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchPlaceholder', 'Search characters...')}
-          searchAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchLabel', 'Search characters to add')}
-          emptyHint={addEmptyHint}
-          onChoose={(uuid) => onAddMember(party.id, uuid)}
+          onRename={(name) => onRename(party.id, name)}
         />
+        <div class="manager-party-add" data-manager-party-add>
+          <span class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}</span>
+          <SearchablePopover
+            options={addableOptions}
+            disabled={saving}
+            triggerClass="manager-button manager-party-add-trigger"
+            triggerIcon="fas fa-user-plus"
+            triggerLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddTrigger', 'Add member')}
+            showChevron={false}
+            triggerAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}
+            dialogAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}
+            searchPlaceholder={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchPlaceholder', 'Search characters...')}
+            searchAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchLabel', 'Search characters to add')}
+            emptyHint={addEmptyHint}
+            onChoose={(uuid) => onAddMember(party.id, uuid)}
+          />
+        </div>
       </div>
 
       <ul class="manager-party-member-rows" data-manager-party-member-rows>

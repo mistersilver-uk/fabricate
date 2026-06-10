@@ -10066,14 +10066,31 @@
   min-width: 0;
 }
 
+.fabricate-manager .manager-party-members-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--fab-space-3);
+  align-items: end;
+}
+
+.fabricate-manager .manager-party-name-field {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-party-name-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .fabricate-manager .manager-party-add {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 6px;
+  min-width: 0;
 }
 
 .fabricate-manager .manager-party-add-trigger {
+  width: 100%;
   justify-content: flex-start;
 }
 

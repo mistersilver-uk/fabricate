@@ -97,6 +97,7 @@ describe('PartyExpandedBody mounted behavior', () => {
     writeRawModule('src/ui/svelte/actions/portal.js');
     writeRawModule('src/ui/svelte/actions/dragDrop.js');
     writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/PartyExpandedBody.svelte.js')).href);
     PartyExpandedBody = mod.default;
@@ -152,6 +153,20 @@ describe('PartyExpandedBody mounted behavior', () => {
     await tick();
     flushSync();
     assert.deepEqual(optionNames(), ['Bromm']);
+    remount();
+  });
+
+  it('renames the party from the name field in the body (commits on blur)', async () => {
+    const renamed = [];
+    await mountBody({ party: makeParty({ id: 'p1', name: 'Wardens' }), onRename: (id, name) => renamed.push([id, name]) });
+    const input = target.querySelector('.manager-party-name-field input');
+    assert.ok(input, 'name field is rendered in the body');
+    assert.equal(input.value, 'Wardens');
+    input.value = 'Vanguard';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    input.dispatchEvent(new window.Event('blur', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(renamed, [['p1', 'Vanguard']]);
     remount();
   });
 

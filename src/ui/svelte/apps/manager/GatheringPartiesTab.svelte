@@ -32,6 +32,7 @@
     onSelectParty = () => {},
     onSetRegionOverride = () => {},
     onClearRegionOverride = () => {},
+    onRenameParty = () => {},
     onAddMember = () => {},
     onRemoveMember = () => {},
     onMoveMember = () => {},
@@ -180,6 +181,7 @@
                 {parties}
                 {actorOptions}
                 {saving}
+                onRename={onRenameParty}
                 {onAddMember}
                 {onRemoveMember}
                 {onMoveMember}
