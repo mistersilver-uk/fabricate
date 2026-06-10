@@ -23,13 +23,15 @@ function makeSystemManager(initialSystems = []) {
 }
 
 // Minimal mirror of CraftingSystemManager normalization for regions only.
+let generatedRegionIdSeq = 0;
 function normalizeSystem(system) {
   return {
     ...system,
     id: system.id,
     gatheringRegions: normalizeGatheringRegionList(system.gatheringRegions, {
       craftingSystemId: system.id,
-      randomID: () => `gen-${Math.random().toString(36).slice(2, 8)}`
+      // Deterministic generated ids — no Math.random (weak-crypto hotspot).
+      randomID: () => `gen-${generatedRegionIdSeq++}`
     }),
     gatheringRegionSettings: normalizeGatheringRegionSettings(system.gatheringRegionSettings)
   };

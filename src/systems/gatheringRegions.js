@@ -57,8 +57,22 @@ function normalizeStringList(value) {
   return Array.from(new Set(values.map(entry => stringOrEmpty(entry).toLowerCase()).filter(Boolean)));
 }
 
+let _regionIdFallbackSeq = 0;
+
+// Region ids are non-secret record keys, but we still avoid Math.random() so the
+// generator is not flagged as weak cryptography. Foundry's randomID is preferred;
+// outside Foundry we use the Web Crypto API, with a deterministic counter as a
+// last resort when no crypto source exists.
 function defaultRandomID() {
-  return globalThis.foundry?.utils?.randomID?.() || Math.random().toString(36).slice(2, 18);
+  if (globalThis.foundry?.utils?.randomID) return globalThis.foundry.utils.randomID();
+  const cryptoSource = globalThis.crypto;
+  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID().replace(/-/g, '').slice(0, 16);
+  if (cryptoSource?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    cryptoSource.getRandomValues(bytes);
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return `region-${(_regionIdFallbackSeq++).toString(36)}`;
 }
 
 /**
