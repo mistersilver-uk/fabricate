@@ -65,7 +65,7 @@
 {#if region}
   <div class="manager-region-env-editor" data-manager-region-env-editor={regionId}>
     <section class="manager-region-env-column" data-region-env-column="available">
-      <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.Regions.AvailableEnvironments', 'Available environments')}</h4>
+      <h4 class="manager-card-subtitle"><i class="fas fa-circle-plus" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.AvailableEnvironments', 'Available environments')}</h4>
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
         <input
@@ -116,7 +116,7 @@
     </section>
 
     <section class="manager-region-env-column" data-region-env-column="included">
-      <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.Regions.IncludedEnvironments', 'Included environments')}</h4>
+      <h4 class="manager-card-subtitle"><i class="fas fa-circle-check" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.IncludedEnvironments', 'Included environments')}</h4>
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
         <input
