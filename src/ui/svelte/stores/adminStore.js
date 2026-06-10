@@ -3853,6 +3853,63 @@ export function createAdminStore(services) {
     }
   }
 
+  // Add or remove a region "tag" on a specific environment's includedRegionIds,
+  // persisting immediately. Driven from the Regions tab membership editor; the
+  // inverse of the environment editor's own region selector.
+  async function setEnvironmentRegionMembership(environmentId, regionId, included) {
+    const targetId = environmentId || '';
+    const region = String(regionId ?? '');
+    if (!targetId || !region) return false;
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.update) return false;
+
+    const environments = get(viewState).environments || [];
+    const target = environments.find(environment => environment.id === targetId);
+    if (!target) return false;
+
+    const current = Array.isArray(target.includedRegionIds) ? target.includedRegionIds : [];
+    const has = current.includes(region);
+    if (included === has) return true; // already in the desired state
+    const nextIds = included ? [...current, region] : current.filter(id => id !== region);
+    const payload = {
+      ..._clonePlain(target),
+      includedRegionIds: nextIds
+    };
+
+    try {
+      const saved = _clonePlain(await environmentStore.update(targetId, payload) || payload);
+      if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
+        if (get(environmentDraftDirty)) {
+          const currentDraft = _clonePlain(get(environmentDraft));
+          if (currentDraft?.id === targetId) {
+            environmentDraft.set({
+              ...currentDraft,
+              includedRegionIds: Array.isArray(saved.includedRegionIds) ? saved.includedRegionIds : nextIds
+            });
+            persistedEnvironmentDraft.set(saved);
+          }
+        } else {
+          _setEnvironmentDraftState(saved, {
+            persistedDraft: saved,
+            dirty: false,
+            isNew: false,
+            saveError: null
+          });
+        }
+      }
+      environmentSaveError.set(null);
+      environmentValidationState.set(null);
+      await refresh();
+      return true;
+    } catch (err) {
+      environmentSaveError.set(_environmentErrorMessage(err));
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return false;
+    }
+  }
+
   // --- Feature toggles ---
 
   async function toggleFeature(feature, enabled) {
@@ -5195,6 +5252,7 @@ export function createAdminStore(services) {
     reorderEnvironments,
     moveEnvironmentDraft,
     toggleEnvironmentEnabled,
+    setEnvironmentRegionMembership,
     toggleSystemEnabled,
     toggleFeature,
     toggleAdvancedOptions,

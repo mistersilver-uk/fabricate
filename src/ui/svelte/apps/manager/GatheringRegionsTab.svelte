@@ -11,11 +11,16 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import RegionEnvironmentsEditor from './RegionEnvironmentsEditor.svelte';
 
   let {
     regions = [],
     selectedRegionId = '',
-    onSelectRegion = () => {}
+    environments = [],
+    saving = false,
+    onSelectRegion = () => {},
+    onAddEnvironment = () => {},
+    onRemoveEnvironment = () => {}
   } = $props();
 
   const PAGE_SIZE = 6;
@@ -140,7 +145,15 @@
           </div>
 
           {#if isExpanded}
-            <div class="manager-travel-regions-editor" data-manager-region-editor></div>
+            <div class="manager-travel-regions-editor" data-manager-region-editor>
+              <RegionEnvironmentsEditor
+                {region}
+                {environments}
+                {saving}
+                onAdd={onAddEnvironment}
+                onRemove={onRemoveEnvironment}
+              />
+            </div>
           {/if}
         </div>
       {/each}

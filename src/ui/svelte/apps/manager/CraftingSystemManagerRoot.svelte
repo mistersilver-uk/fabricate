@@ -3194,6 +3194,8 @@
         travelSystemRegions={$viewState.selectedSystemRegions || []}
         travelSelectedRegionId={selectedTravelRegionId}
         onSelectRegion={(id) => selectedTravelRegionId = id}
+        onAddEnvironmentToRegion={(envId, regionId) => store.setEnvironmentRegionMembership?.(envId, regionId, true)}
+        onRemoveEnvironmentFromRegion={(envId, regionId) => store.setEnvironmentRegionMembership?.(envId, regionId, false)}
         onSelectParty={(id) => store.selectParty?.(id)}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}

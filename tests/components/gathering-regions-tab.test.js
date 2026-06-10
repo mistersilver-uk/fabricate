@@ -76,6 +76,7 @@ describe('GatheringRegionsTab mounted behavior', () => {
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/RegionEnvironmentsEditor.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionsTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringRegionsTab.svelte.js')).href);
     GatheringRegionsTab = mod.default;
@@ -150,13 +151,13 @@ describe('GatheringRegionsTab mounted behavior', () => {
     assert.deepEqual(selections, ['r1']);
     remount();
 
-    // Selected: the matching row renders expanded (with its blank body) and marked selected.
+    // Selected: the matching row renders expanded (with the membership editor) and marked selected.
     await mountTab({ regions: [makeRegion({ id: 'r1', name: 'Northreach' })], selectedRegionId: 'r1' });
     header = target.querySelector('.manager-travel-regions-header');
     assert.equal(header.getAttribute('aria-expanded'), 'true');
     assert.ok(target.querySelector('.manager-travel-regions-row.is-selected'));
     assert.ok(target.querySelector('[data-manager-region-editor]'));
-    assert.equal(target.querySelector('[data-manager-region-editor]').textContent.trim(), '');
+    assert.ok(target.querySelector('[data-manager-region-env-editor]'));
     remount();
 
     // Clicking the already-selected row toggles selection off.

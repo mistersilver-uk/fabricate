@@ -1062,6 +1062,29 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(services._environments.find(environment => environment.id === 'environment-b').enabled, false);
   });
 
+  it('setEnvironmentRegionMembership adds and removes a region tag on an environment', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'environment-a', name: 'Forest', includedRegionIds: [] })]
+    });
+    const store = createAdminStore(services);
+    await store.selectSystem('system-a');
+
+    const added = await store.setEnvironmentRegionMembership('environment-a', 'r1', true);
+    assert.equal(added, true);
+    assert.deepEqual(services._environments.find(e => e.id === 'environment-a').includedRegionIds, ['r1']);
+
+    const removed = await store.setEnvironmentRegionMembership('environment-a', 'r1', false);
+    assert.equal(removed, true);
+    assert.deepEqual(services._environments.find(e => e.id === 'environment-a').includedRegionIds, []);
+
+    // No-op (no extra persist) when already in the desired state.
+    const updatesBefore = services._environmentCalls.update.length;
+    const noop = await store.setEnvironmentRegionMembership('environment-a', 'r1', false);
+    assert.equal(noop, true);
+    assert.equal(services._environmentCalls.update.length, updatesBefore);
+  });
+
   it('keeps a dirty selected draft coherent when toggling its persisted environment', async () => {
     const persistedEnvironment = makeEnvironment({
       id: 'environment-a',

@@ -49,6 +49,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionsTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RegionEnvironmentsEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RegionNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');

@@ -73,6 +73,8 @@
     travelSystemRegions = [],
     travelSelectedRegionId = '',
     onSelectRegion = () => {},
+    onAddEnvironmentToRegion = () => {},
+    onRemoveEnvironmentFromRegion = () => {},
     onSelectParty = () => {},
     onCreateParty = () => {},
     onRenameParty = () => {},
@@ -185,6 +187,14 @@
   });
 
   const environmentList = $derived(environments || []);
+  // Lightweight projection for the Regions tab membership editor.
+  const regionEnvironmentOptions = $derived(environmentList.map(environment => ({
+    id: environment.id,
+    name: environment.name,
+    img: environment.img || '',
+    enabled: environment.enabled !== false,
+    includedRegionIds: Array.isArray(environment.includedRegionIds) ? environment.includedRegionIds : []
+  })));
   const selectedGatheringSystemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
   // Top-level vocabularies from the admin store are normalised into
   // { id, label, icon, colorToken } records, so the fallback path used by
@@ -866,7 +876,11 @@
         <GatheringRegionsTab
           regions={travelSystemRegions}
           selectedRegionId={travelSelectedRegionId}
+          environments={regionEnvironmentOptions}
+          saving={travelSaving}
           {onSelectRegion}
+          onAddEnvironment={onAddEnvironmentToRegion}
+          onRemoveEnvironment={onRemoveEnvironmentFromRegion}
         />
       {:else if activeTravelTab === 'map'}
         <div
