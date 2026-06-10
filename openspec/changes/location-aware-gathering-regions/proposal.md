@@ -9,7 +9,7 @@ The design separates the concepts that currently blur together:
 - **Region**: named geography such as `The Verdant Expanse`.
 - **Biome**: descriptive terrain/ecology traits on a region, such as `forest`, `swamp`, or `coastal`.
 - **Environment**: a reusable gathering place or activity profile that can be available in explicit regions or any region with matching biomes.
-- **Party**: a Fabricate-managed world record with actor members and exactly one travel token.
+- **Party**: a Fabricate-managed world record with actor members and exactly one travel actor — the Actor that represents the party on a campaign map.
 
 ## Motivation
 
@@ -21,10 +21,10 @@ Exploration-heavy GMs need location context that changes as the party travels. A
 
 - Add first-class `GatheringRegion` records scoped to one crafting system.
 - Keep regions as geography, not as environment containers; environments continue to own their availability rules.
-- Add Fabricate-managed `GatheringParty` records as world/cross-system settings with actor membership and exactly one travel token.
-- Enforce one-to-one party/token assignment: one party has one travel token, and one travel token cannot represent multiple parties.
+- Add Fabricate-managed `GatheringParty` records as world/cross-system settings with actor membership and exactly one travel actor — the Actor that represents the party on a campaign map for region presence sensing.
+- Enforce one-to-one party/travel-actor assignment: one enabled party has one travel actor, and one travel actor cannot represent multiple enabled parties.
 - Enforce one enabled party per actor member so selected-actor location is unambiguous.
-- Resolve a party's current regions per crafting system from a GM override first, then token-derived Foundry Scene Region mappings when automation is available.
+- Resolve a party's current regions per crafting system from a GM override first, then Foundry Scene Region mappings derived from the travel actor's placed token(s) when automation is available.
 - Track region discovery on actors through Fabricate actor flags, updated through party travel and manual GM reveal controls.
 - Let environments declare availability through explicit included regions, included biomes, and optional explicit exclusions.
 - Surface player-facing unavailable guidance such as "Travel to Ashen March" or "Available in undiscovered regions" without exposing secret region names.
@@ -36,7 +36,7 @@ Exploration-heavy GMs need location context that changes as the party travels. A
 ## Non-Goals
 
 - No full travel simulation, pathfinding, calendar integration, or random encounter engine.
-- No support for multiple travel tokens per party.
+- No support for multiple travel actors per party.
 - No support for one actor being an enabled member of multiple parties.
 - No user-based party membership; membership is actor-based.
 - No reliance on system-specific party/group actor types.
@@ -46,7 +46,7 @@ Exploration-heavy GMs need location context that changes as the party travels. A
 
 ## Product Phasing
 
-1. **Manual MVP**: Regions, parties, actor membership, one travel token, GM current-region override, actor discovery, environment availability, and player travel guidance.
+1. **Manual MVP**: Regions, parties, actor membership, one travel actor, GM current-region override, actor discovery, environment availability, and player travel guidance.
 2. **Scene automation**: Foundry V13 Scene Region mapping, token-enter/token-exit based current-region updates, and automatic discovery.
 3. **Region modifiers**: Apply region-derived modifiers to listing evidence, start guards, and live result calculations with clear player/GM disclosure settings.
 4. **Importable travel kits**: Per-system region presets and optional scene compendia whose Foundry Scene Regions map to Fabricate regions.

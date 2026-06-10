@@ -7,7 +7,7 @@
 Fabricate MUST support location-aware gathering through first-class regions and Fabricate-managed parties.
 
 1. A **Gathering Region** is named geography scoped to one crafting system.
-2. A **Gathering Party** is a Fabricate-managed world record with actor members and exactly one travel token.
+2. A **Gathering Party** is a Fabricate-managed world record with actor members and exactly one travel actor — the Actor that represents the party on a campaign map.
 3. Gathering availability MAY be evaluated against the current regions resolved for the selected actor's party.
 4. Region-aware gathering MUST remain optional. Existing environments without region availability rules remain valid and may remain available when no current region is resolved.
 5. Fabricate core MUST remain system-agnostic and MUST NOT depend on game-system party or group actor types.
@@ -48,7 +48,7 @@ GatheringParty = {
   name: string,
   enabled: boolean,
   memberActorUuids: string[],
-  travelTokenUuid: string,
+  travelActorUuid: string | null,
   currentRegionOverrides?: {
     [systemId: string]: {
       mode: "none" | "manual",
@@ -62,14 +62,14 @@ GatheringParty = {
 
 Requirements:
 
-1. A party MUST have exactly one travel token.
-2. `travelTokenUuid` MUST identify a placed Scene Token document. It MUST NOT be an Actor UUID or prototype token reference.
-3. A token MUST NOT represent more than one enabled Fabricate party.
+1. An enabled party MUST have exactly one travel actor.
+2. `travelActorUuid` MUST identify an Actor document — the actor that represents the party on a campaign map. It MUST NOT be a placed Token UUID or prototype token reference; region presence sensing resolves the travel actor's placed token(s).
+3. A travel actor MUST NOT represent more than one enabled Fabricate party.
 4. Party membership is actor-based, not user-based.
-5. An actor MUST NOT belong to more than one enabled Fabricate party.
+5. An actor MUST NOT belong to more than one enabled Fabricate party. An actor MUST NOT be associated with more than one enabled party in total, whether as a member, as the travel actor, or both; when both, it MUST be the same party. Membership in disabled parties does not count toward this invariant.
 6. When a party enters or is manually assigned to a region, every current member actor MAY receive discovery for that region according to the configured reveal mode.
 7. Fabricate MUST NOT require a party actor type supplied by the active game system.
-8. A selected actor's party is the source for current-region resolution in player gathering views.
+8. A selected actor's party is the source for current-region resolution in player gathering views. An actor resolves to the unique enabled party that references the actor's UUID either in `memberActorUuids` or as `travelActorUuid`; the composite uniqueness invariant guarantees at most one such party.
 9. If an actor is not in a party, region-aware gathering falls back to no current region unless a later explicit solo-actor location mode is specified.
 10. Existing blind-task `revealScope: "party"` is not redefined by this change and remains the existing blind reveal scope until a later spec changes it.
 
@@ -88,7 +88,7 @@ Requirements:
 
 1. Missing settings normalize to `revealMode: "manual"` and `modifierVisibility: "visible"`.
 2. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret regions.
-3. `onPartyTokenEntry` reveal mode means mapped Scene Region entry reveals the mapped Fabricate region to every current member actor in that party.
+3. `onPartyTokenEntry` reveal mode means entry of a placed token of the party's travel actor into a mapped Scene Region reveals the mapped Fabricate region to every current member actor in that party.
 4. `alwaysVisible` reveal mode means region identities are visible to players without actor discovery, while actor discovery flags may still be written for history/evidence.
 5. The settings are scoped per crafting system because regions are scoped per crafting system.
 
@@ -99,14 +99,14 @@ Current regions are resolved per `partyId` and `systemId`.
 Resolution order:
 
 1. If the party has a GM manual current-region override for the selected system, that override is authoritative.
-2. Otherwise, Fabricate MAY resolve the party travel token's occupied Foundry V13 Scene Regions and map them to Fabricate `GatheringRegion` ids.
+2. Otherwise, Fabricate MAY resolve the occupied Foundry V13 Scene Regions of the travel actor's placed token(s) and map them to Fabricate `GatheringRegion` ids.
 3. If neither source resolves, the party has no current region for that system.
 
 Requirements:
 
-1. Manual override MUST take precedence over token-derived region automation.
+1. Manual override MUST take precedence over token-derived region automation. A manual override that explicitly includes a disabled region id still resolves that region (GM diagnostic/preview inclusion); missing region ids are stale repair evidence and do not resolve. Disabled regions never resolve through token automation.
 2. Overlapping token-derived regions MUST merge; the current-region set is the union of all mapped Fabricate regions.
-3. The current-region resolver MUST expose redaction-safe source evidence: manual override, token-derived, or unresolved.
+3. The current-region resolver MUST expose redaction-safe source evidence using the canonical source tokens `manualOverride`, `travelActor`, and `unresolved` (player-facing labels: `GM override`, `Travel actor`, `No current region`).
 4. Player-facing current-region labels MUST hide secret undiscovered region names.
 5. Changing current region MUST refresh gathering listings but MUST NOT retroactively rewrite completed gathering history.
 
@@ -114,8 +114,10 @@ Requirements:
 
 Region discovery is tracked on actor flags.
 
+Stored via Fabricate's actor-flag helpers (`src/config/flags.js`), which write under the module's flag namespace. Logical shape:
+
 ```js
-Actor.flags.fabricate.discoveredGatheringRegions = {
+discoveredGatheringRegions = {
   [systemId: string]: {
     [regionId: string]: {
       discoveredAt: number,
@@ -133,7 +135,7 @@ Requirements:
 1. Discovery is actor-scoped so region knowledge follows the character across party changes.
 2. Discovery writes MUST validate that the region belongs to the referenced crafting system.
 3. Manual GM reveal MAY add or remove actor discovery entries.
-4. Automatic reveal MAY add discovery when a party travel token enters a mapped Scene Region.
+4. Automatic reveal MAY add discovery when a placed token of the party's travel actor enters a mapped Scene Region.
 5. Secret undiscovered regions MUST be represented to players as undiscovered placeholders, not by name.
 6. GM users MAY inspect full discovered and undiscovered region state.
 
@@ -260,7 +262,7 @@ Fabricate SHOULD expose narrow GM/API methods for:
 - listing regions for a crafting system
 - creating/updating/deleting regions
 - listing parties
-- assigning actor members and travel tokens
+- assigning actor members and travel actors
 - setting or clearing current-region overrides
 - reading current-region evidence for an actor/party/system
 - revealing or hiding actor region discovery
@@ -270,8 +272,16 @@ Public player APIs MUST enforce the same region discovery, secret redaction, and
 ## Testing Requirements
 
 - Unit tests for region normalization, validation, disabled/secret behavior, and stale references.
-- Unit tests for party normalization and one-token-per-party / one-party-per-token validation.
-- Unit tests for actor membership uniqueness across enabled parties.
+- Unit tests for party normalization and one-travel-actor-per-enabled-party / one-enabled-party-per-travel-actor validation.
+- Unit tests for actor membership uniqueness across enabled parties, including: membership in disabled parties does not block enabled-party membership; the composite member/travel-actor invariant; enabling a party without a travel actor is rejected; disabling relaxes uniqueness; duplicate party ids keep first occurrence on read and are rejected at save.
+- Unit tests for `GatheringRegionModifier` and `GatheringRegionSceneMapping` record normalization/validation in Phase 1 (defaults, unknown-enum rejection, finite values, unique ids, stale mappings readable) even though modifier application and Scene automation land later.
+- Unit tests for `GatheringRegionSettings` covering both directions: unknown values rejected at save/import boundaries AND coerced to defaults when read from existing data.
+- Unit tests that discovery writes validate the region belongs to the referenced crafting system, that discovery entries can be removed, and that entries with stale `partyId` references remain readable without error.
+- Unit tests that override clear (`mode: "none"`) stamps `updatedAt`/`updatedByUserId` and empties `regionIds`.
+- Unit tests that a manual override including a disabled region id resolves it (GM diagnostic inclusion) while missing region ids surface as stale evidence.
+- Unit tests that empty-after-normalization availability arrays (e.g. `includedRegionIds: []`) leave the environment ungated, identical to absent fields.
+- Unit tests for biome-level mixed current regions: a biome exclusion on any current region wins over inclusions matched by another current region.
+- Unit tests that travel guidance distinguishes location exclusion from other blockers and emits the "GM needs to set the party's current region" guidance when unresolved.
 - Unit tests for current-region resolution precedence: manual override, token-derived mapping, unresolved.
 - Unit tests for overlapping mapped Scene Regions merging all matching Fabricate regions.
 - Unit tests for actor discovery flags and actor knowledge preservation across party changes.
