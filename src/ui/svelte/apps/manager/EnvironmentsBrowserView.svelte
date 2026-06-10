@@ -10,6 +10,7 @@
   import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringTravelTabs from './GatheringTravelTabs.svelte';
+  import GatheringPartiesTab from './GatheringPartiesTab.svelte';
 
   let {
     environments = [],
@@ -841,15 +842,15 @@
       <GatheringTravelTabs activeTab={activeTravelTab} onSelect={onSelectTravelTab} />
 
       {#if activeTravelTab === 'parties'}
-        <div
-          class="manager-travel-panel"
-          id="travel-panel-parties"
-          role="tabpanel"
-          aria-labelledby="travel-tab-parties"
-          data-travel-panel="parties"
-        >
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Tabs.PartiesPlaceholder', 'Party management will live here.')}</p>
-        </div>
+        <GatheringPartiesTab
+          parties={travelParties}
+          systemId={selectedSystemId}
+          systemRegions={travelSystemRegions}
+          selectedPartyId={travelSelectedPartyId}
+          {onSelectParty}
+          onSetRegionOverride={onSetPartyRegionOverride}
+          onClearRegionOverride={onClearPartyRegionOverride}
+        />
       {:else if activeTravelTab === 'regions'}
         <div
           class="manager-travel-panel"

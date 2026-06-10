@@ -9894,6 +9894,154 @@
   font-size: 13px;
 }
 
+/* Travel > Parties accordion list (styled after the gathering tools browser). */
+.fabricate-manager .manager-travel-parties {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-parties-empty {
+  margin: 0;
+}
+
+.fabricate-manager .manager-travel-parties-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabricate-manager .manager-travel-parties-row {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager .manager-travel-parties-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-travel-parties-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.fabricate-manager .manager-travel-parties-header:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-travel-parties-row.is-expanded > .manager-travel-parties-header {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fabricate-manager .manager-travel-parties-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-parties-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-parties-thumb-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-travel-parties-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-mv2-text);
+  flex: 0 1 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-parties-mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-parties-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-travel-parties-current-region {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.85rem;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-parties-override {
+  max-width: 14ch;
+}
+
+.fabricate-manager .manager-travel-parties-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-travel-parties-editor {
+  min-height: 56px;
+  padding: 16px;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .fabricate-manager .manager-travel-parties-header {
+    flex-wrap: wrap;
+  }
+
+  .fabricate-manager .manager-travel-parties-right {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+}
+
 .fabricate-manager .manager-travel-error {
   margin: 0;
   padding: var(--fab-space-2) var(--fab-space-3);

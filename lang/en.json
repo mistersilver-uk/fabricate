@@ -1989,6 +1989,23 @@
             "RegionsPlaceholder": "Select a region to see its details.",
             "MapLinksPlaceholder": "Select a region to map it to Scene Regions."
           },
+          "Parties": {
+            "Filters": "Party filters",
+            "SearchPlaceholder": "Search parties...",
+            "SearchLabel": "Search parties",
+            "Empty": "No parties yet.",
+            "NoMatches": "No parties match your search.",
+            "NoCurrentRegion": "No current region",
+            "ModeManual": "Manual",
+            "ModeAuto": "Auto",
+            "OverrideLabel": "Current region override",
+            "OverrideAuto": "Auto",
+            "OverrideDisabledSuffix": "(disabled)",
+            "OverrideStale": "Unknown region",
+            "OverrideSearchPlaceholder": "Search regions...",
+            "OverrideSearchLabel": "Search regions",
+            "NoRegionMatches": "No regions match your search."
+          },
           "WorldScopeNote": "Parties are shared across every crafting system. Only the current-region override below is specific to this system.",
           "PartyListLabel": "Parties",
           "PartyListEmpty": "No parties yet.",
