@@ -3,7 +3,7 @@
 ![Latest Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/latest/total?sort=semver&style=for-the-badge)
 ![Total Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/total?label=total%20downloads&style=for-the-badge)
 <!--- Social badges -->
-[![Support me on Patreon](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Dmisterpotts%26type%3Dpatrons&style=for-the-badge)](https://patreon.com/misterpotts)
+[![Support me on Patreon](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Dmistersilver%26type%3Dpatrons&style=for-the-badge)](https://patreon.com/mistersilver)
 [![Discord](https://dcbadge.limes.pink/api/server/APHyMzhPTk)](https://discord.gg/APHyMzhPTk)
 
 <!--- Forge Bazaar Install % Badge -->
@@ -44,11 +44,11 @@ Fabricate isn't on the official module list yet, but when it is, you only need t
 
 ## Quick Start
 
-See [docs/quickstart.md](docs/quickstart.md) for a step-by-step guide.
+See [quickstart](https://mistersilver-uk.github.io/fabricate/quickstart.html) for a step-by-step guide.
 
 ## Documentation
 
-Check out the [docs site](docs/).
+Check out the full [docs site](https://mistersilver-uk.github.io/fabricate/).
 
 ## Development
 
@@ -62,7 +62,7 @@ Canonical specifications live under `openspec/specs/`. Non-trivial implementatio
 
 ### Live Foundry Smoke Test
 
-Fabricate now includes a full and lightweight end-to-end smoke harness against a real Foundry instance.
+Fabricate includes a full and lightweight end-to-end smoke harness against a real Foundry instance.
 
 ```bash
 # 1) Install browser binary once
@@ -106,9 +106,15 @@ See [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [openspec/RE
 
 ## License
 
-Licensed under the [**PolyForm Noncommercial License 1.0.0**](https://polyformproject.org/licenses/noncommercial/1.0.0) (`PolyForm-Noncommercial-1.0.0`).
-Commercial use requires a separate commercial license.
-See `LICENSE`.
+Fabricate is licensed under the PolyForm Noncommercial License 1.0.0 for noncommercial use.
+
+Commercial use is not permitted under that license. If you use Fabricate in connection with a paid product, paid service, subscription, commissioned work, monetized content, or other commercial
+activity, you need a separate commercial license.
+
+Commercial licenses are handled through Patreon. If you need commercial rights, contact me with a brief description of your project and its expected or actual revenue. I will either direct you to an appropriate existing Patreon commercial license tier or create a suitable tier based on your revenue and use case.
+
+Your commercial license remains active only while you maintain the required Patreon tier subscription. If that subscription ends, you must stop new commercial use of Fabricate unless we agree a
+separate license in writing.
 
 ## Credits
 
