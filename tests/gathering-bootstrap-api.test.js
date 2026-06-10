@@ -57,8 +57,17 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
   );
   assert.match(
     mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'startAttempt', options, \(\) => game\.user\);/,
-    'startGatheringAttempt should delegate through current-user viewer enforcement'
+    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'startAttempt', withRememberedActor, \(\) => game\.user\);/,
+    'startGatheringAttempt should delegate through current-user viewer enforcement (with the remembered-actor default)'
+  );
+  // The attempt MUST resolve the same actor the listing did: default
+  // rememberedActorId to the persisted selection (options still override) so the
+  // engine never falls back to the first owned actor — the player-app silent
+  // no-op bug.
+  assert.match(
+    mainSource,
+    /startGatheringAttempt\(options = \{\}\) \{[\s\S]*?rememberedActorId: this\.getSelectedGatheringActorId\(\) \|\| null,\s*\.\.\.options/,
+    'startGatheringAttempt should default rememberedActorId to the persisted selection while letting options override it'
   );
   assert.match(
     mainSource,
@@ -379,10 +388,12 @@ test('scene access adapter accepts Foundry V13 TokenDocument parent scene shape'
     /token\?\.parent\?\.uuid[\s\S]*token\?\.scene\?\.uuid[\s\S]*token\?\.document\?\.parent\?\.uuid/,
     'scene access should accept V13 TokenDocument parent UUID and legacy fake/placeable shapes'
   );
-  assert.match(
+  // The scene-token gate applies to ALL users (no GM exemption), additive with
+  // the region/stamina/node gates.
+  assert.doesNotMatch(
     adaptersSource,
-    /user\?\.isGM === true/,
-    'scene access should exempt GM viewers from the scene gate'
+    /isGM === true\) return \{ allowed: true \}/,
+    'scene access should NOT exempt GM viewers from the scene gate'
   );
 });
 

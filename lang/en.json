@@ -289,6 +289,10 @@
           "fog": "Fog",
           "wind": "Wind",
           "Unknown": "Unknown weather"
+        },
+        "Region": {
+          "Label": "Region",
+          "None": "No region selected"
         }
       },
       "Gathering": {
@@ -409,7 +413,9 @@
             "Paused": "Game paused",
             "DuplicateRun": "Already in progress",
             "NodeDepleted": "Depleted",
-            "StaminaBlocked": "Not enough stamina"
+            "StaminaBlocked": "Not enough stamina",
+            "Location": "Not available in this region",
+            "NoRegion": "No party region set"
           },
           "NodesRemaining": "Nodes remaining",
           "NodesAvailable": "Nodes available: {count}",
@@ -2873,14 +2879,14 @@
         "BlindNoCandidate": "There is nothing you can gather here right now.",
         "ConditionsBlocked": "Current weather or time-of-day does not allow this task.",
         "LocationBlocked": "Not available in the party's current region.",
-        "NoCurrentRegion": "No party region is set. Ask the GM to set the party's current region."
+        "NoCurrentRegion": "No party region set."
       },
       "Region": {
         "UndiscoveredPlaceholder": "Undiscovered region"
       },
       "Travel": {
         "Guidance": {
-          "NoCurrentRegion": "Not available while no party region is set. Ask the GM to set the party's current region.",
+          "NoCurrentRegion": "Not available while no party region set.",
           "Excluded": "Not available in the party's current region.",
           "Travel": "Travel to a region where this is available.",
           "KnownDestinations": "Travel to: {names}.",

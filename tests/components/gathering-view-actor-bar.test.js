@@ -123,6 +123,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
     copyModule('src/ui/svelte/util/foundryBridge.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
+    copyModule('src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
@@ -290,5 +291,62 @@ describe('GatheringView ↔ actor bar wiring', () => {
     assert.equal(calls.list.length, 1, 'still fetches exactly once');
     assert.equal(calls.list[0].rememberedActorId, null, 'rememberedActorId defaults to null without a store');
     assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'renders the populated layout');
+  });
+
+  // The attempt must run as the SAME actor the listing was computed for, else the
+  // engine falls back to the first owned actor and silently fails location gating
+  // (the "nothing happens" bug).
+  function attemptableEnv() {
+    return environment({
+      tasks: [{ id: 'task-1', name: 'Extract Ore', attemptable: true, blockedReasons: [] }]
+    });
+  }
+
+  it('threads the live bar selection into startGatheringAttempt as rememberedActorId', async () => {
+    const attempts = [];
+    const services = {
+      listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+      startGatheringAttempt: (opts) => { attempts.push(opts); return Promise.resolve({ accepted: true }); }
+    };
+    const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+    store.loadSelectableActors();
+    flushSync();
+    services.actorBar = store;
+    await mountView(services);
+
+    target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+    await settle();
+
+    assert.equal(attempts.length, 1, 'attempt fired once');
+    assert.equal(attempts[0].rememberedActorId, 'a1', 'attempt uses the selected actor, not an engine fallback');
+    assert.equal(attempts[0].environmentId, 'env-meadow');
+    assert.equal(attempts[0].taskId, 'task-1');
+  });
+
+  it('surfaces a warning notification when an attempt is rejected (never a silent no-op)', async () => {
+    const warns = [];
+    globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+    try {
+      const services = {
+        listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+        startGatheringAttempt: () => Promise.resolve({
+          accepted: false,
+          blockedReasons: [{ code: 'NO_CURRENT_REGION' }]
+        })
+      };
+      const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+      store.loadSelectableActors();
+      flushSync();
+      services.actorBar = store;
+      await mountView(services);
+
+      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+      await settle();
+
+      assert.equal(warns.length, 1, 'a rejected attempt raises exactly one notification');
+      assert.match(warns[0], /CannotAttempt|NoRegion/, 'the notification names the blocked reason');
+    } finally {
+      delete globalThis.ui;
+    }
   });
 });

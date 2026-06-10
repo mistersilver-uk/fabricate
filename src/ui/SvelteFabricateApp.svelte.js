@@ -42,6 +42,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   // auto-selects this environment+task on open. Cleared on close.
   _scopedEnvironmentId = null;
   _scopedTaskId = null;
+  // Session-scoped actor for an interactable activation. When a region activation
+  // is granted the interacting actor (the token the player walked in) becomes the
+  // default-selected actor in the top bar (when selectable). Cleared on close.
+  _scopedActorId = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
@@ -71,6 +75,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     if (typeof options.taskId === 'string') {
       this._scopedTaskId = options.taskId;
+    }
+    if (typeof options.actorId === 'string') {
+      this._scopedActorId = options.actorId;
     }
   }
 
@@ -139,7 +146,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // gathering view auto-selects this environment + task on open. Null on a
       // plain manual open.
       scopedEnvironmentId: this._scopedEnvironmentId,
-      scopedTaskId: this._scopedTaskId
+      scopedTaskId: this._scopedTaskId,
+      // Session-scoped interacting actor: when a region activation is granted the
+      // shell seeds this actor as the default top-bar selection (once per distinct
+      // value). Null on a plain manual open.
+      scopedActorId: this._scopedActorId
     };
   }
 
@@ -199,6 +210,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._activeCanvasTool = null;
     this._scopedEnvironmentId = null;
     this._scopedTaskId = null;
+    this._scopedActorId = null;
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
@@ -210,6 +222,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._activeCanvasTool = null; // safety net mirroring close().
     this._scopedEnvironmentId = null;
     this._scopedTaskId = null;
+    this._scopedActorId = null;
     super._onClose(options);
   }
 
@@ -229,27 +242,34 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    *   by a granted Tool-station region activation: `{ componentId, systemId, toolId, label }`.
    * @param {string} [options.environmentId] Scoped environment (gathering-task region).
    * @param {string} [options.taskId] Scoped task (gathering-task region).
+   * @param {string} [options.actorId] Scoped interacting actor — seeds the default
+   *   top-bar selection (set when supplied, cleared when not, like the tool/env/task
+   *   context).
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId } = {}) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
     const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
     const nextTaskId = typeof taskId === 'string' ? taskId : null;
+    const nextActorId = typeof actorId === 'string' ? actorId : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
-      // Re-show REPLACES the session-scoped canvas tool + scoped env/task context
-      // (set when supplied, cleared when not) so a manual re-open never inherits
-      // a stale station context.
+      // Re-show REPLACES the session-scoped canvas tool + scoped env/task/actor
+      // context (set when supplied, cleared when not) so a manual re-open never
+      // inherits a stale station context.
       existing._activeCanvasTool = nextCanvasTool;
       existing._scopedEnvironmentId = nextEnvironmentId;
       existing._scopedTaskId = nextTaskId;
-      // Push the replaced tool + scoped env/task to the mounted tree so the status
-      // chip updates and the gathering view re-auto-selects the scoped env+task.
+      existing._scopedActorId = nextActorId;
+      // Push the replaced tool + scoped env/task/actor to the mounted tree so the
+      // status chip updates, the gathering view re-auto-selects the scoped env+task,
+      // and a re-interaction with a different actor re-seeds the selection.
       existing.updateProps({
         activeCanvasTool: nextCanvasTool,
         scopedEnvironmentId: nextEnvironmentId,
-        scopedTaskId: nextTaskId
+        scopedTaskId: nextTaskId,
+        scopedActorId: nextActorId
       });
       existing._selectTab(initialTab);
       existing.bringToFront();
@@ -259,7 +279,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       activeTab: initialTab,
       activeCanvasTool: nextCanvasTool,
       environmentId: nextEnvironmentId,
-      taskId: nextTaskId
+      taskId: nextTaskId,
+      actorId: nextActorId
     });
     SvelteFabricateApp._instance = app;
     await app.render(true);

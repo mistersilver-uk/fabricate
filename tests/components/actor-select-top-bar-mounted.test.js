@@ -54,6 +54,8 @@ function fakeStore(overrides = {}) {
       selectedActorId,
       staminaPool: overrides.staminaPool ?? null,
       conditions: overrides.conditions ?? null,
+      conditionVisibility: overrides.conditionVisibility ?? { weather: true, timeOfDay: true },
+      regionContext: overrides.regionContext ?? { enabled: false, regions: [] },
       loaded: overrides.loaded ?? true,
       get selectedActor() {
         return selectableActors.find((actor) => actor?.id === selectedActorId) ?? null;
@@ -297,9 +299,95 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.Weather.clear'), 'weather value label');
     assert.ok(right.querySelector('.actor-bar-time i.fa-clock'), 'fixed time-of-day category icon renders');
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.dusk'), 'time-of-day value label');
-    // Region is no longer a composition/display axis: the legacy inert
-    // environment.region chip was removed with the gathering-regions unification.
-    assert.equal(right.querySelector('.actor-bar-region'), null, 'legacy region chip removed');
+    // The region chip only appears when the region/travel subsystem is enabled
+    // (regionContext.enabled); it stays hidden for a plain conditions-only store.
+    assert.equal(right.querySelector('.actor-bar-region'), null, 'region chip hidden when regions disabled');
+  });
+
+  it('shows the current region on the gathering tab when regions/travel is enabled', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      regionContext: { enabled: true, regions: [{ id: 'r1', label: 'Whispering Wood', placeholder: false }] }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const region = target.querySelector('.actor-bar-region');
+    assert.ok(region, 'region chip renders when regions enabled');
+    assert.ok(region.querySelector('i.fa-map-location-dot'), 'region uses the map-location icon');
+    assert.ok(region.textContent.includes('Whispering Wood'), 'shows the current region name');
+    assert.equal(region.getAttribute('title'), 'Whispering Wood', 'region name exposed via title');
+  });
+
+  it('shows "No region selected" when regions are enabled but none is resolved', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      regionContext: { enabled: true, regions: [] }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const region = target.querySelector('.actor-bar-region');
+    assert.ok(region, 'region chip still renders with no resolved region');
+    assert.ok(region.textContent.includes('FABRICATE.App.ActorBar.Region.None'), 'shows the no-region label');
+  });
+
+  it('redacts a secret undiscovered current region to the placeholder label', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      regionContext: {
+        enabled: true,
+        regions: [{ id: null, placeholder: true, labelKey: 'FABRICATE.Gathering.Region.UndiscoveredPlaceholder' }]
+      }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const region = target.querySelector('.actor-bar-region');
+    assert.ok(region.textContent.includes('FABRICATE.Gathering.Region.UndiscoveredPlaceholder'), 'placeholder label shown for a redacted region');
+  });
+
+  it('hides the region chip on the gathering tab when regions/travel is disabled', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      regionContext: { enabled: false, regions: [] }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    assert.equal(target.querySelector('.actor-bar-region'), null, 'no region chip when the subsystem is off');
+  });
+
+  it('hides the weather chip when weather is disabled for the active system', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      conditionVisibility: { weather: false, timeOfDay: true }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.equal(right.querySelector('.actor-bar-weather'), null, 'weather chip hidden when disabled');
+    assert.ok(right.querySelector('.actor-bar-time'), 'time-of-day chip still shown');
+  });
+
+  it('hides the time-of-day chip when time of day is disabled for the active system', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      conditionVisibility: { weather: true, timeOfDay: false }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.equal(right.querySelector('.actor-bar-time'), null, 'time-of-day chip hidden when disabled');
+    assert.ok(right.querySelector('.actor-bar-weather'), 'weather chip still shown');
   });
 
   it('falls back to the clock + Unknown label when timeOfDay is missing', async () => {

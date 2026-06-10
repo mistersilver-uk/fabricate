@@ -781,6 +781,7 @@ test('validateAndGrant emits a tool grant (with activeCanvasTool) to the request
     assert.equal(grant.action, 'interactableActivationGranted');
     assert.equal(grant.userId, 'u-1');
     assert.equal(grant.grant.interactableType, 'tool');
+    assert.equal(grant.grant.actorId, 'a1', 'the grant carries the interacting actor for default selection');
     assert.deepEqual(grant.grant.context.activeCanvasTool, {
       componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil'
     });
@@ -942,7 +943,7 @@ test('openGrant opens the CRAFTING tab with the tool activeCanvasTool', () => {
 
     manager.openGrant({
       grant: {
-        tab: 'crafting', interactableType: 'tool',
+        tab: 'crafting', interactableType: 'tool', actorId: 'actor-7',
         context: { activeCanvasTool: { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' } }
       }
     });
@@ -950,6 +951,7 @@ test('openGrant opens the CRAFTING tab with the tool activeCanvasTool', () => {
     assert.equal(shows.length, 1);
     assert.equal(shows[0].tab, 'crafting', 'a Tool station opens the Crafting tab');
     assert.deepEqual(shows[0].options.activeCanvasTool, { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' });
+    assert.equal(shows[0].options.actorId, 'actor-7', 'the interacting actor is forwarded as the default selection');
   } finally {
     restoreGlobals(saved);
   }
@@ -964,7 +966,7 @@ test('openGrant opens a gathering-task session scoped to env+task with NO node o
 
     manager.openGrant({
       grant: {
-        tab: 'gathering', interactableType: 'gatheringTask', environmentId: 'env-1', taskId: 'task-9',
+        tab: 'gathering', interactableType: 'gatheringTask', environmentId: 'env-1', taskId: 'task-9', actorId: 'actor-7',
         ref: { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' }
       }
     });
@@ -973,6 +975,7 @@ test('openGrant opens a gathering-task session scoped to env+task with NO node o
     assert.equal(shows[0].tab, 'gathering');
     assert.equal(shows[0].options.environmentId, 'env-1');
     assert.equal(shows[0].options.taskId, 'task-9');
+    assert.equal(shows[0].options.actorId, 'actor-7', 'the interacting actor is forwarded as the default selection');
     assert.equal('nodeStateOverride' in shows[0].options, false, 'no per-interactable node override is injected');
   } finally {
     restoreGlobals(saved);

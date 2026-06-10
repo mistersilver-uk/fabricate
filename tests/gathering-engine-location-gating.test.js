@@ -225,3 +225,66 @@ test('default (no gatheringRegionSettings) behaves as disabled — no location g
   assert.equal(env.location.gated, false);
   assert.equal(env.attemptable, true);
 });
+
+// ---------------------------------------------------------------------------
+// Header-bar current-region summary (regionsEnabled + currentRegions), surfaced
+// for the player app's region chip independently of this environment's gating.
+// ---------------------------------------------------------------------------
+
+test('regions enabled: the model surfaces regionsEnabled + the party current region (disclosed)', async () => {
+  const engine = makeEngine({
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.equal(env.regionsEnabled, true, 'region chip flag set when the subsystem is enabled');
+  assert.equal(env.currentRegions.length, 1);
+  assert.equal(env.currentRegions[0].label, 'Verdant Expanse', 'non-secret current region name disclosed');
+  assert.equal(env.currentRegions[0].placeholder, false);
+});
+
+test('regions enabled, UNGATED environment still surfaces the party current region', async () => {
+  // The header region chip must show even when the selected environment has no
+  // location rules — the current region is party-scoped, not env-gated.
+  const engine = makeEngine({
+    environments: [environment({ includedRegionIds: [], excludedRegionIds: [] })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.equal(env.location.gated, false, 'environment itself is ungated');
+  assert.equal(env.regionsEnabled, true);
+  assert.equal(env.currentRegions[0]?.label, 'Verdant Expanse', 'current region surfaced despite no gating');
+});
+
+test('regions enabled, no current region: regionsEnabled true with an empty list', async () => {
+  const engine = makeEngine({ parties: [] });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.equal(env.regionsEnabled, true);
+  assert.deepEqual(env.currentRegions, [], 'no party region → empty list ("no region selected")');
+});
+
+test('regions enabled: a secret undiscovered current region is redacted to a placeholder', async () => {
+  const engine = makeEngine({
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-secret'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.equal(env.regionsEnabled, true);
+  assert.equal(env.currentRegions[0].placeholder, true, 'secret undiscovered region is redacted');
+  const serialized = JSON.stringify(env.currentRegions);
+  assert.equal(serialized.includes('Hidden Vale'), false, 'no secret name leak');
+  assert.equal(serialized.includes('r-secret'), false, 'no secret id leak');
+});
+
+test('regions disabled: regionsEnabled false with an empty current-region list', async () => {
+  const engine = makeEngine({
+    systems: [system({ gatheringRegionSettings: disabledSettings })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.equal(env.regionsEnabled, false, 'region chip flag off when the subsystem is disabled');
+  assert.deepEqual(env.currentRegions, []);
+});

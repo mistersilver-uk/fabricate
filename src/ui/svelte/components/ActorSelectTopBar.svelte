@@ -73,6 +73,29 @@
   const timeOfDayIcon = TIME_OF_DAY_FALLBACK_ICON;
   const timeOfDayLabel = $derived(localize(getTimeOfDayLabelKey(timeOfDayId)));
 
+  // Each condition chip displays only when the active gathering system enables
+  // that dimension (pushed from the gathering view via setConditionVisibility).
+  // A missing flag defaults to shown.
+  const showWeather = $derived(store?.conditionVisibility?.weather !== false);
+  const showTimeOfDay = $derived(store?.conditionVisibility?.timeOfDay !== false);
+
+  // The current-region chip appears only when the active gathering system's
+  // region/travel subsystem is enabled (pushed via setRegionContext). It shows
+  // the party's current region name(s) — redaction-safe, so a secret undiscovered
+  // region resolves to the "Undiscovered region" placeholder — or "No region
+  // selected" when the party has no resolved current region.
+  const showRegion = $derived(store?.regionContext?.enabled === true);
+  const regionNames = $derived(
+    (store?.regionContext?.regions ?? [])
+      .map((region) => (region?.placeholder
+        ? localize(region.labelKey || 'FABRICATE.Gathering.Region.UndiscoveredPlaceholder')
+        : String(region?.label ?? '')))
+      .filter((name) => name.trim() !== '')
+  );
+  const regionLabel = $derived(
+    regionNames.length > 0 ? regionNames.join(', ') : localize('FABRICATE.App.ActorBar.Region.None')
+  );
+
   // The selected character's stamina pool for the active stamina-mode system,
   // surfaced contextually on the gathering tab. Null in nodes/none mode.
   const staminaPool = $derived(store?.staminaPool ?? null);
@@ -225,14 +248,24 @@
             <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
           </span>
         {/if}
-        <span class="actor-bar-condition actor-bar-weather">
-          <i class={weatherIcon} aria-hidden="true"></i>
-          <span class="actor-bar-condition-label">{weatherLabel}</span>
-        </span>
-        <span class="actor-bar-condition actor-bar-time">
-          <i class={timeOfDayIcon} aria-hidden="true"></i>
-          <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
-        </span>
+        {#if showWeather}
+          <span class="actor-bar-condition actor-bar-weather">
+            <i class={weatherIcon} aria-hidden="true"></i>
+            <span class="actor-bar-condition-label">{weatherLabel}</span>
+          </span>
+        {/if}
+        {#if showTimeOfDay}
+          <span class="actor-bar-condition actor-bar-time">
+            <i class={timeOfDayIcon} aria-hidden="true"></i>
+            <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
+          </span>
+        {/if}
+        {#if showRegion}
+          <span class="actor-bar-condition actor-bar-region" title={regionLabel}>
+            <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+            <span class="actor-bar-condition-label">{regionLabel}</span>
+          </span>
+        {/if}
       {/if}
     </div>
   {/if}

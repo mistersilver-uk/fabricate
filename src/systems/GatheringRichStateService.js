@@ -1618,6 +1618,28 @@ export class GatheringRichStateService {
   }
 
   /**
+   * Whether the weather condition dimension is enabled for a crafting system.
+   * Drives both gathering match gating (via the per-system condition settings)
+   * and the player header bar's weather chip visibility.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {boolean}
+   */
+  weatherEnabled(systemId) {
+    return resolveSystemConditionSettings(this._config(), systemId)?.weather?.enabled !== false;
+  }
+
+  /**
+   * Whether the time-of-day condition dimension is enabled for a crafting system.
+   *
+   * @param {string} systemId Crafting system id.
+   * @returns {boolean}
+   */
+  timeOfDayEnabled(systemId) {
+    return resolveSystemConditionSettings(this._config(), systemId)?.timeOfDay?.enabled !== false;
+  }
+
+  /**
    * Thin derived back-compat accessor for a system's limitation "mode". The two
    * independent flags are the canonical state; this collapses them to a single
    * string for any external/API consumer. Returns `'both'` when both flags are

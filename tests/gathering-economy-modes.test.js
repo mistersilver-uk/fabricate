@@ -60,6 +60,18 @@ describe('gathering economy — config normalization', () => {
     assert.ok(settings.get(SETTING_KEYS.GATHERING_CONFIG).systems[SYSTEM].economy);
   });
 
+  it('weatherEnabled/timeOfDayEnabled default to true and reflect the per-system toggles', () => {
+    const enabled = makeRichState({ config: { systems: { [SYSTEM]: {} } } }).service;
+    assert.equal(enabled.weatherEnabled(SYSTEM), true, 'weather defaults enabled');
+    assert.equal(enabled.timeOfDayEnabled(SYSTEM), true, 'time-of-day defaults enabled');
+
+    const disabled = makeRichState({
+      config: { systems: { [SYSTEM]: { conditions: { weather: { enabled: false }, timeOfDay: { enabled: false } } } } }
+    }).service;
+    assert.equal(disabled.weatherEnabled(SYSTEM), false, 'weather toggle honored');
+    assert.equal(disabled.timeOfDayEnabled(SYSTEM), false, 'time-of-day toggle honored');
+  });
+
   describe('read-time legacy mode → flags mapping', () => {
     function econFor(raw) {
       return makeRichState({ config: { systems: { [SYSTEM]: { economy: raw } } } }).service.systemEconomy(SYSTEM);
