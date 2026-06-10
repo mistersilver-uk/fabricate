@@ -57,6 +57,6 @@
 
 ## Docs Loop
 
-- [ ] Update canonical specs (`gathering-and-harvesting`, `data-models`, `ui-integration`, `overview`): region is geography only; composition is biome + danger; `gatheringRegionSettings.enabled`; legacy region vocabulary removed; environment multi-region.
-- [ ] Update `DOMAIN.md` (region = geography; composition axes).
+- [x] Update canonical specs (`gathering-and-harvesting`, `data-models`, `ui-integration`, `overview`): region is geography only; composition is biome + danger; `gatheringRegionSettings.enabled`; legacy region vocabulary removed; environment multi-region. (`overview` confirmed to have no composition-by-region statement; no edit needed there.)
+- [x] Update `DOMAIN.md` (region = geography; composition axes; `GatheringRegionSettings.enabled`; `#286` supersession note in Remaining Drift).
 - [ ] Update JSDoc and user docs (`docs/gathering-regions.md`) for the toggle, multi-region environments, and Travel region authoring.

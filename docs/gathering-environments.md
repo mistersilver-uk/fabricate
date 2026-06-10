@@ -47,13 +47,12 @@ Each environment belongs to one crafting system and stores:
 | **Description** | Optional notes shown by the authoring UI |
 | **Enabled** | Disabled environments are ignored by normal player listing |
 | **Selection Mode** | `targeted` for visible task rows, or `blind` for one generic opaque action resolved from one or more hidden tasks |
-| **Region** | Optional single region tag used to match Gathering Tasks and hazards |
 | **Biomes** | Optional biome tags used to match Gathering Tasks and hazards |
 | **Danger Level** | Optional single danger ceiling used to match reusable hazards |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
 {: .note }
-> The **Region** and **Biomes** fields above are matching/display tags for composing tasks and hazards — they do not gate where players can gather. Location-aware availability (gating an environment by the party's current region) uses separate explicit rule fields (`includedRegionIds`, `excludedRegionIds`, `includedBiomeIds`, `excludedBiomeIds`) introduced with first-class regions and parties; see [Gathering Regions & Travel]({% link gathering-regions.md %}).
+> **Biomes** and **Danger Level** above are the composition match tags — they decide which reusable tasks and hazards belong to the environment, not where players can gather. **Region is no longer a composition tag**: geography is the first-class `GatheringRegion`, and an environment declares membership in one or more regions through the editor's multi-region selector when the per-system **Enable Travel & Regions** toggle is on. Region membership and the optional location-availability rule fields (`includedRegionIds`, `excludedRegionIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only; see [Gathering Regions & Travel]({% link gathering-regions.md %}).
 
 Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
 
@@ -74,7 +73,7 @@ game.fabricate.gathering.setConditions({ weather: "fog", timeOfDay: "dawn" });
 
 Mutation methods require a GM user, validate values against the configured weather and time-of-day vocabularies, persist the gathering config setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings. Player-facing code may call `getConditions()` but cannot mutate conditions.
 
-When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. Regions are intentionally empty by default because campaign geography is world-specific. Empty task or hazard match tags mean "matches any" for that dimension.
+When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRegion` authored in the Travel tab (see [Gathering Regions & Travel]({% link gathering-regions.md %})). Empty task or hazard match tags mean "matches any" for that dimension.
 
 ## Gathering Rules
 
@@ -114,7 +113,7 @@ Automatic composition can be fully library-backed. An automatic environment does
 
 In automatic mode, Excluded and Non-matching are separate sections. Non-matching is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records explicitly excluded through `disabledTaskIds` / `disabledHazardIds`.
 
-**Weather and time-of-day are runtime gates, not matching criteria.** A task or hazard whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (region/biome/danger) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked hazard is skipped during the d100 hazard selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
+**Weather and time-of-day are runtime gates, not matching criteria.** A task or hazard whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (biome, plus danger for hazards) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked hazard is skipped during the d100 hazard selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
 
 ## Gathering Tools Library
 
@@ -136,16 +135,16 @@ Library tools are **system-owned** — they persist as `system.tools[]` on the c
 
 ## Gathering Task And Hazard Libraries
 
-Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/region/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
+Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
 
-Environment authoring composes Gathering Tasks and reusable hazards by matching environment region, biome, and danger only. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or hazard belongs to the environment. GMs can toggle matched task and hazard records on or off per environment. Reusable hazard authoring is not part of this slice.
+Environment authoring composes Gathering Tasks and reusable hazards by matching environment biome (and danger for hazards) only — region is not a composition axis. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or hazard belongs to the environment. GMs can toggle matched task and hazard records on or off per environment. Reusable hazard authoring is not part of this slice.
 
 Gathering Task records support:
 
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored task identity and availability |
-| **Region, biomes** | Optional environment match tags; empty means any |
+| **Biomes** | Optional environment composition match tags; empty means any |
 | **Weather, time of day** | Optional runtime availability gates; empty means any |
 | **Drop rows** | Ordered d100 item/component rows with quantity, `dropRate` from 0 to 100, and optional per-drop time/weather modifiers. Authored order is the rank used by system Gathering Rules. |
 | **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
@@ -159,7 +158,7 @@ Reusable hazard records support:
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored hazard identity and availability |
-| **Danger, region, biomes** | Optional environment match tags; empty means any. Environment danger uses the single `dangerLevel` ceiling; legacy `dangerTags` / `risk` values are fallback inputs for older data. |
+| **Danger, biomes** | Optional environment composition match tags; empty means any. Environment danger uses the single `dangerLevel` ceiling; legacy `dangerTags` / `risk` values are fallback inputs for older data. |
 | **Weather, time of day** | Optional runtime availability gates; empty means any |
 | **Drop rate** | d100 hazard trigger rate from 1 to 100 |
 | **Modifier** | Optional hazard roll modifier provider |
@@ -280,7 +279,7 @@ A shared **actor-selection bar** sits above all of the window's tabs. Its left s
 
 The bar lists your selectable **player characters** — the actors a system designates as player characters (the current dnd5e/pf2e implementation is the `character` actor type), owned actors for players and all of them for GMs. This is a selection-list restriction only: it does **not** change which actors are authorized to gather. An owned non-player-character actor (such as an `npc`) can still be listed and attempted through the API, but it does not appear in the bar. If your remembered character is missing from the list, the bar falls back to the first available player character and remembers that instead.
 
-The bar's right side carries gathering context: on the **Gathering** tab it shows the current **weather** and **time of day** (each an icon and label) and the selected environment's **region**, or a neutral placeholder when no environment is selected. On other tabs the right side is empty.
+The bar's right side carries gathering context: on the **Gathering** tab it shows the current **weather** and **time of day** (each an icon and label). On other tabs the right side is empty.
 
 The window lists gathering options through `game.fabricate.listGatheringForActor({ actor })` and starts attempts through `game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Those public runtime methods enforce the current Foundry user as the viewer before delegating to the internal gathering engine.
 
@@ -296,7 +295,7 @@ Targeted task rows can show task labels, task descriptions, active-run timing, t
 
 ### Detail Column
 
-Selecting an environment fills the center **detail** column. It opens with an environment header — the name, a short description, and info pips for any present biome, region, and danger level — plus a mode hint describing how that environment is gathered.
+Selecting an environment fills the center **detail** column. It opens with an environment header — the name, a short description, and info pips for any present biome and danger level — plus a mode hint describing how that environment is gathered.
 
 How the rest of the column reads depends on the selection mode:
 

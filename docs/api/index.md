@@ -168,7 +168,7 @@ The flags map onto the rich-state service accessors `staminaEnabled(systemId)` a
 
 ### Regions, Parties, And Location
 
-Location-aware gathering adds stores for per-system regions and world-level parties, a current-region resolver, and GM discovery controls. Each method also has a shorter alias on the `game.fabricate.gathering` facade (`getPartyStore`, `getRegionStore`, `getLocationService`, `getLocationForActor`, `setPartyRegionOverride`, `clearPartyRegionOverride`, `revealRegionForActor`, `hideRegionForActor`):
+Location-aware gathering adds stores for per-system regions and world-level parties, a current-region resolver, and GM discovery controls. The whole subsystem is gated per crafting system by the `gatheringRegionSettings.enabled` flag (default off; the **Enable Travel & Regions** toggle in gathering Settings): while it is disabled, `getGatheringLocationForActor`, the override setters, and the discovery reveal/hide methods are inert (return `null` / `false` / no-op). Each method also has a shorter alias on the `game.fabricate.gathering` facade (`getPartyStore`, `getRegionStore`, `getLocationService`, `getLocationForActor`, `setPartyRegionOverride`, `clearPartyRegionOverride`, `revealRegionForActor`, `hideRegionForActor`):
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {

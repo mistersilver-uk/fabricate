@@ -267,7 +267,8 @@ Current GM editor behavior:
 - Environment list and draft records are cloned before exposure to the Svelte view.
 - The selected draft can edit environment name, description, enabled state, `selectionMode`, and optional `sceneUuid`.
 - The selected draft can edit a player-facing environment image independent of any linked scene.
-- The selected draft can edit gathering composition tags: one `region`, multiple `biomes`, and multiple `dangerTags`.
+- The selected draft can edit gathering composition tags: multiple `biomes` and multiple `dangerTags`. Region is no longer a composition tag and the legacy single-`region` selector has been removed; geography is authored as region membership (see the region multi-select below).
+- When `gatheringRegionSettings.enabled` is `true`, the environment editor surfaces a multi-select **region** chip control (`includedRegionIds`) mirroring the biome selector, sourced from the system's `GatheringRegion` records. When the toggle is off the region control is hidden entirely. When the toggle is on but the system has no regions yet, the control shows a muted empty line pointing the GM to create regions in the Travel tab first.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected system's Gathering Settings tab configures d100 reward selection, hazard selection, limits, and hazard outcome through `gatheringConfig.systems[systemId].rules`.
 - The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
@@ -286,7 +287,7 @@ Current GM editor behavior:
 - Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The selected-system inspector exposes a per-system character modifier library for gathering, with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
 - D100 drop row and hazard editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
-- The settings/tag area can edit gathering vocabularies for regions, biomes, and danger. Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
+- The settings/tag area can edit gathering vocabularies for biomes and danger. The legacy `regions` vocabulary dimension has been removed (region is geography, not a composition tag); geography is authored as `GatheringRegion` records in the Travel tab. Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
 - The editor keeps core environment identity separate from task/node authoring.
 - The editor allows environments to exist without a linked scene. Scene link controls are optional access/evidence controls, not the identity of the environment.
 - The editor should group rich gathering authoring into Overview, Location, Conditions, Tasks / Nodes, Results, Risk / Encounters, Economy, Visibility, and Advanced sections or equivalent groupings.
@@ -344,7 +345,12 @@ The environments editor must block save when:
 
 ### GM Travel Route
 
-When `features.gathering === true`, the selected-system Gathering submenu exposes a `Travel` route for managing Fabricate-managed gathering parties and the selected system's current-region overrides. It must not be duplicated in a separate detached settings UI.
+When `features.gathering === true` AND the selected system's `gatheringRegionSettings.enabled` is `true`, the selected-system Gathering submenu exposes a `Travel` route for managing Fabricate-managed gathering parties, the selected system's current-region overrides, and the system's regions. It must not be duplicated in a separate detached settings UI.
+
+The Travel/Regions subsystem is opt-in per system:
+
+- A `Travel & Regions` toggle (default off) lives in the gathering Settings surface (it is the one surface that stays visible when the subsystem is disabled, since it hosts the toggle). Enabling it writes `gatheringRegionSettings.enabled = true`. The toggle card carries hint copy naming where Travel lives (e.g. "Enabling this reveals the Travel tab…") so a GM can connect the toggle to the outcome.
+- When the toggle is off, the `Travel` nav item is hidden AND removed from the gathering tab-resolution/fallback lists, so a stale `activeGatheringTab === 'travel'` falls back to `Environments` (filtering the render alone is insufficient). The environment editor also hides its region selector while the toggle is off. Disabling the subsystem treats every environment as ungated at runtime.
 
 Shipped capabilities:
 
@@ -357,10 +363,11 @@ Shipped capabilities:
 - Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-region evidence per source state, member/travel-actor summary, stale references). Override editing exists in exactly one place (center).
 - The current-region evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current region`. The `Travel actor` source is presented as "automation not yet available" rather than hidden, so the model is complete before Phase 3.
 - Each stale member / travel-actor / override-region reference gets a remove/clear action; "repair" means removing the stale reference and re-assigning through the normal pickers.
-- The route embeds a minimal **name-only region quick list** (create, inline rename, enable toggle, delete with referenced-by confirm) as a temporary host until the dedicated Regions route ships. It is a lightweight picker-builder, not a region editor: it edits name and enabled only and never description/img/secret/biomes/modifiers/scene mappings, which round-trip untouched.
+- The route embeds the canonical **region authoring surface** using a region list + detail layout: the list creates/selects/deletes regions; the detail pane edits the selected region's name, description, image, enabled, secret, and biomes (chosen from the system biome vocabulary). Edits merge-patch over the existing record so unedited fields (sort, sceneMappings, modifiers) round-trip untouched. Delete is destructive and routes through the confirm dialog with referenced-by evidence (a deliberate change from the prior immediate-delete quick list).
+- This region authoring is the source of the regions an environment can be assigned to via its `includedRegionIds` multi-select; the multi-region data is authored here, not in the environments browser. The legacy environments-browser "Region" filter has been removed.
 - Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern. Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
 
-Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): the full Region editor route (description/img/secret/biomes/ordering authoring), the environment location-availability editor controls, region discovery controls, and the player-facing travel/current-region view.
+Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): region discovery controls, and the player-facing travel/current-region view. (Region authoring — name/description/img/secret/biomes — and the environment region-membership control now ship inside the Travel route and environment editor; the legacy region ordering/sceneMappings/modifiers authoring remains reserved.)
 
 ### Gathering Hazard Library
 
@@ -370,7 +377,7 @@ Hazard library authoring must support:
 
 - create, edit, duplicate, delete, enable/disable, search/filter, and usage evidence
 - deletion confirmation when hazards are used by environments or tasks
-- rows showing name, image, description summary, enabled state, danger tags, region/biome/weather/time matching tags, drop rate, and modifier provider evidence
+- rows showing name, image, description summary, enabled state, danger tags, biome/weather/time matching tags, drop rate, and modifier provider evidence (region is no longer a matching tag — the region picker, filter, and per-row region chips were removed from the task and hazard editors and browsers)
 - validation for drop rate, tag vocabulary values, provider configuration, and unsafe deletion
 - composition surfaces that attach or toggle matched reusable hazards without editing reusable hazard definitions inline
 
@@ -630,11 +637,11 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 - Show only environments whose owning crafting system has `features.gathering === true`.
 - Hide disabled environments for non-GM users.
-- Support search plus region, biome, risk/status, and availability filters where data exists.
+- Support search plus biome, risk/status, and availability filters where data exists. Region is not a player browse filter (the inert legacy `environment.region` is not echoed to the player listing).
 - If an environment is scene-gated, show whether the selected actor currently meets the scene/token requirements.
-- Display environment image, name, description, region, biome, danger/risk, current global weather/time evidence, selection-mode summary, visibility/condition summary, scene/access state, and availability summary where safe to reveal.
+- Display environment image, name, description, biome, danger/risk, current global weather/time evidence, selection-mode summary, visibility/condition summary, scene/access state, and availability summary where safe to reveal. The player-facing region pip was removed; player geography surfaces, when built, read resolved current regions rather than the inert `environment.region`.
 - Do not expose weather or time of day as player environment browse filters.
-- Environment rows should be image-led and include environment name, region, biome, risk/status chip, and availability summary where safe to reveal.
+- Environment rows should be image-led and include environment name, biome, risk/status chip, and availability summary where safe to reveal.
 - Selecting an environment populates a task list and environment detail/evidence panel.
 
 ### Task Selection

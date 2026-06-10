@@ -106,7 +106,7 @@ GatheringEnvironment = {
   selectionMode: "targeted" | "blind",
   compositionMode?: "automatic" | "manual",
   sceneUuid?: string | null,
-  region?: string,
+  region?: string, // INERT legacy single-region string: not a composition input, not editor-surfaced; migrated to includedRegionIds
   biomes?: string[],
   includedRegionIds?: string[], // opt-in location availability (Gathering Region ids)
   includedBiomeIds?: string[],
@@ -146,13 +146,13 @@ GatheringEnvironment = {
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 7. Scene linkage is optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
 8. Disabled environments are never attemptable by non-GM users and surface no task content to them. Disabled environments are surfaced as **locked identity-only listings to all viewers** in the player listing (players and GMs alike): a **locked identity-only teaser** (`locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, and no `tasks` or composition internals); it must never expose task identity, weights, drop data, or other composition internals. See *Player Environment Listing*.
-9. `region` and `dangerLevel` are single-select tag values; `biomes` is a multi-select tag list.
+9. `dangerLevel` is a single-select tag value; `biomes` is a multi-select tag list. The legacy single `region` string is **inert**: it is no longer a composition input, is not surfaced in the editor, and is superseded by `includedRegionIds` (multiple `GatheringRegion` ids). The region-as-composition-axis vocabulary has been removed.
 10. `dangerLevel` is the canonical environment danger ceiling used for reusable hazard matching. Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs when `dangerLevel` is absent; canonical writes should use `dangerLevel`.
 10a. `risk` may remain as optional player-facing risk evidence for older data, but new matching behavior must not depend on `risk` when `dangerLevel` is present.
-11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by region/biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by region / biome / danger only.
+11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by biome (and, for hazards, danger) only — region is geography (`GatheringRegion`), not a composition axis.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `compositionMode` controls reusable task/hazard composition. In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledHazardIds`; stale `enabled*Ids` and `forced*Ids` are ignored. In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledHazardIds` are ignored.
-12b. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger context (composition state `forceIncluded`). A forced record remains force-included until removed even if later environment edits make it match normally. Weather and time-of-day remain runtime gates for force-included records, so a force-included record can still be condition-blocked and inactive at runtime. Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode. Removing a forced task or hazard in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
+12b. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's biome/danger context (composition state `forceIncluded`). A forced record remains force-included until removed even if later environment edits make it match normally. Weather and time-of-day remain runtime gates for force-included records, so a force-included record can still be condition-blocked and inactive at runtime. Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode. Removing a forced task or hazard in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
 12c. `taskOrder` and `hazardOrder` provide deterministic ordering for composed reusable records. `hazardOrder` applies to every composed/included hazard, including manual `forcedHazardIds`. Records absent from the order list retain library order after ordered records.
 12c.1. GM authoring UI exposes hazard reorder controls only when the selected system's hazard selection mode is `highestRankedDrop`. In that mode, every included hazard can occupy any rank, including matching, explicitly included, force-included, and currently condition-blocked included hazards. Other hazard selection modes do not expose reorder handles or move actions.
 12d. GM authoring UI for manual task and hazard composition shows only two record groups: **Included in this environment** and **Available to add**. Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section. Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded. Automatic composition retains its Excluded and Non-matching sections.
@@ -164,7 +164,7 @@ GatheringEnvironment = {
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 16. `blindSelection` (optional) stores the per-task `weights` map used when a blind environment resolves its generic gather. Selection is always a weighted random draw over the gated candidate pool: `weights[taskId]` defaults to `1`, and a non-positive weight excludes the task. There are no other strategies and no per-environment configuration of the selection algorithm. GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
 17. Reveal behaviour is set at the system level only — the system Gathering Rules `revealPolicy` / `revealScope` apply to every environment. Environments do not override them.
-18. `includedRegionIds`, `includedBiomeIds`, `excludedRegionIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current regions (see *Location-Aware Gathering*). They are distinct from the legacy `region`/`biomes` display/matching metadata: `region`/`biomes` are tag strings and are NOT `GatheringRegion` ids. An environment with none of these fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior. `includedRegionIds`/`excludedRegionIds` are validated against the owning system's `gatheringRegions` only at save boundaries where the system context resolves; load paths never throw on stale ids.
+18. `includedRegionIds`, `includedBiomeIds`, `excludedRegionIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current regions (see *Location-Aware Gathering*). `includedRegionIds` is the region membership (multiple `GatheringRegion` ids) authored from the Travel tab / environment editor. They are distinct from the inert legacy `region` string: `region` is a free-text tag string, is NOT a `GatheringRegion` id, no longer participates in composition matching, and is not editor-surfaced. The legacy `biomes` tag list remains a composition match dimension. An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior. The entire location-availability evaluation is additionally gated by `gatheringRegionSettings.enabled`: when the subsystem is disabled (the default), every environment is treated as ungated regardless of these fields. `includedRegionIds`/`excludedRegionIds` are validated against the owning system's `gatheringRegions` only at save boundaries where the system context resolves; load paths never throw on stale ids.
 
 ## Location-Aware Gathering
 
@@ -173,6 +173,8 @@ GatheringEnvironment = {
 Make **Gathering Region** a first-class per-crafting-system geography concept and add Fabricate-managed world-level **Gathering Parties** whose current region can gate gathering availability. Region authoring stays lightweight geography — a Region owns no tasks, hazards, or drops — so the same environment can be reused across many named places.
 
 This section specifies the **shipped Phase 1** behavior (manual current-region MVP). Scene Region automation, region modifier application, and the full player travel/discovery UI are later-phase follow-ups; the reserved fields and source tokens below leave room for them without changing the contract.
+
+The entire region/travel/availability subsystem is gated by a per-system `gatheringRegionSettings.enabled` toggle that defaults to `false` (see *Gathering Region Settings*). When disabled, every gate point — the engine location-block choke point, the current-region resolver, the location-aware public API, and the Manager Travel tab and environment region selectors — behaves as if no environment is location-gated and no travel surfaces exist. Region is geography only and is NOT a composition axis (composition uses biome + danger); the legacy region vocabulary that previously conflated geography with composition tagging has been removed.
 
 ### Gathering Region
 
@@ -207,6 +209,7 @@ GatheringRegion = {
 
 ```js
 GatheringRegionSettings = {
+  enabled: boolean,                                             // default false; gates the whole region/travel/availability subsystem
   revealMode: "manual" | "onPartyTokenEntry" | "alwaysVisible", // default "manual"
   modifierVisibility: "visible" | "gmOnly",                     // default "visible"
 }
@@ -215,9 +218,10 @@ GatheringRegionSettings = {
 #### Requirements
 
 1. Settings are scoped to one crafting system (`CraftingSystem.gatheringRegionSettings`) because regions are per system.
-2. Missing settings normalize to `revealMode: "manual"` and `modifierVisibility: "visible"`.
-3. Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data.
-4. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret regions. `alwaysVisible` discloses region identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
+2. Missing settings normalize to `enabled: false`, `revealMode: "manual"`, and `modifierVisibility: "visible"`.
+3. Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data. `enabled` must be a real boolean when present; only an explicit `true` enables the subsystem, and any non-boolean coerces to `false` on read.
+4. `enabled` gates the entire region/travel/availability subsystem. When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-region resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides the Travel tab and the environment region selectors. A shared `isGatheringRegionsEnabled(system)` helper is the single source of truth every gate reads.
+5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret regions. `alwaysVisible` discloses region identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
 
 ### Gathering Party
 
@@ -284,6 +288,7 @@ GatheringEnvironmentAvailability = {
 7. When inclusion-gated and no current region resolves, the environment is blocked with `NO_CURRENT_REGION`; an inclusion-gated environment whose current regions resolve but do not match, or any environment matched by an exclusion, is blocked with `LOCATION_BLOCKED`. Exclusion-only and ungated environments are not blocked by missing current-region context.
 8. Location availability is re-evaluated freshly in the **start-attempt guard** (not only in listing), so a stale listing — e.g. an override cleared between list and start — cannot start a location-gated attempt.
 9. Availability evaluation must not leak hidden blind task identity, hidden results, hidden hazards, GM-only notes, or secret undiscovered region names.
+10. All of the above is short-circuited when `gatheringRegionSettings.enabled` is `false` (the default): the engine location choke point (`_locationBlockedReasons`) early-returns the ungated shape before any location-rule check, so every environment is available and the listing `location` field reports `{ gated: false, available: true, source: "unresolved", currentRegions: [], guidance: null }`. The same gate disables the start-attempt location guard.
 
 ### Region Disclosure and Travel Guidance
 
@@ -368,7 +373,8 @@ GatheringConditionConfig = {
     timeOfDay: string,
   },
   vocabularies: {
-    regions: string[],
+    // NOTE: the legacy `regions` vocabulary dimension was removed — region is no
+    // longer a composition axis. Geography is the first-class `GatheringRegion`.
     biomes: string[],
     danger: string[],
     weather: string[],
@@ -394,7 +400,7 @@ ConditionOption = {
 ### Requirements
 
 1. Default weather is `"clear"` and default time of day is `"day"`.
-2. Default regions are empty. Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`, `desert`, `urban`, `ruins`, and `wasteland`.
+2. There is no region vocabulary (removed: region is not a composition axis). Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`, `desert`, `urban`, `ruins`, and `wasteland`.
 3. Default danger levels are `safe`, `unsafe`, `hazardous`, `dangerous`, `deadly`, and `extreme`.
 4. Default weather tags are `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind`.
 5. Default time-of-day tags are `dawn`, `day`, `dusk`, and `night`.
@@ -433,7 +439,6 @@ GatheringTaskDefinition = {
   description?: string,
   img?: string,
   enabled: boolean,
-  region?: string,
   biomes?: string[],
   weather?: string[],
   timeOfDay?: string[],
@@ -469,18 +474,17 @@ GatheringTaskDefinition = {
 
 1. Gathering Tasks are scoped to one crafting system.
 2. Disabled Gathering Tasks never match for player gathering.
-3. Empty match tags mean "matches any" for that dimension.
-4. Region matches when omitted or equal to the environment region.
-5. Biomes match when omitted or at least one task biome is present on the environment.
-6. Weather and time of day are runtime availability gates, not environment composition match criteria. A task whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions remains composed by region/biome/danger, but is not attemptable until the condition gate passes.
-7. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document. Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
-8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
-9. `itemSelectionMode` is a legacy compatibility field. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
-10. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
-11. Drop rows may reference per-system character modifiers. Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, tool gates, or attempt limits.
-12. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
-13. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
-14. Legacy Environment Tasks remain valid as inline compatibility tasks.
+3. Empty match tags mean "matches any" for that dimension. Region is NOT a match dimension — geography (`GatheringRegion`) is not a composition axis. A task no longer carries a `region`/`regions` match tag; any legacy value is stripped by migration and ignored on read.
+4. Biomes match when omitted or at least one task biome is present on the environment.
+5. Weather and time of day are runtime availability gates, not environment composition match criteria. A task whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions remains composed by biome, but is not attemptable until the condition gate passes.
+6. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document. Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
+7. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
+8. `itemSelectionMode` is a legacy compatibility field. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
+9. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
+10. Drop rows may reference per-system character modifiers. Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, tool gates, or attempt limits.
+11. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
+12. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
+13. Legacy Environment Tasks remain valid as inline compatibility tasks.
 
 ## Gathering Tools Library
 
@@ -588,7 +592,6 @@ GatheringHazardDefinition = {
   img?: string,
   enabled: boolean,
   dangerTags?: string[],
-  region?: string,
   biomes?: string[],
   weather?: string[],
   timeOfDay?: string[],
@@ -602,9 +605,9 @@ GatheringHazardDefinition = {
 
 1. Definitions are scoped to one crafting system.
 2. Disabled definitions never match for player gathering.
-3. Empty match tags mean "matches any" for that dimension.
+3. Empty match tags mean "matches any" for that dimension. Region is NOT a match dimension (geography is not a composition axis); a hazard no longer carries a `region`/`regions` match tag and any legacy value is stripped by migration and ignored on read.
 4. Danger matches when omitted or when the hazard's danger tags are within the environment's canonical `dangerLevel` ceiling.
-5. Region and biome matching use the same rules as Gathering Tasks.
+5. Biome matching uses the same rules as Gathering Tasks.
 5a. Hazard `dangerTags` match against the environment's canonical `dangerLevel` ceiling, with environment `dangerTags` / `risk` used only as legacy fallback when `dangerLevel` is absent.
 5b. Weather and time-of-day are runtime hazard gates, not environment composition match criteria. A composed hazard whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions is skipped during d100 hazard selection.
 6. `dropRate` must be an integer from 1 to 100.
@@ -1110,7 +1113,7 @@ Define the redaction-safe per-environment fields the player listing API surfaces
 
 ### Requirements
 
-1. Each environment entry in a non-GM listing carries identity and player-facing metadata (name, description, image, region, biome(s), danger/risk, selection mode, scene linkage) plus `visible`, `attemptable`, and localized `blockedReasons`, in addition to the fields below.
+1. Each environment entry in a non-GM listing carries identity and player-facing metadata (name, description, image, biome(s), danger/risk, selection mode, scene linkage) plus `visible`, `attemptable`, and localized `blockedReasons`, in addition to the fields below. The inert legacy `region` string is NOT echoed to the player listing (the player-facing region pip and the actor-bar region surface were removed); player geography surfaces, when built, read resolved current regions, not `environment.region`.
 2. `locked` (boolean) marks an entry that is a disabled-environment teaser. Disabled environments are surfaced as locked identity-only listings to all viewers in the player listing (players and GMs alike). A locked entry is `attemptable: false`, carries an `ENVIRONMENT_DISABLED` blocked reason, exposes no `tasks` and no composition internals (weights, drop data, hidden task identity), and is non-interactive for the player.
 3. `revealPolicy` is the **effective system-level** reveal policy (`never` | `onSuccess` | `onAttempt`) resolved from the system Gathering Rules. It is system-level only; environments never override it (see *System Gathering Rules* requirement 10).
 4. `composedTaskCount` is the size of the environment's total composed task pool — the denominator (`y`) for a blind `(x/y)` discovery display. It is a pool size and is distinct from any GM-runtime "available right now" count, which additionally excludes condition-blocked records. A locked entry reports `0`.
@@ -1120,7 +1123,7 @@ Define the redaction-safe per-environment fields the player listing API surfaces
 8. `biomeTags` carries resolved biome display metadata (id, label, icon, and color token/custom color) so player biome chips render consistently with GM authoring. The per-system biome vocabulary takes precedence over the global vocabulary, then defaults.
 9. These listing fields are additive and redaction-safe: they must not leak hidden task identity, hidden result details, weights, provider diagnostics, or GM-only notes. Computing reveal/biome metadata is best-effort and must degrade to safe defaults (`0` / empty) rather than failing the listing.
 10. `hazardChance` is the aggregate static "chance of encountering a hazard", a `0`–`1` fraction computed as `1 − ∏(1 − dropRate_i/100)` over the environment's enabled hazards (ignoring actor/condition/character modifiers and hazard selection-mode/limit). It is `0` when no hazards are enabled. It is always emitted, including for blind environments, so the player UI can show the hazard meter even when individual hazards are redacted.
-11. `hazards` is an array of read-only hazard models the player UI lists alongside the tasks and inspects in a detail view. Each model carries player-facing identity (`id`, `name`, `description`, `img`), the hazard's `dangerTags` and a derived `risk` tier (the first danger tag, or `safe`), a static per-hazard `chance` (`dropRate/100`, clamped to `0`–`1`), the hazard's matching criteria (`weather`, `timeOfDay`, `biomes`, `regions` — each a string array where empty means "any"), resolved `biomeTags` display metadata (id/label/icon/colour, like the environment's biome tags) so biome chips render consistently, and an optional `linkedSceneUuid`. Modifier internals (hazard/condition/character modifiers) are NOT surfaced. Only enabled hazards are surfaced. It is `[]` for locked entries and — mirroring how the `tasks` list collapses — `[]` (redacted) for a non-GM viewer of a `blind` environment; targeted environments and GM viewers (including GM viewers of a blind environment) receive the full list. Hazard models are informational only: they carry no attempt action and no provider diagnostics.
+11. `hazards` is an array of read-only hazard models the player UI lists alongside the tasks and inspects in a detail view. Each model carries player-facing identity (`id`, `name`, `description`, `img`), the hazard's `dangerTags` and a derived `risk` tier (the first danger tag, or `safe`), a static per-hazard `chance` (`dropRate/100`, clamped to `0`–`1`), the hazard's matching criteria (`weather`, `timeOfDay`, `biomes` — each a string array where empty means "any"; region is no longer a composition axis, so the model carries no `regions` field), resolved `biomeTags` display metadata (id/label/icon/colour, like the environment's biome tags) so biome chips render consistently, and an optional `linkedSceneUuid`. Modifier internals (hazard/condition/character modifiers) are NOT surfaced. Only enabled hazards are surfaced. It is `[]` for locked entries and — mirroring how the `tasks` list collapses — `[]` (redacted) for a non-GM viewer of a `blind` environment; targeted environments and GM viewers (including GM viewers of a blind environment) receive the full list. Hazard models are informational only: they carry no attempt action and no provider diagnostics.
 
 ## Tool Usage Semantics
 
@@ -1545,7 +1548,7 @@ If a linked scene is deleted:
   - `targeted` requires an explicit task source unless automatic library composition can provide matching Gathering Tasks
   - `blind` allows multiple tasks and validates blind-selection/redaction configuration
 - Unit tests for default tag seeding and preservation of GM-customized tags
-- Unit tests for task/hazard composition matching by region, biome, and danger, plus runtime condition gating by global weather and global time of day
+- Unit tests for task/hazard composition matching by biome and danger (region is not a composition axis), plus runtime condition gating by global weather and global time of day
 - Unit tests proving weather/time do not appear as player environment browse filters
 - API tests for `getConditions`, `setWeather`, `setTimeOfDay`, `setConditions`, permission checks, validation, persistence, and hook dispatch
 - Unit tests for visibility-gate evaluation using `dnd5e`, `pf2e`, and macro providers
