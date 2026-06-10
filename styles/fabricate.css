@@ -9986,7 +9986,7 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-travel-parties-mode-chip {
+.fabricate-manager .manager-travel-parties-members-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -10001,17 +10001,30 @@
   margin-left: auto;
 }
 
-.fabricate-manager .manager-travel-parties-current-region {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.85rem;
-  max-width: 16ch;
+.fabricate-manager .manager-travel-parties-override {
+  flex: 0 0 auto;
+  width: 200px;
+}
+
+.fabricate-manager .manager-travel-parties-override-trigger {
+  width: 100%;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-travel-parties-override-trigger > i {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-parties-override-value {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.fabricate-manager .manager-travel-parties-override {
-  max-width: 14ch;
+  text-align: left;
 }
 
 .fabricate-manager .manager-travel-parties-chevron {
@@ -10263,12 +10276,12 @@
   display: flex;
   flex-direction: column;
   width: max-content;
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 240px;
+  max-width: 340px;
   max-height: min(50vh, 360px);
-  border: 1px solid var(--fab-border);
+  border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 8px;
-  background: var(--fab-surface);
+  background: var(--fab-mv2-surface-2);
   box-shadow: var(--fab-shadow-lg);
   overflow: hidden;
 }
@@ -10281,6 +10294,18 @@
 .fabricate-manager .manager-travel-popover-search input {
   width: 100%;
   box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager .manager-travel-popover-search input:focus-visible {
+  outline: none;
+  border-color: var(--fab-mv2-accent);
+  box-shadow: 0 0 0 1px var(--fab-mv2-accent);
 }
 
 .fabricate-manager .manager-travel-popover-options {

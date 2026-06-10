@@ -4230,22 +4230,6 @@
                   </div>
                 </div>
 
-                <div class="manager-chip-row">
-                  <span class={`manager-chip ${selectedTravelParty.enabled ? 'is-active' : 'is-disabled'}`}>
-                    {selectedTravelParty.enabled
-                      ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
-                      : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
-                  </span>
-                  <span class="manager-chip is-neutral">
-                    {selectedTravelParty.overrideMode === 'manual'
-                      ? text('FABRICATE.Admin.Manager.Travel.Parties.ModeManual', 'Manual')
-                      : text('FABRICATE.Admin.Manager.Travel.Parties.ModeAuto', 'Auto')}
-                  </span>
-                  {#if selectedTravelParty.hasStaleReference}
-                    <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Travel.StaleBadge', 'Needs repair')}</span>
-                  {/if}
-                </div>
-
                 <section class="manager-inspector-card">
                   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current region')}</h3>
                   {#if selectedTravelParty.currentRegionEvidence.regions.length > 0}
@@ -4262,24 +4246,6 @@
                   {:else}
                     <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRegions', 'No current region set for this system.')}</p>
                   {/if}
-                </section>
-
-                <section class="manager-inspector-card">
-                  <div class="manager-fact-grid">
-                    <div class="manager-fact">
-                      <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Travel.InspectorMembersSummary', 'Members')}</span>
-                      <span class="manager-fact-value">{selectedTravelParty.memberCount}</span>
-                    </div>
-                    <div class="manager-fact">
-                      <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Travel.InspectorTravelActorSummary', 'Travel actor')}</span>
-                      <span class="manager-fact-value">
-                        {selectedTravelParty.travelActor?.name
-                          || (selectedTravelParty.staleTravelActor
-                            ? text('FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel', 'Stale travel actor')
-                            : text('FABRICATE.Admin.Manager.Travel.TravelActorEmpty', 'No travel actor assigned.'))}
-                      </span>
-                    </div>
-                  </div>
                 </section>
               {:else}
                 <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>

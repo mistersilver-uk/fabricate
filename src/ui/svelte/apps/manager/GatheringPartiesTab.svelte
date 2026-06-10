@@ -9,18 +9,17 @@
     the selected party's row is the expanded one.
   - The row header shows the travel-actor image (or a default icon), the party
     name, an enabled/disabled chip and a region selection-mode chip on the left,
-    and the party's current region plus a searchable region-override popover on
-    the right (a dropdown does not scale to games with many regions).
+    and the party's current region plus a searchable region-override popover
+    (RegionOverridePicker) on the right.
   - The expanded accordion body is intentionally empty for now.
 
   Uses a `.manager-travel-parties-*` (plural) class namespace to stay clear of
-  the legacy `.manager-travel-party-*` rules from the superseded travel view,
-  and reuses the shared `.manager-travel-picker`/`-popover` picker styling.
+  the legacy `.manager-travel-party-*` rules from the superseded travel view.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import Pagination from '../../components/Pagination.svelte';
+  import RegionOverridePicker from './RegionOverridePicker.svelte';
 
   let {
     parties = [],
@@ -36,9 +35,6 @@
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
-  let openOverridePartyId = $state('');
-  let overrideSearch = $state('');
-  let overrideSearchInput = $state(null);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -61,21 +57,8 @@
 
   const pagedParties = $derived(filteredParties.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE));
 
-  const normalizedOverrideSearch = $derived(overrideSearch.trim().toLowerCase());
-  const filteredOverrideRegions = $derived(
-    normalizedOverrideSearch
-      ? systemRegions.filter(region => String(region.name || '').toLowerCase().includes(normalizedOverrideSearch))
-      : systemRegions
-  );
-
-  // Focus the override search field when its popover opens.
-  $effect(() => {
-    if (openOverridePartyId && overrideSearchInput) overrideSearchInput.focus();
-  });
-
   function selectRow(party) {
     onSelectParty(party.id === selectedPartyId ? '' : party.id);
-    closeOverride();
   }
 
   function onRowKeydown(event, party) {
@@ -84,19 +67,11 @@
     selectRow(party);
   }
 
-  function toggleOverride(event, party) {
-    event.stopPropagation();
-    if (openOverridePartyId === party.id) {
-      closeOverride();
-    } else {
-      openOverridePartyId = party.id;
-      overrideSearch = '';
+  function overrideValue(party) {
+    if (party?.overrideMode === 'manual' && Array.isArray(party.overrideRegionIds) && party.overrideRegionIds.length > 0) {
+      return party.overrideRegionIds[0];
     }
-  }
-
-  function closeOverride() {
-    openOverridePartyId = '';
-    overrideSearch = '';
+    return '';
   }
 
   function chooseOverride(party, regionId) {
@@ -105,39 +80,12 @@
     } else {
       onClearRegionOverride(party.id, systemId);
     }
-    closeOverride();
   }
 
-  function regionNameById(regionId) {
-    return systemRegions.find(region => region.id === regionId)?.name || '';
-  }
-
-  function overrideTriggerLabel(party) {
-    if (party?.overrideMode === 'manual' && Array.isArray(party.overrideRegionIds) && party.overrideRegionIds.length > 0) {
-      return regionNameById(party.overrideRegionIds[0])
-        || text('FABRICATE.Admin.Manager.Travel.Parties.OverrideStale', 'Unknown region');
-    }
-    return text('FABRICATE.Admin.Manager.Travel.Parties.OverrideAuto', 'Auto');
-  }
-
-  function currentRegionLabel(party) {
-    const regions = party?.currentRegionEvidence?.regions || [];
-    if (regions.length === 0) {
-      return text('FABRICATE.Admin.Manager.Travel.Parties.NoCurrentRegion', 'No current region');
-    }
-    return regions.map(region => region.name).filter(Boolean).join(', ');
-  }
-
-  function modeChipLabel(party) {
-    return party?.overrideMode === 'manual'
-      ? text('FABRICATE.Admin.Manager.Travel.Parties.ModeManual', 'Manual')
-      : text('FABRICATE.Admin.Manager.Travel.Parties.ModeAuto', 'Auto');
-  }
-
-  function isCurrentOverride(party, regionId) {
-    return party?.overrideMode === 'manual'
-      && Array.isArray(party.overrideRegionIds)
-      && party.overrideRegionIds.includes(regionId);
+  function memberCountLabel(party) {
+    const count = party?.memberCount ?? 0;
+    if (count === 1) return text('FABRICATE.Admin.Manager.Travel.MemberCountOne', '1 member');
+    return text('FABRICATE.Admin.Manager.Travel.MemberCount', '{count} members').replace('{count}', String(count));
   }
 </script>
 
@@ -198,85 +146,18 @@
                   ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                   : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
               </span>
-              <span class="manager-chip is-neutral manager-travel-parties-mode-chip">
-                <i class={party.overrideMode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'} aria-hidden="true"></i>
-                <span>{modeChipLabel(party)}</span>
+              <span class="manager-chip is-neutral manager-travel-parties-members-chip" title={memberCountLabel(party)} aria-label={memberCountLabel(party)}>
+                <i class="fas fa-users" aria-hidden="true"></i>
+                <span>{party.memberCount ?? 0}</span>
               </span>
             </div>
 
             <div class="manager-travel-parties-right">
-              <span class="manager-travel-parties-current-region" title={currentRegionLabel(party)}>
-                {currentRegionLabel(party)}
-              </span>
-
-              <div
-                class="manager-travel-picker manager-travel-parties-override"
-                use:dismissOnOutsideClick={{ enabled: openOverridePartyId === party.id, onDismiss: closeOverride }}
-              >
-                <button
-                  type="button"
-                  class="manager-button manager-travel-picker-trigger manager-travel-parties-override-trigger"
-                  aria-haspopup="dialog"
-                  aria-expanded={openOverridePartyId === party.id}
-                  aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideLabel', 'Current region override')}
-                  onclick={(event) => toggleOverride(event, party)}
-                  onkeydown={(event) => event.stopPropagation()}
-                >
-                  <i class="fas fa-location-crosshairs" aria-hidden="true"></i>
-                  <span>{overrideTriggerLabel(party)}</span>
-                  <i class={openOverridePartyId === party.id ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
-                </button>
-
-                {#if openOverridePartyId === party.id}
-                  <div
-                    class="manager-travel-popover"
-                    role="dialog"
-                    aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideLabel', 'Current region override')}
-                    onclick={(event) => event.stopPropagation()}
-                    onkeydown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); closeOverride(); } }}
-                  >
-                    <div class="manager-travel-popover-search">
-                      <input
-                        bind:this={overrideSearchInput}
-                        bind:value={overrideSearch}
-                        type="text"
-                        placeholder={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideSearchPlaceholder', 'Search regions...')}
-                        aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideSearchLabel', 'Search regions')}
-                      />
-                    </div>
-                    <div class="manager-travel-popover-options" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideLabel', 'Current region override')}>
-                      <button
-                        type="button"
-                        class="manager-travel-option"
-                        role="option"
-                        aria-selected={party.overrideMode !== 'manual'}
-                        onclick={() => chooseOverride(party, null)}
-                      >
-                        <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
-                        <span class="manager-travel-option-name">{text('FABRICATE.Admin.Manager.Travel.Parties.OverrideAuto', 'Auto')}</span>
-                      </button>
-                      {#each filteredOverrideRegions as region (region.id)}
-                        <button
-                          type="button"
-                          class="manager-travel-option"
-                          role="option"
-                          aria-selected={isCurrentOverride(party, region.id)}
-                          title={region.name}
-                          onclick={() => chooseOverride(party, region.id)}
-                        >
-                          <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-                          <span class="manager-travel-option-name">{region.name}</span>
-                          {#if !region.enabled}
-                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.Parties.OverrideDisabledSuffix', '(disabled)')}</span>
-                          {/if}
-                        </button>
-                      {:else}
-                        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.Parties.NoRegionMatches', 'No regions match your search.')}</p>
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
-              </div>
+              <RegionOverridePicker
+                value={overrideValue(party)}
+                regions={systemRegions}
+                onChoose={(regionId) => chooseOverride(party, regionId)}
+              />
 
               <span class="manager-travel-parties-chevron" aria-hidden="true">
                 <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>

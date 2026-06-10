@@ -84,8 +84,11 @@ describe('GatheringPartiesTab mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    writeRawModule('src/ui/svelte/util/iconPickerPopover.js');
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
+    writeRawModule('src/ui/svelte/actions/portal.js');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte.js')).href);
     GatheringPartiesTab = mod.default;
@@ -105,26 +108,27 @@ describe('GatheringPartiesTab mounted behavior', () => {
     remount();
   });
 
-  it('renders a row per party with status and mode chips, and a fallback icon when no travel actor', async () => {
+  it('renders a row per party with status and member-count chips, and a fallback icon when no travel actor', async () => {
     await mountTab({
       parties: [
-        makeParty({ id: 'p1', name: 'Wardens', enabled: true, overrideMode: 'manual', overrideRegionIds: ['r1'] }),
-        makeParty({ id: 'p2', name: 'Scouts', enabled: false, overrideMode: 'none' })
-      ],
-      systemRegions: [{ id: 'r1', name: 'Northreach', enabled: true }]
+        makeParty({ id: 'p1', name: 'Wardens', enabled: true, memberCount: 3 }),
+        makeParty({ id: 'p2', name: 'Scouts', enabled: false, memberCount: 1 })
+      ]
     });
     assert.equal(rows().length, 2);
     const first = rows()[0];
     assert.match(first.querySelector('.manager-travel-parties-name').textContent, /Wardens/);
     // No travel actor image => fallback icon span
     assert.ok(first.querySelector('.manager-travel-parties-thumb-fallback'));
-    // Enabled chip + manual mode chip
+    // Enabled chip + member-count chip (the mode chip was replaced)
     assert.ok(first.querySelector('.manager-chip.is-active'));
-    assert.match(first.querySelector('.manager-travel-parties-mode-chip').textContent, /Manual/);
-    // Disabled + auto on second
+    assert.equal(first.querySelector('.manager-travel-parties-mode-chip'), null);
+    assert.match(first.querySelector('.manager-travel-parties-members-chip').textContent, /3/);
+    assert.match(first.querySelector('.manager-travel-parties-members-chip').getAttribute('aria-label'), /3 members/);
+    // Disabled + singular member label on second
     const second = rows()[1];
     assert.ok(second.querySelector('.manager-chip.is-disabled'));
-    assert.match(second.querySelector('.manager-travel-parties-mode-chip').textContent, /Auto/);
+    assert.match(second.querySelector('.manager-travel-parties-members-chip').getAttribute('aria-label'), /1 member/);
     remount();
   });
 
@@ -138,15 +142,11 @@ describe('GatheringPartiesTab mounted behavior', () => {
     remount();
   });
 
-  it('displays the current region or a no-region label', async () => {
+  it('does not duplicate the current region in the row header (it lives in the inspector)', async () => {
     await mountTab({
-      parties: [
-        makeParty({ id: 'p1', name: 'A', currentRegionEvidence: { source: 'manualOverride', resolved: true, regions: [{ id: 'r1', name: 'Northreach', enabled: true }], staleRegionIds: [] } }),
-        makeParty({ id: 'p2', name: 'B' })
-      ]
+      parties: [makeParty({ id: 'p1', name: 'A', currentRegionEvidence: { source: 'manualOverride', resolved: true, regions: [{ id: 'r1', name: 'Northreach', enabled: true }], staleRegionIds: [] } })]
     });
-    assert.match(rows()[0].querySelector('.manager-travel-parties-current-region').textContent, /Northreach/);
-    assert.match(rows()[1].querySelector('.manager-travel-parties-current-region').textContent, /No current region/);
+    assert.equal(target.querySelector('.manager-travel-parties-current-region'), null);
     remount();
   });
 
