@@ -37,11 +37,12 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     );
   });
 
-  it('only shows the region/biome detail label when the value is user-defined (not "Any")', () => {
-    // The trailing "Region"/"Biome" label is guarded so "Any region"/"Any biome" is not shown
-    // redundantly as "Any region Region".
-    assert.ok(rootSource.includes('{#if recordRegions(selectedGatheringTask).length > 0}'), 'task region label should be conditional on a user-defined region');
-    assert.ok(rootSource.includes('{#if recordRegions(selectedGatheringHazard).length > 0}'), 'hazard region label should be conditional on a user-defined region');
+  it('only shows the biome detail label when the value is user-defined (not "Any")', () => {
+    // The trailing "Biome" label is guarded so "Any biome" is not shown redundantly
+    // as "Any biome Biome". Region is no longer a composition fact in the inspector.
+    assert.equal(rootSource.includes('recordRegions('), false, 'region fact is removed from the task/hazard inspector');
+    assert.equal(rootSource.includes('data-gathering-task-fact="region"'), false, 'task region fact is removed');
+    assert.equal(rootSource.includes('data-gathering-hazard-fact="region"'), false, 'hazard region fact is removed');
     assert.ok(/data-gathering-task-fact="biomes"[\s\S]*?\{#if Array\.isArray\(selectedGatheringTask\.biomes\) && selectedGatheringTask\.biomes\.length > 0\}/.test(rootSource), 'task biome label should be conditional on user-defined biomes');
   });
 

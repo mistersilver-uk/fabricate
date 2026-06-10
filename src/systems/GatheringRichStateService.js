@@ -6,14 +6,13 @@ const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
-  regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
   danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
-const VOCABULARY_DIMENSIONS = ['regions', 'biomes'];
+const VOCABULARY_DIMENSIONS = ['biomes'];
 const BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
 const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_BIOME_METADATA = Object.freeze({
@@ -1823,7 +1822,6 @@ function normalizeGatheringEconomy(raw = {}) {
 
 function normalizeGatheringConfig(raw = {}) {
   const vocabularies = {
-    regions: seedVocabulary(raw?.vocabularies?.regions, DEFAULT_VOCABULARIES.regions),
     biomes: seedVocabulary(raw?.vocabularies?.biomes, DEFAULT_VOCABULARIES.biomes),
     danger: seedVocabulary(raw?.vocabularies?.danger, DEFAULT_VOCABULARIES.danger),
     weather: seedVocabulary(raw?.vocabularies?.weather, DEFAULT_VOCABULARIES.weather),
@@ -1908,9 +1906,6 @@ function normalizeLibraryTask(task = {}) {
     description: stringOrFallback(task.description, ''),
     img: stringOrFallback(task.img, 'icons/svg/item-bag.svg'),
     enabled: task.enabled !== false,
-    regions: normalizeTagList(Array.isArray(task.regions)
-      ? task.regions
-      : task.region ? [task.region] : []),
     biomes: normalizeTagList(task.biomes),
     weather: normalizeConditionIdList(task.weather),
     timeOfDay: normalizeConditionIdList(task.timeOfDay),
@@ -2014,9 +2009,6 @@ function normalizeHazard(hazard = {}) {
     img: stringOrFallback(hazard.img, 'icons/svg/hazard.svg'),
     enabled: hazard.enabled !== false,
     dangerTags: normalizeTagList(hazard.dangerTags),
-    regions: normalizeTagList(Array.isArray(hazard.regions)
-      ? hazard.regions
-      : hazard.region ? [hazard.region] : []),
     biomes: normalizeTagList(hazard.biomes),
     weather: normalizeConditionIdList(hazard.weather),
     timeOfDay: normalizeConditionIdList(hazard.timeOfDay),

@@ -72,6 +72,15 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/],
   },
   {
+    id: 'manager-travel',
+    label: 'Manager travel and parties',
+    smokeLabels: ['manager-gathering-travel-normal', 'manager-gathering-travel-stacked'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTravelView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringRegionQuickList\.svelte$/,
+    ],
+  },
+  {
     id: 'manager-recipes',
     label: 'Manager recipes',
     smokeLabels: ['manager-recipes-normal'],

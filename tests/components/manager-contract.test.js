@@ -664,7 +664,6 @@ describe('CraftingSystemManager source contract', () => {
     for (const snippet of [
       'data-gathering-tasks-browser',
       'manager-gathering-tasks-table',
-      'regionChips(task)',
       'biomeChips(task)',
       'timeChips(task)',
       'weatherChips(task)',

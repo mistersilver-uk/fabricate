@@ -85,14 +85,13 @@ const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
 const GATHERING_CONFIG_SETTING = 'gatheringConfig';
 const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
-  regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
   danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const GATHERING_CONDITION_DIMENSIONS = new Set(['weather', 'timeOfDay']);
-const GATHERING_VOCABULARY_DIMENSIONS = new Set(['regions', 'biomes']);
+const GATHERING_VOCABULARY_DIMENSIONS = new Set(['biomes']);
 const GATHERING_BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
 const DEFAULT_GATHERING_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({
@@ -615,9 +614,6 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     description: String(task.description || ''),
     img: String(task.img || DEFAULT_GATHERING_TASK_IMG),
     enabled: task.enabled !== false,
-    regions: _normalizeGatheringTagList(Array.isArray(task.regions)
-      ? task.regions
-      : task.region ? [task.region] : []),
     biomes: _normalizeGatheringTagList(task.biomes),
     weather: _normalizeGatheringConditionIdList(task.weather),
     timeOfDay: _normalizeGatheringConditionIdList(task.timeOfDay),
@@ -654,9 +650,6 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
     img: String(hazard.img || 'icons/svg/hazard.svg'),
     enabled: hazard.enabled !== false,
     dangerTags: _normalizeGatheringTagList(hazard.dangerTags),
-    regions: _normalizeGatheringTagList(Array.isArray(hazard.regions)
-      ? hazard.regions
-      : hazard.region ? [hazard.region] : []),
     biomes: _normalizeGatheringTagList(hazard.biomes),
     weather: _normalizeGatheringConditionIdList(hazard.weather),
     timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),
@@ -727,7 +720,6 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
   // safely. `danger` stays as a bare string list because no UI surface renders
   // it directly today.
   const vocabularies = {
-    regions: _normalizeGatheringVocabularyOptions('regions', raw?.vocabularies?.regions || []),
     biomes: _seedGatheringVocabularyOptions('biomes', raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
     danger: _seedGatheringVocabulary(raw?.vocabularies?.danger, DEFAULT_GATHERING_VOCABULARIES.danger),
     weather: _seedGatheringConditionOptions('weather', raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
@@ -826,6 +818,57 @@ function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
     environmentSaveError: null,
     environmentValidationState: null
   };
+}
+
+function _emptyTravelState() {
+  return {
+    travelParties: [],
+    selectedPartyId: '',
+    travelSaving: false,
+    travelError: null,
+    travelFieldErrors: {},
+    selectedSystemRegions: [],
+    actorOptions: []
+  };
+}
+
+/**
+ * Map a thrown party/region store error to inline field errors plus a summary.
+ *
+ * The party store emits a single COMPOSITE uniqueness message
+ * (`Actor "<uuid>" is associated with more than one enabled party`) for both
+ * member and travel-actor conflicts, so the field a duplicate-actor error
+ * belongs to cannot be inferred from the message text. Instead the caller
+ * passes the operation's `fieldContext` (the control whose mutator was invoked)
+ * and the uniqueness violation is routed there. Errors raised outside an
+ * actor-association context fall through to the summary only.
+ *
+ * @param {*} err
+ * @param {(key: string, data?: object) => string} [localizeFn]
+ * @param {('travelActor'|'members'|null)} [fieldContext] control that triggered the operation
+ * @returns {{ travelError: string|null, travelFieldErrors: Record<string, string> }}
+ */
+function _travelErrorState(err, localizeFn = null, fieldContext = null) {
+  if (!err) return { travelError: null, travelFieldErrors: {} };
+  const errors = Array.isArray(err?.errors) ? err.errors : [];
+  const fieldErrors = {};
+  if (fieldContext === 'travelActor' || fieldContext === 'members') {
+    const hasUniquenessViolation = errors.some(message =>
+      String(message).toLowerCase().includes('more than one enabled party'));
+    if (hasUniquenessViolation) {
+      if (fieldContext === 'travelActor') {
+        fieldErrors.travelActor = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateTravelActor')
+          || 'This travel actor is already used by another enabled party.';
+      } else {
+        fieldErrors.members = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateMember')
+          || 'This actor already belongs to another enabled party.';
+      }
+    }
+  }
+  const summary = errors.length > 0
+    ? errors.join('; ')
+    : (err?.message || (localizeFn?.('FABRICATE.Admin.Manager.Travel.Error') || 'Travel update failed.'));
+  return { travelError: summary, travelFieldErrors: fieldErrors };
 }
 
 function _environmentErrorMessage(err) {
@@ -1452,6 +1495,10 @@ export function createAdminStore(services) {
   const toolsDraftSelectedToolId = writable('');
   const toolsDraftExpandedToolId = writable('');
   let dirtyToolsDraftDiscardConfirmation = null;
+  const travelSelectedPartyId = writable('');
+  const travelSaving = writable(false);
+  const travelError = writable(null);
+  const travelFieldErrors = writable({});
   let unsubscribeFabricateReady = null;
   let unsubscribeFabricateDataChanged = null;
   let readyRefreshScheduled = false;
@@ -1477,7 +1524,8 @@ export function createAdminStore(services) {
     experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
     gatheringConfig: _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}),
     foundrySystemId: typeof services.getFoundrySystemId === 'function' ? String(services.getFoundrySystemId() || '') : '',
-    ..._emptyEnvironmentState(false)
+    ..._emptyEnvironmentState(false),
+    ..._emptyTravelState()
   });
 
   function _setEnvironmentDraftState(draft, {
@@ -1883,6 +1931,422 @@ export function createAdminStore(services) {
 
   function _currentGatheringConfig() {
     return _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}, _randomID);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Travel section (world-level parties + per-system current-region overrides).
+  // Kept thin: uniqueness/invariant validation lives in GatheringPartyStore and
+  // GatheringRegionStore; this section surfaces their errors inline and refreshes
+  // derived view state. Confirmations always route through services.confirmDialog.
+  // ---------------------------------------------------------------------------
+  const travel = _createTravelSection();
+
+  function _createTravelSection() {
+    function getPartyStore() {
+      return services.getGatheringPartyStore?.() || null;
+    }
+    function getRegionStore() {
+      return services.getGatheringRegionStore?.() || null;
+    }
+    function getLocationService() {
+      return services.getGatheringLocationService?.() || null;
+    }
+    function getActorOptions() {
+      const options = services.getActorOptions?.() || [];
+      return Array.isArray(options) ? _clonePlain(options) : [];
+    }
+
+    function clearErrors() {
+      travelError.set(null);
+      travelFieldErrors.set({});
+    }
+
+    function applyError(err, fieldContext = null) {
+      const { travelError: summary, travelFieldErrors: fieldErrors } = _travelErrorState(err, services.localize, fieldContext);
+      travelError.set(summary);
+      travelFieldErrors.set(fieldErrors);
+    }
+
+    function buildState() {
+      const partyStore = getPartyStore();
+      const regionStore = getRegionStore();
+      const systemId = get(selectedSystemId);
+      const parties = partyStore?.list ? _clonePlain(partyStore.list() || []) : [];
+      const actorOptions = getActorOptions();
+      const actorByUuid = new Map(actorOptions.map(actor => [actor.uuid, actor]));
+
+      let selectedId = get(travelSelectedPartyId);
+      if (selectedId && !parties.some(party => party.id === selectedId)) selectedId = '';
+      if (!selectedId && parties.length > 0) selectedId = parties[0].id;
+      if (selectedId !== get(travelSelectedPartyId)) travelSelectedPartyId.set(selectedId);
+
+      const regions = (systemId && regionStore?.listBySystem)
+        ? _clonePlain(regionStore.listBySystem(systemId) || [])
+        : [];
+      const regionById = new Map(regions.map(region => [region.id, region]));
+      const locationService = getLocationService();
+
+      const travelParties = parties.map(party => {
+        const staleMembers = party.memberActorUuids.filter(uuid => !actorByUuid.has(uuid));
+        const staleTravelActor = party.travelActorUuid && !actorByUuid.has(party.travelActorUuid)
+          ? party.travelActorUuid
+          : null;
+        const evidence = (systemId && locationService?.resolveCurrentRegions)
+          ? locationService.resolveCurrentRegions({ partyId: party.id, systemId })
+          : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+        const override = party.currentRegionOverrides?.[systemId] || null;
+        const overrideRegionIds = override?.mode === 'manual' ? (override.regionIds || []) : [];
+        const memberCards = party.memberActorUuids.map(uuid => ({
+          uuid,
+          name: actorByUuid.get(uuid)?.name || '',
+          img: actorByUuid.get(uuid)?.img || '',
+          stale: !actorByUuid.has(uuid)
+        }));
+        return {
+          ...party,
+          memberCards,
+          memberCount: party.memberActorUuids.length,
+          travelActor: party.travelActorUuid ? (actorByUuid.get(party.travelActorUuid) || null) : null,
+          staleMembers,
+          staleTravelActor,
+          staleRegionIds: Array.isArray(evidence.staleRegionIds) ? evidence.staleRegionIds : [],
+          hasStaleReference: staleMembers.length > 0 || !!staleTravelActor
+            || (Array.isArray(evidence.staleRegionIds) && evidence.staleRegionIds.length > 0),
+          overrideMode: override?.mode || 'none',
+          overrideRegionIds,
+          currentRegionEvidence: {
+            source: evidence.source,
+            resolved: evidence.resolved === true,
+            regions: (evidence.regions || []).map(region => ({
+              id: region.id,
+              name: regionById.get(region.id)?.name ?? region.name ?? '',
+              enabled: region.enabled !== false
+            })),
+            staleRegionIds: Array.isArray(evidence.staleRegionIds) ? evidence.staleRegionIds : []
+          }
+        };
+      });
+
+      // Per-region counts for the Regions tab header chips. Environments are
+      // fetched once (sync arrays only — listBySystem may be async); parties
+      // reuse the raw list already built above.
+      const regionEnvList = (() => {
+        if (regions.length === 0) return [];
+        const environmentStore = _getEnvironmentStore();
+        if (!environmentStore) return [];
+        // listBySystem may be async; prefer its synchronous array, else fall
+        // back to a synchronous list() (region ids are unique per system).
+        const bySystem = typeof environmentStore.listBySystem === 'function'
+          ? environmentStore.listBySystem(systemId)
+          : null;
+        if (Array.isArray(bySystem)) return bySystem;
+        const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
+        return Array.isArray(all) ? all : [];
+      })();
+      const regionEnvironments = (regionId) => regionEnvList
+        .filter(env => Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId))
+        .map(env => ({ id: env.id, name: env.name, img: env.img || '' }));
+      const regionParties = (regionId) => parties
+        .filter(party => {
+          const override = party?.currentRegionOverrides?.[systemId];
+          return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
+        })
+        .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
+
+      return {
+        travelParties,
+        selectedPartyId: selectedId,
+        travelSaving: get(travelSaving),
+        travelError: get(travelError),
+        travelFieldErrors: _clonePlain(get(travelFieldErrors)),
+        selectedSystemRegions: regions.map(region => {
+          const environments = regionEnvironments(region.id);
+          const partiesInRegion = regionParties(region.id);
+          return {
+            id: region.id,
+            name: region.name,
+            description: String(region.description || ''),
+            img: region.img || null,
+            enabled: region.enabled !== false,
+            secret: region.secret === true,
+            biomes: Array.isArray(region.biomes) ? region.biomes : [],
+            environmentCount: environments.length,
+            partyCount: partiesInRegion.length,
+            environments,
+            parties: partiesInRegion
+          };
+        }),
+        gatheringRegionSettings: (systemId && regionStore?.getRegionSettings)
+          ? regionStore.getRegionSettings(systemId)
+          : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
+        actorOptions
+      };
+    }
+
+    function patch() {
+      viewState.update(state => ({ ...state, ...buildState() }));
+    }
+
+    async function withSave(operation, fieldContext = null) {
+      const partyStore = getPartyStore();
+      if (!partyStore) return false;
+      clearErrors();
+      travelSaving.set(true);
+      patch();
+      try {
+        await operation(partyStore);
+        return true;
+      } catch (err) {
+        applyError(err, fieldContext);
+        return false;
+      } finally {
+        travelSaving.set(false);
+        patch();
+      }
+    }
+
+    return {
+      buildState,
+      patch,
+      refreshTravelParties() {
+        clearErrors();
+        patch();
+      },
+      selectParty(partyId) {
+        travelSelectedPartyId.set(partyId || '');
+        clearErrors();
+        patch();
+      },
+      async createParty() {
+        const created = await withSave(async (partyStore) => {
+          const party = await partyStore.create({
+            name: services.localize?.('FABRICATE.Admin.Manager.Travel.DefaultPartyName') || 'New party'
+          });
+          if (party?.id) travelSelectedPartyId.set(party.id);
+        });
+        return created;
+      },
+      async renameParty(partyId, name) {
+        return withSave((partyStore) => partyStore.update(partyId, { name: String(name ?? '') }));
+      },
+      async setPartyEnabled(partyId, enabled) {
+        return withSave((partyStore) => partyStore.setEnabled(partyId, enabled === true));
+      },
+      async deleteParty(partyId) {
+        const partyStore = getPartyStore();
+        if (!partyStore) return false;
+        const party = partyStore.get?.(partyId);
+        const name = _escapeHtml(party?.name || partyId);
+        const confirmed = await services.confirmDialog?.({
+          title: services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyTitle', { name })
+            || `Delete ${name}?`,
+          content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', { name })
+            || `Delete Fabricate party <strong>${name}</strong>?`}</p>`,
+          yes: () => true,
+          no: () => false
+        });
+        if (!confirmed) return false;
+        return withSave(async (store) => {
+          await store.delete(partyId);
+          if (get(travelSelectedPartyId) === partyId) travelSelectedPartyId.set('');
+        });
+      },
+      async addPartyMember(partyId, actorUuid) {
+        return withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members');
+      },
+      async addOrMovePartyMember(targetPartyId, actorUuid) {
+        const partyStore = getPartyStore();
+        if (!partyStore) return false;
+        const uuid = String(actorUuid ?? '');
+        const source = (partyStore.list?.() || []).find((party) =>
+          party.id !== targetPartyId
+          && Array.isArray(party.memberActorUuids)
+          && party.memberActorUuids.includes(uuid));
+        if (source) {
+          const actorName = _escapeHtml(getActorOptions().find((actor) => actor.uuid === uuid)?.name || uuid);
+          const sourceName = _escapeHtml(source.name || source.id);
+          const targetName = _escapeHtml(partyStore.get?.(targetPartyId)?.name || targetPartyId);
+          const confirmed = await services.confirmDialog?.({
+            title: services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberTitle', { actor: actorName })
+              || `Move ${actorName}?`,
+            content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberContent', { actor: actorName, from: sourceName, to: targetName })
+              || `Move <strong>${actorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`}</p>`,
+            yes: () => true,
+            no: () => false
+          });
+          if (!confirmed) return false;
+          return withSave((store) => store.moveMember(source.id, targetPartyId, uuid), 'members');
+        }
+        return withSave((store) => store.addMember(targetPartyId, uuid), 'members');
+      },
+      async removePartyMember(partyId, actorUuid) {
+        return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members');
+      },
+      async movePartyMember(fromPartyId, toPartyId, actorUuid) {
+        return withSave((partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid), 'members');
+      },
+      async setPartyTravelActor(partyId, actorUuid) {
+        return withSave((partyStore) => partyStore.setTravelActor(partyId, actorUuid), 'travelActor');
+      },
+      async clearPartyTravelActor(partyId) {
+        return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
+      },
+      async setPartyRegionOverride(partyId, systemId, regionIds) {
+        return withSave((partyStore) => partyStore.setCurrentRegionOverride(partyId, systemId, regionIds || []));
+      },
+      async clearPartyRegionOverride(partyId, systemId) {
+        return withSave((partyStore) => partyStore.clearCurrentRegionOverride(partyId, systemId));
+      },
+      async removeStaleMember(partyId, actorUuid) {
+        return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid));
+      },
+      async clearStaleTravelActor(partyId) {
+        return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
+      },
+      async dropStaleOverrideRegion(partyId, systemId, regionId) {
+        const partyStore = getPartyStore();
+        if (!partyStore) return false;
+        const party = partyStore.get?.(partyId);
+        const override = party?.currentRegionOverrides?.[systemId];
+        const nextIds = Array.isArray(override?.regionIds)
+          ? override.regionIds.filter(id => id !== regionId)
+          : [];
+        return withSave((store) => store.setCurrentRegionOverride(partyId, systemId, nextIds));
+      },
+      // --- Region quick list (name/enabled only; never touches other fields). ---
+      async createRegionQuick(systemId, name) {
+        const regionStore = getRegionStore();
+        if (!regionStore || !systemId) return false;
+        clearErrors();
+        travelSaving.set(true);
+        patch();
+        try {
+          const created = await regionStore.create(systemId, { name: String(name ?? '').trim() });
+          // Return the new region id so callers can select it; fall back to true.
+          return created?.id || true;
+        } catch (err) {
+          applyError(err);
+          return false;
+        } finally {
+          travelSaving.set(false);
+          patch();
+        }
+      },
+      async renameRegion(systemId, regionId, name) {
+        return _regionPatch(systemId, regionId, { name: String(name ?? '') });
+      },
+      async toggleRegionEnabled(systemId, regionId, enabled) {
+        return _regionPatch(systemId, regionId, { enabled: enabled === true });
+      },
+      // Merge-patch a single region; the store merges over the existing record so
+      // fields the caller omits round-trip untouched. Backs the full Travel
+      // region authoring surface (description/img/secret/biomes).
+      async updateRegion(systemId, regionId, patch = {}) {
+        return _regionPatch(systemId, regionId, patch && typeof patch === 'object' ? patch : {});
+      },
+      async setGatheringRegionsEnabled(systemId, enabled) {
+        const regionStore = getRegionStore();
+        if (!regionStore?.updateRegionSettings || !systemId) return false;
+        clearErrors();
+        travelSaving.set(true);
+        patch();
+        try {
+          await regionStore.updateRegionSettings(systemId, { enabled: enabled === true });
+          return true;
+        } catch (err) {
+          applyError(err);
+          return false;
+        } finally {
+          travelSaving.set(false);
+          patch();
+        }
+      },
+      async deleteRegion(systemId, regionId) {
+        const regionStore = getRegionStore();
+        if (!regionStore || !systemId) return false;
+        const region = regionStore.get?.(systemId, regionId);
+        const name = _escapeHtml(region?.name || regionId);
+        // Collect referenced-by evidence WITHOUT deleting first: GatheringRegionStore.delete
+        // returns it post-delete, but we surface it in the confirm copy beforehand by
+        // probing the collaborators the store uses.
+        const references = _collectRegionReferences(systemId, regionId);
+        const refLine = (references.environments.length > 0 || references.parties.length > 0)
+          ? `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Regions.DeleteReferenced', {
+            environments: references.environments.length,
+            parties: references.parties.length
+          }) || `It is still referenced by ${references.environments.length} environment(s) and ${references.parties.length} party override(s).`}</p>`
+          : '';
+        const confirmed = await services.confirmDialog?.({
+          title: services.localize?.('FABRICATE.Admin.Manager.Travel.Regions.DeleteTitle', { name })
+            || `Delete ${name}?`,
+          content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Regions.DeleteContent', { name })
+            || `Delete region <strong>${name}</strong>?`}</p>${refLine}`,
+          yes: () => true,
+          no: () => false
+        });
+        if (!confirmed) return false;
+        clearErrors();
+        travelSaving.set(true);
+        patch();
+        try {
+          await regionStore.delete(systemId, regionId, {
+            environmentStore: _getEnvironmentStore(),
+            partyStore: getPartyStore()
+          });
+          return true;
+        } catch (err) {
+          applyError(err);
+          return false;
+        } finally {
+          travelSaving.set(false);
+          patch();
+        }
+      }
+    };
+
+    function _collectRegionReferences(systemId, regionId) {
+      const environments = [];
+      const parties = [];
+      const environmentStore = _getEnvironmentStore();
+      const envList = typeof environmentStore?.listBySystem === 'function'
+        ? environmentStore.listBySystem(systemId)
+        : (typeof environmentStore?.list === 'function' ? environmentStore.list() : []);
+      // listBySystem may be async (environment store); only use synchronous arrays here.
+      if (Array.isArray(envList)) {
+        for (const env of envList) {
+          const included = Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId);
+          const excluded = Array.isArray(env?.excludedRegionIds) && env.excludedRegionIds.includes(regionId);
+          if (included || excluded) environments.push({ id: env.id, name: env.name });
+        }
+      }
+      const partyStore = getPartyStore();
+      const partyList = typeof partyStore?.list === 'function' ? partyStore.list() : [];
+      for (const party of Array.isArray(partyList) ? partyList : []) {
+        const override = party?.currentRegionOverrides?.[systemId];
+        if (override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId)) {
+          parties.push({ id: party.id, name: party.name });
+        }
+      }
+      return { environments, parties };
+    }
+
+    async function _regionPatch(systemId, regionId, patchData) {
+      const regionStore = getRegionStore();
+      if (!regionStore || !systemId) return false;
+      clearErrors();
+      travelSaving.set(true);
+      patch();
+      try {
+        await regionStore.update(systemId, regionId, patchData);
+        return true;
+      } catch (err) {
+        applyError(err);
+        return false;
+      } finally {
+        travelSaving.set(false);
+        patch();
+      }
+    }
   }
 
   /**
@@ -2766,7 +3230,8 @@ export function createAdminStore(services) {
       itemSearchTerm: get(itemSearch),
       graphData,
       graphSearchTerm: get(graphSearch),
-      ...environmentState
+      ...environmentState,
+      ...travel.buildState()
     }));
   }
 
@@ -2975,7 +3440,7 @@ export function createAdminStore(services) {
       'selectionMode',
       'compositionMode',
       'sceneUuid',
-      'region',
+      'includedRegionIds',
       'biomes',
       'dangerTags',
       'dangerLevel',
@@ -3011,7 +3476,7 @@ export function createAdminStore(services) {
         next.img = normalized || null;
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
+      } else if (['includedRegionIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
@@ -3365,6 +3830,63 @@ export function createAdminStore(services) {
             environmentDraft.set({
               ...currentDraft,
               enabled: saved.enabled === true
+            });
+            persistedEnvironmentDraft.set(saved);
+          }
+        } else {
+          _setEnvironmentDraftState(saved, {
+            persistedDraft: saved,
+            dirty: false,
+            isNew: false,
+            saveError: null
+          });
+        }
+      }
+      environmentSaveError.set(null);
+      environmentValidationState.set(null);
+      await refresh();
+      return true;
+    } catch (err) {
+      environmentSaveError.set(_environmentErrorMessage(err));
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return false;
+    }
+  }
+
+  // Add or remove a region "tag" on a specific environment's includedRegionIds,
+  // persisting immediately. Driven from the Regions tab membership editor; the
+  // inverse of the environment editor's own region selector.
+  async function setEnvironmentRegionMembership(environmentId, regionId, included) {
+    const targetId = environmentId || '';
+    const region = String(regionId ?? '');
+    if (!targetId || !region) return false;
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.update) return false;
+
+    const environments = get(viewState).environments || [];
+    const target = environments.find(environment => environment.id === targetId);
+    if (!target) return false;
+
+    const current = Array.isArray(target.includedRegionIds) ? target.includedRegionIds : [];
+    const has = current.includes(region);
+    if (included === has) return true; // already in the desired state
+    const nextIds = included ? [...current, region] : current.filter(id => id !== region);
+    const payload = {
+      ..._clonePlain(target),
+      includedRegionIds: nextIds
+    };
+
+    try {
+      const saved = _clonePlain(await environmentStore.update(targetId, payload) || payload);
+      if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
+        if (get(environmentDraftDirty)) {
+          const currentDraft = _clonePlain(get(environmentDraft));
+          if (currentDraft?.id === targetId) {
+            environmentDraft.set({
+              ...currentDraft,
+              includedRegionIds: Array.isArray(saved.includedRegionIds) ? saved.includedRegionIds : nextIds
             });
             persistedEnvironmentDraft.set(saved);
           }
@@ -3773,9 +4295,6 @@ export function createAdminStore(services) {
     for (const environment of environments) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
       let payload = null;
-      if (kind === 'regions' && _normalizeGatheringVocabularyId(environment.region) === id) {
-        payload = { ..._clonePlain(environment), region: '' };
-      }
       if (kind === 'biomes') {
         const nextBiomes = _normalizeGatheringTagList(environment.biomes ?? environment.biome)
           .filter(existing => _normalizeGatheringVocabularyId(existing) !== id);
@@ -3798,20 +4317,6 @@ export function createAdminStore(services) {
     const nextValues = vocabulary.values.filter(option => option.id !== id);
     if (nextValues.length === vocabulary.values.length) return true;
     systemConfig.vocabularies[kind] = { values: nextValues };
-    if (kind === 'regions') {
-      systemConfig.tasks = systemConfig.tasks.map(task => ({
-        ...task,
-        regions: _normalizeGatheringTagList(Array.isArray(task.regions)
-          ? task.regions
-          : task.region ? [task.region] : []).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
-      }));
-      systemConfig.hazards = systemConfig.hazards.map(hazard => ({
-        ...hazard,
-        regions: _normalizeGatheringTagList(Array.isArray(hazard.regions)
-          ? hazard.regions
-          : hazard.region ? [hazard.region] : []).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
-      }));
-    }
     if (kind === 'biomes') {
       systemConfig.tasks = systemConfig.tasks.map(task => ({
         ...task,
@@ -4748,6 +5253,7 @@ export function createAdminStore(services) {
     reorderEnvironments,
     moveEnvironmentDraft,
     toggleEnvironmentEnabled,
+    setEnvironmentRegionMembership,
     toggleSystemEnabled,
     toggleFeature,
     toggleAdvancedOptions,
@@ -4826,6 +5332,30 @@ export function createAdminStore(services) {
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,
+    // --- Travel (parties + per-system current-region overrides) ---
+    refreshTravelParties: travel.refreshTravelParties,
+    selectParty: travel.selectParty,
+    createParty: travel.createParty,
+    renameParty: travel.renameParty,
+    setPartyEnabled: travel.setPartyEnabled,
+    deleteParty: travel.deleteParty,
+    addPartyMember: travel.addPartyMember,
+    addOrMovePartyMember: travel.addOrMovePartyMember,
+    removePartyMember: travel.removePartyMember,
+    movePartyMember: travel.movePartyMember,
+    setPartyTravelActor: travel.setPartyTravelActor,
+    clearPartyTravelActor: travel.clearPartyTravelActor,
+    setPartyRegionOverride: travel.setPartyRegionOverride,
+    clearPartyRegionOverride: travel.clearPartyRegionOverride,
+    removeStaleMember: travel.removeStaleMember,
+    clearStaleTravelActor: travel.clearStaleTravelActor,
+    dropStaleOverrideRegion: travel.dropStaleOverrideRegion,
+    createRegionQuick: travel.createRegionQuick,
+    renameRegion: travel.renameRegion,
+    toggleRegionEnabled: travel.toggleRegionEnabled,
+    updateRegion: travel.updateRegion,
+    deleteRegion: travel.deleteRegion,
+    setGatheringRegionsEnabled: travel.setGatheringRegionsEnabled,
     refresh,
     refreshGatheringConfig,
     destroy

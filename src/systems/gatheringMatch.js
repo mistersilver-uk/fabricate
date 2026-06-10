@@ -2,15 +2,19 @@
  * Shared, dependency-free environment matching for gathering library records.
  *
  * A reusable task/hazard "matches" an environment when none of its declared
- * region / biome / weather / time / danger constraints conflict with the
- * environment context. An empty constraint means "any" and never blocks a
- * match. This module is the single source of truth consumed by both the
- * runtime composition service (`GatheringRichStateService`) and the Manager V2
- * admin store, so match results and the GM-facing match evidence never drift.
+ * biome / weather / time / danger constraints conflict with the environment
+ * context. An empty constraint means "any" and never blocks a match. This
+ * module is the single source of truth consumed by both the runtime composition
+ * service (`GatheringRichStateService`) and the Manager V2 admin store, so match
+ * results and the GM-facing match evidence never drift.
+ *
+ * Region is NOT a composition axis: geography (`GatheringRegion`) drives
+ * location availability and travel, not which tasks/hazards belong to an
+ * environment. Composition is biome (+ danger for hazards) only.
  *
  * @typedef {'match' | 'any' | 'mismatch'} MatchFieldState
  * @typedef {{ state: MatchFieldState, recordValues: string[], envValues: string[], applicable: boolean }} MatchFieldEvidence
- * @typedef {{ region: MatchFieldEvidence, biome: MatchFieldEvidence, weather: MatchFieldEvidence, time: MatchFieldEvidence, danger: MatchFieldEvidence }} MatchEvidence
+ * @typedef {{ biome: MatchFieldEvidence, weather: MatchFieldEvidence, time: MatchFieldEvidence, danger: MatchFieldEvidence }} MatchEvidence
  */
 
 function normalizeTag(value) {
@@ -42,11 +46,6 @@ function hasAny(left, right) {
   return left.some(entry => right.includes(entry));
 }
 
-function recordRegionList(record) {
-  if (Array.isArray(record?.regions)) return normalizeTagList(record.regions);
-  return record?.region ? normalizeTagList([record.region]) : [];
-}
-
 /**
  * Canonical danger-level severity scale (ascending). An environment carries a
  * single danger level; a hazard is eligible when its highest danger tag ranks
@@ -76,11 +75,12 @@ export function resolveEnvironmentDangerLevel(environment = {}) {
  * Evaluate whether a record matches an environment and produce per-dimension
  * evidence for display.
  *
- * Matching is decided by region, biome, and (for hazards) danger only —
- * weather and time-of-day are runtime gates, not match criteria. A record with
- * the right region/biome/danger but the wrong current weather/time still
- * matches the environment; `conditionsMet` is `false` in that case so callers
- * can mark it inactive at runtime without dropping it from composition.
+ * Matching is decided by biome and (for hazards) danger only — weather and
+ * time-of-day are runtime gates, not match criteria, and region is geography
+ * (not composition). A record with the right biome/danger but the wrong current
+ * weather/time still matches the environment; `conditionsMet` is `false` in that
+ * case so callers can mark it inactive at runtime without dropping it from
+ * composition.
  *
  * @param {object} record Library task or hazard.
  * @param {object} environment Environment (raw or composed).
@@ -93,11 +93,9 @@ export function resolveEnvironmentDangerLevel(environment = {}) {
 export function evaluateEnvironmentMatch(record = {}, environment = {}, conditions = {}, options = {}) {
   const { includeDanger = false, conditionSettings = null } = options;
 
-  const envRegion = normalizeTag(environment?.region);
   const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
   const envDangerLevel = resolveEnvironmentDangerLevel(environment);
 
-  const region = evaluateTagField(recordRegionList(record), envRegion ? [envRegion] : [], { requireAll: false });
   const biome = evaluateTagField(normalizeTagList(record?.biomes), envBiomes, { requireAll: false });
 
   const weatherEnabled = conditionSettings?.weather?.enabled !== false;
@@ -112,9 +110,9 @@ export function evaluateEnvironmentMatch(record = {}, environment = {}, conditio
     ? evaluateDangerField(recordDanger, envDangerLevel)
     : { state: 'any', recordValues: recordDanger, envValues: envDangerLevel ? [envDangerLevel] : [], applicable: false };
 
-  const evidence = { region, biome, weather, time, danger };
+  const evidence = { biome, weather, time, danger };
   // Matching ignores weather/time — those become runtime gates surfaced via conditionsMet.
-  const matches = region.state !== 'mismatch' && biome.state !== 'mismatch' && danger.state !== 'mismatch';
+  const matches = biome.state !== 'mismatch' && danger.state !== 'mismatch';
   const conditionsMet = weather.state !== 'mismatch' && time.state !== 'mismatch';
   return { matches, conditionsMet, evidence };
 }

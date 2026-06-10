@@ -113,8 +113,9 @@ test('0.7.0 runs from 0.6.0 and moves config tools onto the system, bumping the 
   const config = settings.store.get('gatheringConfig');
   assert.deepEqual(systems[0].tools.map(t => t.id), ['t1']);
   assert.equal('tools' in config.systems['sys-1'], false);
-  // The full runner also applies the later 0.8.0 economy-toggle migration.
-  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
+  // The full runner also applies the later 0.8.0 economy-toggle and 0.9.0
+  // region-unification migrations, so the version advances to the latest.
+  assert.equal(settings.store.get('migrationVersion'), '0.9.0');
 });
 
 test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7.0', async () => {
@@ -128,13 +129,14 @@ test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7
   await runner.run();
 
   // The 0.7.0 tool-reconciliation is gated out (config tools untouched). The
-  // later 0.8.0 economy-toggle migration is still pending and runs, but with no
-  // legacy economy `mode` to rewrite it is a data no-op — only the version bumps.
+  // later 0.8.0 economy-toggle and 0.9.0 region-unification migrations are still
+  // pending and run, but with no legacy economy `mode` and no region vocabulary
+  // to rewrite they are data no-ops — only the version bumps.
   const config = settings.store.get('gatheringConfig');
   assert.ok('tools' in config.systems['sys-1'], 'config tools untouched when the 0.7.0 gate blocks the run');
   const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted');
-  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (0.8.0 is a data no-op here)');
+  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (0.8.0/0.9.0 are data no-ops here)');
   assert.deepEqual(setKeys, ['migrationVersion'], 'only the version advances');
-  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
+  assert.equal(settings.store.get('migrationVersion'), '0.9.0');
 });

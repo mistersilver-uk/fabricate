@@ -12,7 +12,6 @@
 
   const FIELDS = [
     { key: 'biome', label: 'Biome', anyFallback: 'All biomes' },
-    { key: 'region', label: 'Region', anyFallback: 'All regions' },
     { key: 'weather', label: 'Weather', anyFallback: 'Any weather' },
     { key: 'time', label: 'Time', anyFallback: 'Any time' },
     { key: 'danger', label: 'Danger', anyFallback: 'Any danger' }
@@ -97,13 +96,13 @@
     });
   }
 
-  // Which dimensions to surface. Chips: the two primary axes (biome, region)
-  // plus any other dimension that actually constrains the match. Checks: every
-  // applicable dimension so the inspector explains the full evaluation.
+  // Which dimensions to surface. Chips: the primary axis (biome) plus any other
+  // dimension that actually constrains the match. Checks: every applicable
+  // dimension so the inspector explains the full evaluation.
   const shown = $derived(FIELDS.filter(field => {
     const entry = entryFor(field);
     if (variant === 'checks') return true;
-    if (field.key === 'biome' || field.key === 'region') return true;
+    if (field.key === 'biome') return true;
     return entry && entry.applicable !== false && entry.state !== 'any';
   }).map(field => {
     const entry = entryFor(field);

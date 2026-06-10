@@ -37,13 +37,15 @@ Capabilities:
 
 1. Create, rename, enable/disable, and delete Fabricate parties.
 2. Assign actor members to a party.
-3. Assign exactly one travel token to a party.
-4. Prevent assigning a travel token already used by another enabled Fabricate party.
+3. Assign exactly one travel actor to a party — the actor that represents the party on a campaign map.
+4. Prevent assigning a travel actor already used by another enabled Fabricate party.
 5. Prevent assigning an actor already used by another enabled Fabricate party.
-6. Surface stale actor or token references and provide repair/remove actions.
+6. Surface stale member or travel actor references and provide remove/clear actions; repair means removing the stale reference and re-assigning through the normal pickers.
+6a. When the world contains no actors, member and travel-actor pickers must show an explicit empty state directing the GM to create an Actor first.
+6b. The enable toggle must be disabled (with an "assign a travel actor to enable" hint) while a party has no travel actor, and newly created parties must visibly show their disabled state.
 7. Show each party's current-region evidence per selected gathering system.
 8. Provide GM controls to set or clear a manual current-region override for the selected party and crafting system.
-9. Present a minimum setup checklist: create region, optionally gate environments, create party, assign a placed token, set current region.
+9. Present a minimum setup checklist: create region, optionally gate environments, create party, assign a travel actor, set current region.
 10. Make Scene Region mapping visibly advanced/future automation, not required setup.
 
 ### Region Discovery Controls
@@ -80,7 +82,7 @@ Requirements:
 1. Show the selected actor's party when the actor belongs to a Fabricate party.
 2. Show current region names when the selected actor is allowed to know them.
 3. Show "Undiscovered region" style placeholders for secret current regions that are not discovered by the selected actor.
-4. Show whether current region evidence comes from GM override, travel token automation, or is unresolved.
+4. Show the current-region evidence source using the canonical labels `GM override`, `Travel actor`, and `No current region`. While Scene Region automation is unimplemented, the `Travel actor` source is presented as "automation not yet available" rather than hidden.
 5. If the actor is not in a party, show a concise no-party location state without blocking non-location-gated environments.
 6. Current-region display must fit narrow Foundry ApplicationV2 layouts without overlapping actor/stamina controls.
 7. Current-region chips must wrap within the app container and must not force horizontal scrolling.
@@ -119,9 +121,9 @@ The selected-system Gathering area adds `Regions` and `Travel` routes when this 
 
 ### Accessibility And Responsive Layout
 
-- Actor, token, region, and Scene Region assignment controls must provide searchable picker flows in addition to any drag/drop affordance.
+- Actor, travel actor, region, and Scene Region assignment controls must provide searchable picker flows in addition to any drag/drop affordance.
 - Remove, repair, reveal, hide, and override actions must be keyboard reachable.
-- Duplicate-token and duplicate-actor membership errors must be inline, associated with the relevant control, and announced through the same accessible validation pattern used by other Manager forms.
+- Duplicate-travel-actor and duplicate-actor membership errors must be inline, associated with the relevant control, and announced through the same accessible validation pattern used by other Manager forms.
 - Region and Travel tables/cards must stack under existing Manager container-width rules.
 - Environment availability pickers, current-region chips, and multi-destination guidance must wrap at narrow app widths without clipping text or causing horizontal overflow.
 - Player travel guidance should collapse from multi-destination prose into short known/undiscovered chips when space is constrained.
@@ -134,7 +136,7 @@ The existing region filter applies to environment metadata. When location-aware 
 
 - Component tests for Region management list/editor states, secret markers, and stale mapping warnings.
 - Component tests for environment location availability controls and exclusion precedence hints.
-- Component tests for Travel management, actor/token picker keyboard flows, travel-token uniqueness errors, actor membership uniqueness errors, stale reference repair evidence, and current-region override controls.
+- Component tests for Travel management, actor picker keyboard flows, travel-actor uniqueness errors, actor membership uniqueness errors, stale reference repair evidence, and current-region override controls.
 - Component tests for player current-region display with known, secret undiscovered, no-party, override, and unresolved states.
 - Component tests for unavailable travel guidance with known destinations, undiscovered destinations, and mixed blocker reasons.
 - Component tests asserting secret undiscovered region names/ids are absent from rendered text, `title`, `aria-label`, filter labels, and DOM `data-*` attributes for non-GM users.

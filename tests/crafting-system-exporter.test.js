@@ -361,3 +361,36 @@ test('makeExportFilename: includes date in ISO format', () => {
 
   assert.ok(dateMatch, 'Filename should contain ISO date');
 });
+
+// ---------------------------------------------------------------------------
+// Gathering regions ride-along (export + import validation)
+// ---------------------------------------------------------------------------
+
+test('buildExportPayload: includes gatheringRegions on the system payload', () => {
+  const system = makeSystem({
+    gatheringRegions: [{ id: 'r1', craftingSystemId: 'sys-1', name: 'Verdant', enabled: true }],
+    gatheringRegionSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' }
+  });
+  const payload = buildExportPayload(system, [], '1.0.0');
+  assert.equal(payload.system.gatheringRegions.length, 1);
+  assert.equal(payload.system.gatheringRegions[0].name, 'Verdant');
+  assert.equal(payload.system.gatheringRegionSettings.revealMode, 'alwaysVisible');
+});
+
+test('validateImportData: rejects non-array gatheringRegions', () => {
+  const result = validateImportData({
+    fabricateVersion: '1.0.0',
+    system: { name: 'X', gatheringRegions: { not: 'an array' } }
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => e.includes('gatheringRegions')));
+});
+
+test('validateImportData: warns on a region missing a name', () => {
+  const result = validateImportData({
+    fabricateVersion: '1.0.0',
+    system: { name: 'X', gatheringRegions: [{ id: 'r1' }] }
+  });
+  assert.equal(result.valid, true);
+  assert.ok(result.warnings.some(w => w.includes('Gathering region')));
+});

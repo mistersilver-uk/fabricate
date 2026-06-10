@@ -52,7 +52,6 @@ function fakeStore(overrides = {}) {
     store: {
       selectableActors,
       selectedActorId,
-      region: overrides.region ?? '',
       staminaPool: overrides.staminaPool ?? null,
       conditions: overrides.conditions ?? null,
       loaded: overrides.loaded ?? true,
@@ -283,11 +282,10 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.equal(option.getAttribute('title'), longName, 'option exposes the full name via title');
   });
 
-  it('shows time-of-day and region on the gathering tab', async () => {
+  it('shows weather and time-of-day on the gathering tab', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      region: 'Greenvale',
       conditions: { weather: 'clear', timeOfDay: 'dusk' }
     });
     await mountBar({ store, activeTab: 'gathering' });
@@ -299,15 +297,15 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.Weather.clear'), 'weather value label');
     assert.ok(right.querySelector('.actor-bar-time i.fa-clock'), 'fixed time-of-day category icon renders');
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.dusk'), 'time-of-day value label');
-    assert.ok(right.querySelector('.actor-bar-region i.fa-map-location-dot'), 'region uses the map icon (not a text label)');
-    assert.ok(right.textContent.includes('Greenvale'), 'region value shown');
+    // Region is no longer a composition/display axis: the legacy inert
+    // environment.region chip was removed with the gathering-regions unification.
+    assert.equal(right.querySelector('.actor-bar-region'), null, 'legacy region chip removed');
   });
 
   it('falls back to the clock + Unknown label when timeOfDay is missing', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      region: '',
       conditions: { weather: 'clear' }
     });
     await mountBar({ store, activeTab: 'gathering' });
@@ -315,14 +313,12 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const right = target.querySelector('.actor-bar-right');
     assert.ok(right.querySelector('.actor-bar-time i.fa-clock'), 'fallback clock icon renders');
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.Unknown'), 'unknown label');
-    assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.Region.None'), 'no-region placeholder');
   });
 
   it('hides the gathering-only context on non-gathering tabs', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      region: 'Greenvale',
       conditions: { weather: 'clear', timeOfDay: 'day' }
     });
     await mountBar({ store, activeTab: 'crafting' });
@@ -359,7 +355,6 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      region: 'Greenvale',
       conditions: { weather: 'clear', timeOfDay: 'dusk' }
     });
     await mountBar({

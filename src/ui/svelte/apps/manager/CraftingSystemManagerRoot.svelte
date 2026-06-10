@@ -10,6 +10,7 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringHazardEditView from './GatheringHazardEditView.svelte';
+  import RegionNameField from './RegionNameField.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -37,7 +38,12 @@
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
   let activeGatheringTab = $state('environments');
+  let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
+
+  function selectTravelTab(tabId) {
+    if (['parties', 'regions', 'map'].includes(tabId)) activeTravelTab = tabId;
+  }
   let selectedGatheringTaskId = $state('');
   let selectedGatheringHazardId = $state('');
   let selectedGatheringDropId = $state('');
@@ -484,6 +490,16 @@
       hintFallback: 'Browse reusable hazards before attaching them to environments.'
     },
     {
+      id: 'travel',
+      icon: 'fas fa-route',
+      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel',
+      labelFallback: 'Travel',
+      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
+      titleFallback: 'Travel and parties',
+      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
+      hintFallback: 'Manage Fabricate parties and set the current region for this crafting system.'
+    },
+    {
       id: 'settings',
       icon: 'fas fa-sliders',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Settings',
@@ -494,14 +510,29 @@
       hintFallback: 'Set system-level rules for gathering.'
     }
   ];
-  const gatheringInspectorTabs = gatheringNavItems.filter(tab => tab.id !== 'environments');
+  // The Travel/Regions subsystem is opt-in per system. When disabled, the Travel
+  // nav item is hidden AND removed from the tab-resolution lists so a stale
+  // `activeGatheringTab === 'travel'` falls back to environments (filtering the
+  // render alone is insufficient — the guards below validate against this list).
+  const gatheringRegionsEnabled = $derived($viewState.gatheringRegionSettings?.enabled === true);
+  const visibleGatheringNavItems = $derived(
+    gatheringRegionsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')
+  );
+  const gatheringInspectorTabs = $derived(visibleGatheringNavItems.filter(tab => tab.id !== 'environments'));
   const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-hazard-edit');
   const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && gatheringNavItems.some(tab => tab.id === activeGatheringTab)
+    isGatheringRoute && visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)
   );
   const activeGatheringInspectorTab = $derived(
     gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
   );
+  // Stale-tab guard: if the active tab is no longer visible (e.g. Travel after the
+  // GM disables Travel & Regions), fall back to Environments.
+  $effect(() => {
+    if (!visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)) {
+      activeGatheringTab = 'environments';
+    }
+  });
   const selectedGatheringRules = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
     rewardSelectionMode: 'highestRankedDrop',
     rewardLimit: 1,
@@ -542,10 +573,32 @@
       .filter(environment => String(environment?.craftingSystemId || '') === String(selectedSystemId || ''))
       .map(environment => ({ id: String(environment.id), name: String(environment.name || environment.id) }))
   );
+  const travelParties = $derived($viewState.travelParties || []);
+  const selectedTravelPartyId = $derived($viewState.selectedPartyId || '');
+  const selectedTravelParty = $derived(
+    travelParties.find(party => party.id === selectedTravelPartyId) || null
+  );
+  // Region selection is UI-local (no store resolution needed); the inspector
+  // reads the selected region from the system-region projection.
+  let selectedTravelRegionId = $state('');
+  const travelSystemRegions = $derived($viewState.selectedSystemRegions || []);
+  const selectedTravelRegion = $derived(
+    travelSystemRegions.find(region => region.id === selectedTravelRegionId) || null
+  );
+  // Mirror the Parties tab: keep a region selected whenever one exists, falling
+  // back to the first region when nothing is selected or the selection is gone.
+  $effect(() => {
+    if (travelSystemRegions.length === 0) {
+      if (selectedTravelRegionId) selectedTravelRegionId = '';
+    } else if (!travelSystemRegions.some(region => region.id === selectedTravelRegionId)) {
+      selectedTravelRegionId = travelSystemRegions[0].id;
+    }
+  });
   const gatheringNavCounts = $derived({
     environments: environmentList.length,
     tasks: gatheringTaskDefinitions.length,
     encounters: gatheringHazardDefinitions.length,
+    travel: travelParties.length,
     total: environmentList.length + gatheringTaskDefinitions.length + gatheringHazardDefinitions.length
   });
   const selectedGatheringTask = $derived(
@@ -912,6 +965,7 @@
       ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
       : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
+    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle', 'Travel and parties');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') {
@@ -936,6 +990,7 @@
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.Manager.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
+    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current region for the selected crafting system.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') {
@@ -979,6 +1034,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
+    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
@@ -991,6 +1047,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Inspector', 'Tags and categories inspector');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Inspector', 'Selected gathering task inspector');
+    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector', 'Selected party inspector');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Inspector', 'Selected environment inspector');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Inspector', 'System edit evidence');
@@ -1982,13 +2039,13 @@
   }
 
   function selectGatheringTab(tabId) {
-    activeGatheringTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    activeGatheringTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
     gatheringMenuExpanded = true;
   }
 
   function openGatheringSection(tabId = 'environments') {
     if (!canShowEnvironments) return;
-    const nextTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    const nextTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
       gatheringMenuExpanded = true;
@@ -2288,9 +2345,7 @@
   }
 
   function gatheringOptionLabel(kind, id) {
-    const options = kind === 'biome'
-      ? selectedGatheringSystemConfig.vocabularies?.biomes?.values
-      : selectedGatheringSystemConfig.vocabularies?.regions?.values;
+    const options = selectedGatheringSystemConfig.vocabularies?.biomes?.values;
     const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
     return String(option?.label || option?.id || id || '').trim();
   }
@@ -2481,12 +2536,6 @@
     });
   }
 
-  // Region selections may be stored as a `regions` array or a legacy single `region`.
-  function recordRegions(record) {
-    if (Array.isArray(record?.regions)) return record.regions;
-    return record?.region ? [record.region] : [];
-  }
-
   function activeGatheringTaskEnvironmentCount(task) {
     if (!task || task.enabled === false) return 0;
     const weatherSetting = selectedGatheringSystemConfig.conditions?.weather || {};
@@ -2494,14 +2543,10 @@
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const taskWeather = Array.isArray(task.weather) ? task.weather : [];
     const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
-    const taskRegions = Array.isArray(task.regions)
-      ? task.regions
-      : (task.region ? [task.region] : []);
     return environmentList.filter(environment => {
       if (environment?.enabled === false) return false;
       if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
       if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
-      if (taskRegions.length > 0 && !taskRegions.includes(String(environment?.region || ''))) return false;
       const environmentBiomes = Array.isArray(environment?.biomes)
         ? environment.biomes
         : (environment?.biome ? [environment.biome] : []);
@@ -2860,6 +2905,18 @@
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Create', 'Create gathering hazard')}</span>
         </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
+        <button type="button" class="manager-button is-primary" onclick={() => store.createParty?.()} disabled={!canShowEnvironments || $viewState.travelSaving}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
+        </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'regions'}
+        <button type="button" class="manager-button is-primary" onclick={async () => { const created = await store.createRegionQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRegionName', 'New region')); if (typeof created === 'string' && created) selectedTravelRegionId = created; }} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Travel.CreateRegion', 'Create region')}</span>
+        </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+        <!-- Map Region Links tab has no create action. -->
       {:else if currentView === 'environments'}
         <button type="button" class="manager-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -3046,7 +3103,7 @@
               </button>
               {#if gatheringMenuExpanded}
                 <div class="manager-nav-submenu" id="manager-gathering-submenu" aria-label={text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Label', 'Gathering sections')}>
-                  {#each gatheringNavItems as gatheringItem (gatheringItem.id)}
+                  {#each visibleGatheringNavItems as gatheringItem (gatheringItem.id)}
                     <button
                       type="button"
                       class={`manager-nav-subitem ${isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
@@ -3092,6 +3149,8 @@
         environmentTaskCounts={$viewState.environmentTaskCounts || {}}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
+        {activeTravelTab}
+        onSelectTravelTab={selectTravelTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedHazardId={selectedGatheringHazard?.id || selectedGatheringHazardId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
@@ -3123,6 +3182,40 @@
         onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}
         onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
         onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
+        gatheringRegionSettings={$viewState.gatheringRegionSettings || { enabled: false }}
+        onSetGatheringRegionsEnabled={(sys, enabled) => store.setGatheringRegionsEnabled?.(sys, enabled)}
+        onPickImagePath={services?.pickImagePath}
+        travelParties={travelParties}
+        travelSelectedPartyId={selectedTravelPartyId}
+        travelSaving={$viewState.travelSaving === true}
+        travelError={$viewState.travelError}
+        travelFieldErrors={$viewState.travelFieldErrors || {}}
+        travelActorOptions={$viewState.actorOptions || []}
+        travelSystemRegions={$viewState.selectedSystemRegions || []}
+        travelSelectedRegionId={selectedTravelRegionId}
+        onSelectRegion={(id) => selectedTravelRegionId = id}
+        onAddEnvironmentToRegion={(envId, regionId) => store.setEnvironmentRegionMembership?.(envId, regionId, true)}
+        onRemoveEnvironmentFromRegion={(envId, regionId) => store.setEnvironmentRegionMembership?.(envId, regionId, false)}
+        onSelectParty={(id) => store.selectParty?.(id)}
+        onCreateParty={() => store.createParty?.()}
+        onRenameParty={(id, name) => store.renameParty?.(id, name)}
+        onSetPartyEnabled={(id, enabled) => store.setPartyEnabled?.(id, enabled)}
+        onDeleteParty={(id) => store.deleteParty?.(id)}
+        onAddPartyMember={(id, uuid) => store.addOrMovePartyMember?.(id, uuid)}
+        onRemovePartyMember={(id, uuid) => store.removePartyMember?.(id, uuid)}
+        onMovePartyMember={(from, to, uuid) => store.movePartyMember?.(from, to, uuid)}
+        onSetPartyTravelActor={(id, uuid) => store.setPartyTravelActor?.(id, uuid)}
+        onClearPartyTravelActor={(id) => store.clearPartyTravelActor?.(id)}
+        onSetPartyRegionOverride={(id, sys, ids) => store.setPartyRegionOverride?.(id, sys, ids)}
+        onClearPartyRegionOverride={(id, sys) => store.clearPartyRegionOverride?.(id, sys)}
+        onRemoveStaleMember={(id, uuid) => store.removeStaleMember?.(id, uuid)}
+        onClearStaleTravelActor={(id) => store.clearStaleTravelActor?.(id)}
+        onDropStaleOverrideRegion={(id, sys, regionId) => store.dropStaleOverrideRegion?.(id, sys, regionId)}
+        onCreateRegionQuick={(sys, name) => store.createRegionQuick?.(sys, name)}
+        onRenameRegion={(sys, id, name) => store.renameRegion?.(sys, id, name)}
+        onToggleRegionEnabled={(sys, id, enabled) => store.toggleRegionEnabled?.(sys, id, enabled)}
+        onUpdateRegion={(sys, id, patch) => store.updateRegion?.(sys, id, patch)}
+        onDeleteRegion={(sys, id) => store.deleteRegion?.(sys, id)}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}>
@@ -3133,7 +3226,8 @@
             hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
             linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
-            regionOptions={gatheringVocabularyOptions('regions')}
+            regionRecords={$viewState.selectedSystemRegions || []}
+            regionsEnabled={gatheringRegionsEnabled}
             biomeOptions={gatheringVocabularyOptions('biomes')}
             dangerOptions={gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
@@ -3158,7 +3252,6 @@
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        regionOptions={gatheringVocabularyOptions('regions')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
@@ -3183,7 +3276,6 @@
         hazard={editingGatheringHazard}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        regionOptions={gatheringVocabularyOptions('regions')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
         onPickImagePath={services?.pickImagePath}
         onUpdateHazard={updateSelectedGatheringHazard}
@@ -3429,12 +3521,6 @@
             <section class="manager-inspector-card">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-task-fact="region">
-                  <span class="manager-fact-line"><strong>{recordRegions(selectedGatheringTask).length === 0
-                    ? text('FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region')
-                    : recordRegions(selectedGatheringTask).map(id => gatheringOptionLabel('region', id) || id).join(', ')
-                  }</strong>{#if recordRegions(selectedGatheringTask).length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>{/if}</span>
-                </div>
                 <div class="manager-fact" data-gathering-task-fact="biomes">
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
@@ -3944,12 +4030,6 @@
             <section class="manager-inspector-card">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Hazards.Details', 'Hazard details')}</h3>
               <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-hazard-fact="region">
-                  <span class="manager-fact-line"><strong>{recordRegions(selectedGatheringHazard).length === 0
-                    ? text('FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region')
-                    : recordRegions(selectedGatheringHazard).map(id => gatheringOptionLabel('region', id) || id).join(', ')
-                  }</strong>{#if recordRegions(selectedGatheringHazard).length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>{/if}</span>
-                </div>
                 <div class="manager-fact" data-gathering-hazard-fact="biomes">
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0 ? selectedGatheringHazard.biomes.length : text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
@@ -4158,6 +4238,154 @@
                 </span>
               </div>
             </div>
+          </section>
+        {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+          <section class="manager-inspector-card manager-travel-inspector" data-gathering-inspector-travel data-travel-inspector={activeTravelTab}>
+            {#if activeTravelTab === 'parties'}
+              {#if selectedTravelParty}
+                <div class="manager-inspector-title-row">
+                  <span class="manager-inspector-icon" aria-hidden="true">
+                    {#if selectedTravelParty.travelActor?.img}
+                      <img class="manager-travel-parties-thumb" src={selectedTravelParty.travelActor.img} alt="" />
+                    {:else}
+                      <i class="fas fa-people-group"></i>
+                    {/if}
+                  </span>
+                  <div class="manager-inspector-copy">
+                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.InspectorKicker', 'Selected party')}</p>
+                    <h2 class="manager-inspector-name">{selectedTravelParty.name}</h2>
+                  </div>
+                </div>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current region')}</h3>
+                  {#if selectedTravelParty.currentRegionEvidence.regions.length > 0}
+                    <ul class="manager-travel-evidence-regions">
+                      {#each selectedTravelParty.currentRegionEvidence.regions as region (region.id)}
+                        <li>
+                          {region.name}
+                          {#if !region.enabled}
+                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRegionChip', 'Disabled')}</span>
+                          {/if}
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRegions', 'No current region set for this system.')}</p>
+                  {/if}
+                </section>
+
+                <div class="manager-travel-inspector-actions">
+                  {#if selectedTravelParty.enabled}
+                    <button
+                      type="button"
+                      class="manager-button manager-party-enable-toggle is-on"
+                      disabled={$viewState.travelSaving === true}
+                      onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
+                    >
+                      <i class="fas fa-toggle-on" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span>
+                    </button>
+                  {:else}
+                    <button
+                      type="button"
+                      class="manager-button manager-party-enable-toggle is-off"
+                      disabled={$viewState.travelSaving === true || !selectedTravelParty.travelActorUuid}
+                      title={selectedTravelParty.travelActorUuid
+                        ? undefined
+                        : text('FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor', 'Assign a travel actor to enable this party.')}
+                      onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
+                    >
+                      <i class="fas fa-toggle-off" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span>
+                    </button>
+                  {/if}
+                  <button
+                    type="button"
+                    class="manager-button is-danger"
+                    disabled={$viewState.travelSaving === true}
+                    onclick={() => store.deleteParty?.(selectedTravelParty.id)}
+                  >
+                    <i class="fas fa-trash" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Delete', 'Delete party')}</span>
+                  </button>
+                </div>
+              {:else}
+                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>
+              {/if}
+            {:else if activeTravelTab === 'regions'}
+              {#if selectedTravelRegion}
+                <div class="manager-inspector-title-row">
+                  <span class="manager-inspector-icon" aria-hidden="true">
+                    <i class="fas fa-map-location-dot"></i>
+                  </span>
+                  <div class="manager-inspector-copy">
+                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.Regions.InspectorKicker', 'Selected region')}</p>
+                    <h2 class="manager-inspector-name">{selectedTravelRegion.name}</h2>
+                  </div>
+                </div>
+
+                <div class="manager-travel-inspector-actions">
+                  <button
+                    type="button"
+                    class="manager-button is-danger"
+                    disabled={$viewState.travelSaving === true}
+                    onclick={() => store.deleteRegion?.(selectedSystemId, selectedTravelRegion.id)}
+                  >
+                    <i class="fas fa-trash" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.Travel.Regions.Delete', 'Delete region')}</span>
+                  </button>
+                </div>
+
+                <section class="manager-inspector-card">
+                  <RegionNameField
+                    name={selectedTravelRegion.name}
+                    disabled={$viewState.travelSaving === true}
+                    onRename={(name) => store.renameRegion?.(selectedSystemId, selectedTravelRegion.id, name)}
+                  />
+                </section>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title"><i class="fas fa-seedling" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.EnvironmentsCardTitle', 'Environments')}</h3>
+                  {#if selectedTravelRegion.environments.length > 0}
+                    <ul class="manager-travel-region-environments">
+                      {#each selectedTravelRegion.environments as environment (environment.id)}
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true">
+                            {#if environment.img}<img src={environment.img} alt="" />{:else}<i class="fas fa-seedling"></i>{/if}
+                          </span>
+                          <span class="manager-travel-region-item-name">{environment.name}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Regions.NoEnvironments', 'No environments include this region yet.')}</p>
+                  {/if}
+                </section>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.PartiesCardTitle', 'Parties in this region')}</h3>
+                  {#if selectedTravelRegion.parties.length > 0}
+                    <ul class="manager-travel-region-parties">
+                      {#each selectedTravelRegion.parties as party (party.id)}
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true">
+                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
+                          </span>
+                          <span class="manager-travel-region-item-name">{party.name}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Regions.NoParties', 'No parties are currently in this region.')}</p>
+                  {/if}
+                </section>
+              {:else}
+                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RegionsPlaceholder', 'Select a region to see its details.')}</p>
+              {/if}
+            {:else if activeTravelTab === 'map'}
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder', 'Select a region to map it to Scene Regions.')}</p>
+            {/if}
           </section>
         {:else if currentView === 'environments' && activeGatheringInspectorTab}
           <section class="manager-inspector-card" data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}>

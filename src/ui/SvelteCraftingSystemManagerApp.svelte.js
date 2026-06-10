@@ -92,6 +92,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
+      getGatheringPartyStore: () => game?.fabricate?.getGatheringPartyStore?.() ?? null,
+      getGatheringRegionStore: () => game?.fabricate?.getGatheringRegionStore?.() ?? null,
+      getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
       getFoundrySystemId: () => game?.system?.id || '',
       isFabricateReady,
       onFabricateReady: (callback) => {
@@ -141,6 +144,17 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         Array.from(game.scenes?.contents || [])
           .map(scene => normalizeSceneOption(scene))
           .filter(scene => scene.uuid && scene.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      getActorOptions: () =>
+        Array.from(game.actors?.contents || [])
+          .map(actor => ({
+            uuid: actor.uuid,
+            id: actor.id,
+            name: actor.name,
+            img: actor.img || '',
+            type: actor.type || ''
+          }))
+          .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       getRollTableOptions: () =>
         Array.from(game.tables?.contents || [])

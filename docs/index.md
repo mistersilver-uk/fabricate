@@ -68,6 +68,8 @@ Recipes, gathering tasks, and salvage all require reusable, breakable equipment 
 
 GMs can define material-gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the `gathering` feature.
 
+Gathering can also be location-aware: GMs describe campaign geography as regions, group actors into Fabricate-managed parties, and gate environments by the party's current region. See [Gathering Regions & Travel]({% link gathering-regions.md %}).
+
 ## Canvas Interactables
 
 GMs can place Tools and Gathering Tasks directly on the scene as **Scene Region** interactables (with an optional on-canvas marker). Players activate them by walking a token into the region: a non-blocking prompt appears, and clicking **Interact** opens the Fabricate UI. See [Canvas Interactables]({% link canvas-interactables.md %}).

@@ -251,6 +251,12 @@ export class GatheringEnvironmentStore {
       region: stringOrEmpty(data?.region),
       biome: stringOrEmpty(data?.biome),
       biomes: normalizeStringList(data?.biomes ?? data?.biome),
+      // Explicit location availability rules (additive, opt-in). Legacy
+      // `region`/`biomes` above stay untouched as compatibility/display metadata.
+      includedRegionIds: normalizeIdList(data?.includedRegionIds),
+      excludedRegionIds: normalizeIdList(data?.excludedRegionIds),
+      includedBiomeIds: normalizeStringList(data?.includedBiomeIds),
+      excludedBiomeIds: normalizeStringList(data?.excludedBiomeIds),
       dangerTags: normalizeStringList(data?.dangerTags ?? data?.risk),
       dangerLevel: resolveEnvironmentDangerLevel(data),
       risk: VALID_RISK_LEVELS.has(data?.risk) ? data.risk : 'safe',
@@ -293,10 +299,31 @@ export class GatheringEnvironmentStore {
     const errors = [];
     const label = normalized.name || normalized.id;
 
+    const system = normalized.craftingSystemId ? this._getSystem(normalized.craftingSystemId) : null;
     if (!normalized.craftingSystemId) {
       errors.push(`Environment "${label}" is missing craftingSystemId`);
-    } else if (!this._getSystem(normalized.craftingSystemId)) {
+    } else if (!system) {
       errors.push(`Environment "${label}" references unresolved craftingSystemId "${normalized.craftingSystemId}"`);
+    }
+
+    // Region-id availability validation runs only at save boundaries where the
+    // owning system context resolves (regions live on the system, environments in
+    // a world setting). Load paths never reach here with a throw because the
+    // load path normalizes without validating. Stale biome ids are not rejected
+    // here — they remain compatibility input until a biome vocabulary surface
+    // ships.
+    if (system && Array.isArray(system.gatheringRegions)) {
+      const regionIds = new Set(system.gatheringRegions.map(region => region?.id).filter(Boolean));
+      for (const regionId of normalized.includedRegionIds) {
+        if (!regionIds.has(regionId)) {
+          errors.push(`Environment "${label}" includedRegionIds references unknown region "${regionId}"`);
+        }
+      }
+      for (const regionId of normalized.excludedRegionIds) {
+        if (!regionIds.has(regionId)) {
+          errors.push(`Environment "${label}" excludedRegionIds references unknown region "${regionId}"`);
+        }
+      }
     }
 
     if (!VALID_SELECTION_MODES.has(original?.selectionMode)) {

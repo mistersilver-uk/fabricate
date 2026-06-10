@@ -1230,6 +1230,8 @@ test('listForActor exposes per-hazard models (identity, danger, chance, matching
         {
           id: 'h1', name: 'Rockslide', description: 'Falling rocks.', img: 'icons/svg/hazard.svg',
           dropRate: 40, dangerTags: ['hazardous'],
+          // Legacy `regions` tag is ignored: region is no longer a composition
+          // axis and the hazard model no longer surfaces a regions field.
           weather: ['storm'], timeOfDay: ['night'], biomes: ['mountain'], regions: ['north'],
           linkedSceneUuid: 'Scene.abc'
         },
@@ -1255,9 +1257,8 @@ test('listForActor exposes per-hazard models (identity, danger, chance, matching
     timeOfDay: ['night'],
     biomes: ['mountain'],
     biomeTags: [],
-    regions: ['north'],
     linkedSceneUuid: 'Scene.abc'
-  }, 'the hazard model carries identity, danger, chance, and matching criteria');
+  }, 'the hazard model carries identity, danger, chance, and matching criteria (no region axis)');
 });
 
 test('listForActor defaults hazard matching criteria to empty arrays', async () => {
@@ -1271,7 +1272,8 @@ test('listForActor defaults hazard matching criteria to empty arrays', async () 
   assert.deepEqual(hazard.timeOfDay, []);
   assert.deepEqual(hazard.biomes, []);
   assert.deepEqual(hazard.biomeTags, []);
-  assert.deepEqual(hazard.regions, []);
+  // Region is no longer a composition axis: the hazard model has no regions field.
+  assert.equal('regions' in hazard, false);
   assert.equal(hazard.linkedSceneUuid, null);
 });
 

@@ -74,6 +74,9 @@ test('migrateGatheringConfig does not touch per-system vocabularies', () => {
   const result = migrateGatheringConfig(input);
 
   assert.deepEqual(result.vocabularies.regions, []);
+  // The 0.2.0 migration deliberately preserves per-system region vocab so the
+  // later 0.9.0 unify-regions migration can read it and derive GatheringRegion
+  // records before clearing it (see migrate-unify-gathering-regions.test.js).
   assert.deepEqual(result.systems['sys-a'].vocabularies.regions.values, ['system-scoped-region'],
-    'per-system regions are scoped and intentionally preserved');
+    'per-system regions preserved here so 0.9.0 can unify them downstream');
 });

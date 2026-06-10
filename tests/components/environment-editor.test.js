@@ -56,7 +56,7 @@ describe('environment editor localization', () => {
     const editor = lang.FABRICATE.Admin.Manager.EnvironmentEditor;
     assert.ok(editor, 'EnvironmentEditor namespace should exist');
     const checks = [
-      ['Overview', 'RegionHint'],
+      ['Overview', 'RegionsHint'],
       ['Overview', 'BiomesHint'],
       ['Overview', 'DangerHint'],
       ['Composition', 'Automatic'],
@@ -109,13 +109,16 @@ describe('environment editor localization', () => {
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
-      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.'],
-      ['Validation.CheckRegion', 'Has a region or is set to "any region"']
+      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.']
     ];
 
     for (const [path, value] of expected) {
       assert.equal(path.split('.').reduce((node, part) => node?.[part], editor), value, `EnvironmentEditor.${path}`);
     }
+
+    // Region is no longer a composition axis; the readiness check and its
+    // localized label were removed with the gathering-regions unification.
+    assert.equal(editor.Validation.CheckRegion, undefined, 'CheckRegion label should be removed');
   });
 
   it('keeps static EnvironmentEditor localization fallbacks aligned with en.json', () => {
@@ -136,8 +139,8 @@ describe('environment editor localization', () => {
 
   it('keeps dynamic EnvironmentEditor validation fallbacks aligned with en.json', () => {
     assert.ok(
-      validationSource.includes('hasRegion: [\'CheckRegion\', \'Has a region or is set to "any region"\']'),
-      'CheckRegion dynamic fallback should match the English catalog'
+      !validationSource.includes('CheckRegion') && !validationSource.includes('hasRegion'),
+      'the region readiness check and its dynamic fallback should be removed'
     );
     for (const snippet of [
       'task: [\'IssueStaleIncludedTask\', \'The task "{name}" no longer matches this environment.\']',
@@ -162,6 +165,34 @@ describe('environment editor localization', () => {
     for (const source of [shellSource, listSource, inspectorSource, tabsSource, evidenceSource, tasksTabSource, overviewSource, summaryInspectorSource]) {
       assert.ok(!/FABRICATE\.Admin\.Manager\.Environment\.(Overview|Composition|Evidence|Diagnostics|Tabs|Runtime|Inspector|Validation)\b/.test(source), 'editor sources should use the EnvironmentEditor namespace');
     }
+  });
+});
+
+describe('environment multi-region selector', () => {
+  it('replaces the single-region select with a toggle-gated includedRegionIds chip control', () => {
+    // The legacy single-region <select> bound to environment.region is gone.
+    assert.equal(overviewSource.includes("data-environment-field=\"region\""), false, 'legacy single-region select should be removed');
+    assert.equal(overviewSource.includes('onUpdate({ region:'), false, 'editor should not write the legacy region string');
+
+    // The multi-region chip control is bound to includedRegionIds and gated on the toggle.
+    assert.ok(overviewSource.includes("data-environment-field=\"includedRegionIds\""), 'region chip control should hook includedRegionIds');
+    assert.ok(overviewSource.includes('{#if regionsEnabled}'), 'region field is gated on the Travel & Regions toggle');
+    assert.ok(overviewSource.includes('onUpdate({ includedRegionIds:'), 'add/remove writes includedRegionIds');
+    assert.ok(/function\s+addRegion\s*\(/.test(overviewSource), 'addRegion handler should exist');
+    assert.ok(/function\s+removeRegion\s*\(/.test(overviewSource), 'removeRegion handler should exist');
+
+    // Empty-state hint points to the Travel tab when no regions exist.
+    assert.ok(overviewSource.includes('data-environment-region-empty'), 'empty-state hint hook should exist');
+    assert.ok(overviewSource.includes('regionOptions.length === 0'), 'empty state guards on no region options');
+    assert.equal(typeof lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsEmpty, 'string');
+    assert.ok(lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsEmpty.includes('Travel'), 'empty-state hint names the Travel tab');
+  });
+
+  it('sources region options from GatheringRegion records, not the removed vocabulary', () => {
+    assert.ok(overviewSource.includes('regionRecords'), 'overview consumes regionRecords (GatheringRegion records)');
+    assert.equal(shellSource.includes("regionOptions={gatheringVocabularyOptions('regions')}"), false, 'no longer sources region from the vocabulary');
+    assert.ok(managerRootSource.includes('regionRecords={$viewState.selectedSystemRegions'), 'root threads region records into the editor');
+    assert.ok(managerRootSource.includes('regionsEnabled={gatheringRegionsEnabled}'), 'root threads the toggle gate into the editor');
   });
 });
 

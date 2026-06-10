@@ -10,6 +10,12 @@ import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
+import { GatheringRegionStore } from './systems/GatheringRegionStore.js';
+import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
+import { GatheringLocationService } from './systems/GatheringLocationService.js';
+import { revealGatheringRegion, hideGatheringRegion, getDiscoveredRegionIdsForSystem } from './systems/gatheringRegionDiscovery.js';
+import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
+import { isGatheringRegionsEnabled } from './systems/gatheringRegions.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
@@ -512,6 +518,23 @@ class Fabricate {
       }
     });
     this.gatheringEnvironmentStore.load();
+    // Per-system gathering regions + Fabricate-managed parties + current-region
+    // resolver for location-aware gathering. Parties persist to a world setting;
+    // regions live on the crafting system via the region store's updateSystem
+    // seam. The resolver is constructor-injected into the engine (not imported).
+    this.gatheringRegionStore = new GatheringRegionStore({ systemManager: this.craftingSystemManager });
+    this.gatheringPartyStore = new GatheringPartyStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID(),
+      getUserId: () => game.user?.id || null,
+      now: () => Date.now()
+    });
+    this.gatheringPartyStore.load();
+    this.gatheringLocationService = new GatheringLocationService({
+      partyStore: this.gatheringPartyStore,
+      systemManager: this.craftingSystemManager
+    });
     this.gatheringRichStateService = new GatheringRichStateService({
       environmentStore: this.gatheringEnvironmentStore,
       getSetting,
@@ -559,6 +582,7 @@ class Fabricate {
         showPrompt: showHazardScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
+      locationResolver: this.gatheringLocationService,
       localize: localizeGathering
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
@@ -600,6 +624,18 @@ class Fabricate {
     if (migratedCount > 0 && game.user?.isGM) {
       const message = game.i18n?.format?.('FABRICATE.Migration.CatalystsToTools.Notice', { count: migratedCount })
         || `Fabricate migrated ${migratedCount} catalyst(s) to the Tools library. Find them under the Tools tab.`;
+      ui.notifications?.info?.(message);
+    }
+
+    // One-time GM-facing notice: when the 0.9.0 migration unified legacy regions on
+    // one or more systems, name them so the GM can re-enable Travel & Regions (the
+    // subsystem stays disabled by default) and knows region-scoped records may now
+    // appear in more environments. GM-only; only when something was migrated.
+    const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
+    if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
+      const systemList = unifiedRegionSystems.join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
+        || `Fabricate unified gathering regions for: ${systemList}. Travel & Regions is disabled by default — enable it per system. Region-scoped tasks/hazards may now appear in more environments.`;
       ui.notifications?.info?.(message);
     }
   }
@@ -653,6 +689,131 @@ class Fabricate {
    */
   getGatheringEnvironmentStore() {
     return this.gatheringEnvironmentStore;
+  }
+
+  /**
+   * Get the Fabricate-managed gathering party store (world-level parties).
+   *
+   * @returns {GatheringPartyStore|null}
+   */
+  getGatheringPartyStore() {
+    this._requireReady();
+    return this.gatheringPartyStore;
+  }
+
+  /**
+   * Get the per-system gathering region store.
+   *
+   * @returns {GatheringRegionStore|null}
+   */
+  getGatheringRegionStore() {
+    this._requireReady();
+    return this.gatheringRegionStore;
+  }
+
+  /**
+   * Get the current-region resolver used for location-aware gathering.
+   *
+   * @returns {GatheringLocationService|null}
+   */
+  getGatheringLocationService() {
+    this._requireReady();
+    return this.gatheringLocationService;
+  }
+
+  /**
+   * Read redaction-safe current-region evidence for a selected actor and system.
+   * Player-callable: the result reports only the resolved source token and
+   * disclosure-safe region display data, never raw secret region records.
+   *
+   * @param {{ actorId?: string, actor?: object, systemId: string }} options
+   * @returns {{ resolved: boolean, source: string, regions: object[], regionIds: string[], staleRegionIds: string[] }|null}
+   */
+  getGatheringLocationForActor({ actorId = null, actor = null, systemId = null } = {}) {
+    this._requireReady();
+    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
+    if (!resolvedActor || !systemId) return null;
+    // Region/travel disabled for this system ⇒ no location surface at all.
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
+    const context = this.gatheringLocationService?.buildCurrentRegionContext({ actor: resolvedActor, systemId });
+    if (!context) return null;
+    const isGM = game.user?.isGM === true;
+    const system = this.craftingSystemManager?.getSystem(systemId);
+    const revealMode = system?.gatheringRegionSettings?.revealMode || 'manual';
+    const discoveredRegionIds = getDiscoveredRegionIdsForSystem(resolvedActor, systemId);
+    return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRegionIds });
+  }
+
+  /**
+   * Set a party's manual current-region override for one crafting system. GM-only.
+   *
+   * @param {{ partyId: string, systemId: string, regionIds?: string[] }} options
+   * @returns {Promise<object|null>}
+   */
+  setGatheringPartyRegionOverride({ partyId = null, systemId = null, regionIds = [] } = {}) {
+    this._requireReady();
+    this._requireGM();
+    if (!partyId || !systemId) return null;
+    // Region/travel disabled ⇒ no-op (no override writes).
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
+    return this.gatheringPartyStore?.setCurrentRegionOverride(partyId, systemId, regionIds);
+  }
+
+  /**
+   * Clear a party's current-region override for one crafting system (stamped,
+   * empties regionIds). GM-only.
+   *
+   * @param {{ partyId: string, systemId: string }} options
+   * @returns {Promise<object|null>}
+   */
+  clearGatheringPartyRegionOverride({ partyId = null, systemId = null } = {}) {
+    this._requireReady();
+    this._requireGM();
+    if (!partyId || !systemId) return null;
+    // Region/travel disabled ⇒ no-op (no override writes).
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
+    return this.gatheringPartyStore?.clearCurrentRegionOverride(partyId, systemId);
+  }
+
+  /**
+   * Reveal a region's discovery on an actor. GM-only; validates the region
+   * belongs to the referenced crafting system before writing.
+   *
+   * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string, source?: string, partyId?: string }} options
+   * @returns {Promise<boolean>}
+   */
+  revealGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null, source = 'manual', partyId = null } = {}) {
+    this._requireReady();
+    this._requireGM();
+    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
+    if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
+    const system = this.craftingSystemManager?.getSystem(systemId);
+    // Region/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRegionsEnabled(system)) return Promise.resolve(false);
+    return revealGatheringRegion(resolvedActor, {
+      systemId,
+      regionId,
+      source,
+      partyId,
+      validateRegionInSystem: system,
+      now: () => Date.now()
+    });
+  }
+
+  /**
+   * Hide (remove) a region's discovery on an actor. GM-only.
+   *
+   * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string }} options
+   * @returns {Promise<boolean>}
+   */
+  hideGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null } = {}) {
+    this._requireReady();
+    this._requireGM();
+    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
+    if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
+    // Region/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
+    return hideGatheringRegion(resolvedActor, { systemId, regionId });
   }
 
   /**
@@ -1100,7 +1261,15 @@ function bindFabricateGlobal() {
     getConditions: () => fabricate.getGatheringConditions(),
     setWeather: (weatherTag) => fabricate.setGatheringWeather(weatherTag),
     setTimeOfDay: (timeOfDayTag) => fabricate.setGatheringTimeOfDay(timeOfDayTag),
-    setConditions: (conditions) => fabricate.setGatheringConditions(conditions)
+    setConditions: (conditions) => fabricate.setGatheringConditions(conditions),
+    getPartyStore: () => fabricate.getGatheringPartyStore(),
+    getRegionStore: () => fabricate.getGatheringRegionStore(),
+    getLocationService: () => fabricate.getGatheringLocationService(),
+    getLocationForActor: (options) => fabricate.getGatheringLocationForActor(options),
+    setPartyRegionOverride: (options) => fabricate.setGatheringPartyRegionOverride(options),
+    clearPartyRegionOverride: (options) => fabricate.clearGatheringPartyRegionOverride(options),
+    revealRegionForActor: (options) => fabricate.revealGatheringRegionForActor(options),
+    hideRegionForActor: (options) => fabricate.hideGatheringRegionForActor(options)
   };
 
   // Expose classes for advanced users
@@ -1116,6 +1285,9 @@ function bindFabricateGlobal() {
     CraftingRunManager,
     SalvageRunManager,
     GatheringEnvironmentStore,
+    GatheringRegionStore,
+    GatheringPartyStore,
+    GatheringLocationService,
     GatheringRunManager,
     GatheringGateAndCheckEvaluator,
     GatheringEngine,

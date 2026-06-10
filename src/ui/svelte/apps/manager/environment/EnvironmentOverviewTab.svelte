@@ -6,7 +6,8 @@
   let {
     environment = null,
     composition = { counts: {}, conditions: {} },
-    regionOptions = [],
+    regionRecords = [],
+    regionsEnabled = false,
     biomeOptions = [],
     dangerOptions = [],
     linkedSceneImage = '',
@@ -40,6 +41,28 @@
 
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
   const availableBiomes = $derived(biomeOptions.filter(option => !biomes.includes(optId(option))));
+
+  // Region membership (geography). Mirrors the biome chip control but sourced
+  // from the system's GatheringRegion records and gated on the Travel toggle.
+  const includedRegionIds = $derived(Array.isArray(environment?.includedRegionIds) ? environment.includedRegionIds : []);
+  const regionOptions = $derived((Array.isArray(regionRecords) ? regionRecords : []).map(region => ({
+    id: String(region?.id ?? '').trim(),
+    label: String(region?.name ?? region?.id ?? '').trim()
+  })).filter(option => option.id));
+  const availableRegions = $derived(regionOptions.filter(option => !includedRegionIds.includes(option.id)));
+
+  function regionLabel(id) {
+    return optLabel(regionOptions.find(option => optId(option) === id)) || id;
+  }
+  function addRegion(event) {
+    const id = String(event.currentTarget.value || '').trim();
+    event.currentTarget.value = '';
+    if (!id) return;
+    if (!includedRegionIds.includes(id)) onUpdate({ includedRegionIds: [...includedRegionIds, id] });
+  }
+  function removeRegion(id) {
+    onUpdate({ includedRegionIds: includedRegionIds.filter(value => value !== id) });
+  }
   const dangerLevelOptions = $derived((Array.isArray(dangerOptions) && dangerOptions.length > 0
     ? dangerOptions
     : DANGER_LEVELS
@@ -142,16 +165,36 @@
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Context', 'Environment context')}</h3>
         <div class="manager-environment-context-split">
           <div class="manager-environment-context-col">
-            <label class="manager-field manager-environment-context-field">
-              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Region', 'Region')}</span>
-              <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionHint', 'Where this environment is (optional). Tasks and hazards match a region if specified.')}</p>
-              <select data-environment-field="region" value={environment.region || ''} onchange={(event) => onUpdate({ region: event.currentTarget.value })}>
-                <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AnyRegion', 'Any region')}</option>
-                {#each regionOptions as option (optId(option))}
-                  <option value={optId(option)}>{optLabel(option)}</option>
-                {/each}
-              </select>
-            </label>
+            {#if regionsEnabled}
+              <div class="manager-field manager-environment-context-field" data-environment-field="includedRegionIds">
+                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Regions', 'Regions')}</span>
+                <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsHint', 'Which regions this environment belongs to. Players can gather here when their party is in one of these regions.')}</p>
+                {#if regionOptions.length === 0}
+                  <p class="manager-muted manager-environment-region-empty" data-environment-region-empty>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsEmpty', 'No regions yet. Create regions in the Travel tab first.')}</p>
+                {:else}
+                  {#if availableRegions.length > 0}
+                    <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRegion', 'Add region')} onchange={addRegion}>
+                      <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRegion', 'Add region')}</option>
+                      {#each availableRegions as option (optId(option))}
+                        <option value={optId(option)}>{optLabel(option)}</option>
+                      {/each}
+                    </select>
+                  {/if}
+                  <div class="manager-availability-pill-row">
+                    {#if includedRegionIds.length > 0}
+                      {#each includedRegionIds as id (id)}
+                        <span class="manager-availability-pill is-region">
+                          <span>{regionLabel(id)}</span>
+                          <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRegion', 'Remove {name}').replace('{name}', regionLabel(id))} onclick={() => removeRegion(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                        </span>
+                      {/each}
+                    {:else}
+                      <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRegions', 'No regions selected')}</span>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/if}
 
             <label class="manager-field manager-environment-context-field">
               <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger', 'Danger level')}</span>

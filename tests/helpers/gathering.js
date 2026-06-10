@@ -82,6 +82,8 @@ export function environment(overrides = {}) {
     name: 'Test Environment',
     enabled: true,
     selectionMode: 'targeted',
+    // Legacy `region` string: inert post-unification (region is no longer a
+    // composition axis), left here to prove it does not affect matching.
     region: 'north',
     biomes: ['forest'],
     dangerTags: ['hazardous'],

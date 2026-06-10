@@ -7,6 +7,7 @@ import { cleanupStalePreferences, isGatheringActorSelectableByUser } from '../co
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import { TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST, TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST, TOOL_REQUIREMENT_PROVIDERS as TOOL_REQUIREMENT_PROVIDER_LIST } from '../models/Tool.js';
+import { normalizeGatheringRegionList, normalizeGatheringRegionSettings } from './gatheringRegions.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -40,6 +41,7 @@ export class CraftingSystemManager {
   }
 
   _normalizeSystem(system = {}) {
+    const systemId = system.id || foundry.utils.randomID();
     const features = this._normalizeFeatures(system);
     const essenceDefinitions = this._normalizeEssenceDefinitions(
       system.essenceDefinitions ?? system.essences
@@ -70,7 +72,7 @@ export class CraftingSystemManager {
     });
 
     return {
-      id: system.id || foundry.utils.randomID(),
+      id: systemId,
       name: system.name || 'New Crafting System',
       description: system.description || '',
       enabled: system.enabled !== false,
@@ -108,7 +110,17 @@ export class CraftingSystemManager {
       // (`getSystem(id).tools`) — the recipe tool gate, salvage, the canvas
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
-      tools: Array.isArray(system.tools) ? system.tools.map(t => this._normalizeTool(t)) : []
+      tools: Array.isArray(system.tools) ? system.tools.map(t => this._normalizeTool(t)) : [],
+      // Per-system gathering region library (geography) + region behavior
+      // settings. Regions ride along with export/import for free because the
+      // exporter clones the normalized system and import funnels back through
+      // _normalizeSystem, which forces each region's craftingSystemId to this
+      // system id (self-heal on a copy-import that rebinds the system id).
+      gatheringRegions: normalizeGatheringRegionList(system.gatheringRegions, {
+        craftingSystemId: systemId,
+        randomID: () => foundry.utils.randomID()
+      }),
+      gatheringRegionSettings: normalizeGatheringRegionSettings(system.gatheringRegionSettings)
     };
   }
 

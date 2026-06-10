@@ -69,6 +69,20 @@ export function validateImportData(data) {
     if (!data.system.name || typeof data.system.name !== 'string') {
       errors.push('System is missing a "name" field');
     }
+    // Gathering regions ride along with the system. If present they must be an
+    // array; each region should carry a name (warning, not a hard error, so a
+    // hand-trimmed export still imports).
+    if (data.system.gatheringRegions !== undefined) {
+      if (!Array.isArray(data.system.gatheringRegions)) {
+        errors.push('System "gatheringRegions" field must be an array');
+      } else {
+        data.system.gatheringRegions.forEach((region, i) => {
+          if (region && typeof region === 'object' && !region.name) {
+            warnings.push(`Gathering region at index ${i} (id: ${region.id || 'unknown'}) has no name`);
+          }
+        });
+      }
+    }
   }
 
   // Recipes checks

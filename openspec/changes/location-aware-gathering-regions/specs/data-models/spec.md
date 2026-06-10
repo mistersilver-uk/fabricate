@@ -85,7 +85,7 @@ GatheringParty = {
   name: string,
   enabled: boolean,
   memberActorUuids: string[],
-  travelTokenUuid: string,
+  travelActorUuid: string | null,
   currentRegionOverrides?: {
     [systemId: string]: GatheringPartyRegionOverride,
   },
@@ -105,15 +105,18 @@ Requirements:
 
 1. `id` must be unique within Fabricate's party list.
 2. `memberActorUuids` stores actor UUIDs and defaults to an empty array.
-3. `travelTokenUuid` is required for enabled parties.
-4. `travelTokenUuid` must be a placed Scene Token document UUID, not an Actor UUID or prototype token reference.
-5. One enabled party must have exactly one travel token.
-6. One token UUID must not be assigned to more than one enabled party.
-7. One actor UUID must not appear in more than one enabled party's `memberActorUuids`.
-8. `currentRegionOverrides` is keyed by crafting system id because regions are per crafting system.
-9. A manual override may include more than one region id to support overlapping/mixed geography.
-10. `mode: "none"` clears the override and allows token-derived resolution.
-11. Stale actor, placed token, system, or region references must remain readable for GM repair.
+3. `travelActorUuid` is required for enabled parties and may be `null` on disabled parties.
+4. `travelActorUuid` must be an Actor document UUID — the actor that represents the party on a campaign map — not a placed Token UUID or prototype token reference.
+5. One enabled party must have exactly one travel actor.
+6. One travel actor UUID must not be assigned to more than one enabled party.
+7. One actor UUID must not appear in more than one enabled party's `memberActorUuids`. The travel actor may also be a member of its own party.
+8. An actor UUID may be associated with at most one enabled party in total, whether as a member, as the travel actor, or both; when both, it must be the same party. Membership in disabled parties does not count toward this invariant.
+9. `currentRegionOverrides` is keyed by crafting system id because regions are per crafting system.
+10. A manual override may include more than one region id to support overlapping/mixed geography.
+11. `mode: "none"` clears the override and allows token-derived resolution. Clearing is a stamped mutation: it sets `mode: "none"`, empties `regionIds`, and updates `updatedAt`/`updatedByUserId`. For a disabled or travel-actor-less party, `mode: "none"` resolves to no current region.
+12. A newly created party defaults to `enabled: false` because enabling requires a travel actor. Setting `enabled: true` without a travel actor is rejected at save boundaries.
+13. Duplicate party ids on read normalize by keeping the first occurrence; duplicates are rejected at save boundaries.
+14. Stale actor, system, or region references must remain readable for GM repair.
 
 ### GatheringRegionSettings
 
@@ -134,8 +137,10 @@ Requirements:
 
 ### Discovered Gathering Regions Flag
 
+Stored on actor flags via Fabricate's actor-flag helpers (`src/config/flags.js`), which write under the module's flag namespace. Logical shape:
+
 ```js
-Actor.flags.fabricate.discoveredGatheringRegions = {
+discoveredGatheringRegions = {
   [systemId: string]: {
     [regionId: string]: {
       discoveredAt: number,
@@ -210,7 +215,8 @@ Requirements:
 
 1. Party records are world-level because parties can be used across multiple crafting systems.
 2. Party records are JSON-serializable.
-3. Party validation must enforce token uniqueness across the complete party list.
+3. Party validation must enforce travel-actor uniqueness across all enabled parties in the complete party list.
+4. Party records are excluded from crafting-system import/export because they reference world-local actors. Overrides referencing missing systems or regions persist as stale repair evidence.
 
 ## Canonical-Write And Legacy-Read Compatibility
 

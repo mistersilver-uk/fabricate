@@ -400,3 +400,56 @@ test('preserves a per-environment nodeRuntime map through update and resets it o
     assert.deepEqual(copy.nodeRuntime, {}, 'a duplicate starts with full pools');
   });
 });
+
+test('normalizes the four location availability id lists; legacy region/biomes preserved', async () => {
+  const { store } = makeMemoryStore({ ids: ['env-loc', 'task-loc'] });
+  store.load();
+  const created = await store.create(environment({
+    id: undefined,
+    name: 'Located',
+    region: 'forest',
+    biomes: ['Forest', 'forest'],
+    includedRegionIds: ['r1', 'r1', ''],
+    excludedRegionIds: ['r2'],
+    includedBiomeIds: ['Temperate', 'temperate'],
+    excludedBiomeIds: ['Arid']
+  }));
+  assert.deepEqual(created.includedRegionIds, ['r1']);
+  assert.deepEqual(created.excludedRegionIds, ['r2']);
+  assert.deepEqual(created.includedBiomeIds, ['temperate']);
+  assert.deepEqual(created.excludedBiomeIds, ['arid']);
+  // Legacy display metadata untouched.
+  assert.equal(created.region, 'forest');
+  assert.deepEqual(created.biomes, ['forest']);
+});
+
+test('save-time validation rejects an includedRegionId not present on the owning system', async () => {
+  const { store } = makeMemoryStore({
+    systems: [
+      { id: 'system-a', features: { gathering: true }, components: [{ id: 'component-gem', difficulty: 1 }], gatheringRegions: [{ id: 'known' }] },
+      { id: 'system-disabled', features: { gathering: false } }
+    ],
+    ids: ['env-bad', 'task-bad']
+  });
+  store.load();
+  await assert.rejects(
+    () => store.create(environment({ id: undefined, name: 'Bad', includedRegionIds: ['unknown'] })),
+    /unknown region/
+  );
+  // A known region id passes.
+  const ok = await store.create(environment({ id: undefined, name: 'Good', includedRegionIds: ['known'] }));
+  assert.deepEqual(ok.includedRegionIds, ['known']);
+});
+
+test('load never throws on a stale includedRegionId (validation is save-time only)', () => {
+  const { store } = makeMemoryStore({
+    saved: [environment({ id: 'env-stale', includedRegionIds: ['gone'] })],
+    systems: [
+      { id: 'system-a', features: { gathering: true }, components: [], gatheringRegions: [{ id: 'known' }] },
+      { id: 'system-disabled', features: { gathering: false } }
+    ]
+  });
+  // load() normalizes without validating; no throw, stale id preserved.
+  const loaded = store.load();
+  assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRegionIds, ['gone']);
+});
