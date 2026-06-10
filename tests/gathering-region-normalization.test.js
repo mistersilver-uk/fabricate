@@ -115,23 +115,40 @@ test('validateGatheringRegionList rejects duplicate region ids', () => {
 });
 
 test('normalizeGatheringRegionSettings coerces unknown values to defaults on read (BOTH directions)', () => {
-  assert.deepEqual(normalizeGatheringRegionSettings({}), { revealMode: 'manual', modifierVisibility: 'visible' });
+  assert.deepEqual(normalizeGatheringRegionSettings({}), { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' });
   assert.deepEqual(
     normalizeGatheringRegionSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' }),
-    { revealMode: 'manual', modifierVisibility: 'visible' }
+    { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }
   );
   assert.deepEqual(
-    normalizeGatheringRegionSettings({ revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),
-    { revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }
+    normalizeGatheringRegionSettings({ enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),
+    { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }
   );
 });
 
+test('normalizeGatheringRegionSettings: enabled defaults false and only explicit true enables', () => {
+  assert.equal(normalizeGatheringRegionSettings({}).enabled, false, 'missing → false');
+  assert.equal(normalizeGatheringRegionSettings({ enabled: true }).enabled, true, 'true → true');
+  assert.equal(normalizeGatheringRegionSettings({ enabled: false }).enabled, false, 'false → false');
+  // Non-boolean truthy/falsey coerce to false (only an explicit boolean true enables).
+  assert.equal(normalizeGatheringRegionSettings({ enabled: 'true' }).enabled, false, 'string "true" → false');
+  assert.equal(normalizeGatheringRegionSettings({ enabled: 1 }).enabled, false, 'number 1 → false');
+});
+
 test('validateGatheringRegionSettings rejects unknown values at save boundary', () => {
-  assert.deepEqual(validateGatheringRegionSettings({ revealMode: 'manual', modifierVisibility: 'visible' }), []);
+  assert.deepEqual(validateGatheringRegionSettings({ enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), []);
   const errors = validateGatheringRegionSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
   assert.equal(errors.length, 2);
   assert.ok(errors.some(e => e.includes('revealMode')));
   assert.ok(errors.some(e => e.includes('modifierVisibility')));
+});
+
+test('validateGatheringRegionSettings rejects a non-boolean enabled but accepts booleans', () => {
+  assert.deepEqual(validateGatheringRegionSettings({ enabled: true }), []);
+  assert.deepEqual(validateGatheringRegionSettings({ enabled: false }), []);
+  const errors = validateGatheringRegionSettings({ enabled: 'yes' });
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0].includes('enabled'));
 });
 
 test('normalizeGatheringRegionList preserves stale scene mappings as readable', () => {

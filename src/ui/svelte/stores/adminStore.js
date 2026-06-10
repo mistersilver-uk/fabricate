@@ -615,9 +615,6 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     description: String(task.description || ''),
     img: String(task.img || DEFAULT_GATHERING_TASK_IMG),
     enabled: task.enabled !== false,
-    regions: _normalizeGatheringTagList(Array.isArray(task.regions)
-      ? task.regions
-      : task.region ? [task.region] : []),
     biomes: _normalizeGatheringTagList(task.biomes),
     weather: _normalizeGatheringConditionIdList(task.weather),
     timeOfDay: _normalizeGatheringConditionIdList(task.timeOfDay),
@@ -654,9 +651,6 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
     img: String(hazard.img || 'icons/svg/hazard.svg'),
     enabled: hazard.enabled !== false,
     dangerTags: _normalizeGatheringTagList(hazard.dangerTags),
-    regions: _normalizeGatheringTagList(Array.isArray(hazard.regions)
-      ? hazard.regions
-      : hazard.region ? [hazard.region] : []),
     biomes: _normalizeGatheringTagList(hazard.biomes),
     weather: _normalizeGatheringConditionIdList(hazard.weather),
     timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),

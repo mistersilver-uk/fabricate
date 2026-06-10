@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringLocationService } from '../src/systems/GatheringLocationService.js';
 
-function makeService({ parties = [], regions = [] } = {}) {
+function makeService({ parties = [], regions = [], enabled = true } = {}) {
   const partyMap = new Map(parties.map(p => [p.id, p]));
   const partyStore = {
     get: id => partyMap.get(id) || null,
@@ -11,7 +11,9 @@ function makeService({ parties = [], regions = [] } = {}) {
       && (p.travelActorUuid === uuid || (p.memberActorUuids || []).includes(uuid))) || null
   };
   const systemManager = {
-    getSystem: id => (id === 'system-a' ? { id: 'system-a', gatheringRegions: regions } : null)
+    getSystem: id => (id === 'system-a'
+      ? { id: 'system-a', gatheringRegions: regions, gatheringRegionSettings: { enabled } }
+      : null)
   };
   return new GatheringLocationService({ partyStore, systemManager });
 }
@@ -109,4 +111,37 @@ test('resolveForActor returns unresolved when the actor is in no enabled party',
   const result = service.resolveForActor({ actor: { uuid: 'Actor.alice' }, systemId: 'system-a' });
   assert.equal(result.resolved, false);
   assert.equal(result.partyId, null);
+});
+
+// ---------------------------------------------------------------------------
+// Toggle disabled: every resolver entry point fast-exits to unresolved-empty.
+// ---------------------------------------------------------------------------
+
+const overrideParty = { id: 'p1', enabled: true, memberActorUuids: ['Actor.alice'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } };
+
+test('resolveCurrentRegions fast-exits to unresolved-empty when the subsystem is disabled', () => {
+  const service = makeService({ enabled: false, regions, parties: [overrideParty] });
+  const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
+  assert.equal(result.resolved, false);
+  assert.equal(result.source, 'unresolved');
+  assert.deepEqual(result.regionIds, []);
+  assert.deepEqual(result.regions, []);
+  assert.deepEqual(result.staleRegionIds, []);
+});
+
+test('resolveForActor fast-exits to unresolved-empty when the subsystem is disabled', () => {
+  const service = makeService({ enabled: false, regions, parties: [overrideParty] });
+  const result = service.resolveForActor({ actor: { uuid: 'Actor.alice' }, systemId: 'system-a' });
+  assert.equal(result.resolved, false);
+  assert.equal(result.source, 'unresolved');
+  assert.deepEqual(result.regionIds, []);
+  assert.equal(result.partyId, null);
+});
+
+test('buildCurrentRegionContext fast-exits to unresolved-empty when the subsystem is disabled', () => {
+  const service = makeService({ enabled: false, regions, parties: [overrideParty] });
+  const result = service.buildCurrentRegionContext({ actor: { uuid: 'Actor.alice' }, systemId: 'system-a' });
+  assert.equal(result.resolved, false);
+  assert.equal(result.source, 'unresolved');
+  assert.deepEqual(result.regions, []);
 });

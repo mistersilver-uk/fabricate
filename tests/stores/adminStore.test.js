@@ -2279,7 +2279,10 @@ describe('createAdminStore', () => {
       assert.equal(duplicate.id, 'copy-id-1');
       assert.equal(duplicate.name, 'Moon Herbs (Copy)');
       assert.deepEqual(duplicate.dropRows.map(row => row.id), ['copy-id-2', 'copy-id-3']);
-      assert.deepEqual(duplicate.regions, ['north']);
+      // Region is no longer a composition axis: legacy `region`/`regions` input is
+      // dropped by the task normalizer (not carried onto the record).
+      assert.equal('regions' in duplicate, false);
+      assert.equal('region' in duplicate, false);
       assert.deepEqual(duplicate.biomes, ['forest']);
       assert.deepEqual(duplicate.weather, ['clear']);
       assert.deepEqual(duplicate.timeOfDay, ['night']);
@@ -2511,7 +2514,8 @@ describe('createAdminStore', () => {
       const sys1Hazards = services._store.gatheringConfig.systems.sys1.hazards;
       assert.equal(duplicate.id, 'hazard-copy-1');
       assert.equal(duplicate.name, 'Thornwall (Copy)');
-      assert.deepEqual(duplicate.regions, ['north']);
+      // Region dropped from hazard composition (legacy `regions` input not carried).
+      assert.equal('regions' in duplicate, false);
       assert.deepEqual(duplicate.biomes, ['forest']);
       assert.deepEqual(duplicate.weather, ['rain']);
       assert.deepEqual(duplicate.timeOfDay, ['night']);
@@ -2808,11 +2812,14 @@ describe('createAdminStore', () => {
       const sys2 = services._store.gatheringConfig.systems.sys2;
       assert.deepEqual(sys1.vocabularies.regions.values, []);
       assert.deepEqual(sys1.vocabularies.biomes.values, []);
-      assert.deepEqual(sys1.tasks[0].regions, []);
+      // Region is no longer a task/hazard composition field: normalization drops
+      // it everywhere (both the pruned system and the untouched one), so the only
+      // composition pruning left to assert is biome.
+      assert.equal('regions' in sys1.tasks[0], false);
       assert.deepEqual(sys1.tasks[0].biomes, []);
-      assert.deepEqual(sys1.hazards[0].regions, []);
+      assert.equal('regions' in sys1.hazards[0], false);
       assert.deepEqual(sys1.hazards[0].biomes, []);
-      assert.deepEqual(sys2.tasks[0].regions, ['north']);
+      assert.equal('regions' in sys2.tasks[0], false);
       assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
       assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1', 'env-sys1']);
       assert.equal(environments[0].region, '');

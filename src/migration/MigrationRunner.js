@@ -15,6 +15,7 @@ import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
+import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,16 @@ const MIGRATIONS = [
     migrate(data) {
       return migrateGatheringLimitationToggles(data.gatheringConfig);
     }
+  },
+  {
+    version: '0.9.0',
+    label: 'Unify gathering regions (vocabulary → GatheringRegion; drop region as a composition axis)',
+    migrate(data) {
+      // Runs after the 0.2.0 migration (which preserves per-system region vocab)
+      // so it sees that vocab. Surfaces the names of systems that had regions via
+      // a transient `_unifiedRegionSystems` field for the runner's GM notice.
+      return migrateUnifyGatheringRegions(data);
+    }
   }
   // Future migrations added here in version order
 ];
@@ -133,8 +144,9 @@ export class MigrationRunner {
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
    *
-   * @returns {Promise<{ ran: number, migratedCatalystCount: number }>} a summary of the run
-   *   so the caller can fire one-time edge effects (e.g. the GM catalyst-migration notice).
+   * @returns {Promise<{ ran: number, migratedCatalystCount: number, unifiedRegionSystems: string[] }>}
+   *   a summary of the run so the caller can fire one-time edge effects (e.g. the
+   *   GM catalyst-migration and region-unification notices).
    */
   async run() {
     const lastRunVersion = this._getSetting(SETTING_KEYS.MIGRATION_VERSION) ?? '0.0.0';
@@ -144,7 +156,7 @@ export class MigrationRunner {
       .sort((a, b) => compareSemver(a.version, b.version));
 
     if (pending.length === 0) {
-      return { ran: 0, migratedCatalystCount: 0 };
+      return { ran: 0, migratedCatalystCount: 0, unifiedRegionSystems: [] };
     }
 
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
@@ -165,6 +177,7 @@ export class MigrationRunner {
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
+    let unifiedRegionSystems = [];
 
     for (const migration of pending) {
       try {
@@ -189,6 +202,14 @@ export class MigrationRunner {
     }
     delete data._migratedCatalystCount;
 
+    // The 0.9.0 region-unification migration reports the names of systems that had
+    // legacy regions via a transient `_unifiedRegionSystems` field. Capture it for
+    // the GM notice and strip it so it is never persisted as part of any setting.
+    if (Array.isArray(data._unifiedRegionSystems)) {
+      unifiedRegionSystems = data._unifiedRegionSystems.map(name => String(name));
+    }
+    delete data._unifiedRegionSystems;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged = JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
@@ -211,6 +232,6 @@ export class MigrationRunner {
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
 
-    return { ran: pending.length, migratedCatalystCount };
+    return { ran: pending.length, migratedCatalystCount, unifiedRegionSystems };
   }
 }

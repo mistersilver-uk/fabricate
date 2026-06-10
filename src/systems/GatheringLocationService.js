@@ -15,6 +15,8 @@
  * - `mode: 'none'`, or a disabled/travel-actor-less party, resolves to
  *   `unresolved`.
  */
+import { isGatheringRegionsEnabled } from './gatheringRegions.js';
+
 export class GatheringLocationService {
   constructor({ partyStore, systemManager } = {}) {
     this.partyStore = partyStore;
@@ -24,6 +26,18 @@ export class GatheringLocationService {
   _getRegions(systemId) {
     const system = this.systemManager?.getSystem?.(systemId);
     return Array.isArray(system?.gatheringRegions) ? system.gatheringRegions : [];
+  }
+
+  /**
+   * Whether the region/travel subsystem is enabled for the given system. Reads
+   * the same shared flag the engine and public API gate on, so a disabled system
+   * resolves to "unresolved" everywhere without re-implementing the check.
+   *
+   * @param {string} systemId
+   * @returns {boolean}
+   */
+  _regionsEnabled(systemId) {
+    return isGatheringRegionsEnabled(this.systemManager?.getSystem?.(systemId));
   }
 
   /**
@@ -41,6 +55,8 @@ export class GatheringLocationService {
       systemId: systemId || ''
     };
     if (!partyId || !systemId) return empty;
+    // Region/travel disabled ⇒ never resolve a current region (no location gating).
+    if (!this._regionsEnabled(systemId)) return empty;
 
     const party = this.partyStore?.get?.(partyId);
     if (!party) return empty;
@@ -85,19 +101,20 @@ export class GatheringLocationService {
    * @returns {object} Same shape as resolveCurrentRegions.
    */
   resolveForActor({ actor, systemId } = {}) {
+    const unresolved = {
+      resolved: false,
+      source: 'unresolved',
+      regions: [],
+      regionIds: [],
+      staleRegionIds: [],
+      partyId: null,
+      systemId: systemId || ''
+    };
+    // Region/travel disabled ⇒ fast-exit to unresolved-empty (no party lookup).
+    if (!this._regionsEnabled(systemId)) return unresolved;
     const actorUuid = actor?.uuid ?? null;
     const party = actorUuid ? this.partyStore?.findEnabledPartyForActor?.(actorUuid) : null;
-    if (!party) {
-      return {
-        resolved: false,
-        source: 'unresolved',
-        regions: [],
-        regionIds: [],
-        staleRegionIds: [],
-        partyId: null,
-        systemId: systemId || ''
-      };
-    }
+    if (!party) return unresolved;
     return this.resolveCurrentRegions({ partyId: party.id, systemId });
   }
 

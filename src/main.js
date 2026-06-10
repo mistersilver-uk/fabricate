@@ -15,6 +15,7 @@ import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
 import { revealGatheringRegion, hideGatheringRegion, getDiscoveredRegionIdsForSystem } from './systems/gatheringRegionDiscovery.js';
 import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
+import { isGatheringRegionsEnabled } from './systems/gatheringRegions.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
@@ -625,6 +626,18 @@ class Fabricate {
         || `Fabricate migrated ${migratedCount} catalyst(s) to the Tools library. Find them under the Tools tab.`;
       ui.notifications?.info?.(message);
     }
+
+    // One-time GM-facing notice: when the 0.9.0 migration unified legacy regions on
+    // one or more systems, name them so the GM can re-enable Travel & Regions (the
+    // subsystem stays disabled by default) and knows region-scoped records may now
+    // appear in more environments. GM-only; only when something was migrated.
+    const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
+    if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
+      const systemList = unifiedRegionSystems.join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
+        || `Fabricate unified gathering regions for: ${systemList}. Travel & Regions is disabled by default — enable it per system. Region-scoped tasks/hazards may now appear in more environments.`;
+      ui.notifications?.info?.(message);
+    }
   }
 
   /**
@@ -720,6 +733,8 @@ class Fabricate {
     this._requireReady();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId) return null;
+    // Region/travel disabled for this system ⇒ no location surface at all.
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
     const context = this.gatheringLocationService?.buildCurrentRegionContext({ actor: resolvedActor, systemId });
     if (!context) return null;
     const isGM = game.user?.isGM === true;
@@ -739,6 +754,8 @@ class Fabricate {
     this._requireReady();
     this._requireGM();
     if (!partyId || !systemId) return null;
+    // Region/travel disabled ⇒ no-op (no override writes).
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
     return this.gatheringPartyStore?.setCurrentRegionOverride(partyId, systemId, regionIds);
   }
 
@@ -753,6 +770,8 @@ class Fabricate {
     this._requireReady();
     this._requireGM();
     if (!partyId || !systemId) return null;
+    // Region/travel disabled ⇒ no-op (no override writes).
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
     return this.gatheringPartyStore?.clearCurrentRegionOverride(partyId, systemId);
   }
 
@@ -769,6 +788,8 @@ class Fabricate {
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
     const system = this.craftingSystemManager?.getSystem(systemId);
+    // Region/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRegionsEnabled(system)) return Promise.resolve(false);
     return revealGatheringRegion(resolvedActor, {
       systemId,
       regionId,
@@ -790,6 +811,8 @@ class Fabricate {
     this._requireGM();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
+    // Region/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
     return hideGatheringRegion(resolvedActor, { systemId, regionId });
   }
 

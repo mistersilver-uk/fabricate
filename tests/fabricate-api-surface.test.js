@@ -41,6 +41,29 @@ test('Fabricate exposes the new gathering location getters and mutators', () => 
   assert.ok(mainSource.includes('hideGatheringRegionForActor('), 'hideGatheringRegionForActor method');
 });
 
+test('the location API methods gate on isGatheringRegionsEnabled (no-op when disabled)', () => {
+  // The five public location entry points must short-circuit when the
+  // region/travel subsystem is disabled for the target system, reading the
+  // single shared predicate so the gate never drifts from the engine/resolver.
+  assert.ok(
+    mainSource.includes("import { isGatheringRegionsEnabled } from './systems/gatheringRegions.js';"),
+    'main.js imports the shared isGatheringRegionsEnabled predicate'
+  );
+  // Each guard resolves the system via craftingSystemManager and bails before doing work.
+  assert.ok(
+    mainSource.includes('if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;'),
+    'getGatheringLocationForActor / set / clear overrides no-op (null) when disabled'
+  );
+  assert.ok(
+    mainSource.includes('if (!isGatheringRegionsEnabled(system)) return Promise.resolve(false);'),
+    'revealGatheringRegionForActor no-ops (false) when disabled'
+  );
+  assert.ok(
+    mainSource.includes('if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);'),
+    'hideGatheringRegionForActor no-ops (false) when disabled'
+  );
+});
+
 test('Fabricate registers a GM-only discipline on region mutators', () => {
   // The reveal mutator validates region membership via the owning system snapshot.
   assert.ok(mainSource.includes('validateRegionInSystem: system'), 'reveal validates region belongs to system');

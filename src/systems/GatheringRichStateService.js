@@ -1908,9 +1908,6 @@ function normalizeLibraryTask(task = {}) {
     description: stringOrFallback(task.description, ''),
     img: stringOrFallback(task.img, 'icons/svg/item-bag.svg'),
     enabled: task.enabled !== false,
-    regions: normalizeTagList(Array.isArray(task.regions)
-      ? task.regions
-      : task.region ? [task.region] : []),
     biomes: normalizeTagList(task.biomes),
     weather: normalizeConditionIdList(task.weather),
     timeOfDay: normalizeConditionIdList(task.timeOfDay),
@@ -2014,9 +2011,6 @@ function normalizeHazard(hazard = {}) {
     img: stringOrFallback(hazard.img, 'icons/svg/hazard.svg'),
     enabled: hazard.enabled !== false,
     dangerTags: normalizeTagList(hazard.dangerTags),
-    regions: normalizeTagList(Array.isArray(hazard.regions)
-      ? hazard.regions
-      : hazard.region ? [hazard.region] : []),
     biomes: normalizeTagList(hazard.biomes),
     weather: normalizeConditionIdList(hazard.weather),
     timeOfDay: normalizeConditionIdList(hazard.timeOfDay),

@@ -20,7 +20,8 @@ function system(overrides = {}) {
     features: { gathering: true },
     components: [],
     gatheringRegions: REGIONS,
-    gatheringRegionSettings: { revealMode: 'manual', modifierVisibility: 'visible' },
+    // Region/travel subsystem ENABLED so these tests exercise location gating.
+    gatheringRegionSettings: { enabled: true, revealMode: 'manual', modifierVisibility: 'visible' },
     ...overrides
   };
 }
@@ -167,4 +168,60 @@ test('ungated legacy environment is unaffected by location gating', async () => 
   assert.equal(env.location.gated, false);
   assert.equal(env.attemptable, true);
   assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'), false);
+});
+
+// ---------------------------------------------------------------------------
+// Toggle disabled: the region/travel subsystem behaves as if no environment is
+// location-gated and no travel exists.
+// ---------------------------------------------------------------------------
+
+const disabledSettings = { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' };
+
+test('disabled subsystem: a location-gated environment is NOT blocked and reports gated=false', async () => {
+  const engine = makeEngine({
+    systems: [system({ gatheringRegionSettings: disabledSettings })],
+    parties: []
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.ok(env);
+  assert.equal(env.location.gated, false, 'location field is the ungated shape when disabled');
+  assert.equal(env.location.available, true);
+  assert.deepEqual(env.location.currentRegions, []);
+  assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'), false);
+  assert.equal(env.blockedReasons.some(r => r.code === 'LOCATION_BLOCKED'), false);
+  assert.equal(env.attemptable, true);
+});
+
+test('disabled subsystem: the start-attempt location guard is skipped', async () => {
+  // No party / no current region, but disabled ⇒ the start guard does not block.
+  // (When ENABLED, the identical setup blocks with NO_CURRENT_REGION — see the
+  // start-guard re-evaluation test above.) Downstream run-creation is out of
+  // scope for this harness, so we assert only that NO location reason fires.
+  const engine = makeEngine({
+    systems: [system({ gatheringRegionSettings: disabledSettings })],
+    parties: []
+  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const reasons = result.blockedReasons || [];
+  assert.equal(reasons.some(r => r.code === 'NO_CURRENT_REGION'), false, 'no NO_CURRENT_REGION when disabled');
+  assert.equal(reasons.some(r => r.code === 'LOCATION_BLOCKED'), false, 'no LOCATION_BLOCKED when disabled');
+});
+
+test('ENABLED subsystem with no current region blocks start (control for the disabled case)', async () => {
+  const engine = makeEngine({ parties: [] });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  assert.equal(result.started ?? false, false);
+  assert.ok((result.blockedReasons || []).some(r => r.code === 'NO_CURRENT_REGION'));
+});
+
+test('default (no gatheringRegionSettings) behaves as disabled — no location gating', async () => {
+  const engine = makeEngine({
+    systems: [system({ gatheringRegionSettings: undefined })],
+    parties: []
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  const env = findEnv(listing);
+  assert.equal(env.location.gated, false);
+  assert.equal(env.attemptable, true);
 });

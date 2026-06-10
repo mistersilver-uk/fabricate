@@ -13,18 +13,21 @@ const conditions = { weather: 'clear', timeOfDay: 'day' };
 test('empty record constraints match any environment and report "any" evidence', () => {
   const { matches, evidence } = evaluateEnvironmentMatch({}, environment, conditions, { includeDanger: true });
   assert.equal(matches, true);
-  assert.equal(evidence.region.state, 'any');
+  // Region is no longer a composition axis — there is no region evidence dimension.
+  assert.equal('region' in evidence, false);
   assert.equal(evidence.biome.state, 'any');
   assert.equal(evidence.weather.state, 'any');
   assert.equal(evidence.time.state, 'any');
   assert.equal(evidence.danger.state, 'any');
 });
 
-test('overlapping biome and region tags report a match', () => {
-  const record = { regions: ['north'], biomes: ['cave'], weather: ['clear'], timeOfDay: ['day'], dangerTags: ['hazardous'] };
+test('overlapping biome tags report a match (region is ignored for composition)', () => {
+  // The record still carries a legacy `regions` tag and a NON-matching region;
+  // composition must ignore region entirely and match purely on biome/danger.
+  const record = { regions: ['south'], biomes: ['cave'], weather: ['clear'], timeOfDay: ['day'], dangerTags: ['hazardous'] };
   const { matches, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: true });
   assert.equal(matches, true);
-  assert.equal(evidence.region.state, 'match');
+  assert.equal('region' in evidence, false);
   assert.equal(evidence.biome.state, 'match');
   assert.equal(evidence.weather.state, 'match');
   assert.equal(evidence.time.state, 'match');
@@ -89,10 +92,22 @@ test('weather/time mismatches keep matches true but flip conditionsMet to false'
   assert.equal(evidence.weather.state, 'mismatch');
 });
 
-test('region/biome/danger mismatch still drives matches false', () => {
+test('biome/danger mismatch still drives matches false', () => {
   const record = { biomes: ['desert'] };
   const { matches, conditionsMet } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
   assert.equal(matches, false);
   // Conditions can still be met even when matching fails.
   assert.equal(conditionsMet, true);
+});
+
+test('a record whose ONLY constraint was a (now-stripped) region matches any environment', () => {
+  // A formerly region-narrowed record with an empty biome list now composes
+  // anywhere its biome ("any") and danger allow — the broaden direction.
+  const record = { regions: ['north'], biomes: [] };
+  const otherEnv = { biomes: ['desert'], dangerTags: ['safe'] };
+  const here = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
+  const elsewhere = evaluateEnvironmentMatch(record, otherEnv, conditions, { includeDanger: false });
+  assert.equal(here.matches, true);
+  assert.equal(elsewhere.matches, true);
+  assert.equal(here.evidence.biome.state, 'any');
 });

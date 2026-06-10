@@ -8,6 +8,7 @@ import {
   evaluateLocationAvailability
 } from './gatheringLocation.js';
 import { getDiscoveredRegionIdsForSystem } from './gatheringRegionDiscovery.js';
+import { isGatheringRegionsEnabled } from './gatheringRegions.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -600,7 +601,7 @@ export class GatheringEngine {
    *   environments. See {@link GatheringEngine#_discoveredTaskModels}.
    * - `hazards` — read-only player-facing models for the environment's composed
    *   hazards (`id`, `name`, `description`, `img`, `dangerTags`, `risk`, a static
-   *   `chance`, the matching criteria `weather`/`timeOfDay`/`biomes`/`regions`,
+   *   `chance`, the matching criteria `weather`/`timeOfDay`/`biomes`,
    *   resolved `biomeTags` display metadata, and an optional `linkedSceneUuid`;
    *   see {@link GatheringEngine#_hazardModel}).
    *   The full list for targeted environments and GM viewers; `[]` (redacted) for
@@ -1341,8 +1342,9 @@ export class GatheringEngine {
    * Carries identity (`id`/`name`/`description`/`img`), the hazard's danger tags
    * + a derived `risk` tier (the first tag, or `safe`), a static `chance`
    * (`dropRate/100`, clamped to 0–1) so the UI can reuse the hazard-chance bar,
-   * and the hazard's matching criteria (`weather`/`timeOfDay`/`biomes`/`regions`,
-   * each an empty array meaning "any") plus an optional `linkedSceneUuid` for the
+   * and the hazard's matching criteria (`weather`/`timeOfDay`/`biomes`, each an
+   * empty array meaning "any"; region is no longer a composition axis) plus an
+   * optional `linkedSceneUuid` for the
    * details view. Modifier internals (hazardModifier/conditionModifiers/
    * characterModifiers) are intentionally NOT surfaced. Like
    * `_environmentHazardChance`, `chance` ignores actor/condition/character
@@ -1370,7 +1372,6 @@ export class GatheringEngine {
       // customColor }) so hazard biome chips render with icons/colours like the
       // environment's biome pips. Empty when richState can't resolve them.
       biomeTags: this._resolveBiomeTagList(biomes, environment),
-      regions: normalizeStringList(hazard?.regions ?? hazard?.region),
       linkedSceneUuid: stringOrNull(hazard?.linkedSceneUuid)
     };
   }
@@ -1483,6 +1484,17 @@ export class GatheringEngine {
    * @returns {{ blockedReasons: object[], location: object }}
    */
   _locationBlockedReasons({ environment, system = null, viewer, actor, regionContextCache = null }) {
+    // When the region/travel subsystem is disabled for this system, behave as if
+    // no environment is location-gated and no travel exists: every environment
+    // is available and the listing `location` field is the ungated shape. This
+    // is the central choke point (the listing `location` field and the
+    // start-attempt location guard both flow through here).
+    if (!isGatheringRegionsEnabled(system)) {
+      return {
+        blockedReasons: [],
+        location: { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null }
+      };
+    }
     const gated = environmentHasLocationRules(environment);
     if (!this.locationResolver || !gated) {
       return {
@@ -1607,8 +1619,8 @@ export class GatheringEngine {
     }
 
     // Weather/time-of-day are runtime gates: a task may match the environment
-    // (region/biome/danger) but be inactive when current conditions don't
-    // satisfy its required `weather` / `timeOfDay` values.
+    // (biome/danger) but be inactive when current conditions don't satisfy its
+    // required `weather` / `timeOfDay` values.
     const conditionsResult = evaluateEnvironmentMatch(task, environment, environment?.conditions || {}, { includeDanger: false });
     if (conditionsResult.conditionsMet === false) {
       blockedReasons.push(this._blockedReason('CONDITIONS_BLOCKED', {

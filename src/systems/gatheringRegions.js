@@ -35,7 +35,7 @@ const MODIFIER_VISIBILITY_SET = new Set(GATHERING_REGION_MODIFIER_VISIBILITIES);
 const MODIFIER_KIND_SET = new Set(GATHERING_REGION_MODIFIER_KINDS);
 const MODIFIER_OPERATION_SET = new Set(GATHERING_REGION_MODIFIER_OPERATIONS);
 
-const DEFAULT_REGION_SETTINGS = Object.freeze({ revealMode: 'manual', modifierVisibility: 'visible' });
+const DEFAULT_REGION_SETTINGS = Object.freeze({ enabled: false, revealMode: 'manual', modifierVisibility: 'visible' });
 
 function stringOrEmpty(value) {
   if (value === null || value === undefined) return '';
@@ -248,12 +248,15 @@ export function validateGatheringRegionList(regions) {
 
 /**
  * Normalize region settings, coercing unknown/missing values to defaults on read.
+ * Only an explicit boolean `true` enables the region/travel subsystem; anything
+ * else (missing, non-boolean) coerces to `false` so the subsystem stays opt-in.
  *
  * @param {object} data
- * @returns {{ revealMode: GatheringRegionRevealMode, modifierVisibility: GatheringRegionModifierVisibility }}
+ * @returns {{ enabled: boolean, revealMode: GatheringRegionRevealMode, modifierVisibility: GatheringRegionModifierVisibility }}
  */
 export function normalizeGatheringRegionSettings(data = {}) {
   return {
+    enabled: data?.enabled === true,
     revealMode: REVEAL_MODE_SET.has(data?.revealMode) ? data.revealMode : DEFAULT_REGION_SETTINGS.revealMode,
     modifierVisibility: MODIFIER_VISIBILITY_SET.has(data?.modifierVisibility)
       ? data.modifierVisibility
@@ -264,6 +267,7 @@ export function normalizeGatheringRegionSettings(data = {}) {
 /**
  * Validate region settings at save/import boundaries: unknown values are invalid
  * (whereas {@link normalizeGatheringRegionSettings} silently coerces on read).
+ * `enabled` must be a real boolean when present.
  *
  * @param {object} data
  * @returns {string[]}
@@ -272,6 +276,9 @@ export function validateGatheringRegionSettings(data = {}) {
   if (data === undefined || data === null) return [];
   if (typeof data !== 'object' || Array.isArray(data)) return ['gatheringRegionSettings must be an object'];
   const errors = [];
+  if (data.enabled !== undefined && typeof data.enabled !== 'boolean') {
+    errors.push('gatheringRegionSettings enabled must be a boolean');
+  }
   if (data.revealMode !== undefined && !REVEAL_MODE_SET.has(data.revealMode)) {
     errors.push(`gatheringRegionSettings revealMode must be one of: ${GATHERING_REGION_REVEAL_MODES.join(', ')}`);
   }
@@ -279,4 +286,16 @@ export function validateGatheringRegionSettings(data = {}) {
     errors.push('gatheringRegionSettings modifierVisibility must be visible or gmOnly');
   }
   return errors;
+}
+
+/**
+ * Shared single source of truth for the region/travel subsystem gate. Reads the
+ * normalized `enabled` flag off a crafting system. Every gate point (engine,
+ * resolver, public API) reads through this helper so the toggle never drifts.
+ *
+ * @param {object} system Crafting system (normalized or raw).
+ * @returns {boolean}
+ */
+export function isGatheringRegionsEnabled(system) {
+  return system?.gatheringRegionSettings?.enabled === true;
 }

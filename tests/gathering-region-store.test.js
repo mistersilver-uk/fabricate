@@ -103,6 +103,52 @@ test('updateRegionSettings rejects unknown values at save boundary', async () =>
   assert.equal(settings.revealMode, 'alwaysVisible');
 });
 
+test('updateRegionSettings round-trips the enabled flag (default false, then true, then back)', async () => {
+  const systemManager = makeSystemManager([{ id: 'system-a' }]);
+  const store = new GatheringRegionStore({ systemManager, randomID });
+
+  // Default: a fresh system has the region subsystem disabled.
+  assert.equal(store.getRegionSettings('system-a').enabled, false);
+
+  const enabled = await store.updateRegionSettings('system-a', { enabled: true });
+  assert.equal(enabled.enabled, true);
+  // Persisted and re-read identically.
+  assert.equal(store.getRegionSettings('system-a').enabled, true);
+  // Unrelated settings round-trip untouched by the enabled merge.
+  assert.equal(enabled.revealMode, 'manual');
+  assert.equal(enabled.modifierVisibility, 'visible');
+
+  const disabled = await store.updateRegionSettings('system-a', { enabled: false });
+  assert.equal(disabled.enabled, false);
+  assert.equal(store.getRegionSettings('system-a').enabled, false);
+});
+
+test('updateRegionSettings rejects a non-boolean enabled at the save boundary', async () => {
+  const systemManager = makeSystemManager([{ id: 'system-a' }]);
+  const store = new GatheringRegionStore({ systemManager, randomID });
+  await assert.rejects(
+    () => store.updateRegionSettings('system-a', { enabled: 'yes' }),
+    GatheringRegionValidationError
+  );
+});
+
+test('region settings (incl. enabled) survive an export/import round-trip through _normalizeSystem', async () => {
+  const systemManager = makeSystemManager([{ id: 'system-a' }]);
+  const store = new GatheringRegionStore({ systemManager, randomID });
+  await store.updateRegionSettings('system-a', { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' });
+
+  // Simulate export: JSON clone of the normalized system. Simulate import: feed it
+  // back through the system normalizer (mirrored here by normalizeSystem).
+  const exported = JSON.parse(JSON.stringify(systemManager.getSystem('system-a')));
+  const reimported = normalizeSystem({ ...exported, id: 'system-a' });
+
+  assert.deepEqual(reimported.gatheringRegionSettings, {
+    enabled: true,
+    revealMode: 'alwaysVisible',
+    modifierVisibility: 'gmOnly'
+  });
+});
+
 test('create rejects an invalid modifier enum at the save boundary', async () => {
   const systemManager = makeSystemManager([{ id: 'system-a' }]);
   const store = new GatheringRegionStore({ systemManager, randomID });

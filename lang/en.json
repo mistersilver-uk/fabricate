@@ -7,6 +7,9 @@
     "Migration": {
       "CatalystsToTools": {
         "Notice": "Fabricate migrated {count} catalyst(s) into shared library Tools. Catalysts are now Tools — manage them under the Tools tab of the Crafting System Manager."
+      },
+      "UnifyRegions": {
+        "Notice": "Fabricate unified gathering regions for: {systems}. Regions are now geography only — Travel & Regions is disabled by default, so enable it per system to use travel. Region-scoped tasks/hazards no longer match by region and may now appear in more environments."
       }
     },
     "Canvas": {
