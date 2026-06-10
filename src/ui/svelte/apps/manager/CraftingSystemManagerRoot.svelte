@@ -38,7 +38,12 @@
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
   let activeGatheringTab = $state('environments');
+  let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
+
+  function selectTravelTab(tabId) {
+    if (['parties', 'regions', 'map'].includes(tabId)) activeTravelTab = tabId;
+  }
   let selectedGatheringTaskId = $state('');
   let selectedGatheringHazardId = $state('');
   let selectedGatheringDropId = $state('');
@@ -3121,6 +3126,8 @@
         environmentTaskCounts={$viewState.environmentTaskCounts || {}}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
+        {activeTravelTab}
+        onSelectTravelTab={selectTravelTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedHazardId={selectedGatheringHazard?.id || selectedGatheringHazardId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
@@ -4206,93 +4213,13 @@
             </div>
           </section>
         {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
-          <section class="manager-inspector-card manager-travel-inspector" data-gathering-inspector-travel>
-            <div class="manager-inspector-title-row">
-              <span class="manager-inspector-icon" aria-hidden="true"><i class="fas fa-route"></i></span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.InspectorKicker', 'Selected party')}</p>
-                <h2 class="manager-inspector-name">
-                  {selectedTravelParty?.name || text('FABRICATE.Admin.Manager.Travel.InspectorNoPartySelected', 'Select a party to see its current-region evidence.')}
-                </h2>
-              </div>
-            </div>
-
-            {#if selectedTravelParty}
-              <div class="manager-chip-row">
-                <span class={`manager-chip ${selectedTravelParty.enabled ? 'is-active' : 'is-disabled'}`}>
-                  {selectedTravelParty.enabled
-                    ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
-                    : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
-                </span>
-                {#if selectedTravelParty.hasStaleReference}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Travel.StaleBadge', 'Needs repair')}</span>
-                {/if}
-              </div>
-
-              <section class="manager-inspector-card">
-                <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current region')}</h3>
-                <p class="manager-travel-evidence-source">
-                  {#if selectedTravelParty.currentRegionEvidence.source === 'manualOverride'}
-                    {text('FABRICATE.Admin.Manager.Travel.EvidenceSourceManualOverride', 'GM override')}
-                  {:else if selectedTravelParty.currentRegionEvidence.source === 'travelActor'}
-                    {text('FABRICATE.Admin.Manager.Travel.EvidenceSourceTravelActor', 'Travel actor')}
-                    <span class="manager-muted"> — {text('FABRICATE.Admin.Manager.Travel.EvidenceTravelActorPending', 'Automation not yet available.')}</span>
-                  {:else}
-                    {text('FABRICATE.Admin.Manager.Travel.EvidenceSourceUnresolved', 'No current region')}
-                  {/if}
-                </p>
-                {#if selectedTravelParty.currentRegionEvidence.regions.length > 0}
-                  <ul class="manager-travel-evidence-regions">
-                    {#each selectedTravelParty.currentRegionEvidence.regions as region (region.id)}
-                      <li>
-                        {region.name}
-                        {#if !region.enabled}
-                          <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRegionChip', 'Disabled')}</span>
-                        {/if}
-                      </li>
-                    {/each}
-                  </ul>
-                {:else}
-                  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRegions', 'No current region set for this system.')}</p>
-                {/if}
-              </section>
-
-              <section class="manager-inspector-card">
-                <div class="manager-fact-grid">
-                  <div class="manager-fact">
-                    <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Travel.InspectorMembersSummary', 'Members')}</span>
-                    <span class="manager-fact-value">{selectedTravelParty.memberCount}</span>
-                  </div>
-                  <div class="manager-fact">
-                    <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Travel.InspectorTravelActorSummary', 'Travel actor')}</span>
-                    <span class="manager-fact-value">
-                      {selectedTravelParty.travelActor?.name
-                        || (selectedTravelParty.staleTravelActor
-                          ? text('FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel', 'Stale travel actor')
-                          : text('FABRICATE.Admin.Manager.Travel.TravelActorEmpty', 'No travel actor assigned.'))}
-                    </span>
-                  </div>
-                </div>
-              </section>
-
-              {#if selectedTravelParty.hasStaleReference}
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.StaleSectionLabel', 'References to repair')}</h3>
-                  <ul class="manager-travel-evidence-regions">
-                    {#each selectedTravelParty.staleMembers as uuid (uuid)}
-                      <li>{text('FABRICATE.Admin.Manager.Travel.StaleMemberLabel', 'Stale member')}</li>
-                    {/each}
-                    {#if selectedTravelParty.staleTravelActor}
-                      <li>{text('FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel', 'Stale travel actor')}</li>
-                    {/if}
-                    {#each selectedTravelParty.staleRegionIds as regionId (regionId)}
-                      <li>{text('FABRICATE.Admin.Manager.Travel.StaleRegionLabel', 'Stale override region')}</li>
-                    {/each}
-                  </ul>
-                </section>
-              {/if}
-            {:else}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.InspectorNoPartySelected', 'Select a party to see its current-region evidence.')}</p>
+          <section class="manager-inspector-card manager-travel-inspector" data-gathering-inspector-travel data-travel-inspector={activeTravelTab}>
+            {#if activeTravelTab === 'parties'}
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>
+            {:else if activeTravelTab === 'regions'}
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RegionsPlaceholder', 'Select a region to see its details.')}</p>
+            {:else if activeTravelTab === 'map'}
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder', 'Select a region to map it to Scene Regions.')}</p>
             {/if}
           </section>
         {:else if currentView === 'environments' && activeGatheringInspectorTab}

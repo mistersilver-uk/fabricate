@@ -46,6 +46,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');

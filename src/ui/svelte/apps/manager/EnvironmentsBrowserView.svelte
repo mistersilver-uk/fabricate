@@ -9,7 +9,7 @@
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
-  import GatheringTravelView from './GatheringTravelView.svelte';
+  import GatheringTravelTabs from './GatheringTravelTabs.svelte';
 
   let {
     environments = [],
@@ -26,6 +26,8 @@
     environmentTaskCounts = {},
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
+    activeTravelTab = 'parties',
+    onSelectTravelTab = () => {},
     services = null,
     selectedTaskId = '',
     selectedHazardId = '',
@@ -835,38 +837,41 @@
       />
     </div>
   {:else if activeGatheringTab === 'travel'}
-    <GatheringTravelView
-      parties={travelParties}
-      selectedPartyId={travelSelectedPartyId}
-      systemId={selectedSystemId}
-      saving={travelSaving}
-      error={travelError}
-      fieldErrors={travelFieldErrors}
-      actorOptions={travelActorOptions}
-      systemRegions={travelSystemRegions}
-      biomeOptions={biomeVocabularyOptions}
-      {onSelectParty}
-      {onCreateParty}
-      {onRenameParty}
-      {onSetPartyEnabled}
-      {onDeleteParty}
-      onAddMember={onAddPartyMember}
-      onRemoveMember={onRemovePartyMember}
-      onMoveMember={onMovePartyMember}
-      onSetTravelActor={onSetPartyTravelActor}
-      onClearTravelActor={onClearPartyTravelActor}
-      onSetRegionOverride={onSetPartyRegionOverride}
-      onClearRegionOverride={onClearPartyRegionOverride}
-      {onRemoveStaleMember}
-      {onClearStaleTravelActor}
-      {onDropStaleOverrideRegion}
-      onCreateRegion={onCreateRegionQuick}
-      {onRenameRegion}
-      {onToggleRegionEnabled}
-      {onUpdateRegion}
-      {onDeleteRegion}
-      {onPickImagePath}
-    />
+    <div class="manager-gathering-panel manager-travel-view" data-manager-travel-view>
+      <GatheringTravelTabs activeTab={activeTravelTab} onSelect={onSelectTravelTab} />
+
+      {#if activeTravelTab === 'parties'}
+        <div
+          class="manager-travel-panel"
+          id="travel-panel-parties"
+          role="tabpanel"
+          aria-labelledby="travel-tab-parties"
+          data-travel-panel="parties"
+        >
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Tabs.PartiesPlaceholder', 'Party management will live here.')}</p>
+        </div>
+      {:else if activeTravelTab === 'regions'}
+        <div
+          class="manager-travel-panel"
+          id="travel-panel-regions"
+          role="tabpanel"
+          aria-labelledby="travel-tab-regions"
+          data-travel-panel="regions"
+        >
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Tabs.RegionsPlaceholder', 'Region management will live here.')}</p>
+        </div>
+      {:else if activeTravelTab === 'map'}
+        <div
+          class="manager-travel-panel"
+          id="travel-panel-map"
+          role="tabpanel"
+          aria-labelledby="travel-tab-map"
+          data-travel-panel="map"
+        >
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinksPlaceholder', 'Scene Region links will live here.')}</p>
+        </div>
+      {/if}
+    </div>
   {:else if activeGatheringTab === 'settings'}
     <div
       class="manager-gathering-panel manager-gathering-settings"
