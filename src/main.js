@@ -14,7 +14,7 @@ import { GatheringRegionStore } from './systems/GatheringRegionStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
 import { revealGatheringRegion, hideGatheringRegion, getDiscoveredRegionIdsForSystem } from './systems/gatheringRegionDiscovery.js';
-import { buildRegionDisclosure } from './systems/gatheringLocation.js';
+import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
@@ -725,16 +725,8 @@ class Fabricate {
     const isGM = game.user?.isGM === true;
     const system = this.craftingSystemManager?.getSystem(systemId);
     const revealMode = system?.gatheringRegionSettings?.revealMode || 'manual';
-    const discovered = getDiscoveredRegionIdsForSystem(resolvedActor, systemId);
-    const regions = (Array.isArray(context.regions) ? context.regions : [])
-      .map(region => buildRegionDisclosure(region, { isGM, discovered: discovered.has(region?.id), revealMode }));
-    return {
-      resolved: context.resolved === true,
-      source: context.source || 'unresolved',
-      regions,
-      regionIds: isGM ? (Array.isArray(context.regionIds) ? context.regionIds : []) : [],
-      staleRegionIds: isGM ? (Array.isArray(context.staleRegionIds) ? context.staleRegionIds : []) : []
-    };
+    const discoveredRegionIds = getDiscoveredRegionIdsForSystem(resolvedActor, systemId);
+    return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRegionIds });
   }
 
   /**

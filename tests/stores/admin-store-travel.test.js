@@ -243,33 +243,53 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
-  it('maps a duplicate-travel-actor validation error to inline field errors', async () => {
+  // The party store emits ONE composite uniqueness message for both member and
+  // travel-actor conflicts: `Actor "<uuid>" is associated with more than one
+  // enabled party`. The adminStore therefore routes the duplicate-actor error by
+  // operation context (which mutator was invoked), not by message text.
+  it('routes the composite uniqueness error to the travelActor field when setPartyTravelActor fails', async () => {
     const { services } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
-      actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
-      partyError: ['Travel actor "Actor.a" is associated with more than one enabled party']
+      parties: [
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t1', currentRegionOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t2', currentRegionOverrides: {} }
+      ],
+      actors: [
+        { uuid: 'Actor.t1', id: 't1', name: 'Tam', img: '' },
+        { uuid: 'Actor.t2', id: 't2', name: 'Tem', img: '' }
+      ],
+      // The exact composite message the real GatheringPartyStore produces.
+      partyError: ['Actor "Actor.t2" is associated with more than one enabled party']
     });
     const store = createAdminStore(services);
     await flush();
-    await store.setPartyEnabled('p1', true);
+    // Assigning party p1 a travel actor already used by enabled party p2.
+    await store.setPartyTravelActor('p1', 'Actor.t2');
     await flush();
     const state = get(store.viewState);
-    assert.ok(state.travelError);
+    assert.ok(state.travelError, 'summary error should be set');
     assert.ok(state.travelFieldErrors.travelActor, 'travelActor field error should be set');
+    assert.equal(state.travelFieldErrors.members, undefined, 'members field error should NOT be set for a travel-actor operation');
     store.destroy();
   });
 
-  it('maps a duplicate-member validation error to the members field', async () => {
+  it('routes the composite uniqueness error to the members field when addPartyMember fails', async () => {
     const { services } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t', currentRegionOverrides: {} }],
+      parties: [
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t1', currentRegionOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: 'Actor.t2', currentRegionOverrides: {} }
+      ],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
+      // Same composite message — the field is resolved purely from operation context.
       partyError: ['Actor "Actor.a" is associated with more than one enabled party']
     });
     const store = createAdminStore(services);
     await flush();
+    // Adding a member already owned by enabled party p2.
     await store.addPartyMember('p1', 'Actor.a');
     await flush();
-    assert.ok(get(store.viewState).travelFieldErrors.members, 'members field error should be set');
+    const state = get(store.viewState);
+    assert.ok(state.travelFieldErrors.members, 'members field error should be set');
+    assert.equal(state.travelFieldErrors.travelActor, undefined, 'travelActor field error should NOT be set for a member operation');
     store.destroy();
   });
 

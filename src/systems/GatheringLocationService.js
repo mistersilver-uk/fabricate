@@ -85,7 +85,7 @@ export class GatheringLocationService {
    * @returns {object} Same shape as resolveCurrentRegions.
    */
   resolveForActor({ actor, systemId } = {}) {
-    const actorUuid = actor?.uuid || actor?.id || null;
+    const actorUuid = actor?.uuid ?? null;
     const party = actorUuid ? this.partyStore?.findEnabledPartyForActor?.(actorUuid) : null;
     if (!party) {
       return {

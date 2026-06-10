@@ -842,26 +842,35 @@ function _emptyTravelState() {
 
 /**
  * Map a thrown party/region store error to inline field errors plus a summary.
- * Both GatheringPartyValidationError and GatheringRegionValidationError expose
- * an `errors` array; uniqueness/duplicate messages route to the relevant
- * control so the view can wire aria-invalid/aria-describedby.
+ *
+ * The party store emits a single COMPOSITE uniqueness message
+ * (`Actor "<uuid>" is associated with more than one enabled party`) for both
+ * member and travel-actor conflicts, so the field a duplicate-actor error
+ * belongs to cannot be inferred from the message text. Instead the caller
+ * passes the operation's `fieldContext` (the control whose mutator was invoked)
+ * and the uniqueness violation is routed there. Errors raised outside an
+ * actor-association context fall through to the summary only.
  *
  * @param {*} err
  * @param {(key: string, data?: object) => string} [localizeFn]
+ * @param {('travelActor'|'members'|null)} [fieldContext] control that triggered the operation
  * @returns {{ travelError: string|null, travelFieldErrors: Record<string, string> }}
  */
-function _travelErrorState(err, localizeFn = null) {
+function _travelErrorState(err, localizeFn = null, fieldContext = null) {
   if (!err) return { travelError: null, travelFieldErrors: {} };
   const errors = Array.isArray(err?.errors) ? err.errors : [];
   const fieldErrors = {};
-  for (const message of errors) {
-    const lower = String(message).toLowerCase();
-    if (lower.includes('travel actor') && lower.includes('more than one')) {
-      fieldErrors.travelActor = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateTravelActor')
-        || 'This travel actor is already used by another enabled party.';
-    } else if (lower.includes('more than one enabled party')) {
-      fieldErrors.members = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateMember')
-        || 'This actor already belongs to another enabled party.';
+  if (fieldContext === 'travelActor' || fieldContext === 'members') {
+    const hasUniquenessViolation = errors.some(message =>
+      String(message).toLowerCase().includes('more than one enabled party'));
+    if (hasUniquenessViolation) {
+      if (fieldContext === 'travelActor') {
+        fieldErrors.travelActor = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateTravelActor')
+          || 'This travel actor is already used by another enabled party.';
+      } else {
+        fieldErrors.members = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateMember')
+          || 'This actor already belongs to another enabled party.';
+      }
     }
   }
   const summary = errors.length > 0
@@ -1960,8 +1969,8 @@ export function createAdminStore(services) {
       travelFieldErrors.set({});
     }
 
-    function applyError(err) {
-      const { travelError: summary, travelFieldErrors: fieldErrors } = _travelErrorState(err, services.localize);
+    function applyError(err, fieldContext = null) {
+      const { travelError: summary, travelFieldErrors: fieldErrors } = _travelErrorState(err, services.localize, fieldContext);
       travelError.set(summary);
       travelFieldErrors.set(fieldErrors);
     }
@@ -2046,7 +2055,7 @@ export function createAdminStore(services) {
       viewState.update(state => ({ ...state, ...buildState() }));
     }
 
-    async function withSave(operation) {
+    async function withSave(operation, fieldContext = null) {
       const partyStore = getPartyStore();
       if (!partyStore) return false;
       clearErrors();
@@ -2056,7 +2065,7 @@ export function createAdminStore(services) {
         await operation(partyStore);
         return true;
       } catch (err) {
-        applyError(err);
+        applyError(err, fieldContext);
         return false;
       } finally {
         travelSaving.set(false);
@@ -2111,16 +2120,16 @@ export function createAdminStore(services) {
         });
       },
       async addPartyMember(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.addMember(partyId, actorUuid));
+        return withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members');
       },
       async removePartyMember(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid));
+        return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members');
       },
       async movePartyMember(fromPartyId, toPartyId, actorUuid) {
-        return withSave((partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid));
+        return withSave((partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid), 'members');
       },
       async setPartyTravelActor(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.setTravelActor(partyId, actorUuid));
+        return withSave((partyStore) => partyStore.setTravelActor(partyId, actorUuid), 'travelActor');
       },
       async clearPartyTravelActor(partyId) {
         return withSave((partyStore) => partyStore.setTravelActor(partyId, null));

@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildRegionDisclosure, buildTravelGuidance, evaluateLocationAvailability } from '../src/systems/gatheringLocation.js';
+import {
+  buildLocationSummaryForViewer,
+  buildRegionDisclosure,
+  buildTravelGuidance,
+  evaluateLocationAvailability
+} from '../src/systems/gatheringLocation.js';
 
 const secretRegion = { id: 'r-secret', name: 'Hidden Vale', secret: true };
 const openRegion = { id: 'r-open', name: 'Verdant Expanse', secret: false };
@@ -93,4 +98,78 @@ test('guidance lists known destination names when not excluded', () => {
   });
   assert.equal(guidance.state, 'travel');
   assert.equal(guidance.knownDestinations[0].label, 'Verdant Expanse');
+});
+
+// buildLocationSummaryForViewer is the pure core of Fabricate.getGatheringLocationForActor:
+// it applies the same disclosure policy and GM gating that main.js used to inline.
+const summaryContext = {
+  resolved: true,
+  source: 'manualOverride',
+  regions: [secretRegion, openRegion],
+  regionIds: ['r-secret', 'r-open'],
+  staleRegionIds: ['r-stale']
+};
+
+test('viewer summary for a non-GM redacts secret undiscovered regions and drops raw ids', () => {
+  const summary = buildLocationSummaryForViewer({
+    context: summaryContext,
+    isGM: false,
+    revealMode: 'manual',
+    discoveredRegionIds: new Set()
+  });
+  assert.equal(summary.resolved, true);
+  assert.equal(summary.source, 'manualOverride');
+  // Non-GM gets EMPTY raw id arrays — those carry real region ids.
+  assert.deepEqual(summary.regionIds, []);
+  assert.deepEqual(summary.staleRegionIds, []);
+  // Regions come back as disclosure objects; the secret one is a placeholder.
+  const secret = summary.regions.find(region => region.placeholder === true);
+  assert.ok(secret, 'secret undiscovered region must surface as a placeholder');
+  assert.equal(secret.id, null);
+  assert.equal(secret.label, undefined);
+  const open = summary.regions.find(region => region.id === 'r-open');
+  assert.equal(open.label, 'Verdant Expanse');
+  // The secret name/id never appear anywhere in the serialized summary.
+  assert.equal(JSON.stringify(summary).includes('Hidden Vale'), false);
+  assert.equal(JSON.stringify(summary).includes('r-secret'), false);
+  assert.equal(JSON.stringify(summary).includes('r-stale'), false);
+});
+
+test('viewer summary for a non-GM discloses a discovered secret region but still hides raw ids', () => {
+  const summary = buildLocationSummaryForViewer({
+    context: summaryContext,
+    isGM: false,
+    revealMode: 'manual',
+    discoveredRegionIds: new Set(['r-secret'])
+  });
+  const secret = summary.regions.find(region => region.secret === true);
+  assert.equal(secret.id, 'r-secret');
+  assert.equal(secret.label, 'Hidden Vale');
+  assert.equal(secret.placeholder, false);
+  // Discovery reveals the disclosure label, but raw id arrays stay GM-only.
+  assert.deepEqual(summary.regionIds, []);
+  assert.deepEqual(summary.staleRegionIds, []);
+});
+
+test('viewer summary for a GM exposes full ids and never redacts', () => {
+  const summary = buildLocationSummaryForViewer({
+    context: summaryContext,
+    isGM: true,
+    revealMode: 'manual',
+    discoveredRegionIds: new Set()
+  });
+  assert.deepEqual(summary.regionIds, ['r-secret', 'r-open']);
+  assert.deepEqual(summary.staleRegionIds, ['r-stale']);
+  assert.equal(summary.regions.every(region => region.placeholder === false), true);
+  const secret = summary.regions.find(region => region.id === 'r-secret');
+  assert.equal(secret.label, 'Hidden Vale');
+});
+
+test('viewer summary tolerates an empty/unresolved context', () => {
+  const summary = buildLocationSummaryForViewer({ context: {}, isGM: false });
+  assert.equal(summary.resolved, false);
+  assert.equal(summary.source, 'unresolved');
+  assert.deepEqual(summary.regions, []);
+  assert.deepEqual(summary.regionIds, []);
+  assert.deepEqual(summary.staleRegionIds, []);
 });

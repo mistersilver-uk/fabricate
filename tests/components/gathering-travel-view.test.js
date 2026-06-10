@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { buildRegionDisclosure, UNDISCOVERED_PLACEHOLDER_KEY } from '../../src/systems/gatheringLocation.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -235,42 +236,68 @@ describe('GatheringTravelView mounted behavior', () => {
     remount();
   });
 
-  it('redaction guard: a secret undiscovered region in evidence never leaks its name/id', async () => {
+  it('redaction guard: a secret undiscovered region routed through buildRegionDisclosure leaks nothing but renders the placeholder', async () => {
     const SECRET_NAME = 'SECRET_SANCTUM';
     const SECRET_ID = 'region-secret-xyz';
-    // Even though this GM surface can show region data, the redaction guard
-    // asserts the view is not a covert leak channel: when a region is intended
-    // to be hidden, its identity must not appear in text, title, aria-label, or
-    // data-* attributes via the disclosure-safe display path. Here we model a
-    // secret region NOT present in the GM-visible systemRegions/evidence and
-    // assert it appears nowhere.
+
+    // Build the disclosure-safe display model the REAL way: a non-GM viewer
+    // seeing a secret, undiscovered region (manual reveal mode). The disclosure
+    // contract redacts both id and name, returning a placeholder instead.
+    const disclosure = buildRegionDisclosure(
+      { id: SECRET_ID, name: SECRET_NAME, secret: true, enabled: true },
+      { isGM: false, discovered: false, revealMode: 'manual' }
+    );
+    assert.equal(disclosure.placeholder, true, 'precondition: secret undiscovered region must redact to a placeholder');
+    assert.equal(disclosure.id, null, 'precondition: disclosure must drop the secret id');
+    assert.equal(disclosure.label, undefined, 'precondition: disclosure must drop the secret name');
+
+    // Wire the placeholder disclosure into the component the way the player-facing
+    // wiring does: a region option/chip whose id and name come from the
+    // disclosure, never from the raw secret record. The localized placeholder
+    // label stands in for the name. (The test's localize stub is identity, so the
+    // rendered label is the placeholder key itself.)
+    const PLACEHOLDER_LABEL = UNDISCOVERED_PLACEHOLDER_KEY;
+    // disclosure.id is null and disclosure.label is undefined for a redacted
+    // region, so the view receives a synthetic id (not the secret one) and the
+    // localized placeholder key in place of the name.
+    const placeholderRegion = {
+      id: disclosure.id ?? 'placeholder-region',
+      name: disclosure.label ?? disclosure.labelKey ?? PLACEHOLDER_LABEL,
+      enabled: true,
+      secret: true
+    };
+
     await mountView(baseProps({
       parties: [makeParty({
         currentRegionEvidence: {
           source: 'manualOverride',
           resolved: true,
-          regions: [{ id: 'r1', name: 'Verdant', enabled: true }],
+          regions: [{ id: placeholderRegion.id, name: placeholderRegion.name, enabled: true }],
           staleRegionIds: []
         }
       })],
       selectedPartyId: 'p1',
-      systemRegions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false }]
+      systemRegions: [placeholderRegion]
     }));
+
     const html = target.innerHTML;
     assert.equal(html.includes(SECRET_NAME), false, 'secret region name must not appear in markup');
     assert.equal(html.includes(SECRET_ID), false, 'secret region id must not appear in markup');
-    // Assert across every attribute channel explicitly.
+    // Assert across every channel: text, title, aria-label, and every data-* attr.
     for (const node of target.querySelectorAll('*')) {
       assert.equal((node.textContent || '').includes(SECRET_NAME), false);
       assert.equal((node.getAttribute('title') || '').includes(SECRET_NAME), false);
       assert.equal((node.getAttribute('aria-label') || '').includes(SECRET_NAME), false);
       for (const attr of node.getAttributeNames()) {
-        if (attr.startsWith('data-')) {
-          assert.equal((node.getAttribute(attr) || '').includes(SECRET_ID), false, `data attr ${attr} must not leak secret id`);
-          assert.equal((node.getAttribute(attr) || '').includes(SECRET_NAME), false, `data attr ${attr} must not leak secret name`);
-        }
+        const value = node.getAttribute(attr) || '';
+        assert.equal(value.includes(SECRET_ID), false, `attr ${attr} must not leak secret id`);
+        assert.equal(value.includes(SECRET_NAME), false, `attr ${attr} must not leak secret name`);
       }
     }
+    // The placeholder label DOES render via the disclosure-safe path.
+    const chip = target.querySelector(`.manager-travel-region-chip[data-region-id="${placeholderRegion.id}"]`);
+    assert.ok(chip, 'placeholder region chip should render');
+    assert.ok(chip.textContent.includes(PLACEHOLDER_LABEL), 'placeholder label should render in place of the secret name');
     remount();
   });
 });

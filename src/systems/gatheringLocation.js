@@ -13,7 +13,7 @@
  * @typedef {{ id: string|null, label?: string, labelKey?: string, discovered: boolean, secret: boolean, placeholder: boolean }} GatheringRegionDisclosure
  */
 
-const UNDISCOVERED_PLACEHOLDER_KEY = 'FABRICATE.Gathering.Region.UndiscoveredPlaceholder';
+export const UNDISCOVERED_PLACEHOLDER_KEY = 'FABRICATE.Gathering.Region.UndiscoveredPlaceholder';
 
 function asIdList(value) {
   const values = Array.isArray(value) ? value : (value ? [value] : []);
@@ -178,6 +178,46 @@ export function buildRegionDisclosure(region = {}, { isGM = false, discovered = 
     discovered: false,
     secret: true,
     placeholder: true
+  };
+}
+
+/**
+ * Build the redaction-safe current-region summary for a player-callable read.
+ *
+ * Mirrors the disclosure policy of `buildRegionDisclosure`: every region is
+ * routed through it so a non-GM viewer never receives a secret undiscovered
+ * region's id or name, and the raw `regionIds`/`staleRegionIds` arrays (which
+ * are real ids) are returned EMPTY unless the viewer is a GM.
+ *
+ * @param {object} args
+ * @param {object} args.context Resolved current-region context
+ *   ({ resolved, source, regions, regionIds, staleRegionIds }).
+ * @param {boolean} [args.isGM]
+ * @param {string} [args.revealMode] System reveal mode ('alwaysVisible' shows names).
+ * @param {Set<string>|string[]} [args.discoveredRegionIds] Region ids the actor discovered.
+ * @returns {{ resolved: boolean, source: string, regions: GatheringRegionDisclosure[], regionIds: string[], staleRegionIds: string[] }}
+ */
+export function buildLocationSummaryForViewer({
+  context = {},
+  isGM = false,
+  revealMode = 'manual',
+  discoveredRegionIds = new Set()
+} = {}) {
+  const discovered = discoveredRegionIds instanceof Set
+    ? discoveredRegionIds
+    : new Set(Array.isArray(discoveredRegionIds) ? discoveredRegionIds : []);
+  const regions = (Array.isArray(context?.regions) ? context.regions : [])
+    .map(region => buildRegionDisclosure(region, {
+      isGM,
+      discovered: discovered.has(region?.id),
+      revealMode
+    }));
+  return {
+    resolved: context?.resolved === true,
+    source: context?.source || 'unresolved',
+    regions,
+    regionIds: isGM ? (Array.isArray(context?.regionIds) ? context.regionIds : []) : [],
+    staleRegionIds: isGM ? (Array.isArray(context?.staleRegionIds) ? context.staleRegionIds : []) : []
   };
 }
 
