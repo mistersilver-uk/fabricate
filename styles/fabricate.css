@@ -10066,6 +10066,13 @@
   gap: 6px;
 }
 
+/* The shared .manager-search is sized for horizontal toolbars (flex: 1 1 260px);
+   inside this column its 260px basis would balloon vertically, so pin it to its
+   content height. */
+.fabricate-manager .manager-party-add .manager-search {
+  flex: 0 0 auto;
+}
+
 .fabricate-manager .manager-party-add-list {
   display: flex;
   flex-direction: column;
