@@ -793,6 +793,9 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-environment-workspace',
       '.environment-fields',
       '.environment-task-layout',
+      '.manager-travel-view',
+      '.manager-travel-party-row',
+      '.manager-travel-member-row',
       '.manager-fact'
     ];
     return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)).map((element, index) => {
@@ -2612,6 +2615,26 @@ async function main() {
         await assertManagerLayoutStable(page, 'gathering hazard editor normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-hazard-editor-normal');
+
+        // Travel route (#257): clicks the gathering Travel subitem and screenshots
+        // the party/region management surface. The subitem is targeted by id so
+        // adding it as a 5th gathering nav item does not shift any pinned .nth()
+        // selector. Captures a default-width and a narrow-width shot, mirroring
+        // the stacked-capture pattern used by the gathering task editor above.
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager #manager-gathering-nav-travel').first().click();
+        await page.locator('.fabricate-manager .manager-travel-view').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertManagerLayoutStable(page, 'gathering travel normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-gathering-travel-normal');
+
+        await setManagerWindowSize(page, { width: 1000, height: 720 });
+        await page.waitForTimeout(250);
+        await assertManagerLayoutStable(page, 'gathering travel stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-gathering-travel-stacked');
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
 
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });

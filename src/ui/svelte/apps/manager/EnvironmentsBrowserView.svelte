@@ -9,6 +9,7 @@
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
+  import GatheringTravelView from './GatheringTravelView.svelte';
 
   let {
     environments = [],
@@ -55,7 +56,33 @@
     onDeleteGatheringConditionValue = () => {},
     onAddGatheringVocabularyValue = () => {},
     onUpdateGatheringVocabularyValue = () => {},
-    onDeleteGatheringVocabularyValue = () => {}
+    onDeleteGatheringVocabularyValue = () => {},
+    travelParties = [],
+    travelSelectedPartyId = '',
+    travelSaving = false,
+    travelError = null,
+    travelFieldErrors = {},
+    travelActorOptions = [],
+    travelSystemRegions = [],
+    onSelectParty = () => {},
+    onCreateParty = () => {},
+    onRenameParty = () => {},
+    onSetPartyEnabled = () => {},
+    onDeleteParty = () => {},
+    onAddPartyMember = () => {},
+    onRemovePartyMember = () => {},
+    onMovePartyMember = () => {},
+    onSetPartyTravelActor = () => {},
+    onClearPartyTravelActor = () => {},
+    onSetPartyRegionOverride = () => {},
+    onClearPartyRegionOverride = () => {},
+    onRemoveStaleMember = () => {},
+    onClearStaleTravelActor = () => {},
+    onDropStaleOverrideRegion = () => {},
+    onCreateRegionQuick = () => {},
+    onRenameRegion = () => {},
+    onToggleRegionEnabled = () => {},
+    onDeleteRegion = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -107,6 +134,16 @@
       titleFallback: 'Gathering hazards',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
       hintFallback: 'Browse reusable hazards before attaching them to environments.'
+    },
+    {
+      id: 'travel',
+      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel',
+      labelFallback: 'Travel',
+      icon: 'fas fa-route',
+      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
+      titleFallback: 'Travel and parties',
+      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
+      hintFallback: 'Manage Fabricate parties and set the current region for this crafting system.'
     },
     {
       id: 'settings',
@@ -822,6 +859,36 @@
         onToggleHazardEnabled={onToggleGatheringHazardEnabled}
       />
     </div>
+  {:else if activeGatheringTab === 'travel'}
+    <GatheringTravelView
+      parties={travelParties}
+      selectedPartyId={travelSelectedPartyId}
+      systemId={selectedSystemId}
+      saving={travelSaving}
+      error={travelError}
+      fieldErrors={travelFieldErrors}
+      actorOptions={travelActorOptions}
+      systemRegions={travelSystemRegions}
+      {onSelectParty}
+      {onCreateParty}
+      {onRenameParty}
+      {onSetPartyEnabled}
+      {onDeleteParty}
+      onAddMember={onAddPartyMember}
+      onRemoveMember={onRemovePartyMember}
+      onMoveMember={onMovePartyMember}
+      onSetTravelActor={onSetPartyTravelActor}
+      onClearTravelActor={onClearPartyTravelActor}
+      onSetRegionOverride={onSetPartyRegionOverride}
+      onClearRegionOverride={onClearPartyRegionOverride}
+      {onRemoveStaleMember}
+      {onClearStaleTravelActor}
+      {onDropStaleOverrideRegion}
+      onCreateRegion={onCreateRegionQuick}
+      {onRenameRegion}
+      {onToggleRegionEnabled}
+      {onDeleteRegion}
+    />
   {:else if activeGatheringTab === 'settings'}
     <div
       class="manager-gathering-panel manager-gathering-settings"

@@ -9869,3 +9869,434 @@
   padding: var(--fab-space-2) var(--fab-space-3);
   line-height: 1.2;
 }
+
+/* ---------------------------------------------------------------------------
+   GM Travel route (issue 257): world-level party management + per-system
+   current-region overrides. Chips/lists wrap at narrow widths (flex-wrap); no
+   horizontal overflow. Buttons with icon+label or portrait content set
+   justify-content/height explicitly so Foundry's global button centering does
+   not clip them.
+   --------------------------------------------------------------------------- */
+.fabricate-manager .manager-travel-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-scope-note {
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-radius: 8px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text-muted);
+  font-size: 13px;
+}
+
+.fabricate-manager .manager-travel-error {
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-radius: 8px;
+  border: 1px solid var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  font-size: 13px;
+}
+
+.fabricate-manager .manager-travel-field-error {
+  margin: 0 0 var(--fab-space-1) 0;
+  color: var(--fab-danger-text);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-travel-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-3);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-party-list {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-party-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-party-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-travel-party-row {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--fab-space-1);
+  height: auto;
+  min-height: 48px;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
+  color: var(--fab-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-party-row:hover {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-travel-party-row.is-active {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-travel-party-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-travel-party-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-travel-panel {
+  flex: 2 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-travel-party-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-rename {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-enable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-travel-hint,
+.fabricate-manager .manager-travel-empty-hint {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-travel-members,
+.fabricate-manager .manager-travel-actor,
+.fabricate-manager .manager-travel-override,
+.fabricate-manager .manager-travel-stale,
+.fabricate-manager .manager-travel-regions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-card-subtitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-travel-member-list,
+.fabricate-manager .manager-travel-stale-list,
+.fabricate-manager .manager-travel-region-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-travel-member-row,
+.fabricate-manager .manager-travel-actor-row,
+.fabricate-manager .manager-travel-stale-row,
+.fabricate-manager .manager-travel-region-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-member-row.is-stale .manager-travel-member-name,
+.fabricate-manager .manager-travel-member-name.is-stale {
+  color: var(--fab-text-muted);
+  font-style: italic;
+}
+
+.fabricate-manager .manager-travel-portrait {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--fab-surface-raised);
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-travel-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-travel-member-name,
+.fabricate-manager .manager-travel-option-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-picker-trigger {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 36px;
+}
+
+.fabricate-manager .manager-travel-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: min(50vh, 360px);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
+  box-shadow: var(--fab-shadow-lg);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-travel-popover-search {
+  padding: var(--fab-space-2);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-travel-popover-search input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fabricate-manager .manager-travel-popover-options {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--fab-space-2);
+  overflow-y: auto;
+}
+
+.fabricate-manager .manager-travel-option {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  height: auto;
+  min-height: 40px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fab-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-option:hover {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-travel-region-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-region-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  height: auto;
+  min-height: 28px;
+  padding: 2px var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  background: var(--fab-surface);
+  color: var(--fab-text);
+  cursor: pointer;
+  white-space: normal;
+}
+
+.fabricate-manager .manager-travel-region-chip.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-travel-region-chip-flag {
+  font-size: 11px;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-travel-override-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
+}
+
+.fabricate-manager .manager-travel-checklist-steps {
+  margin: 0;
+  padding-left: var(--fab-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-travel-regions-header {
+  display: flex;
+  align-items: center;
+}
+
+.fabricate-manager .manager-travel-regions-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  height: auto;
+  min-height: 32px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: none;
+  background: transparent;
+  color: var(--fab-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-status-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 28px;
+  padding: 2px var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  background: var(--fab-surface);
+  color: var(--fab-text);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-status-toggle.is-on {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-travel-status-toggle.is-off {
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-travel-status-toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fabricate-manager .manager-travel-region-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+}
+
+.fabricate-manager .manager-travel-region-create-input,
+.fabricate-manager .manager-travel-region-name {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-evidence-source {
+  margin: 0;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-travel-evidence-regions {
+  list-style: none;
+  margin: var(--fab-space-1) 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}

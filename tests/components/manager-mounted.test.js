@@ -46,6 +46,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -2337,11 +2339,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Settings']
+      ['Environments', 'Tasks', 'Hazards', 'Travel', 'Settings']
     );
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
-      ['2', '3', '0', null]
+      ['2', '3', '0', '0', null]
     );
     assert.equal(
       gatheringSubitem('Environments').getAttribute('aria-current'),
@@ -2353,7 +2355,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
-    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 5);
     assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
 
@@ -2372,7 +2374,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 5);
     assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
@@ -2496,7 +2498,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 5);
     assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
@@ -4350,11 +4352,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Settings']
+      ['Environments', 'Tasks', 'Hazards', 'Travel', 'Settings']
     );
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
-      ['0', '3', '0', null]
+      ['0', '3', '0', '0', null]
     );
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
