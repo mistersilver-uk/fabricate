@@ -9895,11 +9895,14 @@
 }
 
 /* Travel > Parties accordion list (styled after the gathering tools browser). */
+/* Grid (toolbar / scrollable list / pagination) so the accordion list scrolls
+   within the panel while the search and pagination stay pinned. Relies on
+   .manager-gathering-panel's display:grid + min-height:0 + overflow:hidden. */
 .fabricate-manager .manager-travel-parties {
-  display: flex;
-  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--fab-space-3);
-  padding: var(--fab-space-4);
   min-width: 0;
 }
 
@@ -9911,6 +9914,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .fabricate-manager .manager-travel-parties-row {
@@ -10063,26 +10069,12 @@
 .fabricate-manager .manager-party-add {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
 }
 
-/* The shared .manager-search is sized for horizontal toolbars (flex: 1 1 260px);
-   inside this column its 260px basis would balloon vertically, so pin it to its
-   content height. */
-.fabricate-manager .manager-party-add .manager-search {
-  flex: 0 0 auto;
-}
-
-.fabricate-manager .manager-party-add-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 180px;
-  overflow-y: auto;
-  padding: 4px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-03);
+.fabricate-manager .manager-party-add-trigger {
+  justify-content: flex-start;
 }
 
 .fabricate-manager .manager-party-member-rows {

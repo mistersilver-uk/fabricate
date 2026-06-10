@@ -32,19 +32,26 @@
 
   const FALLBACK_PORTRAIT = 'fas fa-user';
 
-  let addSearch = $state('');
-
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
   const memberUuids = $derived(new Set((party?.memberCards || []).map(member => member.uuid)));
-  const normalizedAddSearch = $derived(addSearch.trim().toLowerCase());
-  const addableActors = $derived(
+  const addableOptions = $derived(
     actorOptions
       .filter(actor => actor.type === 'character' && !memberUuids.has(actor.uuid))
-      .filter(actor => !normalizedAddSearch || String(actor.name || '').toLowerCase().includes(normalizedAddSearch))
+      .map(actor => ({
+        id: actor.uuid,
+        label: actor.name,
+        img: actor.img || undefined,
+        icon: actor.img ? undefined : 'fas fa-user'
+      }))
+  );
+  const addEmptyHint = $derived(
+    addableOptions.length === 0
+      ? text('FABRICATE.Admin.Manager.Travel.Members.NoActors', 'No character actors exist in this world yet.')
+      : text('FABRICATE.Admin.Manager.Travel.Members.NoAddMatches', 'No characters match your search.')
   );
 
   const moveTargets = $derived(
@@ -77,39 +84,20 @@
     <section class="manager-party-members" aria-label={text('FABRICATE.Admin.Manager.Travel.Members.SectionLabel', 'Party members')}>
       <div class="manager-party-add" data-manager-party-add>
         <span class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}</span>
-        <label class="manager-search">
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <input
-            type="search"
-            bind:value={addSearch}
-            placeholder={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchPlaceholder', 'Search characters...')}
-            aria-label={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchLabel', 'Search characters to add')}
-          />
-        </label>
-        <div class="manager-party-add-list" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}>
-          {#each addableActors as actor (actor.uuid)}
-            <button
-              type="button"
-              class="manager-travel-option"
-              role="option"
-              aria-selected="false"
-              title={actor.name}
-              disabled={saving}
-              onclick={() => onAddMember(party.id, actor.uuid)}
-            >
-              <span class="manager-travel-portrait" aria-hidden="true">
-                {#if actor.img}<img src={actor.img} alt="" />{:else}<i class={FALLBACK_PORTRAIT}></i>{/if}
-              </span>
-              <span class="manager-travel-option-name">{actor.name}</span>
-            </button>
-          {:else}
-            <p class="manager-travel-empty-hint">
-              {actorOptions.some(actor => actor.type === 'character')
-                ? text('FABRICATE.Admin.Manager.Travel.Members.NoAddMatches', 'No characters match your search.')
-                : text('FABRICATE.Admin.Manager.Travel.Members.NoActors', 'No character actors exist in this world yet.')}
-            </p>
-          {/each}
-        </div>
+        <SearchablePopover
+          options={addableOptions}
+          disabled={saving}
+          triggerClass="manager-button manager-party-add-trigger"
+          triggerIcon="fas fa-user-plus"
+          triggerLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddTrigger', 'Add member')}
+          showChevron={false}
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}
+          dialogAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddLabel', 'Add members')}
+          searchPlaceholder={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchPlaceholder', 'Search characters...')}
+          searchAriaLabel={text('FABRICATE.Admin.Manager.Travel.Members.AddSearchLabel', 'Search characters to add')}
+          emptyHint={addEmptyHint}
+          onChoose={(uuid) => onAddMember(party.id, uuid)}
+        />
       </div>
 
       <ul class="manager-party-member-rows" data-manager-party-member-rows>

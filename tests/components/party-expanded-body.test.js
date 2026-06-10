@@ -109,37 +109,49 @@ describe('PartyExpandedBody mounted behavior', () => {
     if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  function addOptions() {
-    return Array.from(target.querySelectorAll('.manager-party-add-list .manager-travel-option'));
+  async function openAddPopover() {
+    target.querySelector('.manager-party-add-trigger').click();
+    flushSync();
+    await tick();
+    flushSync();
   }
 
-  it('lists only character actors not already members, and adds on click', async () => {
+  function optionNames() {
+    return Array.from(target.querySelectorAll('.manager-travel-option .manager-travel-option-name'))
+      .map(node => node.textContent.trim());
+  }
+
+  it('opens a popover listing only character actors not already members, and adds on click', async () => {
     const added = [];
     await mountBody({
       party: makeParty({ memberCards: [{ uuid: 'Actor.b', name: 'Bromm', img: '', stale: false }] }),
       actorOptions: actors,
       onAddMember: (partyId, uuid) => added.push([partyId, uuid])
     });
-    const names = addOptions().map(button => button.querySelector('.manager-travel-option-name').textContent.trim());
+    // Options only exist once the popover is opened.
+    assert.equal(target.querySelectorAll('.manager-travel-option').length, 0);
+    await openAddPopover();
     // Alara (character, not a member) listed; Bromm excluded (already member); NPC excluded (not character).
-    assert.deepEqual(names, ['Alara']);
-    addOptions()[0].click();
+    assert.deepEqual(optionNames(), ['Alara']);
+    Array.from(target.querySelectorAll('.manager-travel-option'))
+      .find(button => button.textContent.includes('Alara'))
+      .click();
     flushSync();
     assert.deepEqual(added, [['p1', 'Actor.a']]);
     remount();
   });
 
-  it('filters the add list by search', async () => {
+  it('filters the add popover options by search', async () => {
     await mountBody({ actorOptions: actors });
-    assert.equal(addOptions().length, 2); // Alara + Bromm (characters)
-    const search = target.querySelector('.manager-party-add input[type="search"]');
+    await openAddPopover();
+    assert.equal(target.querySelectorAll('.manager-travel-option').length, 2); // Alara + Bromm (characters)
+    const search = target.querySelector('.manager-travel-popover-search input');
     search.value = 'brom';
     search.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     await tick();
     flushSync();
-    const names = addOptions().map(button => button.querySelector('.manager-travel-option-name').textContent.trim());
-    assert.deepEqual(names, ['Bromm']);
+    assert.deepEqual(optionNames(), ['Bromm']);
     remount();
   });
 

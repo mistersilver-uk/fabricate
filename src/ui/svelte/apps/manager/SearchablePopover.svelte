@@ -194,7 +194,11 @@
             title={option.label}
             onclick={() => choose(option.id)}
           >
-            {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}
+            {#if option.img}
+              <span class="manager-travel-portrait" aria-hidden="true"><img src={option.img} alt="" /></span>
+            {:else if option.icon}
+              <i class={option.icon} aria-hidden="true"></i>
+            {/if}
             <span class="manager-travel-option-name">{option.label}</span>
             {#if option.trailing}<span class="manager-chip is-disabled">{option.trailing}</span>{/if}
           </button>

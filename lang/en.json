@@ -2011,6 +2011,7 @@
           "Members": {
             "SectionLabel": "Party members",
             "AddLabel": "Add members",
+            "AddTrigger": "Add member",
             "AddSearchPlaceholder": "Search characters...",
             "AddSearchLabel": "Search characters to add",
             "NoAddMatches": "No characters match your search.",
