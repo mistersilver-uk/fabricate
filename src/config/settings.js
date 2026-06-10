@@ -11,6 +11,7 @@ export const SETTING_KEYS = Object.freeze({
   CRAFTING_SYSTEMS: 'craftingSystems',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
+  GATHERING_PARTIES: 'gatheringParties',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
   LAST_GATHERING_ACTOR: 'lastGatheringActor',
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
@@ -52,6 +53,13 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: Object,
     default: {}
+  },
+  [SETTING_KEYS.GATHERING_PARTIES]: {
+    name: 'Gathering Parties',
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: []
   },
   [SETTING_KEYS.THEME]: {
     name: 'FABRICATE.Settings.Theme.Name',

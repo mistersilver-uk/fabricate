@@ -1,6 +1,13 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { classifyGatheringToolStates, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
+import {
+  buildRegionDisclosure,
+  buildTravelGuidance,
+  environmentHasLocationRules,
+  evaluateLocationAvailability
+} from './gatheringLocation.js';
+import { getDiscoveredRegionIdsForSystem } from './gatheringRegionDiscovery.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -25,7 +32,9 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
   BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate',
-  CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked'
+  CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked',
+  LOCATION_BLOCKED: 'FABRICATE.Gathering.Blocked.LocationBlocked',
+  NO_CURRENT_REGION: 'FABRICATE.Gathering.Blocked.NoCurrentRegion'
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -86,6 +95,7 @@ export class GatheringEngine {
     failureFeedback = null,
     hazardSceneTrigger = null,
     getRunViewer = null,
+    locationResolver = null,
     random = Math.random,
     localize = defaultLocalize,
     // Stamina regen / node respawn run on world-time advance and write shared
@@ -110,6 +120,9 @@ export class GatheringEngine {
     this.failureFeedback = failureFeedback;
     this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
+    // Constructor-injected current-region resolver (GatheringLocationService),
+    // NOT a module import — keeps the engine system-agnostic and testable.
+    this.locationResolver = locationResolver;
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
@@ -286,6 +299,20 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('ENVIRONMENT_DISABLED')
+      });
+    }
+
+    // Fresh location re-resolution at attempt time (no listing cache) so a stale
+    // listing state — e.g. an override cleared between list and start — cannot
+    // start a location-gated attempt.
+    const locationGuard = this._locationBlockedReasons({ environment, system, viewer, actor: selectedActor });
+    if (locationGuard.blockedReasons.length > 0) {
+      return this._blockedStart({
+        viewer,
+        actor: selectedActor,
+        environment,
+        task,
+        reason: locationGuard.blockedReasons[0]
       });
     }
 
@@ -633,13 +660,16 @@ export class GatheringEngine {
 
     const hidden = { targeted: 0, blind: 0 };
     const environmentModels = [];
+    // Resolve each system's current-region context at most once per listing call.
+    const regionContextCache = new Map();
     for (const environment of environments) {
       const model = await this._buildEnvironmentListing({
         environment,
         system: systems.get(environment.craftingSystemId),
         viewer,
         actor: selectedActor,
-        presentTools
+        presentTools,
+        regionContextCache
       });
       if (model.visible) {
         environmentModels.push(model);
@@ -950,7 +980,7 @@ export class GatheringEngine {
     return environment;
   }
 
-  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null }) {
+  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null, regionContextCache = null }) {
     // Disabled environments surface to every viewer (players and GMs alike) as
     // non-interactive "locked" teasers. Build them before any task-visibility
     // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
@@ -979,7 +1009,9 @@ export class GatheringEngine {
       };
     }
 
-    const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, viewer, actor });
+    const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    // Redaction-safe location field computed once for the listing model.
+    const { location } = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
     // Stash each visible task's blocked reasons so both the player task models
     // and the blind "discovered tasks" list draw from one computation — no
     // extra visibility pass that could surface unrevealed tasks.
@@ -1080,6 +1112,7 @@ export class GatheringEngine {
       hazards: listedHazards,
       hazardVisibility,
       blockedReasons,
+      location,
       tasks: listedTasks,
       discoveredTasks,
       ...this._playerListingFields({ environment, actor, locked: false })
@@ -1383,7 +1416,7 @@ export class GatheringEngine {
     });
   }
 
-  async _environmentBlockedReasons({ environment, viewer, actor }) {
+  async _environmentBlockedReasons({ environment, system = null, viewer, actor, regionContextCache = null }) {
     const blockedReasons = [];
     if (environment.enabled === false) {
       blockedReasons.push(this._blockedReason('ENVIRONMENT_DISABLED'));
@@ -1400,7 +1433,102 @@ export class GatheringEngine {
       }
     }
 
+    const location = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    blockedReasons.push(...location.blockedReasons);
+
     return blockedReasons;
+  }
+
+  /**
+   * Resolve the current-region context for one system once per listing call.
+   * Memoized by systemId in the supplied cache so the per-environment loop in
+   * `listForActor` does not re-resolve for every environment of a system.
+   *
+   * @param {object} args
+   * @param {object} args.actor Selected actor.
+   * @param {string} args.systemId Owning crafting system id.
+   * @param {Map<string, object>|null} [args.cache]
+   * @returns {object} Current-region context (resolved/source/regions/...).
+   */
+  _resolveRegionContext({ actor, systemId, cache = null }) {
+    if (cache && cache.has(systemId)) return cache.get(systemId);
+    const context = typeof this.locationResolver?.buildCurrentRegionContext === 'function'
+      ? this.locationResolver.buildCurrentRegionContext({ actor, systemId })
+      : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+    if (cache) cache.set(systemId, context);
+    return context;
+  }
+
+  /**
+   * Evaluate location availability for an environment and produce blocked
+   * reasons plus a redaction-safe `location` listing field. Fast-exits (returns
+   * no reasons and an ungated `location`) when no resolver is wired or the
+   * environment declares no location rules — legacy ungated environments are
+   * preserved exactly.
+   *
+   * Non-GM blocked-reason `data` is built entirely from `buildTravelGuidance`,
+   * whose destinations flow through `buildRegionDisclosure`, so secret
+   * undiscovered region ids/names never appear in player-facing data.
+   *
+   * @param {object} args
+   * @returns {{ blockedReasons: object[], location: object }}
+   */
+  _locationBlockedReasons({ environment, system = null, viewer, actor, regionContextCache = null }) {
+    const gated = environmentHasLocationRules(environment);
+    if (!this.locationResolver || !gated) {
+      return {
+        blockedReasons: [],
+        location: { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null }
+      };
+    }
+
+    const systemId = stringOrNull(environment?.craftingSystemId);
+    const context = this._resolveRegionContext({ actor, systemId, cache: regionContextCache });
+    const availability = evaluateLocationAvailability(environment, context);
+    const isGM = viewer?.isGM === true;
+    const revealMode = this._regionRevealMode(system);
+    const regionsById = new Map((Array.isArray(system?.gatheringRegions) ? system.gatheringRegions : []).map(region => [region.id, region]));
+    const discoveredRegionIds = actor ? getDiscoveredRegionIdsForSystem(actor, systemId) : new Set();
+
+    const currentRegions = (Array.isArray(context?.regions) ? context.regions : []).map(region => buildRegionDisclosure(region, {
+      isGM,
+      discovered: discoveredRegionIds.has(region?.id),
+      revealMode
+    }));
+
+    const location = {
+      gated: true,
+      available: availability.available === true,
+      source: stringOrNull(context?.source) || 'unresolved',
+      currentRegions,
+      guidance: null
+    };
+
+    if (availability.available === true) {
+      return { blockedReasons: [], location };
+    }
+
+    const guidance = buildTravelGuidance({
+      environment,
+      regionsById,
+      currentRegionContext: context,
+      availability,
+      discoveredRegionIds,
+      isGM,
+      revealMode
+    });
+    location.guidance = guidance;
+
+    const code = availability.reasons.includes('NO_CURRENT_REGION') ? 'NO_CURRENT_REGION' : 'LOCATION_BLOCKED';
+    return {
+      blockedReasons: [this._blockedReason(code, { data: guidance })],
+      location
+    };
+  }
+
+  _regionRevealMode(system) {
+    const mode = system?.gatheringRegionSettings?.revealMode;
+    return mode === 'alwaysVisible' || mode === 'onPartyTokenEntry' ? mode : 'manual';
   }
 
   async _checkSceneAccess({ environment, viewer, actor }) {

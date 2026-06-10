@@ -2691,7 +2691,21 @@
         "AttemptLimitExhausted": "No attempts remain for this gathering task.",
         "StaminaBlocked": "The selected actor does not have enough gathering stamina.",
         "BlindNoCandidate": "There is nothing you can gather here right now.",
-        "ConditionsBlocked": "Current weather or time-of-day does not allow this task."
+        "ConditionsBlocked": "Current weather or time-of-day does not allow this task.",
+        "LocationBlocked": "Not available in the party's current region.",
+        "NoCurrentRegion": "No party region is set. Ask the GM to set the party's current region."
+      },
+      "Region": {
+        "UndiscoveredPlaceholder": "Undiscovered region"
+      },
+      "Travel": {
+        "Guidance": {
+          "NoCurrentRegion": "Not available while no party region is set. Ask the GM to set the party's current region.",
+          "Excluded": "Not available in the party's current region.",
+          "Travel": "Travel to a region where this is available.",
+          "KnownDestinations": "Travel to: {names}.",
+          "UndiscoveredDestinations": "Available in {count} undiscovered region(s)."
+        }
       },
       "Risk": {
         "safe": "Safe",
