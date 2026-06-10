@@ -73,6 +73,12 @@
   const timeOfDayIcon = TIME_OF_DAY_FALLBACK_ICON;
   const timeOfDayLabel = $derived(localize(getTimeOfDayLabelKey(timeOfDayId)));
 
+  // Each condition chip displays only when the active gathering system enables
+  // that dimension (pushed from the gathering view via setConditionVisibility).
+  // A missing flag defaults to shown.
+  const showWeather = $derived(store?.conditionVisibility?.weather !== false);
+  const showTimeOfDay = $derived(store?.conditionVisibility?.timeOfDay !== false);
+
   // The selected character's stamina pool for the active stamina-mode system,
   // surfaced contextually on the gathering tab. Null in nodes/none mode.
   const staminaPool = $derived(store?.staminaPool ?? null);
@@ -225,14 +231,18 @@
             <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
           </span>
         {/if}
-        <span class="actor-bar-condition actor-bar-weather">
-          <i class={weatherIcon} aria-hidden="true"></i>
-          <span class="actor-bar-condition-label">{weatherLabel}</span>
-        </span>
-        <span class="actor-bar-condition actor-bar-time">
-          <i class={timeOfDayIcon} aria-hidden="true"></i>
-          <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
-        </span>
+        {#if showWeather}
+          <span class="actor-bar-condition actor-bar-weather">
+            <i class={weatherIcon} aria-hidden="true"></i>
+            <span class="actor-bar-condition-label">{weatherLabel}</span>
+          </span>
+        {/if}
+        {#if showTimeOfDay}
+          <span class="actor-bar-condition actor-bar-time">
+            <i class={timeOfDayIcon} aria-hidden="true"></i>
+            <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
+          </span>
+        {/if}
       {/if}
     </div>
   {/if}

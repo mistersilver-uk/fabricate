@@ -239,6 +239,16 @@
   $effect(() => {
     store?.setStaminaPool(selectedEnvironment?.staminaPool ?? null);
   });
+
+  // Report whether weather / time-of-day are enabled for the selected
+  // environment's system so the header bar can hide the chip for a disabled
+  // condition. Defaults to shown when no environment is selected.
+  $effect(() => {
+    store?.setConditionVisibility({
+      weather: selectedEnvironment ? selectedEnvironment.weatherEnabled !== false : true,
+      timeOfDay: selectedEnvironment ? selectedEnvironment.timeOfDayEnabled !== false : true
+    });
+  });
 </script>
 
 {#if loading}

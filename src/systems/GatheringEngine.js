@@ -1110,6 +1110,8 @@ export class GatheringEngine {
       economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
       staminaEnabled: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true,
       nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
+      weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
+      timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
       staminaPool: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true && actor
         ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) || null
         : null,
@@ -1228,6 +1230,8 @@ export class GatheringEngine {
       economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
       staminaEnabled: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true,
       nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
+      weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
+      timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
       staminaPool: null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',

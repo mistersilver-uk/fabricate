@@ -21,14 +21,29 @@
     services = null,
     activeCanvasTool = null,
     scopedEnvironmentId = null,
-    scopedTaskId = null
+    scopedTaskId = null,
+    scopedActorId = null
   } = $props();
+
+  // The scoped interacting actor most recently applied to the selection, so an
+  // interactable-granted actor seeds the bar once per distinct value (re-applied
+  // when the window re-opens for a different actor) without clobbering a later
+  // manual pick within the session.
+  let appliedScopedActorId = $state(null);
 
   // Load the shared actor-selection state and current gathering conditions once
   // the shell mounts. The store guards its own one-time load (re-entry guard).
+  // When an interactable activation supplied a scoped actor, seed it as the
+  // default selection AFTER the selectable list has loaded.
   $effect(() => {
-    services?.actorBar?.loadSelectableActors();
-    services?.actorBar?.refreshConditions();
+    const bar = services?.actorBar;
+    if (!bar) return;
+    bar.loadSelectableActors();
+    bar.refreshConditions();
+    if (scopedActorId && scopedActorId !== appliedScopedActorId) {
+      appliedScopedActorId = scopedActorId;
+      bar.selectScopedActor(scopedActorId);
+    }
   });
 
   // The Alchemy tab is only shown when an enabled alchemy system has recipes.

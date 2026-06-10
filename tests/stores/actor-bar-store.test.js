@@ -166,4 +166,52 @@ describe('actorBarStore', () => {
     flushSync();
     assert.deepEqual(store.conditions, conditions);
   });
+
+  it('selectScopedActor selects + persists a selectable id', () => {
+    const { services, calls } = makeServices({ actors: ACTORS, seededId: 'a1' });
+    const store = createActorBarStore({ services });
+    store.loadSelectableActors();
+    flushSync();
+    calls.setSelectedActorId.length = 0;
+
+    store.selectScopedActor('a2');
+    flushSync();
+
+    assert.equal(store.selectedActorId, 'a2', 'scoped actor becomes the selection');
+    assert.deepEqual(calls.setSelectedActorId, ['a2'], 'scoped selection is persisted');
+  });
+
+  it('selectScopedActor no-ops for a non-selectable id (keeps the default seed)', () => {
+    const { services, calls } = makeServices({ actors: ACTORS, seededId: 'a1' });
+    const store = createActorBarStore({ services });
+    store.loadSelectableActors();
+    flushSync();
+    calls.setSelectedActorId.length = 0;
+
+    store.selectScopedActor('npc-1');
+    flushSync();
+
+    assert.equal(store.selectedActorId, 'a1', 'unselectable scoped id leaves the seed in place');
+    assert.deepEqual(calls.setSelectedActorId, [], 'nothing persisted for an unselectable id');
+  });
+
+  it('setConditionVisibility defaults to shown and reflects pushed flags', () => {
+    const { services } = makeServices({ actors: ACTORS });
+    const store = createActorBarStore({ services });
+
+    assert.deepEqual(
+      store.conditionVisibility,
+      { weather: true, timeOfDay: true },
+      'both chips shown by default'
+    );
+
+    store.setConditionVisibility({ weather: false, timeOfDay: true });
+    flushSync();
+    assert.deepEqual(store.conditionVisibility, { weather: false, timeOfDay: true });
+
+    // A missing flag defaults back to shown (true).
+    store.setConditionVisibility({ timeOfDay: false });
+    flushSync();
+    assert.deepEqual(store.conditionVisibility, { weather: true, timeOfDay: false });
+  });
 });

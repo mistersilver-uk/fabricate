@@ -24,6 +24,11 @@ export function createActorBarStore({ services } = {}) {
   let selectableActors = $state([]);
   let staminaPool = $state(null);
   let conditions = $state(null);
+  // Per-condition display visibility for the header bar's weather/time-of-day
+  // chips, mirroring the active gathering system's enable toggles. Defaults to
+  // shown so non-gathering tabs and the pre-load window keep prior behavior; the
+  // gathering tab pushes the selected environment's flags via setConditionVisibility.
+  let conditionVisibility = $state({ weather: true, timeOfDay: true });
   let loaded = $state(false);
 
   const selectedActor = $derived(
@@ -38,6 +43,23 @@ export function createActorBarStore({ services } = {}) {
   function selectActor(id) {
     selectedActorId = id ?? '';
     services?.setSelectedActorId?.(selectedActorId);
+  }
+
+  /**
+   * Seed the selection from an interactable activation's interacting actor.
+   *
+   * Selects + persists `id` ONLY when it is one of the user's selectable
+   * characters (the bar is player-character-only). When the id is absent from
+   * `selectableActors` (e.g. a non-PC owned actor) this no-ops so the default
+   * seed from {@link loadSelectableActors} stays in place rather than leaving the
+   * bar with an unselectable, portrait-less selection.
+   *
+   * @param {string} id Interacting actor id.
+   */
+  function selectScopedActor(id) {
+    if (!id) return;
+    if (!selectableActors.some((actor) => actor?.id === id)) return;
+    selectActor(id);
   }
 
   /**
@@ -95,6 +117,20 @@ export function createActorBarStore({ services } = {}) {
     conditions = services?.getGatheringConditions?.() ?? null;
   }
 
+  /**
+   * Set whether the header bar's weather / time-of-day chips should display,
+   * mirroring the selected gathering environment's per-system enable toggles. A
+   * missing flag defaults to shown (`true`).
+   *
+   * @param {{ weather?: boolean, timeOfDay?: boolean }|null} next Visibility flags.
+   */
+  function setConditionVisibility(next) {
+    conditionVisibility = {
+      weather: next?.weather !== false,
+      timeOfDay: next?.timeOfDay !== false
+    };
+  }
+
   return {
     get selectedActorId() {
       return selectedActorId;
@@ -108,6 +144,9 @@ export function createActorBarStore({ services } = {}) {
     get conditions() {
       return conditions;
     },
+    get conditionVisibility() {
+      return conditionVisibility;
+    },
     get loaded() {
       return loaded;
     },
@@ -116,7 +155,9 @@ export function createActorBarStore({ services } = {}) {
     },
     loadSelectableActors,
     selectActor,
+    selectScopedActor,
     setStaminaPool,
-    refreshConditions
+    refreshConditions,
+    setConditionVisibility
   };
 }

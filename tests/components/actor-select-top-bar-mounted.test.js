@@ -54,6 +54,7 @@ function fakeStore(overrides = {}) {
       selectedActorId,
       staminaPool: overrides.staminaPool ?? null,
       conditions: overrides.conditions ?? null,
+      conditionVisibility: overrides.conditionVisibility ?? { weather: true, timeOfDay: true },
       loaded: overrides.loaded ?? true,
       get selectedActor() {
         return selectableActors.find((actor) => actor?.id === selectedActorId) ?? null;
@@ -300,6 +301,34 @@ describe('ActorSelectTopBar mounted behavior', () => {
     // Region is no longer a composition/display axis: the legacy inert
     // environment.region chip was removed with the gathering-regions unification.
     assert.equal(right.querySelector('.actor-bar-region'), null, 'legacy region chip removed');
+  });
+
+  it('hides the weather chip when weather is disabled for the active system', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      conditionVisibility: { weather: false, timeOfDay: true }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.equal(right.querySelector('.actor-bar-weather'), null, 'weather chip hidden when disabled');
+    assert.ok(right.querySelector('.actor-bar-time'), 'time-of-day chip still shown');
+  });
+
+  it('hides the time-of-day chip when time of day is disabled for the active system', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      conditionVisibility: { weather: true, timeOfDay: false }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.equal(right.querySelector('.actor-bar-time'), null, 'time-of-day chip hidden when disabled');
+    assert.ok(right.querySelector('.actor-bar-weather'), 'weather chip still shown');
   });
 
   it('falls back to the clock + Unknown label when timeOfDay is missing', async () => {

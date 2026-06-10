@@ -665,7 +665,11 @@ class InteractableManager {
         ref: { sceneId: request.sceneId, regionId: request.regionId, behaviorId: request.behaviorId },
         interactableType: system.interactableType,
         environmentId: system.environmentId ?? null,
-        taskId: system.taskId ?? null
+        taskId: system.taskId ?? null,
+        // The interacting actor (the token the player walked in) becomes the
+        // default selected actor when the granted session opens. Already
+        // ownership-validated above (`canControlActor`).
+        actorId: request.actorId ?? null
       }
     };
     // The requesting user opens the session locally. When the GM IS the requester
@@ -703,6 +707,10 @@ class InteractableManager {
       return;
     }
 
+    // The interacting actor becomes the default-selected actor in the opened
+    // session's top bar (when it is one of the user's selectable characters).
+    const actorId = grant.actorId ?? null;
+
     if (grant.interactableType === 'tool') {
       const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
       if (!activeCanvasTool) {
@@ -711,7 +719,7 @@ class InteractableManager {
       // A Tool station belongs to crafting; open the Crafting tab with the active
       // station tool (the Crafting tab is still a placeholder, so this shows the
       // placeholder with the active-tool chip in the header).
-      void AppClass.show('crafting', { activeCanvasTool });
+      void AppClass.show('crafting', { activeCanvasTool, actorId });
       return;
     }
 
@@ -721,7 +729,7 @@ class InteractableManager {
       if (!environmentId || !taskId) {
         return;
       }
-      void AppClass.show('gathering', { environmentId, taskId });
+      void AppClass.show('gathering', { environmentId, taskId, actorId });
     }
   }
 
