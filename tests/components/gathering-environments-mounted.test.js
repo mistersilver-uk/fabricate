@@ -127,6 +127,11 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
     writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
 
+    // GatheringTaskDetail + GatheringView share the blocked-reason localizer.
+    const blockedReasonsDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
+    mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
+    writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');

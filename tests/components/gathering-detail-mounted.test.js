@@ -167,6 +167,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
     writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
 
+    // GatheringTaskDetail + GatheringView share the blocked-reason localizer.
+    const blockedReasonsDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
+    mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
+    writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
@@ -575,7 +580,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await settle();
 
     assert.equal(calls.attempts.length, 1, 'startGatheringAttempt called once');
-    assert.deepEqual(calls.attempts[0], { environmentId: 'env-meadow', taskId: 'task-1' }, 'called with env + task id');
+    assert.deepEqual(
+      calls.attempts[0],
+      { environmentId: 'env-meadow', taskId: 'task-1', rememberedActorId: null },
+      'called with env + task id (+ remembered actor; null with no actor bar)'
+    );
     assert.equal(calls.list, 2, 'listing re-fetched after the attempt');
   });
 
@@ -696,7 +705,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await settle();
 
     assert.equal(calls.attempts.length, 1, 'blind attempt fires once');
-    assert.deepEqual(calls.attempts[0], { environmentId: 'env-blind', taskId: null }, 'blind attempt omits the task id');
+    assert.deepEqual(
+      calls.attempts[0],
+      { environmentId: 'env-blind', taskId: null, rememberedActorId: null },
+      'blind attempt omits the task id (remembered actor null with no actor bar)'
+    );
   });
 
   it('filters and paginates the task list via the task search box', async () => {

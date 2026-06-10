@@ -214,4 +214,25 @@ describe('actorBarStore', () => {
     flushSync();
     assert.deepEqual(store.conditionVisibility, { weather: true, timeOfDay: false });
   });
+
+  it('setRegionContext defaults to disabled/empty and reflects pushed summaries', () => {
+    const { services } = makeServices({ actors: ACTORS });
+    const store = createActorBarStore({ services });
+
+    assert.deepEqual(
+      store.regionContext,
+      { enabled: false, regions: [] },
+      'region chip hidden by default'
+    );
+
+    const regions = [{ id: 'r1', label: 'Whispering Wood', placeholder: false }];
+    store.setRegionContext({ enabled: true, regions });
+    flushSync();
+    assert.deepEqual(store.regionContext, { enabled: true, regions });
+
+    // A null/partial push normalizes to disabled + empty.
+    store.setRegionContext(null);
+    flushSync();
+    assert.deepEqual(store.regionContext, { enabled: false, regions: [] });
+  });
 });

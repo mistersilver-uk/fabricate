@@ -15,6 +15,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { formatRespawnDuration } from '../../util/formatDuration.js';
+  import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringTaskRequirements from './GatheringTaskRequirements.svelte';
   import GatheringTaskDrops from './GatheringTaskDrops.svelte';
   import SuccessChanceBar from './SuccessChanceBar.svelte';
@@ -43,15 +44,6 @@
   // tooltip naming the reason. Reuse the center-row callout vocabulary.
   const blocked = $derived(task != null && !attemptable);
   const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
-  const BLOCK_LABEL_KEYS = {
-    TOOL_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools',
-    CONDITIONS_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Conditions',
-    GAME_PAUSED: 'FABRICATE.App.Gathering.Detail.Callout.Paused',
-    DUPLICATE_ACTIVE_RUN: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun',
-    SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene',
-    NODE_DEPLETED: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted',
-    STAMINA_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked'
-  };
 
   // Economy summary shown above the Attempt button: the per-task stamina cost
   // against the actor's pool, and/or the remaining node count. Each is present
@@ -80,20 +72,7 @@
       ? localize('FABRICATE.App.Gathering.Detail.NodeRespawnEta', { duration: respawnDuration })
       : ''
   );
-  const blockReason = $derived.by(() => {
-    if (!blocked) return '';
-    const seen = new Set();
-    const labels = [];
-    for (const reason of blockedReasons) {
-      const code = reason?.code;
-      if (!code || seen.has(code)) continue;
-      seen.add(code);
-      const key = BLOCK_LABEL_KEYS[code];
-      labels.push(key ? localize(key) : (reason?.message || localize('FABRICATE.App.Gathering.Detail.Blocked')));
-    }
-    if (labels.length === 0) return localize('FABRICATE.App.Gathering.Detail.Blocked');
-    return localize('FABRICATE.App.Gathering.Detail.CannotAttempt', { reason: labels.join(', ') });
-  });
+  const blockReason = $derived(blocked ? describeBlockedReasons(blockedReasons, localize) : '');
 
   const titleId = 'gathering-task-detail-title';
 

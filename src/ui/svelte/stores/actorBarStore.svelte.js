@@ -29,6 +29,12 @@ export function createActorBarStore({ services } = {}) {
   // shown so non-gathering tabs and the pre-load window keep prior behavior; the
   // gathering tab pushes the selected environment's flags via setConditionVisibility.
   let conditionVisibility = $state({ weather: true, timeOfDay: true });
+  // The party's current-region summary for the header bar, mirroring the active
+  // gathering system's region/travel subsystem. `enabled` gates the chip;
+  // `regions` is the redaction-safe disclosure list (empty → "no region
+  // selected"). Defaults to disabled so the chip is hidden until the gathering
+  // tab pushes the selected environment's region summary via setRegionContext.
+  let regionContext = $state({ enabled: false, regions: [] });
   let loaded = $state(false);
 
   const selectedActor = $derived(
@@ -131,6 +137,20 @@ export function createActorBarStore({ services } = {}) {
     };
   }
 
+  /**
+   * Set the header bar's current-region summary, mirroring the selected gathering
+   * environment's region/travel subsystem. `enabled` gates the chip; `regions` is
+   * the redaction-safe disclosure list (empty → "no region selected").
+   *
+   * @param {{ enabled?: boolean, regions?: object[] }|null} next Region summary.
+   */
+  function setRegionContext(next) {
+    regionContext = {
+      enabled: next?.enabled === true,
+      regions: Array.isArray(next?.regions) ? next.regions : []
+    };
+  }
+
   return {
     get selectedActorId() {
       return selectedActorId;
@@ -147,6 +167,9 @@ export function createActorBarStore({ services } = {}) {
     get conditionVisibility() {
       return conditionVisibility;
     },
+    get regionContext() {
+      return regionContext;
+    },
     get loaded() {
       return loaded;
     },
@@ -158,6 +181,7 @@ export function createActorBarStore({ services } = {}) {
     selectScopedActor,
     setStaminaPool,
     refreshConditions,
-    setConditionVisibility
+    setConditionVisibility,
+    setRegionContext
   };
 }

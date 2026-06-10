@@ -10,7 +10,8 @@
   highlight-only — no center-column wiring yet.
 -->
 <script>
-  import { localize, subscribeSceneChange } from '../../util/foundryBridge.js';
+  import { localize, notifyWarn, subscribeSceneChange } from '../../util/foundryBridge.js';
+  import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import GatheringTaskDetail from './GatheringTaskDetail.svelte';
@@ -199,7 +200,21 @@
     if (busy || !environmentId) return;
     busy = true;
     try {
-      await services?.startGatheringAttempt?.({ environmentId, taskId });
+      // Thread the live bar selection so the attempt resolves the SAME actor the
+      // listing/availability was computed for. Without it the engine falls back to
+      // the first owned actor, which can differ from the selected character and
+      // silently fail location/ownership gating (the "nothing happens" bug).
+      const result = await services?.startGatheringAttempt?.({
+        environmentId,
+        taskId,
+        rememberedActorId: store?.selectedActorId ?? null
+      });
+      // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be
+      // a silent no-op. A started/accepted attempt reports its outcome via the chat
+      // card, so only an explicit rejection notifies here.
+      if (result && result.accepted === false) {
+        notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
+      }
       await load();
     } finally {
       busy = false;
@@ -247,6 +262,17 @@
     store?.setConditionVisibility({
       weather: selectedEnvironment ? selectedEnvironment.weatherEnabled !== false : true,
       timeOfDay: selectedEnvironment ? selectedEnvironment.timeOfDayEnabled !== false : true
+    });
+  });
+
+  // Report the party's current-region summary for the selected environment's
+  // system so the header bar can show the current region (or "no region
+  // selected") when the region/travel subsystem is enabled. Disabled (chip
+  // hidden) when no environment is selected or the system has regions off.
+  $effect(() => {
+    store?.setRegionContext({
+      enabled: selectedEnvironment?.regionsEnabled === true,
+      regions: selectedEnvironment?.currentRegions ?? []
     });
   });
 </script>

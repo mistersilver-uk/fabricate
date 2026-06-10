@@ -1022,6 +1022,10 @@ export class GatheringEngine {
     const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, system, viewer, actor, regionContextCache });
     // Redaction-safe location field computed once for the listing model.
     const { location } = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    // Party current-region summary for the header bar (regardless of this
+    // environment's gating), so the player app can show the current region or
+    // "no region selected" when the region/travel subsystem is enabled.
+    const regionSummary = this._currentRegionSummary({ environment, system, viewer, actor, regionContextCache });
     // Stash each visible task's blocked reasons so both the player task models
     // and the blind "discovered tasks" list draw from one computation — no
     // extra visibility pass that could surface unrevealed tasks.
@@ -1116,6 +1120,8 @@ export class GatheringEngine {
         ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) || null
         : null,
       conditions: plainObjectOrNull(environment.conditions) || {},
+      regionsEnabled: regionSummary.regionsEnabled,
+      currentRegions: regionSummary.currentRegions,
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
@@ -1232,6 +1238,11 @@ export class GatheringEngine {
       nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
       weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
       timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
+      // No actor/viewer is resolved for a locked teaser, so the current region is
+      // left empty ("no region selected"); the flag still mirrors the system so
+      // the header chip appears when the subsystem is enabled.
+      regionsEnabled: isGatheringRegionsEnabled(system),
+      currentRegions: [],
       staminaPool: null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
@@ -1549,6 +1560,35 @@ export class GatheringEngine {
       blockedReasons: [this._blockedReason(code, { data: guidance })],
       location
     };
+  }
+
+  /**
+   * Resolve the party's current-region summary for the header bar, independent of
+   * whether THIS environment is location-gated. Unlike the `location` field (which
+   * only discloses current regions for a gated environment), this surfaces the
+   * party's current region for the system whenever the region/travel subsystem is
+   * enabled, so the player header can show "current region / no region selected".
+   * Reuses the per-listing region-context cache and the same redaction policy as
+   * the gated path (`buildRegionDisclosure`).
+   *
+   * @param {object} args
+   * @returns {{ regionsEnabled: boolean, currentRegions: object[] }}
+   */
+  _currentRegionSummary({ environment, system = null, viewer, actor, regionContextCache = null }) {
+    if (!isGatheringRegionsEnabled(system)) {
+      return { regionsEnabled: false, currentRegions: [] };
+    }
+    const systemId = stringOrNull(environment?.craftingSystemId);
+    const context = this._resolveRegionContext({ actor, systemId, cache: regionContextCache });
+    const isGM = viewer?.isGM === true;
+    const revealMode = this._regionRevealMode(system);
+    const discoveredRegionIds = actor ? getDiscoveredRegionIdsForSystem(actor, systemId) : new Set();
+    const currentRegions = (Array.isArray(context?.regions) ? context.regions : []).map(region => buildRegionDisclosure(region, {
+      isGM,
+      discovered: discoveredRegionIds.has(region?.id),
+      revealMode
+    }));
+    return { regionsEnabled: true, currentRegions };
   }
 
   _regionRevealMode(system) {

@@ -1073,8 +1073,8 @@ If Foundry is paused, Fabricate must reject new gathering attempts before run-st
 
 If `environment.sceneUuid` is set:
 
-1. Non-GM users may only attempt gathering while viewing that scene.
-2. The selected actor must be player-owned by the acting user.
+1. Any user — **including GMs** — may only attempt gathering while viewing that scene. This presence gate is additive with the region/travel and stamina/node gates (which also apply to GMs); it is NOT one of the visibility/inspection restrictions GMs bypass.
+2. For a non-GM user the selected actor must be player-owned by the acting user.
 3. The selected actor must have at least one token present on the associated scene.
 4. If any of the above checks fail, the environment is not attemptable by that user.
 
@@ -1083,7 +1083,8 @@ If `environment.sceneUuid` is absent, the environment is not scene-gated by this
 ### GM Permissions
 
 - GMs may view and configure all environments and tasks.
-- GMs may bypass player-facing visibility restrictions for inspection, testing, and administration.
+- GMs may bypass player-facing **visibility** restrictions (hidden tasks, secret region names, hazard tiers) for inspection, testing, and administration.
+- GMs are NOT exempt from **attemptability** gates: the scene/token presence requirement, region/travel availability, and stamina/node limits all apply to a GM attempting to gather, the same as for any player.
 - Non-GM users may gather only with actors they own and only when all scene and visibility guards pass.
 - Gathering actor selectability is based on actor resolution and Foundry ownership/permission, not actor document type. Fabricate must not exclude Actor types such as `npc`, `group`, or `character` by type.
 

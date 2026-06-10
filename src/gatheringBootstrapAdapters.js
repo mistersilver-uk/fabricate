@@ -42,24 +42,21 @@ export function getTokenSceneUuid(token) {
  * Build the scene-link access gate used by GatheringEngine.
  *
  * Scene links are attemptability gates rather than listing filters: failures
- * return a blocked result so the player app can show a localized reason. Per
- * the gathering spec, GM viewers are exempt; non-GM users may only attempt
- * gathering while viewing the linked scene with at least one token present on
- * it.
+ * return a blocked result so the player app can show a localized reason. The
+ * restriction applies to EVERY user, including GMs — additive with the region
+ * and stamina/node gates (which also gate GMs). A user may only attempt
+ * gathering while viewing the linked scene with at least one of the acting
+ * actor's tokens present on it.
  *
  * @param {object} adapters
- * @param {Function} adapters.getCurrentUser Current Foundry user getter.
  * @param {Function} adapters.getCurrentScene Currently viewed/active scene getter.
  * @returns {{canAttempt: Function}} Scene-access handler for the engine.
  */
-export function createGatheringSceneAccess({ getCurrentUser, getCurrentScene } = {}) {
+export function createGatheringSceneAccess({ getCurrentScene } = {}) {
   return {
-    canAttempt({ environment, actor, viewer } = {}) {
+    canAttempt({ environment, actor } = {}) {
       const sceneUuid = environment?.sceneUuid;
       if (!sceneUuid) return { allowed: true };
-
-      const user = viewer ?? getCurrentUser?.() ?? null;
-      if (user?.isGM === true) return { allowed: true };
 
       const currentScene = getCurrentScene?.() ?? null;
       if (!currentScene || currentScene.uuid !== sceneUuid) {

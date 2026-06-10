@@ -560,7 +560,6 @@ class Fabricate {
       isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer),
       isGamePaused: isCurrentWorldPaused,
       sceneAccess: createGatheringSceneAccess({
-        getCurrentUser: () => game.user,
         getCurrentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
       }),
       toolAvailability: createGatheringToolAvailability({
@@ -959,7 +958,18 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', options, () => game.user);
+    // Default the remembered actor to the persisted last-gathering selection so
+    // the attempt resolves the SAME actor the listing/availability was computed
+    // for (an explicit `rememberedActorId` still overrides). Without this the
+    // engine falls back to the first owned selectable actor, which can differ
+    // from the selected actor and silently fail location/ownership gating — the
+    // player-app "nothing happens" bug. Mirrors `listGatheringForActor`.
+    const withRememberedActor = {
+      rememberedActorId: this.getSelectedGatheringActorId() || null,
+      ...options
+    };
+
+    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', withRememberedActor, () => game.user);
   }
 
   /**
