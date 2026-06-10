@@ -1,12 +1,12 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -15,25 +15,7 @@ let GatheringRegionsTab;
 let mounted;
 let target;
 
-function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
-}
-
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
-
-function writeRawModule(modulePath) {
-  const destination = join(tempRoot, modulePath);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
-}
+const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 function makeRegion(overrides = {}) {
   return { id: 'r1', name: 'Northreach', enabled: true, environmentCount: 0, partyCount: 0, ...overrides };
@@ -67,9 +49,7 @@ function rows() {
 describe('GatheringRegionsTab mounted behavior', () => {
   before(async () => {
     setupDOM();
-    globalThis.Text = document.createTextNode('').constructor;
-    globalThis.Comment = document.createComment('').constructor;
-    globalThis.game = { i18n: { localize: (key) => key, format: (key, data) => `${key}:${JSON.stringify(data)}` } };
+    installComponentTestGlobals();
 
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-regions-tab-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');

@@ -255,7 +255,7 @@ describe('adminStore travel section', () => {
     assert.equal(r2.environmentCount, 1);
     assert.equal(r2.partyCount, 0);
     // Lists carry the referencing environment / party identities (with images) for the inspector.
-    assert.deepEqual(r1.environments.map(e => e.name).sort(), ['Glade', 'Grove']);
+    assert.deepEqual(r1.environments.map(e => e.name).sort((a, b) => a.localeCompare(b)), ['Glade', 'Grove']);
     assert.deepEqual(r1.parties.map(p => p.id), ['p1']);
     assert.deepEqual(r2.environments.map(e => e.name), ['Glade']);
     assert.deepEqual(r2.parties, []);
