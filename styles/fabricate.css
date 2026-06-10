@@ -10197,7 +10197,22 @@
 
 .fabricate-manager .manager-travel-inspector-actions {
   display: flex;
-  justify-content: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-inspector-actions > button {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.fabricate-manager .manager-party-enable-toggle.is-on {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-party-enable-toggle.is-off {
+  color: var(--fab-mv2-text-muted);
 }
 
 @media (max-width: 720px) {

@@ -4248,6 +4248,30 @@
                 </section>
 
                 <div class="manager-travel-inspector-actions">
+                  {#if selectedTravelParty.enabled}
+                    <button
+                      type="button"
+                      class="manager-button manager-party-enable-toggle is-on"
+                      disabled={$viewState.travelSaving === true}
+                      onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
+                    >
+                      <i class="fas fa-toggle-on" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span>
+                    </button>
+                  {:else}
+                    <button
+                      type="button"
+                      class="manager-button manager-party-enable-toggle is-off"
+                      disabled={$viewState.travelSaving === true || !selectedTravelParty.travelActorUuid}
+                      title={selectedTravelParty.travelActorUuid
+                        ? undefined
+                        : text('FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor', 'Assign a travel actor to enable this party.')}
+                      onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
+                    >
+                      <i class="fas fa-toggle-off" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span>
+                    </button>
+                  {/if}
                   <button
                     type="button"
                     class="manager-button is-danger"

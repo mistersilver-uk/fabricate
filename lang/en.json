@@ -2006,7 +2006,10 @@
             "OverrideSearchLabel": "Search regions",
             "NoRegionMatches": "No regions match your search.",
             "NameLabel": "Party name",
-            "Delete": "Delete party"
+            "Delete": "Delete party",
+            "Enable": "Enable",
+            "Disable": "Disable",
+            "EnableNeedsTravelActor": "Assign a travel actor to enable this party."
           },
           "Members": {
             "SectionLabel": "Party members",
