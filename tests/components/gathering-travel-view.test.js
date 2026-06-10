@@ -300,4 +300,77 @@ describe('GatheringTravelView mounted behavior', () => {
     assert.ok(chip.textContent.includes(PLACEHOLDER_LABEL), 'placeholder label should render in place of the secret name');
     remount();
   });
+
+  it('expanded region authoring edits description, secret, image, and biomes through onUpdateRegion', async () => {
+    const updates = [];
+    const toggles = [];
+    const deletes = [];
+    await mountView(baseProps({
+      parties: [makeParty()],
+      selectedPartyId: 'p1',
+      systemRegions: [
+        { id: 'r1', name: 'Verdant', description: 'Old wood', img: 'icons/svg/direction.svg', enabled: true, secret: false, biomes: ['forest'] },
+        { id: 'r2', name: 'Dunes', description: '', img: null, enabled: false, secret: true, biomes: [] }
+      ],
+      biomeOptions: [
+        { id: 'forest', label: 'Forest' },
+        { id: 'cavern', label: 'Crystal Cavern' }
+      ],
+      onUpdateRegion: (sys, id, patch) => updates.push([sys, id, patch]),
+      onToggleRegionEnabled: (sys, id, enabled) => toggles.push([sys, id, enabled]),
+      onDeleteRegion: (sys, id) => deletes.push([sys, id])
+    }));
+
+    // List + detail layout: first region selected by default.
+    const detail = target.querySelector('.manager-travel-region-detail');
+    assert.ok(detail, 'region detail pane should render');
+    assert.equal(detail.dataset.regionDetail, 'r1');
+
+    // Description edit round-trips a merge patch.
+    const description = detail.querySelector('[data-region-field="description"]');
+    description.value = 'Ancient moonlit forest';
+    description.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { description: 'Ancient moonlit forest' }]);
+
+    // Secret toggle round-trips through onUpdateRegion (not a quick toggle).
+    detail.querySelector('[data-region-field="secret"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { secret: true }]);
+
+    // Enabled toggle round-trips through onToggleRegionEnabled.
+    detail.querySelector('[data-region-field="enabled"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(toggles.at(-1), ['sys-1', 'r1', false]);
+
+    // Biome add appends to the existing biome list.
+    const biomeSelect = detail.querySelector('[data-region-field="biomes"] select');
+    biomeSelect.value = 'cavern';
+    biomeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { biomes: ['forest', 'cavern'] }]);
+
+    // Biome remove drops the chip.
+    detail.querySelector('[data-region-field="biomes"] .manager-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { biomes: [] }]);
+
+    // Selecting the second region swaps the detail pane.
+    target.querySelector('[data-region-select="r2"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.manager-travel-region-detail').dataset.regionDetail, 'r2');
+
+    // Delete routes through the (store-owned) delete handler.
+    target.querySelector('[data-region-id="r2"] .manager-icon-button.is-danger').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(deletes.at(-1), ['sys-1', 'r2']);
+    remount();
+  });
 });

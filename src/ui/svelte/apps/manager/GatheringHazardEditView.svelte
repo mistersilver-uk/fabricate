@@ -11,7 +11,6 @@
     hazard = null,
     weatherOptions = [],
     timeOfDayOptions = [],
-    regionOptions = [],
     biomeOptions = [],
     onPickImagePath = null,
     onUpdateHazard = () => {}
@@ -99,7 +98,6 @@
   function conditionOptions(kind) {
     if (kind === 'weather') return weatherOptions;
     if (kind === 'biomes') return biomeOptions;
-    if (kind === 'regions') return regionOptions;
     return timeOfDayOptions;
   }
 
@@ -107,9 +105,6 @@
     let values;
     if (kind === 'weather') values = hazard?.weather;
     else if (kind === 'biomes') values = hazard?.biomes;
-    else if (kind === 'regions') values = Array.isArray(hazard?.regions)
-      ? hazard.regions
-      : (hazard?.region ? [hazard.region] : []);
     else values = hazard?.timeOfDay;
     return Array.isArray(values)
       ? values.map(value => String(value || '').trim()).filter(Boolean)
@@ -132,7 +127,6 @@
   function availabilityFieldLabel(kind) {
     if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Hazards.Weather', 'Weather');
     if (kind === 'biomes') return text('FABRICATE.Admin.Manager.Environment.Hazards.Biome', 'Biome');
-    if (kind === 'regions') return text('FABRICATE.Admin.Manager.Environment.Hazards.Region', 'Region');
     return text('FABRICATE.Admin.Manager.Environment.Hazards.TimeOfDay', 'Time of day');
   }
 
@@ -141,19 +135,16 @@
     if (available.length === 0) {
       if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Hazards.AllWeatherSelected', 'All weather selected');
       if (kind === 'biomes') return text('FABRICATE.Admin.Manager.Environment.Hazards.AllBiomesSelected', 'All biomes selected');
-      if (kind === 'regions') return text('FABRICATE.Admin.Manager.Environment.Hazards.AllRegionsSelected', 'All regions selected');
       return text('FABRICATE.Admin.Manager.Environment.Hazards.AllTimesSelected', 'All times selected');
     }
     if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Hazards.AddWeatherCondition', 'Add weather');
     if (kind === 'biomes') return text('FABRICATE.Admin.Manager.Environment.Hazards.AddBiomeCondition', 'Add biome');
-    if (kind === 'regions') return text('FABRICATE.Admin.Manager.Environment.Hazards.AddRegionCondition', 'Add region');
     return text('FABRICATE.Admin.Manager.Environment.Hazards.AddTimeOfDayCondition', 'Add time of day');
   }
 
   function emptyAvailabilityLabel(kind) {
     if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Hazards.AnyWeatherTitle', 'Any Weather');
     if (kind === 'biomes') return text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiomeTitle', 'Any Biome');
-    if (kind === 'regions') return text('FABRICATE.Admin.Manager.Environment.Hazards.AnyRegionTitle', 'Any Region');
     return text('FABRICATE.Admin.Manager.Environment.Hazards.AnyTimeTitle', 'Any Time');
   }
 
@@ -262,11 +253,11 @@
       <div class="manager-task-card-heading">
         <div>
           <h3>{text('FABRICATE.Admin.Manager.Environment.Hazards.HazardAvailability', 'Hazard Matching')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Hazards.AvailabilityHint', 'Hazards match environments by region, biome, weather, and time of day. Empty fields mean "matches any".')}</p>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Hazards.AvailabilityHint', 'Hazards match environments by biome, weather, and time of day. Empty fields mean "matches any".')}</p>
         </div>
       </div>
       <div class="manager-task-availability-row" data-gathering-hazard-availability>
-        {#each ['regions', 'biomes', 'timeOfDay', 'weather'] as kind (kind)}
+        {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <div class="manager-field manager-availability-multi" data-gathering-hazard-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <div

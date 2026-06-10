@@ -25,7 +25,7 @@ describe('GatheringHazardsBrowserView source contract', () => {
     assert.ok(browserSource.includes("type=\"search\""), 'browser should include a search input');
     assert.ok(browserSource.includes('bind:value={searchTerm}'), 'browser should bind the search term');
     assert.ok(browserSource.includes("value={statusFilter}"), 'browser should expose a status filter');
-    assert.ok(browserSource.includes("value={regionFilter}"), 'browser should expose a region filter');
+    assert.equal(browserSource.includes("value={regionFilter}"), false, 'region filter is removed (region is geography, not composition)');
     assert.ok(browserSource.includes("value={biomeFilter}"), 'browser should expose a biome filter');
     assert.ok(browserSource.includes("value={dangerFilter}"), 'browser should expose a danger tag filter');
   });
@@ -56,11 +56,12 @@ describe('GatheringHazardsBrowserView source contract', () => {
     }
   });
 
-  it('renders chips for region, biome, time, weather, and danger via rowChips', () => {
+  it('renders chips for biome, time, weather, and danger via rowChips', () => {
     assert.ok(browserSource.includes('rowChips(hazard)'), 'tags cell renders rowChips(hazard)');
-    for (const helper of ['regionChips(', 'biomeChips(', 'timeChips(', 'weatherChips(', 'dangerChips(']) {
+    for (const helper of ['biomeChips(', 'timeChips(', 'weatherChips(', 'dangerChips(']) {
       assert.ok(browserSource.includes(helper), `helper ${helper} should be present`);
     }
+    assert.equal(browserSource.includes('regionChips('), false, 'region chips are removed (region is geography, not composition)');
     assert.ok(browserSource.includes('data-gathering-hazard-tags'), 'tags cell exposes a data attribute');
     assert.ok(browserSource.includes("icon: 'fa-solid fa-triangle-exclamation'"), 'danger chips should render a triangle warning icon');
     assert.ok(browserSource.includes('{#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}'), 'row chip icons should be decorative');

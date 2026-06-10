@@ -40,7 +40,7 @@ describe('GatheringTasksBrowserView card-style row', () => {
   });
 
   it('renders all tag dimensions in a single chip row via rowChips', () => {
-    assert.ok(browserSource.includes('regionChips(task)'), 'region chip helper should exist');
+    assert.equal(browserSource.includes('regionChips(task)'), false, 'region chip helper removed (region is geography, not composition)');
     assert.ok(browserSource.includes('biomeChips(task)'), 'biome chip helper should exist');
     assert.ok(browserSource.includes('timeChips(task)'), 'time chip helper should exist');
     assert.ok(browserSource.includes('weatherChips(task)'), 'weather chip helper should exist');

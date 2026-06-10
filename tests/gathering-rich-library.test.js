@@ -159,7 +159,6 @@ test('global gathering conditions seed defaults and preserve customized vocabula
     weather: 'ashfall',
     timeOfDay: 'witching-hour',
     vocabularies: {
-      regions: [],
       biomes: ['mycelium'],
       danger: ['safe', 'cursed'],
       weather: ['clear', 'ashfall'],

@@ -842,6 +842,11 @@ function createStore(calls = [], options = {}) {
     addGatheringVocabularyValue: (...args) => calls.push(['addGatheringVocabularyValue', ...args]),
     updateGatheringVocabularyValue: (...args) => calls.push(['updateGatheringVocabularyValue', ...args]),
     deleteGatheringVocabularyValue: (...args) => calls.push(['deleteGatheringVocabularyValue', ...args]),
+    setGatheringRegionsEnabled: (systemId, enabled) => {
+      calls.push(['setGatheringRegionsEnabled', systemId, enabled]);
+      viewState.update(state => ({ ...state, gatheringRegionSettings: { ...(state.gatheringRegionSettings || {}), enabled } }));
+      return true;
+    },
     addGatheringLibraryTask: (systemId) => {
       calls.push(['addGatheringLibraryTask', systemId]);
       return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
@@ -2334,16 +2339,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
     assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
+    // The parent count is the sum of records (environments + tasks + hazards), not
+    // the subitem count. Travel is hidden by default (Travel & Regions toggle off).
     assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Travel', 'Settings']
+      ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
-      ['2', '3', '0', '0', null]
+      ['2', '3', '0', null]
     );
     assert.equal(
       gatheringSubitem('Environments').getAttribute('aria-current'),
@@ -2355,7 +2362,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
-    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 5);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
     assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
 
@@ -2374,7 +2381,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 5);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
     assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
@@ -2389,11 +2396,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const tagPills = Array.from(tagsCell.querySelectorAll('.manager-availability-pill'));
     const tagKinds = new Set();
     for (const pill of tagPills) {
-      for (const kind of ['region', 'biome', 'timeOfDay', 'weather']) {
+      for (const kind of ['biome', 'timeOfDay', 'weather']) {
         if (pill.classList.contains(`is-${kind}`)) tagKinds.add(kind);
       }
     }
-    assert.equal(tagKinds.size, 4, 'tags row should contain chips from all four dimensions (region/biome/time/weather)');
+    assert.equal(tagKinds.size, 3, 'tags row should contain chips from all composition dimensions (biome/time/weather); region is geography, not composition');
     const description = firstTaskRow.querySelector('.manager-gathering-task-identity .manager-system-description');
     assert.ok(description && description.textContent.trim().length > 0, 'short description should render under the task name');
     assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected gathering task'));
@@ -2428,10 +2435,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       'drops summary should show the nightshade drop name + chance'
     );
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
-    // A user-defined region/biome keeps its contextual label inline (e.g. "Northlands Region").
-    const taskRegionFact = target.querySelector('[data-gathering-task-fact="region"]');
-    assert.ok(taskRegionFact.querySelector('.manager-fact-label'), 'a user-defined region should keep its contextual label');
-    assert.match(taskRegionFact.textContent.replace(/\s+/g, ' ').trim(), /Northlands\s+Region/);
+    // Region is no longer a composition fact in the task inspector.
+    assert.equal(target.querySelector('[data-gathering-task-fact="region"]'), null, 'region fact is removed from the task inspector');
+    // A user-defined biome keeps its contextual label inline (e.g. "2 Biome").
     const taskBiomeFact = target.querySelector('[data-gathering-task-fact="biomes"]');
     assert.ok(taskBiomeFact.querySelector('.manager-fact-label'), 'a user-defined biome count should keep its contextual label');
 
@@ -2457,13 +2463,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    taskSelects[1].value = 'north';
+    // Region filter is removed; the biome filter is now the second select.
+    taskSelects[1].value = 'cavern';
     taskSelects[1].dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 2);
-    taskSelects[2].value = 'cavern';
-    taskSelects[2].dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 1);
@@ -2471,8 +2473,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    taskSelects[3].value = 'mismatch';
-    taskSelects[3].dispatchEvent(new Event('change', { bubbles: true }));
+    taskSelects[2].value = 'mismatch';
+    taskSelects[2].dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 2);
@@ -2498,7 +2500,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 5);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
     assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
@@ -2741,33 +2743,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(taskNameInput.value, 'Gather Sun Herbs');
-    const regionAvailability = target.querySelector('[data-gathering-task-field="regions"]');
     const biomeAvailability = target.querySelector('[data-gathering-task-field="biomes"]');
     const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
     const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
-    assert.equal(regionAvailability.querySelector('select'), null);
+    // Region is no longer a task availability/composition axis.
+    assert.equal(target.querySelector('[data-gathering-task-field="regions"]'), null, 'region availability picker is removed from the task editor');
     assert.equal(timeAvailability.querySelector('select'), null);
     assert.equal(weatherAvailability.querySelector('select'), null);
     assert.equal(biomeAvailability.querySelector('select'), null);
-    const regionPillNorth = regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"]');
-    assert.ok(regionPillNorth);
-    assert.ok(regionPillNorth.textContent.includes('Northlands'));
-    regionAvailability.querySelector('.manager-availability-menu-button').click();
-    await tick();
-    flushSync();
-    assert.equal(regionAvailability.querySelector('[data-gathering-task-availability-option="regions"][data-condition-id="north"]'), null);
-    assert.deepEqual(
-      Array.from(regionAvailability.querySelectorAll('[data-gathering-task-availability-option="regions"]')).map(option => option.textContent.trim()),
-      ['South Coast']
-    );
-    regionAvailability.querySelector('[data-gathering-task-availability-option="regions"][data-condition-id="south"]').click();
-    await tick();
-    flushSync();
-    assert.ok(regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="south"]'));
-    regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"] .manager-availability-remove').click();
-    await tick();
-    flushSync();
-    assert.equal(regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"]'), null);
     const biomePill = biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]');
     const timePill = timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]');
     const weatherPill = weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]');
@@ -2842,7 +2825,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]'), null);
-    for (const availability of [regionAvailability, biomeAvailability, timeAvailability, weatherAvailability]) {
+    for (const availability of [biomeAvailability, timeAvailability, weatherAvailability]) {
       availability.querySelector('.manager-availability-menu-button').click();
       await tick();
       flushSync();
@@ -2912,33 +2895,36 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.manager-environments-table'), null);
     assert.ok(target.textContent.includes('Set system-level drop resolution and hazard rules for gathering.'));
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
-    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 2);
+    // Region is no longer a vocabulary dimension: only the biome vocabulary panel remains.
+    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 1);
     assert.ok(target.querySelector('[data-gathering-condition-panel="timeOfDay"]'));
     assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
-    assert.ok(target.querySelector('[data-gathering-vocabulary-panel="regions"]'));
+    assert.equal(target.querySelector('[data-gathering-vocabulary-panel="regions"]'), null);
     assert.ok(target.querySelector('[data-gathering-vocabulary-panel="biomes"]'));
+    // The Travel & Regions toggle card hosts the subsystem flag.
+    assert.ok(target.querySelector('[data-gathering-region-toggle-panel]'));
+    assert.ok(target.querySelector('[data-gathering-region-toggle]'));
     assert.ok(target.textContent.includes('Times of day'));
     assert.ok(target.textContent.includes('Weather conditions'));
-    assert.ok(target.textContent.includes('Regions'));
+    assert.ok(target.textContent.includes('Travel & Regions'));
     assert.ok(target.textContent.includes('Biomes'));
     assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.'));
     assert.ok(target.textContent.includes('These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.'));
-    assert.ok(target.textContent.includes('Environments use one region. Click the name of a region to edit it.'));
     assert.ok(target.textContent.includes('Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.'));
-    assert.equal(target.querySelectorAll('.manager-condition-add input').length, 4);
+    assert.equal(target.querySelectorAll('.manager-condition-add input').length, 3);
     assert.equal(target.querySelectorAll('.manager-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
     assert.equal(target.querySelectorAll('.manager-color-picker-trigger').length, 1);
-    assert.equal(target.querySelectorAll('.manager-condition-add .manager-add-button').length, 4);
+    assert.equal(target.querySelectorAll('.manager-condition-add .manager-add-button').length, 3);
     assert.equal(Array.from(target.querySelectorAll('.manager-condition-add .manager-add-button')).every(button => button.textContent.trim() === 'Add'), true);
     assert.equal(target.textContent.includes('Add time of day'), false);
     assert.equal(target.textContent.includes('Add weather'), false);
     assert.equal(target.textContent.includes('Add region'), false);
     assert.equal(target.textContent.includes('Add biome'), false);
     assert.equal(target.querySelectorAll('[data-gathering-condition-value]').length, 5);
-    assert.equal(target.querySelectorAll('.manager-vocabulary-pill').length, 4);
+    assert.equal(target.querySelectorAll('.manager-vocabulary-pill').length, 2);
     assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel="biomes"] .manager-biome-combined-trigger').length, 2);
-    assert.equal(target.querySelectorAll('.manager-condition-label-input').length, 9);
-    assert.equal(target.querySelectorAll('.manager-vocabulary-pill .manager-condition-label-input').length, 4);
+    assert.equal(target.querySelectorAll('.manager-condition-label-input').length, 7);
+    assert.equal(target.querySelectorAll('.manager-vocabulary-pill .manager-condition-label-input').length, 2);
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-gathering-condition-panel="weather"] .manager-condition-label-input')).map(input => input.value),
       ['Clear Sky', 'Storm Rain']
@@ -2968,14 +2954,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['updateGatheringConditionValue', 'timeOfDay', 'dawn', { label: 'Grey Dawn' }, 'alchemy']
     );
     assert.equal(target.querySelectorAll('[data-gathering-condition-value] .essence-icon-picker-trigger.icon-only').length, 5);
-    const regionLabelInput = target.querySelector('[data-gathering-vocabulary-panel="regions"] [data-gathering-vocabulary-value="north"] .manager-condition-label-input');
-    regionLabelInput.value = 'Northern Reach';
-    regionLabelInput.dispatchEvent(new Event('blur'));
+    const biomeLabelInput = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-condition-label-input');
+    biomeLabelInput.value = 'Old Moon Forest';
+    biomeLabelInput.dispatchEvent(new Event('blur'));
     await tick();
     flushSync();
     assert.deepEqual(
       calls.find(call => call[0] === 'updateGatheringVocabularyValue'),
-      ['updateGatheringVocabularyValue', 'regions', 'north', { label: 'Northern Reach' }, 'alchemy']
+      ['updateGatheringVocabularyValue', 'biomes', 'forest', { label: 'Old Moon Forest' }, 'alchemy']
     );
     const biomeIconTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-biome-combined-trigger');
     biomeIconTrigger.click();
@@ -3160,6 +3146,83 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
     assert.ok(target.querySelector('.manager-environment-editor-shell .manager-environment-edit-view'));
     assert.ok(target.textContent.includes('Quiet Cavern'));
+  });
+
+  it('flips the Travel & Regions toggle (aria-pressed) and reveals the Travel nav item', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Settings').click();
+    await tick();
+    flushSync();
+
+    // Travel is hidden while the toggle is off.
+    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden by default');
+    const toggle = target.querySelector('[data-gathering-region-toggle]');
+    assert.ok(toggle, 'region toggle card renders on the settings tab');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle starts unpressed');
+
+    toggle.click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'setGatheringRegionsEnabled' && call[1] === 'alchemy' && call[2] === true),
+      'clicking the toggle calls setGatheringRegionsEnabled with the flipped value');
+    assert.equal(target.querySelector('[data-gathering-region-toggle]').getAttribute('aria-pressed'), 'true', 'toggle reflects the new pressed state');
+    // Enabling the flag reveals the Travel nav item.
+    assert.ok(gatheringSubitem('Travel'), 'Travel nav item appears once Travel & Regions is enabled');
+  });
+
+  it('falls back from a stale Travel tab to Environments when Travel & Regions is disabled', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    // Enable the subsystem, then route to the Travel tab.
+    gatheringSubitem('Settings').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-region-toggle]').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Travel').click();
+    await tick();
+    flushSync();
+    assert.ok(gatheringSubitem('Travel')?.getAttribute('aria-current') === 'page', 'Travel tab is active');
+
+    // Disabling the flag must drop the stale Travel tab back to Environments, not
+    // leave the manager stranded on a hidden tab. Re-enter Settings to flip it off
+    // (the Travel surface has no toggle).
+    gatheringSubitem('Settings').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-region-toggle]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden again');
+    // The active tab is no longer Travel; Settings remains the current selection.
+    const activeSubitem = Array.from(target.querySelectorAll('.manager-nav-subitem'))
+      .find(item => item.getAttribute('aria-current') === 'page');
+    assert.notEqual(activeSubitem?.textContent.trim(), 'Travel', 'stale Travel tab is not the active tab');
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -4352,11 +4415,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Travel', 'Settings']
+      ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
-      ['0', '3', '0', '0', null]
+      ['0', '3', '0', null]
     );
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
@@ -4784,7 +4847,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'task inspector should not render an open-source CTA');
     assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Task Environment Matching');
     const taskEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
-    assert.deepEqual(taskEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'task evidence table should render all five dimensions');
+    assert.deepEqual(taskEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'weather', 'time', 'danger'], 'task evidence table should render every composition dimension (region is geography, not composition)');
     assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="match"]').textContent.trim(), 'Forest');
     assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Desert');
     assert.equal(target.querySelector('[data-evidence-field="weather"] .manager-environment-evidence-value-pill').classList.contains('is-warning'), true, 'weather mismatch should use warning tone');
@@ -4847,7 +4910,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
     assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Hazard Environment Matching');
     const hazardEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
-    assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'hazard evidence table should render all five dimensions');
+    assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'weather', 'time', 'danger'], 'hazard evidence table should render every composition dimension (region is geography, not composition)');
     assert.equal(target.querySelector('[data-evidence-field="danger"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Deadly');
     assert.equal(target.querySelector('[data-evidence-field="danger"] .manager-environment-evidence-value-pill').classList.contains('is-danger'), true, 'danger mismatch should use danger tone');
     const hazardOverrides = target.querySelector('[data-record-inspector-section="overrides"]');

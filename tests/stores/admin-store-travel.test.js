@@ -58,7 +58,7 @@ function createServices({
   const calls = {
     create: [], update: [], delete: [], addMember: [], removeMember: [],
     moveMember: [], setTravelActor: [], setEnabled: [], setOverride: [], clearOverride: [],
-    regionCreate: [], regionUpdate: [], regionDelete: []
+    regionCreate: [], regionUpdate: [], regionDelete: [], regionSettings: []
   };
   const confirmCalls = [];
 
@@ -144,7 +144,9 @@ function createServices({
     get: (sys, id) => clone(system.gatheringRegions.find(r => r.id === id) || null),
     create: async (sys, data) => { calls.regionCreate.push({ sys, data: clone(data) }); system.gatheringRegions.push({ id: `region-${system.gatheringRegions.length + 1}`, name: data.name, enabled: true, secret: false, biomes: [], description: 'keep', img: 'keep.webp' }); return true; },
     update: async (sys, id, patch) => { calls.regionUpdate.push({ sys, id, patch: clone(patch) }); const r = system.gatheringRegions.find(x => x.id === id); if (r) Object.assign(r, patch); return clone(r); },
-    delete: async (sys, id, collaborators) => { calls.regionDelete.push({ sys, id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } }); system.gatheringRegions = system.gatheringRegions.filter(r => r.id !== id); return { deleted: { id }, referencedBy: { environments: [], partyOverrides: [] } }; }
+    delete: async (sys, id, collaborators) => { calls.regionDelete.push({ sys, id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } }); system.gatheringRegions = system.gatheringRegions.filter(r => r.id !== id); return { deleted: { id }, referencedBy: { environments: [], partyOverrides: [] } }; },
+    getRegionSettings: () => clone(system.gatheringRegionSettings || { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }),
+    updateRegionSettings: async (sys, patch) => { calls.regionSettings.push({ sys, patch: clone(patch) }); system.gatheringRegionSettings = { ...(system.gatheringRegionSettings || { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), ...patch }; return clone(system.gatheringRegionSettings); }
   };
 
   const locationService = {
@@ -197,7 +199,7 @@ describe('adminStore travel section', () => {
   it('exposes parties, regions, and actor options in view state', async () => {
     const { services } = createServices({
       parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }],
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'Old wood', img: 'verdant.webp' }],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }]
     });
     const store = createAdminStore(services);
@@ -206,6 +208,16 @@ describe('adminStore travel section', () => {
     assert.equal(state.travelParties.length, 1);
     assert.equal(state.travelParties[0].name, 'Vanguard');
     assert.equal(state.selectedSystemRegions.length, 1);
+    // The Travel view-model carries the full authoring projection, not just name/enabled/secret.
+    assert.deepEqual(state.selectedSystemRegions[0], {
+      id: 'r1',
+      name: 'Verdant',
+      description: 'Old wood',
+      img: 'verdant.webp',
+      enabled: true,
+      secret: false,
+      biomes: ['forest']
+    });
     assert.equal(state.actorOptions.length, 1);
     assert.equal(state.selectedPartyId, 'p1');
     store.destroy();
@@ -333,6 +345,43 @@ describe('adminStore travel section', () => {
     assert.equal(calls.regionCreate.length, 1);
     assert.deepEqual(calls.regionUpdate[0].patch, { name: 'Verdant Expanse' });
     assert.deepEqual(calls.regionUpdate[1].patch, { enabled: false });
+    store.destroy();
+  });
+
+  it('updateRegion merge-patches authoring fields (description/img/secret/biomes) without touching others', async () => {
+    const { services, calls, system } = createServices({
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'lore', img: 'pic.webp' }]
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.updateRegion('system-a', 'r1', { description: 'Ancient wood' });
+    await store.updateRegion('system-a', 'r1', { secret: true });
+    await store.updateRegion('system-a', 'r1', { biomes: ['forest', 'cavern'] });
+    await flush();
+    assert.deepEqual(calls.regionUpdate.map(c => c.patch), [
+      { description: 'Ancient wood' },
+      { secret: true },
+      { biomes: ['forest', 'cavern'] }
+    ]);
+    // The store merges over the existing record, so unedited fields survive.
+    const region = system.gatheringRegions.find(r => r.id === 'r1');
+    assert.equal(region.name, 'Verdant');
+    assert.equal(region.img, 'pic.webp');
+    store.destroy();
+  });
+
+  it('setGatheringRegionsEnabled writes the enabled flag through GatheringRegionStore.updateRegionSettings', async () => {
+    const { services, calls, system } = createServices();
+    const store = createAdminStore(services);
+    await flush();
+    await store.setGatheringRegionsEnabled('system-a', true);
+    await flush();
+    assert.equal(calls.regionSettings.length, 1);
+    assert.deepEqual(calls.regionSettings[0].patch, { enabled: true });
+    assert.equal(system.gatheringRegionSettings.enabled, true);
+    await store.setGatheringRegionsEnabled('system-a', false);
+    await flush();
+    assert.equal(system.gatheringRegionSettings.enabled, false);
     store.destroy();
   });
 

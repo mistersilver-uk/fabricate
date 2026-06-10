@@ -14,7 +14,6 @@
     managedItemOptions = [],
     weatherOptions = [],
     timeOfDayOptions = [],
-    regionOptions = [],
     biomeOptions = [],
     selectedDropId = '',
     rewardRules = null,
@@ -227,7 +226,6 @@
   function conditionOptions(kind) {
     if (kind === 'weather') return weatherOptions;
     if (kind === 'biomes') return biomeOptions;
-    if (kind === 'regions') return regionOptions;
     return timeOfDayOptions;
   }
 
@@ -235,9 +233,6 @@
     let values;
     if (kind === 'weather') values = task?.weather;
     else if (kind === 'biomes') values = task?.biomes;
-    else if (kind === 'regions') values = Array.isArray(task?.regions)
-      ? task.regions
-      : (task?.region ? [task.region] : []);
     else values = task?.timeOfDay;
     return Array.isArray(values)
       ? values.map(value => String(value || '').trim()).filter(Boolean)
@@ -266,9 +261,6 @@
       if (kind === 'biomes') {
         return text('FABRICATE.Admin.Manager.Environment.Tasks.AllBiomesSelected', 'All biomes selected');
       }
-      if (kind === 'regions') {
-        return text('FABRICATE.Admin.Manager.Environment.Tasks.AllRegionsSelected', 'All regions selected');
-      }
       return text('FABRICATE.Admin.Manager.Environment.Tasks.AllTimesSelected', 'All times selected');
     }
     if (kind === 'weather') {
@@ -276,9 +268,6 @@
     }
     if (kind === 'biomes') {
       return text('FABRICATE.Admin.Manager.Environment.Tasks.AddBiomeCondition', 'Add biome');
-    }
-    if (kind === 'regions') {
-      return text('FABRICATE.Admin.Manager.Environment.Tasks.AddRegionCondition', 'Add region');
     }
     return text('FABRICATE.Admin.Manager.Environment.Tasks.AddTimeOfDayCondition', 'Add time of day');
   }
@@ -290,9 +279,6 @@
     if (kind === 'biomes') {
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Biome', 'Biome');
     }
-    if (kind === 'regions') {
-      return text('FABRICATE.Admin.Manager.Environment.Tasks.Region', 'Region');
-    }
     return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeOfDay', 'Time of day');
   }
 
@@ -302,9 +288,6 @@
     }
     if (kind === 'biomes') {
       return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiomeTitle', 'Any Biome');
-    }
-    if (kind === 'regions') {
-      return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region');
     }
     return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTimeTitle', 'Any Time');
   }
@@ -728,7 +711,7 @@
         </div>
       </div>
       <div class="manager-task-availability-row" data-gathering-task-availability>
-        {#each ['regions', 'biomes', 'timeOfDay', 'weather'] as kind (kind)}
+        {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <div class="manager-field manager-availability-multi" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <div

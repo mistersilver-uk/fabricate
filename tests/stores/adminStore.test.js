@@ -1988,12 +1988,10 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.updateGatheringConditions({ weather: 'rain', timeOfDay: 'night' });
-      await store.updateGatheringVocabulary('regions', ['north', 'south']);
       const task = await store.addGatheringLibraryTask('sys1');
       assert.equal(task.name, 'New Gathering Task');
       await store.updateGatheringLibraryTask('sys1', task.id, {
         name: 'Rain Herbs',
-        region: 'north',
         biomes: ['forest'],
         weather: ['rain'],
         timeOfDay: ['night'],
@@ -2031,10 +2029,8 @@ describe('createAdminStore', () => {
           { id: 'night', label: 'Night', icon: 'fas fa-moon' }
         ]
       });
-      assert.deepEqual(config.vocabularies.regions, [
-        { id: 'north', label: 'North' },
-        { id: 'south', label: 'South' }
-      ]);
+      // Region is no longer a composition vocabulary; it is geography (GatheringRegion).
+      assert.equal('regions' in config.vocabularies, false);
       assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
       assert.deepEqual(config.systems.sys1.tasks[0].dropRows[0], {
         id: 'drop-herb',
@@ -2664,7 +2660,6 @@ describe('createAdminStore', () => {
       sys.features = { gathering: true };
       services._store.gatheringConfig = {
         vocabularies: {
-          regions: ['north'],
           biomes: ['forest'],
           danger: ['safe'],
           weather: ['clear'],
@@ -2672,28 +2667,27 @@ describe('createAdminStore', () => {
         },
         systems: {
           sys1: {
-            tasks: [{ id: 'task-forest', name: 'Forest', region: 'north', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+            tasks: [{ id: 'task-forest', name: 'Forest', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', biomes: ['forest'], dropRate: 50 }]
           }
         }
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.regions.values, [
-        { id: 'north', label: 'North' }
-      ]);
+      // Region is no longer a composition vocabulary dimension.
+      assert.equal('regions' in get(store.viewState).gatheringConfig.systems.sys1.vocabularies, false);
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
         { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
       ]);
 
-      await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1');
+      // The regions dimension is rejected by the vocabulary actions.
+      assert.equal(await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1'), false);
       await store.addGatheringVocabularyValue('biomes', { label: 'Crystal Cavern', icon: 'fas fa-gem', colorToken: 'mist', customColor: '#88aaff' }, 'sys1');
-      await store.updateGatheringVocabularyValue('regions', 'south coast', { label: 'Southern Coast' }, 'sys1');
       await store.updateGatheringVocabularyValue('biomes', 'crystal cavern', { label: 'Crystal Caves', icon: 'fas fa-mountain', colorToken: '--fab-tag-lavender', customColor: 'bad' }, 'sys1');
 
       const vocabularies = services._store.gatheringConfig.systems.sys1.vocabularies;
-      assert.deepEqual(vocabularies.regions.values.at(-1), { id: 'south coast', label: 'Southern Coast' });
+      assert.equal('regions' in vocabularies, false);
       assert.deepEqual(vocabularies.biomes.values.at(-1), {
         id: 'crystal cavern',
         label: 'Crystal Caves',
@@ -2711,7 +2705,6 @@ describe('createAdminStore', () => {
       sys.features = { gathering: true };
       services._store.gatheringConfig = {
         vocabularies: {
-          regions: ['northreach'],
           biomes: ['forest', 'mountain', 'swamp']
         }
       };
@@ -2720,9 +2713,8 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const config = get(store.viewState).gatheringConfig;
 
-      assert.deepEqual(config.vocabularies.regions, [
-        { id: 'northreach', label: 'Northreach' }
-      ], 'bare string region ids render as capitalised labels');
+      assert.equal('regions' in config.vocabularies, false,
+        'region is no longer a composition vocabulary dimension');
 
       assert.deepEqual(config.vocabularies.biomes, [
         { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
@@ -2741,8 +2733,8 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const config = get(store.viewState).gatheringConfig;
 
-      assert.equal(config.vocabularies.regions.length, 0,
-        'regions stays empty by default (no canonical list)');
+      assert.equal('regions' in config.vocabularies, false,
+        'region is no longer a composition vocabulary dimension');
 
       const biomeIds = config.vocabularies.biomes.map(b => b.id);
       assert.deepEqual(biomeIds, [
@@ -2763,11 +2755,11 @@ describe('createAdminStore', () => {
       assert.deepEqual(timeOfDayLabels, ['Dawn', 'Day', 'Dusk', 'Night']);
     });
 
-    it('deletes selected-system region and biome vocabulary values and prunes matching references only in that system', async () => {
+    it('deletes selected-system biome vocabulary values and prunes matching references only in that system', async () => {
       const environmentUpdates = [];
       const environments = [
-        { id: 'env-sys1', craftingSystemId: 'sys1', region: 'north', biomes: ['forest', 'swamp'] },
-        { id: 'env-sys2', craftingSystemId: 'sys2', region: 'north', biomes: ['forest'] }
+        { id: 'env-sys1', craftingSystemId: 'sys1', biomes: ['forest', 'swamp'] },
+        { id: 'env-sys2', craftingSystemId: 'sys2', biomes: ['forest'] }
       ];
       const services = createMockServices({
         getGatheringEnvironmentStore: () => ({
@@ -2786,45 +2778,36 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             vocabularies: {
-              regions: { values: [{ id: 'north', label: 'North' }] },
               biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
             },
-            tasks: [{ id: 'task-forest', name: 'Forest', region: 'north', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+            tasks: [{ id: 'task-forest', name: 'Forest', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', biomes: ['forest'], dropRate: 50 }]
           },
           sys2: {
             vocabularies: {
-              regions: { values: [{ id: 'north', label: 'North' }] },
               biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
             },
-            tasks: [{ id: 'task-other', name: 'Other', region: 'north', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-other', name: 'Other Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+            tasks: [{ id: 'task-other', name: 'Other', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', biomes: ['forest'], dropRate: 50 }]
           }
         }
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.equal(await store.deleteGatheringVocabularyValue('regions', 'north', 'sys1'), true);
+      // Region is no longer a vocabulary dimension: the action rejects it.
+      assert.equal(await store.deleteGatheringVocabularyValue('regions', 'north', 'sys1'), false);
       assert.equal(await store.deleteGatheringVocabularyValue('biomes', 'forest', 'sys1'), true);
 
       const sys1 = services._store.gatheringConfig.systems.sys1;
       const sys2 = services._store.gatheringConfig.systems.sys2;
-      assert.deepEqual(sys1.vocabularies.regions.values, []);
+      assert.equal('regions' in sys1.vocabularies, false);
       assert.deepEqual(sys1.vocabularies.biomes.values, []);
-      // Region is no longer a task/hazard composition field: normalization drops
-      // it everywhere (both the pruned system and the untouched one), so the only
-      // composition pruning left to assert is biome.
-      assert.equal('regions' in sys1.tasks[0], false);
       assert.deepEqual(sys1.tasks[0].biomes, []);
-      assert.equal('regions' in sys1.hazards[0], false);
       assert.deepEqual(sys1.hazards[0].biomes, []);
-      assert.equal('regions' in sys2.tasks[0], false);
       assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
-      assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1', 'env-sys1']);
-      assert.equal(environments[0].region, '');
+      assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1']);
       assert.deepEqual(environments[0].biomes, ['swamp']);
-      assert.equal(environments[1].region, 'north');
       assert.deepEqual(environments[1].biomes, ['forest']);
     });
 

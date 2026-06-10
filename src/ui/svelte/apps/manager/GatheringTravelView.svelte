@@ -32,6 +32,7 @@
     fieldErrors = {},
     actorOptions = [],
     systemRegions = [],
+    biomeOptions = [],
     onSelectParty = () => {},
     onCreateParty = () => {},
     onRenameParty = () => {},
@@ -50,7 +51,9 @@
     onCreateRegion = () => {},
     onRenameRegion = () => {},
     onToggleRegionEnabled = () => {},
-    onDeleteRegion = () => {}
+    onUpdateRegion = () => {},
+    onDeleteRegion = () => {},
+    onPickImagePath = null
   } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
@@ -566,10 +569,13 @@
         regions={systemRegions}
         {systemId}
         {saving}
+        {biomeOptions}
         {onCreateRegion}
         {onRenameRegion}
         {onToggleRegionEnabled}
+        {onUpdateRegion}
         {onDeleteRegion}
+        {onPickImagePath}
       />
     </section>
   </div>

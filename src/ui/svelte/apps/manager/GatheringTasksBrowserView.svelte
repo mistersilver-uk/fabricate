@@ -22,7 +22,6 @@
 
   let searchTerm = $state('');
   let statusFilter = $state('all');
-  let regionFilter = $state('all');
   let biomeFilter = $state('all');
   let availabilityFilter = $state('all');
   let lastSystemId = $state('');
@@ -34,12 +33,6 @@
   const weatherCondition = $derived(systemConfig.conditions?.weather || {});
   const timeCondition = $derived(systemConfig.conditions?.timeOfDay || {});
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
-  const regionOptions = $derived(uniqueSorted([
-    ...taskList.flatMap(task => Array.isArray(task.regions)
-      ? task.regions
-      : (task.region ? [task.region] : [])),
-    ...vocabularyIds(systemConfig.vocabularies?.regions?.values)
-  ]));
   const biomeOptions = $derived(uniqueSorted([
     ...taskList.flatMap(task => Array.isArray(task.biomes) ? task.biomes : []),
     ...vocabularyIds(systemConfig.vocabularies?.biomes?.values)
@@ -50,22 +43,17 @@
     const matchesStatus = statusFilter === 'all'
       || (statusFilter === 'active' && task.enabled !== false)
       || (statusFilter === 'disabled' && task.enabled === false);
-    const taskRegions = Array.isArray(task.regions)
-      ? task.regions
-      : (task.region ? [task.region] : []);
-    const matchesRegion = regionFilter === 'all' || taskRegions.includes(regionFilter);
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const matchesBiome = biomeFilter === 'all' || taskBiomes.includes(biomeFilter);
     const availability = availabilityState(task);
     const matchesAvailability = availabilityFilter === 'all'
       || availabilityFilter === availability
       || (availabilityFilter === 'limited' && availability !== 'any');
-    return matchesSearch && matchesStatus && matchesRegion && matchesBiome && matchesAvailability;
+    return matchesSearch && matchesStatus && matchesBiome && matchesAvailability;
   }));
   const filtersActive = $derived(
     normalizedSearchTerm.length > 0
     || statusFilter !== 'all'
-    || regionFilter !== 'all'
     || biomeFilter !== 'all'
     || availabilityFilter !== 'all'
   );
@@ -75,7 +63,6 @@
     if (selectedSystemId === lastSystemId) return;
     searchTerm = '';
     statusFilter = 'all';
-    regionFilter = 'all';
     biomeFilter = 'all';
     availabilityFilter = 'all';
     pageIndex = 0;
@@ -108,18 +95,15 @@
 
   function defaultIcon(kind) {
     switch (kind) {
-      case 'biome': return 'fas fa-tree';
       case 'weather': return 'fas fa-cloud-sun';
       case 'timeOfDay': return 'fas fa-clock';
-      case 'region':
-      default: return 'fas fa-map-location-dot';
+      case 'biome':
+      default: return 'fas fa-tree';
     }
   }
 
   function vocabularyEntry(kind, id) {
-    const values = kind === 'biome'
-      ? systemConfig.vocabularies?.biomes?.values
-      : systemConfig.vocabularies?.regions?.values;
+    const values = systemConfig.vocabularies?.biomes?.values;
     const option = (Array.isArray(values) ? values : []).find(value => String(value?.id || value) === String(id || ''));
     const label = String(option?.label || option?.id || id || '').trim();
     const icon = String(option?.icon || '').trim() || defaultIcon(kind);
@@ -145,16 +129,6 @@
 
   function optionLabel(kind, id) {
     return vocabularyEntry(kind, id).label;
-  }
-
-  function regionChips(task) {
-    const values = Array.isArray(task?.regions)
-      ? task.regions
-      : (task?.region ? [task.region] : []);
-    return values
-      .map(id => vocabularyEntry('region', id))
-      .filter(entry => entry.label)
-      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}` }));
   }
 
   function biomeChips(task) {
@@ -183,7 +157,6 @@
 
   function rowChips(task) {
     return [
-      ...regionChips(task),
       ...biomeChips(task),
       ...timeChips(task),
       ...weatherChips(task)
@@ -230,7 +203,6 @@
   function clearFilters() {
     searchTerm = '';
     statusFilter = 'all';
-    regionFilter = 'all';
     biomeFilter = 'all';
     availabilityFilter = 'all';
   }
@@ -259,15 +231,6 @@
         <option value="all">{text('FABRICATE.Admin.Manager.Environment.Tasks.StatusAll', 'All gathering tasks')}</option>
         <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
         <option value="disabled">{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option>
-      </select>
-    </label>
-    <label class="manager-filter">
-      <span>{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
-      <select value={regionFilter} onchange={(event) => regionFilter = event.currentTarget.value}>
-        <option value="all">{text('FABRICATE.Admin.Manager.Environment.RegionAll', 'All regions')}</option>
-        {#each regionOptions as region (region)}
-          <option value={region}>{optionLabel('region', region) || region}</option>
-        {/each}
       </select>
     </label>
     <label class="manager-filter">

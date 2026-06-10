@@ -85,14 +85,13 @@ const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
 const GATHERING_CONFIG_SETTING = 'gatheringConfig';
 const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
-  regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
   danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const GATHERING_CONDITION_DIMENSIONS = new Set(['weather', 'timeOfDay']);
-const GATHERING_VOCABULARY_DIMENSIONS = new Set(['regions', 'biomes']);
+const GATHERING_VOCABULARY_DIMENSIONS = new Set(['biomes']);
 const GATHERING_BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
 const DEFAULT_GATHERING_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({
@@ -721,7 +720,6 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
   // safely. `danger` stays as a bare string list because no UI surface renders
   // it directly today.
   const vocabularies = {
-    regions: _normalizeGatheringVocabularyOptions('regions', raw?.vocabularies?.regions || []),
     biomes: _seedGatheringVocabularyOptions('biomes', raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
     danger: _seedGatheringVocabulary(raw?.vocabularies?.danger, DEFAULT_GATHERING_VOCABULARIES.danger),
     weather: _seedGatheringConditionOptions('weather', raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
@@ -2038,9 +2036,15 @@ export function createAdminStore(services) {
         selectedSystemRegions: regions.map(region => ({
           id: region.id,
           name: region.name,
+          description: String(region.description || ''),
+          img: region.img || null,
           enabled: region.enabled !== false,
-          secret: region.secret === true
+          secret: region.secret === true,
+          biomes: Array.isArray(region.biomes) ? region.biomes : []
         })),
+        gatheringRegionSettings: (systemId && regionStore?.getRegionSettings)
+          ? regionStore.getRegionSettings(systemId)
+          : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
         actorOptions
       };
     }
@@ -2173,6 +2177,29 @@ export function createAdminStore(services) {
       },
       async toggleRegionEnabled(systemId, regionId, enabled) {
         return _regionPatch(systemId, regionId, { enabled: enabled === true });
+      },
+      // Merge-patch a single region; the store merges over the existing record so
+      // fields the caller omits round-trip untouched. Backs the full Travel
+      // region authoring surface (description/img/secret/biomes).
+      async updateRegion(systemId, regionId, patch = {}) {
+        return _regionPatch(systemId, regionId, patch && typeof patch === 'object' ? patch : {});
+      },
+      async setGatheringRegionsEnabled(systemId, enabled) {
+        const regionStore = getRegionStore();
+        if (!regionStore?.updateRegionSettings || !systemId) return false;
+        clearErrors();
+        travelSaving.set(true);
+        patch();
+        try {
+          await regionStore.updateRegionSettings(systemId, { enabled: enabled === true });
+          return true;
+        } catch (err) {
+          applyError(err);
+          return false;
+        } finally {
+          travelSaving.set(false);
+          patch();
+        }
       },
       async deleteRegion(systemId, regionId) {
         const regionStore = getRegionStore();
@@ -3353,7 +3380,7 @@ export function createAdminStore(services) {
       'selectionMode',
       'compositionMode',
       'sceneUuid',
-      'region',
+      'includedRegionIds',
       'biomes',
       'dangerTags',
       'dangerLevel',
@@ -3389,7 +3416,7 @@ export function createAdminStore(services) {
         next.img = normalized || null;
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
+      } else if (['includedRegionIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
@@ -4151,9 +4178,6 @@ export function createAdminStore(services) {
     for (const environment of environments) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
       let payload = null;
-      if (kind === 'regions' && _normalizeGatheringVocabularyId(environment.region) === id) {
-        payload = { ..._clonePlain(environment), region: '' };
-      }
       if (kind === 'biomes') {
         const nextBiomes = _normalizeGatheringTagList(environment.biomes ?? environment.biome)
           .filter(existing => _normalizeGatheringVocabularyId(existing) !== id);
@@ -4176,20 +4200,6 @@ export function createAdminStore(services) {
     const nextValues = vocabulary.values.filter(option => option.id !== id);
     if (nextValues.length === vocabulary.values.length) return true;
     systemConfig.vocabularies[kind] = { values: nextValues };
-    if (kind === 'regions') {
-      systemConfig.tasks = systemConfig.tasks.map(task => ({
-        ...task,
-        regions: _normalizeGatheringTagList(Array.isArray(task.regions)
-          ? task.regions
-          : task.region ? [task.region] : []).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
-      }));
-      systemConfig.hazards = systemConfig.hazards.map(hazard => ({
-        ...hazard,
-        regions: _normalizeGatheringTagList(Array.isArray(hazard.regions)
-          ? hazard.regions
-          : hazard.region ? [hazard.region] : []).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
-      }));
-    }
     if (kind === 'biomes') {
       systemConfig.tasks = systemConfig.tasks.map(task => ({
         ...task,
@@ -5224,7 +5234,9 @@ export function createAdminStore(services) {
     createRegionQuick: travel.createRegionQuick,
     renameRegion: travel.renameRegion,
     toggleRegionEnabled: travel.toggleRegionEnabled,
+    updateRegion: travel.updateRegion,
     deleteRegion: travel.deleteRegion,
+    setGatheringRegionsEnabled: travel.setGatheringRegionsEnabled,
     refresh,
     refreshGatheringConfig,
     destroy

@@ -10287,6 +10287,129 @@
   min-width: 0;
 }
 
+/* Region authoring: list + detail layout. Wraps to a single column at narrow
+   widths so the detail pane never overflows the Travel surface. */
+.fabricate-manager .manager-travel-regions-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  font-weight: 600;
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-travel-region-layout {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-region-select {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  height: auto;
+  min-height: 32px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-surface);
+  color: var(--fab-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-region-select.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-travel-region-select-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-region-secret-flag {
+  flex: 0 0 auto;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-travel-region-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-travel-region-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-travel-region-image {
+  flex: 0 0 auto;
+  position: relative;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--fab-surface);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-region-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-travel-region-image i {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  font-size: 10px;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-travel-region-detail-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-region-description {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.fabricate-manager .manager-travel-region-biomes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+@media (max-width: 720px) {
+  .fabricate-manager .manager-travel-region-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .fabricate-manager .manager-travel-evidence-source {
   margin: 0;
   font-weight: 600;

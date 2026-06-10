@@ -505,14 +505,29 @@
       hintFallback: 'Set system-level rules for gathering.'
     }
   ];
-  const gatheringInspectorTabs = gatheringNavItems.filter(tab => tab.id !== 'environments');
+  // The Travel/Regions subsystem is opt-in per system. When disabled, the Travel
+  // nav item is hidden AND removed from the tab-resolution lists so a stale
+  // `activeGatheringTab === 'travel'` falls back to environments (filtering the
+  // render alone is insufficient — the guards below validate against this list).
+  const gatheringRegionsEnabled = $derived($viewState.gatheringRegionSettings?.enabled === true);
+  const visibleGatheringNavItems = $derived(
+    gatheringRegionsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')
+  );
+  const gatheringInspectorTabs = $derived(visibleGatheringNavItems.filter(tab => tab.id !== 'environments'));
   const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-hazard-edit');
   const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && gatheringNavItems.some(tab => tab.id === activeGatheringTab)
+    isGatheringRoute && visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)
   );
   const activeGatheringInspectorTab = $derived(
     gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
   );
+  // Stale-tab guard: if the active tab is no longer visible (e.g. Travel after the
+  // GM disables Travel & Regions), fall back to Environments.
+  $effect(() => {
+    if (!visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)) {
+      activeGatheringTab = 'environments';
+    }
+  });
   const selectedGatheringRules = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
     rewardSelectionMode: 'highestRankedDrop',
     rewardLimit: 1,
@@ -2003,13 +2018,13 @@
   }
 
   function selectGatheringTab(tabId) {
-    activeGatheringTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    activeGatheringTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
     gatheringMenuExpanded = true;
   }
 
   function openGatheringSection(tabId = 'environments') {
     if (!canShowEnvironments) return;
-    const nextTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    const nextTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
       gatheringMenuExpanded = true;
@@ -2309,9 +2324,7 @@
   }
 
   function gatheringOptionLabel(kind, id) {
-    const options = kind === 'biome'
-      ? selectedGatheringSystemConfig.vocabularies?.biomes?.values
-      : selectedGatheringSystemConfig.vocabularies?.regions?.values;
+    const options = selectedGatheringSystemConfig.vocabularies?.biomes?.values;
     const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
     return String(option?.label || option?.id || id || '').trim();
   }
@@ -2502,12 +2515,6 @@
     });
   }
 
-  // Region selections may be stored as a `regions` array or a legacy single `region`.
-  function recordRegions(record) {
-    if (Array.isArray(record?.regions)) return record.regions;
-    return record?.region ? [record.region] : [];
-  }
-
   function activeGatheringTaskEnvironmentCount(task) {
     if (!task || task.enabled === false) return 0;
     const weatherSetting = selectedGatheringSystemConfig.conditions?.weather || {};
@@ -2515,14 +2522,10 @@
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const taskWeather = Array.isArray(task.weather) ? task.weather : [];
     const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
-    const taskRegions = Array.isArray(task.regions)
-      ? task.regions
-      : (task.region ? [task.region] : []);
     return environmentList.filter(environment => {
       if (environment?.enabled === false) return false;
       if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
       if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
-      if (taskRegions.length > 0 && !taskRegions.includes(String(environment?.region || ''))) return false;
       const environmentBiomes = Array.isArray(environment?.biomes)
         ? environment.biomes
         : (environment?.biome ? [environment.biome] : []);
@@ -3072,7 +3075,7 @@
               </button>
               {#if gatheringMenuExpanded}
                 <div class="manager-nav-submenu" id="manager-gathering-submenu" aria-label={text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Label', 'Gathering sections')}>
-                  {#each gatheringNavItems as gatheringItem (gatheringItem.id)}
+                  {#each visibleGatheringNavItems as gatheringItem (gatheringItem.id)}
                     <button
                       type="button"
                       class={`manager-nav-subitem ${isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
@@ -3149,6 +3152,9 @@
         onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}
         onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
         onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
+        gatheringRegionSettings={$viewState.gatheringRegionSettings || { enabled: false }}
+        onSetGatheringRegionsEnabled={(sys, enabled) => store.setGatheringRegionsEnabled?.(sys, enabled)}
+        onPickImagePath={services?.pickImagePath}
         travelParties={travelParties}
         travelSelectedPartyId={selectedTravelPartyId}
         travelSaving={$viewState.travelSaving === true}
@@ -3174,6 +3180,7 @@
         onCreateRegionQuick={(sys, name) => store.createRegionQuick?.(sys, name)}
         onRenameRegion={(sys, id, name) => store.renameRegion?.(sys, id, name)}
         onToggleRegionEnabled={(sys, id, enabled) => store.toggleRegionEnabled?.(sys, id, enabled)}
+        onUpdateRegion={(sys, id, patch) => store.updateRegion?.(sys, id, patch)}
         onDeleteRegion={(sys, id) => store.deleteRegion?.(sys, id)}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
@@ -3185,7 +3192,8 @@
             hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
             linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
-            regionOptions={gatheringVocabularyOptions('regions')}
+            regionRecords={$viewState.selectedSystemRegions || []}
+            regionsEnabled={gatheringRegionsEnabled}
             biomeOptions={gatheringVocabularyOptions('biomes')}
             dangerOptions={gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
@@ -3210,7 +3218,6 @@
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        regionOptions={gatheringVocabularyOptions('regions')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
@@ -3235,7 +3242,6 @@
         hazard={editingGatheringHazard}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        regionOptions={gatheringVocabularyOptions('regions')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
         onPickImagePath={services?.pickImagePath}
         onUpdateHazard={updateSelectedGatheringHazard}
@@ -3481,12 +3487,6 @@
             <section class="manager-inspector-card">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-task-fact="region">
-                  <span class="manager-fact-line"><strong>{recordRegions(selectedGatheringTask).length === 0
-                    ? text('FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region')
-                    : recordRegions(selectedGatheringTask).map(id => gatheringOptionLabel('region', id) || id).join(', ')
-                  }</strong>{#if recordRegions(selectedGatheringTask).length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>{/if}</span>
-                </div>
                 <div class="manager-fact" data-gathering-task-fact="biomes">
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
@@ -3996,12 +3996,6 @@
             <section class="manager-inspector-card">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Hazards.Details', 'Hazard details')}</h3>
               <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-hazard-fact="region">
-                  <span class="manager-fact-line"><strong>{recordRegions(selectedGatheringHazard).length === 0
-                    ? text('FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region')
-                    : recordRegions(selectedGatheringHazard).map(id => gatheringOptionLabel('region', id) || id).join(', ')
-                  }</strong>{#if recordRegions(selectedGatheringHazard).length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>{/if}</span>
-                </div>
                 <div class="manager-fact" data-gathering-hazard-fact="biomes">
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0 ? selectedGatheringHazard.biomes.length : text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>

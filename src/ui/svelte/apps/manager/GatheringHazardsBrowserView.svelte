@@ -21,7 +21,6 @@
 
   let searchTerm = $state('');
   let statusFilter = $state('all');
-  let regionFilter = $state('all');
   let biomeFilter = $state('all');
   let dangerFilter = $state('all');
   let lastSystemId = $state('');
@@ -40,12 +39,6 @@
   const weatherCondition = $derived(systemConfig.conditions?.weather || {});
   const timeCondition = $derived(systemConfig.conditions?.timeOfDay || {});
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
-  const regionOptions = $derived(uniqueSorted([
-    ...hazardList.flatMap(hazard => Array.isArray(hazard.regions)
-      ? hazard.regions
-      : (hazard.region ? [hazard.region] : [])),
-    ...vocabularyIds(systemConfig.vocabularies?.regions?.values)
-  ]));
   const biomeOptions = $derived(uniqueSorted([
     ...hazardList.flatMap(hazard => Array.isArray(hazard.biomes) ? hazard.biomes : []),
     ...vocabularyIds(systemConfig.vocabularies?.biomes?.values)
@@ -70,19 +63,14 @@
     const matchesStatus = statusFilter === 'all'
       || (statusFilter === 'active' && hazard.enabled !== false)
       || (statusFilter === 'disabled' && hazard.enabled === false);
-    const hazardRegions = Array.isArray(hazard.regions)
-      ? hazard.regions
-      : (hazard.region ? [hazard.region] : []);
-    const matchesRegion = regionFilter === 'all' || hazardRegions.includes(regionFilter);
     const hazardBiomes = Array.isArray(hazard.biomes) ? hazard.biomes : [];
     const matchesBiome = biomeFilter === 'all' || hazardBiomes.includes(biomeFilter);
     const matchesDanger = dangerFilter === 'all' || dangerTags.includes(dangerFilter);
-    return matchesSearch && matchesStatus && matchesRegion && matchesBiome && matchesDanger;
+    return matchesSearch && matchesStatus && matchesBiome && matchesDanger;
   }));
   const filtersActive = $derived(
     normalizedSearchTerm.length > 0
     || statusFilter !== 'all'
-    || regionFilter !== 'all'
     || biomeFilter !== 'all'
     || dangerFilter !== 'all'
   );
@@ -92,7 +80,6 @@
     if (selectedSystemId === lastSystemId) return;
     searchTerm = '';
     statusFilter = 'all';
-    regionFilter = 'all';
     biomeFilter = 'all';
     dangerFilter = 'all';
     pageIndex = 0;
@@ -125,18 +112,15 @@
 
   function defaultIcon(kind) {
     switch (kind) {
-      case 'biome': return 'fas fa-tree';
       case 'weather': return 'fas fa-cloud-sun';
       case 'timeOfDay': return 'fas fa-clock';
-      case 'region':
-      default: return 'fas fa-map-location-dot';
+      case 'biome':
+      default: return 'fas fa-tree';
     }
   }
 
   function vocabularyEntry(kind, id) {
-    const values = kind === 'biome'
-      ? systemConfig.vocabularies?.biomes?.values
-      : systemConfig.vocabularies?.regions?.values;
+    const values = systemConfig.vocabularies?.biomes?.values;
     const option = (Array.isArray(values) ? values : []).find(value => String(value?.id || value) === String(id || ''));
     const label = String(option?.label || option?.id || id || '').trim();
     const icon = String(option?.icon || '').trim() || defaultIcon(kind);
@@ -167,16 +151,6 @@
   function dangerLabel(tag) {
     const key = `FABRICATE.Admin.Manager.Environment.Hazards.DangerTag.${tag}`;
     return text(key, tag.charAt(0).toUpperCase() + tag.slice(1));
-  }
-
-  function regionChips(hazard) {
-    const values = Array.isArray(hazard?.regions)
-      ? hazard.regions
-      : (hazard?.region ? [hazard.region] : []);
-    return values
-      .map(id => vocabularyEntry('region', id))
-      .filter(entry => entry.label)
-      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}`, pillClass: 'manager-availability-pill is-region' }));
   }
 
   function biomeChips(hazard) {
@@ -224,7 +198,6 @@
 
   function rowChips(hazard) {
     return [
-      ...regionChips(hazard),
       ...biomeChips(hazard),
       ...timeChips(hazard),
       ...weatherChips(hazard),
@@ -243,7 +216,6 @@
   function clearFilters() {
     searchTerm = '';
     statusFilter = 'all';
-    regionFilter = 'all';
     biomeFilter = 'all';
     dangerFilter = 'all';
   }
@@ -272,15 +244,6 @@
         <option value="all">{text('FABRICATE.Admin.Manager.Environment.Hazards.StatusAll', 'All hazards')}</option>
         <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
         <option value="disabled">{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option>
-      </select>
-    </label>
-    <label class="manager-filter">
-      <span>{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
-      <select value={regionFilter} onchange={(event) => regionFilter = event.currentTarget.value}>
-        <option value="all">{text('FABRICATE.Admin.Manager.Environment.RegionAll', 'All regions')}</option>
-        {#each regionOptions as region (region)}
-          <option value={region}>{optionLabel('region', region) || region}</option>
-        {/each}
       </select>
     </label>
     <label class="manager-filter">

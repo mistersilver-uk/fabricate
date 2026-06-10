@@ -57,6 +57,9 @@
     onAddGatheringVocabularyValue = () => {},
     onUpdateGatheringVocabularyValue = () => {},
     onDeleteGatheringVocabularyValue = () => {},
+    gatheringRegionSettings = { enabled: false },
+    onSetGatheringRegionsEnabled = () => {},
+    onPickImagePath = null,
     travelParties = [],
     travelSelectedPartyId = '',
     travelSaving = false,
@@ -82,6 +85,7 @@
     onCreateRegionQuick = () => {},
     onRenameRegion = () => {},
     onToggleRegionEnabled = () => {},
+    onUpdateRegion = () => {},
     onDeleteRegion = () => {}
   } = $props();
 
@@ -89,14 +93,12 @@
   let statusFilter = $state('all');
   let selectionFilter = $state('all');
   let riskFilter = $state('all');
-  let regionFilter = $state('all');
   let biomeFilter = $state('all');
   let lastSystemId = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(10);
   let weatherInput = $state('');
   let timeOfDayInput = $state('');
-  let regionInput = $state('');
   let biomeInput = $state('');
   let weatherIconInput = $state('fas fa-cloud-sun');
   let timeOfDayIconInput = $state('fas fa-clock');
@@ -163,11 +165,9 @@
     statusFilter = 'all';
     selectionFilter = 'all';
     riskFilter = 'all';
-    regionFilter = 'all';
     biomeFilter = 'all';
     weatherInput = '';
     timeOfDayInput = '';
-    regionInput = '';
     biomeInput = '';
     weatherIconInput = defaultConditionIcon('weather');
     timeOfDayIconInput = defaultConditionIcon('timeOfDay');
@@ -194,14 +194,12 @@
     current: gatheringConfig?.conditions?.timeOfDay || 'day',
     values: gatheringConfig?.vocabularies?.timeOfDay || []
   });
-  const regionVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.regions || {
-    values: gatheringConfig?.vocabularies?.regions || []
-  });
   const biomeVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.biomes || {
     values: gatheringConfig?.vocabularies?.biomes || []
   });
+  const biomeVocabularyOptions = $derived(Array.isArray(biomeVocabulary?.values) ? biomeVocabulary.values : []);
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
-  const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
+  const regionsEnabled = $derived(gatheringRegionSettings?.enabled === true);
   const biomeOptions = $derived(uniqueSorted(environmentList.flatMap(environment =>
     Array.isArray(environment.biomes) ? environment.biomes : (environment.biome ? [environment.biome] : []))));
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -216,19 +214,17 @@
     const matchesSelection = selectionFilter === 'all'
       || environment.selectionMode === selectionFilter;
     const matchesRisk = riskFilter === 'all' || (environment.risk || 'safe') === riskFilter;
-    const matchesRegion = regionFilter === 'all' || (environment.region || '') === regionFilter;
     const matchesBiome = biomeFilter === 'all'
       || (Array.isArray(environment.biomes)
         ? environment.biomes.includes(biomeFilter)
         : (environment.biome || '') === biomeFilter);
-    return matchesSearch && matchesStatus && matchesSelection && matchesRisk && matchesRegion && matchesBiome;
+    return matchesSearch && matchesStatus && matchesSelection && matchesRisk && matchesBiome;
   }));
   const filtersActive = $derived(
     normalizedSearchTerm.length > 0
     || statusFilter !== 'all'
     || selectionFilter !== 'all'
     || riskFilter !== 'all'
-    || regionFilter !== 'all'
     || biomeFilter !== 'all'
   );
   const paginatedEnvironments = $derived(filteredEnvironments.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
@@ -322,7 +318,6 @@
     statusFilter = 'all';
     selectionFilter = 'all';
     riskFilter = 'all';
-    regionFilter = 'all';
     biomeFilter = 'all';
   }
 
@@ -386,48 +381,37 @@
     setConditionInput(kind, '');
   }
 
-  function vocabularyTitle(kind) {
-    return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionsTitle', 'Regions')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesTitle', 'Biomes');
+  function vocabularyTitle() {
+    return text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesTitle', 'Biomes');
   }
 
-  function vocabularyAddLabel(kind) {
-    return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.AddRegion', 'Add region')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.AddBiome', 'Add biome');
+  function vocabularyAddLabel() {
+    return text('FABRICATE.Admin.Manager.Environment.Vocabularies.AddBiome', 'Add biome');
   }
 
-  function vocabularyHint(kind) {
-    return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionsHint', 'Environments use one region. Click the name of a region to edit it.')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesHint', 'Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.');
+  function vocabularyHint() {
+    return text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesHint', 'Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.');
   }
 
-  function vocabularyPlaceholder(kind) {
-    return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionPlaceholder', 'e.g. Northlands')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomePlaceholder', 'e.g. Mushroom forest');
+  function vocabularyPlaceholder() {
+    return text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomePlaceholder', 'e.g. Mushroom forest');
   }
 
-  function vocabularyInputValue(kind) {
-    return kind === 'regions' ? regionInput : biomeInput;
+  function vocabularyInputValue() {
+    return biomeInput;
   }
 
-  function setVocabularyInput(kind, value) {
-    if (kind === 'regions') regionInput = value;
-    else biomeInput = value;
+  function setVocabularyInput(value) {
+    biomeInput = value;
   }
 
   function submitVocabularyValue(event, kind) {
     event.preventDefault();
-    const value = vocabularyInputValue(kind).trim();
+    const value = vocabularyInputValue().trim();
     if (!value) return;
-    const payload = kind === 'biomes'
-      ? { label: value, icon: biomeIconInput, colorToken: biomeColorTokenInput, customColor: biomeCustomColorInput }
-      : { label: value };
+    const payload = { label: value, icon: biomeIconInput, colorToken: biomeColorTokenInput, customColor: biomeCustomColorInput };
     onAddGatheringVocabularyValue?.(kind, payload, selectedSystemId);
-    setVocabularyInput(kind, '');
+    setVocabularyInput('');
   }
 
   function vocabularyId(option) {
@@ -672,15 +656,6 @@
           </select>
         </label>
         <label class="manager-filter">
-          <span>{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
-          <select value={regionFilter} onchange={(event) => regionFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Environment.RegionFilterLabel', 'Filter environments by region')}>
-            <option value="all">{text('FABRICATE.Admin.Manager.Environment.RegionAll', 'All regions')}</option>
-            {#each regionOptions as region (region)}
-              <option value={region}>{prettifyTag(region)}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
           <select value={biomeFilter} onchange={(event) => biomeFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Environment.BiomeFilterLabel', 'Filter environments by biome')}>
             <option value="all">{text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes')}</option>
@@ -869,6 +844,7 @@
       fieldErrors={travelFieldErrors}
       actorOptions={travelActorOptions}
       systemRegions={travelSystemRegions}
+      biomeOptions={biomeVocabularyOptions}
       {onSelectParty}
       {onCreateParty}
       {onRenameParty}
@@ -887,7 +863,9 @@
       onCreateRegion={onCreateRegionQuick}
       {onRenameRegion}
       {onToggleRegionEnabled}
+      {onUpdateRegion}
       {onDeleteRegion}
+      {onPickImagePath}
     />
   {:else if activeGatheringTab === 'settings'}
     <div
@@ -897,6 +875,33 @@
       aria-labelledby="manager-gathering-nav-settings"
     >
       <GatheringEconomyView {services} systemId={selectedSystemId} />
+
+      <section class="manager-condition-panel manager-region-toggle-panel" data-gathering-region-toggle-panel aria-label={text('FABRICATE.Admin.Manager.Environment.RegionToggle.Title', 'Travel & Regions')}>
+        <header class="manager-condition-panel-header">
+          <span class="manager-condition-panel-title">
+            <i class="fas fa-route" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Environment.RegionToggle.Title', 'Travel & Regions')}</span>
+          </span>
+          <button
+            type="button"
+            class={`manager-status-toggle ${regionsEnabled ? 'is-on' : 'is-off'}`}
+            data-gathering-region-toggle
+            aria-pressed={regionsEnabled}
+            aria-label={regionsEnabled
+              ? text('FABRICATE.Admin.Manager.Environment.RegionToggle.Disable', 'Disable Travel & Regions')
+              : text('FABRICATE.Admin.Manager.Environment.RegionToggle.Enable', 'Enable Travel & Regions')}
+            onclick={() => onSetGatheringRegionsEnabled?.(selectedSystemId, !regionsEnabled)}
+          >
+            <span class="manager-status-toggle-track" aria-hidden="true">
+              <span class="manager-status-toggle-knob"></span>
+            </span>
+            <span class="manager-status-toggle-label">
+              {regionsEnabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            </span>
+          </button>
+        </header>
+        <p class="manager-condition-panel-hint">{text('FABRICATE.Admin.Manager.Environment.RegionToggle.Hint', 'Enabling this reveals the Travel tab, where you build regions and place parties, and lets environments be assigned to regions. Leave it off if your game does not use travel or location-gated gathering.')}</p>
+      </section>
 
       {#each [
         { kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition },
@@ -994,19 +999,18 @@
         </section>
       {/each}
       {#each [
-        { kind: 'regions', icon: 'fas fa-map-location-dot', vocabulary: regionVocabulary },
         { kind: 'biomes', icon: 'fas fa-tree', vocabulary: biomeVocabulary }
       ] as vocabulary (vocabulary.kind)}
-        <section class={`manager-condition-panel manager-vocabulary-settings-panel ${vocabulary.kind === 'biomes' ? 'is-biomes' : 'is-regions'}`} data-gathering-vocabulary-panel={vocabulary.kind} aria-label={vocabularyTitle(vocabulary.kind)}>
+        <section class="manager-condition-panel manager-vocabulary-settings-panel is-biomes" data-gathering-vocabulary-panel={vocabulary.kind} aria-label={vocabularyTitle()}>
           <header class="manager-condition-panel-header">
             <span class="manager-condition-panel-title">
               <i class={vocabulary.icon} aria-hidden="true"></i>
-              <span>{vocabularyTitle(vocabulary.kind)}</span>
+              <span>{vocabularyTitle()}</span>
             </span>
           </header>
-          <p class="manager-condition-panel-hint">{vocabularyHint(vocabulary.kind)}</p>
+          <p class="manager-condition-panel-hint">{vocabularyHint()}</p>
 
-          <form class={`manager-condition-add ${vocabulary.kind === 'biomes' ? 'manager-biome-add' : 'manager-region-add'}`} onsubmit={(event) => submitVocabularyValue(event, vocabulary.kind)}>
+          <form class="manager-condition-add manager-biome-add" onsubmit={(event) => submitVocabularyValue(event, vocabulary.kind)}>
             {#if vocabulary.kind === 'biomes'}
               <IconPicker
                 value={biomeIconInput}
@@ -1028,13 +1032,13 @@
             {/if}
             <label class="manager-field">
               <input
-                value={vocabularyInputValue(vocabulary.kind)}
-                aria-label={vocabularyAddLabel(vocabulary.kind)}
-                placeholder={vocabularyPlaceholder(vocabulary.kind)}
-                oninput={(event) => setVocabularyInput(vocabulary.kind, event.currentTarget.value)}
+                value={vocabularyInputValue()}
+                aria-label={vocabularyAddLabel()}
+                placeholder={vocabularyPlaceholder()}
+                oninput={(event) => setVocabularyInput(event.currentTarget.value)}
               />
             </label>
-            <button type="submit" class="manager-button manager-add-button" aria-label={vocabularyAddLabel(vocabulary.kind)} title={vocabularyAddLabel(vocabulary.kind)}>
+            <button type="submit" class="manager-button manager-add-button" aria-label={vocabularyAddLabel()} title={vocabularyAddLabel()}>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
             </button>
           </form>
@@ -1042,7 +1046,7 @@
           <div class="manager-condition-pill-list" aria-label={text('FABRICATE.Admin.Manager.Environment.Vocabularies.Values', 'Vocabulary values')}>
             {#each vocabularyValues(vocabulary.vocabulary) as option (vocabularyId(option))}
               {@const valueId = vocabularyId(option)}
-              <span class={`manager-condition-pill manager-vocabulary-pill ${vocabulary.kind === 'biomes' ? 'is-biome' : 'is-region'}`} data-gathering-vocabulary-value={valueId}>
+              <span class="manager-condition-pill manager-vocabulary-pill is-biome" data-gathering-vocabulary-value={valueId}>
                 {#if vocabulary.kind === 'biomes'}
                   <span class="manager-biome-combined-picker">
                     <IconPicker

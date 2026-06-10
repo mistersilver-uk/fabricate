@@ -6,14 +6,13 @@ const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
-  regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
   danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
-const VOCABULARY_DIMENSIONS = ['regions', 'biomes'];
+const VOCABULARY_DIMENSIONS = ['biomes'];
 const BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
 const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_BIOME_METADATA = Object.freeze({
@@ -1823,7 +1822,6 @@ function normalizeGatheringEconomy(raw = {}) {
 
 function normalizeGatheringConfig(raw = {}) {
   const vocabularies = {
-    regions: seedVocabulary(raw?.vocabularies?.regions, DEFAULT_VOCABULARIES.regions),
     biomes: seedVocabulary(raw?.vocabularies?.biomes, DEFAULT_VOCABULARIES.biomes),
     danger: seedVocabulary(raw?.vocabularies?.danger, DEFAULT_VOCABULARIES.danger),
     weather: seedVocabulary(raw?.vocabularies?.weather, DEFAULT_VOCABULARIES.weather),
