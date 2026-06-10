@@ -2383,6 +2383,10 @@ async function main() {
           if (!alara) {
             throw new Error('Smoke actor "Alara the Alchemist" not found for Travel seeding.');
           }
+          // Travel & Regions is disabled by default (#286). Enable it on this
+          // system before the manager opens so the Travel nav item is visible
+          // for the capture step.
+          await regionStore.updateRegionSettings(sysId, { enabled: true });
           for (const party of partyStore.list()) {
             await partyStore.delete(party.id);
           }
