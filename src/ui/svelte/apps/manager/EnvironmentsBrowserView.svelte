@@ -11,6 +11,7 @@
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringTravelTabs from './GatheringTravelTabs.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
+  import GatheringRegionsTab from './GatheringRegionsTab.svelte';
 
   let {
     environments = [],
@@ -860,15 +861,7 @@
           onClearTravelActor={onClearPartyTravelActor}
         />
       {:else if activeTravelTab === 'regions'}
-        <div
-          class="manager-travel-panel"
-          id="travel-panel-regions"
-          role="tabpanel"
-          aria-labelledby="travel-tab-regions"
-          data-travel-panel="regions"
-        >
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Tabs.RegionsPlaceholder', 'Region management will live here.')}</p>
-        </div>
+        <GatheringRegionsTab regions={travelSystemRegions} />
       {:else if activeTravelTab === 'map'}
         <div
           class="manager-travel-panel"

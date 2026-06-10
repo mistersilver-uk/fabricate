@@ -41,6 +41,7 @@ function createServices({
   parties = [],
   regions = [],
   actors = [],
+  environments = [],
   confirmResult = true,
   partyError = null
 } = {}) {
@@ -172,7 +173,7 @@ function createServices({
     setSetting: async (key, value) => { settings[key] = value; },
     getCraftingSystemManager: () => systemManager,
     getRecipeManager: () => recipeManager,
-    getGatheringEnvironmentStore: () => ({ listBySystem: async () => [], list: () => [] }),
+    getGatheringEnvironmentStore: () => ({ listBySystem: async () => clone(environments), list: () => clone(environments) }),
     getGatheringPartyStore: () => partyStore,
     getGatheringRegionStore: () => regionStore,
     getGatheringLocationService: () => locationService,
@@ -208,7 +209,7 @@ describe('adminStore travel section', () => {
     assert.equal(state.travelParties.length, 1);
     assert.equal(state.travelParties[0].name, 'Vanguard');
     assert.equal(state.selectedSystemRegions.length, 1);
-    // The Travel view-model carries the full authoring projection, not just name/enabled/secret.
+    // The Travel view-model carries the full authoring projection plus per-region counts.
     assert.deepEqual(state.selectedSystemRegions[0], {
       id: 'r1',
       name: 'Verdant',
@@ -216,10 +217,40 @@ describe('adminStore travel section', () => {
       img: 'verdant.webp',
       enabled: true,
       secret: false,
-      biomes: ['forest']
+      biomes: ['forest'],
+      environmentCount: 0,
+      partyCount: 0
     });
     assert.equal(state.actorOptions.length, 1);
     assert.equal(state.selectedPartyId, 'p1');
+    store.destroy();
+  });
+
+  it('selectedSystemRegions includes per-region environment and party counts', async () => {
+    const { services } = createServices({
+      parties: [
+        { id: 'p1', name: 'A', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
+        { id: 'p2', name: 'B', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }
+      ],
+      regions: [
+        { id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] },
+        { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [] }
+      ],
+      environments: [
+        { id: 'e1', name: 'Grove', includedRegionIds: ['r1'] },
+        { id: 'e2', name: 'Glade', includedRegionIds: ['r1', 'r2'] },
+        { id: 'e3', name: 'Bare', includedRegionIds: [] }
+      ]
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+    const state = get(store.viewState);
+    const r1 = state.selectedSystemRegions.find(r => r.id === 'r1');
+    const r2 = state.selectedSystemRegions.find(r => r.id === 'r2');
+    assert.equal(r1.environmentCount, 2);
+    assert.equal(r1.partyCount, 1);
+    assert.equal(r2.environmentCount, 1);
+    assert.equal(r2.partyCount, 0);
     store.destroy();
   });
 

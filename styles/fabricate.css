@@ -9895,6 +9895,123 @@
 }
 
 /* Travel > Parties accordion list (styled after the gathering tools browser). */
+/* Travel > Regions accordion list — mirrors the Parties list mechanics. */
+.fabricate-manager .manager-travel-regions {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-regions-empty {
+  margin: 0;
+}
+
+.fabricate-manager .manager-travel-regions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.fabricate-manager .manager-travel-regions-row {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager .manager-travel-regions-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-travel-regions-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.fabricate-manager .manager-travel-regions-header:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-travel-regions-row.is-expanded > .manager-travel-regions-header {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fabricate-manager .manager-travel-regions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-regions-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-mv2-text-muted);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-regions-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-mv2-text);
+  flex: 0 1 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-regions-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-regions-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  margin-left: auto;
+  color: var(--fab-mv2-text-muted);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-regions-editor {
+  min-height: 56px;
+  padding: 16px;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
 /* Grid (toolbar / scrollable list / pagination) so the accordion list scrolls
    within the panel while the search and pagination stay pinned. Relies on
    .manager-gathering-panel's display:grid + min-height:0 + overflow:hidden. */

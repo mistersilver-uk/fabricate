@@ -2027,6 +2027,29 @@ export function createAdminStore(services) {
         };
       });
 
+      // Per-region counts for the Regions tab header chips. Environments are
+      // fetched once (sync arrays only — listBySystem may be async); parties
+      // reuse the raw list already built above.
+      const regionEnvList = (() => {
+        if (regions.length === 0) return [];
+        const environmentStore = _getEnvironmentStore();
+        if (!environmentStore) return [];
+        // listBySystem may be async; prefer its synchronous array, else fall
+        // back to a synchronous list() (region ids are unique per system).
+        const bySystem = typeof environmentStore.listBySystem === 'function'
+          ? environmentStore.listBySystem(systemId)
+          : null;
+        if (Array.isArray(bySystem)) return bySystem;
+        const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
+        return Array.isArray(all) ? all : [];
+      })();
+      const regionEnvironmentCount = (regionId) => regionEnvList.filter(env =>
+        Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId)).length;
+      const regionPartyCount = (regionId) => parties.filter(party => {
+        const override = party?.currentRegionOverrides?.[systemId];
+        return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
+      }).length;
+
       return {
         travelParties,
         selectedPartyId: selectedId,
@@ -2040,7 +2063,9 @@ export function createAdminStore(services) {
           img: region.img || null,
           enabled: region.enabled !== false,
           secret: region.secret === true,
-          biomes: Array.isArray(region.biomes) ? region.biomes : []
+          biomes: Array.isArray(region.biomes) ? region.biomes : [],
+          environmentCount: regionEnvironmentCount(region.id),
+          partyCount: regionPartyCount(region.id)
         })),
         gatheringRegionSettings: (systemId && regionStore?.getRegionSettings)
           ? regionStore.getRegionSettings(systemId)
