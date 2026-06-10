@@ -106,6 +106,7 @@ World:
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
 - `fabricate.gatheringConfig`
+- `fabricate.gatheringParties` for world-level Fabricate-managed gathering parties (excluded from crafting-system import/export)
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
 - `fabricate.experimentalFeatures` for future experimental feature gates, disabled by default
@@ -128,6 +129,7 @@ Client:
 - `flags.fabricate.gatheringRuns.active` for in-progress time-gated gathering runs
 - `flags.fabricate.gatheringRuns.history` for completed/failed/cancelled gathering run history
 - `flags.fabricate.learnedRecipes` for learned recipe records
+- `flags.fabricate.discoveredGatheringRegions` for actor-scoped gathering region discovery (keyed by system then region)
 
 Clean-up semantics for stale runs/learned records are defined in `007-destructive-changes-and-migrations.md`.
 

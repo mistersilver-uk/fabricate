@@ -52,6 +52,9 @@ Each environment belongs to one crafting system and stores:
 | **Danger Level** | Optional single danger ceiling used to match reusable hazards |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
+{: .note }
+> The **Region** and **Biomes** fields above are matching/display tags for composing tasks and hazards — they do not gate where players can gather. Location-aware availability (gating an environment by the party's current region) uses separate explicit rule fields (`includedRegionIds`, `excludedRegionIds`, `includedBiomeIds`, `excludedBiomeIds`) introduced with first-class regions and parties; see [Gathering Regions & Travel]({% link gathering-regions.md %}).
+
 Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
 
 Deleting an environment also cleans active and historical gathering runs that reference it.

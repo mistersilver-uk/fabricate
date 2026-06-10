@@ -82,7 +82,7 @@ Selected-system navigation:
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`. When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route. When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
-- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Hazards, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
+- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Hazards, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The `Travel` submenu item shows the total party count as its badge. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`. It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
@@ -341,6 +341,26 @@ The environments editor must block save when:
 - `selectionMode === "targeted"` and the environment has zero tasks
 - a task is missing required routed or progressive fields
 - a task's result groups violate reserved failure keyword rules
+
+### GM Travel Route
+
+When `features.gathering === true`, the selected-system Gathering submenu exposes a `Travel` route for managing Fabricate-managed gathering parties and the selected system's current-region overrides. It must not be duplicated in a separate detached settings UI.
+
+Shipped capabilities:
+
+- `Travel` is reachable only while a gathering-enabled crafting system is selected. Party create/rename/enable/disable, member management, and travel-actor assignment are **world-global** (parties are shared across systems); only the current-region override block is **per selected system**. The view states this explicitly.
+- The `Travel` submenu badge shows the total party count.
+- Create, rename, enable/disable, and delete Fabricate parties.
+- Assign actor members to a party and assign exactly one **travel actor** (the actor that represents the party on a campaign map). Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
+- The enable toggle is disabled (with an "assign a travel actor to enable" hint) while a party has no travel actor; newly created parties visibly show their disabled state.
+- When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
+- Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-region evidence per source state, member/travel-actor summary, stale references). Override editing exists in exactly one place (center).
+- The current-region evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current region`. The `Travel actor` source is presented as "automation not yet available" rather than hidden, so the model is complete before Phase 3.
+- Each stale member / travel-actor / override-region reference gets a remove/clear action; "repair" means removing the stale reference and re-assigning through the normal pickers.
+- The route embeds a minimal **name-only region quick list** (create, inline rename, enable toggle, delete with referenced-by confirm) as a temporary host until the dedicated Regions route ships. It is a lightweight picker-builder, not a region editor: it edits name and enabled only and never description/img/secret/biomes/modifiers/scene mappings, which round-trip untouched.
+- Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern. Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
+
+Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): the full Region editor route (description/img/secret/biomes/ordering authoring), the environment location-availability editor controls, region discovery controls, and the player-facing travel/current-region view.
 
 ### Gathering Hazard Library
 
@@ -765,6 +785,7 @@ World settings:
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
 - `fabricate.gatheringConfig`
+- `fabricate.gatheringParties`
 - `fabricate.migrationVersion`
 - `fabricate.theme`
 - `fabricate.experimentalFeatures`
@@ -785,6 +806,7 @@ Flags:
 - `flags.fabricate.learnedRecipes`
 - `flags.fabricate.craftingRuns`
 - `flags.fabricate.gatheringRuns`
+- `flags.fabricate.discoveredGatheringRegions`
 
 ## Compatibility
 

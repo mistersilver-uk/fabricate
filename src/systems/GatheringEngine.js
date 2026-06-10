@@ -75,6 +75,15 @@ const FAILURE_KEYWORDS = new Set([
  * matured waitingTime runs, writes terminal history before post-history
  * effects, cancels missing-reference runs into terminal history, and clears
  * resume-time misconfiguration without player history or effects.
+ *
+ * When a `locationResolver` collaborator (a GatheringLocationService) is
+ * injected, listings additionally evaluate each environment's location
+ * availability against the party's resolved current regions — emitting a
+ * redaction-safe `location` listing field plus `LOCATION_BLOCKED` /
+ * `NO_CURRENT_REGION` blocked reasons — and attempt starts re-resolve location
+ * fresh so a stale listing cannot start a location-gated attempt. Without the
+ * resolver, or for environments that declare no location rules, listing and
+ * start behavior is unchanged.
  */
 export class GatheringEngine {
   constructor({
