@@ -141,23 +141,6 @@ describe('actorBarStore', () => {
     assert.deepEqual(calls.setSelectedActorId, [], 'no re-persist on the guarded second load');
   });
 
-  it('setRegion stores the reported region and clears on empty', () => {
-    const { services } = makeServices({ actors: ACTORS });
-    const store = createActorBarStore({ services });
-
-    store.setRegion('Greenvale');
-    flushSync();
-    assert.equal(store.region, 'Greenvale');
-
-    store.setRegion('');
-    flushSync();
-    assert.equal(store.region, '');
-
-    store.setRegion(null);
-    flushSync();
-    assert.equal(store.region, '', 'null normalizes to empty string');
-  });
-
   it('setStaminaPool stores the active pool and clears to null', () => {
     const { services } = makeServices({ actors: ACTORS });
     const store = createActorBarStore({ services });

@@ -2,7 +2,7 @@
 <!--
   GatheringDetail is the center column of the player gathering tab. With no
   environment selected it shows a hint to pick one from the left. With an
-  environment selected it renders a header (name, biome/region/danger info pips,
+  environment selected it renders a header (name, biome/danger info pips,
   description, and a gathering-mode hint), the economy strip, an optional
   environment-level scene banner, then a TAB STRIP (GatheringDetailTabs) with two
   tab panels:
@@ -77,7 +77,6 @@
   );
 
   const biomeTags = $derived(Array.isArray(env?.biomeTags) ? env.biomeTags : []);
-  const region = $derived(String(env?.region ?? ''));
   const danger = $derived(String(env?.risk ?? (Array.isArray(env?.dangerTags) ? env.dangerTags[0] : '') ?? ''));
   // Localize the danger value to match the GM editor's risk labels (Safe,
   // Hazardous, …); fall back to the raw value for any unmapped level.
@@ -190,7 +189,7 @@
     <header class="gathering-detail-header">
       <h2 id={titleId} class="gathering-detail-title" title={name}>{name}</h2>
 
-      {#if biomeTags.length > 0 || region !== '' || danger !== ''}
+      {#if biomeTags.length > 0 || danger !== ''}
         <ul class="gathering-detail-pips" data-gathering-pips>
           {#each biomeTags as tag (tag.id)}
             <li
@@ -202,15 +201,6 @@
               <span>{tag.label}</span>
             </li>
           {/each}
-          {#if region !== ''}
-            <li
-              class="gathering-detail-pip"
-              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Region', { value: region })}
-            >
-              <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-              <span>{region}</span>
-            </li>
-          {/if}
           {#if dangerLabel !== ''}
             <li
               class={`gathering-detail-pip is-danger ${dangerRiskClass}`}

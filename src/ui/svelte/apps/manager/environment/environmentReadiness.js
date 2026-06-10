@@ -29,7 +29,6 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
 
   const hasName = Boolean(trimmed(environment?.name));
   const hasDescription = Boolean(trimmed(environment?.description));
-  const hasRegion = true; // empty region is a valid "any region" state
   const hasBiome = tagList(environment?.biomes ?? environment?.biome).length > 0;
   const hasDanger = Boolean(trimmed(environment?.dangerLevel))
     || tagList(environment?.dangerTags ?? environment?.risk).length > 0
@@ -42,7 +41,6 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   const checks = [
     { id: 'hasName', satisfied: hasName },
     { id: 'hasDescription', satisfied: hasDescription },
-    { id: 'hasRegion', satisfied: hasRegion },
     { id: 'hasBiome', satisfied: hasBiome },
     { id: 'hasDanger', satisfied: hasDanger },
     { id: 'hasCompositionMode', satisfied: hasCompositionMode },

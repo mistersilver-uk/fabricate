@@ -56,7 +56,6 @@ function environment(overrides = {}) {
     locked: false,
     selectionMode: 'targeted',
     revealPolicy: 'never',
-    region: 'Greenvale',
     risk: 'safe',
     attemptable: true,
     discoveredTaskCount: 0,
@@ -225,7 +224,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const pips = target.querySelector('[data-gathering-pips]');
     assert.ok(pips, 'info pips render');
     assert.ok(pips.textContent.includes('Forest'), 'biome pip present');
-    assert.ok(pips.textContent.includes('Greenvale'), 'region pip present');
+    // Region is no longer a composition/display axis: the legacy inert
+    // environment.region pip was removed with the gathering-regions unification.
+    assert.ok(!pips.textContent.includes('Greenvale'), 'no legacy region pip');
+    assert.equal(target.querySelector('.gathering-detail-pip i.fa-map-location-dot'), null, 'region pip icon removed');
     // Danger is localized via the Risk.<value> key (not the raw enum); the i18n
     // stub echoes the key, so the localized key path proves the lookup happened.
     assert.ok(pips.textContent.includes('Risk.safe'), 'danger pip uses the localized risk key');

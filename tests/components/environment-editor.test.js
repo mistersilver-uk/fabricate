@@ -109,13 +109,16 @@ describe('environment editor localization', () => {
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
-      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.'],
-      ['Validation.CheckRegion', 'Has a region or is set to "any region"']
+      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.']
     ];
 
     for (const [path, value] of expected) {
       assert.equal(path.split('.').reduce((node, part) => node?.[part], editor), value, `EnvironmentEditor.${path}`);
     }
+
+    // Region is no longer a composition axis; the readiness check and its
+    // localized label were removed with the gathering-regions unification.
+    assert.equal(editor.Validation.CheckRegion, undefined, 'CheckRegion label should be removed');
   });
 
   it('keeps static EnvironmentEditor localization fallbacks aligned with en.json', () => {
@@ -136,8 +139,8 @@ describe('environment editor localization', () => {
 
   it('keeps dynamic EnvironmentEditor validation fallbacks aligned with en.json', () => {
     assert.ok(
-      validationSource.includes('hasRegion: [\'CheckRegion\', \'Has a region or is set to "any region"\']'),
-      'CheckRegion dynamic fallback should match the English catalog'
+      !validationSource.includes('CheckRegion') && !validationSource.includes('hasRegion'),
+      'the region readiness check and its dynamic fallback should be removed'
     );
     for (const snippet of [
       'task: [\'IssueStaleIncludedTask\', \'The task "{name}" no longer matches this environment.\']',

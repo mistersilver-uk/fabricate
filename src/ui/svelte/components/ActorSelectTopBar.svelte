@@ -4,7 +4,7 @@
   unified-window tabs. Its left side is a portrait + caret trigger that opens a
   searchable popover of the user's selectable player characters (reusing the
   IconPicker popover pattern). Its right side carries gathering-only context
-  (current time-of-day + region) and is empty on other tabs.
+  (current weather + time-of-day) and is empty on other tabs.
 
   All selection state lives in the shared `store` (services.actorBar); this
   component only renders it and calls back into it.
@@ -72,7 +72,6 @@
   const timeOfDayId = $derived(store?.conditions?.timeOfDay ?? null);
   const timeOfDayIcon = TIME_OF_DAY_FALLBACK_ICON;
   const timeOfDayLabel = $derived(localize(getTimeOfDayLabelKey(timeOfDayId)));
-  const regionLabel = $derived(store?.region || localize('FABRICATE.App.ActorBar.Region.None'));
 
   // The selected character's stamina pool for the active stamina-mode system,
   // surfaced contextually on the gathering tab. Null in nodes/none mode.
@@ -233,14 +232,6 @@
         <span class="actor-bar-condition actor-bar-time">
           <i class={timeOfDayIcon} aria-hidden="true"></i>
           <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
-        </span>
-        <span class="actor-bar-condition actor-bar-region">
-          <i
-            class="fas fa-map-location-dot"
-            aria-hidden="true"
-            title={localize('FABRICATE.App.ActorBar.Region.Label')}
-          ></i>
-          <span class="actor-bar-condition-label" title={store?.region || ''}>{regionLabel}</span>
         </span>
       {/if}
     </div>

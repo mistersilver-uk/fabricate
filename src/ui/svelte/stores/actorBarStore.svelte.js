@@ -3,7 +3,7 @@
  * selection top bar.
  *
  * The bar lives in the shell (`FabricateAppRoot`) but the gathering tab
- * (`GatheringView`) owns the selected environment whose `region` the bar
+ * (`GatheringView`) owns the selected environment whose stamina pool the bar
  * displays, and a change of selected actor must re-drive the gathering fetch.
  * This bidirectional shell↔tab state flows through a single store instance hung
  * off `services.actorBar` (created once in `_buildServices()`), so neither side
@@ -22,7 +22,6 @@
 export function createActorBarStore({ services } = {}) {
   let selectedActorId = $state('');
   let selectableActors = $state([]);
-  let region = $state('');
   let staminaPool = $state(null);
   let conditions = $state(null);
   let loaded = $state(false);
@@ -79,16 +78,6 @@ export function createActorBarStore({ services } = {}) {
   }
 
   /**
-   * Store the gathering tab's reported region (`''` when no environment is
-   * selected).
-   *
-   * @param {string} next Region string.
-   */
-  function setRegion(next) {
-    region = next ?? '';
-  }
-
-  /**
    * Store the gathering tab's active stamina pool (`{ current, max, … }`) for
    * the header bar, or `null` when the active system is not in stamina mode (or
    * no actor/pool applies).
@@ -113,9 +102,6 @@ export function createActorBarStore({ services } = {}) {
     get selectableActors() {
       return selectableActors;
     },
-    get region() {
-      return region;
-    },
     get staminaPool() {
       return staminaPool;
     },
@@ -130,7 +116,6 @@ export function createActorBarStore({ services } = {}) {
     },
     loadSelectableActors,
     selectActor,
-    setRegion,
     setStaminaPool,
     refreshConditions
   };

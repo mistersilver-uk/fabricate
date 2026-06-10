@@ -205,19 +205,6 @@ describe('GatheringView ↔ actor bar wiring', () => {
     assert.equal(calls.list[1].rememberedActorId, 'a2', 're-fetch uses the new selection');
   });
 
-  it('reports the selected environment region to the store', async () => {
-    const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
-    store.loadSelectableActors();
-    flushSync();
-    const { services } = makeGatheringServices(listing([environment({ id: 'env-r', region: 'Ashfen' })]));
-    services.actorBar = store;
-
-    await mountView(services);
-    await settle();
-
-    assert.equal(store.region, 'Ashfen', 'the selected environment region is reported to the store');
-  });
-
   it('first-load backstop adopts listing.selectedActorId once, only when present in the bar list', async () => {
     const store = makeStore({
       actors: [{ id: 'a1', name: 'Aria', img: null }, { id: 'a2', name: 'Borin', img: null }],

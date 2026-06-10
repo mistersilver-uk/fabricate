@@ -24,7 +24,6 @@
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
     hasDescription: ['CheckDescription', 'Has a description'],
-    hasRegion: ['CheckRegion', 'Has a region or is set to "any region"'],
     hasBiome: ['CheckBiome', 'Has at least one biome'],
     hasDanger: ['CheckDanger', 'Has a danger level'],
     hasCompositionMode: ['CheckCompositionMode', 'Has a composition mode'],
