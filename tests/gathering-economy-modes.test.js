@@ -9,13 +9,19 @@ import { makeRichState, makeFakeActor, environment, DEFAULT_TEST_SYSTEM } from '
 const SYSTEM = 'system-test';
 const HOUR = 3600;
 
+// Build the two-flag economy block from a legacy-style mode string, so the
+// existing per-mode fixtures read clearly while exercising the new shape.
+function economyForMode(mode) {
+  return { stamina: { enabled: mode === 'stamina' }, nodes: { enabled: mode === 'nodes' } };
+}
+
 function staminaConfig(regen = {}) {
   return {
     systems: {
       [SYSTEM]: {
         economy: {
-          mode: 'stamina',
-          stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: 5, ...regen } }
+          stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: 5, ...regen } },
+          nodes: { enabled: false }
         }
       }
     }
@@ -23,29 +29,72 @@ function staminaConfig(regen = {}) {
 }
 
 describe('gathering economy — config normalization', () => {
-  it('defaults a system economy to none/no-regen', () => {
+  it('defaults a system economy to both flags off / no-regen', () => {
     const { service } = makeRichState({ config: { systems: { [SYSTEM]: {} } } });
     const econ = service.systemEconomy(SYSTEM);
-    assert.equal(econ.mode, 'none');
+    assert.equal(econ.stamina.enabled, false);
+    assert.equal(econ.nodes.enabled, false);
+    assert.equal(service.economyMode(SYSTEM), 'none');
     assert.equal(econ.stamina.regen.policy, 'none');
     assert.equal(econ.stamina.regen.unit, 'hours');
   });
 
-  it('rejects an invalid mode and regen unit', () => {
+  it('rejects an invalid legacy mode and regen unit', () => {
     const { service } = makeRichState({
       config: { systems: { [SYSTEM]: { economy: { mode: 'hybrid', stamina: { regen: { policy: 'elapsedTime', unit: 'fortnights', amount: 2 } } } } } }
     });
     const econ = service.systemEconomy(SYSTEM);
-    assert.equal(econ.mode, 'none'); // 'hybrid' is no longer valid
+    // 'hybrid' is not a recognized legacy mode ⇒ neither flag is set.
+    assert.equal(econ.stamina.enabled, false);
+    assert.equal(econ.nodes.enabled, false);
     assert.equal(econ.stamina.regen.unit, 'hours'); // unknown unit falls back
     assert.equal(econ.stamina.regen.amount, '2'); // amount is a number-or-formula string
   });
 
   it('persists a system economy via setSystemEconomy', async () => {
     const { service, settings } = makeRichState({ config: {} });
-    await service.setSystemEconomy({ systemId: SYSTEM, economy: { mode: 'nodes' } });
+    await service.setSystemEconomy({ systemId: SYSTEM, economy: { nodes: { enabled: true } } });
+    assert.equal(service.nodesEnabled(SYSTEM), true);
+    assert.equal(service.staminaEnabled(SYSTEM), false);
     assert.equal(service.economyMode(SYSTEM), 'nodes');
     assert.ok(settings.get(SETTING_KEYS.GATHERING_CONFIG).systems[SYSTEM].economy);
+  });
+
+  describe('read-time legacy mode → flags mapping', () => {
+    function econFor(raw) {
+      return makeRichState({ config: { systems: { [SYSTEM]: { economy: raw } } } }).service.systemEconomy(SYSTEM);
+    }
+
+    it('maps a legacy mode when no flags are present', () => {
+      const stamina = econFor({ mode: 'stamina' });
+      assert.equal(stamina.stamina.enabled, true);
+      assert.equal(stamina.nodes.enabled, false);
+
+      const nodes = econFor({ mode: 'nodes' });
+      assert.equal(nodes.stamina.enabled, false);
+      assert.equal(nodes.nodes.enabled, true);
+
+      const none = econFor({ mode: 'none' });
+      assert.equal(none.stamina.enabled, false);
+      assert.equal(none.nodes.enabled, false);
+
+      const absent = econFor({});
+      assert.equal(absent.stamina.enabled, false);
+      assert.equal(absent.nodes.enabled, false);
+    });
+
+    it('lets present flags win over a stale mode (no resurrection of a disabled limit)', () => {
+      // A stale `mode: 'stamina'` must NOT resurrect stamina when the flag is
+      // explicitly disabled (the key is present and false).
+      const disabled = econFor({ mode: 'stamina', stamina: { enabled: false } });
+      assert.equal(disabled.stamina.enabled, false);
+
+      // Both flags explicitly on with a conflicting stale mode ⇒ both win.
+      const both = econFor({ mode: 'nodes', stamina: { enabled: true }, nodes: { enabled: true } });
+      assert.equal(both.stamina.enabled, true);
+      assert.equal(both.nodes.enabled, true);
+      assert.equal(makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'nodes', stamina: { enabled: true }, nodes: { enabled: true } } } } } }).service.economyMode(SYSTEM), 'both');
+    });
   });
 });
 
@@ -97,7 +146,7 @@ describe('gathering economy — stamina regeneration over world time', () => {
     await noMax.service.setActorStamina(a1, { systemId: SYSTEM, current: 0, max: null, provider: 'external' });
     assert.equal(await noMax.service.regenerateActorStamina({ actor: a1, systemId: SYSTEM, worldTime: 5 * HOUR }), null);
 
-    const nodesMode = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'nodes' } } } } });
+    const nodesMode = makeRichState({ config: { systems: { [SYSTEM]: { economy: economyForMode('nodes') } } } });
     const a2 = makeFakeActor();
     await nodesMode.service.setActorStamina(a2, { systemId: SYSTEM, current: 0, max: 10 });
     await nodesMode.service.regenerateActorStamina({ actor: a2, systemId: SYSTEM, worldTime: 0 });
@@ -109,8 +158,8 @@ describe('gathering economy — stamina regeneration over world time', () => {
       systems: {
         [SYSTEM]: {
           economy: {
-            mode: 'stamina',
-            stamina: { regen: { policy: 'elapsedTime', unit: 'hours', amount: '1 + @abilities.con.mod' } }
+            stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: '1 + @abilities.con.mod' } },
+            nodes: { enabled: false }
           }
         }
       }
@@ -133,7 +182,7 @@ describe('gathering economy — node respawn over world time', () => {
         'task-node': { enabled: true, max, current, depletionTiming: 'onStart', respawn }
       }
     });
-    const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: { mode } } } }]]);
+    const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: economyForMode(mode) } } }]]);
     const queue = [...rolls];
     // Expression seam: when `amounts` is provided, evaluate the dice expression
     // to the next queued amount (deterministic stand-in for Foundry's Roll).
@@ -278,7 +327,7 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
   function libService({ mode = 'nodes', task = LIB_TASK(), nodeRuntime = {}, envs = null, rolls = [] } = {}) {
     const environments = envs || [environment({ id: 'env-1', tasks: [], nodeRuntime })];
     const byId = new Map(environments.map(e => [e.id, e]));
-    const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: { mode }, tasks: [task] } } }]]);
+    const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: economyForMode(mode), tasks: [task] } } }]]);
     const queue = [...rolls];
     const service = new GatheringRichStateService({
       getSetting: key => settings.get(key),
@@ -356,20 +405,82 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
     await service.restockNode({ environmentId: env.id, taskId: 'lib-1', current: 5, max: null });
     assert.equal(env.nodeRuntime['lib-1'].current, 2); // clamped to max
   });
+
+  it('reads max from the library task, not a stale per-environment snapshot (raising node count takes effect)', async () => {
+    // A task configured with 3 nodes, depleted once so the environment persists a
+    // runtime snapshot (which historically froze max=3 and shadowed later edits).
+    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }) });
+    const actor = makeFakeActor();
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 2);
+    assert.equal(env.nodeRuntime['lib-1'].max, 3, 'the persisted snapshot froze the old cap');
+
+    // GM raises the library task's node count to 5. Composition must reflect the
+    // new cap (config is library-sourced) while keeping this environment's own
+    // depleted count (state is per-environment).
+    const raised = LIB_TASK({ nodes: { enabled: true, max: 5, current: 5, depletionTiming: 'onStart', respawn: { policy: 'manual' } } });
+    const composed = service._libraryTaskToRuntimeTask(raised, env);
+    assert.equal(composed.nodes.max, 5, 'max comes from the library source, not the stale snapshot');
+    assert.equal(composed.nodes.current, 2, 'the per-environment depleted count is preserved');
+  });
+
+  it('clamps the stored current down to a lowered library max', async () => {
+    const { service, env, task } = libService({ task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }) });
+    const actor = makeFakeActor();
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 2);
+
+    // Lowering the library cap below the stored count must clamp current to the cap.
+    const lowered = LIB_TASK({ nodes: { enabled: true, max: 1, current: 1, depletionTiming: 'onStart', respawn: { policy: 'manual' } } });
+    const composed = service._libraryTaskToRuntimeTask(lowered, env);
+    assert.equal(composed.nodes.max, 1);
+    assert.equal(composed.nodes.current, 1, 'current cannot exceed the lowered library cap');
+  });
 });
 
-describe('gathering economy — cost modifiers and mode gating', () => {
+describe('gathering economy — cost modifiers and flag gating', () => {
   function costConfig(mode = 'stamina') {
     return {
       systems: {
         [SYSTEM]: {
           characterModifiers: [{ id: 'str', label: 'Str', provider: 'dnd5e', expression: '@abilities.str.mod' }],
-          economy: { mode }
+          economy: economyForMode(mode)
+        }
+      }
+    };
+  }
+  // Both stamina and resource nodes enabled at once (the anti-dogpiling combination).
+  function bothConfig() {
+    return {
+      systems: {
+        [SYSTEM]: {
+          characterModifiers: [{ id: 'str', label: 'Str', provider: 'dnd5e', expression: '@abilities.str.mod' }],
+          economy: { stamina: { enabled: true }, nodes: { enabled: true } }
         }
       }
     };
   }
   const task = (overrides = {}) => ({ id: 'task-1', name: 'Mine', staminaCost: 5, ...overrides });
+
+  // A rich-state service whose environment store persists nodeRuntime writes, so
+  // commitAcceptedAttempt's node-depletion path can be asserted against `env`.
+  function wiredService(config) {
+    const env = environment();
+    const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
+    const service = new GatheringRichStateService({
+      getSetting: key => settings.get(key),
+      setSetting: async (key, value) => { settings.set(key, value); return value; },
+      settingKey: SETTING_KEYS.GATHERING_CONFIG,
+      environmentStore: {
+        get: () => env,
+        list: () => [env],
+        update: async (id, patch) => { Object.assign(env, patch); return env; }
+      },
+      evaluateExpression: async () => 0,
+      hooks: { callAll: () => {} }
+    });
+    return { service, env };
+  }
 
   it('reduces the effective stamina cost by a character modifier, floored at 0', async () => {
     const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 3 });
@@ -405,7 +516,7 @@ describe('gathering economy — cost modifiers and mode gating', () => {
     assert.equal(await service.listingStaminaCost({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: task({ staminaCost: 0 }) }), null);
   });
 
-  it('blocks on insufficient stamina only in stamina mode, and the gate equals the spend', async () => {
+  it('blocks on insufficient stamina only when stamina is enabled, and the gate equals the spend', async () => {
     const { service } = makeRichState({ config: costConfig('stamina'), evaluateExpression: () => 0 });
     const env = environment();
     const actor = makeFakeActor();
@@ -423,7 +534,7 @@ describe('gathering economy — cost modifiers and mode gating', () => {
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 3);
   });
 
-  it('does not gate or spend stamina when the system mode is none', async () => {
+  it('does not gate or spend stamina when both limitation flags are off', async () => {
     const { service } = makeRichState({ config: costConfig('none') });
     const env = environment();
     const actor = makeFakeActor();
@@ -433,6 +544,100 @@ describe('gathering economy — cost modifiers and mode gating', () => {
     assert.equal(result.evidence.stamina, null);
     await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: task(), outcome: { status: 'succeeded' } });
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 1); // untouched
+  });
+
+  // The node + stamina task fixture used by the flag-isolation cases below.
+  const nodeStaminaTask = (overrides = {}) => task({
+    staminaCost: 5,
+    nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'manual' } },
+    ...overrides
+  });
+
+  it('stamina-only: a node-carrying task never decrements the node pool when nodes are off', async () => {
+    const { service, env } = wiredService(costConfig('stamina'));
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 10, max: 10 });
+
+    const evidence = await service.commitAcceptedAttempt({
+      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+    });
+    // Stamina spent, node pool untouched (no nodeRuntime write).
+    assert.equal(evidence.stamina.spent, 5);
+    assert.equal(evidence.node, null);
+    assert.equal(env.nodeRuntime?.['task-1'], undefined);
+  });
+
+  it('nodes-only: getActorStamina is untouched even when the task carries a staminaCost', async () => {
+    const { service, env } = wiredService(costConfig('nodes'));
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 7, max: 10 });
+
+    const evidence = await service.commitAcceptedAttempt({
+      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+    });
+    // Node depleted, stamina untouched.
+    assert.equal(evidence.node.remaining, 2);
+    assert.equal(evidence.stamina, null);
+    assert.equal(service.getActorStamina(actor, SYSTEM).current, 7);
+  });
+
+  it('both enabled: both start gates fire, and one accepted attempt depletes the node AND spends stamina', async () => {
+    const { service, env } = wiredService(bothConfig());
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 10, max: 10 });
+
+    // Both gates evaluate: a depleted node blocks AND stamina evidence is populated.
+    const depletedGate = await service.evaluateStart({
+      actor, system: { id: SYSTEM }, environment: env,
+      task: nodeStaminaTask({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } })
+    });
+    assert.equal(depletedGate.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
+    assert.ok(depletedGate.evidence.stamina, 'stamina evidence is populated under both');
+
+    // An accepted attempt against an available node both decrements it and spends stamina (anti-dogpiling).
+    const evidence = await service.commitAcceptedAttempt({
+      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+    });
+    assert.equal(env.nodeRuntime['task-1'].current, 2, 'node pool decremented by one');
+    assert.equal(evidence.node.remaining, 2);
+    assert.equal(evidence.stamina.spent, 5);
+    assert.equal(service.getActorStamina(actor, SYSTEM).current, 5, 'stamina spent by exactly the cost');
+  });
+
+  it('both enabled: a depleted node AND insufficient stamina raise both block codes at once', async () => {
+    const { service, env } = wiredService(bothConfig());
+    const actor = makeFakeActor();
+    // Stamina below the task cost (5) and the node pool empty: both gates must block.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 2, max: 10 });
+
+    const gate = await service.evaluateStart({
+      actor, system: { id: SYSTEM }, environment: env,
+      task: nodeStaminaTask({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } })
+    });
+    assert.equal(gate.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true, 'node gate blocks');
+    assert.equal(gate.blockedReasons.some(r => r.code === 'STAMINA_BLOCKED'), true, 'stamina gate blocks');
+  });
+
+  it('both off: neither gate fires and both pieces of evidence are null', async () => {
+    const { service, env } = wiredService(costConfig('none'));
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 10, max: 10 });
+
+    const gate = await service.evaluateStart({
+      actor, system: { id: SYSTEM }, environment: env,
+      task: nodeStaminaTask({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } })
+    });
+    assert.equal(gate.blockedReasons.length, 0);
+    assert.equal(gate.evidence.stamina, null);
+    assert.equal(gate.evidence.nodes, null);
+
+    const evidence = await service.commitAcceptedAttempt({
+      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+    });
+    assert.equal(evidence.node, null);
+    assert.equal(evidence.stamina, null);
+    assert.equal(env.nodeRuntime?.['task-1'], undefined);
+    assert.equal(service.getActorStamina(actor, SYSTEM).current, 10);
   });
 
   it('blocks a depleted node for players and GMs alike (GMs are subject to the economy)', async () => {
@@ -508,16 +713,16 @@ describe('gathering economy — processWorldTime drives regen under the primary-
 
 describe('gathering economy — expression-based max/start (seed once per character)', () => {
   it('normalizes max and start as expression strings (empty by default)', () => {
-    const set = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: 12, start: '@abilities.con.mod' } } } } } });
+    const set = makeRichState({ config: { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: 12, start: '@abilities.con.mod' } } } } } });
     assert.equal(set.service.systemEconomy(SYSTEM).stamina.max, '12'); // numbers stringify
     assert.equal(set.service.systemEconomy(SYSTEM).stamina.start, '@abilities.con.mod');
-    const unset = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina' } } } } });
+    const unset = makeRichState({ config: { systems: { [SYSTEM]: { economy: { stamina: { enabled: true } } } } } });
     assert.equal(unset.service.systemEconomy(SYSTEM).stamina.max, '');
     assert.equal(unset.service.systemEconomy(SYSTEM).stamina.start, '');
   });
 
   it('seeds a character pool by rolling max & start once; blank start starts full', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '4 * @abilities.con.mod' } } } } };
+    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '4 * @abilities.con.mod' } } } } };
     let rolls = 0;
     const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? (++rolls, 16) : null) });
     const actor = makeFakeActor();
@@ -540,7 +745,7 @@ describe('gathering economy — expression-based max/start (seed once per charac
   });
 
   it('starts at the rolled starting value when one is configured, and force re-rolls', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '20', start: '@abilities.con.mod' } } } } };
+    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '20', start: '@abilities.con.mod' } } } } };
     const seq = { staminaMax: [20, 30], staminaStart: [7, 9] };
     const { service } = makeRichState({ config, evaluateExpression: (p) => seq[p.kind].shift() });
     const actor = makeFakeActor();
@@ -553,14 +758,14 @@ describe('gathering economy — expression-based max/start (seed once per charac
   });
 
   it('does not seed when the max expression is blank (stamina then unenforced)', async () => {
-    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina' } } } } });
+    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { stamina: { enabled: true } } } } } });
     const actor = makeFakeActor();
     assert.equal(await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }), null);
     assert.equal(service.getActorStamina(actor, SYSTEM).max, null);
   });
 
   it('regenerates up to the rolled max once the pool is seeded', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '20', start: '12', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '20', start: '12', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
     const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? 20 : p.kind === 'staminaStart' ? 12 : 5) });
     const actor = makeFakeActor();
     await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }); // current 12 / max 20
@@ -574,7 +779,7 @@ describe('gathering economy — expression-based max/start (seed once per charac
 
 describe('gathering economy — per-character max override', () => {
   it('layers an override over the rolled max and falls back when cleared', async () => {
-    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '20' } } } } } });
+    const { service } = makeRichState({ config: { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '20' } } } } } });
     const actor = makeFakeActor();
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 18, max: 20 }); // rolled pool
 
@@ -594,7 +799,7 @@ describe('gathering economy — per-character max override', () => {
   });
 
   it('regenerates up to the override, and a force reroll clears it', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { max: '50', start: '50', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '50', start: '50', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
     const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? 50 : p.kind === 'staminaStart' ? 50 : 5) });
     const actor = makeFakeActor();
     await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }); // 50/50

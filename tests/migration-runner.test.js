@@ -282,7 +282,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '0.7.0');
+  assert.equal(versionCall.value, '0.8.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall?.value, '0.7.0');
+  assert.equal(versionCall?.value, '0.8.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -458,9 +458,13 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   assert.equal(envs[0].tasks[0].staminaCost, 2); // unrelated fields preserved
 
   const config = settings.store.get('gatheringConfig');
-  assert.equal(config.systems['sys-1'].economy.mode, 'nodes');
+  // 0.3.0 seeds economy.mode = 'nodes'; the full run then applies 0.8.0, which
+  // rewrites that legacy mode into the two independent flags and drops `mode`.
+  assert.equal('mode' in config.systems['sys-1'].economy, false);
+  assert.equal(config.systems['sys-1'].economy.stamina.enabled, false);
+  assert.equal(config.systems['sys-1'].economy.nodes.enabled, true);
 
-  assert.equal(settings.store.get('migrationVersion'), '0.7.0');
+  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
 });
 
 test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
@@ -489,7 +493,7 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
   assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
-  assert.equal(settings.store.get('migrationVersion'), '0.7.0');
+  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
@@ -506,13 +510,104 @@ test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
 
   await runner.run();
   const config = settings.store.get('gatheringConfig');
-  assert.equal(config.systems['sys-h'].economy.mode, 'stamina'); // hybrid -> stamina
-  // time -> none: economy is only seeded when a non-default mode must be kept.
-  assert.equal(config.systems['sys-t'].economy?.mode ?? 'none', 'none');
+  // 0.3.0 maps hybrid -> stamina mode; 0.8.0 then rewrites that to flags.
+  assert.equal('mode' in config.systems['sys-h'].economy, false);
+  assert.equal(config.systems['sys-h'].economy.stamina.enabled, true);
+  assert.equal(config.systems['sys-h'].economy.nodes.enabled, false);
+  // time -> none: economy is only seeded when a non-default mode must be kept,
+  // so sys-t has no economy block at all (0.8.0 leaves the absent block alone).
+  assert.equal(config.systems['sys-t'].economy?.stamina?.enabled ?? false, false);
+  assert.equal(config.systems['sys-t'].economy?.nodes?.enabled ?? false, false);
 
   // Re-running over already-migrated data changes nothing further.
   const before = JSON.stringify(settings.store.get('gatheringEnvironments'));
   settings.store.set('migrationVersion', '0.2.0');
   await runner.run();
   assert.equal(JSON.stringify(settings.store.get('gatheringEnvironments')), before);
+});
+
+// ---------------------------------------------------------------------------
+// Group: 0.8.0 — independent stamina + resource-node limitation toggles
+// ---------------------------------------------------------------------------
+
+test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.7.0',
+      gatheringConfig: {
+        systems: {
+          'sys-stamina': { economy: { mode: 'stamina', stamina: { max: '40', regen: { policy: 'none' } } } },
+          'sys-nodes': { economy: { mode: 'nodes' } },
+          'sys-none': { economy: { mode: 'none' } }
+        }
+      }
+    }
+  });
+
+  await runner.run();
+
+  const systems = settings.store.get('gatheringConfig').systems;
+
+  // stamina mode -> stamina.enabled true, nodes.enabled false, `mode` dropped.
+  assert.equal('mode' in systems['sys-stamina'].economy, false);
+  assert.equal(systems['sys-stamina'].economy.stamina.enabled, true);
+  assert.equal(systems['sys-stamina'].economy.nodes.enabled, false);
+  // Existing stamina config is preserved verbatim alongside the flag.
+  assert.equal(systems['sys-stamina'].economy.stamina.max, '40');
+
+  // nodes mode -> nodes.enabled true, stamina.enabled false.
+  assert.equal('mode' in systems['sys-nodes'].economy, false);
+  assert.equal(systems['sys-nodes'].economy.stamina.enabled, false);
+  assert.equal(systems['sys-nodes'].economy.nodes.enabled, true);
+
+  // none -> both false.
+  assert.equal('mode' in systems['sys-none'].economy, false);
+  assert.equal(systems['sys-none'].economy.stamina.enabled, false);
+  assert.equal(systems['sys-none'].economy.nodes.enabled, false);
+
+  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
+});
+
+test('0.8.0 is idempotent and leaves already-migrated economies untouched', async () => {
+  const alreadyMigrated = {
+    systems: {
+      'sys-1': { economy: { stamina: { enabled: true, max: '30' }, nodes: { enabled: false } } }
+    }
+  };
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.7.0',
+      gatheringConfig: JSON.parse(JSON.stringify(alreadyMigrated))
+    }
+  });
+
+  await runner.run();
+
+  // No `mode` to rewrite ⇒ economy passes through unchanged; gatheringConfig
+  // should not be re-persisted.
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('gatheringConfig'), 'unchanged config should not be re-persisted');
+  assert.deepEqual(settings.store.get('gatheringConfig'), alreadyMigrated);
+});
+
+test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', async () => {
+  // 0.3.0 maps the legacy env-level economyMode into economy.mode; 0.8.0 then
+  // rewrites that mode into the flags. The two economy migrations compose.
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.2.0',
+      gatheringConfig: { systems: { 'sys-1': { tasks: [] } } },
+      gatheringEnvironments: [{
+        id: 'env-1', craftingSystemId: 'sys-1', economyMode: 'stamina', tasks: []
+      }]
+    }
+  });
+
+  await runner.run();
+
+  const economy = settings.store.get('gatheringConfig').systems['sys-1'].economy;
+  assert.equal('mode' in economy, false, '0.8.0 drops the mode 0.3.0 seeded');
+  assert.equal(economy.stamina.enabled, true);
+  assert.equal(economy.nodes.enabled, false);
+  assert.equal(settings.store.get('migrationVersion'), '0.8.0');
 });

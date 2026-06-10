@@ -5118,10 +5118,18 @@
   font-size: 0.72rem;
 }
 
-/* The "no image set" placeholder (fa-image) sits large and centered in the box;
-   it shares the picker's flex centering, so it must NOT be absolutely positioned
-   (that was the source of the bottom-right overlap with the pen badge). */
+/* The "no image set" placeholder (fa-image) sits large and centered in the box.
+   It centers itself with an absolute, full-box flex layer (inset:0 + center)
+   rather than inheriting the button's flex centering — Foundry's global `button`
+   styles can override the picker's own `display`/`justify-content`, which left
+   the glyph stranded in the corner. The layer is transparent and centers only
+   the glyph, so the bottom-right pen/lock badge still shows on top of it. */
 .fabricate-manager .manager-task-image-picker .fa-image {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.8rem;
   color: var(--fab-mv2-text-muted);
 }

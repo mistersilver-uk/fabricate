@@ -617,13 +617,15 @@ GatheringNodeConfig = {
 17. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
 18. Player-facing UI should show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
 19. A per-environment node runtime entry persists only STATE — the current count, a GM-overridable `max`, and the respawn timers (anchor/roll). The respawn CONFIG (policy, gain mode, interval, depletion timing) is sourced from the current library task at evaluation time and is never frozen at first depletion, so editing a task's respawn config takes effect in every environment, including pools already depleted to zero.
+20. All resource-node mechanics (availability gating, depletion, and respawn) apply only when the owning crafting system's economy `nodes.enabled` flag is set (see "Gathering Economy and Stamina"). When `nodes.enabled` is false, per-task node configuration is inert and node pools are neither enforced nor respawned, regardless of per-task `nodes` data. The per-task node mechanics above are otherwise unchanged.
 
 ## Gathering Attempt Limits (removed)
 
 > Removed by the gathering-attempt-limitation change. The per-scope attempt-count
 > limiter (`GatheringAttemptLimitConfig`, `task.attemptLimit`, and its recharge)
 > was scaffolded but never enforced and has been deleted. Pacing is provided by
-> the per-system economy mode (`stamina` / `nodes`) instead. The original
+> the per-system economy limitation toggles (`stamina.enabled` / `nodes.enabled`)
+> instead. The original
 > requirements are retained below for historical context only and are no longer
 > normative.
 
@@ -661,52 +663,60 @@ GatheringAttemptLimitConfig = {
 
 ### Purpose
 
-Allow crafting systems with gathering enabled to select the primary pacing economy and optionally use actor-scoped stamina.
+Allow crafting systems with gathering enabled to independently toggle two pacing limitations — actor-scoped stamina and finite resource nodes — and to optionally combine them.
 
 ### Properties
 
 ```js
 // Stored per crafting system at gatheringConfig.systems[systemId].economy.
+// Two independent boolean toggles select the limitation models; there is no
+// single mutually-exclusive `mode` field.
 GatheringEconomyConfig = {
-  mode: "none" | "stamina" | "nodes",
   stamina: {
+    enabled: boolean,                   // actor stamina limitation toggle
+    max: string,                        // expression template (number or formula), blank ⇒ start full at max
+    start: string,                      // expression template; blank ⇒ start at max
     regen: {
       policy: "none" | "elapsedTime",
       unit: "minutes" | "hours" | "days" | "weeks", // day/week lengths are calendar-derived at runtime
-      amount: number | null,            // fixed amount per unit
-      formula: string,                  // provider expression; wins over amount when set
-      characterModifiers: ModifierReference[],
-      lastRoll: object | null,
+      amount: string,                   // expression: plain number or character-referencing formula, per unit
+      lastRoll: object | null,          // persisted evaluated regen roll
     },
+  },
+  nodes: {
+    enabled: boolean,                   // resource-node limitation toggle
   },
 }
 ```
 
 ### Requirements
 
-1. The gathering limitation mode is selected per crafting system and is one of `none`, `stamina`, or `nodes`.
-2. `none` applies no limitation (legacy behaviour); timed attempts via `timeRequirement` remain available in every mode and are orthogonal to the limitation mode.
-3. `nodes` uses task availability/depletion/respawn as the limitation model; node enforcement applies only in this mode.
-4. `stamina` uses actor stamina spend/regeneration as the limitation model; stamina enforcement applies only in this mode.
+1. The stamina and resource-node limitations are each toggled independently per crafting system via `stamina.enabled` and `nodes.enabled`; there is no single mutually-exclusive limitation mode.
+2. When neither toggle is enabled, no limitation applies (legacy behaviour); timed attempts via `timeRequirement` remain available regardless of either toggle and are orthogonal to the limitation toggles.
+3. Task availability/depletion/respawn is the resource-node limitation model; node enforcement applies only when `nodes.enabled` is set.
+4. Actor stamina spend/regeneration is the stamina limitation model; stamina enforcement applies only when `stamina.enabled` is set.
 5. A task's stamina cost may be adjusted per actor by character-modifier references resolved against the per-system character modifier library, floored at zero.
-6. The selected economy mode controls which GM authoring controls are primary, secondary, or hidden.
-7. Existing gathering systems without an economy mode behave as `none`; a 0.3.0 migration removes the legacy per-environment `economyMode` field and the unused per-task `attemptLimit`, mapping a non-`time` legacy value onto the system mode (`hybrid → stamina`).
-8. Gathering stamina is optional and actor-scoped.
-9. When stamina is enabled, a gathering task may define a stamina cost.
-10. A start attempt is blocked if the selected actor lacks the required stamina and no GM override is used.
-11. Stamina spend occurs only after start guards pass.
-12. Stamina spend, refund, and rollback semantics must be explicit in implementation design before production code changes.
-13. A crafting system lets the GM choose whether stamina regenerates over time, regenerates from explicit rest/provider events, is manual-only, or uses a hybrid of manual and automatic regeneration.
-14. Manual-only stamina means stamina changes only through explicit GM adjustment, approved API calls, or provider events configured by the GM.
-15. Automatic elapsed-time regeneration defines an interval and amount, or a provider expression/macro that calculates amount from actor and world-time context.
-15a. The regeneration interval `unit` of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) so it tracks custom (non-24h-day / non-7-day-week) calendars; `minutes` (60s) and `hours` (3600s) are fixed. With no calendar configured the lengths fall back to 86400s (day) and 604800s (week), reproducing the pre-calendar behaviour. The interval length is resolved per evaluation so a mid-session calendar change is honoured.
-16. Rest/provider-event regeneration identifies the provider event or hook contract that grants stamina.
-17. GMs can manually set current stamina for an actor when they have permission to manage that actor's gathering state.
-18. GMs should be able to manually set or override maximum stamina when the selected stamina provider is Fabricate-owned. External provider maximums may be read-only.
-19. System-specific stamina formulas are provider-driven or configured; Fabricate core does not hardcode system-specific resource paths.
-20. Actor stamina state may be stored in Fabricate actor flags when no external provider owns stamina.
-21. Actor stamina display includes current and maximum values when known.
-22. Stamina history should record enough evidence for players and GMs to understand spend, manual adjustment, and regeneration events.
+6. The two toggles independently show or hide their own GM authoring sub-blocks: the stamina sub-config renders when `stamina.enabled`, and the resource-node note/config renders when `nodes.enabled`; both sub-blocks render simultaneously when both toggles are on, and neither renders when both are off. No single "selected mode" decides which controls are primary or hidden.
+7. When both toggles are enabled, both limitations apply simultaneously: at start both gates are evaluated, and one accepted attempt both depletes the node pool and spends the actor's stamina (in that order). This is the anti-dogpiling combination — finite resource nodes cap total pulls regardless of how much collective stamina the party has, until the nodes respawn over world time.
+8. Read-time legacy compatibility: an economy block that still carries a legacy `mode` string maps it to the toggles ONLY when neither the `stamina.enabled` nor the `nodes.enabled` KEY is present (`stamina → stamina.enabled`, `nodes → nodes.enabled`, `none`/absent → both false). When either flag key is present it wins over `mode`, so a stale `mode` can never resurrect a toggle that has been explicitly disabled. This keeps an un-migrated world behaving identically on every read.
+9. A back-compat accessor (`economyMode`) derives a string from the two toggles for external/API consumers and may return `'both'` (both enabled), `'stamina'`, `'nodes'`, or `'none'`; no internal enforcement relies on it.
+10. Migration history: a 0.3.0 migration removed the legacy per-environment `economyMode` field and the unused per-task `attemptLimit`, mapping a non-`time` legacy value onto a system-level `mode` (`hybrid → stamina`). A 0.8.0 migration then rewrites that legacy `mode` into the two toggles (`stamina.enabled = mode === 'stamina'`, `nodes.enabled = mode === 'nodes'`) and drops `mode`; it is pure, idempotent, and leaves already-toggle-shaped economies untouched. Existing gathering systems without either toggle behave as no-limit.
+11. Gathering stamina is optional and actor-scoped.
+12. When stamina is enabled, a gathering task may define a stamina cost.
+13. A start attempt is blocked if the selected actor lacks the required stamina and no GM override is used.
+14. Stamina spend occurs only after start guards pass.
+15. Stamina spend, refund, and rollback semantics must be explicit in implementation design before production code changes.
+16. A crafting system lets the GM choose whether stamina regenerates over time, regenerates from explicit rest/provider events, is manual-only, or uses a hybrid of manual and automatic regeneration.
+17. Manual-only stamina means stamina changes only through explicit GM adjustment, approved API calls, or provider events configured by the GM.
+18. Automatic elapsed-time regeneration defines an interval and amount, or a provider expression/macro that calculates amount from actor and world-time context.
+18a. The regeneration interval `unit` of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) so it tracks custom (non-24h-day / non-7-day-week) calendars; `minutes` (60s) and `hours` (3600s) are fixed. With no calendar configured the lengths fall back to 86400s (day) and 604800s (week), reproducing the pre-calendar behaviour. The interval length is resolved per evaluation so a mid-session calendar change is honoured.
+19. Rest/provider-event regeneration identifies the provider event or hook contract that grants stamina.
+20. GMs can manually set current stamina for an actor when they have permission to manage that actor's gathering state.
+21. GMs should be able to manually set or override maximum stamina when the selected stamina provider is Fabricate-owned. External provider maximums may be read-only.
+22. System-specific stamina formulas are provider-driven or configured; Fabricate core does not hardcode system-specific resource paths.
+23. Actor stamina state may be stored in Fabricate actor flags when no external provider owns stamina.
+24. Actor stamina display includes current and maximum values when known.
+25. Stamina history should record enough evidence for players and GMs to understand spend, manual adjustment, and regeneration events.
 
 ## Gathering Risk and Encounters
 

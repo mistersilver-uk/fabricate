@@ -65,13 +65,15 @@
   const composedTaskCount = $derived(Number(env?.composedTaskCount ?? 0));
   const blindAttemptable = $derived(env?.attemptable === true);
 
-  // System limitation mode + (stamina mode) the actor's pool, surfaced as a
-  // strip beneath the header. `none` shows nothing; blind environments keep the
-  // node legend generic (per-task counts are redacted in the rows themselves).
-  const economyMode = $derived(String(env?.economyMode ?? 'none'));
+  // System limitation flags + (when stamina enabled) the actor's pool, surfaced
+  // as a strip beneath the header. Both flags off shows nothing; both on shows
+  // both items. Blind environments keep the node legend generic (per-task counts
+  // are redacted in the rows themselves).
+  const staminaEnabled = $derived(env?.staminaEnabled === true);
+  const nodesEnabled = $derived(env?.nodesEnabled === true);
   const staminaPool = $derived(env?.staminaPool ?? null);
   const hasStaminaPool = $derived(
-    economyMode === 'stamina' && staminaPool && staminaPool.current != null && staminaPool.max != null
+    staminaEnabled && staminaPool && staminaPool.current != null && staminaPool.max != null
   );
 
   const biomeTags = $derived(Array.isArray(env?.biomeTags) ? env.biomeTags : []);
@@ -236,9 +238,9 @@
       </p>
     </header>
 
-    {#if economyMode === 'stamina' || economyMode === 'nodes'}
-      <section class="gathering-detail-economy" data-gathering-economy-strip data-economy-mode={economyMode}>
-        {#if economyMode === 'stamina'}
+    {#if staminaEnabled || nodesEnabled}
+      <section class="gathering-detail-economy" data-gathering-economy-strip data-economy-mode={env?.economyMode ?? 'none'}>
+        {#if staminaEnabled}
           <span class="gathering-detail-economy-item">
             <i class="fas fa-bolt" aria-hidden="true"></i>
             {#if hasStaminaPool}
@@ -247,7 +249,8 @@
               <span data-gathering-stamina-pool="none">{localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone')}</span>
             {/if}
           </span>
-        {:else}
+        {/if}
+        {#if nodesEnabled}
           <span class="gathering-detail-economy-item">
             <i class="fas fa-mountain" aria-hidden="true"></i>
             <span>{localize('FABRICATE.App.Gathering.Detail.NodesLegend')}</span>

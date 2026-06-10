@@ -17,42 +17,54 @@ const rootSource = readFileSync(rootPath, 'utf8');
 const cssSource = readFileSync(cssPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-describe('Gathering task editor — economy sections are mode-gated and carded', () => {
-  it('accepts an economyMode prop (default none)', () => {
-    assert.match(editorSource, /economyMode\s*=\s*'none'/, 'editor should declare an economyMode prop defaulting to none');
+describe('Gathering task editor — economy sections are flag-gated and carded', () => {
+  it('accepts independent staminaEnabled / nodesEnabled props (default false)', () => {
+    assert.match(editorSource, /staminaEnabled\s*=\s*false/, 'editor should declare a staminaEnabled prop defaulting to false');
+    assert.match(editorSource, /nodesEnabled\s*=\s*false/, 'editor should declare a nodesEnabled prop defaulting to false');
+    // The single mode prop is gone.
+    assert.ok(!/economyMode\s*=\s*'none'/.test(editorSource), 'the old economyMode prop is removed');
   });
 
-  it('shows the stamina cost card only in stamina mode', () => {
-    const guardIdx = editorSource.indexOf("{#if economyMode === 'stamina'}");
+  it('shows the stamina cost card only when stamina is enabled', () => {
+    const guardIdx = editorSource.indexOf('{#if staminaEnabled}');
     const staminaIdx = editorSource.indexOf('data-gathering-task-stamina');
-    assert.ok(guardIdx >= 0, 'stamina section should be guarded by economyMode === stamina');
-    assert.ok(staminaIdx > guardIdx, 'the stamina card should render inside the stamina-mode guard');
+    assert.ok(guardIdx >= 0, 'stamina section should be guarded by staminaEnabled');
+    assert.ok(staminaIdx > guardIdx, 'the stamina card should render inside the staminaEnabled guard');
   });
 
-  it('shows the resource node card only in nodes mode', () => {
-    const guardIdx = editorSource.indexOf("{#if economyMode === 'nodes'}");
+  it('shows the resource node card only when nodes are enabled', () => {
+    const guardIdx = editorSource.indexOf('{#if nodesEnabled}');
     const nodesIdx = editorSource.indexOf('data-gathering-task-nodes');
-    assert.ok(guardIdx >= 0, 'node section should be guarded by economyMode === nodes');
-    assert.ok(nodesIdx > guardIdx, 'the node card should render inside the nodes-mode guard');
+    assert.ok(guardIdx >= 0, 'node section should be guarded by nodesEnabled');
+    assert.ok(nodesIdx > guardIdx, 'the node card should render inside the nodesEnabled guard');
   });
 
-  it('shows a guidance hint in the node area when NOT in nodes mode (the {:else} branch)', () => {
-    // The hint lives in the `{:else}` of the nodes guard, so it renders for any
-    // non-nodes economy (stamina/none) explaining how to enable canvas depletion.
-    const guardIdx = editorSource.indexOf("{#if economyMode === 'nodes'}");
-    const elseIdx = editorSource.indexOf('{:else}', guardIdx);
+  it('renders both economy cards independently (both guards present, no shared else)', () => {
+    // The two cards are gated by two independent {#if} blocks, so both render
+    // when both flags are on (the anti-dogpiling combination). The stamina guard
+    // is NOT chained to the nodes guard.
+    const staminaGuard = editorSource.indexOf('{#if staminaEnabled}');
+    const nodesGuard = editorSource.indexOf('{#if nodesEnabled}');
+    assert.ok(staminaGuard >= 0 && nodesGuard >= 0, 'both flag guards exist');
+    assert.ok(staminaGuard < nodesGuard, 'the stamina guard precedes the nodes guard');
+  });
+
+  it('shows the guidance hint in the {:else} of the nodes guard (nodes disabled)', () => {
+    // The hint now lives in the {:else} of the nodesEnabled guard, so it renders
+    // whenever resource nodes are off — independent of the stamina toggle.
+    const guardIdx = editorSource.indexOf('{#if nodesEnabled}');
+    const elseIdx = editorSource.indexOf('{:else}\n    <section class="manager-task-nodes-card manager-task-nodes-hint-card"', guardIdx);
     const hintIdx = editorSource.indexOf('data-gathering-task-nodes-hint');
-    assert.ok(elseIdx > guardIdx, 'the nodes guard has an else branch');
-    assert.ok(hintIdx > elseIdx, 'the guidance hint renders inside the else (non-nodes) branch');
-    // It is wired to the dedicated economy hint key.
-    assert.match(editorSource, /FABRICATE\.Admin\.Manager\.Economy\.TaskNodesEconomyHint/, 'the hint uses the economy-mode guidance key');
+    assert.ok(elseIdx > guardIdx, 'the nodes guard has an else branch carrying the hint');
+    assert.ok(hintIdx > elseIdx, 'the guidance hint renders inside the else (nodes-disabled) branch');
+    assert.match(editorSource, /FABRICATE\.Admin\.Manager\.Economy\.TaskNodesEconomyHint/, 'the hint uses the dedicated guidance key');
   });
 
-  it('adds the non-nodes economy guidance hint i18n key (mentions the nodes economy)', () => {
+  it('the node-guidance hint i18n key drops "mode" and names the Resource nodes toggle', () => {
     const hint = lang.FABRICATE.Admin.Manager.Economy.TaskNodesEconomyHint;
     assert.ok(typeof hint === 'string' && hint.length > 0, 'the guidance key exists');
-    assert.match(hint, /nodes/i, 'the hint explains the nodes economy requirement');
-    assert.match(hint, /economy/i, 'the hint points at the gathering economy setting');
+    assert.match(hint, /resource nodes/i, 'the hint names the resource-nodes toggle');
+    assert.ok(!/\bmode\b/i.test(hint), 'the hint no longer mentions a limitation "mode"');
   });
 
   it('exposes the full node-config controls (count, depletion, respawn, interval, gain mode, chance, amount)', () => {
@@ -98,9 +110,11 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     );
   });
 
-  it('wires the economy mode from the parent', () => {
-    assert.match(rootSource, /selectedGatheringTaskEconomyMode\s*=\s*\$derived\(selectedGatheringSystemConfig\.economy\?\.mode/, 'parent derives the mode from the system economy block');
-    assert.match(rootSource, /economyMode=\{selectedGatheringTaskEconomyMode\}/, 'parent passes economyMode to the task editor');
+  it('wires the two economy flags from the parent', () => {
+    assert.match(rootSource, /selectedGatheringTaskStaminaEnabled\s*=\s*\$derived/, 'parent derives stamina-enabled from the system economy block');
+    assert.match(rootSource, /selectedGatheringTaskNodesEnabled\s*=\s*\$derived/, 'parent derives nodes-enabled from the system economy block');
+    assert.match(rootSource, /staminaEnabled=\{selectedGatheringTaskStaminaEnabled\}/, 'parent passes staminaEnabled to the task editor');
+    assert.match(rootSource, /nodesEnabled=\{selectedGatheringTaskNodesEnabled\}/, 'parent passes nodesEnabled to the task editor');
   });
 
   it('authors depletedBehavior with a FilePicker swap-image (swap is the only behavior; no delete, no postfix)', () => {
@@ -169,8 +183,11 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
       'the picker always renders the fa-pen edit affordance'
     );
 
-    // Shared CSS: the pen (and the scene-locked variant) is the absolutely-positioned
-    // corner badge; the placeholder is centered+large and NOT absolutely positioned.
+    // Shared CSS: the pen (and the scene-locked variant) is pinned to the
+    // bottom-right corner; the placeholder centers itself with a full-box absolute
+    // flex layer (inset:0 + center) so it stays centered even when Foundry's global
+    // button styles override the picker's own flex — without that, the glyph drifts
+    // into the corner and overlaps the pen.
     assert.match(
       cssSource,
       /\.manager-task-image-picker \.fa-pen[\s\S]*?position:\s*absolute[\s\S]*?bottom:\s*5px/,
@@ -178,10 +195,10 @@ describe('Gathering task editor — economy sections are mode-gated and carded',
     );
     const placeholderRule = cssSource.slice(cssSource.indexOf('.manager-task-image-picker .fa-image'));
     const placeholderBlock = placeholderRule.slice(0, placeholderRule.indexOf('}'));
-    assert.ok(
-      !placeholderBlock.includes('position: absolute'),
-      'the fa-image placeholder is centered (shares picker flex centering), not absolutely positioned'
-    );
+    assert.match(placeholderBlock, /position:\s*absolute/, 'the placeholder uses an absolute layer so its centering is independent of the button display');
+    assert.match(placeholderBlock, /inset:\s*0/, 'the absolute layer fills the whole box (so margin/flex centering is box-relative, not corner-pinned)');
+    assert.match(placeholderBlock, /justify-content:\s*center/, 'the placeholder glyph is centered horizontally');
+    assert.ok(!placeholderBlock.includes('bottom: 5px'), 'the placeholder is NOT corner-pinned like the pen badge (no overlap)');
     assert.match(placeholderBlock, /font-size:\s*1\.8rem/, 'the placeholder icon is larger than the corner badge');
   });
 

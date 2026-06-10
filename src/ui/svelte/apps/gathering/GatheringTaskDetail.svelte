@@ -54,8 +54,9 @@
   };
 
   // Economy summary shown above the Attempt button: the per-task stamina cost
-  // against the actor's pool, or the remaining node count. Present only when the
-  // active system runs that mode (the runtime supplies task.rich.{stamina,nodes}).
+  // against the actor's pool, and/or the remaining node count. Each is present
+  // only when the active system enables that limitation (the runtime supplies
+  // task.rich.{stamina,nodes}); both appear when both flags are on.
   const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
   const staminaState = $derived(task?.rich?.stamina?.state ?? null);
   const richNodes = $derived(task?.rich?.nodes ?? null);

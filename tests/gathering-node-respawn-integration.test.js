@@ -164,18 +164,21 @@ describe('node respawn over world time — real store integration (reproduction)
     assert.equal(after.respawn.policy, 'overTime', 'and self-heals the stored config to match the library');
   });
 
-  // A GM may overstock one environment beyond the library max via
-  // restockNode({max}); that per-environment max is STATE and must survive the
-  // config-from-library merge (it is not reset to the library's max).
-  it('preserves a per-environment max override across respawn', async () => {
+  // `max` (node capacity) is library CONFIG, not per-environment state — the same
+  // rule the rest of this file applies to respawn policy/interval. A stored
+  // snapshot carrying a different max (seeded by an old depletion, or a legacy
+  // overstock) must NOT shadow the library task's node count, or raising a task's
+  // node count would never take effect in environments that had already gathered
+  // it. The merge uses the library max and clamps the stored current to it.
+  it('uses the library max over a stale stored max, clamping current to the library cap', async () => {
     const respawn = { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 };
-    // Library max is 3 (libraryTask); this environment was overstocked to max 12.
+    // Library max is 3 (libraryTask); this environment's stale snapshot says max 12, current 5.
     const { store, richState } = harness(respawn, { runtime: { current: 5, max: 12 } });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 0 });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 2 * HOUR });
     const after = store.get('env-1').nodeRuntime['lib-1'];
-    assert.equal(after.max, 12, 'per-env max override is not clobbered by the library max');
-    assert.equal(after.current, 7, 'respawn grows toward the per-env max, not the library max');
+    assert.equal(after.max, 3, 'the library node count is authoritative, not the stale stored max');
+    assert.equal(after.current, 3, 'current is clamped to the library cap (no overstock beyond it)');
   });
 
   it('seeds the respawn anchor on depletion so the FIRST advance restocks (no wasted tick)', async () => {

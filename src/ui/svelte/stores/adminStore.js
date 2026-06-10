@@ -747,8 +747,9 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
       characterModifiers: (Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [])
         .map(entry => _normalizeGatheringCharacterModifier(entry, randomID))
         .filter(Boolean),
-      // Preserve the economy block (limitation mode + stamina config) so views
-      // can read the active mode reactively. Owned/normalized by the service.
+      // Preserve the economy block (stamina/nodes limitation flags + stamina
+      // config) so views can read the active flags reactively. Owned/normalized
+      // by the service.
       ...(systemConfig?.economy ? { economy: _clonePlain(systemConfig.economy) } : {})
     };
   }

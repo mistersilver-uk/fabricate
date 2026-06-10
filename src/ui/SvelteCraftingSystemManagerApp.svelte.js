@@ -547,14 +547,19 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         // Gathering economy authoring + manual state controls (GM-only).
         getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
         // The economy panel persists straight to the gathering-config setting, so
-        // after a limitation-MODE change refresh the store's reactive copy — the
-        // task editor derives its economy mode from viewState.gatheringConfig and
-        // would otherwise stay stale until the app reopens. Skipped when only the
-        // stamina expressions change (mode unchanged) to avoid per-keystroke churn.
+        // after a limitation-FLAG change refresh the store's reactive copy — the
+        // task editor derives its stamina/nodes gating from viewState.gatheringConfig
+        // and would otherwise stay stale until the app reopens. Skipped when only the
+        // stamina expressions change (both flags unchanged) to avoid per-keystroke
+        // churn.
         setGatheringEconomy: async (opts = {}) => {
-          const prevMode = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[opts?.systemId]?.economy?.mode ?? 'none';
+          const prevEconomy = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[opts?.systemId]?.economy;
+          const prevStamina = prevEconomy?.stamina?.enabled === true;
+          const prevNodes = prevEconomy?.nodes?.enabled === true;
+          const nextStamina = opts?.economy?.stamina?.enabled === true;
+          const nextNodes = opts?.economy?.nodes?.enabled === true;
           const result = await game?.fabricate?.setGatheringEconomy?.(opts);
-          if ((opts?.economy?.mode ?? 'none') !== prevMode) this._adminStore?.refreshGatheringConfig?.();
+          if (nextStamina !== prevStamina || nextNodes !== prevNodes) this._adminStore?.refreshGatheringConfig?.();
           return result;
         },
         getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],

@@ -3,11 +3,14 @@
   GatheringEconomyView is the GM authoring surface for a crafting system's
   gathering limitation economy, shown in the gathering "Settings" tab as a single
   card:
-   - selects the system limitation mode (none / stamina / nodes);
-   - in stamina mode, a 2-column layout shows the stamina regeneration config on
-     the left and a searchable, paginated, scrollable list of player characters
-     (non-NPCs) with editable stamina pools (image, name, current, max, save) on
-     the right.
+   - two independent toggle pills (Stamina / Resource nodes); both can be on at
+     once (the anti-dogpiling combination), neither on means no limit;
+   - when stamina is enabled, a 2-column layout shows the stamina regeneration
+     config on the left and a searchable, paginated, scrollable list of player
+     characters (non-NPCs) with editable stamina pools (image, name, current,
+     max, save) on the right;
+   - when resource nodes are enabled, a note points the GM to the per-task node
+     config. Both sub-blocks can render together.
 
   All persistence goes through the GM-only game.fabricate endpoints exposed on the
   injected `services` bag (getGatheringEconomy/setGatheringEconomy,
@@ -33,7 +36,7 @@
   let actorPageSize = $state(6);
 
   function defaultEconomy() {
-    return { mode: 'none', stamina: { max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } } };
+    return { stamina: { enabled: false, max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } };
   }
 
   // Reload economy + actor stamina whenever the selected system changes.
@@ -62,13 +65,20 @@
     if (actorPageIndex > maxIndex) actorPageIndex = maxIndex;
   });
 
+  // Mirror of the service `normalizeGatheringEconomy()` read-compat mapping:
+  // "new flags present" means the `enabled` KEY exists (not merely truthy). Only
+  // when neither key exists do we fall back to a legacy `mode`, so a stale `mode`
+  // can never resurrect a disabled limitation.
   function normalizeEconomy(raw) {
     const base = defaultEconomy();
     if (!raw || typeof raw !== 'object') return base;
     const regen = raw.stamina?.regen || {};
+    const hasStaminaFlag = raw.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
+    const hasNodesFlag = raw.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
+    const legacyMode = ['none', 'stamina', 'nodes'].includes(raw.mode) ? raw.mode : 'none';
     return {
-      mode: ['none', 'stamina', 'nodes'].includes(raw.mode) ? raw.mode : 'none',
       stamina: {
+        enabled: hasStaminaFlag ? raw.stamina.enabled === true : legacyMode === 'stamina',
         max: raw.stamina?.max == null ? '' : String(raw.stamina.max),
         start: raw.stamina?.start == null ? '' : String(raw.stamina.start),
         regen: {
@@ -76,7 +86,8 @@
           unit: UNITS.includes(regen.unit) ? regen.unit : 'hours',
           amount: regen.amount == null ? '' : String(regen.amount)
         }
-      }
+      },
+      nodes: { enabled: hasNodesFlag ? raw.nodes.enabled === true : legacyMode === 'nodes' }
     };
   }
 
@@ -97,8 +108,13 @@
     await services.setGatheringEconomy?.({ systemId, economy: $state.snapshot(economy) });
   }
 
-  function setMode(mode) {
-    economy.mode = mode;
+  function setStamina(enabled) {
+    economy.stamina = { ...economy.stamina, enabled };
+    void persistEconomy();
+  }
+
+  function setNodes(enabled) {
+    economy.nodes = { ...economy.nodes, enabled };
     void persistEconomy();
   }
 
@@ -143,11 +159,28 @@
     actorPageIndex = 0;
   }
 
-  const MODE_OPTIONS = [
-    { id: 'none', icon: 'fas fa-infinity', labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.None', labelFallback: 'No limit' },
-    { id: 'stamina', icon: 'fas fa-bolt', labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.Stamina', labelFallback: 'Stamina' },
-    { id: 'nodes', icon: 'fas fa-mountain', labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.Nodes', labelFallback: 'Resource nodes' }
+  // Two independent toggle pills. `enabled` reads its flag off the live economy;
+  // `toggle` flips it. Both can be active at once; neither active = no limit.
+  const TOGGLE_OPTIONS = [
+    {
+      id: 'stamina',
+      icon: 'fas fa-bolt',
+      labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.Stamina',
+      labelFallback: 'Stamina',
+      enabled: () => economy.stamina.enabled === true,
+      toggle: () => setStamina(economy.stamina.enabled !== true)
+    },
+    {
+      id: 'nodes',
+      icon: 'fas fa-mountain',
+      labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.Nodes',
+      labelFallback: 'Resource nodes',
+      enabled: () => economy.nodes.enabled === true,
+      toggle: () => setNodes(economy.nodes.enabled !== true)
+    }
   ];
+
+  const anyLimitEnabled = $derived(economy.stamina.enabled === true || economy.nodes.enabled === true);
 </script>
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
@@ -157,15 +190,14 @@
       <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ModeHint', 'How this system limits how often tasks can be attempted.')}</p>
     </header>
 
-    <div class="manager-economy-mode-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}>
-      {#each MODE_OPTIONS as option (option.id)}
+    <div class="manager-economy-mode-options" role="group" aria-label={text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}>
+      {#each TOGGLE_OPTIONS as option (option.id)}
         <button
           type="button"
-          class={`manager-economy-mode-option ${economy.mode === option.id ? 'is-active' : ''}`}
-          role="radio"
-          aria-checked={economy.mode === option.id}
+          class={`manager-economy-mode-option ${option.enabled() ? 'is-active' : ''}`}
+          aria-pressed={option.enabled()}
           data-economy-mode-option={option.id}
-          onclick={() => setMode(option.id)}
+          onclick={option.toggle}
         >
           <i class={option.icon} aria-hidden="true"></i>
           <span>{text(option.labelKey, option.labelFallback)}</span>
@@ -173,7 +205,11 @@
       {/each}
     </div>
 
-    {#if economy.mode === 'stamina'}
+    {#if !anyLimitEnabled}
+      <p class="manager-economy-card-hint manager-muted" data-economy-no-limit-hint>{text('FABRICATE.Admin.Manager.Economy.Mode.None', 'No limit — tasks can be attempted freely.')}</p>
+    {/if}
+
+    {#if economy.stamina.enabled}
       <div class="manager-economy-stamina-grid">
         <div class="manager-economy-subsection" data-economy-regen-card>
           <h4 class="manager-economy-subtitle"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h4>
@@ -288,10 +324,12 @@
           {/if}
         </div>
       </div>
-    {:else if economy.mode === 'nodes'}
+    {/if}
+
+    {#if economy.nodes.enabled}
       <div class="manager-economy-subsection" data-economy-nodes-note>
         <h4 class="manager-economy-subtitle"><i class="fas fa-mountain" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.Mode.Nodes', 'Resource nodes')}</span></h4>
-        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'In nodes mode, set each task’s node count and respawn on the environment’s task inspector.')}</p>
+        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'Set each task’s node count and respawn on the environment’s task inspector.')}</p>
       </div>
     {/if}
   </section>

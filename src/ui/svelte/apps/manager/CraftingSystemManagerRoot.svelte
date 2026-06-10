@@ -513,7 +513,20 @@
     hazardVisibility: 'encounterChance'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
-  const selectedGatheringTaskEconomyMode = $derived(selectedGatheringSystemConfig.economy?.mode || 'none');
+  // Two independent limitation flags. Honor key-presence precedence: a present
+  // `enabled` flag wins over a stale legacy `mode` (mirrors the service / GM
+  // economy-view read-compat mapping) so a disabled limit can't be resurrected.
+  const selectedGatheringEconomy = $derived(selectedGatheringSystemConfig.economy || {});
+  const selectedGatheringTaskStaminaEnabled = $derived(
+    selectedGatheringEconomy.stamina != null && Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
+      ? selectedGatheringEconomy.stamina.enabled === true
+      : selectedGatheringEconomy.mode === 'stamina'
+  );
+  const selectedGatheringTaskNodesEnabled = $derived(
+    selectedGatheringEconomy.nodes != null && Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.nodes, 'enabled')
+      ? selectedGatheringEconomy.nodes.enabled === true
+      : selectedGatheringEconomy.mode === 'nodes'
+  );
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
   const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
   // Tools are system-owned: read the canonical library from the selected
@@ -3139,7 +3152,8 @@
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={editingGatheringTask}
-        economyMode={selectedGatheringTaskEconomyMode}
+        staminaEnabled={selectedGatheringTaskStaminaEnabled}
+        nodesEnabled={selectedGatheringTaskNodesEnabled}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
