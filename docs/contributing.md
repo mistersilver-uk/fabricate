@@ -198,6 +198,8 @@ Triggers:
 
 Manual dispatch is the operator path for dry-runs, recovery reruns, and intentional overwrite attempts. Automatic calls from `release-candidate.yml` publish only a newly-created RC tag and do not overwrite an existing versioned zip.
 
+**Closed-beta tester path secret.** The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from the repository **secret** `S3_TESTER_PATH_SECRET` (env var of the same name locally) — never the committed config. Generate it once (`openssl rand -hex 16`) and set it before publishing; the publish **refuses to run** when tester groups are configured but the secret is unset, so the feed can never fall back to a guessable URL. `release-s3.js` withholds all S3 keys and install URLs from CI logs (they only print on local/`--dry-run` runs); GitHub also masks the secret value. To rotate a compromised path: set a new `S3_TESTER_PATH_SECRET`, publish, distribute the new manifest URL to testers privately, then delete the old objects (`aws s3 rm --recursive s3://<bucket>/testers/<group>/fabricate/` — the legacy prefix only; the new `<segment>/` path is not matched).
+
 ### Codex workflows
 
 Codex GitHub Actions workflows are manual-only in this repository. Codex does not run automatically on `push`, `pull_request`, `pull_request_target`, `issue_comment`, `schedule`, or any other automatic trigger.

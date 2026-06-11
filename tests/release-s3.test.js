@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { deriveS3Layout, getFlag } = await import('../scripts/release-s3.js');
+const { deriveS3Layout, getFlag, redactSegment } = await import('../scripts/release-s3.js');
 
 // ───────────────────────────────────────────────────────────────────────────
 // deriveS3Layout() tests
@@ -87,6 +87,46 @@ test('deriveS3Layout uses stable labels for staging/logging', () => {
   const { channelTarget, testerTargets } = deriveS3Layout(baseOpts);
   assert.equal(channelTarget.label, 'channel-beta');
   assert.equal(testerTargets[0].label, 'tester-closed-beta-2026');
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Secret tester path segment (closed-beta URL rotation)
+// ───────────────────────────────────────────────────────────────────────────
+
+test('deriveS3Layout inserts the secret segment between group and module id', () => {
+  const { testerTargets } = deriveS3Layout({ ...baseOpts, testerSegment: 's3cr3t' });
+  const t = testerTargets[0];
+  assert.equal(t.zipKey, 'testers/closed-beta-2026/s3cr3t/fabricate/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+  assert.equal(t.manifestKey, 'testers/closed-beta-2026/s3cr3t/fabricate/module.json');
+  assert.equal(t.manifestUrl, 'https://releases.example.io/testers/closed-beta-2026/s3cr3t/fabricate/module.json');
+  assert.equal(t.downloadUrl, 'https://releases.example.io/testers/closed-beta-2026/s3cr3t/fabricate/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+  // The label stays the public group name (no secret) — it is used in CI logs.
+  assert.equal(t.label, 'tester-closed-beta-2026');
+});
+
+test('deriveS3Layout leaves the channel target unaffected by the secret segment', () => {
+  const withSeg = deriveS3Layout({ ...baseOpts, testerSegment: 's3cr3t' }).channelTarget;
+  const noSeg = deriveS3Layout(baseOpts).channelTarget;
+  assert.deepEqual(withSeg, noSeg);
+});
+
+test('deriveS3Layout trims stray slashes around the secret segment', () => {
+  const { testerTargets } = deriveS3Layout({ ...baseOpts, testerSegment: '/s3cr3t/' });
+  assert.equal(testerTargets[0].manifestKey, 'testers/closed-beta-2026/s3cr3t/fabricate/module.json');
+});
+
+test('deriveS3Layout without a segment keeps the legacy (guessable) layout', () => {
+  const { testerTargets } = deriveS3Layout(baseOpts);
+  assert.equal(testerTargets[0].manifestKey, 'testers/closed-beta-2026/fabricate/module.json');
+});
+
+test('redactSegment masks the secret segment, and is a no-op without one', () => {
+  assert.equal(
+    redactSegment('s3://b/testers/closed-beta-2026/s3cr3t/fabricate/module.json', 's3cr3t'),
+    's3://b/testers/closed-beta-2026/***/fabricate/module.json'
+  );
+  assert.equal(redactSegment('no secret here', ''), 'no secret here');
+  assert.equal(redactSegment('no secret here'), 'no secret here');
 });
 
 // ───────────────────────────────────────────────────────────────────────────
