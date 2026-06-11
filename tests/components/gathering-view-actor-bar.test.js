@@ -247,10 +247,10 @@ describe('GatheringView ↔ actor bar wiring', () => {
   });
 
   it('subscribes to scene changes and quietly re-fetches the listing on canvasReady', async () => {
-    let registered = null;
+    const registrations = [];
     const offCalls = [];
     globalThis.Hooks = {
-      on: (event, fn) => { registered = { event, fn }; return 'hook-canvas'; },
+      on: (event, fn) => { registrations.push({ event, fn }); return 'hook-canvas'; },
       off: (event, id) => { offCalls.push({ event, id }); }
     };
     try {
@@ -262,11 +262,13 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
       await mountView(services);
       assert.equal(calls.list.length, 1);
-      assert.ok(registered, 'a Foundry hook was registered on mount');
-      assert.equal(registered.event, 'canvasReady', 'subscribes to canvasReady');
+      // The view subscribes to canvasReady (scene change) alongside other hooks
+      // (e.g. travel-marker token movement); assert canvasReady is among them.
+      const canvasReg = registrations.find(reg => reg.event === 'canvasReady');
+      assert.ok(canvasReg, 'subscribes to canvasReady');
 
       // Simulate the player navigating to / the GM activating a scene.
-      registered.fn();
+      canvasReg.fn();
       await settle();
       assert.equal(calls.list.length, 2, 'canvasReady triggers a listing re-fetch');
       // The populated grid stays mounted across the quiet refresh (no spinner swap).
@@ -277,6 +279,54 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.ok(
         offCalls.some(({ event, id }) => event === 'canvasReady' && id === 'hook-canvas'),
         'unsubscribes the canvasReady hook on destroy'
+      );
+    } finally {
+      delete globalThis.Hooks;
+    }
+  });
+
+  it('quietly re-fetches the listing when a party travel marker token moves', async () => {
+    const registrations = [];
+    const offCalls = [];
+    globalThis.Hooks = {
+      on: (event, fn) => { registrations.push({ event, fn }); return `hook-${event}`; },
+      off: (event, id) => { offCalls.push({ event, id }); }
+    };
+    try {
+      const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+      store.loadSelectableActors();
+      flushSync();
+      const { services, calls } = makeGatheringServices(listing([environment()]));
+      services.actorBar = store;
+      services.isTravelMarkerActor = (actorUuid) => actorUuid === 'Actor.marker';
+
+      await mountView(services);
+      assert.equal(calls.list.length, 1);
+      const updateReg = registrations.find(reg => reg.event === 'updateToken');
+      assert.ok(updateReg, 'subscribes to updateToken for travel-marker movement');
+
+      // A NON-marker token moving must not re-fetch (filtered by isTravelMarkerActor).
+      updateReg.fn({ actor: { uuid: 'Actor.other' } }, { x: 5 });
+      await settle();
+      assert.equal(calls.list.length, 1, 'a non-marker token move is ignored');
+
+      // The party's travel marker moving quietly re-fetches the live listing.
+      updateReg.fn({ actor: { uuid: 'Actor.marker' } }, { x: 10 });
+      await settle();
+      assert.equal(calls.list.length, 2, 'travel-marker move re-fetches the listing');
+      assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'keeps the populated layout (quiet)');
+
+      // A token that only carries the marker's world-actor id (e.g. an unlinked
+      // token) is matched via `Actor.<actorId>` and also re-fetches.
+      updateReg.fn({ actorId: 'marker' });
+      await settle();
+      assert.equal(calls.list.length, 3, 're-fetches for a token referencing the marker world actor');
+
+      unmount(mounted);
+      mounted = null;
+      assert.ok(
+        offCalls.some(({ event }) => event === 'updateToken'),
+        'unsubscribes the updateToken hook on destroy'
       );
     } finally {
       delete globalThis.Hooks;

@@ -537,6 +537,10 @@ class Fabricate {
       systemManager: this.craftingSystemManager,
       // Live token-derived sensing: which Scene Region UUIDs the party's travel
       // marker token currently sits inside, across the marker's own scene(s).
+      // Prefer Foundry's AUTHORITATIVE membership (V13 `TokenDocument#regions`),
+      // maintained by the core region system and not subject to the move-animation
+      // lag that makes position hit-testing report the region the token just left.
+      // Fall back to position hit-testing only when membership is unavailable.
       senseSceneRegions: (travelActorUuid) => {
         const resolve = globalThis.fromUuidSync;
         if (typeof resolve !== 'function' || !travelActorUuid) return [];
@@ -545,6 +549,14 @@ class Fabricate {
         const tokens = actor?.getActiveTokens?.(false, true) || [];
         const uuids = new Set();
         for (const token of tokens) {
+          const memberRegions = token?.regions;
+          let matched = false;
+          if (memberRegions && typeof memberRegions[Symbol.iterator] === 'function') {
+            for (const region of memberRegions) {
+              if (region?.uuid) { uuids.add(String(region.uuid)); matched = true; }
+            }
+          }
+          if (matched) continue;
           const scene = token?.parent ?? token?.scene ?? null;
           for (const uuid of sceneRegionUuidsContainingToken({ scene, token })) uuids.add(uuid);
         }

@@ -150,6 +150,70 @@ export function subscribeSceneChange(handler) {
   return () => { hooks.off?.('canvasReady', id); };
 }
 
+/**
+ * Subscribe to token movement (and token creation/removal) so callers can refresh
+ * the live travel current-region view when a party's travel-marker token moves.
+ * Fires `handler(actorUuid)` — the base Actor uuid of the moved token. `updateToken`
+ * only commits once per move (not the continuous `refreshToken`), so no debounce is
+ * needed. No-ops gracefully when the Foundry `Hooks` global is absent (unit tests).
+ *
+ * @param {(actorUuid: string|null) => void} handler
+ * @returns {Function} Unsubscribe callback.
+ */
+/**
+ * Resolve once a token's MOVE has fully settled. V13 animates token movement, and
+ * the document position / region membership only reach their destination once the
+ * animation completes — reading earlier reports the region the token just left.
+ * Waits one frame for the animation to register, then awaits it (bounded by a
+ * timeout). Resolves immediately when there is no canvas/animation (tests/headless).
+ *
+ * @param {object} tokenDoc
+ * @returns {Promise<void>}
+ */
+function awaitTokenMovementSettled(tokenDoc) {
+  const obj = tokenDoc?.object;
+  const CanvasAnimation = globalThis.CanvasAnimation;
+  if (!obj || typeof CanvasAnimation?.getAnimation !== 'function') return Promise.resolve();
+  const nextFrame = () => new Promise((resolve) => {
+    if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(() => resolve());
+    else setTimeout(resolve, 16);
+  });
+  const settle = (async () => {
+    await nextFrame();
+    const anim = CanvasAnimation.getAnimation(obj.animationName);
+    if (anim?.promise) { try { await anim.promise; } catch { /* ignore */ } }
+  })();
+  const timeout = new Promise((resolve) => setTimeout(resolve, 1000));
+  return Promise.race([settle, timeout]);
+}
+
+export function subscribeTravelMarkerMove(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  // Prefer the BASE world-actor uuid (`Actor.<id>`) so it matches a party's
+  // `travelActorUuid` for both linked and unlinked marker tokens; fall back to the
+  // token's bound actor uuid only when the token references no world actor.
+  const actorUuidOf = (tokenDoc) =>
+    (tokenDoc?.actorId ? `Actor.${tokenDoc.actorId}` : null) ?? tokenDoc?.actor?.uuid ?? null;
+  // Fire on ANY token update — the consumer filters to actual travel markers, so a
+  // marker's occasional non-positional update merely triggers a cheap quiet refetch.
+  // (V13 may not always deliver movement as top-level x/y, so we do not pre-filter.)
+  // Defer the notification until the move animation settles so the resolved current
+  // region reflects the DESTINATION, not the region the marker just departed.
+  const notify = (tokenDoc) => {
+    const actorUuid = actorUuidOf(tokenDoc);
+    awaitTokenMovementSettled(tokenDoc).then(() => handler(actorUuid));
+  };
+  const updateId = hooks.on('updateToken', notify);
+  const createId = hooks.on('createToken', notify);
+  const deleteId = hooks.on('deleteToken', notify);
+  return () => {
+    hooks.off?.('updateToken', updateId);
+    hooks.off?.('createToken', createId);
+    hooks.off?.('deleteToken', deleteId);
+  };
+}
+
 export function notifyInfo(msg) {
   globalThis.ui?.notifications?.info(msg);
 }

@@ -7,10 +7,11 @@ import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
-import { localize, subscribeSceneChange } from './svelte/util/foundryBridge.js';
+import { localize, subscribeSceneChange, subscribeTravelMarkerMove } from './svelte/util/foundryBridge.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
+import { tokenDocumentCenter } from '../canvas/regionHitTest.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 
@@ -100,29 +101,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getCurrentSceneRegions: () =>
         readSceneRegions(game?.scenes?.current ?? game?.scene ?? globalThis.canvas?.scene ?? null),
       subscribeSceneChange: (handler) => subscribeSceneChange(handler),
-      // Notify when a token's position changes (or a token is added/removed) so
-      // travel-marker movement can refresh the manager's live current-region view.
-      // Fires handler(actorUuid) — `updateToken` only commits once per move (not
-      // the continuous refreshToken), so no debounce is needed.
-      subscribeTravelMarkerMove: (handler) => {
-        const hooks = globalThis.Hooks;
-        if (!hooks?.on || typeof handler !== 'function') return () => {};
-        const actorUuidOf = (tokenDoc) =>
-          tokenDoc?.actor?.uuid ?? (tokenDoc?.actorId ? `Actor.${tokenDoc.actorId}` : null);
-        const onUpdate = (tokenDoc, changes) => {
-          if (!changes || (changes.x === undefined && changes.y === undefined && changes.elevation === undefined)) return;
-          handler(actorUuidOf(tokenDoc));
-        };
-        const onCreateDelete = (tokenDoc) => handler(actorUuidOf(tokenDoc));
-        const updateId = hooks.on('updateToken', onUpdate);
-        const createId = hooks.on('createToken', onCreateDelete);
-        const deleteId = hooks.on('deleteToken', onCreateDelete);
-        return () => {
-          hooks.off?.('updateToken', updateId);
-          hooks.off?.('createToken', createId);
-          hooks.off?.('deleteToken', deleteId);
-        };
-      },
+      subscribeTravelMarkerMove: (handler) => subscribeTravelMarkerMove(handler),
       // Of the given actor uuids, return those whose token currently sits inside
       // the Foundry Scene Region identified by `sceneRegionUuid`. Backs the Map
       // Region Links auto-update of party current regions on (un)link. Returns []
@@ -152,9 +131,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               getTokenSceneUuid(candidate) === sceneUuid
             ) ?? null;
             if (!token) return null;
-            const center = token?.object?.center;
-            if (center && Number.isFinite(center.x) && Number.isFinite(center.y)) return center;
-            return Number.isFinite(token?.x) && Number.isFinite(token?.y) ? { x: token.x, y: token.y } : null;
+            // Use the DOCUMENT-derived centre so a just-moved marker resolves to its
+            // new position (the placeable centre lags during the move animation).
+            return tokenDocumentCenter(token);
           }
         });
       },

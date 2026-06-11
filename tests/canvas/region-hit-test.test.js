@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 
 import {
   regionEnvironmentIdsAtPoint,
-  sceneRegionUuidsContainingToken
+  sceneRegionUuidsContainingToken,
+  tokenDocumentCenter
 } from '../../src/canvas/regionHitTest.js';
 
 function region({ envId, contains }) {
@@ -134,4 +135,31 @@ test('sceneRegionUuidsContainingToken returns [] with no regions or no resolvabl
     sceneRegionUuidsContainingToken({ scene: { regions: [uuidRegion({ uuid: 'R', contains: () => true })] }, token: {} }),
     []
   );
+});
+
+test('tokenDocumentCenter computes the centre from the DOCUMENT position, beating a lagging placeable/getCenterPoint', () => {
+  // Mid-move: the placeable centre AND getCenterPoint still report the OLD spot,
+  // but the document x/y already holds the destination — the fresh document
+  // computation must win (this is the off-by-one fix).
+  const token = {
+    x: 200, y: 200, width: 1, height: 1, parent: { grid: { size: 100 } },
+    getCenterPoint: () => ({ x: 0, y: 0 }),
+    object: { center: { x: 0, y: 0 } }
+  };
+  assert.deepEqual(tokenDocumentCenter(token), { x: 250, y: 250 });
+});
+
+test('tokenDocumentCenter honours the token footprint when sizing the centre', () => {
+  const token = { x: 100, y: 100, width: 2, height: 2, parent: { grid: { size: 100 } } };
+  assert.deepEqual(tokenDocumentCenter(token), { x: 200, y: 200 });
+});
+
+test('tokenDocumentCenter falls back to getCenterPoint, then the placeable centre, then top-left, then null', () => {
+  // No grid size ⇒ cannot size the footprint ⇒ use getCenterPoint.
+  assert.deepEqual(tokenDocumentCenter({ getCenterPoint: () => ({ x: 12, y: 8 }) }), { x: 12, y: 8 });
+  // No grid, no getCenterPoint ⇒ placeable centre.
+  assert.deepEqual(tokenDocumentCenter({ object: { center: { x: 7, y: 9 } } }), { x: 7, y: 9 });
+  // No grid, no getCenterPoint, no placeable ⇒ document top-left.
+  assert.deepEqual(tokenDocumentCenter({ x: 3, y: 4 }), { x: 3, y: 4 });
+  assert.equal(tokenDocumentCenter({}), null);
 });
