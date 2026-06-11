@@ -6,11 +6,13 @@
   reverts.
 -->
 <script>
+  import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let { name = '', disabled = false, onRename = () => {} } = $props();
 
-  let draft = $state(name);
+  // Seed without subscribing to `name` here; the $effect below keeps it synced.
+  let draft = $state(untrack(() => name));
 
   // Reseed the draft whenever the upstream name changes (selection change or
   // external rename). Does not fire while the user is typing (name is stable).
