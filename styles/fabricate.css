@@ -9997,6 +9997,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 3ch;
+  text-align: left;
 }
 
 .fabricate-manager .manager-map-link-picker-cell {
@@ -10022,6 +10023,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
 }
 
 .fabricate-manager .manager-map-link-inspector-swatch {

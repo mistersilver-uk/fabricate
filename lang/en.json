@@ -2000,6 +2000,7 @@
             "NoRegions": "The active scene has no regions.",
             "UnnamedRegion": "Unnamed region",
             "InspectorKicker": "Selected map region",
+            "LinkSectionTitle": "Linked Fabricate region",
             "PartiesInMapRegionTitle": "Parties in this map region",
             "PartiesInFabricateRegionTitle": "Parties in this Fabricate region",
             "NoPartiesInMapRegion": "No party travel markers are in this map region.",

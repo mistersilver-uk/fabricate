@@ -4416,6 +4416,24 @@
                 </section>
 
                 <section class="manager-inspector-card">
+                  <h3 class="manager-card-title"><i class="fas fa-link" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkSectionTitle', 'Linked Fabricate region')}</h3>
+                  {#if selectedMapRegion.linkedRegionId}
+                    {@const linkedRegion = travelSystemRegions.find(region => region.id === selectedMapRegion.linkedRegionId)}
+                    <ul class="manager-travel-region-parties">
+                      <li>
+                        <span class="manager-travel-region-thumb" aria-hidden="true"><i class="fas fa-map-location-dot"></i></span>
+                        <span class="manager-travel-region-item-name">{linkedRegion?.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown region')}</span>
+                        {#if linkedRegion && !linkedRegion.enabled}
+                          <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                        {/if}
+                      </li>
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate region.')}</p>
+                  {/if}
+                </section>
+
+                <section class="manager-inspector-card">
                   <h3 class="manager-card-title"><i class="fas fa-map-location-dot" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInMapRegionTitle', 'Parties in this map region')}</h3>
                   {#if selectedMapRegion.partiesInMapRegion?.length > 0}
                     <ul class="manager-travel-region-parties">
