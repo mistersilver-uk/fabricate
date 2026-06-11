@@ -562,9 +562,41 @@ describe('adminStore Map Region Links', () => {
     const state = get(store.viewState);
     assert.equal(state.currentSceneUuid, 'Scene.s1');
     assert.deepEqual(state.currentSceneRegions, [
-      { sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f', linkedRegionId: 'r1' },
-      { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322', linkedRegionId: '' }
+      { sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f', linkedRegionId: 'r1', partiesInMapRegion: [], partiesInFabricateRegion: [] },
+      { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322', linkedRegionId: '', partiesInMapRegion: [], partiesInFabricateRegion: [] }
     ]);
+    store.destroy();
+  });
+
+  it('annotates each scene region with parties in the map region (marker inside) and in the Fabricate region', async () => {
+    const { services } = createServices({
+      parties: [
+        // Marker inside the scene region, and current region includes the linked region r1.
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
+        // Current region includes r1 (in the Fabricate region) but marker NOT inside the map region.
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m2', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } }
+      ],
+      regions: [{
+        id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+        sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+      }],
+      actors: [
+        { uuid: 'Actor.m1', id: 'm1', name: 'Marker 1', img: 'm1.webp' },
+        { uuid: 'Actor.m2', id: 'm2', name: 'Marker 2', img: 'm2.webp' }
+      ],
+      sceneRegions: SCENE_REGIONS,
+      insideActorUuids: ['Actor.m1'] // only p1's marker is inside Region.a
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+    const regionA = get(store.viewState).currentSceneRegions.find(r => r.sceneRegionUuid === 'Scene.s1.Region.a');
+    // Marker-inside list: only p1.
+    assert.deepEqual(regionA.partiesInMapRegion, [{ id: 'p1', name: 'Vanguard', img: 'm1.webp' }]);
+    // Fabricate-region list (current region includes r1): both p1 and p2.
+    assert.deepEqual(regionA.partiesInFabricateRegion.map(p => p.id).sort(), ['p1', 'p2']);
+    // The unlinked region has no Fabricate-region parties.
+    const regionB = get(store.viewState).currentSceneRegions.find(r => r.sceneRegionUuid === 'Scene.s1.Region.b');
+    assert.deepEqual(regionB.partiesInFabricateRegion, []);
     store.destroy();
   });
 

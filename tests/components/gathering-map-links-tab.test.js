@@ -22,12 +22,20 @@ const SCENE_REGIONS = [
   { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322', linkedRegionId: '' }
 ];
 
+const REGIONS = [
+  { id: 'r1', name: 'Verdant', enabled: true },
+  { id: 'r2', name: 'Ashen', enabled: false }
+];
+
 async function mountTab(props) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(GatheringMapLinksTab, {
     target,
-    props: { sceneRegions: [], sceneUuid: '', selectedRegionUuid: '', onSelect: () => {}, ...props }
+    props: {
+      sceneRegions: [], sceneUuid: '', selectedRegionUuid: '', regions: REGIONS,
+      saving: false, onSelect: () => {}, onSetLink: () => {}, ...props
+    }
   });
   flushSync();
   await tick();
@@ -52,6 +60,11 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    writeRawModule('src/ui/svelte/util/iconPickerPopover.js');
+    writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
+    writeRawModule('src/ui/svelte/actions/portal.js');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte.js')).href);
     GatheringMapLinksTab = mod.default;
@@ -82,16 +95,39 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     remount();
   });
 
-  it('renders one selectable row per scene region with its colour swatch and name', async () => {
+  it('renders one selectable row per scene region with its colour swatch, name and a link picker', async () => {
     await mountTab({ sceneUuid: 'Scene.s1', sceneRegions: SCENE_REGIONS, selectedRegionUuid: 'Scene.s1.Region.a' });
     assert.equal(rows().length, 2);
     const first = rows()[0];
     assert.match(first.querySelector('.manager-map-link-name').textContent, /Northwood/);
     assert.match(first.querySelector('.manager-map-link-swatch').getAttribute('style'), /#1a9c4f/);
     assert.equal(first.getAttribute('data-manager-map-region-uuid'), 'Scene.s1.Region.a');
-    // The linked row carries the link chip; the unlinked one does not.
-    assert.ok(first.querySelector('.manager-map-link-linked-chip'));
-    assert.equal(rows()[1].querySelector('.manager-map-link-linked-chip'), null);
+    // Each row carries its own link picker; the linked row shows the region name,
+    // the unlinked row reads "Not linked".
+    assert.match(first.querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Verdant/);
+    assert.match(rows()[1].querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Not linked/);
+    remount();
+  });
+
+  it('invokes onSetLink with the row’s scene-region uuid and the chosen region id', async () => {
+    const calls = [];
+    await mountTab({
+      sceneUuid: 'Scene.s1',
+      sceneRegions: SCENE_REGIONS,
+      selectedRegionUuid: 'Scene.s1.Region.a',
+      onSetLink: (sceneRegionUuid, regionId) => calls.push([sceneRegionUuid, regionId])
+    });
+    // Open the second (unlinked) row's picker and choose "Verdant".
+    rows()[1].querySelector('.manager-map-link-trigger').click();
+    flushSync();
+    await tick();
+    flushSync();
+    const option = Array.from(rows()[1].querySelectorAll('.manager-travel-option'))
+      .find(node => /Verdant/.test(node.textContent));
+    assert.ok(option, 'the Verdant option should be present');
+    option.click();
+    flushSync();
+    assert.deepEqual(calls, [['Scene.s1.Region.b', 'r1']]);
     remount();
   });
 

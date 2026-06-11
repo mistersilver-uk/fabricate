@@ -2070,11 +2070,24 @@ export function createAdminStore(services) {
           }
         }
       }
+      // Parties whose travel-marker token can be tested for containment (those
+      // that have a marker actor). Reused across scene regions below.
+      const partiesWithMarker = parties.filter(party => party?.travelActorUuid);
+      const markerUuids = partiesWithMarker.map(party => String(party.travelActorUuid));
       const currentSceneRegions = (Array.isArray(sceneData.regions) ? sceneData.regions : [])
-        .map(sceneRegion => ({
-          ...sceneRegion,
-          linkedRegionId: linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || ''
-        }));
+        .map(sceneRegion => {
+          const linkedRegionId = linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || '';
+          // Parties whose travel marker currently sits inside this Scene Region.
+          const insideUuids = markerUuids.length
+            ? new Set(services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) || [])
+            : new Set();
+          const partiesInMapRegion = partiesWithMarker
+            .filter(party => insideUuids.has(String(party.travelActorUuid)))
+            .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
+          // Parties whose current region includes the linked Fabricate region.
+          const partiesInFabricateRegion = linkedRegionId ? regionParties(linkedRegionId) : [];
+          return { ...sceneRegion, linkedRegionId, partiesInMapRegion, partiesInFabricateRegion };
+        });
 
       return {
         currentSceneUuid,

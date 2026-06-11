@@ -99,7 +99,8 @@
     travelCurrentSceneRegions = [],
     travelCurrentSceneUuid = '',
     mapSelectedRegionUuid = '',
-    onSelectMapRegion = () => {}
+    onSelectMapRegion = () => {},
+    onSetMapRegionLink = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -892,7 +893,10 @@
           sceneRegions={travelCurrentSceneRegions}
           sceneUuid={travelCurrentSceneUuid}
           selectedRegionUuid={mapSelectedRegionUuid}
+          regions={travelSystemRegions}
+          saving={travelSaving}
           onSelect={onSelectMapRegion}
+          onSetLink={onSetMapRegionLink}
         />
       {/if}
     </div>

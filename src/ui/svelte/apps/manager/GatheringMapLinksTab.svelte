@@ -2,19 +2,24 @@
 <!--
   Manager — Travel tab "Map Region Links" section (central column). A selectable
   list of every Foundry Scene Region on the currently active scene: each row
-  shows the scene region's colour swatch + name. Selecting a row surfaces its
-  detail (and the Fabricate-region link picker) in the right inspector; the
-  parent auto-selects the first region. Empty states cover "no active scene" and
-  "scene has no regions".
+  shows the scene region's colour swatch + name (the selectable header) plus a
+  searchable picker to link it to a Fabricate region. Selecting a row surfaces
+  its detail (parties present) in the right inspector; the parent auto-selects
+  the first region. Empty states cover "no active scene" and "scene has no
+  regions".
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import MapRegionLinkPicker from './MapRegionLinkPicker.svelte';
 
   let {
     sceneRegions = [],
     sceneUuid = '',
     selectedRegionUuid = '',
-    onSelect = () => {}
+    regions = [],
+    saving = false,
+    onSelect = () => {},
+    onSetLink = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -69,11 +74,14 @@
             <span class="manager-map-link-name">
               {sceneRegion.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
             </span>
-            {#if sceneRegion.linkedRegionId}
-              <span class="manager-chip is-neutral manager-map-link-linked-chip" aria-hidden="true">
-                <i class="fas fa-link"></i>
-              </span>
-            {/if}
+          </div>
+          <div class="manager-map-link-picker-cell">
+            <MapRegionLinkPicker
+              value={sceneRegion.linkedRegionId}
+              {regions}
+              disabled={saving}
+              onChoose={(regionId) => onSetLink(sceneRegion.sceneRegionUuid, regionId)}
+            />
           </div>
         </div>
       {/each}

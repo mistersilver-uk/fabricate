@@ -9939,6 +9939,9 @@
 
 .fabricate-manager .manager-map-link-row {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -9958,7 +9961,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 10px 12px;
   cursor: pointer;
   background: transparent;
@@ -9995,8 +9999,29 @@
   min-width: 3ch;
 }
 
-.fabricate-manager .manager-map-link-linked-chip {
+.fabricate-manager .manager-map-link-picker-cell {
   flex: 0 0 auto;
+  /* Every row's link picker is the same fixed width so the column lines up;
+     overflowing region names truncate with an ellipsis inside the trigger. */
+  width: 200px;
+  padding: 6px 10px 6px 0;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-travel-picker {
+  width: 100%;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-map-link-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-map-link-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-map-link-inspector-swatch {
@@ -10004,10 +10029,20 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-map-link-colour-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+/* Map tab inspector: the selected map region and its link live in two sibling
+   cards, so the shared outer inspector card drops its own chrome and just lays
+   them out in a spaced column. */
+.fabricate-manager .manager-travel-inspector[data-travel-inspector="map"] {
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-map-link-region-card .manager-inspector-title-row {
+  margin: 0;
 }
 
 .fabricate-manager .manager-travel-map-links-empty {

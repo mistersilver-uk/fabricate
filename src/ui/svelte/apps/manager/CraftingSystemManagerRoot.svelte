@@ -11,7 +11,6 @@
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringHazardEditView from './GatheringHazardEditView.svelte';
   import RegionNameField from './RegionNameField.svelte';
-  import MapRegionLinkPicker from './MapRegionLinkPicker.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -3236,6 +3235,7 @@
         travelCurrentSceneUuid={$viewState.currentSceneUuid || ''}
         mapSelectedRegionUuid={selectedMapRegionUuid}
         onSelectMapRegion={(uuid) => selectedMapRegionUuid = uuid}
+        onSetMapRegionLink={(sceneRegionUuid, regionId) => store.setMapRegionLink?.(sceneRegionUuid, regionId)}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}>
@@ -4405,32 +4405,52 @@
               {/if}
             {:else if activeTravelTab === 'map'}
               {#if selectedMapRegion}
-                <div class="manager-inspector-title-row">
-                  <span class="manager-inspector-icon manager-map-link-inspector-swatch" aria-hidden="true" style={selectedMapRegion.color ? `background:${selectedMapRegion.color};` : ''}></span>
-                  <div class="manager-inspector-copy">
-                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.MapLinks.InspectorKicker', 'Selected map region')}</p>
-                    <h2 class="manager-inspector-name">{selectedMapRegion.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}</h2>
+                <section class="manager-inspector-card manager-map-link-region-card">
+                  <div class="manager-inspector-title-row">
+                    <span class="manager-inspector-icon manager-map-link-inspector-swatch" aria-hidden="true" style={selectedMapRegion.color ? `background:${selectedMapRegion.color};` : ''}></span>
+                    <div class="manager-inspector-copy">
+                      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.MapLinks.InspectorKicker', 'Selected map region')}</p>
+                      <h2 class="manager-inspector-name">{selectedMapRegion.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}</h2>
+                    </div>
                   </div>
-                </div>
-
-                {#if selectedMapRegion.color}
-                  <section class="manager-inspector-card manager-map-link-colour-card">
-                    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.MapLinks.ColourLabel', 'Colour')}</h3>
-                    <span class="manager-map-link-colour-value">
-                      <span class="manager-map-link-swatch" aria-hidden="true" style={`background:${selectedMapRegion.color};`}></span>
-                      <code>{selectedMapRegion.color}</code>
-                    </span>
-                  </section>
-                {/if}
+                </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-link" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkSectionTitle', 'Linked Fabricate region')}</h3>
-                  <MapRegionLinkPicker
-                    value={selectedMapRegion.linkedRegionId}
-                    regions={travelSystemRegions}
-                    disabled={$viewState.travelSaving === true}
-                    onChoose={(regionId) => store.setMapRegionLink?.(selectedMapRegion.sceneRegionUuid, regionId)}
-                  />
+                  <h3 class="manager-card-title"><i class="fas fa-map-location-dot" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInMapRegionTitle', 'Parties in this map region')}</h3>
+                  {#if selectedMapRegion.partiesInMapRegion?.length > 0}
+                    <ul class="manager-travel-region-parties">
+                      {#each selectedMapRegion.partiesInMapRegion as party (party.id)}
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true">
+                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
+                          </span>
+                          <span class="manager-travel-region-item-name">{party.name}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInMapRegion', 'No party travel markers are in this map region.')}</p>
+                  {/if}
+                </section>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInFabricateRegionTitle', 'Parties in this Fabricate region')}</h3>
+                  {#if !selectedMapRegion.linkedRegionId}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate region.')}</p>
+                  {:else if selectedMapRegion.partiesInFabricateRegion?.length > 0}
+                    <ul class="manager-travel-region-parties">
+                      {#each selectedMapRegion.partiesInFabricateRegion as party (party.id)}
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true">
+                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
+                          </span>
+                          <span class="manager-travel-region-item-name">{party.name}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInFabricateRegion', 'No parties are in this Fabricate region.')}</p>
+                  {/if}
                 </section>
               {:else}
                 <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder', 'Select a region to map it to Scene Regions.')}</p>
