@@ -7,11 +7,17 @@
  * gets its OWN versioned zip whose in-zip module.json bakes that target's own
  * `manifest` URL, plus a "latest" manifest pointing at that zip.
  *
- * Layout (moduleId=fabricate, channel=beta, version=0.2.0-rc.1, group=closed-beta-2026):
- *   modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip      (sources, immutable)
- *   modules/fabricate/beta/latest/module.json                               (sources, no-cache)
- *   testers/closed-beta-2026/fabricate/versions/0.2.0-rc.1/fabricate-…​.zip   (access group, immutable)
- *   testers/closed-beta-2026/fabricate/module.json                          (access group, no-cache)
+ * Layout (moduleId=fabricate, channel=beta, version=0.2.0-rc.1, group=closed-beta-2026,
+ * tester segment from the S3_TESTER_PATH_SECRET secret shown as <seg>):
+ *   modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip          (sources, immutable)
+ *   modules/fabricate/beta/latest/module.json                                   (sources, no-cache)
+ *   testers/closed-beta-2026/<seg>/fabricate/versions/0.2.0-rc.1/fabricate-…​.zip (access group, immutable)
+ *   testers/closed-beta-2026/<seg>/fabricate/module.json                        (access group, no-cache)
+ *
+ * The tester `<seg>` keeps the closed-beta feed URL unguessable; it comes from the
+ * S3_TESTER_PATH_SECRET env var (a GitHub Actions secret in CI) and is NEVER printed
+ * to CI logs or committed. Publishing refuses to run when tester groups are configured
+ * but the secret is unset, so the feed can never fall back to a guessable path.
  *
  * Why per-cohort zips: when Foundry installs from a manifest URL it extracts
  * the zip's module.json to disk, and future "Check for Updates" calls use the
@@ -52,6 +58,33 @@ const STAGING_DIR = join(ROOT, 'build', 's3');
 
 const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
 const CACHE_NO_CACHE = 'no-cache, max-age=0, must-revalidate';
+
+// Running inside CI (GitHub Actions). In CI we never print S3 keys, `s3://` URIs,
+// the bucket host, or full install URLs — those leak the closed-beta secret path
+// into job logs. Local/dry-run runs still print them so the maintainer can
+// distribute the URL.
+const inCI = env.GITHUB_ACTIONS === 'true' || env.CI === 'true';
+
+// The live secret segment, captured for the top-level error handler so an AWS
+// error that echoes a key (e.g. "NoSuchKey: testers/<group>/<segment>/…") is
+// redacted before it reaches CI logs.
+let activeTesterSegment = '';
+
+/**
+ * Belt-and-suspenders: replace the secret tester segment with `***` anywhere it
+ * might appear in a string we print. The primary defence is not printing keys/URLs
+ * in CI at all; this guards anything that slips through (and GitHub also masks the
+ * secret value independently).
+ *
+ * @param {string} str
+ * @param {string} [segment]
+ * @returns {string}
+ */
+export function redactSegment(str, segment) {
+  const s = String(str ?? '');
+  if (!segment) return s;
+  return s.split(segment).join('***');
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Exported pure helpers (also used by tests)
@@ -94,12 +127,15 @@ export function getFlag(args, flag) {
  * @param {string} opts.version
  * @param {string} opts.baseUrl - public base URL (trailing slashes stripped)
  * @param {string[]} [opts.testerGroups]
+ * @param {string} [opts.testerSegment] - secret directory segment inserted between
+ *   the tester group and the module id (e.g. `testers/<group>/<segment>/<moduleId>/…`)
+ *   so the tester feed URL is not guessable. Empty ⇒ legacy (guessable) layout.
  * @returns {{
  *   zipName: string, channel: string, version: string,
  *   channelTarget: PublishTarget, testerTargets: PublishTarget[], targets: PublishTarget[]
  * }}
  */
-export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups = [] }) {
+export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups = [], testerSegment = '' }) {
   const base = baseUrl.replace(/\/+$/, '');
   const zipName = `${moduleId}-${version}.zip`;
 
@@ -121,8 +157,13 @@ export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGrou
   const channelPrefix = `modules/${moduleId}/${channel}`;
   const channelTarget = makeTarget('channel', null, channelPrefix, `${channelPrefix}/latest/module.json`);
 
+  // The secret segment sits between the (public) group and the module id so the
+  // tester feed URL can't be guessed from the group name alone.
+  const segment = String(testerSegment || '').replace(/^\/+|\/+$/g, '');
   const testerTargets = testerGroups.map((group) => {
-    const prefix = `testers/${group}/${moduleId}`;
+    const prefix = segment
+      ? `testers/${group}/${segment}/${moduleId}`
+      : `testers/${group}/${moduleId}`;
     return makeTarget('tester', group, prefix, `${prefix}/module.json`);
   });
 
@@ -168,9 +209,19 @@ async function main() {
   const bucket = env.S3_RELEASE_BUCKET || config.bucket;
   const baseUrl = (env.RELEASE_BASE_URL || config.baseUrl || '').replace(/\/+$/, '');
   const testerGroups = config.testerGroups || [];
+  // Secret directory segment for tester feeds — env only, never committed. Without
+  // it we refuse to publish tester groups to a guessable path (the whole point of
+  // the closed beta is a non-discoverable URL).
+  const testerSegment = (env.S3_TESTER_PATH_SECRET || '').replace(/^\/+|\/+$/g, '');
+  activeTesterSegment = testerSegment;
 
   if (!moduleId) fail('config is missing "moduleId"');
   if (!channel) fail('config is missing "channel" (and no --channel given)');
+  if (testerGroups.length > 0 && !testerSegment) {
+    fail('tester groups are configured but S3_TESTER_PATH_SECRET is unset — refusing to '
+      + 'publish to a guessable path. Set the secret (GitHub Actions secret in CI; an env '
+      + 'var locally) before publishing.');
+  }
 
   // AWS credentials are validated lazily by the SDK on first call; only the
   // script-level inputs without a provider chain are enforced here.
@@ -184,7 +235,8 @@ async function main() {
   }
 
   console.log(`release-s3: module=${moduleId} channel=${channel} version=${version}${dryRun ? ' (dry-run)' : ''}`);
-  console.log(`release-s3: bucket=${bucket || '(unset)'} baseUrl=${baseUrl || '(unset)'}`);
+  // The bucket host + baseUrl are part of the secret feed URL — only print them locally.
+  if (!inCI) console.log(`release-s3: bucket=${bucket || '(unset)'} baseUrl=${baseUrl || '(unset)'}`);
   console.log(`release-s3: targets=channel + ${testerGroups.length} tester group(s)\n`);
 
   // 2. Build dist/ at the requested version (reuse the canonical build path)
@@ -219,7 +271,8 @@ async function main() {
     channel,
     version,
     baseUrl: baseUrl || 'https://example.invalid',
-    testerGroups
+    testerGroups,
+    testerSegment
   });
 
   // 5. Stage one zip per target: rewrite dist/module.json with that target's
@@ -235,7 +288,10 @@ async function main() {
     await mkdir(outDir, { recursive: true });
     const zipPath = join(outDir, layout.zipName);
     zipDirectory(distDir, zipPath);
-    console.log(`release-s3: staged ${target.label} -> ${target.zipKey}`);
+    // Label only in CI (the key carries the secret segment); full key locally.
+    console.log(inCI
+      ? `release-s3: staged ${target.label}`
+      : `release-s3: staged ${target.label} -> ${target.zipKey}`);
     staged.push({ target, body, zipPath });
   }
 
@@ -260,25 +316,42 @@ async function main() {
     // never leave a half-published release behind).
     for (const { target } of staged) {
       if (await s3Exists(target.zipKey)) {
-        if (!overwrite) fail(`s3://${bucket}/${target.zipKey} already exists — pass --overwrite to replace it`);
-        console.log(`release-s3: will overwrite ${target.zipKey} (--overwrite set)`);
+        if (!overwrite) fail(inCI
+          ? `${target.label} version zip already exists — pass --overwrite to replace it`
+          : `s3://${bucket}/${target.zipKey} already exists — pass --overwrite to replace it`);
+        console.log(inCI
+          ? `release-s3: will overwrite ${target.label} (--overwrite set)`
+          : `release-s3: will overwrite ${target.zipKey} (--overwrite set)`);
       }
     }
 
     for (const { target, body, zipPath } of staged) {
       const zipBytes = await readFile(zipPath);
-      console.log(`release-s3: upload zip      -> s3://${bucket}/${target.zipKey}`);
+      if (!inCI) console.log(`release-s3: upload zip      -> s3://${bucket}/${target.zipKey}`);
       await s3Put(target.zipKey, zipBytes, 'application/zip', CACHE_IMMUTABLE);
-      console.log(`release-s3: upload manifest -> s3://${bucket}/${target.manifestKey}`);
+      if (!inCI) console.log(`release-s3: upload manifest -> s3://${bucket}/${target.manifestKey}`);
       await s3Put(target.manifestKey, JSON.stringify(body, null, 2), 'application/json', CACHE_NO_CACHE);
+      if (inCI) console.log(`release-s3: uploaded ${target.label} (zip + manifest)`);
     }
   }
 
   // 7. Install-URL summary
-  printSummary({ layout, dryRun });
+  printSummary({ layout, dryRun, segment: testerSegment });
 }
 
-function printSummary({ layout, dryRun }) {
+function printSummary({ layout, dryRun, segment }) {
+  // CI: the install URLs ARE the closed-beta secret — never print them to job logs.
+  if (inCI) {
+    const verb = dryRun ? 'would publish' : 'published';
+    console.log(`\nrelease-s3: ${verb} channel + ${layout.testerTargets.length} tester feed(s) `
+      + `(v${layout.version}). Install URLs withheld from CI logs — run a local `
+      + `\`--dry-run\` with S3_TESTER_PATH_SECRET set to retrieve them.`);
+    return;
+  }
+  // Local/dry-run: print the real install URLs so the maintainer can distribute
+  // them privately (local stdout is not a public artifact). `segment` is the live
+  // secret here by design — do not redact.
+  void segment;
   const header = dryRun ? 'DRY-RUN — install URLs that would be published:' : 'Published install URLs:';
   console.log('\n' + '═'.repeat(header.length));
   console.log(header);
@@ -295,7 +368,9 @@ function printSummary({ layout, dryRun }) {
 const isMain = argv[1] && fileURLToPath(import.meta.url) === argv[1];
 if (isMain) {
   main().catch((err) => {
-    console.error(err);
+    // In CI, redact the secret segment from any error text (AWS errors can echo
+    // the object key) before it lands in the job log.
+    console.error(inCI ? redactSegment(String(err?.stack || err), activeTesterSegment) : err);
     exit(1);
   });
 }

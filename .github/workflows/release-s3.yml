@@ -94,6 +94,10 @@ jobs:
         env:
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          # Secret directory segment for the closed-beta tester feed path. GitHub
+          # masks its value in logs; the script also withholds all S3 keys/URLs in
+          # CI and refuses to publish tester groups when this is unset.
+          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
         run: |
           node scripts/release-s3.js \
             --version "${{ steps.version.outputs.version }}" \
