@@ -170,6 +170,7 @@
       class="manager-travel-popover"
       style={popoverStyle}
       role="dialog"
+      tabindex="-1"
       aria-label={dialogAriaLabel || undefined}
       use:portal={() => getPopoverHost()}
       onclick={stop}
