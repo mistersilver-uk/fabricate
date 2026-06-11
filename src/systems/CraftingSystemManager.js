@@ -583,8 +583,8 @@ export class CraftingSystemManager {
     return '';
   }
 
-  _buildComponentSourceSnapshot(itemUuid, source = null, fallbackItem = null) {
-    const sourceData = this._resolveImportedSourceData(itemUuid, source);
+  async _buildComponentSourceSnapshot(itemUuid, source = null, fallbackItem = null, sourceData = null) {
+    sourceData ??= await this._resolveImportedComponentSourceData(itemUuid, source);
     const sourceResolved = !!source;
     const fallbackName = fallbackItem?.name || itemUuid?.split('.')?.pop() || 'Imported Item';
     const fallbackImg = fallbackItem?.img || 'icons/svg/item-bag.svg';
@@ -597,6 +597,8 @@ export class CraftingSystemManager {
         : this._normalizeComponentDescription(fallbackItem?.description),
       sourceUuid: sourceData.currentUuid,
       sourceItemUuid: sourceData.canonicalUuid,
+      fallbackItemIds: sourceData.fallbackItemIds,
+      sourceFallbacks: sourceData.sourceFallbacks,
       references: sourceData.references
     };
   }
@@ -616,9 +618,12 @@ export class CraftingSystemManager {
     };
   }
 
-  _buildFallbackSourceReferences(item, nextSourceUuid, nextSourceItemUuid) {
+  _buildFallbackSourceReferences(item, nextSourceUuid, nextSourceItemUuid, additionalFallbacks = []) {
     const fallbackSet = new Set(Array.isArray(item?.fallbackItemIds) ? item.fallbackItemIds : []);
     for (const ref of [item?.sourceUuid, item?.sourceItemUuid]) {
+      if (ref) fallbackSet.add(ref);
+    }
+    for (const ref of Array.isArray(additionalFallbacks) ? additionalFallbacks : []) {
       if (ref) fallbackSet.add(ref);
     }
     fallbackSet.delete(nextSourceUuid);
@@ -1233,6 +1238,60 @@ export class CraftingSystemManager {
   }
 
   /**
+   * Resolve component import source references, falling back when Foundry's
+   * recorded canonical source no longer resolves.
+   *
+   * @param {string} itemUuid
+   * @param {Item|object|null} source
+   * @returns {Promise<{
+   *   currentUuid: string|null,
+   *   canonicalUuid: string|null,
+   *   references: string[],
+   *   fallbackItemIds: string[],
+   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
+   * }>}
+   */
+  async _resolveImportedComponentSourceData(itemUuid, source = null) {
+    const sourceData = this._resolveImportedSourceData(itemUuid, source);
+    const sourceFallbacks = [];
+    const fallbackItemIds = [];
+    const recordedCanonicalUuid = getSourceUuid(source);
+    const currentUuid = sourceData.currentUuid;
+    if (!recordedCanonicalUuid || !currentUuid || recordedCanonicalUuid === currentUuid) {
+      return { ...sourceData, fallbackItemIds, sourceFallbacks };
+    }
+
+    let canonicalSource = null;
+    try {
+      canonicalSource = typeof fromUuid === 'function'
+        ? await fromUuid(recordedCanonicalUuid)
+        : null;
+    } catch {
+      canonicalSource = null;
+    }
+
+    if (canonicalSource) {
+      return { ...sourceData, fallbackItemIds, sourceFallbacks };
+    }
+
+    if (!sourceData.references.includes(recordedCanonicalUuid)) {
+      sourceData.references.push(recordedCanonicalUuid);
+    }
+    fallbackItemIds.push(recordedCanonicalUuid);
+    sourceFallbacks.push({
+      itemName: source?.name || itemUuid?.split('.')?.pop() || 'Imported Item',
+      brokenUuid: recordedCanonicalUuid,
+      fallbackUuid: currentUuid
+    });
+    return {
+      ...sourceData,
+      canonicalUuid: currentUuid,
+      fallbackItemIds,
+      sourceFallbacks
+    };
+  }
+
+  /**
    * Find an existing component in the system that already claims any of the given source references.
    *
    * @param {object} system - Normalized system object
@@ -1317,7 +1376,11 @@ export class CraftingSystemManager {
    *
    * @param {string} systemId
    * @param {string} itemUuid
-   * @returns {Promise<{ item: object, action: 'added'|'updated'|'skipped' }>}
+   * @returns {Promise<{
+   *   item: object,
+   *   action: 'added'|'updated'|'skipped',
+   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
+   * }>}
    */
   async addItemFromUuid(systemId, itemUuid) {
     this._assertGM('add component from uuid');
@@ -1339,14 +1402,15 @@ export class CraftingSystemManager {
       );
     }
 
-    const nextSourceData = this._resolveImportedSourceData(itemUuid, source);
+    const nextSourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
     const existing = this._findComponentBySourceReferences(system, nextSourceData.references);
-    const nextSnapshot = this._buildComponentSourceSnapshot(itemUuid, source, existing);
+    const nextSnapshot = await this._buildComponentSourceSnapshot(itemUuid, source, existing, nextSourceData);
     if (existing) {
       const nextFallbacks = this._buildFallbackSourceReferences(
         existing,
         nextSnapshot.sourceUuid,
-        nextSnapshot.sourceItemUuid
+        nextSnapshot.sourceItemUuid,
+        nextSnapshot.fallbackItemIds
       );
       const unchanged = existing.sourceUuid === nextSnapshot.sourceUuid
         && existing.sourceItemUuid === nextSnapshot.sourceItemUuid
@@ -1357,7 +1421,7 @@ export class CraftingSystemManager {
         && nextFallbacks.every(ref => (existing.fallbackItemIds || []).includes(ref));
 
       if (unchanged) {
-        return { item: existing, action: 'skipped' };
+        return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
       }
 
       existing.name = nextSnapshot.name;
@@ -1368,7 +1432,7 @@ export class CraftingSystemManager {
       existing.fallbackItemIds = nextFallbacks;
 
       await this.save();
-      return { item: existing, action: 'updated' };
+      return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
     }
 
     // No match: create new component
@@ -1380,9 +1444,21 @@ export class CraftingSystemManager {
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
     await this.save();
-    return { item, action: 'added' };
+    return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
+  /**
+   * Replace a component's source Item link and return fallback metadata when the
+   * dropped Item's recorded canonical source is broken.
+   *
+   * @param {string} systemId
+   * @param {string} itemId
+   * @param {string} itemUuid
+   * @returns {Promise<{
+   *   item: object,
+   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
+   * }>}
+   */
   async replaceItemSource(systemId, itemId, itemUuid) {
     this._assertGM('replace component source');
     const system = this.getSystem(systemId);
@@ -1404,7 +1480,7 @@ export class CraftingSystemManager {
     }
 
     const existing = system.components[idx];
-    const nextSnapshot = this._buildComponentSourceSnapshot(itemUuid, source, existing);
+    const nextSnapshot = await this._buildComponentSourceSnapshot(itemUuid, source, existing);
     const conflict = this._findComponentBySourceReferences(system, nextSnapshot.references, itemId);
     if (conflict) {
       throw new Error(
@@ -1420,7 +1496,8 @@ export class CraftingSystemManager {
         fallbackItemIds: this._buildFallbackSourceReferences(
           existing,
           nextSnapshot.sourceUuid,
-          nextSnapshot.sourceItemUuid
+          nextSnapshot.sourceItemUuid,
+          nextSnapshot.fallbackItemIds
         ),
         id: itemId
       },
@@ -1430,7 +1507,7 @@ export class CraftingSystemManager {
 
     system.components[idx] = updatedItem;
     await this.save();
-    return updatedItem;
+    return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
   /**
@@ -1439,7 +1516,13 @@ export class CraftingSystemManager {
    *
    * @param {string} systemId  - The crafting system to add items to
    * @param {string} packId    - The compendium pack identifier (e.g. "dnd5e.items")
-   * @returns {Promise<{added: number, updated: number, skipped: number, total: number}>}
+   * @returns {Promise<{
+   *   added: number,
+   *   updated: number,
+   *   skipped: number,
+   *   total: number,
+   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
+   * }>}
    */
   async addItemsFromPack(systemId, packId) {
     this._assertGM('bulk import from compendium');
@@ -1455,15 +1538,17 @@ export class CraftingSystemManager {
     let added = 0;
     let updated = 0;
     let skipped = 0;
+    const sourceFallbacks = [];
     for (const item of items) {
       const uuid = `Compendium.${packId}.${item.id}`;
       const result = await this.addItemFromUuid(systemId, uuid);
       if (result.action === 'added') added++;
       else if (result.action === 'updated') updated++;
       else skipped++;
+      if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
     }
 
-    return { added, updated, skipped, total: items.length };
+    return { added, updated, skipped, total: items.length, sourceFallbacks };
   }
 
   _hasChangedPath(changes = {}, path = []) {

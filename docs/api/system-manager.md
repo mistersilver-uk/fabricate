@@ -233,7 +233,7 @@ Adds a single Foundry Item document to the system as a component. GM only.
 
 Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
 
-The method resolves both the dropped item's live UUID and its canonical source UUID (via `_stats.compendiumSource`, with `flags.core.sourceId` as a legacy fallback) before deciding what to do. A component can claim a full source-reference chain through `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
+The method resolves both the dropped item's live UUID and its canonical source UUID (via `_stats.compendiumSource`, with `flags.core.sourceId` as a legacy fallback) before deciding what to do. If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `fallbackItemIds`. A component can claim a full source-reference chain through `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
 
 1. **Claimed source chain** — an existing component already claims either the dropped live UUID, the canonical source UUID, or a fallback UUID in the same chain. Fabricate refreshes the component in place and returns `action: "updated"` when metadata or stored references changed, or `action: "skipped"` when nothing changed.
 2. **Unclaimed source chain** — no component claims any of those references, so a new component is created and `action` is `"added"`.
@@ -243,10 +243,11 @@ The method resolves both the dropped item's live UUID and its canonical source U
 | `systemId` | `string` | System ID |
 | `itemUuid` | `string` | UUID of the Foundry item to add. Accepts both world item UUIDs (`Item.abc123`) and compendium item UUIDs (`Compendium.pack.id.itemId`). |
 
-**Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped' }>`
+**Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped', sourceFallbacks: object[] }>`
 
 - `item` — the component object (new or existing).
 - `action` — `"added"` if a new component was created, `"updated"` if an existing component's name/image/source references were refreshed, `"skipped"` if the claimed source chain was already current.
+- `sourceFallbacks` — broken source-link fallback notices in the form `{ itemName, brokenUuid, fallbackUuid }`. Empty when no fallback occurred.
 
 **Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document (such as an Actor or JournalEntry).
 
@@ -278,12 +279,13 @@ Each item is processed via `addItemFromUuid()`, so the same source-chain dedupli
 | `systemId` | `string` | System ID |
 | `packId` | `string` | Compendium pack identifier in `"scope.name"` format (e.g. `"dnd5e.items"`) |
 
-**Returns:** `Promise<{ added: number, updated: number, skipped: number, total: number }>`
+**Returns:** `Promise<{ added: number, updated: number, skipped: number, total: number, sourceFallbacks: object[] }>`
 
 - `added` — number of items created as new components on this call.
 - `updated` — number of items already registered whose name, image, or description was refreshed from the source.
 - `skipped` — number of items already registered and already up to date; no changes written.
 - `total` — total number of Item documents found in the pack.
+- `sourceFallbacks` — aggregated broken source-link fallback notices from imported items.
 
 **Throws:** `Error` if the system ID or pack ID is not found.
 

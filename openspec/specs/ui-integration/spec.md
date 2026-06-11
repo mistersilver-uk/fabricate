@@ -60,6 +60,10 @@ The `Gathering` button is hidden when no crafting system exposes gathering.
 
 Provide GM action to import all items from a compendium into a crafting system.
 Items with the same UUID or sourceUuid are de-duplicated on import.
+If an imported Item's recorded canonical source UUID no longer resolves,
+Fabricate falls back to the live dropped Item UUID. Single item and replace-source
+operations warn with the affected item and UUIDs; folder and compendium pack
+imports emit one summary warning with the affected count.
 
 ## GM Crafting Admin
 

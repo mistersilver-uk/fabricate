@@ -186,6 +186,8 @@ Drag any Item document from the **Items sidebar** or from an open **compendium b
 
 If the item is already registered in the system by either its live UUID or its canonical source UUID, the drop reuses the existing component instead of creating a duplicate. If the stored name, image, or live UUID is stale, Fabricate updates the component in place and records the previous live UUID in `fallbackItemIds`.
 
+If Foundry reports an original compendium/source UUID but that source no longer resolves, Fabricate stores the live dropped item UUID instead, keeps the broken source UUID in `fallbackItemIds`, and warns the GM.
+
 After import, Fabricate also listens for linked Foundry Item updates from a GM client. When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
 
 If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported. If the drag data cannot be resolved to any UUID, the same warning is shown.
@@ -199,11 +201,12 @@ To import all Item documents from a compendium pack at once, drag the **compendi
 - Items already registered and already up to date are skipped.
 - A single crafting system cannot contain two components that claim the same source item UUID chain.
 - A summary notification reports how many items were added, updated, and skipped.
+- If an item's recorded original source link is broken, Fabricate stores the live imported item UUID instead, keeps the broken UUID as fallback evidence, and warns once for the bulk import.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
 
 #### Folder drop
 
-Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder. Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added. If the folder contains no Item documents, a notification says so and nothing is written.
+Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder. Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added. If any imported item has a broken original source link, Fabricate warns once with the affected count. If the folder contains no Item documents, a notification says so and nothing is written.
 
 {: .note }
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops or the `addItemsFromPack()` API method instead.
