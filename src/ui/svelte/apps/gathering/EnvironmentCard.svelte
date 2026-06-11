@@ -76,6 +76,22 @@
     localize('FABRICATE.App.Gathering.Environments.LockedAria', { name })
   );
 
+  // Region lock: the environment itself is out of the party's current region. The
+  // engine surfaces this as a locked teaser carrying location.available === false
+  // plus a NO_CURRENT_REGION / LOCATION_BLOCKED blocked reason. Render a header
+  // alert (next to the danger pip) and use the full reason text as its tooltip.
+  const notInRegion = $derived(
+    locked
+      && environment?.location?.gated === true
+      && environment?.location?.available === false
+  );
+  const regionAlertTitle = $derived(
+    (Array.isArray(environment?.blockedReasons) ? environment.blockedReasons : [])
+      .find(reason => reason?.code === 'NO_CURRENT_REGION' || reason?.code === 'LOCATION_BLOCKED')
+      ?.message
+    || localize('FABRICATE.App.Gathering.Environments.RegionLockedChip')
+  );
+
   // Danger pill: always shown, icon-only, coloured by the environment's risk
   // tier with the full danger level in a tooltip. The engine always provides a
   // risk (defaulting to 'safe'), so this renders for every card.
@@ -107,6 +123,12 @@
       <span class="gathering-env-card-blind" title={localize('FABRICATE.App.Gathering.Environments.BlindChip')}>
         <i class="fas fa-mask" aria-hidden="true"></i>
         <span class="gathering-env-card-blind-label">{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span>
+      </span>
+    {/if}
+    {#if notInRegion}
+      <span class="gathering-env-card-region-alert" title={regionAlertTitle}>
+        <i class="fas fa-location-dot" aria-hidden="true"></i>
+        <span class="gathering-env-card-region-label">{localize('FABRICATE.App.Gathering.Environments.RegionLockedChip')}</span>
       </span>
     {/if}
     <span class={`gathering-env-card-hazard ${riskClass}`} aria-label={dangerAria}>
@@ -428,6 +450,29 @@
   }
 
   .gathering-env-card-blind i {
+    font-size: 11px;
+  }
+
+  /*
+    Region-lock alert: shown only when the environment is locked because the party
+    isn't in its region. Mirrors the warning-tone task callout pill so it reads as
+    the same "not in current region" indicator, just promoted to the env header.
+  */
+  .gathering-env-card-region-alert {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fab-warning-text);
+    background: var(--fab-warning-soft);
+    border: 1px solid var(--fab-warning-border);
+  }
+
+  .gathering-env-card-region-alert i {
     font-size: 11px;
   }
 

@@ -93,6 +93,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/gathering\//],
   },
   {
+    id: 'player-gathering-region-locked',
+    label: 'Player gathering — region-locked environment',
+    smokeLabels: ['player-gathering-region-locked'],
+    matches: [/^src\/ui\/svelte\/apps\/gathering\//],
+  },
+  {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],
