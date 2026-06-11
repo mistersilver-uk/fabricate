@@ -57,5 +57,13 @@ Hit list seen historically:
 - `.manager-environment-edit-view.is-placeholder` and `.manager-environment-placeholder-card` — gone since the real composition editor replaced the placeholder.
 - "Return to environments" button text — renamed to "Back to environments" and rewired through `confirmRouteExit`.
 - `.manager-environment-details-band` — CSS rule survived in `styles/fabricate.css`, but the Svelte usage was removed; the harness kept waiting on it.
+- `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from the retired `GatheringTravelView`. The live Travel tab renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed. A whole component can be replaced and its old classes only survive in the harness.
 
-**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done. Prefer running `npm run test:foundry` locally at least once on UI-touching PRs. If the harness asserts on something the new markup no longer has, update the harness in the same PR.
+**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done. Prefer running `npm run test:foundry` locally at least once on UI-touching PRs. If the harness asserts on something the new markup no longer has, update the harness in the same PR.
+
+**CI blind spot:** PR CI runs a reduced profile (`test:foundry:ci`) that skips full-only steps (e.g. the Travel screenshot). A selector that only the **full** profile exercises rots invisibly until someone runs `npm run test:foundry` locally. Don't assume green PR CI means the full smoke walk passes.
+
+## Running it locally (gotchas)
+
+- Needs Docker Desktop running and `.env.foundry` with `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` (the `up` script loads it; CI sets the vars directly). The container is cached between runs, so re-runs boot in ~5s.
+- The `run` phase **wipes `test-results/`** at startup. Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`. Background-task stdout is captured elsewhere; tee to a path outside `test-results/` if you need a copy.
