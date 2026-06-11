@@ -108,3 +108,7 @@ jobs:
       rc_tag: ${{ needs.release-candidate.outputs.rc_tag }}
       dry_run: false
       overwrite: false
+    secrets:
+      # Reusable workflows don't inherit repo secrets; pass the tester-path secret
+      # through explicitly so the publish can write to the (unguessable) feed path.
+      S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}

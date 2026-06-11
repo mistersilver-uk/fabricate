@@ -33,6 +33,13 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      # Secrets are NOT inherited by reusable workflows — the caller
+      # (release-candidate.yml) must pass this through explicitly. Without it the
+      # publish refuses to run (tester groups configured + secret unset).
+      S3_TESTER_PATH_SECRET:
+        description: "Secret directory segment for the closed-beta tester feed path"
+        required: false
 
 # id-token: write lets the workflow request a GitHub OIDC token, which is
 # exchanged with AWS STS for short-lived role credentials. AWS access is
