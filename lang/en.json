@@ -2432,6 +2432,8 @@
         "SourceUuidCopyFailed": "Could not copy source item UUID.",
         "SourceReplaced": "Replaced source for {name}.",
         "ReplaceFailed": "Failed to replace component source.",
+        "SourceFallbackWarning": "The original source link for {name} is broken ({brokenUuid}). Fabricate used the live item UUID instead: {fallbackUuid}.",
+        "SourceFallbackSummary": "{count} imported items had broken original source links. Fabricate used their live item UUIDs instead.",
         "SourceUnlinked": "Unlinked component source.",
         "UnlinkFailed": "Failed to unlink component source.",
         "SourceNotFound": "The linked source item could not be opened.",

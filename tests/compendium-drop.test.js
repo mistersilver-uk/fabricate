@@ -291,6 +291,9 @@ test('addItemsFromPack — updates existing component when canonical source UUID
   });
 
   globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Compendium.source.items.iron-ore') {
+      return { documentName: 'Item', name: 'Iron Ore Source' };
+    }
     if (uuid !== 'Compendium.world.new-pack.item-b') return null;
     return {
       documentName: 'Item',
@@ -406,6 +409,67 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
   globalThis.fromUuid = async () => null;
 });
 
+test('addItemFromUuid — keeps resolvable canonical source UUID', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Item.world-azuryt') {
+      return {
+        uuid,
+        documentName: 'Item',
+        name: 'Azuryt',
+        img: 'azuryt.png',
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.azuryt' }
+      };
+    }
+    if (uuid === 'Compendium.crafting.items.Item.azuryt') {
+      return { documentName: 'Item', name: 'Azuryt Source' };
+    }
+    return null;
+  };
+
+  const result = await mgr.addItemFromUuid('sys1', 'Item.world-azuryt');
+
+  assert.equal(result.action, 'added');
+  assert.equal(result.item.sourceUuid, 'Item.world-azuryt');
+  assert.equal(result.item.sourceItemUuid, 'Compendium.crafting.items.Item.azuryt');
+  assert.deepEqual(result.item.fallbackItemIds, []);
+  assert.deepEqual(result.sourceFallbacks, []);
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('addItemFromUuid — falls back to live item UUID when canonical source is broken', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Item.world-azuryt') {
+      return {
+        uuid,
+        documentName: 'Item',
+        name: 'Azuryt',
+        img: 'azuryt.png',
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' }
+      };
+    }
+    return null;
+  };
+
+  const result = await mgr.addItemFromUuid('sys1', 'Item.world-azuryt');
+
+  assert.equal(result.action, 'added');
+  assert.equal(result.item.sourceUuid, 'Item.world-azuryt');
+  assert.equal(result.item.sourceItemUuid, 'Item.world-azuryt');
+  assert.deepEqual(result.item.fallbackItemIds, ['Compendium.crafting.items.Item.missing-azuryt']);
+  assert.deepEqual(result.sourceFallbacks, [{
+    itemName: 'Azuryt',
+    brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+    fallbackUuid: 'Item.world-azuryt'
+  }]);
+
+  globalThis.fromUuid = async () => null;
+});
+
 test('addItemFromUuid — exact match with differing metadata overwrites name/img and returns updated', async () => {
   const mgr = buildManager([{
     id: 'sys1',
@@ -438,6 +502,46 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.iron-ore');
   // System should still have only one item
   assert.equal(mgr.getSystem('sys1').components.length, 1);
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('addItemFromUuid — updates existing component through broken canonical source reference', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Azuryt',
+      img: 'old.png',
+      sourceUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+      sourceItemUuid: 'Compendium.crafting.items.Item.missing-azuryt'
+    }]
+  }]);
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Item.world-azuryt') {
+      return {
+        uuid,
+        documentName: 'Item',
+        name: 'Azuryt',
+        img: 'azuryt.png',
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' }
+      };
+    }
+    return null;
+  };
+
+  const result = await mgr.addItemFromUuid('sys1', 'Item.world-azuryt');
+
+  assert.equal(result.action, 'updated');
+  assert.equal(result.item.id, 'comp-1');
+  assert.equal(result.item.name, 'Azuryt');
+  assert.equal(result.item.sourceUuid, 'Item.world-azuryt');
+  assert.equal(result.item.sourceItemUuid, 'Item.world-azuryt');
+  assert.ok(result.item.fallbackItemIds.includes('Compendium.crafting.items.Item.missing-azuryt'));
+  assert.equal(mgr.getSystem('sys1').components.length, 1);
+  assert.equal(result.sourceFallbacks.length, 1);
 
   globalThis.fromUuid = async () => null;
 });
@@ -590,14 +694,60 @@ test('replaceItemSource — updates source refs, description, and fallbackItemId
   });
 
   const result = await mgr.replaceItemSource('sys1', 'comp-1', 'Compendium.world.pack.sunleaf');
+  const item = result.item;
 
-  assert.equal(result.id, 'comp-1');
-  assert.equal(result.name, 'Sunleaf');
-  assert.equal(result.img, 'sunleaf.png');
-  assert.equal(result.description, 'Radiates warmth.');
-  assert.equal(result.sourceUuid, 'Compendium.world.pack.sunleaf');
-  assert.equal(result.sourceItemUuid, 'Compendium.source.items.sunleaf');
-  assert.ok(result.fallbackItemIds.includes('Item.old-herb'));
+  assert.equal(item.id, 'comp-1');
+  assert.equal(item.name, 'Sunleaf');
+  assert.equal(item.img, 'sunleaf.png');
+  assert.equal(item.description, 'Radiates warmth.');
+  assert.equal(item.sourceUuid, 'Compendium.world.pack.sunleaf');
+  assert.equal(item.sourceItemUuid, 'Compendium.source.items.sunleaf');
+  assert.ok(item.fallbackItemIds.includes('Item.old-herb'));
+  assert.deepEqual(result.sourceFallbacks, []);
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('replaceItemSource — falls back to live item UUID when canonical source is broken', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Herb',
+      img: 'old-herb.png',
+      description: 'Old herb description.',
+      sourceUuid: 'Item.old-herb'
+    }]
+  }]);
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Item.world-sunleaf') {
+      return {
+        uuid,
+        documentName: 'Item',
+        name: 'Sunleaf',
+        img: 'sunleaf.png',
+        _stats: { compendiumSource: 'Compendium.source.items.missing-sunleaf' }
+      };
+    }
+    return null;
+  };
+
+  const result = await mgr.replaceItemSource('sys1', 'comp-1', 'Item.world-sunleaf');
+  const item = result.item;
+
+  assert.equal(item.id, 'comp-1');
+  assert.equal(item.name, 'Sunleaf');
+  assert.equal(item.sourceUuid, 'Item.world-sunleaf');
+  assert.equal(item.sourceItemUuid, 'Item.world-sunleaf');
+  assert.ok(item.fallbackItemIds.includes('Item.old-herb'));
+  assert.ok(item.fallbackItemIds.includes('Compendium.source.items.missing-sunleaf'));
+  assert.deepEqual(result.sourceFallbacks, [{
+    itemName: 'Sunleaf',
+    brokenUuid: 'Compendium.source.items.missing-sunleaf',
+    fallbackUuid: 'Item.world-sunleaf'
+  }]);
 
   globalThis.fromUuid = async () => null;
 });
@@ -619,11 +769,11 @@ test('replaceItemSource — preserves existing metadata when fromUuid cannot res
 
   const result = await mgr.replaceItemSource('sys1', 'comp-1', 'Compendium.world.pack.sunleaf');
 
-  assert.equal(result.name, 'Old Herb');
-  assert.equal(result.img, 'old-herb.png');
-  assert.equal(result.description, 'Old herb description.');
-  assert.equal(result.sourceUuid, 'Compendium.world.pack.sunleaf');
-  assert.ok(result.fallbackItemIds.includes('Item.old-herb'));
+  assert.equal(result.item.name, 'Old Herb');
+  assert.equal(result.item.img, 'old-herb.png');
+  assert.equal(result.item.description, 'Old herb description.');
+  assert.equal(result.item.sourceUuid, 'Compendium.world.pack.sunleaf');
+  assert.ok(result.item.fallbackItemIds.includes('Item.old-herb'));
 });
 
 test('addItemsFromPack — returns { added, updated, skipped, total } with updated field', async () => {
@@ -651,6 +801,54 @@ test('addItemsFromPack — returns { added, updated, skipped, total } with updat
   assert.equal(result.added, 2);
   assert.equal(result.updated, 0);
   assert.ok('updated' in result, 'result must have an updated field');
+});
+
+test('addItemsFromPack — aggregates broken canonical source fallbacks', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+
+  _mockPacks.set('world.broken-sources', {
+    getDocuments: async () => [
+      { id: 'item-a', documentName: 'Item', name: 'Azuryt', img: 'azuryt.png' },
+      { id: 'item-b', documentName: 'Item', name: 'Cytryn', img: 'cytryn.png' }
+    ]
+  });
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Compendium.world.broken-sources.item-a') {
+      return {
+        documentName: 'Item',
+        name: 'Azuryt',
+        img: 'azuryt.png',
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' }
+      };
+    }
+    if (uuid === 'Compendium.world.broken-sources.item-b') {
+      return {
+        documentName: 'Item',
+        name: 'Cytryn',
+        img: 'cytryn.png',
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.cytryn' }
+      };
+    }
+    if (uuid === 'Compendium.crafting.items.Item.cytryn') {
+      return { documentName: 'Item', name: 'Cytryn Source' };
+    }
+    return null;
+  };
+
+  const result = await mgr.addItemsFromPack('sys1', 'world.broken-sources');
+
+  assert.equal(result.total, 2);
+  assert.equal(result.added, 2);
+  assert.deepEqual(result.sourceFallbacks, [{
+    itemName: 'Azuryt',
+    brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+    fallbackUuid: 'Compendium.world.broken-sources.item-a'
+  }]);
+  assert.equal(mgr.getSystem('sys1').components[0].sourceItemUuid, 'Compendium.world.broken-sources.item-a');
+  assert.equal(mgr.getSystem('sys1').components[1].sourceItemUuid, 'Compendium.crafting.items.Item.cytryn');
+
+  globalThis.fromUuid = async () => null;
 });
 
 test('addItemFromUuid — rejects non-Item document type', async () => {
@@ -1068,6 +1266,21 @@ test('resolveDropData — null input returns nulls', () => {
  * SvelteRecipeManagerApp._prepareSvelteProps, usable without the Svelte app.
  */
 function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, folders }) {
+  function notifySingleSourceFallback(fallbacks = []) {
+    const fallback = Array.isArray(fallbacks) ? fallbacks[0] : null;
+    if (!fallback) return;
+    notifyWarn('SourceFallbackWarning', {
+      name: fallback.itemName || fallback.fallbackUuid,
+      brokenUuid: fallback.brokenUuid,
+      fallbackUuid: fallback.fallbackUuid
+    });
+  }
+
+  function notifyBulkSourceFallback(fallbacks = []) {
+    const count = Array.isArray(fallbacks) ? fallbacks.length : 0;
+    if (count > 0) notifyWarn('SourceFallbackSummary', { count });
+  }
+
   function folderValues() {
     if (!folders) return [];
     if (folders instanceof Map) return Array.from(folders.values());
@@ -1102,6 +1315,7 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
       }
       const result = await systemManager.addItemsFromPack(systemId, data.collection);
       notifyInfo('BulkImportUpdated', result);
+      notifyBulkSourceFallback(result.sourceFallbacks);
       return;
     }
 
@@ -1123,13 +1337,16 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
       let added = 0;
       let updated = 0;
       let skipped = 0;
+      const sourceFallbacks = [];
       for (const fi of folderItems) {
         const res = await systemManager.addItemFromUuid(systemId, fi.uuid);
         if (res.action === 'added') added++;
         else if (res.action === 'updated') updated++;
         else skipped++;
+        if (Array.isArray(res.sourceFallbacks)) sourceFallbacks.push(...res.sourceFallbacks);
       }
       notifyInfo('FolderImportSummary', { added, updated, skipped, total: folderItems.length, name: folder.name });
+      notifyBulkSourceFallback(sourceFallbacks);
       return;
     }
 
@@ -1150,7 +1367,8 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
       notifyWarn('DropNoSystemSelected');
       return;
     }
-    await systemManager.addItemFromUuid(systemId, uuid);
+    const result = await systemManager.addItemFromUuid(systemId, uuid);
+    notifySingleSourceFallback(result.sourceFallbacks);
   };
 }
 
@@ -1177,6 +1395,74 @@ test('onDropItem integration — Actor drop shows warning and does not call addI
   assert.equal(warnings.length, 1);
   assert.equal(warnings[0].key, 'DropNotAnItem');
   assert.equal(warnings[0].params.type, 'Actor');
+});
+
+test('onDropItem integration — single item import warns when source fallback is used', async () => {
+  const warnings = [];
+
+  const mgr = {
+    addItemFromUuid: async () => ({
+      item: { name: 'Azuryt' },
+      action: 'added',
+      sourceFallbacks: [{
+        itemName: 'Azuryt',
+        brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+        fallbackUuid: 'Item.world-azuryt'
+      }]
+    }),
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0, sourceFallbacks: [] })
+  };
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
+    notifyInfo: () => {},
+    folders: new Map()
+  });
+
+  await handler({ type: 'Item', uuid: 'Item.world-azuryt' });
+
+  assert.deepEqual(warnings, [{
+    key: 'SourceFallbackWarning',
+    params: {
+      name: 'Azuryt',
+      brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+      fallbackUuid: 'Item.world-azuryt'
+    }
+  }]);
+});
+
+test('onDropItem integration — compendium pack import summarizes source fallbacks', async () => {
+  const warnings = [];
+  const infos = [];
+
+  const mgr = {
+    addItemFromUuid: async () => ({ item: {}, action: 'added', sourceFallbacks: [] }),
+    addItemsFromPack: async () => ({
+      added: 2,
+      updated: 0,
+      skipped: 0,
+      total: 2,
+      sourceFallbacks: [
+        { itemName: 'Azuryt', brokenUuid: 'Compendium.missing.a', fallbackUuid: 'Compendium.world.pack.a' },
+        { itemName: 'Cytryn', brokenUuid: 'Compendium.missing.c', fallbackUuid: 'Compendium.world.pack.c' }
+      ]
+    })
+  };
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders: new Map()
+  });
+
+  await handler({ type: 'Compendium', collection: 'world.pack' });
+
+  assert.equal(infos[0].key, 'BulkImportUpdated');
+  assert.deepEqual(warnings, [{ key: 'SourceFallbackSummary', params: { count: 2 } }]);
 });
 
 test('onDropItem integration — Folder with Items imports each and shows summary', async () => {
@@ -1222,6 +1508,44 @@ test('onDropItem integration — Folder with Items imports each and shows summar
   assert.equal(infos[0].params.updated, 0);
   assert.equal(infos[0].params.skipped, 0);
   assert.equal(infos[0].params.total, 2);
+});
+
+test('onDropItem integration — Folder import summarizes source fallbacks once', async () => {
+  const warnings = [];
+
+  const mgr = {
+    addItemFromUuid: async (_sysId, uuid) => ({
+      item: { name: uuid },
+      action: 'added',
+      sourceFallbacks: uuid === 'Item.item-x'
+        ? [{ itemName: 'Azuryt', brokenUuid: 'Compendium.missing.azuryt', fallbackUuid: uuid }]
+        : []
+    }),
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0, sourceFallbacks: [] })
+  };
+
+  const folders = new Map([
+    ['folder1', {
+      id: 'folder1',
+      name: 'My Folder',
+      contents: [
+        { documentName: 'Item', uuid: 'Item.item-x' },
+        { documentName: 'Item', uuid: 'Item.item-y' }
+      ]
+    }]
+  ]);
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
+    notifyInfo: () => {},
+    folders
+  });
+
+  await handler({ type: 'Folder', id: 'folder1', documentType: 'Item' });
+
+  assert.deepEqual(warnings, [{ key: 'SourceFallbackSummary', params: { count: 1 } }]);
 });
 
 test('onDropItem integration — Folder import includes nested item folders and summary counts', async () => {

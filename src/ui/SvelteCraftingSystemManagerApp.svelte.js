@@ -406,6 +406,24 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       return uuid;
     };
 
+    const notifySingleSourceFallback = (fallbacks = []) => {
+      const fallback = Array.isArray(fallbacks) ? fallbacks[0] : null;
+      if (!fallback) return;
+      ui.notifications.warn(localize('FABRICATE.Admin.Items.SourceFallbackWarning', {
+        name: fallback.itemName || fallback.fallbackUuid,
+        brokenUuid: fallback.brokenUuid,
+        fallbackUuid: fallback.fallbackUuid
+      }));
+    };
+
+    const notifyBulkSourceFallback = (fallbacks = []) => {
+      const count = Array.isArray(fallbacks) ? fallbacks.length : 0;
+      if (count <= 0) return;
+      ui.notifications.warn(localize('FABRICATE.Admin.Items.SourceFallbackSummary', {
+        count
+      }));
+    };
+
     const importSingleManagedItemFromDrop = async (data) => {
       const systemManager = game.fabricate.getCraftingSystemManager();
       const systemId = get(this._adminStore.selectedSystemId) || '';
@@ -424,6 +442,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             name: result.item.name
           }));
         }
+        notifySingleSourceFallback(result.sourceFallbacks);
         await this._adminStore.refresh();
         return result.item ?? null;
       } catch (err) {
@@ -456,6 +475,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               skipped: result.skipped,
               total: result.total
             }));
+            notifyBulkSourceFallback(result.sourceFallbacks);
             await this._adminStore.refresh();
             return;
           }
@@ -480,11 +500,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             let added = 0;
             let updated = 0;
             let skipped = 0;
+            const sourceFallbacks = [];
             for (const folderItem of folderItems) {
               const result = await systemManager.addItemFromUuid(systemId, folderItem.uuid);
               if (result.action === 'added') added++;
               else if (result.action === 'updated') updated++;
               else skipped++;
+              if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
             }
             ui.notifications.info(localize('FABRICATE.Admin.Items.FolderImportSummary', {
               added,
@@ -493,6 +515,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               total: folderItems.length,
               name: folder.name || data.id
             }));
+            notifyBulkSourceFallback(sourceFallbacks);
             await this._adminStore.refresh();
             return;
           }
@@ -512,10 +535,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           if (!uuid) return;
 
           try {
-            const item = await systemManager.replaceItemSource(systemId, itemId, uuid);
+            const result = await systemManager.replaceItemSource(systemId, itemId, uuid);
+            const item = result.item;
             ui.notifications.info(localize('FABRICATE.Admin.Items.SourceReplaced', {
               name: item.name
             }));
+            notifySingleSourceFallback(result.sourceFallbacks);
             await this._adminStore.refresh();
           } catch (err) {
             ui.notifications.warn(err.message || localize('FABRICATE.Admin.Items.ReplaceFailed'));

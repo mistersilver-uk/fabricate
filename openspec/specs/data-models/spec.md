@@ -259,6 +259,9 @@ Represent one curated item entry available to recipes and salvage operations.
 7. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"routed"`.
 8. `salvage.ingredientQuantity` must be a positive integer.
 9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
+10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
+11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `sourceUuid` and `sourceItemUuid`, and preserve the broken canonical source UUID in `fallbackItemIds`.
+12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
 
 ## Recipe
 
