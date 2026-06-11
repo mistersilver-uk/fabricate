@@ -794,8 +794,8 @@ async function assertManagerLayoutStable(page, label) {
       '.environment-fields',
       '.environment-task-layout',
       '.manager-travel-view',
-      '.manager-travel-party-row',
-      '.manager-travel-member-row',
+      '.manager-travel-parties-row',
+      '.manager-party-member-row',
       '.manager-fact'
     ];
     return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)).map((element, index) => {
@@ -827,7 +827,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-task-row'
       || metric.selector === '.manager-gathering-hazard-row'
       || metric.selector === '.manager-tools-row'
-      || metric.selector === '.manager-travel-party-row'
+      || metric.selector === '.manager-travel-parties-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-system-edit-form'
@@ -2661,7 +2661,7 @@ async function main() {
         await page.locator('.fabricate-manager #manager-gathering-nav-travel').first().click();
         await page.locator('.fabricate-manager .manager-travel-view').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager .manager-travel-party-row').first()
+        await page.locator('.fabricate-manager .manager-travel-parties-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertManagerLayoutStable(page, 'gathering travel normal');
         await assertNoScreenshotOverlays(page);

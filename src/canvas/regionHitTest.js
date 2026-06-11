@@ -123,6 +123,75 @@ export function interactableBehaviorsContainingToken({ scene, token, isInteracta
 }
 
 /**
+ * Collect the UUIDs of every Scene Region on the given scene whose shape contains
+ * the token's center. Keyed on `region.uuid` (not the Fabricate env flag), so it
+ * works for plain regions a GM has drawn. Backs the travel-marker current-region
+ * sensor: which Scene Regions is this token standing in right now?
+ *
+ * @param {object} args
+ * @param {object} args.scene  The token's scene (carries `regions`).
+ * @param {object} args.token  A TokenDocument (or its placeable) with center coords.
+ * @returns {string[]} Region UUIDs containing the token center ([] when none / no point).
+ */
+export function sceneRegionUuidsContainingToken({ scene, token } = {}) {
+  const point = tokenDocumentCenter(token);
+  if (!point) return [];
+  const uuids = [];
+  for (const region of collectRegions(scene?.regions)) {
+    if (!region?.uuid) continue;
+    if (regionContainsPoint(region, point)) uuids.push(String(region.uuid));
+  }
+  return uuids;
+}
+
+/**
+ * Resolve a token's CENTER point from its DOCUMENT, preferring the authoritative
+ * document position over the placeable's `center`. This matters for live travel
+ * sensing: the `updateToken` hook fires before the placeable finishes its move
+ * animation, so `object.center` still reports the OLD position while the document
+ * already holds the new one. Order: V13 `TokenDocument#getCenterPoint()` →
+ * computed from `x/y` + footprint (when a grid size is known) → the placeable
+ * `center` → the document top-left. Returns null when nothing finite resolves.
+ *
+ * @param {object} token  TokenDocument (preferred) or its placeable.
+ * @returns {{ x: number, y: number } | null}
+ */
+export function tokenDocumentCenter(token) {
+  const x = Number(token?.x);
+  const y = Number(token?.y);
+  // PRIMARY: compute the centre from the DOCUMENT position + footprint. At the
+  // `updateToken` hook the document already holds the destination, while the
+  // placeable centre / `getCenterPoint()` still lag behind the move animation —
+  // reading those produces an off-by-one (the region the token just LEFT).
+  const grid = Number(token?.parent?.grid?.size);
+  if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(grid) && grid > 0) {
+    const w = Number(token?.width);
+    const h = Number(token?.height);
+    return {
+      x: x + grid * (Number.isFinite(w) ? w : 1) / 2,
+      y: y + grid * (Number.isFinite(h) ? h : 1) / 2
+    };
+  }
+  // Fallbacks for gridless / unusual scenes where the footprint cannot be sized.
+  if (typeof token?.getCenterPoint === 'function') {
+    try {
+      const c = token.getCenterPoint();
+      if (Number.isFinite(Number(c?.x)) && Number.isFinite(Number(c?.y))) {
+        return { x: Number(c.x), y: Number(c.y) };
+      }
+    } catch {
+      // fall through
+    }
+  }
+  const center = token?.object?.center;
+  if (center && Number.isFinite(Number(center.x)) && Number.isFinite(Number(center.y))) {
+    return { x: Number(center.x), y: Number(center.y) };
+  }
+  if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+  return null;
+}
+
+/**
  * Resolve a token's CENTER point in scene-space, preferring the live placeable's
  * `center` (the authoritative pixel center Foundry computes from the footprint),
  * falling back to the document's top-left `x/y`. Returns null when no finite

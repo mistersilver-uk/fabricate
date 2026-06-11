@@ -12,6 +12,7 @@
   import GatheringTravelTabs from './GatheringTravelTabs.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import GatheringRegionsTab from './GatheringRegionsTab.svelte';
+  import GatheringMapLinksTab from './GatheringMapLinksTab.svelte';
 
   let {
     environments = [],
@@ -94,7 +95,12 @@
     onRenameRegion = () => {},
     onToggleRegionEnabled = () => {},
     onUpdateRegion = () => {},
-    onDeleteRegion = () => {}
+    onDeleteRegion = () => {},
+    travelCurrentSceneRegions = [],
+    travelCurrentSceneUuid = '',
+    mapSelectedRegionUuid = '',
+    onSelectMapRegion = () => {},
+    onSetMapRegionLink = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -883,15 +889,15 @@
           onRemoveEnvironment={onRemoveEnvironmentFromRegion}
         />
       {:else if activeTravelTab === 'map'}
-        <div
-          class="manager-travel-panel"
-          id="travel-panel-map"
-          role="tabpanel"
-          aria-labelledby="travel-tab-map"
-          data-travel-panel="map"
-        >
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinksPlaceholder', 'Scene Region links will live here.')}</p>
-        </div>
+        <GatheringMapLinksTab
+          sceneRegions={travelCurrentSceneRegions}
+          sceneUuid={travelCurrentSceneUuid}
+          selectedRegionUuid={mapSelectedRegionUuid}
+          regions={travelSystemRegions}
+          saving={travelSaving}
+          onSelect={onSelectMapRegion}
+          onSetLink={onSetMapRegionLink}
+        />
       {/if}
     </div>
   {:else if activeGatheringTab === 'settings'}

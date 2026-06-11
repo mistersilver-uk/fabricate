@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringLocationService } from '../src/systems/GatheringLocationService.js';
 
-function makeService({ parties = [], regions = [], enabled = true } = {}) {
+function makeService({ parties = [], regions = [], enabled = true, senseSceneRegions } = {}) {
   const partyMap = new Map(parties.map(p => [p.id, p]));
   const partyStore = {
     get: id => partyMap.get(id) || null,
@@ -15,7 +15,7 @@ function makeService({ parties = [], regions = [], enabled = true } = {}) {
       ? { id: 'system-a', gatheringRegions: regions, gatheringRegionSettings: { enabled } }
       : null)
   };
-  return new GatheringLocationService({ partyStore, systemManager });
+  return new GatheringLocationService({ partyStore, systemManager, senseSceneRegions });
 }
 
 const regions = [
@@ -144,4 +144,84 @@ test('buildCurrentRegionContext fast-exits to unresolved-empty when the subsyste
   assert.equal(result.resolved, false);
   assert.equal(result.source, 'unresolved');
   assert.deepEqual(result.regions, []);
+});
+
+// ---------------------------------------------------------------------------
+// Auto (travel-actor) sensing: current region derived live from the marker's
+// token position via region sceneMappings, when there is no manual override.
+// ---------------------------------------------------------------------------
+
+const mappedRegions = [
+  { id: 'r1', name: 'Verdant', enabled: true, sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }] },
+  { id: 'r2', name: 'Ashen', enabled: true, sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.b' }] },
+  { id: 'r3', name: 'Unmapped', enabled: true, sceneMappings: [] }
+];
+
+test('auto: marker inside a linked Scene Region resolves the Fabricate region (source travelActor)', () => {
+  const service = makeService({
+    regions: mappedRegions,
+    parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
+    senseSceneRegions: (uuid) => (uuid === 'Actor.m1' ? ['Scene.s1.Region.a'] : [])
+  });
+  const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
+  assert.equal(result.resolved, true);
+  assert.equal(result.source, 'travelActor');
+  assert.deepEqual(result.regionIds, ['r1']);
+});
+
+test('auto: marker inside multiple linked Scene Regions resolves all matching Fabricate regions', () => {
+  const service = makeService({
+    regions: mappedRegions,
+    parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRegionOverrides: { 'system-a': { mode: 'none', regionIds: [] } } }],
+    senseSceneRegions: () => new Set(['Scene.s1.Region.a', 'Scene.s1.Region.b'])
+  });
+  const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
+  assert.equal(result.resolved, true);
+  assert.equal(result.source, 'travelActor');
+  assert.deepEqual([...result.regionIds].sort((a, b) => a.localeCompare(b)), ['r1', 'r2']);
+});
+
+test('auto: a manual override still wins over live sensing', () => {
+  const service = makeService({
+    regions: mappedRegions,
+    parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r2'] } } }],
+    senseSceneRegions: () => ['Scene.s1.Region.a']
+  });
+  const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
+  assert.equal(result.source, 'manualOverride');
+  assert.deepEqual(result.regionIds, ['r2']);
+});
+
+test('auto: marker in no linked Scene Region resolves to unresolved', () => {
+  const service = makeService({
+    regions: mappedRegions,
+    parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
+    senseSceneRegions: () => ['Scene.s1.Region.unmapped']
+  });
+  const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
+  assert.equal(result.resolved, false);
+  assert.equal(result.source, 'unresolved');
+});
+
+test('auto: a travel-actor-less party resolves to unresolved (no sensing attempted)', () => {
+  let sensed = false;
+  const service = makeService({
+    regions: mappedRegions,
+    parties: [{ id: 'p1', enabled: true, currentRegionOverrides: {} }],
+    senseSceneRegions: () => { sensed = true; return ['Scene.s1.Region.a']; }
+  });
+  const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
+  assert.equal(result.resolved, false);
+  assert.equal(sensed, false, 'no marker ⇒ no sensing call');
+});
+
+test('auto: resolveForActor derives the region from the party marker for a member', () => {
+  const service = makeService({
+    regions: mappedRegions,
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.alice'], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
+    senseSceneRegions: (uuid) => (uuid === 'Actor.m1' ? ['Scene.s1.Region.b'] : [])
+  });
+  const result = service.resolveForActor({ actor: { uuid: 'Actor.alice' }, systemId: 'system-a' });
+  assert.equal(result.resolved, true);
+  assert.deepEqual(result.regionIds, ['r2']);
 });

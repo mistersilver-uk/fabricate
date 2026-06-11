@@ -1501,6 +1501,8 @@ export function createAdminStore(services) {
   const travelFieldErrors = writable({});
   let unsubscribeFabricateReady = null;
   let unsubscribeFabricateDataChanged = null;
+  let unsubscribeSceneChange = null;
+  let unsubscribeTravelMarkerMove = null;
   let readyRefreshScheduled = false;
   let externalRefreshScheduled = false;
   let destroyed = false;
@@ -1986,14 +1988,26 @@ export function createAdminStore(services) {
       const regionById = new Map(regions.map(region => [region.id, region]));
       const locationService = getLocationService();
 
+      // Resolve each party's current regions ONCE (manual override OR live travel-
+      // marker sensing) and bucket by region id, so every region→party list below
+      // reflects auto mode — not just stored overrides.
+      const partyEvidence = new Map();
+      const partyResolvedRegionIds = new Map();
+      for (const party of parties) {
+        const evidence = (systemId && locationService?.resolveCurrentRegions)
+          ? locationService.resolveCurrentRegions({ partyId: party.id, systemId })
+          : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+        partyEvidence.set(party.id, evidence);
+        partyResolvedRegionIds.set(party.id, new Set(Array.isArray(evidence.regionIds) ? evidence.regionIds : []));
+      }
+
       const travelParties = parties.map(party => {
         const staleMembers = party.memberActorUuids.filter(uuid => !actorByUuid.has(uuid));
         const staleTravelActor = party.travelActorUuid && !actorByUuid.has(party.travelActorUuid)
           ? party.travelActorUuid
           : null;
-        const evidence = (systemId && locationService?.resolveCurrentRegions)
-          ? locationService.resolveCurrentRegions({ partyId: party.id, systemId })
-          : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+        const evidence = partyEvidence.get(party.id)
+          || { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
         const override = party.currentRegionOverrides?.[systemId] || null;
         const overrideRegionIds = override?.mode === 'manual' ? (override.regionIds || []) : [];
         const memberCards = party.memberActorUuids.map(uuid => ({
@@ -2046,14 +2060,50 @@ export function createAdminStore(services) {
       const regionEnvironments = (regionId) => regionEnvList
         .filter(env => Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId))
         .map(env => ({ id: env.id, name: env.name, img: env.img || '' }));
+      // Parties whose RESOLVED current region (manual or live auto) includes the
+      // region — reuses the precomputed buckets so auto-mode parties are included.
       const regionParties = (regionId) => parties
-        .filter(party => {
-          const override = party?.currentRegionOverrides?.[systemId];
-          return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
-        })
+        .filter(party => partyResolvedRegionIds.get(party.id)?.has(regionId))
         .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
 
+      // Map Region Links tab: the current scene's regions, each annotated with the
+      // Fabricate region (if any) whose sceneMappings already claim it on this
+      // scene. The link is single-valued per scene region (first mapping wins).
+      const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
+      const currentSceneUuid = String(sceneData.sceneUuid || '');
+      const linkBySceneRegionUuid = new Map();
+      for (const region of regions) {
+        const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
+        for (const mapping of mappings) {
+          if (!mapping?.sceneRegionUuid) continue;
+          if (currentSceneUuid && mapping.sceneUuid && mapping.sceneUuid !== currentSceneUuid) continue;
+          if (!linkBySceneRegionUuid.has(mapping.sceneRegionUuid)) {
+            linkBySceneRegionUuid.set(mapping.sceneRegionUuid, region.id);
+          }
+        }
+      }
+      // Parties whose travel-marker token can be tested for containment (those
+      // that have a marker actor). Reused across scene regions below.
+      const partiesWithMarker = parties.filter(party => party?.travelActorUuid);
+      const markerUuids = partiesWithMarker.map(party => String(party.travelActorUuid));
+      const currentSceneRegions = (Array.isArray(sceneData.regions) ? sceneData.regions : [])
+        .map(sceneRegion => {
+          const linkedRegionId = linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || '';
+          // Parties whose travel marker currently sits inside this Scene Region.
+          const insideUuids = markerUuids.length
+            ? new Set(services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) || [])
+            : new Set();
+          const partiesInMapRegion = partiesWithMarker
+            .filter(party => insideUuids.has(String(party.travelActorUuid)))
+            .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
+          // Parties whose current region includes the linked Fabricate region.
+          const partiesInFabricateRegion = linkedRegionId ? regionParties(linkedRegionId) : [];
+          return { ...sceneRegion, linkedRegionId, partiesInMapRegion, partiesInFabricateRegion };
+        });
+
       return {
+        currentSceneUuid,
+        currentSceneRegions,
         travelParties,
         selectedPartyId: selectedId,
         travelSaving: get(travelSaving),
@@ -2243,6 +2293,52 @@ export function createAdminStore(services) {
       // region authoring surface (description/img/secret/biomes).
       async updateRegion(systemId, regionId, patch = {}) {
         return _regionPatch(systemId, regionId, patch && typeof patch === 'object' ? patch : {});
+      },
+      // Link (or unlink) a Foundry Scene Region on the current scene to a Fabricate
+      // region. Single-valued: the scene region is stripped from every region's
+      // sceneMappings (on this scene) before being attached to the chosen region;
+      // a falsy regionId just clears the link. Only regions that actually change
+      // are persisted, so this is a no-op write when nothing moved.
+      async setMapRegionLink(sceneRegionUuid, fabricateRegionId) {
+        const regionStore = getRegionStore();
+        const systemId = get(selectedSystemId);
+        const targetSceneRegionUuid = String(sceneRegionUuid || '');
+        if (!regionStore || !systemId || !targetSceneRegionUuid) return false;
+        const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
+        const sceneUuid = String(sceneData.sceneUuid || '');
+        const nextRegionId = fabricateRegionId ? String(fabricateRegionId) : '';
+        const matchesTarget = (mapping) => mapping?.sceneRegionUuid === targetSceneRegionUuid
+          && (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
+        clearErrors();
+        travelSaving.set(true);
+        patch();
+        try {
+          const regions = regionStore.listBySystem?.(systemId) || [];
+          const regionList = Array.isArray(regions) ? regions : [];
+
+          for (const region of regionList) {
+            const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
+            const filtered = mappings.filter(mapping => !matchesTarget(mapping));
+            if (nextRegionId && region.id === nextRegionId) {
+              await regionStore.update(systemId, region.id, {
+                sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }]
+              });
+            } else if (filtered.length !== mappings.length) {
+              await regionStore.update(systemId, region.id, { sceneMappings: filtered });
+            }
+          }
+
+          // No current-region writes here: a party's current region is derived
+          // LIVE from its travel marker's position (GatheringLocationService auto
+          // sensing), so inside markers resolve to the new link automatically.
+          return true;
+        } catch (err) {
+          applyError(err);
+          return false;
+        } finally {
+          travelSaving.set(false);
+          patch();
+        }
       },
       async setGatheringRegionsEnabled(systemId, enabled) {
         const regionStore = getRegionStore();
@@ -5205,11 +5301,33 @@ export function createAdminStore(services) {
     unsubscribeFabricateReady = null;
     unsubscribeFabricateDataChanged?.();
     unsubscribeFabricateDataChanged = null;
+    unsubscribeSceneChange?.();
+    unsubscribeSceneChange = null;
+    unsubscribeTravelMarkerMove?.();
+    unsubscribeTravelMarkerMove = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
   }
 
   unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
+
+  // Refresh the Map Region Links list when the GM activates a different scene.
+  unsubscribeSceneChange = services.subscribeSceneChange?.(() => {
+    if (destroyed) return;
+    travel.patch();
+  }) || null;
+
+  // Refresh the live current-region view when a party's travel marker token moves
+  // (or is added/removed). Only re-patch for tokens that are actually a party's
+  // travel marker, so unrelated token moves don't churn the Travel view.
+  unsubscribeTravelMarkerMove = services.subscribeTravelMarkerMove?.((actorUuid) => {
+    if (destroyed) return;
+    if (!actorUuid) { travel.patch(); return; }
+    const parties = services.getGatheringPartyStore?.()?.list?.() || [];
+    const isMarker = (Array.isArray(parties) ? parties : [])
+      .some(party => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid));
+    if (isMarker) travel.patch();
+  }) || null;
 
   // Trigger initial computation
   refresh();
@@ -5354,6 +5472,7 @@ export function createAdminStore(services) {
     renameRegion: travel.renameRegion,
     toggleRegionEnabled: travel.toggleRegionEnabled,
     updateRegion: travel.updateRegion,
+    setMapRegionLink: travel.setMapRegionLink,
     deleteRegion: travel.deleteRegion,
     setGatheringRegionsEnabled: travel.setGatheringRegionsEnabled,
     refresh,

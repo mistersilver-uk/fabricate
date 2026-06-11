@@ -10,7 +10,7 @@
   highlight-only — no center-column wiring yet.
 -->
 <script>
-  import { localize, notifyWarn, subscribeSceneChange } from '../../util/foundryBridge.js';
+  import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove } from '../../util/foundryBridge.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -246,6 +246,14 @@
   // scene; re-fetch (quietly) when Foundry redraws the canvas so the gate clears
   // without reopening the app. No-ops outside the Foundry runtime.
   $effect(() => subscribeSceneChange(() => load(true)));
+
+  // A party's current Fabricate region is derived live from its travel-marker
+  // token position. When a travel marker moves, re-fetch (quietly) so the current
+  // region and any region-gated availability update without reopening the app.
+  // Filtered to actual travel markers so ordinary token moves don't re-fetch.
+  $effect(() => subscribeTravelMarkerMove((actorUuid) => {
+    if (services?.isTravelMarkerActor?.(actorUuid)) load(true);
+  }));
 
   // Report the selected environment's stamina pool up to the shared store so the
   // header bar can render it; cleared when no environment is selected.

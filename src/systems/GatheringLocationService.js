@@ -1,9 +1,10 @@
 /**
  * Resolves the current regions for a party (or a selected actor) within one
- * crafting system. Manual GM override takes precedence; the slice does not yet
- * implement token-derived sensing, but the canonical source token `travelActor`
- * is reserved so Phase 3 can insert it between the override and unresolved
- * branches without changing the contract.
+ * crafting system. Manual GM override takes precedence; absent a manual override
+ * the current region is derived LIVE from where the party's `travelActor` marker
+ * token currently sits (token-in-scene-region → region `sceneMappings` → Fabricate
+ * region), via the injected `senseSceneRegions` collaborator. No state is stored
+ * for the auto case — it always reflects the marker's live position.
  *
  * Canonical source tokens: `manualOverride`, `travelActor`, `unresolved`.
  *
@@ -12,15 +13,25 @@
  *   diagnostic/preview inclusion); the UI marks it disabled.
  * - Region ids referencing MISSING regions are stale repair evidence
  *   (`staleRegionIds`) and do not resolve.
- * - `mode: 'none'`, or a disabled/travel-actor-less party, resolves to
+ * - `mode: 'none'` / absent override ⇒ auto (travel-actor) sensing; a
+ *   travel-actor-less party, or a marker in no linked Scene Region, resolves to
  *   `unresolved`.
  */
 import { isGatheringRegionsEnabled } from './gatheringRegions.js';
 
 export class GatheringLocationService {
-  constructor({ partyStore, systemManager } = {}) {
+  /**
+   * @param {object} collaborators
+   * @param {object} collaborators.partyStore
+   * @param {object} collaborators.systemManager
+   * @param {(travelActorUuid: string) => Iterable<string>} [collaborators.senseSceneRegions]
+   *   Returns the Scene Region UUIDs the marker token currently sits inside.
+   *   Foundry-backed at runtime; defaults to none so the service stays pure in tests.
+   */
+  constructor({ partyStore, systemManager, senseSceneRegions = () => [] } = {}) {
     this.partyStore = partyStore;
     this.systemManager = systemManager;
+    this.senseSceneRegions = typeof senseSceneRegions === 'function' ? senseSceneRegions : () => [];
   }
 
   _getRegions(systemId) {
@@ -89,9 +100,35 @@ export class GatheringLocationService {
       };
     }
 
-    // Phase 3 inserts travel-actor token sensing here. For now, mode 'none' or
-    // absent override, or a disabled/travel-actor-less party, resolves to none.
-    return { ...empty, partyId, systemId };
+    // Auto (travel-actor) sensing: derive the current regions LIVE from the Scene
+    // Regions the party's marker token sits inside, mapped to Fabricate regions by
+    // their sceneMappings. A travel-actor-less party, or a marker in no linked
+    // region, resolves to unresolved.
+    const travelActorUuid = party.travelActorUuid ? String(party.travelActorUuid) : '';
+    if (!travelActorUuid) return { ...empty, partyId, systemId };
+
+    const sensed = this.senseSceneRegions(travelActorUuid);
+    const sceneRegionUuids = sensed instanceof Set ? sensed : new Set(Array.isArray(sensed) ? sensed : []);
+    if (sceneRegionUuids.size === 0) return { ...empty, partyId, systemId };
+
+    const regions = [];
+    const regionIds = [];
+    for (const region of this._getRegions(systemId)) {
+      const mappings = Array.isArray(region?.sceneMappings) ? region.sceneMappings : [];
+      if (mappings.some(mapping => sceneRegionUuids.has(mapping?.sceneRegionUuid))) {
+        regions.push(region);
+        regionIds.push(region.id);
+      }
+    }
+    return {
+      resolved: regionIds.length > 0,
+      source: regionIds.length > 0 ? 'travelActor' : 'unresolved',
+      regions,
+      regionIds,
+      staleRegionIds: [],
+      partyId,
+      systemId
+    };
   }
 
   /**

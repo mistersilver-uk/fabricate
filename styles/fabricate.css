@@ -9927,6 +9927,130 @@
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
+/* Travel > Map Region Links: one row per Foundry Scene Region. */
+.fabricate-manager .manager-map-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.fabricate-manager .manager-map-link-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager .manager-map-link-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-map-link-row.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-map-link-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  color: inherit;
+}
+
+.fabricate-manager .manager-map-link-header:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-map-link-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  /* Themed default; the scene region's own colour overrides this inline. */
+  background: var(--fab-overlay-light-04);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-map-link-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-mv2-text);
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 3ch;
+  text-align: left;
+}
+
+.fabricate-manager .manager-map-link-picker-cell {
+  flex: 0 0 auto;
+  /* Every row's link picker is the same fixed width so the column lines up;
+     overflowing region names truncate with an ellipsis inside the trigger. */
+  width: 200px;
+  padding: 6px 10px 6px 0;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-travel-picker {
+  width: 100%;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-map-link-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-map-link-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.fabricate-manager .manager-map-link-inspector-swatch {
+  border: 1px solid var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-04);
+}
+
+/* Map tab inspector: the selected map region and its link live in two sibling
+   cards, so the shared outer inspector card drops its own chrome and just lays
+   them out in a spaced column. */
+.fabricate-manager .manager-travel-inspector[data-travel-inspector="map"] {
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-map-link-region-card .manager-inspector-title-row {
+  margin: 0;
+}
+
+.fabricate-manager .manager-travel-map-links-empty {
+  padding: 12px;
+}
+
 .fabricate-manager .manager-travel-regions-row:hover {
   border-color: var(--fab-mv2-border-strong);
 }

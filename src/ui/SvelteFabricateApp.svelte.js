@@ -120,7 +120,16 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
       setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
       adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
-      restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts)
+      restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts),
+      // Whether the given actor uuid is some party's travel-marker actor. Lets the
+      // gathering view ignore movement of ordinary tokens and only re-resolve the
+      // live current region when an actual travel marker moves.
+      isTravelMarkerActor: (actorUuid) => {
+        if (!actorUuid) return false;
+        const parties = game?.fabricate?.getGatheringPartyStore?.()?.list?.() ?? [];
+        return (Array.isArray(parties) ? parties : [])
+          .some(party => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid));
+      }
     };
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.
