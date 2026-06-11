@@ -1995,6 +1995,21 @@
             "RegionsPlaceholder": "Select a region to see its details.",
             "MapLinksPlaceholder": "Select a region to map it to Scene Regions."
           },
+          "MapLinks": {
+            "NoScene": "Activate a scene to link its regions.",
+            "NoRegions": "The active scene has no regions.",
+            "UnnamedRegion": "Unnamed region",
+            "InspectorKicker": "Selected map region",
+            "ColourLabel": "Colour",
+            "LinkSectionTitle": "Linked Fabricate region",
+            "LinkLabel": "Linked Fabricate region",
+            "None": "Not linked",
+            "DisabledSuffix": "(disabled)",
+            "Stale": "Unknown region",
+            "SearchPlaceholder": "Search regions...",
+            "SearchLabel": "Search regions",
+            "NoMatches": "No regions match your search."
+          },
           "Parties": {
             "Filters": "Party filters",
             "SearchPlaceholder": "Search parties...",

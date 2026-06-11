@@ -9927,6 +9927,93 @@
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
+/* Travel > Map Region Links: one row per Foundry Scene Region. */
+.fabricate-manager .manager-map-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.fabricate-manager .manager-map-link-row {
+  position: relative;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager .manager-map-link-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-map-link-row.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-map-link-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  color: inherit;
+}
+
+.fabricate-manager .manager-map-link-header:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-map-link-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  /* Themed default; the scene region's own colour overrides this inline. */
+  background: var(--fab-overlay-light-04);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-map-link-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-mv2-text);
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 3ch;
+}
+
+.fabricate-manager .manager-map-link-linked-chip {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-map-link-inspector-swatch {
+  border: 1px solid var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-map-link-colour-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-travel-map-links-empty {
+  padding: 12px;
+}
+
 .fabricate-manager .manager-travel-regions-row:hover {
   border-color: var(--fab-mv2-border-strong);
 }

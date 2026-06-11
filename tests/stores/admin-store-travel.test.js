@@ -43,7 +43,9 @@ function createServices({
   actors = [],
   environments = [],
   confirmResult = true,
-  partyError = null
+  partyError = null,
+  sceneRegions = null,
+  insideActorUuids = []
 } = {}) {
   const settings = { lastManagedCraftingSystem: 'system-a' };
   const system = makeSystem({ gatheringRegions: regions });
@@ -177,6 +179,10 @@ function createServices({
     getGatheringPartyStore: () => partyStore,
     getGatheringRegionStore: () => regionStore,
     getGatheringLocationService: () => locationService,
+    getCurrentSceneRegions: () => clone(sceneRegions || { sceneUuid: '', regions: [] }),
+    subscribeSceneChange: () => () => {},
+    getActorUuidsInSceneRegion: (sceneRegionUuid, actorUuids) =>
+      (Array.isArray(actorUuids) ? actorUuids : []).filter(uuid => insideActorUuids.includes(uuid)),
     getActorOptions: () => clone(actors),
     getScriptMacros: () => [],
     getSceneOptions: () => [],
@@ -527,6 +533,235 @@ describe('adminStore travel section', () => {
     assert.equal(party.staleTravelActor, 'Actor.also-gone');
     assert.deepEqual(party.staleRegionIds, ['r-missing']);
     assert.equal(party.hasStaleReference, true);
+    store.destroy();
+  });
+});
+
+describe('adminStore Map Region Links', () => {
+  const SCENE_REGIONS = {
+    sceneUuid: 'Scene.s1',
+    regions: [
+      { sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f' },
+      { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322' }
+    ]
+  };
+
+  it('exposes the current scene regions with their existing Fabricate links', async () => {
+    const { services } = createServices({
+      regions: [
+        {
+          id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+          sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+        },
+        { id: 'r2', name: 'Ashen', enabled: false, secret: false, biomes: [], sceneMappings: [] }
+      ],
+      sceneRegions: SCENE_REGIONS
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+    const state = get(store.viewState);
+    assert.equal(state.currentSceneUuid, 'Scene.s1');
+    assert.deepEqual(state.currentSceneRegions, [
+      { sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f', linkedRegionId: 'r1' },
+      { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322', linkedRegionId: '' }
+    ]);
+    store.destroy();
+  });
+
+  it('setMapRegionLink attaches a scene region to the chosen Fabricate region', async () => {
+    const { services, calls, system } = createServices({
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+      sceneRegions: SCENE_REGIONS
+    });
+    const store = createAdminStore(services);
+    await flush();
+    const ok = await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
+    await flush();
+    assert.equal(ok, true);
+    assert.equal(calls.regionUpdate.length, 1);
+    assert.deepEqual(calls.regionUpdate[0].patch.sceneMappings, [
+      { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
+    ]);
+    assert.deepEqual(system.gatheringRegions[0].sceneMappings, [
+      { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
+    ]);
+    store.destroy();
+  });
+
+  it('setMapRegionLink moves an existing link off the previous region', async () => {
+    const { services, calls, system } = createServices({
+      regions: [
+        {
+          id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+          sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+        },
+        { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [], sceneMappings: [] }
+      ],
+      sceneRegions: SCENE_REGIONS
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', 'r2');
+    await flush();
+    // r1 had the mapping stripped; r2 gained it.
+    assert.deepEqual(system.gatheringRegions.find(r => r.id === 'r1').sceneMappings, []);
+    assert.deepEqual(system.gatheringRegions.find(r => r.id === 'r2').sceneMappings, [
+      { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
+    ]);
+    // Both regions were persisted (one cleared, one set).
+    assert.equal(calls.regionUpdate.length, 2);
+    store.destroy();
+  });
+
+  it('setMapRegionLink with a falsy region clears the link everywhere on the scene', async () => {
+    const { services, calls, system } = createServices({
+      regions: [{
+        id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+        sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+      }],
+      sceneRegions: SCENE_REGIONS
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', null);
+    await flush();
+    assert.deepEqual(system.gatheringRegions[0].sceneMappings, []);
+    assert.equal(calls.regionUpdate.length, 1);
+    store.destroy();
+  });
+
+  it('setMapRegionLink leaves other scenes’ mappings untouched', async () => {
+    const { services, system } = createServices({
+      regions: [{
+        id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+        sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.other', sceneRegionUuid: 'Scene.other.Region.z' }]
+      }],
+      sceneRegions: SCENE_REGIONS
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
+    await flush();
+    // The other scene's mapping is preserved verbatim; the current scene's link is appended.
+    assert.deepEqual(system.gatheringRegions[0].sceneMappings, [
+      { id: 'm1', sceneUuid: 'Scene.other', sceneRegionUuid: 'Scene.other.Region.z' },
+      { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
+    ]);
+    store.destroy();
+  });
+});
+
+describe('adminStore Map Region Links — party current-region auto-update on link', () => {
+  const SCENE_REGIONS = {
+    sceneUuid: 'Scene.s1',
+    regions: [{ sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f' }]
+  };
+
+  function partiesFixture() {
+    return [
+      // Enabled, marker inside the region.
+      { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} },
+      // Enabled, marker NOT inside the region.
+      { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m2', currentRegionOverrides: {} },
+      // Disabled (with a marker that would be inside) — must be skipped.
+      { id: 'p3', name: 'Reserve', enabled: false, memberActorUuids: [], travelActorUuid: 'Actor.m3', currentRegionOverrides: {} }
+    ];
+  }
+
+  it('adds the linked region to the current region of an enabled party whose marker is inside', async () => {
+    const { services, calls } = createServices({
+      parties: partiesFixture(),
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+      actors: [{ uuid: 'Actor.m1', id: 'm1', name: 'Marker 1', img: '' }],
+      sceneRegions: SCENE_REGIONS,
+      insideActorUuids: ['Actor.m1', 'Actor.m3'] // m3 is inside too, but its party is disabled
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
+    await flush();
+    // Only p1 (enabled + marker inside) is updated; p2 (outside) and p3 (disabled) are not.
+    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['r1'] }]);
+    store.destroy();
+  });
+
+  it('merges the linked region into a party’s existing manual current region (dedup, keep others)', async () => {
+    const { services, calls } = createServices({
+      parties: [{
+        id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1',
+        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['rX'] } }
+      }],
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+      sceneRegions: SCENE_REGIONS,
+      insideActorUuids: ['Actor.m1']
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
+    await flush();
+    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['rX', 'r1'] }]);
+    store.destroy();
+  });
+
+  it('re-pointing the link removes the previous region and adds the new one for inside markers', async () => {
+    const { services, calls } = createServices({
+      parties: [{
+        id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1',
+        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } }
+      }],
+      regions: [
+        {
+          id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+          sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+        },
+        { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [], sceneMappings: [] }
+      ],
+      sceneRegions: SCENE_REGIONS,
+      insideActorUuids: ['Actor.m1']
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', 'r2');
+    await flush();
+    // r1 dropped, r2 added.
+    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['r2'] }]);
+    store.destroy();
+  });
+
+  it('unlinking removes the previously-linked region from inside markers', async () => {
+    const { services, calls } = createServices({
+      parties: [{
+        id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1',
+        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1', 'rY'] } }
+      }],
+      regions: [{
+        id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+        sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+      }],
+      sceneRegions: SCENE_REGIONS,
+      insideActorUuids: ['Actor.m1']
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', null);
+    await flush();
+    // r1 removed; rY (unrelated) retained.
+    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['rY'] }]);
+    store.destroy();
+  });
+
+  it('does not touch parties when no marker is inside the linked scene region', async () => {
+    const { services, calls } = createServices({
+      parties: partiesFixture(),
+      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+      sceneRegions: SCENE_REGIONS,
+      insideActorUuids: [] // nobody inside
+    });
+    const store = createAdminStore(services);
+    await flush();
+    await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
+    await flush();
+    assert.deepEqual(calls.setOverride, []);
     store.destroy();
   });
 });

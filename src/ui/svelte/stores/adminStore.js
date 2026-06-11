@@ -1501,6 +1501,7 @@ export function createAdminStore(services) {
   const travelFieldErrors = writable({});
   let unsubscribeFabricateReady = null;
   let unsubscribeFabricateDataChanged = null;
+  let unsubscribeSceneChange = null;
   let readyRefreshScheduled = false;
   let externalRefreshScheduled = false;
   let destroyed = false;
@@ -2053,7 +2054,31 @@ export function createAdminStore(services) {
         })
         .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
 
+      // Map Region Links tab: the current scene's regions, each annotated with the
+      // Fabricate region (if any) whose sceneMappings already claim it on this
+      // scene. The link is single-valued per scene region (first mapping wins).
+      const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
+      const currentSceneUuid = String(sceneData.sceneUuid || '');
+      const linkBySceneRegionUuid = new Map();
+      for (const region of regions) {
+        const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
+        for (const mapping of mappings) {
+          if (!mapping?.sceneRegionUuid) continue;
+          if (currentSceneUuid && mapping.sceneUuid && mapping.sceneUuid !== currentSceneUuid) continue;
+          if (!linkBySceneRegionUuid.has(mapping.sceneRegionUuid)) {
+            linkBySceneRegionUuid.set(mapping.sceneRegionUuid, region.id);
+          }
+        }
+      }
+      const currentSceneRegions = (Array.isArray(sceneData.regions) ? sceneData.regions : [])
+        .map(sceneRegion => ({
+          ...sceneRegion,
+          linkedRegionId: linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || ''
+        }));
+
       return {
+        currentSceneUuid,
+        currentSceneRegions,
         travelParties,
         selectedPartyId: selectedId,
         travelSaving: get(travelSaving),
@@ -2244,6 +2269,58 @@ export function createAdminStore(services) {
       async updateRegion(systemId, regionId, patch = {}) {
         return _regionPatch(systemId, regionId, patch && typeof patch === 'object' ? patch : {});
       },
+      // Link (or unlink) a Foundry Scene Region on the current scene to a Fabricate
+      // region. Single-valued: the scene region is stripped from every region's
+      // sceneMappings (on this scene) before being attached to the chosen region;
+      // a falsy regionId just clears the link. Only regions that actually change
+      // are persisted, so this is a no-op write when nothing moved.
+      async setMapRegionLink(sceneRegionUuid, fabricateRegionId) {
+        const regionStore = getRegionStore();
+        const systemId = get(selectedSystemId);
+        const targetSceneRegionUuid = String(sceneRegionUuid || '');
+        if (!regionStore || !systemId || !targetSceneRegionUuid) return false;
+        const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
+        const sceneUuid = String(sceneData.sceneUuid || '');
+        const nextRegionId = fabricateRegionId ? String(fabricateRegionId) : '';
+        const matchesTarget = (mapping) => mapping?.sceneRegionUuid === targetSceneRegionUuid
+          && (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
+        clearErrors();
+        travelSaving.set(true);
+        patch();
+        try {
+          const regions = regionStore.listBySystem?.(systemId) || [];
+          const regionList = Array.isArray(regions) ? regions : [];
+          // The Fabricate region this scene region was linked to BEFORE this change
+          // (first match on the current scene) so we can reverse it on unlink/re-point.
+          const previousRegionId = regionList.find(region =>
+            (Array.isArray(region.sceneMappings) ? region.sceneMappings : []).some(matchesTarget)
+          )?.id || '';
+
+          for (const region of regionList) {
+            const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
+            const filtered = mappings.filter(mapping => !matchesTarget(mapping));
+            if (nextRegionId && region.id === nextRegionId) {
+              await regionStore.update(systemId, region.id, {
+                sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }]
+              });
+            } else if (filtered.length !== mappings.length) {
+              await regionStore.update(systemId, region.id, { sceneMappings: filtered });
+            }
+          }
+
+          // Update the current region of any enabled party whose travel marker
+          // currently sits inside this scene region: add the newly-linked region
+          // and drop the previously-linked one.
+          await _applyMarkerRegionUpdate({ systemId, targetSceneRegionUuid, previousRegionId, nextRegionId });
+          return true;
+        } catch (err) {
+          applyError(err);
+          return false;
+        } finally {
+          travelSaving.set(false);
+          patch();
+        }
+      },
       async setGatheringRegionsEnabled(systemId, enabled) {
         const regionStore = getRegionStore();
         if (!regionStore?.updateRegionSettings || !systemId) return false;
@@ -2328,6 +2405,42 @@ export function createAdminStore(services) {
         }
       }
       return { environments, parties };
+    }
+
+    // When a Scene Region is (un)linked, reconcile the current region of every
+    // enabled party whose travel-marker actor token currently sits inside that
+    // Scene Region: drop the previously-linked Fabricate region and merge in the
+    // newly-linked one (dedup), leaving any other current regions untouched.
+    async function _applyMarkerRegionUpdate({ systemId, targetSceneRegionUuid, previousRegionId, nextRegionId }) {
+      if (!previousRegionId && !nextRegionId) return;
+      if (previousRegionId === nextRegionId) return;
+      const partyStore = getPartyStore();
+      if (!partyStore?.list || typeof partyStore.setCurrentRegionOverride !== 'function') return;
+      const parties = partyStore.list() || [];
+      const candidates = (Array.isArray(parties) ? parties : [])
+        .filter(party => party?.enabled && party?.travelActorUuid);
+      if (candidates.length === 0) return;
+      const markerUuids = candidates.map(party => String(party.travelActorUuid));
+      const inside = new Set(services.getActorUuidsInSceneRegion?.(targetSceneRegionUuid, markerUuids) || []);
+      if (inside.size === 0) return;
+      for (const party of candidates) {
+        if (!inside.has(String(party.travelActorUuid))) continue;
+        const override = party.currentRegionOverrides?.[systemId];
+        const currentIds = (override?.mode === 'manual' && Array.isArray(override.regionIds))
+          ? override.regionIds.map(String)
+          : [];
+        let nextIds = currentIds;
+        let changed = false;
+        if (previousRegionId && nextIds.includes(previousRegionId)) {
+          nextIds = nextIds.filter(id => id !== previousRegionId);
+          changed = true;
+        }
+        if (nextRegionId && !nextIds.includes(nextRegionId)) {
+          nextIds = [...nextIds, nextRegionId];
+          changed = true;
+        }
+        if (changed) await partyStore.setCurrentRegionOverride(party.id, systemId, nextIds);
+      }
     }
 
     async function _regionPatch(systemId, regionId, patchData) {
@@ -5205,11 +5318,19 @@ export function createAdminStore(services) {
     unsubscribeFabricateReady = null;
     unsubscribeFabricateDataChanged?.();
     unsubscribeFabricateDataChanged = null;
+    unsubscribeSceneChange?.();
+    unsubscribeSceneChange = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
   }
 
   unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
+
+  // Refresh the Map Region Links list when the GM activates a different scene.
+  unsubscribeSceneChange = services.subscribeSceneChange?.(() => {
+    if (destroyed) return;
+    travel.patch();
+  }) || null;
 
   // Trigger initial computation
   refresh();
@@ -5354,6 +5475,7 @@ export function createAdminStore(services) {
     renameRegion: travel.renameRegion,
     toggleRegionEnabled: travel.toggleRegionEnabled,
     updateRegion: travel.updateRegion,
+    setMapRegionLink: travel.setMapRegionLink,
     deleteRegion: travel.deleteRegion,
     setGatheringRegionsEnabled: travel.setGatheringRegionsEnabled,
     refresh,

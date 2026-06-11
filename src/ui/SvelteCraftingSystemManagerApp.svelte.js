@@ -7,8 +7,10 @@ import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
-import { localize } from './svelte/util/foundryBridge.js';
+import { localize, subscribeSceneChange } from './svelte/util/foundryBridge.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
+import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
+import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 
@@ -95,6 +97,44 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getGatheringPartyStore: () => game?.fabricate?.getGatheringPartyStore?.() ?? null,
       getGatheringRegionStore: () => game?.fabricate?.getGatheringRegionStore?.() ?? null,
       getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
+      getCurrentSceneRegions: () =>
+        readSceneRegions(game?.scenes?.current ?? game?.scene ?? globalThis.canvas?.scene ?? null),
+      subscribeSceneChange: (handler) => subscribeSceneChange(handler),
+      // Of the given actor uuids, return those whose token currently sits inside
+      // the Foundry Scene Region identified by `sceneRegionUuid`. Backs the Map
+      // Region Links auto-update of party current regions on (un)link. Returns []
+      // when Foundry globals / the region are unavailable (headless / no canvas).
+      getActorUuidsInSceneRegion: (sceneRegionUuid, actorUuids) => {
+        const resolveSync = globalThis.fromUuidSync;
+        if (typeof resolveSync !== 'function' || !sceneRegionUuid || !Array.isArray(actorUuids)) return [];
+        let regionDoc = null;
+        try {
+          regionDoc = resolveSync(String(sceneRegionUuid));
+        } catch (_) {
+          regionDoc = null;
+        }
+        if (!regionDoc) return [];
+        const sceneUuid = regionDoc?.parent?.uuid ?? '';
+        return filterActorUuidsInsideRegion({
+          regionDoc,
+          actorUuids,
+          resolveActorTokenCenter: (actorUuid) => {
+            let actor = null;
+            try {
+              actor = resolveSync(String(actorUuid));
+            } catch (_) {
+              actor = null;
+            }
+            const token = actor?.getActiveTokens?.(false, true)?.find(candidate =>
+              getTokenSceneUuid(candidate) === sceneUuid
+            ) ?? null;
+            if (!token) return null;
+            const center = token?.object?.center;
+            if (center && Number.isFinite(center.x) && Number.isFinite(center.y)) return center;
+            return Number.isFinite(token?.x) && Number.isFinite(token?.y) ? { x: token.x, y: token.y } : null;
+          }
+        });
+      },
       getFoundrySystemId: () => game?.system?.id || '',
       isFabricateReady,
       onFabricateReady: (callback) => {
