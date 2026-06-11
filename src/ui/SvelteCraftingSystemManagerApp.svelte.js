@@ -100,6 +100,29 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getCurrentSceneRegions: () =>
         readSceneRegions(game?.scenes?.current ?? game?.scene ?? globalThis.canvas?.scene ?? null),
       subscribeSceneChange: (handler) => subscribeSceneChange(handler),
+      // Notify when a token's position changes (or a token is added/removed) so
+      // travel-marker movement can refresh the manager's live current-region view.
+      // Fires handler(actorUuid) — `updateToken` only commits once per move (not
+      // the continuous refreshToken), so no debounce is needed.
+      subscribeTravelMarkerMove: (handler) => {
+        const hooks = globalThis.Hooks;
+        if (!hooks?.on || typeof handler !== 'function') return () => {};
+        const actorUuidOf = (tokenDoc) =>
+          tokenDoc?.actor?.uuid ?? (tokenDoc?.actorId ? `Actor.${tokenDoc.actorId}` : null);
+        const onUpdate = (tokenDoc, changes) => {
+          if (!changes || (changes.x === undefined && changes.y === undefined && changes.elevation === undefined)) return;
+          handler(actorUuidOf(tokenDoc));
+        };
+        const onCreateDelete = (tokenDoc) => handler(actorUuidOf(tokenDoc));
+        const updateId = hooks.on('updateToken', onUpdate);
+        const createId = hooks.on('createToken', onCreateDelete);
+        const deleteId = hooks.on('deleteToken', onCreateDelete);
+        return () => {
+          hooks.off?.('updateToken', updateId);
+          hooks.off?.('createToken', createId);
+          hooks.off?.('deleteToken', deleteId);
+        };
+      },
       // Of the given actor uuids, return those whose token currently sits inside
       // the Foundry Scene Region identified by `sceneRegionUuid`. Backs the Map
       // Region Links auto-update of party current regions on (un)link. Returns []

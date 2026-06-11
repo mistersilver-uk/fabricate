@@ -123,6 +123,28 @@ export function interactableBehaviorsContainingToken({ scene, token, isInteracta
 }
 
 /**
+ * Collect the UUIDs of every Scene Region on the given scene whose shape contains
+ * the token's center. Keyed on `region.uuid` (not the Fabricate env flag), so it
+ * works for plain regions a GM has drawn. Backs the travel-marker current-region
+ * sensor: which Scene Regions is this token standing in right now?
+ *
+ * @param {object} args
+ * @param {object} args.scene  The token's scene (carries `regions`).
+ * @param {object} args.token  A TokenDocument (or its placeable) with center coords.
+ * @returns {string[]} Region UUIDs containing the token center ([] when none / no point).
+ */
+export function sceneRegionUuidsContainingToken({ scene, token } = {}) {
+  const point = tokenCenter(token);
+  if (!point) return [];
+  const uuids = [];
+  for (const region of collectRegions(scene?.regions)) {
+    if (!region?.uuid) continue;
+    if (regionContainsPoint(region, point)) uuids.push(String(region.uuid));
+  }
+  return uuids;
+}
+
+/**
  * Resolve a token's CENTER point in scene-space, preferring the live placeable's
  * `center` (the authoritative pixel center Foundry computes from the footprint),
  * falling back to the document's top-left `x/y`. Returns null when no finite

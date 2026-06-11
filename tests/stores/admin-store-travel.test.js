@@ -45,7 +45,8 @@ function createServices({
   confirmResult = true,
   partyError = null,
   sceneRegions = null,
-  insideActorUuids = []
+  insideActorUuids = [],
+  autoRegionIds = {}
 } = {}) {
   const settings = { lastManagedCraftingSystem: 'system-a' };
   const system = makeSystem({ gatheringRegions: regions });
@@ -64,6 +65,7 @@ function createServices({
     regionCreate: [], regionUpdate: [], regionDelete: [], regionSettings: []
   };
   const confirmCalls = [];
+  const markerMoveHandlers = [];
 
   function maybeThrow() {
     if (partyError) throw new PartyValidationError(partyError);
@@ -166,6 +168,13 @@ function createServices({
         }
         return { resolved: resolvedRegions.length > 0, source: resolvedRegions.length > 0 ? 'manualOverride' : 'unresolved', regions: resolvedRegions, regionIds: resolvedRegions.map(r => r.id), staleRegionIds, partyId, systemId };
       }
+      // Auto (travel-actor) sensing — driven by the mutable autoRegionIds map.
+      const autoIds = autoRegionIds[partyId];
+      if (Array.isArray(autoIds) && autoIds.length > 0) {
+        const regionsById = new Map(system.gatheringRegions.map(r => [r.id, r]));
+        const regions = autoIds.filter(id => regionsById.has(id)).map(id => regionsById.get(id));
+        return { resolved: regions.length > 0, source: regions.length > 0 ? 'travelActor' : 'unresolved', regions, regionIds: regions.map(r => r.id), staleRegionIds: [], partyId, systemId };
+      }
       return { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [], partyId, systemId };
     }
   };
@@ -181,6 +190,7 @@ function createServices({
     getGatheringLocationService: () => locationService,
     getCurrentSceneRegions: () => clone(sceneRegions || { sceneUuid: '', regions: [] }),
     subscribeSceneChange: () => () => {},
+    subscribeTravelMarkerMove: (handler) => { markerMoveHandlers.push(handler); return () => {}; },
     getActorUuidsInSceneRegion: (sceneRegionUuid, actorUuids) =>
       (Array.isArray(actorUuids) ? actorUuids : []).filter(uuid => insideActorUuids.includes(uuid)),
     getActorOptions: () => clone(actors),
@@ -194,7 +204,7 @@ function createServices({
     getModuleVersion: () => 'test'
   };
 
-  return { services, calls, confirmCalls, partyRecords, system };
+  return { services, calls, confirmCalls, partyRecords, system, markerMoveHandlers, autoRegionIds };
 }
 
 async function flush() {
@@ -683,46 +693,15 @@ describe('adminStore Map Region Links', () => {
   });
 });
 
-describe('adminStore Map Region Links — party current-region auto-update on link', () => {
+describe('adminStore Map Region Links — live auto current region', () => {
   const SCENE_REGIONS = {
     sceneUuid: 'Scene.s1',
     regions: [{ sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f' }]
   };
 
-  function partiesFixture() {
-    return [
-      // Enabled, marker inside the region.
-      { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} },
-      // Enabled, marker NOT inside the region.
-      { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m2', currentRegionOverrides: {} },
-      // Disabled (with a marker that would be inside) — must be skipped.
-      { id: 'p3', name: 'Reserve', enabled: false, memberActorUuids: [], travelActorUuid: 'Actor.m3', currentRegionOverrides: {} }
-    ];
-  }
-
-  it('adds the linked region to the current region of an enabled party whose marker is inside', async () => {
+  it('setMapRegionLink only updates sceneMappings (no party current-region writes)', async () => {
     const { services, calls } = createServices({
-      parties: partiesFixture(),
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
-      actors: [{ uuid: 'Actor.m1', id: 'm1', name: 'Marker 1', img: '' }],
-      sceneRegions: SCENE_REGIONS,
-      insideActorUuids: ['Actor.m1', 'Actor.m3'] // m3 is inside too, but its party is disabled
-    });
-    const store = createAdminStore(services);
-    await flush();
-    await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
-    await flush();
-    // Only p1 (enabled + marker inside) is updated; p2 (outside) and p3 (disabled) are not.
-    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['r1'] }]);
-    store.destroy();
-  });
-
-  it('merges the linked region into a party’s existing manual current region (dedup, keep others)', async () => {
-    const { services, calls } = createServices({
-      parties: [{
-        id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1',
-        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['rX'] } }
-      }],
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
       regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
       sceneRegions: SCENE_REGIONS,
       insideActorUuids: ['Actor.m1']
@@ -731,69 +710,83 @@ describe('adminStore Map Region Links — party current-region auto-update on li
     await flush();
     await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
     await flush();
-    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['rX', 'r1'] }]);
+    // The marker's current region is now DERIVED live; linking writes no override.
+    assert.deepEqual(calls.setOverride, []);
+    assert.equal(calls.regionUpdate.length, 1);
     store.destroy();
   });
 
-  it('re-pointing the link removes the previous region and adds the new one for inside markers', async () => {
-    const { services, calls } = createServices({
-      parties: [{
-        id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1',
-        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } }
-      }],
-      regions: [
-        {
-          id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
-          sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
-        },
-        { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [], sceneMappings: [] }
-      ],
-      sceneRegions: SCENE_REGIONS,
-      insideActorUuids: ['Actor.m1']
-    });
-    const store = createAdminStore(services);
-    await flush();
-    await store.setMapRegionLink('Scene.s1.Region.a', 'r2');
-    await flush();
-    // r1 dropped, r2 added.
-    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['r2'] }]);
-    store.destroy();
-  });
-
-  it('unlinking removes the previously-linked region from inside markers', async () => {
-    const { services, calls } = createServices({
-      parties: [{
-        id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1',
-        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1', 'rY'] } }
-      }],
+  it('region→party lists reflect AUTO-resolved parties (no manual override)', async () => {
+    const { services } = createServices({
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
       regions: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
       }],
       sceneRegions: SCENE_REGIONS,
-      insideActorUuids: ['Actor.m1']
+      insideActorUuids: ['Actor.m1'],
+      autoRegionIds: { p1: ['r1'] } // marker live-resolves to r1
     });
     const store = createAdminStore(services);
-    await flush();
-    await store.setMapRegionLink('Scene.s1.Region.a', null);
-    await flush();
-    // r1 removed; rY (unrelated) retained.
-    assert.deepEqual(calls.setOverride, [{ id: 'p1', sys: 'system-a', ids: ['rY'] }]);
+    await store.refresh();
+    const state = get(store.viewState);
+    // Regions tab: the auto-resolved party is listed in the region.
+    const r1 = state.selectedSystemRegions.find(r => r.id === 'r1');
+    assert.deepEqual(r1.parties.map(p => p.id), ['p1']);
+    assert.equal(r1.partyCount, 1);
+    // Map tab: parties-in-fabricate-region also reflects the live resolution.
+    const regionA = state.currentSceneRegions.find(r => r.sceneRegionUuid === 'Scene.s1.Region.a');
+    assert.deepEqual(regionA.partiesInFabricateRegion.map(p => p.id), ['p1']);
+    // And the Parties inspector evidence is resolved via travelActor sensing.
+    assert.equal(state.travelParties[0].currentRegionEvidence.source, 'travelActor');
+    assert.deepEqual(state.travelParties[0].currentRegionEvidence.regions.map(r => r.id), ['r1']);
     store.destroy();
   });
 
-  it('does not touch parties when no marker is inside the linked scene region', async () => {
-    const { services, calls } = createServices({
-      parties: partiesFixture(),
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+  it('refreshes the travel view-model when a party travel marker moves', async () => {
+    const auto = { p1: [] };
+    const { services, markerMoveHandlers } = createServices({
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
+      regions: [{
+        id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+        sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+      }],
       sceneRegions: SCENE_REGIONS,
-      insideActorUuids: [] // nobody inside
+      autoRegionIds: auto
     });
     const store = createAdminStore(services);
+    await store.refresh();
+    assert.equal(get(store.viewState).travelParties[0].currentRegionEvidence.resolved, false);
+    assert.ok(markerMoveHandlers.length >= 1, 'the store subscribes to travel-marker movement');
+
+    // Marker moves into Region.a → r1; firing the move handler must re-patch.
+    auto.p1 = ['r1'];
+    markerMoveHandlers.forEach(handler => handler('Actor.m1'));
     await flush();
-    await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
+    assert.equal(get(store.viewState).travelParties[0].currentRegionEvidence.resolved, true);
+    assert.deepEqual(get(store.viewState).travelParties[0].currentRegionEvidence.regions.map(r => r.id), ['r1']);
+    store.destroy();
+  });
+
+  it('ignores movement of tokens that are not a party travel marker', async () => {
+    const auto = { p1: [] };
+    const { services, markerMoveHandlers } = createServices({
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
+      regions: [{
+        id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
+        sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
+      }],
+      sceneRegions: SCENE_REGIONS,
+      autoRegionIds: auto
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+    // A non-marker token moves; even though the resolver would now return r1, no
+    // re-patch happens because the actor is not a travel marker.
+    auto.p1 = ['r1'];
+    markerMoveHandlers.forEach(handler => handler('Actor.someone-else'));
     await flush();
-    assert.deepEqual(calls.setOverride, []);
+    assert.equal(get(store.viewState).travelParties[0].currentRegionEvidence.resolved, false);
     store.destroy();
   });
 });

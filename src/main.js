@@ -38,6 +38,7 @@ import {
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
 } from './gatheringBootstrapAdapters.js';
+import { sceneRegionUuidsContainingToken } from './canvas/regionHitTest.js';
 import {
   createGatheringToolAvailability,
   matchGatheringTools
@@ -533,7 +534,22 @@ class Fabricate {
     this.gatheringPartyStore.load();
     this.gatheringLocationService = new GatheringLocationService({
       partyStore: this.gatheringPartyStore,
-      systemManager: this.craftingSystemManager
+      systemManager: this.craftingSystemManager,
+      // Live token-derived sensing: which Scene Region UUIDs the party's travel
+      // marker token currently sits inside, across the marker's own scene(s).
+      senseSceneRegions: (travelActorUuid) => {
+        const resolve = globalThis.fromUuidSync;
+        if (typeof resolve !== 'function' || !travelActorUuid) return [];
+        let actor = null;
+        try { actor = resolve(String(travelActorUuid)); } catch (_) { actor = null; }
+        const tokens = actor?.getActiveTokens?.(false, true) || [];
+        const uuids = new Set();
+        for (const token of tokens) {
+          const scene = token?.parent ?? token?.scene ?? null;
+          for (const uuid of sceneRegionUuidsContainingToken({ scene, token })) uuids.add(uuid);
+        }
+        return uuids;
+      }
     });
     this.gatheringRichStateService = new GatheringRichStateService({
       environmentStore: this.gatheringEnvironmentStore,

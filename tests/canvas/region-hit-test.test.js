@@ -10,7 +10,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { regionEnvironmentIdsAtPoint } from '../../src/canvas/regionHitTest.js';
+import {
+  regionEnvironmentIdsAtPoint,
+  sceneRegionUuidsContainingToken
+} from '../../src/canvas/regionHitTest.js';
 
 function region({ envId, contains }) {
   return {
@@ -101,4 +104,34 @@ test('interactableBehaviorsContainingToken uses the token document top-left when
 test('interactableBehaviorsContainingToken returns [] when the token point cannot be resolved', () => {
   const scene = { regions: [regionWithBehaviors({ contains: () => true, behaviors: { contents: [{ type: 'fabricate.interactable' }] } })] };
   assert.deepEqual(interactableBehaviorsContainingToken({ scene, token: {}, isInteractableBehavior: isInteractable }), []);
+});
+
+function uuidRegion({ uuid, contains }) {
+  return { uuid, testPoint: (point) => contains(point) };
+}
+
+test('sceneRegionUuidsContainingToken returns the uuids of regions containing the token centre', () => {
+  const scene = {
+    regions: {
+      contents: [
+        uuidRegion({ uuid: 'Scene.s.Region.a', contains: () => true }),
+        uuidRegion({ uuid: 'Scene.s.Region.b', contains: () => false }),
+        uuidRegion({ uuid: '', contains: () => true }), // no uuid -> skipped
+        uuidRegion({ uuid: 'Scene.s.Region.c', contains: () => true })
+      ]
+    }
+  };
+  const token = { object: { center: { x: 5, y: 5 } } };
+  assert.deepEqual(
+    sceneRegionUuidsContainingToken({ scene, token }).sort(),
+    ['Scene.s.Region.a', 'Scene.s.Region.c']
+  );
+});
+
+test('sceneRegionUuidsContainingToken returns [] with no regions or no resolvable token point', () => {
+  assert.deepEqual(sceneRegionUuidsContainingToken({ scene: {}, token: { x: 1, y: 1 } }), []);
+  assert.deepEqual(
+    sceneRegionUuidsContainingToken({ scene: { regions: [uuidRegion({ uuid: 'R', contains: () => true })] }, token: {} }),
+    []
+  );
 });

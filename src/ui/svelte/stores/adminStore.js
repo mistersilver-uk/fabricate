@@ -1502,6 +1502,7 @@ export function createAdminStore(services) {
   let unsubscribeFabricateReady = null;
   let unsubscribeFabricateDataChanged = null;
   let unsubscribeSceneChange = null;
+  let unsubscribeTravelMarkerMove = null;
   let readyRefreshScheduled = false;
   let externalRefreshScheduled = false;
   let destroyed = false;
@@ -1987,14 +1988,26 @@ export function createAdminStore(services) {
       const regionById = new Map(regions.map(region => [region.id, region]));
       const locationService = getLocationService();
 
+      // Resolve each party's current regions ONCE (manual override OR live travel-
+      // marker sensing) and bucket by region id, so every region→party list below
+      // reflects auto mode — not just stored overrides.
+      const partyEvidence = new Map();
+      const partyResolvedRegionIds = new Map();
+      for (const party of parties) {
+        const evidence = (systemId && locationService?.resolveCurrentRegions)
+          ? locationService.resolveCurrentRegions({ partyId: party.id, systemId })
+          : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+        partyEvidence.set(party.id, evidence);
+        partyResolvedRegionIds.set(party.id, new Set(Array.isArray(evidence.regionIds) ? evidence.regionIds : []));
+      }
+
       const travelParties = parties.map(party => {
         const staleMembers = party.memberActorUuids.filter(uuid => !actorByUuid.has(uuid));
         const staleTravelActor = party.travelActorUuid && !actorByUuid.has(party.travelActorUuid)
           ? party.travelActorUuid
           : null;
-        const evidence = (systemId && locationService?.resolveCurrentRegions)
-          ? locationService.resolveCurrentRegions({ partyId: party.id, systemId })
-          : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+        const evidence = partyEvidence.get(party.id)
+          || { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
         const override = party.currentRegionOverrides?.[systemId] || null;
         const overrideRegionIds = override?.mode === 'manual' ? (override.regionIds || []) : [];
         const memberCards = party.memberActorUuids.map(uuid => ({
@@ -2047,11 +2060,10 @@ export function createAdminStore(services) {
       const regionEnvironments = (regionId) => regionEnvList
         .filter(env => Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId))
         .map(env => ({ id: env.id, name: env.name, img: env.img || '' }));
+      // Parties whose RESOLVED current region (manual or live auto) includes the
+      // region — reuses the precomputed buckets so auto-mode parties are included.
       const regionParties = (regionId) => parties
-        .filter(party => {
-          const override = party?.currentRegionOverrides?.[systemId];
-          return override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId);
-        })
+        .filter(party => partyResolvedRegionIds.get(party.id)?.has(regionId))
         .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
 
       // Map Region Links tab: the current scene's regions, each annotated with the
@@ -2303,11 +2315,6 @@ export function createAdminStore(services) {
         try {
           const regions = regionStore.listBySystem?.(systemId) || [];
           const regionList = Array.isArray(regions) ? regions : [];
-          // The Fabricate region this scene region was linked to BEFORE this change
-          // (first match on the current scene) so we can reverse it on unlink/re-point.
-          const previousRegionId = regionList.find(region =>
-            (Array.isArray(region.sceneMappings) ? region.sceneMappings : []).some(matchesTarget)
-          )?.id || '';
 
           for (const region of regionList) {
             const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
@@ -2321,10 +2328,9 @@ export function createAdminStore(services) {
             }
           }
 
-          // Update the current region of any enabled party whose travel marker
-          // currently sits inside this scene region: add the newly-linked region
-          // and drop the previously-linked one.
-          await _applyMarkerRegionUpdate({ systemId, targetSceneRegionUuid, previousRegionId, nextRegionId });
+          // No current-region writes here: a party's current region is derived
+          // LIVE from its travel marker's position (GatheringLocationService auto
+          // sensing), so inside markers resolve to the new link automatically.
           return true;
         } catch (err) {
           applyError(err);
@@ -2418,42 +2424,6 @@ export function createAdminStore(services) {
         }
       }
       return { environments, parties };
-    }
-
-    // When a Scene Region is (un)linked, reconcile the current region of every
-    // enabled party whose travel-marker actor token currently sits inside that
-    // Scene Region: drop the previously-linked Fabricate region and merge in the
-    // newly-linked one (dedup), leaving any other current regions untouched.
-    async function _applyMarkerRegionUpdate({ systemId, targetSceneRegionUuid, previousRegionId, nextRegionId }) {
-      if (!previousRegionId && !nextRegionId) return;
-      if (previousRegionId === nextRegionId) return;
-      const partyStore = getPartyStore();
-      if (!partyStore?.list || typeof partyStore.setCurrentRegionOverride !== 'function') return;
-      const parties = partyStore.list() || [];
-      const candidates = (Array.isArray(parties) ? parties : [])
-        .filter(party => party?.enabled && party?.travelActorUuid);
-      if (candidates.length === 0) return;
-      const markerUuids = candidates.map(party => String(party.travelActorUuid));
-      const inside = new Set(services.getActorUuidsInSceneRegion?.(targetSceneRegionUuid, markerUuids) || []);
-      if (inside.size === 0) return;
-      for (const party of candidates) {
-        if (!inside.has(String(party.travelActorUuid))) continue;
-        const override = party.currentRegionOverrides?.[systemId];
-        const currentIds = (override?.mode === 'manual' && Array.isArray(override.regionIds))
-          ? override.regionIds.map(String)
-          : [];
-        let nextIds = currentIds;
-        let changed = false;
-        if (previousRegionId && nextIds.includes(previousRegionId)) {
-          nextIds = nextIds.filter(id => id !== previousRegionId);
-          changed = true;
-        }
-        if (nextRegionId && !nextIds.includes(nextRegionId)) {
-          nextIds = [...nextIds, nextRegionId];
-          changed = true;
-        }
-        if (changed) await partyStore.setCurrentRegionOverride(party.id, systemId, nextIds);
-      }
     }
 
     async function _regionPatch(systemId, regionId, patchData) {
@@ -5333,6 +5303,8 @@ export function createAdminStore(services) {
     unsubscribeFabricateDataChanged = null;
     unsubscribeSceneChange?.();
     unsubscribeSceneChange = null;
+    unsubscribeTravelMarkerMove?.();
+    unsubscribeTravelMarkerMove = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
   }
@@ -5343,6 +5315,18 @@ export function createAdminStore(services) {
   unsubscribeSceneChange = services.subscribeSceneChange?.(() => {
     if (destroyed) return;
     travel.patch();
+  }) || null;
+
+  // Refresh the live current-region view when a party's travel marker token moves
+  // (or is added/removed). Only re-patch for tokens that are actually a party's
+  // travel marker, so unrelated token moves don't churn the Travel view.
+  unsubscribeTravelMarkerMove = services.subscribeTravelMarkerMove?.((actorUuid) => {
+    if (destroyed) return;
+    if (!actorUuid) { travel.patch(); return; }
+    const parties = services.getGatheringPartyStore?.()?.list?.() || [];
+    const isMarker = (Array.isArray(parties) ? parties : [])
+      .some(party => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid));
+    if (isMarker) travel.patch();
   }) || null;
 
   // Trigger initial computation
