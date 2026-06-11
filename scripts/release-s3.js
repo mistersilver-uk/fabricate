@@ -86,6 +86,23 @@ export function redactSegment(str, segment) {
   return s.split(segment).join('***');
 }
 
+/**
+ * Strip leading/trailing `/` from a path segment. Written as a linear scan rather
+ * than a regex so there is no backtracking/ReDoS surface on the (config/secret)
+ * input.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function trimSlashes(value) {
+  const s = String(value ?? '');
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === '/') start += 1;
+  while (end > start && s[end - 1] === '/') end -= 1;
+  return s.slice(start, end);
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Exported pure helpers (also used by tests)
 // ───────────────────────────────────────────────────────────────────────────
@@ -159,7 +176,7 @@ export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGrou
 
   // The secret segment sits between the (public) group and the module id so the
   // tester feed URL can't be guessed from the group name alone.
-  const segment = String(testerSegment || '').replace(/^\/+|\/+$/g, '');
+  const segment = trimSlashes(testerSegment);
   const testerTargets = testerGroups.map((group) => {
     const prefix = segment
       ? `testers/${group}/${segment}/${moduleId}`
@@ -212,7 +229,7 @@ async function main() {
   // Secret directory segment for tester feeds — env only, never committed. Without
   // it we refuse to publish tester groups to a guessable path (the whole point of
   // the closed beta is a non-discoverable URL).
-  const testerSegment = (env.S3_TESTER_PATH_SECRET || '').replace(/^\/+|\/+$/g, '');
+  const testerSegment = trimSlashes(env.S3_TESTER_PATH_SECRET || '');
   activeTesterSegment = testerSegment;
 
   if (!moduleId) fail('config is missing "moduleId"');
