@@ -39,8 +39,8 @@ export function toCssColor(value, fallback = '') {
     if (typeof value.css === 'string' && value.css) return value.css;
     const asString = typeof value.toString === 'function' ? value.toString() : '';
     if (/^#[0-9a-f]{3,8}$/i.test(asString)) return asString;
-    const numeric = typeof value.valueOf === 'function' ? value.valueOf() : NaN;
-    return toCssColor(typeof numeric === 'number' ? numeric : NaN, fallback);
+    const numeric = typeof value.valueOf === 'function' ? value.valueOf() : Number.NaN;
+    return toCssColor(typeof numeric === 'number' ? numeric : Number.NaN, fallback);
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();

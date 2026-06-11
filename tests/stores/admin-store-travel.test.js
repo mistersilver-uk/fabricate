@@ -603,7 +603,7 @@ describe('adminStore Map Region Links', () => {
     // Marker-inside list: only p1.
     assert.deepEqual(regionA.partiesInMapRegion, [{ id: 'p1', name: 'Vanguard', img: 'm1.webp' }]);
     // Fabricate-region list (current region includes r1): both p1 and p2.
-    assert.deepEqual(regionA.partiesInFabricateRegion.map(p => p.id).sort(), ['p1', 'p2']);
+    assert.deepEqual([...regionA.partiesInFabricateRegion.map(p => p.id)].sort((a, b) => a.localeCompare(b)), ['p1', 'p2']);
     // The unlinked region has no Fabricate-region parties.
     const regionB = get(store.viewState).currentSceneRegions.find(r => r.sceneRegionUuid === 'Scene.s1.Region.b');
     assert.deepEqual(regionB.partiesInFabricateRegion, []);

@@ -178,7 +178,7 @@ test('auto: marker inside multiple linked Scene Regions resolves all matching Fa
   const result = service.resolveCurrentRegions({ partyId: 'p1', systemId: 'system-a' });
   assert.equal(result.resolved, true);
   assert.equal(result.source, 'travelActor');
-  assert.deepEqual(result.regionIds.sort(), ['r1', 'r2']);
+  assert.deepEqual([...result.regionIds].sort((a, b) => a.localeCompare(b)), ['r1', 'r2']);
 });
 
 test('auto: a manual override still wins over live sensing', () => {

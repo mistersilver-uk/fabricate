@@ -124,7 +124,7 @@ test('sceneRegionUuidsContainingToken returns the uuids of regions containing th
   };
   const token = { object: { center: { x: 5, y: 5 } } };
   assert.deepEqual(
-    sceneRegionUuidsContainingToken({ scene, token }).sort(),
+    [...sceneRegionUuidsContainingToken({ scene, token })].sort((a, b) => a.localeCompare(b)),
     ['Scene.s.Region.a', 'Scene.s.Region.c']
   );
 });
