@@ -303,6 +303,7 @@
           "Hint": "Choose a place to gather. Locked environments are unavailable until your GM enables them.",
           "Empty": "No gathering environments are available for this character yet.",
           "BlindChip": "Blind",
+          "RegionLockedChip": "Not in current region",
           "LockedAria": "{name} (locked)",
           "Discovered": "{x} of {y} tasks discovered",
           "SearchPlaceholder": "Search environments…",

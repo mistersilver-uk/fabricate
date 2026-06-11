@@ -123,6 +123,39 @@ test('listing blocks with LOCATION_BLOCKED when current region does not match', 
   assert.ok(env.blockedReasons.some(r => r.code === 'LOCATION_BLOCKED'));
 });
 
+test('a NO_CURRENT_REGION environment renders as a locked teaser (no tasks, unselectable)', async () => {
+  const engine = makeEngine({ parties: [] });
+  const env = findEnv(await engine.listForActor({ viewer, actor }));
+  assert.equal(env.locked, true);
+  assert.equal(env.attemptable, false);
+  assert.deepEqual(env.tasks, []);
+  assert.deepEqual(env.discoveredTasks, []);
+  // The location reason + field survive on the teaser so the card can show the alert.
+  assert.ok(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'));
+  assert.equal(env.location.gated, true);
+  assert.equal(env.location.available, false);
+});
+
+test('a LOCATION_BLOCKED environment renders as a locked teaser', async () => {
+  const engine = makeEngine({
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+  });
+  const env = findEnv(await engine.listForActor({ viewer, actor }));
+  assert.equal(env.locked, true);
+  assert.equal(env.attemptable, false);
+  assert.deepEqual(env.tasks, []);
+  assert.ok(env.blockedReasons.some(r => r.code === 'LOCATION_BLOCKED'));
+});
+
+test('an in-region environment is NOT locked and still lists its tasks', async () => {
+  const engine = makeEngine({
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-secret'] } } }]
+  });
+  const env = findEnv(await engine.listForActor({ viewer, actor }));
+  assert.equal(env.locked, false);
+  assert.ok(env.tasks.length > 0);
+});
+
 test('non-GM blocked-reason data contains no secret region id or name', async () => {
   const engine = makeEngine({
     parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]

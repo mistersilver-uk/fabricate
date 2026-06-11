@@ -2400,6 +2400,35 @@ async function main() {
           await partyStore.setTravelActor(party.id, alara.uuid);
           await partyStore.setEnabled(party.id, true);
           await partyStore.setCurrentRegionOverride(party.id, sysId, [region.id]);
+
+          // Region-lock evidence (#294): a second region the party is NOT in, plus
+          // an environment that REQUIRES it. The player Gathering tab then shows a
+          // region-locked environment card with the "Not in current region" alert
+          // (LOCATION_BLOCKED for a party member; NO_CURRENT_REGION for a viewer
+          // with no party — either way the card locks). Idempotent across reruns.
+          const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
+          if (environmentStore) {
+            const hiddenVale = regionStore.listBySystem(sysId).find(r => r.name === 'Hidden Vale')
+              || await regionStore.create(sysId, { name: 'Hidden Vale', enabled: true });
+            const existingEnvs = (typeof environmentStore.listBySystem === 'function')
+              ? (environmentStore.listBySystem(sysId) || [])
+              : [];
+            const alreadySeeded = Array.isArray(existingEnvs)
+              && existingEnvs.some(env => env?.name === 'Hidden Hollow');
+            if (!alreadySeeded) {
+              await environmentStore.create({
+                craftingSystemId: sysId,
+                name: 'Hidden Hollow',
+                description: "Out of the party's current region — locked until they travel there.",
+                enabled: true,
+                selectionMode: 'targeted',
+                sceneUuid: '',
+                compositionMode: 'manual',
+                forcedTaskIds: ['smoke-meadow-herbs'],
+                includedRegionIds: [hiddenVale.id]
+              });
+            }
+          }
         }, craftingSetup.systemId);
         await page.evaluate(() => {
           globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
@@ -2789,6 +2818,22 @@ async function main() {
         // 'player-gathering' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
         await screenshot(page, 'player-gathering-environments');
         await screenshot(page, 'fabricate-app-shell');
+
+        // Region-lock evidence (#294): the locked "Hidden Hollow" env sorts last,
+        // so page forward until it appears, then capture it. The detail panel keeps
+        // showing the already-selected environment, so the frame stays populated.
+        const lockedEnvCard = appShell.locator('.gathering-env-card[data-locked="true"]');
+        const envNextPage = appShell.locator('.gathering-env-list [data-pagination-next]');
+        for (let i = 0; i < 6 && (await lockedEnvCard.count()) === 0 && (await envNextPage.count()) > 0; i++) {
+          if (await envNextPage.isDisabled()) break;
+          await envNextPage.click();
+          await page.waitForTimeout(150);
+        }
+        if ((await lockedEnvCard.count()) > 0) {
+          await lockedEnvCard.first().scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-gathering-region-locked');
+        }
 
         await closeOpenApplications(page);
         results.steps.push({ step: 'open-fabricate-app-shell', passed: true });

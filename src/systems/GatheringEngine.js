@@ -1000,6 +1000,22 @@ export class GatheringEngine {
       return this._lockedEnvironmentListing({ environment, system });
     }
 
+    // A location-gated environment the party is NOT in is itself the "thing" out
+    // of region: surface it as a locked teaser (identity only, unselectable) with
+    // the location reason + travel guidance, rather than a selectable environment
+    // whose every task carries the region block. Evaluated before task-visibility
+    // gating so it is never dropped, mirroring the disabled-teaser path above.
+    const locationGate = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    if (locationGate.location?.gated === true && locationGate.location?.available === false) {
+      return this._lockedEnvironmentListing({
+        environment,
+        system,
+        actor,
+        blockedReasons: locationGate.blockedReasons,
+        location: locationGate.location
+      });
+    }
+
     // Auto-seed the acting character's stamina pool on first sight of a stamina
     // system (e.g. opening the gathering tab), so the displayed pool reflects the
     // rolled max/start. Idempotent — the dice roll persists once.
@@ -1020,8 +1036,9 @@ export class GatheringEngine {
     }
 
     const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, system, viewer, actor, regionContextCache });
-    // Redaction-safe location field computed once for the listing model.
-    const { location } = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    // Redaction-safe location field — reuse the gate computed above (here the
+    // environment is region-available, so this is the ungated/available shape).
+    const location = locationGate.location;
     // Party current-region summary for the header bar (regardless of this
     // environment's gating), so the player app can show the current region or
     // "no region selected" when the region/travel subsystem is enabled.
@@ -1218,7 +1235,7 @@ export class GatheringEngine {
    * identity fields only — no tasks, weights, or composition internals — plus
    * the existing ENVIRONMENT_DISABLED reason.
    */
-  _lockedEnvironmentListing({ environment, system }) {
+  _lockedEnvironmentListing({ environment, system, actor = null, blockedReasons = null, location = null }) {
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
     return {
@@ -1238,22 +1255,28 @@ export class GatheringEngine {
       nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
       weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
       timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
-      // No actor/viewer is resolved for a locked teaser, so the current region is
-      // left empty ("no region selected"); the flag still mirrors the system so
-      // the header chip appears when the subsystem is enabled.
+      // A disabled teaser resolves no actor, so its current region is empty ("no
+      // region selected"); a location-lock teaser DOES have an actor + resolved
+      // location, so it carries the disclosed current regions. The flag mirrors
+      // the system so the header chip appears when the subsystem is enabled.
       regionsEnabled: isGatheringRegionsEnabled(system),
-      currentRegions: [],
+      currentRegions: Array.isArray(location?.currentRegions) ? location.currentRegions : [],
       staminaPool: null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
       attemptable: false,
-      blockedReasons: [this._blockedReason('ENVIRONMENT_DISABLED')],
+      // Disabled teaser defaults to ENVIRONMENT_DISABLED; a location-lock passes
+      // its NO_CURRENT_REGION / LOCATION_BLOCKED reason (with travel guidance).
+      blockedReasons: blockedReasons ?? [this._blockedReason('ENVIRONMENT_DISABLED')],
+      // The redaction-safe location field is surfaced on the teaser so the card
+      // can show the "Not in current region" alert and its guidance tooltip.
+      location: location ?? { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null },
       tasks: [],
       discoveredTasks: [],
       hazards: [],
-      ...this._playerListingFields({ environment, actor: null, locked: true })
+      ...this._playerListingFields({ environment, actor, locked: true })
     };
   }
 
