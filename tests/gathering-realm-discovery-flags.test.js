@@ -123,7 +123,7 @@ test('legacy upgrade: a discovery write persists only the new discoveredGatherin
   });
   // The merged map (legacy r1 + new r2) is written under the NEW key.
   const fresh = new FakeDocument({ flags: { fabricate: { fabricate: { discoveredGatheringRealms: doc.flags.fabricate.fabricate.discoveredGatheringRealms } } } });
-  assert.deepEqual([...getDiscoveredRealmIdsForSystem(fresh, 'system-a')].sort(), ['r1', 'r2']);
+  assert.deepEqual([...getDiscoveredRealmIdsForSystem(fresh, 'system-a')].sort((a, b) => a.localeCompare(b)), ['r1', 'r2']);
   // The legacy key is not re-derived from the new write.
   assert.equal(doc.flags.fabricate.fabricate.discoveredGatheringRealms !== undefined, true);
 });
