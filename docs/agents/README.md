@@ -7,6 +7,7 @@ Scope:
 - **AGENTS.md** is the source of truth for repo-wide rules (do / don't). Read it first.
 - **This directory** holds the *explanations* behind the rules — how a layered helper actually composes, where the canonical data lives, what to grep when a UI change might have broken something out of view.
 - **`openspec/specs/*/spec.md`** owns behavior contracts. **`docs/` (the Jekyll site at root)** is end-user GM documentation. Neither overlaps with this directory.
+- **Reusable scripts** are indexed in `scripts/README.md`. For latest beta manifest/version lookups across Fabricate and the premium sibling modules, use `node scripts/latest-module-versions.mjs --profile fabricate-beta`, substituting the local AWS profile when needed.
 
 ## Index
 

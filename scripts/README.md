@@ -1,5 +1,32 @@
 # Fabricate Test Scripts
 
+## Latest Module Versions
+
+`latest-module-versions.mjs` queries the current latest manifest for Fabricate and the
+premium sibling modules without requiring S3 bucket listing permission. It reads the root
+`release.s3.config.json` plus `../fabricate-premium/release.config.json`, then fetches
+exact keys in the form `modules/<moduleId>/<channel>/latest/module.json`.
+
+```bash
+node scripts/latest-module-versions.mjs --profile fabricate-beta
+node scripts/latest-module-versions.mjs --profile fabricate-beta --json
+node scripts/latest-module-versions.mjs --profile fabricate-beta --include extra-module
+```
+
+Useful options:
+
+| Option | Description |
+|---|---|
+| `--profile <name>` | AWS CLI/shared-config profile; use the local profile that can read the release bucket. |
+| `--region <name>` | AWS region; defaults to `eu-west-2`. |
+| `--bucket <name>` | Override the manifest bucket. |
+| `--channel <name>` | Release channel; defaults to `beta`. |
+| `--config <path>` | Fabricate release config path. |
+| `--premium-config <path>` | Premium release config path. |
+| `--include <moduleId>` | Add an explicit module id; repeatable. |
+| `--no-premium` | Skip the sibling premium config. |
+| `--json` | Print machine-readable JSON instead of a table. |
+
 ## Foundry Integration Smoke Test
 
 The smoke test (`foundry-test-run.mjs`) verifies that Fabricate loads and functions correctly

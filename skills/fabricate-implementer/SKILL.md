@@ -62,6 +62,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
+- For release/latest-version lookups, reuse `node scripts/latest-module-versions.mjs --profile fabricate-beta`; do not hand-roll S3 listing code for the Fabricate module set, and substitute another `--profile <name>` when needed. The helper reads configured release manifests via exact `GetObject` keys and supports `--json` for downstream tooling.
 
 ## Foundry V13 checks
 
