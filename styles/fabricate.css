@@ -10177,20 +10177,20 @@
   background: var(--fab-overlay-light-03);
 }
 
-/* Colour-code the two columns so "in the region" vs "can be added" reads at a
+/* Colour-code the two columns so "in the realm" vs "can be added" reads at a
    glance: included rows are tinted/accented success, available rows stay plain
    with an accent Add affordance. */
-.fabricate-manager .manager-realm-env-column[data-region-env-column="included"] .manager-card-subtitle {
+.fabricate-manager .manager-realm-env-column[data-realm-env-column="included"] .manager-card-subtitle {
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-realm-env-column[data-region-env-column="included"] .manager-realm-env-row {
+.fabricate-manager .manager-realm-env-column[data-realm-env-column="included"] .manager-realm-env-row {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
   box-shadow: inset 3px 0 0 var(--fab-success-border);
 }
 
-.fabricate-manager .manager-realm-env-column[data-region-env-column="available"] .manager-realm-env-row {
+.fabricate-manager .manager-realm-env-column[data-realm-env-column="available"] .manager-realm-env-row {
   box-shadow: inset 3px 0 0 var(--fab-mv2-border);
   opacity: 0.92;
 }

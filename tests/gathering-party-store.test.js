@@ -119,6 +119,21 @@ test('setCurrentRealmOverride stamps updatedAt/updatedByUserId; clear empties re
   assert.ok(clearedOverride.updatedAt > override.updatedAt);
 });
 
+test('accepts legacy currentRegionOverrides/regionIds on read (pre-1.1.0 import)', () => {
+  const { store } = makeStore({
+    saved: [{
+      id: 'p-legacy',
+      name: 'Legacy',
+      currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1', 'r2'] } }
+    }]
+  });
+  const party = store.get('p-legacy');
+  const override = party.currentRealmOverrides['system-a'];
+  assert.ok(override, 'legacy currentRegionOverrides read as currentRealmOverrides');
+  assert.equal(override.mode, 'manual');
+  assert.deepEqual(override.realmIds, ['r1', 'r2'], 'legacy regionIds read as realmIds');
+});
+
 test('moveMember is a single persisted write that moves the uuid between parties', async () => {
   const writes = [];
   const settings = new Map([[SETTING_KEYS.GATHERING_PARTIES, [

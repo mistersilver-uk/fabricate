@@ -394,3 +394,12 @@ test('validateImportData: warns on a realm missing a name', () => {
   assert.equal(result.valid, true);
   assert.ok(result.warnings.some(w => w.includes('Gathering realm')));
 });
+
+test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1.1.0 export)', () => {
+  const result = validateImportData({
+    fabricateVersion: '1.0.0',
+    system: { name: 'X', gatheringRegions: { not: 'an array' } }
+  });
+  assert.equal(result.valid, false, 'legacy gatheringRegions is validated, not silently ignored');
+  assert.ok(result.errors.some(e => e.includes('gatheringRealms')), 'reports under the canonical realm name');
+});

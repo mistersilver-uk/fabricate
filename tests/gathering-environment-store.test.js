@@ -487,3 +487,25 @@ test('_normalizeEnvironment defaults an unknown event policy to successWithEvent
   const normalized = store._normalizeEnvironment({ craftingSystemId: 'system-a', hazardPolicy: 'nonsense' });
   assert.equal(normalized.eventPolicy, 'successWithEvent');
 });
+
+test('_normalizeEnvironment accepts legacy region-schema id lists on read (pre-1.1.0 import)', () => {
+  const { store } = makeMemoryStore();
+  const normalized = store._normalizeEnvironment({
+    id: 'env-legacy-realm',
+    craftingSystemId: 'system-a',
+    includedRegionIds: ['r1', 'r2'],
+    excludedRegionIds: ['r3']
+  });
+  assert.deepEqual(normalized.includedRealmIds, ['r1', 'r2'], 'legacy includedRegionIds read as includedRealmIds');
+  assert.deepEqual(normalized.excludedRealmIds, ['r3'], 'legacy excludedRegionIds read as excludedRealmIds');
+});
+
+test('_normalizeEnvironment prefers the new realm id lists when both are present', () => {
+  const { store } = makeMemoryStore();
+  const normalized = store._normalizeEnvironment({
+    craftingSystemId: 'system-a',
+    includedRealmIds: ['new'],
+    includedRegionIds: ['legacy']
+  });
+  assert.deepEqual(normalized.includedRealmIds, ['new'], 'new key wins over legacy when both present');
+});
