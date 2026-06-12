@@ -24,5 +24,10 @@ provider-local copies or provider-specific mirrors; see the bindings table in `A
 
 For non-trivial work, use the OpenSpec workflow:
 
-- canonical specs: `openspec/specs/*/spec.md`
-- per-change work: `openspec/changes/<change>/proposal.md`, `design.md`, `tasks.md`
+- canonical specs: `openspec/specs/*/spec.md` — the only versioned spec source of truth
+- per-change delta: a managed `openspec-delta` block in the work's GitHub issue
+  (proposal, design, tasks, spec deltas, roster, acceptance), not versioned files.
+  Append it to an existing issue (preserving the reporter's text) or create one from the
+  `OpenSpec Change Delta` issue template for prompt-driven work. See `openspec/README.md`.
+- implementation makes the canonical spec changes the delta requires under `openspec/specs/`;
+  post-implementation and docs reviewers reconcile the `openspec/specs/` diff against the issue delta.

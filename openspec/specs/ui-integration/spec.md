@@ -86,7 +86,7 @@ Selected-system navigation:
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`. When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route. When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
-- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The `Travel` submenu item shows the total party count as its badge. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
+- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page. Activating only the expand/collapse control toggles the submenu without navigation. While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed. The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The `Travel` submenu item shows the total party count as its badge. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`. It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
@@ -219,6 +219,11 @@ Capabilities:
 - Edit managed item essences (if enabled).
 - Edit managed item difficulty (progressive mode).
 - Replace associated source item by drag/drop.
+
+Component import warnings:
+
+- When a single component import or replace-source operation falls back because the dropped Item's recorded canonical source UUID no longer resolves, the GM manager UI warns that the original source link is broken and that Fabricate used the live dropped Item UUID instead, naming the affected item and UUIDs.
+- When a folder or compendium pack import falls back for one or more Items, the GM manager UI emits one summary warning with the number of affected Items, rather than one warning per Item.
 
 ### Essences Tab
 
@@ -384,6 +389,13 @@ Event library authoring must support:
 - rows showing name, image, description summary, enabled state, danger tags, biome/weather/time matching tags, drop rate, and modifier provider evidence (geography is no longer a matching tag — the region picker, filter, and per-row region chips were removed from the task and event editors and browsers)
 - validation for drop rate, tag vocabulary values, provider configuration, and unsafe deletion
 - composition surfaces that attach or toggle matched reusable events without editing reusable event definitions inline
+
+Player-facing event copy is framed as a neutral encounter (a travelling merchant as readily as an eruption) rather than danger-first, while the danger axis itself is retained:
+
+- Timing and locality copy reads as a neutral encounter (for example "When & where it happens" rather than danger/hazard framing).
+- An environment's player-facing event presence reads neutrally (for example "This area has events in store." and "The events here are hidden until you gather.").
+- Event-outcome copy uses event terminology (for example "If an event occurs, your gather still succeeds." / "…the gather fails.") rather than risk/hazard terminology.
+- Copy that legitimately describes the danger axis (for example "Danger tags let environments opt in…") is retained. The d100 result-group validation copy still reserves the failure aliases (including the former miss/`hazard` terms) as forbidden result-group names — this is the failure-keyword concept, not the Gathering Event concept.
 
 ## Recipe Editor
 
@@ -630,12 +642,36 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 ### Actor Selection
 
-- Select the gathering actor.
-- The top header shows the selected actor and, when enabled, gathering stamina current/max values plus regeneration or adjustment affordances where permitted.
-- Persist the last selected actor in `fabricate.lastGatheringActor`.
+- The unified window selects the gathering actor through a shared **Actor selection top bar** rendered above all tabs (see *Unified Window Actor Selection Top Bar*), rather than only a per-tab header control.
+- The bar's selectable list is restricted to **player characters** — the actor type(s) a system designates as player characters, owned for non-GM users, all for GMs. The current dnd5e/pf2e implementation of that concept is `actor.type === 'character'` (the predicate `isPlayerCharacterActor`); other player-character types are a known limitation. This restriction is a selection-list concern only and does not change which actors are authorized to make a gathering attempt.
+- The top header/bar shows the selected actor and, when enabled, gathering stamina current/max values plus regeneration or adjustment affordances where permitted.
+- Persist the last selected actor in `fabricate.lastGatheringActor`. The shared store seeds from this setting, persists the selection on change, and re-persists a fallback selection when the stored id is empty or stale.
 - Only actors the user owns are selectable for non-GM users.
-- Actor selection is permission-based, not actor-type-based; actor types such as `npc`, `group`, or `character` are valid when the user has the required ownership/permission.
+- Gathering attempt authorization remains permission-based, not actor-type-based; an owned `npc`, `group`, or other non-player-character actor remains attempt-authorized even though it does not appear in the player-character selection list. Startup preference cleanup likewise stays ownership-based, so a persisted owned non-player-character id is not cleared at startup; the shared store converges it to a player character.
 - The app should provide primary tabs or segmented navigation for `Environments` and `Gathering Log`.
+
+### Unified Window Actor Selection Top Bar
+
+The unified Fabricate window presents a shared, content-width **Actor selection top bar** above all primary tabs.
+
+- The bar spans the content width and renders above ALL tabs (`Gathering`, `Crafting`, `Journal`, `Inventory`), not inside any single tab body. It lives in a vertical flex column wrapper (`.fabricate-app-main`) where the bar is `flex: 0 0 auto` and the content region is `flex: 1 1 auto; min-height: 0`, so a tab body using `height: 100%` keeps a bounded parent and does not collapse or double-scroll.
+- The bar's left side is a character-portrait + dropdown-caret trigger that opens a searchable popover listing the user's selectable **player characters** (owned for non-GM, all for GM), narrowing the ownership-selectable set by the player-character concept. The popover provides a case-insensitive name search and a `role="listbox"` of portrait + name options; selecting an option updates the shared selection and persists it.
+- The bar's right side carries tab-specific context. For the `Gathering` tab only, it shows the current weather, the current time-of-day, and the current realm (each icon + value). For other tabs the right-side context is empty. The condition icons MUST be the fixed icons used by the GM gathering-settings UI — `fas fa-cloud-sun` for weather, `fas fa-clock` for time of day, and `fas fa-map-location-dot` for realm — rather than per-value or text labels; the value text shows the current weather/time/realm. "Current realm" is the `region` string of the gathering tab's currently selected environment; when no environment is selected, a neutral placeholder is shown and no realm name is fabricated.
+- The bar uses the player-app theming scope and base design tokens only; it must render correctly in both themes and must not depend on Manager-scoped tokens. Selecting an actor in the bar re-filters and persists the gathering listing; the `Crafting`, `Journal`, and `Inventory` tab bodies may remain placeholders while still rendering the bar.
+- The popover keyboard/accessibility model follows the IconPicker interaction pattern: a `role="dialog"` popover with an `aria-label`; the trigger exposes `aria-haspopup` and `aria-expanded`; options are `role="option"` rows inside a `role="listbox"`; the popover supports Tab-through option buttons, Escape / outside-click dismissal, and focus-on-open of the search input. It does not provide listbox arrow-key roving focus or `aria-activedescendant`. The popover renders in-place below the trigger (left-aligned, dropping downward) as a descendant of the bar root, so an outside-click dismisses it.
+- An actor whose portrait `img` is null/empty MUST render a neutral fallback icon (not an empty `<img>`); the portrait is decorative (`aria-hidden`) and the actor name is the accessible label / alt text. Long actor names MUST truncate with ellipsis (and expose the full name via `title`) in both the trigger and the option rows. The trigger and each option row lay portrait + name out flush-left (not centered) and size tall enough to contain the portrait without clipping, overriding the host application's default `button` styling.
+- When there are zero selectable actors, the trigger is disabled with a placeholder portrait/label and the popover shows a neutral empty state.
+- The right-side gathering context renders gracefully when `conditions.timeOfDay` is absent (the fixed clock icon + an "unknown time-of-day" label), when `conditions.weather` is absent (the fixed cloud-sun icon + an "unknown weather" label), and when `region === ''` (a neutral "no realm" placeholder). When the window is resized narrow, the weather/time-of-day/realm cluster truncates or wraps, the actor trigger stays usable, and the bar produces no horizontal overflow.
+
+### Shared Actor Selection State
+
+Bidirectional shell↔tab actor/realm state flows through a single shared selection store provided on the app services, not through per-tab prop drilling.
+
+- A single shared selection store is created once when services are built and exposed on the services bag so both the shell and the gathering tab read and write the same reactive state. The shell writes the selected actor id and the selectable-actor list; the gathering tab reads the selected actor id and writes the current realm; the bar reads realm and conditions for its right-side context.
+- The store seeds the selected actor from the persisted last-gathering-actor selection. When that id is empty or **not present in the bar's player-character `selectableActors`** (stale, including a legacy owned non-player-character id), it falls back to the first selectable actor and re-persists that fallback so a fresh client converges on a valid, sticky player-character selection. When the selectable list is **empty**, the store sets no selection, persists nothing, and must not throw (it must not index the first element of an empty list).
+- The store factory must not access Foundry globals directly; all environment access goes through the injected services bag, preserving the presentational-component boundary.
+- The re-persist fallback runs at most once per load: a re-entrant load after a deliberate selection must not clobber or re-seed the user's choice (guarded by an initialized flag).
+- The shared store is the single source of truth for the selected gathering actor **after convergence**. Because the gathering listing resolves a remembered actor against its ownership list (not the player-character list), a legacy persisted owned non-player-character id may be honored by the listing on the first fetch; the store converges by falling back to the first player character and re-persisting, after which the store and the persisted setting agree.
 
 ### Environment List
 
@@ -647,6 +683,33 @@ It is opened from the `Gathering` header action in the Items directory and must 
 - Do not expose weather or time of day as player environment browse filters.
 - Environment rows should be image-led and include environment name, biome, risk/status chip, and availability summary where safe to reveal.
 - Selecting an environment populates a task list and environment detail/evidence panel.
+
+### Player Current Realm
+
+When location-aware gathering is enabled, the player Gathering app shows current location context for the selected actor.
+
+- Show the selected actor's party when the actor belongs to a Fabricate gathering party.
+- Show the current realm name(s) when the selected actor is allowed to know them. Show "Undiscovered realm" style placeholders for secret current realms the selected actor has not discovered.
+- Show the current-realm evidence source using the canonical labels `GM override`, `Travel actor`, and `No current realm`. While Scene Region automation is unimplemented, the `Travel actor` source is presented as "automation not yet available" rather than hidden.
+- If the actor is not in a party, show a concise no-party location state that still does not block non-location-gated environments.
+- Current-realm display must fit narrow Foundry ApplicationV2 layouts without overlapping actor/stamina controls, and current-realm chips must wrap within the app container without forcing horizontal scrolling.
+
+### Player Environment Availability and Travel Guidance
+
+The player Gathering app makes location-gated availability understandable.
+
+- Available environments sort before unavailable location-gated environments. Unavailable environments may remain visible when safe, with clear blocked reasons.
+- Known destination guidance may list realm names; secret or undiscovered destination guidance must use undiscovered placeholders and counts.
+- Guidance must distinguish the location blocker from weather, time, tool, stamina, node, scene, permission, duplicate-run, and visibility blockers where practical.
+- Environment cards/details must not leak hidden blind task names, hidden results, hidden events, provider diagnostics, GM-only notes, or secret undiscovered realm names. Secret undiscovered realm names and ids must not appear in visible text, `title`, `aria-label`, filter labels, or DOM `data-*` attributes.
+- Non-GM destination filters may expose known destination names and aggregate buckets such as `Undiscovered realms`; they must not expose secret undiscovered realm names or ids.
+
+### Player Realm Modifier Visibility
+
+The player UI respects the realm modifier visibility setting.
+
+- Modifier visibility defaults to visible. Visible modifiers show concise source evidence, such as the realm name and the affected value.
+- GM-only modifiers must not reveal secret realm identity or hidden modifier values to non-GM users; hidden modifier effects avoid misleading player copy (generic "local conditions may affect this attempt" copy is acceptable when needed).
 
 ### Task Selection
 

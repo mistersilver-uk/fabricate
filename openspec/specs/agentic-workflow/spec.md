@@ -18,12 +18,25 @@ The repository MUST treat files under `openspec/specs/*/spec.md` as the canonica
 
 ### Requirement: Per-change planning
 
-Non-trivial changes MUST be planned in a dedicated change folder under `openspec/changes/` before implementation starts.
+Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts. The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
 
 #### Scenario: planning issue work
 
 - **WHEN** work is non-trivial or spans multiple files, validations, or decisions
-- **THEN** the implementer creates or updates `proposal.md`, `design.md`, and `tasks.md` in `openspec/changes/<change>/`
+- **THEN** the orchestrator captures the change delta in the issue's managed `openspec-delta` block before code changes begin
+- **AND** when the work originates from an existing issue it appends the block, preserving the reporter's original text, and when the work originates from a prompt with no issue it creates an issue from the `OpenSpec Change Delta` template
+- **AND** it rewrites the block in place across plan-review iterations rather than appending duplicate blocks, and never edits outside the markers
+
+#### Scenario: implementing the delta into canonical specs
+
+- **WHEN** the change requires canonical requirement changes
+- **THEN** the implementer makes those changes under `openspec/specs/*/spec.md` (the only versioned spec source of truth) as required by the issue's `Spec Deltas`
+
+#### Scenario: reconciling the implementation against the delta
+
+- **WHEN** implementation is complete
+- **THEN** post-implementation review and the documentation loop compare the actual `openspec/specs/` diff against the proposed delta in the issue
+- **AND** they confirm the implementation faithfully realizes the delta, or — when implementation justifiably deviated — the issue's delta and its `Deviations` note are updated so the delta accurately describes what shipped
 
 ### Requirement: Branch and PR workflow
 
@@ -95,7 +108,7 @@ Agents and skills MUST keep durable product behavior in canonical specs or activ
 #### Scenario: UI learning becomes durable
 
 - **WHEN** an implementation or review uncovers a reusable product UI rule
-- **THEN** the agent updates the relevant `openspec/specs/*/spec.md` or active `openspec/changes/<change>/design.md`
+- **THEN** the agent updates the relevant `openspec/specs/*/spec.md`, or the active change delta in the issue's `openspec-delta` block when the rule is still being planned
 - **AND** role prompts or skills may add only concise workflow guidance that points agents to those documents
 
 #### Scenario: validation infrastructure fails

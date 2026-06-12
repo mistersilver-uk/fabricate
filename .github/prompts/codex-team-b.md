@@ -5,6 +5,7 @@ Read these files before doing anything else, ideally in parallel:
 - `AGENTS.md`
 - `.git/codex-team-b-context/issue-meta.md`
 - `.git/codex-team-b-context/issue-body.txt`
+- `openspec/README.md`
 - `openspec/specs/README.md`
 - `.codex/config.toml`
 - `.codex/agents/fabricate-orchestrator.toml`
@@ -36,7 +37,7 @@ Work through these phases:
 1. Plan
 - Use `fabricate-orchestrator` behavior first.
 - Search the codebase for relevant files before deciding on changes.
-- For non-trivial work, create or update `openspec/changes/<change>/proposal.md`, `design.md`, and `tasks.md` before code changes.
+- For non-trivial work, author the OpenSpec change delta in the **selected issue's body** before code changes, using `gh issue edit "$ISSUE_NUMBER"` to write the managed `openspec-delta` block (proposal, design, tasks, any per-domain spec deltas, resolved roster, acceptance). Preserve the reporter's original text above the block, edit only inside the `openspec-delta:start`/`openspec-delta:end` markers, and rewrite the block in place rather than appending a duplicate. See `openspec/README.md`. The delta lives in the issue, not in versioned files, so it persists even when the branch commit is code-only.
 - For trivial work, keep the task tightly scoped.
 
 2. Implement
@@ -55,6 +56,7 @@ Work through these phases:
 4. Document
 - Follow the docs-writer skill expectations.
 - Update relevant documentation if behavior changed.
+- Reconcile the shipped canonical specs (`openspec/specs/`) against the issue's `openspec-delta`: when implementation faithfully realized the delta, leave it; when it justifiably deviated, update the issue's delta block (and its `Deviations` note) via `gh issue edit` so it accurately describes what shipped.
 
 5. Commit
 - If you make changes, stage and commit them using:

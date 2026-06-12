@@ -58,7 +58,7 @@ npm test         # Run test suite
 npm run build    # Vite build to /dist
 ```
 
-Canonical specifications live under `openspec/specs/`. Non-trivial implementation work should be planned under `openspec/changes/<change>/`.
+Canonical specifications live under `openspec/specs/`. Non-trivial work is planned as an OpenSpec change delta in the work's GitHub issue (see `openspec/README.md`), not as versioned files.
 
 ### Live Foundry Smoke Test
 
