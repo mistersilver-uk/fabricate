@@ -88,22 +88,22 @@
   --fab-bg-2: #1B2833;
   --fab-bg-3: #2C3B49;
   --fab-surface: #15212B;
-  --fab-surface-soft: rgba(241, 209, 181, 0.05);
-  --fab-surface-raised: rgba(241, 209, 181, 0.08);
-  --fab-surface-active: rgba(241, 209, 181, 0.12);
-  --fab-border: rgba(217, 184, 156, 0.18);
-  --fab-border-strong: rgba(217, 184, 156, 0.32);
+  --fab-surface-soft: rgb(241 209 181 / 5%);
+  --fab-surface-raised: rgb(241 209 181 / 8%);
+  --fab-surface-active: rgb(241 209 181 / 12%);
+  --fab-border: rgb(217 184 156 / 18%);
+  --fab-border-strong: rgb(217 184 156 / 32%);
   --fab-border-soft: #2C3B49;
   --fab-text: #F1D1B5;
   --fab-text-secondary: #D9B89C;
-  --fab-text-muted: rgba(217, 184, 156, 0.74);
-  --fab-text-subtle: rgba(217, 184, 156, 0.56);
-  --fab-text-disabled: rgba(217, 184, 156, 0.42);
+  --fab-text-muted: rgb(217 184 156 / 74%);
+  --fab-text-subtle: rgb(217 184 156 / 56%);
+  --fab-text-disabled: rgb(217 184 156 / 42%);
   --fab-accent: #E8C6A7;
   --fab-accent-hover: #F1D1B5;
   --fab-accent-strong: #D9B89C;
-  --fab-accent-soft: rgba(232, 198, 167, 0.16);
-  --fab-accent-border: rgba(232, 198, 167, 0.48);
+  --fab-accent-soft: rgb(232 198 167 / 16%);
+  --fab-accent-border: rgb(232 198 167 / 48%);
   --fab-on-accent: #111A23;
   --fab-on-info: #111A23;
   --fab-on-success: #111A23;
@@ -111,23 +111,23 @@
   --fab-success: #9AB89C;
   --fab-success-strong: #A9C7AA;
   --fab-success-text: #D7E6D8;
-  --fab-success-soft: rgba(154, 184, 156, 0.16);
-  --fab-success-border: rgba(154, 184, 156, 0.56);
+  --fab-success-soft: rgb(154 184 156 / 16%);
+  --fab-success-border: rgb(154 184 156 / 56%);
   --fab-info: #B9D3DD;
   --fab-info-strong: #9EC5D2;
   --fab-info-text: #DCEEF3;
-  --fab-info-soft: rgba(185, 211, 221, 0.14);
-  --fab-info-border: rgba(185, 211, 221, 0.44);
+  --fab-info-soft: rgb(185 211 221 / 14%);
+  --fab-info-border: rgb(185 211 221 / 44%);
   --fab-warning: #E7DBB1;
   --fab-warning-text: #F2E8C7;
-  --fab-warning-soft: rgba(231, 219, 177, 0.14);
-  --fab-warning-border: rgba(231, 219, 177, 0.46);
+  --fab-warning-soft: rgb(231 219 177 / 14%);
+  --fab-warning-border: rgb(231 219 177 / 46%);
   --fab-danger: #B97C78;
   --fab-danger-text: #E7BDBA;
-  --fab-danger-soft: rgba(185, 124, 120, 0.16);
-  --fab-danger-border: rgba(185, 124, 120, 0.54);
+  --fab-danger-soft: rgb(185 124 120 / 16%);
+  --fab-danger-border: rgb(185 124 120 / 54%);
   --fab-purple: #CEC1E6;
-  --fab-purple-soft: rgba(206, 193, 230, 0.14);
+  --fab-purple-soft: rgb(206 193 230 / 14%);
   --fab-tag-sage: #BFD5C3;
   --fab-tag-mist: #B9D3DD;
   --fab-tag-lavender: #CEC1E6;
@@ -143,60 +143,60 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
-  --fab-overlay-dark-05: rgba(17, 26, 35, 0.05);
-  --fab-overlay-dark-08: rgba(17, 26, 35, 0.08);
-  --fab-overlay-dark-10: rgba(17, 26, 35, 0.1);
-  --fab-overlay-dark-12: rgba(17, 26, 35, 0.12);
-  --fab-overlay-dark-14: rgba(17, 26, 35, 0.14);
-  --fab-overlay-dark-15: rgba(17, 26, 35, 0.15);
-  --fab-overlay-dark-16: rgba(17, 26, 35, 0.16);
-  --fab-overlay-dark-18: rgba(17, 26, 35, 0.18);
-  --fab-overlay-dark-20: rgba(17, 26, 35, 0.2);
-  --fab-overlay-dark-24: rgba(17, 26, 35, 0.24);
-  --fab-overlay-dark-25: rgba(17, 26, 35, 0.25);
-  --fab-overlay-dark-28: rgba(17, 26, 35, 0.28);
-  --fab-overlay-dark-32: rgba(17, 26, 35, 0.32);
-  --fab-overlay-dark-34: rgba(17, 26, 35, 0.34);
-  --fab-overlay-dark-35: rgba(17, 26, 35, 0.35);
-  --fab-overlay-dark-42: rgba(17, 26, 35, 0.42);
-  --fab-overlay-dark-48: rgba(17, 26, 35, 0.48);
-  --fab-overlay-dark-70: rgba(17, 26, 35, 0.7);
-  --fab-overlay-dark-78: rgba(17, 26, 35, 0.78);
-  --fab-overlay-dark-80: rgba(17, 26, 35, 0.8);
-  --fab-overlay-dark-84: rgba(17, 26, 35, 0.84);
-  --fab-overlay-light-02: rgba(241, 209, 181, 0.02);
-  --fab-overlay-light-025: rgba(241, 209, 181, 0.025);
-  --fab-overlay-light-03: rgba(241, 209, 181, 0.03);
-  --fab-overlay-light-035: rgba(241, 209, 181, 0.035);
-  --fab-overlay-light-04: rgba(241, 209, 181, 0.04);
-  --fab-overlay-light-05: rgba(241, 209, 181, 0.05);
-  --fab-overlay-light-06: rgba(241, 209, 181, 0.06);
-  --fab-overlay-light-07: rgba(241, 209, 181, 0.07);
-  --fab-overlay-light-08: rgba(241, 209, 181, 0.08);
-  --fab-overlay-light-10: rgba(241, 209, 181, 0.1);
-  --fab-overlay-light-12: rgba(241, 209, 181, 0.12);
-  --fab-overlay-light-14: rgba(241, 209, 181, 0.14);
-  --fab-overlay-light-16: rgba(241, 209, 181, 0.16);
-  --fab-overlay-light-18: rgba(241, 209, 181, 0.18);
-  --fab-overlay-light-20: rgba(241, 209, 181, 0.2);
-  --fab-overlay-light-22: rgba(241, 209, 181, 0.22);
-  --fab-overlay-light-24: rgba(241, 209, 181, 0.24);
-  --fab-overlay-light-28: rgba(241, 209, 181, 0.28);
-  --fab-overlay-light-50: rgba(241, 209, 181, 0.5);
-  --fab-overlay-light-60: rgba(241, 209, 181, 0.6);
-  --fab-overlay-light-68: rgba(241, 209, 181, 0.68);
-  --fab-overlay-light-70: rgba(241, 209, 181, 0.7);
-  --fab-overlay-light-72: rgba(241, 209, 181, 0.72);
-  --fab-overlay-light-96: rgba(241, 209, 181, 0.96);
+  --fab-overlay-dark-05: rgb(17 26 35 / 5%);
+  --fab-overlay-dark-08: rgb(17 26 35 / 8%);
+  --fab-overlay-dark-10: rgb(17 26 35 / 10%);
+  --fab-overlay-dark-12: rgb(17 26 35 / 12%);
+  --fab-overlay-dark-14: rgb(17 26 35 / 14%);
+  --fab-overlay-dark-15: rgb(17 26 35 / 15%);
+  --fab-overlay-dark-16: rgb(17 26 35 / 16%);
+  --fab-overlay-dark-18: rgb(17 26 35 / 18%);
+  --fab-overlay-dark-20: rgb(17 26 35 / 20%);
+  --fab-overlay-dark-24: rgb(17 26 35 / 24%);
+  --fab-overlay-dark-25: rgb(17 26 35 / 25%);
+  --fab-overlay-dark-28: rgb(17 26 35 / 28%);
+  --fab-overlay-dark-32: rgb(17 26 35 / 32%);
+  --fab-overlay-dark-34: rgb(17 26 35 / 34%);
+  --fab-overlay-dark-35: rgb(17 26 35 / 35%);
+  --fab-overlay-dark-42: rgb(17 26 35 / 42%);
+  --fab-overlay-dark-48: rgb(17 26 35 / 48%);
+  --fab-overlay-dark-70: rgb(17 26 35 / 70%);
+  --fab-overlay-dark-78: rgb(17 26 35 / 78%);
+  --fab-overlay-dark-80: rgb(17 26 35 / 80%);
+  --fab-overlay-dark-84: rgb(17 26 35 / 84%);
+  --fab-overlay-light-02: rgb(241 209 181 / 2%);
+  --fab-overlay-light-025: rgb(241 209 181 / 2.5%);
+  --fab-overlay-light-03: rgb(241 209 181 / 3%);
+  --fab-overlay-light-035: rgb(241 209 181 / 3.5%);
+  --fab-overlay-light-04: rgb(241 209 181 / 4%);
+  --fab-overlay-light-05: rgb(241 209 181 / 5%);
+  --fab-overlay-light-06: rgb(241 209 181 / 6%);
+  --fab-overlay-light-07: rgb(241 209 181 / 7%);
+  --fab-overlay-light-08: rgb(241 209 181 / 8%);
+  --fab-overlay-light-10: rgb(241 209 181 / 10%);
+  --fab-overlay-light-12: rgb(241 209 181 / 12%);
+  --fab-overlay-light-14: rgb(241 209 181 / 14%);
+  --fab-overlay-light-16: rgb(241 209 181 / 16%);
+  --fab-overlay-light-18: rgb(241 209 181 / 18%);
+  --fab-overlay-light-20: rgb(241 209 181 / 20%);
+  --fab-overlay-light-22: rgb(241 209 181 / 22%);
+  --fab-overlay-light-24: rgb(241 209 181 / 24%);
+  --fab-overlay-light-28: rgb(241 209 181 / 28%);
+  --fab-overlay-light-50: rgb(241 209 181 / 50%);
+  --fab-overlay-light-60: rgb(241 209 181 / 60%);
+  --fab-overlay-light-68: rgb(241 209 181 / 68%);
+  --fab-overlay-light-70: rgb(241 209 181 / 70%);
+  --fab-overlay-light-72: rgb(241 209 181 / 72%);
+  --fab-overlay-light-96: rgb(241 209 181 / 96%);
   --fab-blue-soft: var(--fab-info-soft);
   --fab-blue-border: var(--fab-info-border);
-  --fab-danger-surface: rgba(185, 124, 120, 0.24);
-  --fab-danger-surface-strong: rgba(185, 124, 120, 0.36);
-  --fab-danger-focus: rgba(185, 124, 120, 0.72);
-  --fab-warning-focus: rgba(231, 219, 177, 0.78);
-  --fab-shadow-sm: 0 8px 18px rgba(17, 26, 35, 0.2);
-  --fab-shadow-md: 0 10px 24px rgba(17, 26, 35, 0.28);
-  --fab-shadow-lg: 0 14px 38px rgba(17, 26, 35, 0.34);
+  --fab-danger-surface: rgb(185 124 120 / 24%);
+  --fab-danger-surface-strong: rgb(185 124 120 / 36%);
+  --fab-danger-focus: rgb(185 124 120 / 72%);
+  --fab-warning-focus: rgb(231 219 177 / 78%);
+  --fab-shadow-sm: 0 8px 18px rgb(17 26 35 / 20%);
+  --fab-shadow-md: 0 10px 24px rgb(17 26 35 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(17 26 35 / 34%);
 }
 
 :root[data-fabricate-theme="mythwright"],
@@ -206,22 +206,22 @@
   --fab-bg-2: #101D27;
   --fab-bg-3: #152633;
   --fab-surface: #101D27;
-  --fab-surface-soft: rgba(255, 255, 255, 0.035);
-  --fab-surface-raised: rgba(255, 255, 255, 0.06);
-  --fab-surface-active: rgba(255, 255, 255, 0.1);
-  --fab-border: rgba(153, 191, 204, 0.16);
-  --fab-border-strong: rgba(153, 191, 204, 0.28);
-  --fab-border-soft: rgba(153, 191, 204, 0.12);
+  --fab-surface-soft: rgb(255 255 255 / 3.5%);
+  --fab-surface-raised: rgb(255 255 255 / 6%);
+  --fab-surface-active: rgb(255 255 255 / 10%);
+  --fab-border: rgb(153 191 204 / 16%);
+  --fab-border-strong: rgb(153 191 204 / 28%);
+  --fab-border-soft: rgb(153 191 204 / 12%);
   --fab-text: #F2F7F5;
   --fab-text-secondary: #DFF6DF;
   --fab-text-muted: #A9B8BD;
   --fab-text-subtle: #7F9299;
-  --fab-text-disabled: rgba(169, 184, 189, 0.5);
+  --fab-text-disabled: rgb(169 184 189 / 50%);
   --fab-accent: #63D47B;
   --fab-accent-hover: #72DF89;
   --fab-accent-strong: #3EB95F;
-  --fab-accent-soft: rgba(99, 212, 123, 0.16);
-  --fab-accent-border: rgba(99, 212, 123, 0.54);
+  --fab-accent-soft: rgb(99 212 123 / 16%);
+  --fab-accent-border: rgb(99 212 123 / 54%);
   --fab-on-accent: #051E0C;
   --fab-on-info: #061821;
   --fab-on-success: #051E0C;
@@ -229,23 +229,23 @@
   --fab-success: #5CB85C;
   --fab-success-strong: #63D47B;
   --fab-success-text: #DFF6DF;
-  --fab-success-soft: rgba(92, 184, 92, 0.16);
-  --fab-success-border: rgba(92, 184, 92, 0.54);
+  --fab-success-soft: rgb(92 184 92 / 16%);
+  --fab-success-border: rgb(92 184 92 / 54%);
   --fab-info: #58B7E8;
   --fab-info-strong: #5A88BB;
   --fab-info-text: #DCEEF3;
-  --fab-info-soft: rgba(88, 183, 232, 0.16);
-  --fab-info-border: rgba(88, 183, 232, 0.48);
+  --fab-info-soft: rgb(88 183 232 / 16%);
+  --fab-info-border: rgb(88 183 232 / 48%);
   --fab-warning: #F4C04F;
   --fab-warning-text: #FFE3B6;
-  --fab-warning-soft: rgba(244, 192, 79, 0.16);
-  --fab-warning-border: rgba(244, 192, 79, 0.48);
+  --fab-warning-soft: rgb(244 192 79 / 16%);
+  --fab-warning-border: rgb(244 192 79 / 48%);
   --fab-danger: #FF5252;
   --fab-danger-text: #FFB7B4;
-  --fab-danger-soft: rgba(255, 82, 82, 0.14);
-  --fab-danger-border: rgba(255, 82, 82, 0.54);
+  --fab-danger-soft: rgb(255 82 82 / 14%);
+  --fab-danger-border: rgb(255 82 82 / 54%);
   --fab-purple: #A875FF;
-  --fab-purple-soft: rgba(168, 117, 255, 0.16);
+  --fab-purple-soft: rgb(168 117 255 / 16%);
   --fab-tag-sage: #BFD5C3;
   --fab-tag-mist: #B9D3DD;
   --fab-tag-lavender: #CEC1E6;
@@ -261,60 +261,60 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
-  --fab-overlay-dark-05: rgba(0, 0, 0, 0.05);
-  --fab-overlay-dark-08: rgba(0, 0, 0, 0.08);
-  --fab-overlay-dark-10: rgba(0, 0, 0, 0.1);
-  --fab-overlay-dark-12: rgba(0, 0, 0, 0.12);
-  --fab-overlay-dark-14: rgba(0, 0, 0, 0.14);
-  --fab-overlay-dark-15: rgba(0, 0, 0, 0.15);
-  --fab-overlay-dark-16: rgba(0, 0, 0, 0.16);
-  --fab-overlay-dark-18: rgba(0, 0, 0, 0.18);
-  --fab-overlay-dark-20: rgba(0, 0, 0, 0.2);
-  --fab-overlay-dark-24: rgba(0, 0, 0, 0.24);
-  --fab-overlay-dark-25: rgba(0, 0, 0, 0.25);
-  --fab-overlay-dark-28: rgba(0, 0, 0, 0.28);
-  --fab-overlay-dark-32: rgba(0, 0, 0, 0.32);
-  --fab-overlay-dark-34: rgba(0, 0, 0, 0.34);
-  --fab-overlay-dark-35: rgba(0, 0, 0, 0.35);
-  --fab-overlay-dark-42: rgba(0, 0, 0, 0.42);
-  --fab-overlay-dark-48: rgba(0, 0, 0, 0.48);
-  --fab-overlay-dark-70: rgba(0, 0, 0, 0.7);
-  --fab-overlay-dark-78: rgba(0, 0, 0, 0.78);
-  --fab-overlay-dark-80: rgba(0, 0, 0, 0.8);
-  --fab-overlay-dark-84: rgba(0, 0, 0, 0.84);
-  --fab-overlay-light-02: rgba(255, 255, 255, 0.02);
-  --fab-overlay-light-025: rgba(255, 255, 255, 0.025);
-  --fab-overlay-light-03: rgba(255, 255, 255, 0.03);
-  --fab-overlay-light-035: rgba(255, 255, 255, 0.035);
-  --fab-overlay-light-04: rgba(255, 255, 255, 0.04);
-  --fab-overlay-light-05: rgba(255, 255, 255, 0.05);
-  --fab-overlay-light-06: rgba(255, 255, 255, 0.06);
-  --fab-overlay-light-07: rgba(255, 255, 255, 0.07);
-  --fab-overlay-light-08: rgba(255, 255, 255, 0.08);
-  --fab-overlay-light-10: rgba(255, 255, 255, 0.1);
-  --fab-overlay-light-12: rgba(255, 255, 255, 0.12);
-  --fab-overlay-light-14: rgba(255, 255, 255, 0.14);
-  --fab-overlay-light-16: rgba(255, 255, 255, 0.16);
-  --fab-overlay-light-18: rgba(255, 255, 255, 0.18);
-  --fab-overlay-light-20: rgba(255, 255, 255, 0.2);
-  --fab-overlay-light-22: rgba(255, 255, 255, 0.22);
-  --fab-overlay-light-24: rgba(255, 255, 255, 0.24);
-  --fab-overlay-light-28: rgba(255, 255, 255, 0.28);
-  --fab-overlay-light-50: rgba(255, 255, 255, 0.5);
-  --fab-overlay-light-60: rgba(255, 255, 255, 0.6);
-  --fab-overlay-light-68: rgba(255, 255, 255, 0.68);
-  --fab-overlay-light-70: rgba(255, 255, 255, 0.7);
-  --fab-overlay-light-72: rgba(255, 255, 255, 0.72);
-  --fab-overlay-light-96: rgba(255, 255, 255, 0.96);
-  --fab-blue-soft: rgba(74, 144, 226, 0.16);
-  --fab-blue-border: rgba(148, 190, 255, 0.3);
-  --fab-danger-surface: rgba(120, 20, 20, 0.18);
-  --fab-danger-surface-strong: rgba(120, 20, 20, 0.2);
-  --fab-danger-focus: rgba(220, 80, 80, 0.72);
-  --fab-warning-focus: rgba(246, 176, 72, 0.78);
-  --fab-shadow-sm: 0 8px 18px rgba(0, 0, 0, 0.18);
-  --fab-shadow-md: 0 10px 24px rgba(0, 0, 0, 0.28);
-  --fab-shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.34);
+  --fab-overlay-dark-05: rgb(0 0 0 / 5%);
+  --fab-overlay-dark-08: rgb(0 0 0 / 8%);
+  --fab-overlay-dark-10: rgb(0 0 0 / 10%);
+  --fab-overlay-dark-12: rgb(0 0 0 / 12%);
+  --fab-overlay-dark-14: rgb(0 0 0 / 14%);
+  --fab-overlay-dark-15: rgb(0 0 0 / 15%);
+  --fab-overlay-dark-16: rgb(0 0 0 / 16%);
+  --fab-overlay-dark-18: rgb(0 0 0 / 18%);
+  --fab-overlay-dark-20: rgb(0 0 0 / 20%);
+  --fab-overlay-dark-24: rgb(0 0 0 / 24%);
+  --fab-overlay-dark-25: rgb(0 0 0 / 25%);
+  --fab-overlay-dark-28: rgb(0 0 0 / 28%);
+  --fab-overlay-dark-32: rgb(0 0 0 / 32%);
+  --fab-overlay-dark-34: rgb(0 0 0 / 34%);
+  --fab-overlay-dark-35: rgb(0 0 0 / 35%);
+  --fab-overlay-dark-42: rgb(0 0 0 / 42%);
+  --fab-overlay-dark-48: rgb(0 0 0 / 48%);
+  --fab-overlay-dark-70: rgb(0 0 0 / 70%);
+  --fab-overlay-dark-78: rgb(0 0 0 / 78%);
+  --fab-overlay-dark-80: rgb(0 0 0 / 80%);
+  --fab-overlay-dark-84: rgb(0 0 0 / 84%);
+  --fab-overlay-light-02: rgb(255 255 255 / 2%);
+  --fab-overlay-light-025: rgb(255 255 255 / 2.5%);
+  --fab-overlay-light-03: rgb(255 255 255 / 3%);
+  --fab-overlay-light-035: rgb(255 255 255 / 3.5%);
+  --fab-overlay-light-04: rgb(255 255 255 / 4%);
+  --fab-overlay-light-05: rgb(255 255 255 / 5%);
+  --fab-overlay-light-06: rgb(255 255 255 / 6%);
+  --fab-overlay-light-07: rgb(255 255 255 / 7%);
+  --fab-overlay-light-08: rgb(255 255 255 / 8%);
+  --fab-overlay-light-10: rgb(255 255 255 / 10%);
+  --fab-overlay-light-12: rgb(255 255 255 / 12%);
+  --fab-overlay-light-14: rgb(255 255 255 / 14%);
+  --fab-overlay-light-16: rgb(255 255 255 / 16%);
+  --fab-overlay-light-18: rgb(255 255 255 / 18%);
+  --fab-overlay-light-20: rgb(255 255 255 / 20%);
+  --fab-overlay-light-22: rgb(255 255 255 / 22%);
+  --fab-overlay-light-24: rgb(255 255 255 / 24%);
+  --fab-overlay-light-28: rgb(255 255 255 / 28%);
+  --fab-overlay-light-50: rgb(255 255 255 / 50%);
+  --fab-overlay-light-60: rgb(255 255 255 / 60%);
+  --fab-overlay-light-68: rgb(255 255 255 / 68%);
+  --fab-overlay-light-70: rgb(255 255 255 / 70%);
+  --fab-overlay-light-72: rgb(255 255 255 / 72%);
+  --fab-overlay-light-96: rgb(255 255 255 / 96%);
+  --fab-blue-soft: rgb(74 144 226 / 16%);
+  --fab-blue-border: rgb(148 190 255 / 30%);
+  --fab-danger-surface: rgb(120 20 20 / 18%);
+  --fab-danger-surface-strong: rgb(120 20 20 / 20%);
+  --fab-danger-focus: rgb(220 80 80 / 72%);
+  --fab-warning-focus: rgb(246 176 72 / 78%);
+  --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 18%);
+  --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
 }
 
 :root[data-fabricate-theme="ironblood-forge"],
@@ -324,22 +324,22 @@
   --fab-bg-2: #2C2428;
   --fab-bg-3: #5A4A50;
   --fab-surface: #1F1A1D;
-  --fab-surface-soft: rgba(240, 226, 212, 0.05);
-  --fab-surface-raised: rgba(240, 226, 212, 0.08);
-  --fab-surface-active: rgba(240, 226, 212, 0.12);
-  --fab-border: rgba(200, 177, 163, 0.18);
-  --fab-border-strong: rgba(200, 177, 163, 0.32);
+  --fab-surface-soft: rgb(240 226 212 / 5%);
+  --fab-surface-raised: rgb(240 226 212 / 8%);
+  --fab-surface-active: rgb(240 226 212 / 12%);
+  --fab-border: rgb(200 177 163 / 18%);
+  --fab-border-strong: rgb(200 177 163 / 32%);
   --fab-border-soft: #5A4A50;
   --fab-text: #F0E2D4;
   --fab-text-secondary: #C8B1A3;
-  --fab-text-muted: rgba(200, 177, 163, 0.74);
-  --fab-text-subtle: rgba(200, 177, 163, 0.56);
-  --fab-text-disabled: rgba(200, 177, 163, 0.42);
+  --fab-text-muted: rgb(200 177 163 / 74%);
+  --fab-text-subtle: rgb(200 177 163 / 56%);
+  --fab-text-disabled: rgb(200 177 163 / 42%);
   --fab-accent: #C58B5A;
   --fab-accent-hover: #D1A37C;
   --fab-accent-strong: #A5754D;
-  --fab-accent-soft: rgba(197, 139, 90, 0.16);
-  --fab-accent-border: rgba(197, 139, 90, 0.48);
+  --fab-accent-soft: rgb(197 139 90 / 16%);
+  --fab-accent-border: rgb(197 139 90 / 48%);
   --fab-on-accent: #141214;
   --fab-on-info: #141214;
   --fab-on-success: #141214;
@@ -347,23 +347,23 @@
   --fab-success: #92A78B;
   --fab-success-strong: #A3B298;
   --fab-success-text: #D2CFBD;
-  --fab-success-soft: rgba(146, 167, 139, 0.16);
-  --fab-success-border: rgba(146, 167, 139, 0.56);
+  --fab-success-soft: rgb(146 167 139 / 16%);
+  --fab-success-border: rgb(146 167 139 / 56%);
   --fab-info: #8E9A8F;
   --fab-info-strong: #788279;
   --fab-info-text: #D5CEC1;
-  --fab-info-soft: rgba(142, 154, 143, 0.14);
-  --fab-info-border: rgba(142, 154, 143, 0.44);
+  --fab-info-soft: rgb(142 154 143 / 14%);
+  --fab-info-border: rgb(142 154 143 / 44%);
   --fab-warning: #D6C08E;
   --fab-warning-text: #E9D9C2;
-  --fab-warning-soft: rgba(214, 192, 142, 0.14);
-  --fab-warning-border: rgba(214, 192, 142, 0.46);
+  --fab-warning-soft: rgb(214 192 142 / 14%);
+  --fab-warning-border: rgb(214 192 142 / 46%);
   --fab-danger: #A86D66;
   --fab-danger-text: #D5B6AA;
-  --fab-danger-soft: rgba(168, 109, 102, 0.16);
-  --fab-danger-border: rgba(168, 109, 102, 0.54);
+  --fab-danger-soft: rgb(168 109 102 / 16%);
+  --fab-danger-border: rgb(168 109 102 / 54%);
   --fab-purple: #C3B2CA;
-  --fab-purple-soft: rgba(195, 178, 202, 0.14);
+  --fab-purple-soft: rgb(195 178 202 / 14%);
   --fab-tag-sage: #B1BEAC;
   --fab-tag-mist: #C9C3BF;
   --fab-tag-lavender: #C3B2CA;
@@ -379,60 +379,60 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
-  --fab-overlay-dark-05: rgba(20, 18, 20, 0.05);
-  --fab-overlay-dark-08: rgba(20, 18, 20, 0.08);
-  --fab-overlay-dark-10: rgba(20, 18, 20, 0.1);
-  --fab-overlay-dark-12: rgba(20, 18, 20, 0.12);
-  --fab-overlay-dark-14: rgba(20, 18, 20, 0.14);
-  --fab-overlay-dark-15: rgba(20, 18, 20, 0.15);
-  --fab-overlay-dark-16: rgba(20, 18, 20, 0.16);
-  --fab-overlay-dark-18: rgba(20, 18, 20, 0.18);
-  --fab-overlay-dark-20: rgba(20, 18, 20, 0.2);
-  --fab-overlay-dark-24: rgba(20, 18, 20, 0.24);
-  --fab-overlay-dark-25: rgba(20, 18, 20, 0.25);
-  --fab-overlay-dark-28: rgba(20, 18, 20, 0.28);
-  --fab-overlay-dark-32: rgba(20, 18, 20, 0.32);
-  --fab-overlay-dark-34: rgba(20, 18, 20, 0.34);
-  --fab-overlay-dark-35: rgba(20, 18, 20, 0.35);
-  --fab-overlay-dark-42: rgba(20, 18, 20, 0.42);
-  --fab-overlay-dark-48: rgba(20, 18, 20, 0.48);
-  --fab-overlay-dark-70: rgba(20, 18, 20, 0.7);
-  --fab-overlay-dark-78: rgba(20, 18, 20, 0.78);
-  --fab-overlay-dark-80: rgba(20, 18, 20, 0.8);
-  --fab-overlay-dark-84: rgba(20, 18, 20, 0.84);
-  --fab-overlay-light-02: rgba(240, 226, 212, 0.02);
-  --fab-overlay-light-025: rgba(240, 226, 212, 0.025);
-  --fab-overlay-light-03: rgba(240, 226, 212, 0.03);
-  --fab-overlay-light-035: rgba(240, 226, 212, 0.035);
-  --fab-overlay-light-04: rgba(240, 226, 212, 0.04);
-  --fab-overlay-light-05: rgba(240, 226, 212, 0.05);
-  --fab-overlay-light-06: rgba(240, 226, 212, 0.06);
-  --fab-overlay-light-07: rgba(240, 226, 212, 0.07);
-  --fab-overlay-light-08: rgba(240, 226, 212, 0.08);
-  --fab-overlay-light-10: rgba(240, 226, 212, 0.1);
-  --fab-overlay-light-12: rgba(240, 226, 212, 0.12);
-  --fab-overlay-light-14: rgba(240, 226, 212, 0.14);
-  --fab-overlay-light-16: rgba(240, 226, 212, 0.16);
-  --fab-overlay-light-18: rgba(240, 226, 212, 0.18);
-  --fab-overlay-light-20: rgba(240, 226, 212, 0.2);
-  --fab-overlay-light-22: rgba(240, 226, 212, 0.22);
-  --fab-overlay-light-24: rgba(240, 226, 212, 0.24);
-  --fab-overlay-light-28: rgba(240, 226, 212, 0.28);
-  --fab-overlay-light-50: rgba(240, 226, 212, 0.5);
-  --fab-overlay-light-60: rgba(240, 226, 212, 0.6);
-  --fab-overlay-light-68: rgba(240, 226, 212, 0.68);
-  --fab-overlay-light-70: rgba(240, 226, 212, 0.7);
-  --fab-overlay-light-72: rgba(240, 226, 212, 0.72);
-  --fab-overlay-light-96: rgba(240, 226, 212, 0.96);
+  --fab-overlay-dark-05: rgb(20 18 20 / 5%);
+  --fab-overlay-dark-08: rgb(20 18 20 / 8%);
+  --fab-overlay-dark-10: rgb(20 18 20 / 10%);
+  --fab-overlay-dark-12: rgb(20 18 20 / 12%);
+  --fab-overlay-dark-14: rgb(20 18 20 / 14%);
+  --fab-overlay-dark-15: rgb(20 18 20 / 15%);
+  --fab-overlay-dark-16: rgb(20 18 20 / 16%);
+  --fab-overlay-dark-18: rgb(20 18 20 / 18%);
+  --fab-overlay-dark-20: rgb(20 18 20 / 20%);
+  --fab-overlay-dark-24: rgb(20 18 20 / 24%);
+  --fab-overlay-dark-25: rgb(20 18 20 / 25%);
+  --fab-overlay-dark-28: rgb(20 18 20 / 28%);
+  --fab-overlay-dark-32: rgb(20 18 20 / 32%);
+  --fab-overlay-dark-34: rgb(20 18 20 / 34%);
+  --fab-overlay-dark-35: rgb(20 18 20 / 35%);
+  --fab-overlay-dark-42: rgb(20 18 20 / 42%);
+  --fab-overlay-dark-48: rgb(20 18 20 / 48%);
+  --fab-overlay-dark-70: rgb(20 18 20 / 70%);
+  --fab-overlay-dark-78: rgb(20 18 20 / 78%);
+  --fab-overlay-dark-80: rgb(20 18 20 / 80%);
+  --fab-overlay-dark-84: rgb(20 18 20 / 84%);
+  --fab-overlay-light-02: rgb(240 226 212 / 2%);
+  --fab-overlay-light-025: rgb(240 226 212 / 2.5%);
+  --fab-overlay-light-03: rgb(240 226 212 / 3%);
+  --fab-overlay-light-035: rgb(240 226 212 / 3.5%);
+  --fab-overlay-light-04: rgb(240 226 212 / 4%);
+  --fab-overlay-light-05: rgb(240 226 212 / 5%);
+  --fab-overlay-light-06: rgb(240 226 212 / 6%);
+  --fab-overlay-light-07: rgb(240 226 212 / 7%);
+  --fab-overlay-light-08: rgb(240 226 212 / 8%);
+  --fab-overlay-light-10: rgb(240 226 212 / 10%);
+  --fab-overlay-light-12: rgb(240 226 212 / 12%);
+  --fab-overlay-light-14: rgb(240 226 212 / 14%);
+  --fab-overlay-light-16: rgb(240 226 212 / 16%);
+  --fab-overlay-light-18: rgb(240 226 212 / 18%);
+  --fab-overlay-light-20: rgb(240 226 212 / 20%);
+  --fab-overlay-light-22: rgb(240 226 212 / 22%);
+  --fab-overlay-light-24: rgb(240 226 212 / 24%);
+  --fab-overlay-light-28: rgb(240 226 212 / 28%);
+  --fab-overlay-light-50: rgb(240 226 212 / 50%);
+  --fab-overlay-light-60: rgb(240 226 212 / 60%);
+  --fab-overlay-light-68: rgb(240 226 212 / 68%);
+  --fab-overlay-light-70: rgb(240 226 212 / 70%);
+  --fab-overlay-light-72: rgb(240 226 212 / 72%);
+  --fab-overlay-light-96: rgb(240 226 212 / 96%);
   --fab-blue-soft: var(--fab-info-soft);
   --fab-blue-border: var(--fab-info-border);
-  --fab-danger-surface: rgba(168, 109, 102, 0.24);
-  --fab-danger-surface-strong: rgba(168, 109, 102, 0.36);
-  --fab-danger-focus: rgba(168, 109, 102, 0.72);
-  --fab-warning-focus: rgba(214, 192, 142, 0.78);
-  --fab-shadow-sm: 0 8px 18px rgba(20, 18, 20, 0.2);
-  --fab-shadow-md: 0 10px 24px rgba(20, 18, 20, 0.28);
-  --fab-shadow-lg: 0 14px 38px rgba(20, 18, 20, 0.34);
+  --fab-danger-surface: rgb(168 109 102 / 24%);
+  --fab-danger-surface-strong: rgb(168 109 102 / 36%);
+  --fab-danger-focus: rgb(168 109 102 / 72%);
+  --fab-warning-focus: rgb(214 192 142 / 78%);
+  --fab-shadow-sm: 0 8px 18px rgb(20 18 20 / 20%);
+  --fab-shadow-md: 0 10px 24px rgb(20 18 20 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(20 18 20 / 34%);
 }
 
 :root[data-fabricate-theme="hearth-herb"],
@@ -442,22 +442,22 @@
   --fab-bg-2: #2B3831;
   --fab-bg-3: #53695E;
   --fab-surface: #1F2924;
-  --fab-surface-soft: rgba(241, 233, 216, 0.05);
-  --fab-surface-raised: rgba(241, 233, 216, 0.08);
-  --fab-surface-active: rgba(241, 233, 216, 0.12);
-  --fab-border: rgba(213, 198, 168, 0.18);
-  --fab-border-strong: rgba(213, 198, 168, 0.32);
+  --fab-surface-soft: rgb(241 233 216 / 5%);
+  --fab-surface-raised: rgb(241 233 216 / 8%);
+  --fab-surface-active: rgb(241 233 216 / 12%);
+  --fab-border: rgb(213 198 168 / 18%);
+  --fab-border-strong: rgb(213 198 168 / 32%);
   --fab-border-soft: #53695E;
   --fab-text: #F1E9D8;
   --fab-text-secondary: #D5C6A8;
-  --fab-text-muted: rgba(213, 198, 168, 0.74);
-  --fab-text-subtle: rgba(213, 198, 168, 0.56);
-  --fab-text-disabled: rgba(213, 198, 168, 0.42);
+  --fab-text-muted: rgb(213 198 168 / 74%);
+  --fab-text-subtle: rgb(213 198 168 / 56%);
+  --fab-text-disabled: rgb(213 198 168 / 42%);
   --fab-accent: #C8A36E;
   --fab-accent-hover: #D3B78C;
   --fab-accent-strong: #A88B5F;
-  --fab-accent-soft: rgba(200, 163, 110, 0.16);
-  --fab-accent-border: rgba(200, 163, 110, 0.48);
+  --fab-accent-soft: rgb(200 163 110 / 16%);
+  --fab-accent-border: rgb(200 163 110 / 48%);
   --fab-on-accent: #161C19;
   --fab-on-info: #161C19;
   --fab-on-success: #161C19;
@@ -465,23 +465,23 @@
   --fab-success: #AFC7A4;
   --fab-success-strong: #BBCDAD;
   --fab-success-text: #DCDEC7;
-  --fab-success-soft: rgba(175, 199, 164, 0.16);
-  --fab-success-border: rgba(175, 199, 164, 0.56);
+  --fab-success-soft: rgb(175 199 164 / 16%);
+  --fab-success-border: rgb(175 199 164 / 56%);
   --fab-info: #9BB79E;
   --fab-info-strong: #839B86;
   --fab-info-text: #D9DBC8;
-  --fab-info-soft: rgba(155, 183, 158, 0.14);
-  --fab-info-border: rgba(155, 183, 158, 0.44);
+  --fab-info-soft: rgb(155 183 158 / 14%);
+  --fab-info-border: rgb(155 183 158 / 44%);
   --fab-warning: #E7D8A2;
   --fab-warning-text: #EEE5CA;
-  --fab-warning-soft: rgba(231, 216, 162, 0.14);
-  --fab-warning-border: rgba(231, 216, 162, 0.46);
+  --fab-warning-soft: rgb(231 216 162 / 14%);
+  --fab-warning-border: rgb(231 216 162 / 46%);
   --fab-danger: #B98378;
   --fab-danger-text: #DCC2B4;
-  --fab-danger-soft: rgba(185, 131, 120, 0.16);
-  --fab-danger-border: rgba(185, 131, 120, 0.54);
+  --fab-danger-soft: rgb(185 131 120 / 16%);
+  --fab-danger-border: rgb(185 131 120 / 54%);
   --fab-purple: #D0C7E2;
-  --fab-purple-soft: rgba(208, 199, 226, 0.14);
+  --fab-purple-soft: rgb(208 199 226 / 14%);
   --fab-tag-sage: #C6D8C2;
   --fab-tag-mist: #C8D9D3;
   --fab-tag-lavender: #D0C7E2;
@@ -497,60 +497,60 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
-  --fab-overlay-dark-05: rgba(22, 28, 25, 0.05);
-  --fab-overlay-dark-08: rgba(22, 28, 25, 0.08);
-  --fab-overlay-dark-10: rgba(22, 28, 25, 0.1);
-  --fab-overlay-dark-12: rgba(22, 28, 25, 0.12);
-  --fab-overlay-dark-14: rgba(22, 28, 25, 0.14);
-  --fab-overlay-dark-15: rgba(22, 28, 25, 0.15);
-  --fab-overlay-dark-16: rgba(22, 28, 25, 0.16);
-  --fab-overlay-dark-18: rgba(22, 28, 25, 0.18);
-  --fab-overlay-dark-20: rgba(22, 28, 25, 0.2);
-  --fab-overlay-dark-24: rgba(22, 28, 25, 0.24);
-  --fab-overlay-dark-25: rgba(22, 28, 25, 0.25);
-  --fab-overlay-dark-28: rgba(22, 28, 25, 0.28);
-  --fab-overlay-dark-32: rgba(22, 28, 25, 0.32);
-  --fab-overlay-dark-34: rgba(22, 28, 25, 0.34);
-  --fab-overlay-dark-35: rgba(22, 28, 25, 0.35);
-  --fab-overlay-dark-42: rgba(22, 28, 25, 0.42);
-  --fab-overlay-dark-48: rgba(22, 28, 25, 0.48);
-  --fab-overlay-dark-70: rgba(22, 28, 25, 0.7);
-  --fab-overlay-dark-78: rgba(22, 28, 25, 0.78);
-  --fab-overlay-dark-80: rgba(22, 28, 25, 0.8);
-  --fab-overlay-dark-84: rgba(22, 28, 25, 0.84);
-  --fab-overlay-light-02: rgba(241, 233, 216, 0.02);
-  --fab-overlay-light-025: rgba(241, 233, 216, 0.025);
-  --fab-overlay-light-03: rgba(241, 233, 216, 0.03);
-  --fab-overlay-light-035: rgba(241, 233, 216, 0.035);
-  --fab-overlay-light-04: rgba(241, 233, 216, 0.04);
-  --fab-overlay-light-05: rgba(241, 233, 216, 0.05);
-  --fab-overlay-light-06: rgba(241, 233, 216, 0.06);
-  --fab-overlay-light-07: rgba(241, 233, 216, 0.07);
-  --fab-overlay-light-08: rgba(241, 233, 216, 0.08);
-  --fab-overlay-light-10: rgba(241, 233, 216, 0.1);
-  --fab-overlay-light-12: rgba(241, 233, 216, 0.12);
-  --fab-overlay-light-14: rgba(241, 233, 216, 0.14);
-  --fab-overlay-light-16: rgba(241, 233, 216, 0.16);
-  --fab-overlay-light-18: rgba(241, 233, 216, 0.18);
-  --fab-overlay-light-20: rgba(241, 233, 216, 0.2);
-  --fab-overlay-light-22: rgba(241, 233, 216, 0.22);
-  --fab-overlay-light-24: rgba(241, 233, 216, 0.24);
-  --fab-overlay-light-28: rgba(241, 233, 216, 0.28);
-  --fab-overlay-light-50: rgba(241, 233, 216, 0.5);
-  --fab-overlay-light-60: rgba(241, 233, 216, 0.6);
-  --fab-overlay-light-68: rgba(241, 233, 216, 0.68);
-  --fab-overlay-light-70: rgba(241, 233, 216, 0.7);
-  --fab-overlay-light-72: rgba(241, 233, 216, 0.72);
-  --fab-overlay-light-96: rgba(241, 233, 216, 0.96);
+  --fab-overlay-dark-05: rgb(22 28 25 / 5%);
+  --fab-overlay-dark-08: rgb(22 28 25 / 8%);
+  --fab-overlay-dark-10: rgb(22 28 25 / 10%);
+  --fab-overlay-dark-12: rgb(22 28 25 / 12%);
+  --fab-overlay-dark-14: rgb(22 28 25 / 14%);
+  --fab-overlay-dark-15: rgb(22 28 25 / 15%);
+  --fab-overlay-dark-16: rgb(22 28 25 / 16%);
+  --fab-overlay-dark-18: rgb(22 28 25 / 18%);
+  --fab-overlay-dark-20: rgb(22 28 25 / 20%);
+  --fab-overlay-dark-24: rgb(22 28 25 / 24%);
+  --fab-overlay-dark-25: rgb(22 28 25 / 25%);
+  --fab-overlay-dark-28: rgb(22 28 25 / 28%);
+  --fab-overlay-dark-32: rgb(22 28 25 / 32%);
+  --fab-overlay-dark-34: rgb(22 28 25 / 34%);
+  --fab-overlay-dark-35: rgb(22 28 25 / 35%);
+  --fab-overlay-dark-42: rgb(22 28 25 / 42%);
+  --fab-overlay-dark-48: rgb(22 28 25 / 48%);
+  --fab-overlay-dark-70: rgb(22 28 25 / 70%);
+  --fab-overlay-dark-78: rgb(22 28 25 / 78%);
+  --fab-overlay-dark-80: rgb(22 28 25 / 80%);
+  --fab-overlay-dark-84: rgb(22 28 25 / 84%);
+  --fab-overlay-light-02: rgb(241 233 216 / 2%);
+  --fab-overlay-light-025: rgb(241 233 216 / 2.5%);
+  --fab-overlay-light-03: rgb(241 233 216 / 3%);
+  --fab-overlay-light-035: rgb(241 233 216 / 3.5%);
+  --fab-overlay-light-04: rgb(241 233 216 / 4%);
+  --fab-overlay-light-05: rgb(241 233 216 / 5%);
+  --fab-overlay-light-06: rgb(241 233 216 / 6%);
+  --fab-overlay-light-07: rgb(241 233 216 / 7%);
+  --fab-overlay-light-08: rgb(241 233 216 / 8%);
+  --fab-overlay-light-10: rgb(241 233 216 / 10%);
+  --fab-overlay-light-12: rgb(241 233 216 / 12%);
+  --fab-overlay-light-14: rgb(241 233 216 / 14%);
+  --fab-overlay-light-16: rgb(241 233 216 / 16%);
+  --fab-overlay-light-18: rgb(241 233 216 / 18%);
+  --fab-overlay-light-20: rgb(241 233 216 / 20%);
+  --fab-overlay-light-22: rgb(241 233 216 / 22%);
+  --fab-overlay-light-24: rgb(241 233 216 / 24%);
+  --fab-overlay-light-28: rgb(241 233 216 / 28%);
+  --fab-overlay-light-50: rgb(241 233 216 / 50%);
+  --fab-overlay-light-60: rgb(241 233 216 / 60%);
+  --fab-overlay-light-68: rgb(241 233 216 / 68%);
+  --fab-overlay-light-70: rgb(241 233 216 / 70%);
+  --fab-overlay-light-72: rgb(241 233 216 / 72%);
+  --fab-overlay-light-96: rgb(241 233 216 / 96%);
   --fab-blue-soft: var(--fab-info-soft);
   --fab-blue-border: var(--fab-info-border);
-  --fab-danger-surface: rgba(185, 131, 120, 0.24);
-  --fab-danger-surface-strong: rgba(185, 131, 120, 0.36);
-  --fab-danger-focus: rgba(185, 131, 120, 0.72);
-  --fab-warning-focus: rgba(231, 216, 162, 0.78);
-  --fab-shadow-sm: 0 8px 18px rgba(22, 28, 25, 0.2);
-  --fab-shadow-md: 0 10px 24px rgba(22, 28, 25, 0.28);
-  --fab-shadow-lg: 0 14px 38px rgba(22, 28, 25, 0.34);
+  --fab-danger-surface: rgb(185 131 120 / 24%);
+  --fab-danger-surface-strong: rgb(185 131 120 / 36%);
+  --fab-danger-focus: rgb(185 131 120 / 72%);
+  --fab-warning-focus: rgb(231 216 162 / 78%);
+  --fab-shadow-sm: 0 8px 18px rgb(22 28 25 / 20%);
+  --fab-shadow-md: 0 10px 24px rgb(22 28 25 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(22 28 25 / 34%);
 }
 
 :root[data-fabricate-theme="starglass-arcana"],
@@ -560,22 +560,22 @@
   --fab-bg-2: #243147;
   --fab-bg-3: #40506B;
   --fab-surface: #1A2232;
-  --fab-surface-soft: rgba(242, 236, 255, 0.05);
-  --fab-surface-raised: rgba(242, 236, 255, 0.08);
-  --fab-surface-active: rgba(242, 236, 255, 0.12);
-  --fab-border: rgba(203, 191, 236, 0.18);
-  --fab-border-strong: rgba(203, 191, 236, 0.32);
+  --fab-surface-soft: rgb(242 236 255 / 5%);
+  --fab-surface-raised: rgb(242 236 255 / 8%);
+  --fab-surface-active: rgb(242 236 255 / 12%);
+  --fab-border: rgb(203 191 236 / 18%);
+  --fab-border-strong: rgb(203 191 236 / 32%);
   --fab-border-soft: #40506B;
   --fab-text: #F2ECFF;
   --fab-text-secondary: #CBBFEC;
-  --fab-text-muted: rgba(203, 191, 236, 0.74);
-  --fab-text-subtle: rgba(203, 191, 236, 0.56);
-  --fab-text-disabled: rgba(203, 191, 236, 0.42);
+  --fab-text-muted: rgb(203 191 236 / 74%);
+  --fab-text-subtle: rgb(203 191 236 / 56%);
+  --fab-text-disabled: rgb(203 191 236 / 42%);
   --fab-accent: #9FC5E8;
   --fab-accent-hover: #B6D0EE;
   --fab-accent-strong: #86A6C5;
-  --fab-accent-soft: rgba(159, 197, 232, 0.16);
-  --fab-accent-border: rgba(159, 197, 232, 0.48);
+  --fab-accent-soft: rgb(159 197 232 / 16%);
+  --fab-accent-border: rgb(159 197 232 / 48%);
   --fab-on-accent: #121824;
   --fab-on-info: #121824;
   --fab-on-success: #121824;
@@ -583,23 +583,23 @@
   --fab-success: #9DC9BD;
   --fab-success-strong: #ACCFC9;
   --fab-success-text: #D7E1EA;
-  --fab-success-soft: rgba(157, 201, 189, 0.16);
-  --fab-success-border: rgba(157, 201, 189, 0.56);
+  --fab-success-soft: rgb(157 201 189 / 16%);
+  --fab-success-border: rgb(157 201 189 / 56%);
   --fab-info: #C7A6E6;
   --fab-info-strong: #A68CC3;
   --fab-info-text: #E6D8F8;
-  --fab-info-soft: rgba(199, 166, 230, 0.14);
-  --fab-info-border: rgba(199, 166, 230, 0.44);
+  --fab-info-soft: rgb(199 166 230 / 14%);
+  --fab-info-border: rgb(199 166 230 / 44%);
   --fab-warning: #E6E0C8;
   --fab-warning-text: #EFE9F1;
-  --fab-warning-soft: rgba(230, 224, 200, 0.14);
-  --fab-warning-border: rgba(230, 224, 200, 0.46);
+  --fab-warning-soft: rgb(230 224 200 / 14%);
+  --fab-warning-border: rgb(230 224 200 / 46%);
   --fab-danger: #C78A96;
   --fab-danger-text: #E2C7D7;
-  --fab-danger-soft: rgba(199, 138, 150, 0.16);
-  --fab-danger-border: rgba(199, 138, 150, 0.54);
+  --fab-danger-soft: rgb(199 138 150 / 16%);
+  --fab-danger-border: rgb(199 138 150 / 54%);
   --fab-purple: #BEC3EE;
-  --fab-purple-soft: rgba(190, 195, 238, 0.14);
+  --fab-purple-soft: rgb(190 195 238 / 14%);
   --fab-tag-sage: #B8DBE0;
   --fab-tag-mist: #C7D7EE;
   --fab-tag-lavender: #D6C4EC;
@@ -615,60 +615,60 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
-  --fab-overlay-dark-05: rgba(18, 24, 36, 0.05);
-  --fab-overlay-dark-08: rgba(18, 24, 36, 0.08);
-  --fab-overlay-dark-10: rgba(18, 24, 36, 0.1);
-  --fab-overlay-dark-12: rgba(18, 24, 36, 0.12);
-  --fab-overlay-dark-14: rgba(18, 24, 36, 0.14);
-  --fab-overlay-dark-15: rgba(18, 24, 36, 0.15);
-  --fab-overlay-dark-16: rgba(18, 24, 36, 0.16);
-  --fab-overlay-dark-18: rgba(18, 24, 36, 0.18);
-  --fab-overlay-dark-20: rgba(18, 24, 36, 0.2);
-  --fab-overlay-dark-24: rgba(18, 24, 36, 0.24);
-  --fab-overlay-dark-25: rgba(18, 24, 36, 0.25);
-  --fab-overlay-dark-28: rgba(18, 24, 36, 0.28);
-  --fab-overlay-dark-32: rgba(18, 24, 36, 0.32);
-  --fab-overlay-dark-34: rgba(18, 24, 36, 0.34);
-  --fab-overlay-dark-35: rgba(18, 24, 36, 0.35);
-  --fab-overlay-dark-42: rgba(18, 24, 36, 0.42);
-  --fab-overlay-dark-48: rgba(18, 24, 36, 0.48);
-  --fab-overlay-dark-70: rgba(18, 24, 36, 0.7);
-  --fab-overlay-dark-78: rgba(18, 24, 36, 0.78);
-  --fab-overlay-dark-80: rgba(18, 24, 36, 0.8);
-  --fab-overlay-dark-84: rgba(18, 24, 36, 0.84);
-  --fab-overlay-light-02: rgba(242, 236, 255, 0.02);
-  --fab-overlay-light-025: rgba(242, 236, 255, 0.025);
-  --fab-overlay-light-03: rgba(242, 236, 255, 0.03);
-  --fab-overlay-light-035: rgba(242, 236, 255, 0.035);
-  --fab-overlay-light-04: rgba(242, 236, 255, 0.04);
-  --fab-overlay-light-05: rgba(242, 236, 255, 0.05);
-  --fab-overlay-light-06: rgba(242, 236, 255, 0.06);
-  --fab-overlay-light-07: rgba(242, 236, 255, 0.07);
-  --fab-overlay-light-08: rgba(242, 236, 255, 0.08);
-  --fab-overlay-light-10: rgba(242, 236, 255, 0.1);
-  --fab-overlay-light-12: rgba(242, 236, 255, 0.12);
-  --fab-overlay-light-14: rgba(242, 236, 255, 0.14);
-  --fab-overlay-light-16: rgba(242, 236, 255, 0.16);
-  --fab-overlay-light-18: rgba(242, 236, 255, 0.18);
-  --fab-overlay-light-20: rgba(242, 236, 255, 0.2);
-  --fab-overlay-light-22: rgba(242, 236, 255, 0.22);
-  --fab-overlay-light-24: rgba(242, 236, 255, 0.24);
-  --fab-overlay-light-28: rgba(242, 236, 255, 0.28);
-  --fab-overlay-light-50: rgba(242, 236, 255, 0.5);
-  --fab-overlay-light-60: rgba(242, 236, 255, 0.6);
-  --fab-overlay-light-68: rgba(242, 236, 255, 0.68);
-  --fab-overlay-light-70: rgba(242, 236, 255, 0.7);
-  --fab-overlay-light-72: rgba(242, 236, 255, 0.72);
-  --fab-overlay-light-96: rgba(242, 236, 255, 0.96);
+  --fab-overlay-dark-05: rgb(18 24 36 / 5%);
+  --fab-overlay-dark-08: rgb(18 24 36 / 8%);
+  --fab-overlay-dark-10: rgb(18 24 36 / 10%);
+  --fab-overlay-dark-12: rgb(18 24 36 / 12%);
+  --fab-overlay-dark-14: rgb(18 24 36 / 14%);
+  --fab-overlay-dark-15: rgb(18 24 36 / 15%);
+  --fab-overlay-dark-16: rgb(18 24 36 / 16%);
+  --fab-overlay-dark-18: rgb(18 24 36 / 18%);
+  --fab-overlay-dark-20: rgb(18 24 36 / 20%);
+  --fab-overlay-dark-24: rgb(18 24 36 / 24%);
+  --fab-overlay-dark-25: rgb(18 24 36 / 25%);
+  --fab-overlay-dark-28: rgb(18 24 36 / 28%);
+  --fab-overlay-dark-32: rgb(18 24 36 / 32%);
+  --fab-overlay-dark-34: rgb(18 24 36 / 34%);
+  --fab-overlay-dark-35: rgb(18 24 36 / 35%);
+  --fab-overlay-dark-42: rgb(18 24 36 / 42%);
+  --fab-overlay-dark-48: rgb(18 24 36 / 48%);
+  --fab-overlay-dark-70: rgb(18 24 36 / 70%);
+  --fab-overlay-dark-78: rgb(18 24 36 / 78%);
+  --fab-overlay-dark-80: rgb(18 24 36 / 80%);
+  --fab-overlay-dark-84: rgb(18 24 36 / 84%);
+  --fab-overlay-light-02: rgb(242 236 255 / 2%);
+  --fab-overlay-light-025: rgb(242 236 255 / 2.5%);
+  --fab-overlay-light-03: rgb(242 236 255 / 3%);
+  --fab-overlay-light-035: rgb(242 236 255 / 3.5%);
+  --fab-overlay-light-04: rgb(242 236 255 / 4%);
+  --fab-overlay-light-05: rgb(242 236 255 / 5%);
+  --fab-overlay-light-06: rgb(242 236 255 / 6%);
+  --fab-overlay-light-07: rgb(242 236 255 / 7%);
+  --fab-overlay-light-08: rgb(242 236 255 / 8%);
+  --fab-overlay-light-10: rgb(242 236 255 / 10%);
+  --fab-overlay-light-12: rgb(242 236 255 / 12%);
+  --fab-overlay-light-14: rgb(242 236 255 / 14%);
+  --fab-overlay-light-16: rgb(242 236 255 / 16%);
+  --fab-overlay-light-18: rgb(242 236 255 / 18%);
+  --fab-overlay-light-20: rgb(242 236 255 / 20%);
+  --fab-overlay-light-22: rgb(242 236 255 / 22%);
+  --fab-overlay-light-24: rgb(242 236 255 / 24%);
+  --fab-overlay-light-28: rgb(242 236 255 / 28%);
+  --fab-overlay-light-50: rgb(242 236 255 / 50%);
+  --fab-overlay-light-60: rgb(242 236 255 / 60%);
+  --fab-overlay-light-68: rgb(242 236 255 / 68%);
+  --fab-overlay-light-70: rgb(242 236 255 / 70%);
+  --fab-overlay-light-72: rgb(242 236 255 / 72%);
+  --fab-overlay-light-96: rgb(242 236 255 / 96%);
   --fab-blue-soft: var(--fab-info-soft);
   --fab-blue-border: var(--fab-info-border);
-  --fab-danger-surface: rgba(199, 138, 150, 0.24);
-  --fab-danger-surface-strong: rgba(199, 138, 150, 0.36);
-  --fab-danger-focus: rgba(199, 138, 150, 0.72);
-  --fab-warning-focus: rgba(230, 224, 200, 0.78);
-  --fab-shadow-sm: 0 8px 18px rgba(18, 24, 36, 0.2);
-  --fab-shadow-md: 0 10px 24px rgba(18, 24, 36, 0.28);
-  --fab-shadow-lg: 0 14px 38px rgba(18, 24, 36, 0.34);
+  --fab-danger-surface: rgb(199 138 150 / 24%);
+  --fab-danger-surface-strong: rgb(199 138 150 / 36%);
+  --fab-danger-focus: rgb(199 138 150 / 72%);
+  --fab-warning-focus: rgb(230 224 200 / 78%);
+  --fab-shadow-sm: 0 8px 18px rgb(18 24 36 / 20%);
+  --fab-shadow-md: 0 10px 24px rgb(18 24 36 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(18 24 36 / 34%);
 }
 
 :root[data-fabricate-theme="foundry-native"],
@@ -678,22 +678,22 @@
   --fab-bg-2: #30282F;
   --fab-bg-3: #2E2833;
   --fab-surface: #111018;
-  --fab-surface-soft: rgba(243, 243, 245, 0.035);
-  --fab-surface-raised: rgba(243, 243, 245, 0.06);
-  --fab-surface-active: rgba(243, 243, 245, 0.1);
-  --fab-border: rgba(188, 137, 99, 0.18);
-  --fab-border-strong: rgba(188, 137, 99, 0.32);
+  --fab-surface-soft: rgb(243 243 245 / 3.5%);
+  --fab-surface-raised: rgb(243 243 245 / 6%);
+  --fab-surface-active: rgb(243 243 245 / 10%);
+  --fab-border: rgb(188 137 99 / 18%);
+  --fab-border-strong: rgb(188 137 99 / 32%);
   --fab-border-soft: #2E2833;
   --fab-text: #F3F3F5;
   --fab-text-secondary: #B6B4B2;
-  --fab-text-muted: rgba(182, 180, 178, 0.78);
-  --fab-text-subtle: rgba(182, 180, 178, 0.6);
-  --fab-text-disabled: rgba(148, 143, 144, 0.5);
+  --fab-text-muted: rgb(182 180 178 / 78%);
+  --fab-text-subtle: rgb(182 180 178 / 60%);
+  --fab-text-disabled: rgb(148 143 144 / 50%);
   --fab-accent: #BC8963;
   --fab-accent-hover: #C1966E;
   --fab-accent-strong: #A16C60;
-  --fab-accent-soft: rgba(188, 137, 99, 0.14);
-  --fab-accent-border: rgba(188, 137, 99, 0.42);
+  --fab-accent-soft: rgb(188 137 99 / 14%);
+  --fab-accent-border: rgb(188 137 99 / 42%);
   --fab-on-accent: #191813;
   --fab-on-info: #F3F3F5;
   --fab-on-success: #F3F3F5;
@@ -701,23 +701,23 @@
   --fab-success: #617054;
   --fab-success-strong: #7C8B71;
   --fab-success-text: #F3F3F5;
-  --fab-success-soft: rgba(97, 112, 84, 0.16);
-  --fab-success-border: rgba(124, 139, 113, 0.44);
+  --fab-success-soft: rgb(97 112 84 / 16%);
+  --fab-success-border: rgb(124 139 113 / 44%);
   --fab-info: #706B70;
   --fab-info-strong: #948F90;
   --fab-info-text: #F3F3F5;
-  --fab-info-soft: rgba(112, 107, 112, 0.14);
-  --fab-info-border: rgba(148, 143, 144, 0.42);
+  --fab-info-soft: rgb(112 107 112 / 14%);
+  --fab-info-border: rgb(148 143 144 / 42%);
   --fab-warning: #BC8963;
   --fab-warning-text: #F3F3F5;
-  --fab-warning-soft: rgba(188, 137, 99, 0.16);
-  --fab-warning-border: rgba(188, 137, 99, 0.44);
+  --fab-warning-soft: rgb(188 137 99 / 16%);
+  --fab-warning-border: rgb(188 137 99 / 44%);
   --fab-danger: #A16C60;
   --fab-danger-text: #F3F3F5;
-  --fab-danger-soft: rgba(161, 108, 96, 0.16);
-  --fab-danger-border: rgba(161, 108, 96, 0.44);
+  --fab-danger-soft: rgb(161 108 96 / 16%);
+  --fab-danger-border: rgb(161 108 96 / 44%);
   --fab-purple: #584A75;
-  --fab-purple-soft: rgba(88, 74, 117, 0.16);
+  --fab-purple-soft: rgb(88 74 117 / 16%);
   --fab-tag-sage: #A9BE9E;
   --fab-tag-mist: #CBC6BB;
   --fab-tag-lavender: #A99BC4;
@@ -733,60 +733,60 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
-  --fab-overlay-dark-05: rgba(12, 10, 20, 0.05);
-  --fab-overlay-dark-08: rgba(12, 10, 20, 0.08);
-  --fab-overlay-dark-10: rgba(12, 10, 20, 0.1);
-  --fab-overlay-dark-12: rgba(12, 10, 20, 0.12);
-  --fab-overlay-dark-14: rgba(12, 10, 20, 0.14);
-  --fab-overlay-dark-15: rgba(12, 10, 20, 0.15);
-  --fab-overlay-dark-16: rgba(12, 10, 20, 0.16);
-  --fab-overlay-dark-18: rgba(12, 10, 20, 0.18);
-  --fab-overlay-dark-20: rgba(12, 10, 20, 0.2);
-  --fab-overlay-dark-24: rgba(12, 10, 20, 0.24);
-  --fab-overlay-dark-25: rgba(12, 10, 20, 0.25);
-  --fab-overlay-dark-28: rgba(12, 10, 20, 0.28);
-  --fab-overlay-dark-32: rgba(12, 10, 20, 0.32);
-  --fab-overlay-dark-34: rgba(12, 10, 20, 0.34);
-  --fab-overlay-dark-35: rgba(12, 10, 20, 0.35);
-  --fab-overlay-dark-42: rgba(12, 10, 20, 0.42);
-  --fab-overlay-dark-48: rgba(12, 10, 20, 0.48);
-  --fab-overlay-dark-70: rgba(12, 10, 20, 0.7);
-  --fab-overlay-dark-78: rgba(12, 10, 20, 0.78);
-  --fab-overlay-dark-80: rgba(12, 10, 20, 0.8);
-  --fab-overlay-dark-84: rgba(12, 10, 20, 0.84);
-  --fab-overlay-light-02: rgba(243, 243, 245, 0.02);
-  --fab-overlay-light-025: rgba(243, 243, 245, 0.025);
-  --fab-overlay-light-03: rgba(243, 243, 245, 0.03);
-  --fab-overlay-light-035: rgba(243, 243, 245, 0.035);
-  --fab-overlay-light-04: rgba(243, 243, 245, 0.04);
-  --fab-overlay-light-05: rgba(243, 243, 245, 0.05);
-  --fab-overlay-light-06: rgba(243, 243, 245, 0.06);
-  --fab-overlay-light-07: rgba(243, 243, 245, 0.07);
-  --fab-overlay-light-08: rgba(243, 243, 245, 0.08);
-  --fab-overlay-light-10: rgba(243, 243, 245, 0.1);
-  --fab-overlay-light-12: rgba(243, 243, 245, 0.12);
-  --fab-overlay-light-14: rgba(243, 243, 245, 0.14);
-  --fab-overlay-light-16: rgba(243, 243, 245, 0.16);
-  --fab-overlay-light-18: rgba(243, 243, 245, 0.18);
-  --fab-overlay-light-20: rgba(243, 243, 245, 0.2);
-  --fab-overlay-light-22: rgba(243, 243, 245, 0.22);
-  --fab-overlay-light-24: rgba(243, 243, 245, 0.24);
-  --fab-overlay-light-28: rgba(243, 243, 245, 0.28);
-  --fab-overlay-light-50: rgba(243, 243, 245, 0.5);
-  --fab-overlay-light-60: rgba(243, 243, 245, 0.6);
-  --fab-overlay-light-68: rgba(243, 243, 245, 0.68);
-  --fab-overlay-light-70: rgba(243, 243, 245, 0.7);
-  --fab-overlay-light-72: rgba(243, 243, 245, 0.72);
-  --fab-overlay-light-96: rgba(243, 243, 245, 0.96);
+  --fab-overlay-dark-05: rgb(12 10 20 / 5%);
+  --fab-overlay-dark-08: rgb(12 10 20 / 8%);
+  --fab-overlay-dark-10: rgb(12 10 20 / 10%);
+  --fab-overlay-dark-12: rgb(12 10 20 / 12%);
+  --fab-overlay-dark-14: rgb(12 10 20 / 14%);
+  --fab-overlay-dark-15: rgb(12 10 20 / 15%);
+  --fab-overlay-dark-16: rgb(12 10 20 / 16%);
+  --fab-overlay-dark-18: rgb(12 10 20 / 18%);
+  --fab-overlay-dark-20: rgb(12 10 20 / 20%);
+  --fab-overlay-dark-24: rgb(12 10 20 / 24%);
+  --fab-overlay-dark-25: rgb(12 10 20 / 25%);
+  --fab-overlay-dark-28: rgb(12 10 20 / 28%);
+  --fab-overlay-dark-32: rgb(12 10 20 / 32%);
+  --fab-overlay-dark-34: rgb(12 10 20 / 34%);
+  --fab-overlay-dark-35: rgb(12 10 20 / 35%);
+  --fab-overlay-dark-42: rgb(12 10 20 / 42%);
+  --fab-overlay-dark-48: rgb(12 10 20 / 48%);
+  --fab-overlay-dark-70: rgb(12 10 20 / 70%);
+  --fab-overlay-dark-78: rgb(12 10 20 / 78%);
+  --fab-overlay-dark-80: rgb(12 10 20 / 80%);
+  --fab-overlay-dark-84: rgb(12 10 20 / 84%);
+  --fab-overlay-light-02: rgb(243 243 245 / 2%);
+  --fab-overlay-light-025: rgb(243 243 245 / 2.5%);
+  --fab-overlay-light-03: rgb(243 243 245 / 3%);
+  --fab-overlay-light-035: rgb(243 243 245 / 3.5%);
+  --fab-overlay-light-04: rgb(243 243 245 / 4%);
+  --fab-overlay-light-05: rgb(243 243 245 / 5%);
+  --fab-overlay-light-06: rgb(243 243 245 / 6%);
+  --fab-overlay-light-07: rgb(243 243 245 / 7%);
+  --fab-overlay-light-08: rgb(243 243 245 / 8%);
+  --fab-overlay-light-10: rgb(243 243 245 / 10%);
+  --fab-overlay-light-12: rgb(243 243 245 / 12%);
+  --fab-overlay-light-14: rgb(243 243 245 / 14%);
+  --fab-overlay-light-16: rgb(243 243 245 / 16%);
+  --fab-overlay-light-18: rgb(243 243 245 / 18%);
+  --fab-overlay-light-20: rgb(243 243 245 / 20%);
+  --fab-overlay-light-22: rgb(243 243 245 / 22%);
+  --fab-overlay-light-24: rgb(243 243 245 / 24%);
+  --fab-overlay-light-28: rgb(243 243 245 / 28%);
+  --fab-overlay-light-50: rgb(243 243 245 / 50%);
+  --fab-overlay-light-60: rgb(243 243 245 / 60%);
+  --fab-overlay-light-68: rgb(243 243 245 / 68%);
+  --fab-overlay-light-70: rgb(243 243 245 / 70%);
+  --fab-overlay-light-72: rgb(243 243 245 / 72%);
+  --fab-overlay-light-96: rgb(243 243 245 / 96%);
   --fab-blue-soft: var(--fab-info-soft);
   --fab-blue-border: var(--fab-info-border);
-  --fab-danger-surface: rgba(161, 108, 96, 0.24);
-  --fab-danger-surface-strong: rgba(161, 108, 96, 0.36);
-  --fab-danger-focus: rgba(161, 108, 96, 0.72);
-  --fab-warning-focus: rgba(193, 150, 110, 0.72);
-  --fab-shadow-sm: 0 8px 18px rgba(0, 0, 0, 0.2);
-  --fab-shadow-md: 0 10px 24px rgba(0, 0, 0, 0.28);
-  --fab-shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.34);
+  --fab-danger-surface: rgb(161 108 96 / 24%);
+  --fab-danger-surface-strong: rgb(161 108 96 / 36%);
+  --fab-danger-focus: rgb(161 108 96 / 72%);
+  --fab-warning-focus: rgb(193 150 110 / 72%);
+  --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 20%);
+  --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
 }
 
 /* ==========================================
@@ -837,13 +837,11 @@
   display: flex;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .fabricate-manager .image-path-picker-controls input {
   min-width: 0;
-}
-
-.fabricate-manager .image-path-picker-controls input {
   flex: 1 1 58%;
 }
 
@@ -862,10 +860,6 @@
   border-radius: 4px;
   border: 1px solid var(--fab-overlay-light-16);
   background: var(--fab-overlay-light-06);
-}
-
-.fabricate-manager .image-path-picker-controls {
-  flex: 1 1 auto;
 }
 
 .fabricate-manager .image-path-picker-button {
@@ -926,6 +920,7 @@
   --fab-mv2-info: var(--fab-info);
   --fab-mv2-warning: var(--fab-warning);
   --fab-mv2-danger: var(--fab-danger);
+
   position: relative;
   isolation: isolate;
   container-type: inline-size;
@@ -1136,11 +1131,10 @@
 
 .fabricate-manager .manager-character-modifier-card-header {
   display: flex;
-  flex-direction: row;
+  flex-flow: row wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-character-modifier-card-header-copy {
@@ -1265,8 +1259,7 @@
   min-width: 0;
   min-height: 0;
   padding-top: 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 
 .fabricate-manager .manager-inspector-card.is-sticky {
@@ -1295,11 +1288,10 @@
 
 .fabricate-manager .manager-character-modifier-row-card-header {
   display: flex;
-  flex-direction: row;
+  flex-flow: row wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-character-modifier-row-card-heading {
@@ -1531,7 +1523,7 @@
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
@@ -1613,7 +1605,7 @@
   width: 100%;
   min-width: 0;
   height: 34px;
-  padding: 0 34px 0 34px;
+  padding: 0 34px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -1813,6 +1805,7 @@
 
 .fabricate-manager .manager-recipes-table {
   --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.5fr) minmax(0, 0.48fr) minmax(0, 0.76fr) minmax(0, 0.58fr) 118px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1825,6 +1818,7 @@
 
 .fabricate-manager .manager-components-table {
   --fab-mv2-component-grid: minmax(0, 1.42fr) minmax(0, 0.55fr) minmax(0, 0.58fr) minmax(0, 0.48fr) 118px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1861,6 +1855,7 @@
 
 .fabricate-manager .manager-environments-table {
   --fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1869,6 +1864,7 @@
 
 .fabricate-manager .manager-gathering-tasks-table {
   --fab-mv2-gathering-task-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1877,6 +1873,7 @@
 
 .fabricate-manager .manager-essences-table {
   --fab-mv2-essence-grid: minmax(0, 1.55fr) minmax(64px, 0.32fr) minmax(92px, 0.42fr) 92px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2229,7 +2226,6 @@
   overflow: hidden;
   overflow-wrap: anywhere;
   white-space: normal;
-  word-break: break-word;
 }
 
 .fabricate-manager .manager-scope-return {
@@ -2331,6 +2327,7 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
+
   /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
   height: 64px;
   overflow-y: auto;
@@ -3542,10 +3539,6 @@
 .fabricate-manager .manager-environment-task-editor {
   min-height: 0;
   overflow: auto;
-}
-
-.fabricate-manager .manager-environment-task-rail,
-.fabricate-manager .manager-environment-task-editor {
   padding: 12px;
 }
 
@@ -3765,10 +3758,10 @@
 .fabricate-manager .environment-stale-warning,
 .fabricate-manager .environment-field-error {
   font-size: 0.74rem;
+  color: var(--fab-danger-text);
 }
 
-.fabricate-manager .environment-stale-warning,
-.fabricate-manager .environment-field-error {
+.fabricate-manager .environment-stale-warning {
   color: var(--fab-danger-text);
 }
 
@@ -4264,8 +4257,7 @@
 .fabricate-manager .manager-feature-list {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-start;
-  align-content: flex-start;
+  place-content: flex-start flex-start;
   gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
@@ -4439,6 +4431,7 @@
 
 .fabricate-manager .manager-gathering-events-table {
   --fab-mv2-gathering-event-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4566,6 +4559,7 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
+
   /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
   height: 64px;
   overflow-y: auto;
@@ -4739,7 +4733,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
   appearance: none;
   border: none;
   background: none;
@@ -4824,6 +4817,7 @@
 
 .fabricate-manager .manager-gathering-task-edit-view {
   display: grid;
+
   /* Rows size to each card (cards that need a fixed height — required-tools,
      component-browser, drops — set their own `height`). This keeps the stack
      order free: sections can be reordered without breaking heights. */
@@ -4859,7 +4853,7 @@
 
 .fabricate-manager .manager-gathering-task-edit-view .manager-search input:not([type="checkbox"]):not([type="radio"]) {
   height: 34px;
-  padding: 0 34px 0 34px;
+  padding: 0 34px;
 }
 
 .fabricate-manager .manager-gathering-task-edit-view input[type="range"] {
@@ -5327,6 +5321,7 @@
 
 .fabricate-manager .manager-task-drops-card {
   --fab-mv2-task-drop-table-visible-height: 262px;
+
   display: grid;
   grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;
   height: 410px;
@@ -5608,7 +5603,7 @@
 .fabricate-manager .manager-task-component-tag-search .manager-tag-suggestions {
   position: absolute;
   z-index: 5;
-  inset: calc(100% + 4px) 0 auto 0;
+  inset: calc(100% + 4px) 0 auto;
   max-height: 132px;
   overflow-y: auto;
 }
@@ -5623,8 +5618,7 @@
   grid-row-start: 3;
   min-height: 0;
   padding: 10px 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 
 .fabricate-manager .manager-task-component-grid {
@@ -5685,8 +5679,7 @@
 .fabricate-manager .manager-tools-component-browser-scroll {
   min-height: 0;
   padding: 10px 0 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 
 .fabricate-manager .manager-tools-component-grid {
@@ -5969,8 +5962,7 @@
 }
 
 .fabricate-manager .manager-task-required-tools-add-icon {
-  justify-self: end;
-  align-self: center;
+  place-self: center end;
   width: 22px;
   height: 22px;
   display: inline-flex;
@@ -6055,6 +6047,7 @@
 
 .fabricate-manager .manager-gathering-task-drops-table {
   --fab-mv2-task-drop-grid: minmax(0, 1.05fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
+
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -6078,7 +6071,7 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 4px 4px;
+  padding: 4px;
   box-sizing: border-box;
 }
 
@@ -6104,8 +6097,7 @@
   height: var(--fab-mv2-task-drop-table-visible-height);
   max-height: var(--fab-mv2-task-drop-table-visible-height);
   padding: 10px 0 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 
 .fabricate-manager .manager-gathering-task-drop-table-head,
@@ -6268,6 +6260,7 @@
 .fabricate-manager .manager-drop-rate-control {
   --fab-drop-rate-value: 1%;
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
+
   position: relative;
   display: grid;
   align-items: center;
@@ -6388,6 +6381,7 @@
     var(--fab-tool-breakage-chance-mid) 50%,
     var(--fab-tool-breakage-chance-high) 100%
   );
+
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-tool-breakage-chance-thumb-radius);
@@ -6554,6 +6548,7 @@
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
+
   /* Two-line chip budget; extra modifier chips scroll within the cell. */
   max-height: 58px;
   overflow-y: auto;
@@ -6942,7 +6937,7 @@
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
@@ -7511,8 +7506,7 @@
   }
 
   .fabricate-manager .manager-task-drops-card .manager-table-scroll {
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden auto;
   }
 
   .fabricate-manager .manager-system-edit-form {
@@ -8482,6 +8476,12 @@
   margin-left: 2px;
 }
 
+/* stylelint-disable-next-line no-duplicate-selectors -- known latent duplicate
+   (see GitHub issue 315): the earlier `.manager-environment-workspace` (older
+   rail+editor layout) is overridden at runtime by this newer composition-editor
+   layout. Kept as-is to preserve current behaviour; reconciling the two layouts
+   is separate product work tracked in GitHub issue 315, not part of introducing
+   the linter. */
 .fabricate-manager .manager-environment-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -8498,6 +8498,7 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
+
   /* Reserve scrollbar space and add a guaranteed visual buffer so the
      vertical scrollbar never overlays the rightmost row content (the actions
      column) when the panel scrolls. The padding works even when the host
@@ -8654,26 +8655,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-}
-
-.fabricate-manager .manager-environment-evidence-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 0.75em;
-  border: 1px solid var(--fab-mv2-border);
-  background: var(--fab-overlay-dark-16);
-}
-
-.fabricate-manager .manager-environment-evidence-chip.is-positive {
-  border-color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-environment-evidence-chip.is-danger {
-  border-color: var(--fab-mv2-danger);
-  color: var(--fab-mv2-danger);
 }
 
 .fabricate-manager .manager-environment-evidence-label {
@@ -8879,6 +8860,7 @@
 .fabricate-manager .manager-environment-comp {
   --fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
   --fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;
+
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -9140,9 +9122,8 @@
 .fabricate-manager .manager-environment-comp-menu button {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
+  place-items: center start;
   justify-content: start;
-  justify-items: start;
   column-gap: 8px;
   width: 100%;
   min-width: 0;
@@ -9186,9 +9167,8 @@
 .fabricate-manager .manager-environment-comp-menu-note {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
+  place-items: center start;
   justify-content: start;
-  justify-items: start;
   column-gap: 8px;
   width: 100%;
   min-width: 0;
@@ -9586,9 +9566,13 @@
 }
 
 /* -------------------------------------------------------------------------- */
+
 /* Gathering result chat card                                                 */
+
 /* Rendered inside the Foundry chat log (outside the Fabricate app shell), so  */
+
 /* it relies on the :root --fab-* tokens and stays self-contained.            */
+
 /* -------------------------------------------------------------------------- */
 
 /* Blends with Foundry's chat card: inherits the chat text colour (so it stays
@@ -9895,6 +9879,7 @@
 }
 
 /* Travel > Parties accordion list (styled after the gathering tools browser). */
+
 /* Travel > Regions accordion list — mirrors the Parties list mechanics. */
 .fabricate-manager .manager-travel-realms {
   flex: 1 1 auto;
@@ -9983,6 +9968,7 @@
   height: 18px;
   border-radius: 4px;
   border: 1px solid var(--fab-mv2-border-strong);
+
   /* Themed default; the scene region's own colour overrides this inline. */
   background: var(--fab-overlay-light-04);
   flex: 0 0 auto;
@@ -10002,6 +9988,7 @@
 
 .fabricate-manager .manager-map-link-picker-cell {
   flex: 0 0 auto;
+
   /* Every row's link picker is the same fixed width so the column lines up;
      overflowing region names truncate with an ellipsis inside the trigger. */
   width: 200px;
@@ -10952,11 +10939,6 @@
   flex-direction: column;
   gap: var(--fab-space-1);
   color: var(--fab-text);
-}
-
-.fabricate-manager .manager-travel-realms-header {
-  display: flex;
-  align-items: center;
 }
 
 .fabricate-manager .manager-travel-realms-toggle {
