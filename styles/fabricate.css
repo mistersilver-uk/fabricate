@@ -8476,11 +8476,11 @@
   margin-left: 2px;
 }
 
-/* stylelint-disable-next-line no-duplicate-selectors -- known latent duplicate:
-   the earlier `.manager-environment-workspace` (older rail+editor layout) is
-   overridden at runtime by this newer composition-editor layout. Kept as-is to
-   preserve current behaviour; reconciling the two layouts is separate product
-   work, not part of introducing the linter. */
+/* stylelint-disable-next-line no-duplicate-selectors -- known latent duplicate
+   (#315): the earlier `.manager-environment-workspace` (older rail+editor
+   layout) is overridden at runtime by this newer composition-editor layout.
+   Kept as-is to preserve current behaviour; reconciling the two layouts is
+   separate product work tracked in #315, not part of introducing the linter. */
 .fabricate-manager .manager-environment-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
