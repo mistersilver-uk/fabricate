@@ -20,7 +20,7 @@ function staminaConfig(regen = {}) {
     systems: {
       [SYSTEM]: {
         economy: {
-          stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: 5, ...regen } },
+          stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: 5, ...regen } },
           nodes: { enabled: false }
         }
       }
@@ -41,7 +41,7 @@ describe('gathering economy — config normalization', () => {
 
   it('rejects an invalid legacy mode and regen unit', () => {
     const { service } = makeRichState({
-      config: { systems: { [SYSTEM]: { economy: { mode: 'hybrid', stamina: { regen: { policy: 'elapsedTime', unit: 'fortnights', amount: 2 } } } } } }
+      config: { systems: { [SYSTEM]: { economy: { mode: 'hybrid', stamina: { regen: { policy: 'overTime', unit: 'fortnights', amount: 2 } } } } } }
     });
     const econ = service.systemEconomy(SYSTEM);
     // 'hybrid' is not a recognized legacy mode ⇒ neither flag is set.
@@ -49,6 +49,24 @@ describe('gathering economy — config normalization', () => {
     assert.equal(econ.nodes.enabled, false);
     assert.equal(econ.stamina.regen.unit, 'hours'); // unknown unit falls back
     assert.equal(econ.stamina.regen.amount, '2'); // amount is a number-or-formula string
+  });
+
+  it('maps a legacy elapsedTime regen policy to overTime at read time (regen stays active)', () => {
+    const { service } = makeRichState({
+      config: { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: 3 } } } } } }
+    });
+    const econ = service.systemEconomy(SYSTEM);
+    // Un-migrated worlds keep the unified `overTime` term rather than degrading to `none`.
+    assert.equal(econ.stamina.regen.policy, 'overTime');
+    assert.equal(econ.stamina.regen.unit, 'hours');
+    assert.equal(econ.stamina.regen.amount, '3');
+  });
+
+  it('falls back an unknown regen policy to none', () => {
+    const { service } = makeRichState({
+      config: { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, regen: { policy: 'sometimes' } } } } } }
+    });
+    assert.equal(service.systemEconomy(SYSTEM).stamina.regen.policy, 'none');
   });
 
   it('persists a system economy via setSystemEconomy', async () => {
@@ -170,7 +188,7 @@ describe('gathering economy — stamina regeneration over world time', () => {
       systems: {
         [SYSTEM]: {
           economy: {
-            stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: '1 + @abilities.con.mod' } },
+            stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '1 + @abilities.con.mod' } },
             nodes: { enabled: false }
           }
         }
@@ -777,7 +795,7 @@ describe('gathering economy — expression-based max/start (seed once per charac
   });
 
   it('regenerates up to the rolled max once the pool is seeded', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '20', start: '12', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '20', start: '12', regen: { policy: 'overTime', unit: 'hours', amount: 5 } } } } } };
     const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? 20 : p.kind === 'staminaStart' ? 12 : 5) });
     const actor = makeFakeActor();
     await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }); // current 12 / max 20
@@ -811,7 +829,7 @@ describe('gathering economy — per-character max override', () => {
   });
 
   it('regenerates up to the override, and a force reroll clears it', async () => {
-    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '50', start: '50', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } } } } } };
+    const config = { systems: { [SYSTEM]: { economy: { stamina: { enabled: true, max: '50', start: '50', regen: { policy: 'overTime', unit: 'hours', amount: 5 } } } } } };
     const { service } = makeRichState({ config, evaluateExpression: (p) => (p.kind === 'staminaMax' ? 50 : p.kind === 'staminaStart' ? 50 : 5) });
     const actor = makeFakeActor();
     await service.seedActorStaminaIfNeeded({ actor, systemId: SYSTEM }); // 50/50

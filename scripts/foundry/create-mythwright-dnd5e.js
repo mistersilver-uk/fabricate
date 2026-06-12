@@ -963,7 +963,7 @@ const MythwrightDnd5eBootstrap = (() => {
     stamina: {
       max: '(max(1, @abilities.con.mod))d6 + 1',
       start: '', // blank ⇒ start full at max
-      regen: { policy: 'elapsedTime', unit: 'days', amount: '1 + @abilities.con.mod', lastRoll: null }
+      regen: { policy: 'overTime', unit: 'days', amount: '1 + @abilities.con.mod', lastRoll: null }
     }
   });
 

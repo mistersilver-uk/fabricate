@@ -191,7 +191,7 @@ test('does not mutate its inputs (deep-clones)', () => {
 // Through the runner
 // ---------------------------------------------------------------------------
 
-test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at 1.1.0', async () => {
+test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at the highest version', async () => {
   const data = legacyData();
   // Minimal in-memory settings backing the runner; migrationVersion 0.9.0 leaves
   // the 1.0.0 and 1.1.0 migrations pending.
@@ -208,7 +208,7 @@ test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at 1
 
   await runner.run();
 
-  assert.equal(store.get('migrationVersion'), '1.1.0', 'advances to the new highest version');
+  assert.equal(store.get('migrationVersion'), '1.2.0', 'advances to the new highest version');
   const sys = store.get('gatheringConfig').systems['sys-a'];
   assert.ok(Array.isArray(sys.events), 'persisted gatheringConfig was rewritten to events');
   assert.equal(sys.rules.eventPolicy, 'failureWithEvent');

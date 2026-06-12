@@ -64,7 +64,14 @@ const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // flags). The canonical state is the two independent booleans, not this enum.
 const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
 // Stamina regeneration over world time.
-const STAMINA_REGEN_POLICIES = new Set(['none', 'elapsedTime']);
+const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
+// Legacy stamina-regen policy mapped onto the unified `overTime` term. The 1.2.0
+// migration rewrites this in persisted data, but normalizeGatheringEconomy applies
+// the same mapping at read time so a world whose stamina data was never migrated
+// keeps regenerating instead of silently coercing to `none` (which disables regen).
+// NOTE: distinct from the pre-0.4.0 node-respawn `elapsedTime` legacy value — a
+// different enum at a different path (see gatheringNodeConfig.js).
+const LEGACY_STAMINA_REGEN_POLICY_MAP = Object.freeze({ elapsedTime: 'overTime' });
 const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86400, weeks: 604800 });
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
@@ -807,7 +814,7 @@ export class GatheringRichStateService {
 
     const entry = {
       provider: 'fabricate',
-      regenerationMode: econ.stamina?.regen?.policy === 'elapsedTime' ? 'auto' : 'manual',
+      regenerationMode: econ.stamina?.regen?.policy === 'overTime' ? 'auto' : 'manual',
       current: Math.min(start, max),
       max,
       lastRegenWorldTime: this._now()
@@ -969,7 +976,7 @@ export class GatheringRichStateService {
     const econ = this._systemEconomy(key);
     if (econ.stamina?.enabled !== true) return null;
     const regen = econ.stamina?.regen || {};
-    if (regen.policy !== 'elapsedTime') return null;
+    if (regen.policy !== 'overTime') return null;
     const interval = this._durationToSeconds(1, regen.unit);
     if (!(interval > 0)) return null;
 
@@ -1803,7 +1810,7 @@ function shouldDepleteNode(task, outcome) {
  * (the anti-dogpiling combination); neither on means no limit. Stamina regen is
  * system-level: `amount` is a single expression (a plain number or a formula
  * with character references) evaluated per actor and applied once per `unit` of
- * elapsed world time when `policy === 'elapsedTime'`.
+ * elapsed world time when `policy === 'overTime'`.
  *
  * Read-time legacy compat: when neither new flag KEY is present but a legacy
  * `mode` string is, it is mapped to the flags (`stamina` ⇒ stamina.enabled,
@@ -1830,7 +1837,7 @@ function normalizeGatheringEconomy(raw = {}) {
       max: stringOrFallback(raw?.stamina?.max, ''),
       start: stringOrFallback(raw?.stamina?.start, ''),
       regen: {
-        policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : 'none',
+        policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : (LEGACY_STAMINA_REGEN_POLICY_MAP[regen.policy] ?? 'none'),
         unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
         // A single expression: a plain number ("1") or a formula with character
         // references ("1 + @abilities.con.mod"), evaluated per actor in-game.
