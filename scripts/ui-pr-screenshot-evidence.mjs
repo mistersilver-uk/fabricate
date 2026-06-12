@@ -77,7 +77,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-gathering-travel-normal', 'manager-gathering-travel-stacked'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringTravelView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/GatheringRegionQuickList\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringRealmQuickList\.svelte$/,
     ],
   },
   {
@@ -93,9 +93,9 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/gathering\//],
   },
   {
-    id: 'player-gathering-region-locked',
-    label: 'Player gathering — region-locked environment',
-    smokeLabels: ['player-gathering-region-locked'],
+    id: 'player-gathering-realm-locked',
+    label: 'Player gathering — realm-locked environment',
+    smokeLabels: ['player-gathering-realm-locked'],
     matches: [/^src\/ui\/svelte\/apps\/gathering\//],
   },
   {

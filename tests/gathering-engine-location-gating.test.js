@@ -19,9 +19,9 @@ function system(overrides = {}) {
     enabled: true,
     features: { gathering: true },
     components: [],
-    gatheringRegions: REGIONS,
-    // Region/travel subsystem ENABLED so these tests exercise location gating.
-    gatheringRegionSettings: { enabled: true, revealMode: 'manual', modifierVisibility: 'visible' },
+    gatheringRealms: REGIONS,
+    // Realm/travel subsystem ENABLED so these tests exercise location gating.
+    gatheringRealmSettings: { enabled: true, revealMode: 'manual', modifierVisibility: 'visible' },
     ...overrides
   };
 }
@@ -35,7 +35,7 @@ function environment(overrides = {}) {
     enabled: true,
     selectionMode: 'targeted',
     sceneUuid: null,
-    includedRegionIds: ['r-secret'],
+    includedRealmIds: ['r-secret'],
     tasks: [task()],
     ...overrides
   };
@@ -93,20 +93,20 @@ function findEnv(listing, id = 'env-a') {
   return listing.environments.find(e => e.id === id);
 }
 
-test('listing blocks an inclusion-gated environment with NO_CURRENT_REGION when no party region is set', async () => {
+test('listing blocks an inclusion-gated environment with NO_CURRENT_REALM when no party realm is set', async () => {
   const engine = makeEngine({ parties: [] });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
   assert.ok(env);
-  assert.ok(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'));
+  assert.ok(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REALM'));
   assert.equal(env.location.gated, true);
   assert.equal(env.location.available, false);
-  assert.equal(env.location.guidance.state, 'noCurrentRegion');
+  assert.equal(env.location.guidance.state, 'noCurrentRealm');
 });
 
-test('listing makes the environment available when the party current region matches', async () => {
+test('listing makes the environment available when the party current realm matches', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-secret'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-secret'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
@@ -114,16 +114,16 @@ test('listing makes the environment available when the party current region matc
   assert.equal(env.attemptable, true);
 });
 
-test('listing blocks with LOCATION_BLOCKED when current region does not match', async () => {
+test('listing blocks with LOCATION_BLOCKED when current realm does not match', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
   assert.ok(env.blockedReasons.some(r => r.code === 'LOCATION_BLOCKED'));
 });
 
-test('a NO_CURRENT_REGION environment renders as a locked teaser (no tasks, unselectable)', async () => {
+test('a NO_CURRENT_REALM environment renders as a locked teaser (no tasks, unselectable)', async () => {
   const engine = makeEngine({ parties: [] });
   const env = findEnv(await engine.listForActor({ viewer, actor }));
   assert.equal(env.locked, true);
@@ -131,14 +131,14 @@ test('a NO_CURRENT_REGION environment renders as a locked teaser (no tasks, unse
   assert.deepEqual(env.tasks, []);
   assert.deepEqual(env.discoveredTasks, []);
   // The location reason + field survive on the teaser so the card can show the alert.
-  assert.ok(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'));
+  assert.ok(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REALM'));
   assert.equal(env.location.gated, true);
   assert.equal(env.location.available, false);
 });
 
 test('a LOCATION_BLOCKED environment renders as a locked teaser', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const env = findEnv(await engine.listForActor({ viewer, actor }));
   assert.equal(env.locked, true);
@@ -147,18 +147,18 @@ test('a LOCATION_BLOCKED environment renders as a locked teaser', async () => {
   assert.ok(env.blockedReasons.some(r => r.code === 'LOCATION_BLOCKED'));
 });
 
-test('an in-region environment is NOT locked and still lists its tasks', async () => {
+test('an in-realm environment is NOT locked and still lists its tasks', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-secret'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-secret'] } } }]
   });
   const env = findEnv(await engine.listForActor({ viewer, actor }));
   assert.equal(env.locked, false);
   assert.ok(env.tasks.length > 0);
 });
 
-test('non-GM blocked-reason data contains no secret region id or name', async () => {
+test('non-GM blocked-reason data contains no secret realm id or name', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
@@ -172,7 +172,7 @@ test('non-GM blocked-reason data contains no secret region id or name', async ()
 
 test('GM sees the secret destination name in blocked-reason data', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const listing = await engine.listForActor({ viewer: gmViewer, actor });
   const env = findEnv(listing);
@@ -181,30 +181,30 @@ test('GM sees the secret destination name in blocked-reason data', async () => {
 });
 
 test('start guard re-evaluates: override cleared between list and start ⇒ blocked', async () => {
-  const party = { id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-secret'] } } };
+  const party = { id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-secret'] } } };
   const engine = makeEngine({ parties: [party] });
   // First confirm available.
   const listing = await engine.listForActor({ viewer, actor });
   assert.equal(findEnv(listing).location.available, true);
 
   // Clear the override (simulate GM clearing it between list and start).
-  party.currentRegionOverrides['system-a'] = { mode: 'none', regionIds: [] };
+  party.currentRealmOverrides['system-a'] = { mode: 'none', realmIds: [] };
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
   assert.equal(result.started ?? false, false);
-  assert.ok((result.blockedReasons || []).some(r => r.code === 'NO_CURRENT_REGION'));
+  assert.ok((result.blockedReasons || []).some(r => r.code === 'NO_CURRENT_REALM'));
 });
 
 test('ungated legacy environment is unaffected by location gating', async () => {
-  const engine = makeEngine({ environments: [environment({ includedRegionIds: [], excludedRegionIds: [] })], parties: [] });
+  const engine = makeEngine({ environments: [environment({ includedRealmIds: [], excludedRealmIds: [] })], parties: [] });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
   assert.equal(env.location.gated, false);
   assert.equal(env.attemptable, true);
-  assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'), false);
+  assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REALM'), false);
 });
 
 // ---------------------------------------------------------------------------
-// Toggle disabled: the region/travel subsystem behaves as if no environment is
+// Toggle disabled: the realm/travel subsystem behaves as if no environment is
 // location-gated and no travel exists.
 // ---------------------------------------------------------------------------
 
@@ -212,7 +212,7 @@ const disabledSettings = { enabled: false, revealMode: 'manual', modifierVisibil
 
 test('disabled subsystem: a location-gated environment is NOT blocked and reports gated=false', async () => {
   const engine = makeEngine({
-    systems: [system({ gatheringRegionSettings: disabledSettings })],
+    systems: [system({ gatheringRealmSettings: disabledSettings })],
     parties: []
   });
   const listing = await engine.listForActor({ viewer, actor });
@@ -220,37 +220,37 @@ test('disabled subsystem: a location-gated environment is NOT blocked and report
   assert.ok(env);
   assert.equal(env.location.gated, false, 'location field is the ungated shape when disabled');
   assert.equal(env.location.available, true);
-  assert.deepEqual(env.location.currentRegions, []);
-  assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REGION'), false);
+  assert.deepEqual(env.location.currentRealms, []);
+  assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REALM'), false);
   assert.equal(env.blockedReasons.some(r => r.code === 'LOCATION_BLOCKED'), false);
   assert.equal(env.attemptable, true);
 });
 
 test('disabled subsystem: the start-attempt location guard is skipped', async () => {
-  // No party / no current region, but disabled ⇒ the start guard does not block.
-  // (When ENABLED, the identical setup blocks with NO_CURRENT_REGION — see the
+  // No party / no current realm, but disabled ⇒ the start guard does not block.
+  // (When ENABLED, the identical setup blocks with NO_CURRENT_REALM — see the
   // start-guard re-evaluation test above.) Downstream run-creation is out of
   // scope for this harness, so we assert only that NO location reason fires.
   const engine = makeEngine({
-    systems: [system({ gatheringRegionSettings: disabledSettings })],
+    systems: [system({ gatheringRealmSettings: disabledSettings })],
     parties: []
   });
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
   const reasons = result.blockedReasons || [];
-  assert.equal(reasons.some(r => r.code === 'NO_CURRENT_REGION'), false, 'no NO_CURRENT_REGION when disabled');
+  assert.equal(reasons.some(r => r.code === 'NO_CURRENT_REALM'), false, 'no NO_CURRENT_REALM when disabled');
   assert.equal(reasons.some(r => r.code === 'LOCATION_BLOCKED'), false, 'no LOCATION_BLOCKED when disabled');
 });
 
-test('ENABLED subsystem with no current region blocks start (control for the disabled case)', async () => {
+test('ENABLED subsystem with no current realm blocks start (control for the disabled case)', async () => {
   const engine = makeEngine({ parties: [] });
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
   assert.equal(result.started ?? false, false);
-  assert.ok((result.blockedReasons || []).some(r => r.code === 'NO_CURRENT_REGION'));
+  assert.ok((result.blockedReasons || []).some(r => r.code === 'NO_CURRENT_REALM'));
 });
 
-test('default (no gatheringRegionSettings) behaves as disabled — no location gating', async () => {
+test('default (no gatheringRealmSettings) behaves as disabled — no location gating', async () => {
   const engine = makeEngine({
-    systems: [system({ gatheringRegionSettings: undefined })],
+    systems: [system({ gatheringRealmSettings: undefined })],
     parties: []
   });
   const listing = await engine.listForActor({ viewer, actor });
@@ -260,64 +260,64 @@ test('default (no gatheringRegionSettings) behaves as disabled — no location g
 });
 
 // ---------------------------------------------------------------------------
-// Header-bar current-region summary (regionsEnabled + currentRegions), surfaced
-// for the player app's region chip independently of this environment's gating.
+// Header-bar current-realm summary (realmsEnabled + currentRealms), surfaced
+// for the player app's realm chip independently of this environment's gating.
 // ---------------------------------------------------------------------------
 
-test('regions enabled: the model surfaces regionsEnabled + the party current region (disclosed)', async () => {
+test('realms enabled: the model surfaces realmsEnabled + the party current realm (disclosed)', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
-  assert.equal(env.regionsEnabled, true, 'region chip flag set when the subsystem is enabled');
-  assert.equal(env.currentRegions.length, 1);
-  assert.equal(env.currentRegions[0].label, 'Verdant Expanse', 'non-secret current region name disclosed');
-  assert.equal(env.currentRegions[0].placeholder, false);
+  assert.equal(env.realmsEnabled, true, 'realm chip flag set when the subsystem is enabled');
+  assert.equal(env.currentRealms.length, 1);
+  assert.equal(env.currentRealms[0].label, 'Verdant Expanse', 'non-secret current realm name disclosed');
+  assert.equal(env.currentRealms[0].placeholder, false);
 });
 
-test('regions enabled, UNGATED environment still surfaces the party current region', async () => {
-  // The header region chip must show even when the selected environment has no
-  // location rules — the current region is party-scoped, not env-gated.
+test('realms enabled, UNGATED environment still surfaces the party current realm', async () => {
+  // The header realm chip must show even when the selected environment has no
+  // location rules — the current realm is party-scoped, not env-gated.
   const engine = makeEngine({
-    environments: [environment({ includedRegionIds: [], excludedRegionIds: [] })],
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    environments: [environment({ includedRealmIds: [], excludedRealmIds: [] })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
   assert.equal(env.location.gated, false, 'environment itself is ungated');
-  assert.equal(env.regionsEnabled, true);
-  assert.equal(env.currentRegions[0]?.label, 'Verdant Expanse', 'current region surfaced despite no gating');
+  assert.equal(env.realmsEnabled, true);
+  assert.equal(env.currentRealms[0]?.label, 'Verdant Expanse', 'current realm surfaced despite no gating');
 });
 
-test('regions enabled, no current region: regionsEnabled true with an empty list', async () => {
+test('realms enabled, no current realm: realmsEnabled true with an empty list', async () => {
   const engine = makeEngine({ parties: [] });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
-  assert.equal(env.regionsEnabled, true);
-  assert.deepEqual(env.currentRegions, [], 'no party region → empty list ("no region selected")');
+  assert.equal(env.realmsEnabled, true);
+  assert.deepEqual(env.currentRealms, [], 'no party realm → empty list ("no realm selected")');
 });
 
-test('regions enabled: a secret undiscovered current region is redacted to a placeholder', async () => {
+test('realms enabled: a secret undiscovered current realm is redacted to a placeholder', async () => {
   const engine = makeEngine({
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-secret'] } } }]
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-secret'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
-  assert.equal(env.regionsEnabled, true);
-  assert.equal(env.currentRegions[0].placeholder, true, 'secret undiscovered region is redacted');
-  const serialized = JSON.stringify(env.currentRegions);
+  assert.equal(env.realmsEnabled, true);
+  assert.equal(env.currentRealms[0].placeholder, true, 'secret undiscovered realm is redacted');
+  const serialized = JSON.stringify(env.currentRealms);
   assert.equal(serialized.includes('Hidden Vale'), false, 'no secret name leak');
   assert.equal(serialized.includes('r-secret'), false, 'no secret id leak');
 });
 
-test('regions disabled: regionsEnabled false with an empty current-region list', async () => {
+test('realms disabled: realmsEnabled false with an empty current-realm list', async () => {
   const engine = makeEngine({
-    systems: [system({ gatheringRegionSettings: disabledSettings })],
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-here'] } } }]
+    systems: [system({ gatheringRealmSettings: disabledSettings })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
   });
   const listing = await engine.listForActor({ viewer, actor });
   const env = findEnv(listing);
-  assert.equal(env.regionsEnabled, false, 'region chip flag off when the subsystem is disabled');
-  assert.deepEqual(env.currentRegions, []);
+  assert.equal(env.realmsEnabled, false, 'realm chip flag off when the subsystem is disabled');
+  assert.deepEqual(env.currentRealms, []);
 });

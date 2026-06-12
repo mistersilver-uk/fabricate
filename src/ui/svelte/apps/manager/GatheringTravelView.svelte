@@ -2,7 +2,7 @@
 <!--
   GatheringTravelView is the center-column surface for the gathering `Travel`
   route (issue 257, first slice). It manages WORLD-LEVEL Fabricate parties
-  (create/rename/enable/members/travel actor) plus the PER-SYSTEM current-region
+  (create/rename/enable/members/travel actor) plus the PER-SYSTEM current-realm
   override for the selected crafting system. The right inspector renders a
   read-only evidence echo; all editing controls live here so override editing
   exists in exactly one place.
@@ -12,16 +12,16 @@
   reachable buttons). Inline validation errors come from the party store and are
   associated with the relevant control via aria-invalid + aria-describedby.
 
-  Disclosure: this surface is GM-only, but it still routes region labels through
-  the store-provided region records. Secret undiscovered region names/ids belong
+  Disclosure: this surface is GM-only, but it still routes realm labels through
+  the store-provided realm records. Secret undiscovered realm names/ids belong
   to the player surface, not here; the redaction guard test asserts that even if
-  a secret region is present in evidence the view never leaks identity through a
+  a secret realm is present in evidence the view never leaks identity through a
   player-facing channel beyond what the GM is permitted to see.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
-  import GatheringRegionQuickList from './GatheringRegionQuickList.svelte';
+  import GatheringRealmQuickList from './GatheringRealmQuickList.svelte';
 
   let {
     parties = [],
@@ -31,7 +31,7 @@
     error = null,
     fieldErrors = {},
     actorOptions = [],
-    systemRegions = [],
+    systemRealms = [],
     biomeOptions = [],
     onSelectParty = () => {},
     onCreateParty = () => {},
@@ -43,16 +43,16 @@
     onMoveMember = () => {},
     onSetTravelActor = () => {},
     onClearTravelActor = () => {},
-    onSetRegionOverride = () => {},
-    onClearRegionOverride = () => {},
+    onSetRealmOverride = () => {},
+    onClearRealmOverride = () => {},
     onRemoveStaleMember = () => {},
     onClearStaleTravelActor = () => {},
-    onDropStaleOverrideRegion = () => {},
-    onCreateRegion = () => {},
-    onRenameRegion = () => {},
-    onToggleRegionEnabled = () => {},
-    onUpdateRegion = () => {},
-    onDeleteRegion = () => {},
+    onDropStaleOverrideRealm = () => {},
+    onCreateRealm = () => {},
+    onRenameRealm = () => {},
+    onToggleRealmEnabled = () => {},
+    onUpdateRealm = () => {},
+    onDeleteRealm = () => {},
     onPickImagePath = null
   } = $props();
 
@@ -73,14 +73,14 @@
   const selectedParty = $derived(parties.find(party => party.id === selectedPartyId) || null);
   const hasActors = $derived(actorOptions.length > 0);
   const hasParties = $derived(parties.length > 0);
-  const hasRegions = $derived(systemRegions.length > 0);
+  const hasRealms = $derived(systemRealms.length > 0);
 
-  // Region selection for the override editor is local while the GM is choosing,
+  // Realm selection for the override editor is local while the GM is choosing,
   // and falls back to the persisted override ids when not mid-edit.
-  const overrideRegionIds = $derived(
+  const overrideRealmIds = $derived(
     pendingOverrideIds !== null
       ? pendingOverrideIds
-      : (selectedParty?.overrideRegionIds || [])
+      : (selectedParty?.overrideRealmIds || [])
   );
 
   function text(key, fallback, data) {
@@ -160,29 +160,29 @@
     closeTravelPicker();
   }
 
-  // --- Override region multi-select ---
-  function toggleOverrideRegion(regionId) {
-    const current = overrideRegionIds.slice();
-    const index = current.indexOf(regionId);
+  // --- Override realm multi-select ---
+  function toggleOverrideRealm(realmId) {
+    const current = overrideRealmIds.slice();
+    const index = current.indexOf(realmId);
     if (index >= 0) current.splice(index, 1);
-    else current.push(regionId);
+    else current.push(realmId);
     pendingOverrideIds = current;
   }
   function commitOverride() {
     if (!selectedParty) return;
-    onSetRegionOverride(selectedParty.id, systemId, overrideRegionIds);
+    onSetRealmOverride(selectedParty.id, systemId, overrideRealmIds);
     pendingOverrideIds = null;
   }
   function clearOverride() {
     if (!selectedParty) return;
     pendingOverrideIds = null;
-    onClearRegionOverride(selectedParty.id, systemId);
+    onClearRealmOverride(selectedParty.id, systemId);
   }
 
   function evidenceSourceLabel(source) {
     if (source === 'manualOverride') return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceManualOverride', 'GM override');
     if (source === 'travelActor') return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceTravelActor', 'Travel actor');
-    return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceUnresolved', 'No current region');
+    return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceUnresolved', 'No current realm');
   }
 
   $effect(() => {
@@ -207,7 +207,7 @@
 </script>
 
 <main class="manager-main manager-travel-view" data-manager-travel-view aria-label={text('FABRICATE.Admin.Manager.Travel.Title', 'Travel')}>
-  <p class="manager-travel-scope-note">{text('FABRICATE.Admin.Manager.Travel.WorldScopeNote', 'Parties are shared across every crafting system. Only the current-region override below is specific to this system.')}</p>
+  <p class="manager-travel-scope-note">{text('FABRICATE.Admin.Manager.Travel.WorldScopeNote', 'Parties are shared across every crafting system. Only the current-realm override below is specific to this system.')}</p>
 
   {#if error}
     <p class="manager-travel-error" role="alert">{error}</p>
@@ -263,15 +263,15 @@
         <div class="manager-travel-checklist" aria-label={text('FABRICATE.Admin.Manager.Travel.ChecklistTitle', 'Set up location-aware gathering')}>
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.ChecklistTitle', 'Set up location-aware gathering')}</h3>
           <ol class="manager-travel-checklist-steps">
-            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep1', 'Create at least one region.')}</li>
+            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep1', 'Create at least one realm.')}</li>
             <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep2', 'Create a party.')}</li>
             <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep3', 'Add actor members.')}</li>
             <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep4', 'Assign a travel actor.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep5', "Set the party's current region.")}</li>
+            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep5', "Set the party's current realm.")}</li>
           </ol>
         </div>
       {:else if !selectedParty}
-        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.SelectPartyHint', 'Select a party to manage its members, travel actor, and current region.')}</p>
+        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.SelectPartyHint', 'Select a party to manage its members, travel actor, and current realm.')}</p>
       {:else}
         <!-- Rename + enable -->
         <div class="manager-travel-party-head">
@@ -492,28 +492,28 @@
           </div>
         </section>
 
-        <!-- Current-region override (per selected system) -->
-        <section class="manager-travel-override" aria-label={text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current region override')}>
-          <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current region override')}</h4>
-          <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.OverrideHint', "Set the party's current region for this crafting system.")}</p>
+        <!-- Current-realm override (per selected system) -->
+        <section class="manager-travel-override" aria-label={text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current realm override')}>
+          <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current realm override')}</h4>
+          <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.OverrideHint', "Set the party's current realm for this crafting system.")}</p>
 
-          {#if !hasRegions}
-            <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.Regions.Empty', 'No regions yet.')}</p>
+          {#if !hasRealms}
+            <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}</p>
           {:else}
-            <div class="manager-travel-region-chips" role="group" aria-label={text('FABRICATE.Admin.Manager.Travel.RegionSelectLabel', 'Override regions')}>
-              {#each systemRegions as region (region.id)}
-                {@const selected = overrideRegionIds.includes(region.id)}
+            <div class="manager-travel-realm-chips" role="group" aria-label={text('FABRICATE.Admin.Manager.Travel.RealmSelectLabel', 'Override realms')}>
+              {#each systemRealms as realm (realm.id)}
+                {@const selected = overrideRealmIds.includes(realm.id)}
                 <button
                   type="button"
-                  class={`manager-travel-region-chip ${selected ? 'is-selected' : ''}`}
+                  class={`manager-travel-realm-chip ${selected ? 'is-selected' : ''}`}
                   aria-pressed={selected}
-                  data-region-id={region.id}
+                  data-realm-id={realm.id}
                   disabled={saving}
-                  onclick={() => toggleOverrideRegion(region.id)}
+                  onclick={() => toggleOverrideRealm(realm.id)}
                 >
-                  <span>{region.name}</span>
-                  {#if !region.enabled}
-                    <span class="manager-travel-region-chip-flag">{text('FABRICATE.Admin.Manager.Travel.DisabledRegionChip', 'Disabled')}</span>
+                  <span>{realm.name}</span>
+                  {#if !realm.enabled}
+                    <span class="manager-travel-realm-chip-flag">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span>
                   {/if}
                 </button>
               {/each}
@@ -521,11 +521,11 @@
           {/if}
 
           <div class="manager-travel-override-actions">
-            <button type="button" class="manager-button is-primary" disabled={saving || !hasRegions} onclick={commitOverride}>
-              <span>{text('FABRICATE.Admin.Manager.Travel.SetOverride', 'Set current region')}</span>
+            <button type="button" class="manager-button is-primary" disabled={saving || !hasRealms} onclick={commitOverride}>
+              <span>{text('FABRICATE.Admin.Manager.Travel.SetOverride', 'Set current realm')}</span>
             </button>
             <button type="button" class="manager-button" disabled={saving} onclick={clearOverride}>
-              <span>{text('FABRICATE.Admin.Manager.Travel.ClearOverride', 'Clear current region')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Travel.ClearOverride', 'Clear current realm')}</span>
             </button>
           </div>
         </section>
@@ -551,10 +551,10 @@
                   </button>
                 </li>
               {/if}
-              {#each selectedParty.staleRegionIds as regionId (regionId)}
-                <li class="manager-travel-stale-row" data-stale-region={regionId}>
-                  <span>{text('FABRICATE.Admin.Manager.Travel.StaleRegionLabel', 'Stale override region')}</span>
-                  <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Travel.RemoveStaleRegion', 'Remove stale override region', { id: regionId })} disabled={saving} onclick={() => onDropStaleOverrideRegion(selectedParty.id, systemId, regionId)}>
+              {#each selectedParty.staleRealmIds as realmId (realmId)}
+                <li class="manager-travel-stale-row" data-stale-realm={realmId}>
+                  <span>{text('FABRICATE.Admin.Manager.Travel.StaleRealmLabel', 'Stale override realm')}</span>
+                  <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Travel.RemoveStaleRealm', 'Remove stale override realm', { id: realmId })} disabled={saving} onclick={() => onDropStaleOverrideRealm(selectedParty.id, systemId, realmId)}>
                     <i class="fas fa-times" aria-hidden="true"></i>
                   </button>
                 </li>
@@ -564,17 +564,17 @@
         {/if}
       {/if}
 
-      <!-- Region quick list (temporary host until the dedicated Regions route) -->
-      <GatheringRegionQuickList
-        regions={systemRegions}
+      <!-- Realm quick list (temporary host until the dedicated Realms route) -->
+      <GatheringRealmQuickList
+        realms={systemRealms}
         {systemId}
         {saving}
         {biomeOptions}
-        {onCreateRegion}
-        {onRenameRegion}
-        {onToggleRegionEnabled}
-        {onUpdateRegion}
-        {onDeleteRegion}
+        {onCreateRealm}
+        {onRenameRealm}
+        {onToggleRealmEnabled}
+        {onUpdateRealm}
+        {onDeleteRealm}
         {onPickImagePath}
       />
     </section>

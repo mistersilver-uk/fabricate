@@ -247,36 +247,36 @@ describe('GatheringView mounted behavior', () => {
     );
   });
 
-  it('renders a "Not in current region" header alert on a region-locked card', async () => {
+  it('renders a "Not in current realm" header alert on a realm-locked card', async () => {
     await mountView(makeServices(listing([
       environment({ id: 'env-open', name: 'Open' }),
       environment({
-        id: 'env-region',
+        id: 'env-realm',
         name: 'Far Vale',
         locked: true,
-        location: { gated: true, available: false, currentRegions: [], guidance: null },
-        blockedReasons: [{ code: 'NO_CURRENT_REGION', message: 'No party region set.' }]
+        location: { gated: true, available: false, currentRealms: [], guidance: null },
+        blockedReasons: [{ code: 'NO_CURRENT_REALM', message: 'No party realm set.' }]
       })
     ])));
 
-    const regionCard = target.querySelector('[data-environment-id="env-region"]');
-    assert.equal(regionCard.getAttribute('data-locked'), 'true', 'region-gated env renders locked');
-    assert.equal(regionCard.querySelector('button'), null, 'region-locked card is not selectable');
+    const realmCard = target.querySelector('[data-environment-id="env-realm"]');
+    assert.equal(realmCard.getAttribute('data-locked'), 'true', 'realm-gated env renders locked');
+    assert.equal(realmCard.querySelector('button'), null, 'realm-locked card is not selectable');
 
-    const alert = regionCard.querySelector('.gathering-env-card-region-alert');
-    assert.ok(alert, 'region-locked card shows the region alert chip');
-    assert.match(alert.textContent, /RegionLockedChip/, 'chip uses the RegionLockedChip label');
+    const alert = realmCard.querySelector('.gathering-env-card-realm-alert');
+    assert.ok(alert, 'realm-locked card shows the realm alert chip');
+    assert.match(alert.textContent, /RealmLockedChip/, 'chip uses the RealmLockedChip label');
     assert.ok(alert.querySelector('.fa-location-dot'), 'chip carries the location icon');
-    assert.equal(alert.getAttribute('title'), 'No party region set.', 'tooltip is the full reason message');
+    assert.equal(alert.getAttribute('title'), 'No party realm set.', 'tooltip is the full reason message');
 
     // The alert sits in the header alongside the danger pip.
-    const header = regionCard.querySelector('.gathering-env-card-header');
+    const header = realmCard.querySelector('.gathering-env-card-header');
     assert.ok(header.contains(alert), 'alert is in the card header');
     assert.ok(header.querySelector('.gathering-env-card-event'), 'danger pip is in the same header');
 
-    // A normal (in-region/open) environment shows no region alert.
+    // A normal (in-realm/open) environment shows no realm alert.
     const openCard = target.querySelector('[data-environment-id="env-open"]');
-    assert.equal(openCard.querySelector('.gathering-env-card-region-alert'), null, 'open env has no region alert');
+    assert.equal(openCard.querySelector('.gathering-env-card-realm-alert'), null, 'open env has no realm alert');
   });
 
   it('renders a literal customColor hex in the chip --fab-chip-color, distinct from the token path', async () => {

@@ -23,7 +23,7 @@ export const BLOCK_LABEL_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted',
   STAMINA_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked',
   LOCATION_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Location',
-  NO_CURRENT_REGION: 'FABRICATE.App.Gathering.Detail.Callout.NoRegion'
+  NO_CURRENT_REALM: 'FABRICATE.App.Gathering.Detail.Callout.NoRealm'
 });
 
 const GENERIC_BLOCKED_KEY = 'FABRICATE.App.Gathering.Detail.Blocked';

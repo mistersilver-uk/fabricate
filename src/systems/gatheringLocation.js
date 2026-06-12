@@ -1,19 +1,19 @@
 /**
- * Pure location-availability evaluation, disclosure-safe region display models,
+ * Pure location-availability evaluation, disclosure-safe realm display models,
  * and player travel guidance. No Foundry globals. Shared by the gathering engine
  * (listing + start guard) and the public player-facing API so availability,
  * redaction, and guidance never drift between them.
  *
- * Disclosure policy: for a non-GM viewer, a SECRET undiscovered region MUST NOT
+ * Disclosure policy: for a non-GM viewer, a SECRET undiscovered realm MUST NOT
  * expose its id or name anywhere (label, title, aria-label, data-*, filter
- * options). `buildRegionDisclosure` returns `id: null` and a placeholder label
- * key in that case. Always route player-facing region labels through it.
+ * options). `buildRealmDisclosure` returns `id: null` and a placeholder label
+ * key in that case. Always route player-facing realm labels through it.
  *
- * @typedef {{ available: boolean, gated: boolean, reasons: string[], matchedRegionIds: string[], excludedRegionIds: string[] }} LocationAvailability
- * @typedef {{ id: string|null, label?: string, labelKey?: string, discovered: boolean, secret: boolean, placeholder: boolean }} GatheringRegionDisclosure
+ * @typedef {{ available: boolean, gated: boolean, reasons: string[], matchedRealmIds: string[], excludedRealmIds: string[] }} LocationAvailability
+ * @typedef {{ id: string|null, label?: string, labelKey?: string, discovered: boolean, secret: boolean, placeholder: boolean }} GatheringRealmDisclosure
  */
 
-export const UNDISCOVERED_PLACEHOLDER_KEY = 'FABRICATE.Gathering.Region.UndiscoveredPlaceholder';
+export const UNDISCOVERED_PLACEHOLDER_KEY = 'FABRICATE.Gathering.Realm.UndiscoveredPlaceholder';
 
 function asIdList(value) {
   const values = Array.isArray(value) ? value : (value ? [value] : []);
@@ -34,67 +34,67 @@ function asBiomeList(value) {
  * @returns {boolean}
  */
 export function environmentHasLocationRules(env = {}) {
-  return asIdList(env?.includedRegionIds).length > 0
-    || asIdList(env?.excludedRegionIds).length > 0
+  return asIdList(env?.includedRealmIds ?? env?.includedRegionIds).length > 0
+    || asIdList(env?.excludedRealmIds ?? env?.excludedRegionIds).length > 0
     || asBiomeList(env?.includedBiomeIds).length > 0
     || asBiomeList(env?.excludedBiomeIds).length > 0;
 }
 
 /**
- * Evaluate environment availability against the resolved current-region context.
+ * Evaluate environment availability against the resolved current-realm context.
  *
  * @param {object} env Environment with availability rule fields.
- * @param {object} currentRegionContext
- * @param {boolean} currentRegionContext.resolved Whether a current region resolved.
- * @param {Array<{ id: string, biomes?: string[] }>} [currentRegionContext.regions] Resolved current regions.
+ * @param {object} currentRealmContext
+ * @param {boolean} currentRealmContext.resolved Whether a current realm resolved.
+ * @param {Array<{ id: string, biomes?: string[] }>} [currentRealmContext.realms] Resolved current realms.
  * @returns {LocationAvailability}
  */
-export function evaluateLocationAvailability(env = {}, currentRegionContext = {}) {
-  const includedRegions = asIdList(env?.includedRegionIds);
-  const excludedRegions = asIdList(env?.excludedRegionIds);
+export function evaluateLocationAvailability(env = {}, currentRealmContext = {}) {
+  const includedRealms = asIdList(env?.includedRealmIds ?? env?.includedRegionIds);
+  const excludedRealms = asIdList(env?.excludedRealmIds ?? env?.excludedRegionIds);
   const includedBiomes = asBiomeList(env?.includedBiomeIds);
   const excludedBiomes = asBiomeList(env?.excludedBiomeIds);
 
-  const gated = includedRegions.length > 0
-    || excludedRegions.length > 0
+  const gated = includedRealms.length > 0
+    || excludedRealms.length > 0
     || includedBiomes.length > 0
     || excludedBiomes.length > 0;
 
   // Rule 6: ungated environments are never location-blocked.
   if (!gated) {
-    return { available: true, gated: false, reasons: [], matchedRegionIds: [], excludedRegionIds: [] };
+    return { available: true, gated: false, reasons: [], matchedRealmIds: [], excludedRealmIds: [] };
   }
 
-  const hasInclusions = includedRegions.length > 0 || includedBiomes.length > 0;
-  const resolved = currentRegionContext?.resolved === true;
-  const regions = Array.isArray(currentRegionContext?.regions) ? currentRegionContext.regions : [];
+  const hasInclusions = includedRealms.length > 0 || includedBiomes.length > 0;
+  const resolved = currentRealmContext?.resolved === true;
+  const realms = Array.isArray(currentRealmContext?.realms) ? currentRealmContext.realms : [];
 
-  // Rule 7: no current region resolved.
-  if (!resolved || regions.length === 0) {
+  // Rule 7: no current realm resolved.
+  if (!resolved || realms.length === 0) {
     if (hasInclusions) {
       return {
         available: false,
         gated: true,
-        reasons: ['NO_CURRENT_REGION'],
-        matchedRegionIds: [],
-        excludedRegionIds: []
+        reasons: ['NO_CURRENT_REALM'],
+        matchedRealmIds: [],
+        excludedRealmIds: []
       };
     }
-    // Exclusion-only or biome-exclusion-only with no current region: available.
-    return { available: true, gated: true, reasons: [], matchedRegionIds: [], excludedRegionIds: [] };
+    // Exclusion-only or biome-exclusion-only with no current realm: available.
+    return { available: true, gated: true, reasons: [], matchedRealmIds: [], excludedRealmIds: [] };
   }
 
-  // Rules 1 & 2: exclusions win. A region exclusion on ANY current region, or a
-  // biome exclusion matched by ANY current region's biome, blocks the env.
+  // Rules 1 & 2: exclusions win. A realm exclusion on ANY current realm, or a
+  // biome exclusion matched by ANY current realm's biome, blocks the env.
   const excludedHits = [];
-  for (const region of regions) {
-    const regionBiomes = asBiomeList(region?.biomes);
-    if (excludedRegions.includes(region?.id)) {
-      excludedHits.push(region.id);
+  for (const realm of realms) {
+    const realmBiomes = asBiomeList(realm?.biomes);
+    if (excludedRealms.includes(realm?.id)) {
+      excludedHits.push(realm.id);
       continue;
     }
-    if (regionBiomes.some(biome => excludedBiomes.includes(biome))) {
-      excludedHits.push(region?.id);
+    if (realmBiomes.some(biome => excludedBiomes.includes(biome))) {
+      excludedHits.push(realm?.id);
     }
   }
   if (excludedHits.length > 0) {
@@ -102,23 +102,23 @@ export function evaluateLocationAvailability(env = {}, currentRegionContext = {}
       available: false,
       gated: true,
       reasons: ['LOCATION_BLOCKED'],
-      matchedRegionIds: [],
-      excludedRegionIds: Array.from(new Set(excludedHits.filter(Boolean)))
+      matchedRealmIds: [],
+      excludedRealmIds: Array.from(new Set(excludedHits.filter(Boolean)))
     };
   }
 
   // Rule 5: exclusion-only (no inclusions) and not excluded above ⇒ available.
   if (!hasInclusions) {
-    return { available: true, gated: true, reasons: [], matchedRegionIds: [], excludedRegionIds: [] };
+    return { available: true, gated: true, reasons: [], matchedRealmIds: [], excludedRealmIds: [] };
   }
 
-  // Rules 3 & 4: inclusion match when any current region id is included OR any
-  // current region has an included biome.
+  // Rules 3 & 4: inclusion match when any current realm id is included OR any
+  // current realm has an included biome.
   const matched = [];
-  for (const region of regions) {
-    const regionBiomes = asBiomeList(region?.biomes);
-    if (includedRegions.includes(region?.id) || regionBiomes.some(biome => includedBiomes.includes(biome))) {
-      matched.push(region.id);
+  for (const realm of realms) {
+    const realmBiomes = asBiomeList(realm?.biomes);
+    if (includedRealms.includes(realm?.id) || realmBiomes.some(biome => includedBiomes.includes(biome))) {
+      matched.push(realm.id);
     }
   }
   if (matched.length > 0) {
@@ -126,39 +126,39 @@ export function evaluateLocationAvailability(env = {}, currentRegionContext = {}
       available: true,
       gated: true,
       reasons: [],
-      matchedRegionIds: Array.from(new Set(matched)),
-      excludedRegionIds: []
+      matchedRealmIds: Array.from(new Set(matched)),
+      excludedRealmIds: []
     };
   }
 
-  // Inclusion-gated, current region resolved, but no current region matches.
+  // Inclusion-gated, current realm resolved, but no current realm matches.
   return {
     available: false,
     gated: true,
     reasons: ['LOCATION_BLOCKED'],
-    matchedRegionIds: [],
-    excludedRegionIds: []
+    matchedRealmIds: [],
+    excludedRealmIds: []
   };
 }
 
 /**
- * Build a disclosure-safe display model for one region. For a non-GM viewer, a
- * secret undiscovered region NEVER leaks its id or name: it resolves to
+ * Build a disclosure-safe display model for one realm. For a non-GM viewer, a
+ * secret undiscovered realm NEVER leaks its id or name: it resolves to
  * `{ id: null, labelKey: placeholder, placeholder: true }`.
  *
- * @param {object} region Region record (with at least id, name, secret).
+ * @param {object} realm Realm record (with at least id, name, secret).
  * @param {object} options
  * @param {boolean} options.isGM
- * @param {boolean} options.discovered Whether the selected actor discovered the region.
+ * @param {boolean} options.discovered Whether the selected actor discovered the realm.
  * @param {string} [options.revealMode] System reveal mode ('alwaysVisible' shows names).
- * @returns {GatheringRegionDisclosure}
+ * @returns {GatheringRealmDisclosure}
  */
-export function buildRegionDisclosure(region = {}, { isGM = false, discovered = false, revealMode = 'manual' } = {}) {
-  const id = region?.id ? String(region.id) : null;
-  const secret = region?.secret === true;
-  const name = String(region?.name ?? '');
+export function buildRealmDisclosure(realm = {}, { isGM = false, discovered = false, revealMode = 'manual' } = {}) {
+  const id = realm?.id ? String(realm.id) : null;
+  const secret = realm?.secret === true;
+  const name = String(realm?.name ?? '');
 
-  // GMs, non-secret regions, discovered regions, and alwaysVisible reveal mode
+  // GMs, non-secret realms, discovered realms, and alwaysVisible reveal mode
   // all disclose the real name/id.
   const disclosed = isGM === true || !secret || discovered === true || revealMode === 'alwaysVisible';
   if (disclosed) {
@@ -182,42 +182,42 @@ export function buildRegionDisclosure(region = {}, { isGM = false, discovered = 
 }
 
 /**
- * Build the redaction-safe current-region summary for a player-callable read.
+ * Build the redaction-safe current-realm summary for a player-callable read.
  *
- * Mirrors the disclosure policy of `buildRegionDisclosure`: every region is
+ * Mirrors the disclosure policy of `buildRealmDisclosure`: every realm is
  * routed through it so a non-GM viewer never receives a secret undiscovered
- * region's id or name, and the raw `regionIds`/`staleRegionIds` arrays (which
+ * realm's id or name, and the raw `realmIds`/`staleRealmIds` arrays (which
  * are real ids) are returned EMPTY unless the viewer is a GM.
  *
  * @param {object} args
- * @param {object} args.context Resolved current-region context
- *   ({ resolved, source, regions, regionIds, staleRegionIds }).
+ * @param {object} args.context Resolved current-realm context
+ *   ({ resolved, source, realms, realmIds, staleRealmIds }).
  * @param {boolean} [args.isGM]
  * @param {string} [args.revealMode] System reveal mode ('alwaysVisible' shows names).
- * @param {Set<string>|string[]} [args.discoveredRegionIds] Region ids the actor discovered.
- * @returns {{ resolved: boolean, source: string, regions: GatheringRegionDisclosure[], regionIds: string[], staleRegionIds: string[] }}
+ * @param {Set<string>|string[]} [args.discoveredRealmIds] Realm ids the actor discovered.
+ * @returns {{ resolved: boolean, source: string, realms: GatheringRealmDisclosure[], realmIds: string[], staleRealmIds: string[] }}
  */
 export function buildLocationSummaryForViewer({
   context = {},
   isGM = false,
   revealMode = 'manual',
-  discoveredRegionIds = new Set()
+  discoveredRealmIds = new Set()
 } = {}) {
-  const discovered = discoveredRegionIds instanceof Set
-    ? discoveredRegionIds
-    : new Set(Array.isArray(discoveredRegionIds) ? discoveredRegionIds : []);
-  const regions = (Array.isArray(context?.regions) ? context.regions : [])
-    .map(region => buildRegionDisclosure(region, {
+  const discovered = discoveredRealmIds instanceof Set
+    ? discoveredRealmIds
+    : new Set(Array.isArray(discoveredRealmIds) ? discoveredRealmIds : []);
+  const realms = (Array.isArray(context?.realms) ? context.realms : [])
+    .map(realm => buildRealmDisclosure(realm, {
       isGM,
-      discovered: discovered.has(region?.id),
+      discovered: discovered.has(realm?.id),
       revealMode
     }));
   return {
     resolved: context?.resolved === true,
     source: context?.source || 'unresolved',
-    regions,
-    regionIds: isGM ? (Array.isArray(context?.regionIds) ? context.regionIds : []) : [],
-    staleRegionIds: isGM ? (Array.isArray(context?.staleRegionIds) ? context.staleRegionIds : []) : []
+    realms,
+    realmIds: isGM ? (Array.isArray(context?.realmIds) ? context.realmIds : []) : [],
+    staleRealmIds: isGM ? (Array.isArray(context?.staleRealmIds) ? context.staleRealmIds : []) : []
   };
 }
 
@@ -226,49 +226,49 @@ export function buildLocationSummaryForViewer({
  *
  * @param {object} args
  * @param {object} args.environment Environment with availability rules.
- * @param {Map<string, object>|object} args.regionsById Region lookup by id.
- * @param {object} args.currentRegionContext Resolved current-region context.
+ * @param {Map<string, object>|object} args.realmsById Realm lookup by id.
+ * @param {object} args.currentRealmContext Resolved current-realm context.
  * @param {LocationAvailability} args.availability Result of evaluateLocationAvailability.
- * @param {Set<string>|string[]} [args.discoveredRegionIds] Region ids the actor discovered.
+ * @param {Set<string>|string[]} [args.discoveredRealmIds] Realm ids the actor discovered.
  * @param {boolean} [args.isGM]
  * @param {string} [args.revealMode]
- * @returns {{ state: 'noCurrentRegion'|'excluded'|'travel', knownDestinations: GatheringRegionDisclosure[], undiscoveredCount: number }}
+ * @returns {{ state: 'noCurrentRealm'|'excluded'|'travel', knownDestinations: GatheringRealmDisclosure[], undiscoveredCount: number }}
  */
 export function buildTravelGuidance({
   environment = {},
-  regionsById = new Map(),
-  currentRegionContext = {},
+  realmsById = new Map(),
+  currentRealmContext = {},
   availability = null,
-  discoveredRegionIds = new Set(),
+  discoveredRealmIds = new Set(),
   isGM = false,
   revealMode = 'manual'
 } = {}) {
-  const result = availability || evaluateLocationAvailability(environment, currentRegionContext);
-  const lookup = regionsById instanceof Map
-    ? regionsById
-    : new Map(Object.entries(regionsById || {}));
-  const discovered = discoveredRegionIds instanceof Set
-    ? discoveredRegionIds
-    : new Set(Array.isArray(discoveredRegionIds) ? discoveredRegionIds : []);
+  const result = availability || evaluateLocationAvailability(environment, currentRealmContext);
+  const lookup = realmsById instanceof Map
+    ? realmsById
+    : new Map(Object.entries(realmsById || {}));
+  const discovered = discoveredRealmIds instanceof Set
+    ? discoveredRealmIds
+    : new Set(Array.isArray(discoveredRealmIds) ? discoveredRealmIds : []);
 
-  // No current region resolved (and the env is inclusion-gated) ⇒ ask the GM to
-  // set the party's current region. Distinct from an explicit exclusion.
-  if (result.reasons.includes('NO_CURRENT_REGION')) {
-    return { state: 'noCurrentRegion', knownDestinations: [], undiscoveredCount: 0 };
+  // No current realm resolved (and the env is inclusion-gated) ⇒ ask the GM to
+  // set the party's current realm. Distinct from an explicit exclusion.
+  if (result.reasons.includes('NO_CURRENT_REALM')) {
+    return { state: 'noCurrentRealm', knownDestinations: [], undiscoveredCount: 0 };
   }
 
-  const excluded = Array.isArray(result.excludedRegionIds) && result.excludedRegionIds.length > 0;
+  const excluded = Array.isArray(result.excludedRealmIds) && result.excludedRealmIds.length > 0;
   const state = excluded ? 'excluded' : 'travel';
 
-  // Destinations are the environment's included region ids — the places the
+  // Destinations are the environment's included realm ids — the places the
   // player could travel to so the env becomes available.
-  const destinationIds = asIdList(environment?.includedRegionIds);
+  const destinationIds = asIdList(environment?.includedRealmIds ?? environment?.includedRegionIds);
   const knownDestinations = [];
   let undiscoveredCount = 0;
-  for (const regionId of destinationIds) {
-    const region = lookup.get(regionId) || { id: regionId, name: '', secret: false };
-    const isDiscovered = discovered.has(regionId);
-    const disclosure = buildRegionDisclosure(region, { isGM, discovered: isDiscovered, revealMode });
+  for (const realmId of destinationIds) {
+    const realm = lookup.get(realmId) || { id: realmId, name: '', secret: false };
+    const isDiscovered = discovered.has(realmId);
+    const disclosure = buildRealmDisclosure(realm, { isGM, discovered: isDiscovered, revealMode });
     if (disclosure.placeholder) {
       undiscoveredCount += 1;
     } else {

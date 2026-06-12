@@ -228,6 +228,20 @@ test('CraftingSystemManager: loading persisted data with cauldron mode produces 
   assert.equal(system.alchemy.learnOnCraft, true);
 });
 
+test('CraftingSystemManager accepts legacy gatheringRegions/gatheringRegionSettings keys on read (pre-1.1.0 import)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const system = manager._normalizeSystem({
+    id: 'legacy-realm-sys',
+    name: 'Legacy Realm System',
+    gatheringRegions: [{ id: 'r1', craftingSystemId: 'legacy-realm-sys', name: 'Verdant', enabled: true }],
+    gatheringRegionSettings: { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }
+  });
+  assert.equal(system.gatheringRealms.length, 1, 'legacy gatheringRegions read as gatheringRealms');
+  assert.equal(system.gatheringRealms[0].name, 'Verdant');
+  assert.equal(system.gatheringRealmSettings.enabled, true, 'legacy gatheringRegionSettings read as gatheringRealmSettings');
+  assert.equal(system.gatheringRealmSettings.revealMode, 'alwaysVisible');
+});
+
 // ============================================================================
 // ResolutionModeService: alchemy validation
 // ============================================================================

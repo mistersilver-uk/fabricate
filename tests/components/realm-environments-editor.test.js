@@ -11,23 +11,23 @@ import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/sv
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 let tempRoot;
-let RegionEnvironmentsEditor;
+let RealmEnvironmentsEditor;
 let mounted;
 let target;
 
 const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, () => tempRoot);
 
-function env(id, name, includedRegionIds = [], extra = {}) {
-  return { id, name, img: '', enabled: true, includedRegionIds, ...extra };
+function env(id, name, includedRealmIds = [], extra = {}) {
+  return { id, name, img: '', enabled: true, includedRealmIds, ...extra };
 }
 
 async function mountEditor(props) {
   target = document.createElement('div');
   document.body.appendChild(target);
-  mounted = mount(RegionEnvironmentsEditor, {
+  mounted = mount(RealmEnvironmentsEditor, {
     target,
     props: {
-      region: { id: 'r1', name: 'Northreach' },
+      realm: { id: 'r1', name: 'Northreach' },
       environments: [],
       saving: false,
       onAdd: () => {},
@@ -46,25 +46,25 @@ function remount() {
 }
 
 function column(which) {
-  return target.querySelector(`[data-region-env-column="${which}"]`);
+  return target.querySelector(`[data-realm-env-column="${which}"]`);
 }
 function rowNames(which) {
-  return Array.from(column(which).querySelectorAll('.manager-region-env-name')).map(n => n.textContent.trim());
+  return Array.from(column(which).querySelectorAll('.manager-realm-env-name')).map(n => n.textContent.trim());
 }
 
-describe('RegionEnvironmentsEditor mounted behavior', () => {
+describe('RealmEnvironmentsEditor mounted behavior', () => {
   before(async () => {
     setupDOM();
     installComponentTestGlobals();
 
-    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-region-env-'));
+    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-realm-env-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/RegionEnvironmentsEditor.svelte');
-    const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/RegionEnvironmentsEditor.svelte.js')).href);
-    RegionEnvironmentsEditor = mod.default;
+    writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
+    const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte.js')).href);
+    RealmEnvironmentsEditor = mod.default;
   });
 
   after(() => {
@@ -74,7 +74,7 @@ describe('RegionEnvironmentsEditor mounted behavior', () => {
     if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('splits environments into available (not in region) and included (in region)', async () => {
+  it('splits environments into available (not in realm) and included (in realm)', async () => {
     await mountEditor({
       environments: [
         env('e1', 'Grove', ['r1']),
@@ -87,25 +87,25 @@ describe('RegionEnvironmentsEditor mounted behavior', () => {
     remount();
   });
 
-  it('Add on an available row calls onAdd(envId, regionId)', async () => {
+  it('Add on an available row calls onAdd(envId, realmId)', async () => {
     const added = [];
     await mountEditor({
       environments: [env('e2', 'Glade', [])],
-      onAdd: (envId, regionId) => added.push([envId, regionId])
+      onAdd: (envId, realmId) => added.push([envId, realmId])
     });
-    column('available').querySelector('.manager-region-env-add').click();
+    column('available').querySelector('.manager-realm-env-add').click();
     flushSync();
     assert.deepEqual(added, [['e2', 'r1']]);
     remount();
   });
 
-  it('Remove on an included row calls onRemove(envId, regionId)', async () => {
+  it('Remove on an included row calls onRemove(envId, realmId)', async () => {
     const removed = [];
     await mountEditor({
       environments: [env('e1', 'Grove', ['r1'])],
-      onRemove: (envId, regionId) => removed.push([envId, regionId])
+      onRemove: (envId, realmId) => removed.push([envId, realmId])
     });
-    column('included').querySelector('.manager-region-env-remove').click();
+    column('included').querySelector('.manager-realm-env-remove').click();
     flushSync();
     assert.deepEqual(removed, [['e1', 'r1']]);
     remount();
@@ -130,7 +130,7 @@ describe('RegionEnvironmentsEditor mounted behavior', () => {
   it('paginates each column over a page size of 6', async () => {
     const many = Array.from({ length: 7 }, (_, i) => env(`a${i}`, `Avail ${i}`, []));
     await mountEditor({ environments: many });
-    assert.equal(column('available').querySelectorAll('.manager-region-env-row').length, 6);
+    assert.equal(column('available').querySelectorAll('.manager-realm-env-row').length, 6);
     remount();
   });
 });

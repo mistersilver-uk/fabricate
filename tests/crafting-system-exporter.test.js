@@ -363,34 +363,43 @@ test('makeExportFilename: includes date in ISO format', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Gathering regions ride-along (export + import validation)
+// Gathering realms ride-along (export + import validation)
 // ---------------------------------------------------------------------------
 
-test('buildExportPayload: includes gatheringRegions on the system payload', () => {
+test('buildExportPayload: includes gatheringRealms on the system payload', () => {
   const system = makeSystem({
-    gatheringRegions: [{ id: 'r1', craftingSystemId: 'sys-1', name: 'Verdant', enabled: true }],
-    gatheringRegionSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' }
+    gatheringRealms: [{ id: 'r1', craftingSystemId: 'sys-1', name: 'Verdant', enabled: true }],
+    gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' }
   });
   const payload = buildExportPayload(system, [], '1.0.0');
-  assert.equal(payload.system.gatheringRegions.length, 1);
-  assert.equal(payload.system.gatheringRegions[0].name, 'Verdant');
-  assert.equal(payload.system.gatheringRegionSettings.revealMode, 'alwaysVisible');
+  assert.equal(payload.system.gatheringRealms.length, 1);
+  assert.equal(payload.system.gatheringRealms[0].name, 'Verdant');
+  assert.equal(payload.system.gatheringRealmSettings.revealMode, 'alwaysVisible');
 });
 
-test('validateImportData: rejects non-array gatheringRegions', () => {
+test('validateImportData: rejects non-array gatheringRealms', () => {
+  const result = validateImportData({
+    fabricateVersion: '1.0.0',
+    system: { name: 'X', gatheringRealms: { not: 'an array' } }
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => e.includes('gatheringRealms')));
+});
+
+test('validateImportData: warns on a realm missing a name', () => {
+  const result = validateImportData({
+    fabricateVersion: '1.0.0',
+    system: { name: 'X', gatheringRealms: [{ id: 'r1' }] }
+  });
+  assert.equal(result.valid, true);
+  assert.ok(result.warnings.some(w => w.includes('Gathering realm')));
+});
+
+test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1.1.0 export)', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
     system: { name: 'X', gatheringRegions: { not: 'an array' } }
   });
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('gatheringRegions')));
-});
-
-test('validateImportData: warns on a region missing a name', () => {
-  const result = validateImportData({
-    fabricateVersion: '1.0.0',
-    system: { name: 'X', gatheringRegions: [{ id: 'r1' }] }
-  });
-  assert.equal(result.valid, true);
-  assert.ok(result.warnings.some(w => w.includes('Gathering region')));
+  assert.equal(result.valid, false, 'legacy gatheringRegions is validated, not silently ignored');
+  assert.ok(result.errors.some(e => e.includes('gatheringRealms')), 'reports under the canonical realm name');
 });

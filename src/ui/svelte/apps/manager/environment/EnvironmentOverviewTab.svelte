@@ -6,8 +6,8 @@
   let {
     environment = null,
     composition = { counts: {}, conditions: {} },
-    regionRecords = [],
-    regionsEnabled = false,
+    realmRecords = [],
+    realmsEnabled = false,
     biomeOptions = [],
     dangerOptions = [],
     linkedSceneImage = '',
@@ -42,26 +42,26 @@
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
   const availableBiomes = $derived(biomeOptions.filter(option => !biomes.includes(optId(option))));
 
-  // Region membership (geography). Mirrors the biome chip control but sourced
-  // from the system's GatheringRegion records and gated on the Travel toggle.
-  const includedRegionIds = $derived(Array.isArray(environment?.includedRegionIds) ? environment.includedRegionIds : []);
-  const regionOptions = $derived((Array.isArray(regionRecords) ? regionRecords : []).map(region => ({
-    id: String(region?.id ?? '').trim(),
-    label: String(region?.name ?? region?.id ?? '').trim()
+  // Realm membership (geography). Mirrors the biome chip control but sourced
+  // from the system's GatheringRealm records and gated on the Travel toggle.
+  const includedRealmIds = $derived(Array.isArray(environment?.includedRealmIds) ? environment.includedRealmIds : []);
+  const realmOptions = $derived((Array.isArray(realmRecords) ? realmRecords : []).map(realm => ({
+    id: String(realm?.id ?? '').trim(),
+    label: String(realm?.name ?? realm?.id ?? '').trim()
   })).filter(option => option.id));
-  const availableRegions = $derived(regionOptions.filter(option => !includedRegionIds.includes(option.id)));
+  const availableRealms = $derived(realmOptions.filter(option => !includedRealmIds.includes(option.id)));
 
-  function regionLabel(id) {
-    return optLabel(regionOptions.find(option => optId(option) === id)) || id;
+  function realmLabel(id) {
+    return optLabel(realmOptions.find(option => optId(option) === id)) || id;
   }
-  function addRegion(event) {
+  function addRealm(event) {
     const id = String(event.currentTarget.value || '').trim();
     event.currentTarget.value = '';
     if (!id) return;
-    if (!includedRegionIds.includes(id)) onUpdate({ includedRegionIds: [...includedRegionIds, id] });
+    if (!includedRealmIds.includes(id)) onUpdate({ includedRealmIds: [...includedRealmIds, id] });
   }
-  function removeRegion(id) {
-    onUpdate({ includedRegionIds: includedRegionIds.filter(value => value !== id) });
+  function removeRealm(id) {
+    onUpdate({ includedRealmIds: includedRealmIds.filter(value => value !== id) });
   }
   const dangerLevelOptions = $derived((Array.isArray(dangerOptions) && dangerOptions.length > 0
     ? dangerOptions
@@ -165,31 +165,31 @@
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Context', 'Environment context')}</h3>
         <div class="manager-environment-context-split">
           <div class="manager-environment-context-col">
-            {#if regionsEnabled}
-              <div class="manager-field manager-environment-context-field" data-environment-field="includedRegionIds">
-                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Regions', 'Regions')}</span>
-                <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsHint', 'Which regions this environment belongs to. Players can gather here when their party is in one of these regions.')}</p>
-                {#if regionOptions.length === 0}
-                  <p class="manager-muted manager-environment-region-empty" data-environment-region-empty>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsEmpty', 'No regions yet. Create regions in the Travel tab first.')}</p>
+            {#if realmsEnabled}
+              <div class="manager-field manager-environment-context-field" data-environment-field="includedRealmIds">
+                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Realms', 'Realms')}</span>
+                <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsHint', 'Which realms this environment belongs to. Players can gather here when their party is in one of these realms.')}</p>
+                {#if realmOptions.length === 0}
+                  <p class="manager-muted manager-environment-realm-empty" data-environment-realm-empty>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty', 'No realms yet. Create realms in the Travel tab first.')}</p>
                 {:else}
-                  {#if availableRegions.length > 0}
-                    <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRegion', 'Add region')} onchange={addRegion}>
-                      <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRegion', 'Add region')}</option>
-                      {#each availableRegions as option (optId(option))}
+                  {#if availableRealms.length > 0}
+                    <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm', 'Add realm')} onchange={addRealm}>
+                      <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm', 'Add realm')}</option>
+                      {#each availableRealms as option (optId(option))}
                         <option value={optId(option)}>{optLabel(option)}</option>
                       {/each}
                     </select>
                   {/if}
                   <div class="manager-availability-pill-row">
-                    {#if includedRegionIds.length > 0}
-                      {#each includedRegionIds as id (id)}
-                        <span class="manager-availability-pill is-region">
-                          <span>{regionLabel(id)}</span>
-                          <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRegion', 'Remove {name}').replace('{name}', regionLabel(id))} onclick={() => removeRegion(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                    {#if includedRealmIds.length > 0}
+                      {#each includedRealmIds as id (id)}
+                        <span class="manager-availability-pill is-realm">
+                          <span>{realmLabel(id)}</span>
+                          <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRealm', 'Remove {name}').replace('{name}', realmLabel(id))} onclick={() => removeRealm(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
                         </span>
                       {/each}
                     {:else}
-                      <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRegions', 'No regions selected')}</span>
+                      <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRealms', 'No realms selected')}</span>
                     {/if}
                   </div>
                 {/if}

@@ -98,7 +98,7 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 
 - `game`, `ui`, `Hooks`, and `CONFIG` are runtime globals. Never import them.
 - The module targets Foundry V13. Account for V13 API shapes when touching Foundry-facing code.
-- V13 **animates token movement**: at the `updateToken` hook the document is already at the destination, but the placeable (`token.object.center`) and `TokenDocument#getCenterPoint()` still report the *animating* position — the spot the token just left. Any region containment / "where is this token" read at the hook is off-by-one if it uses the placeable. Read `TokenDocument#regions` (authoritative membership) or compute the centre from the document `x/y` + footprint, and defer until the move animation settles. See [`docs/agents/travel-current-region-sensing.md`](docs/agents/travel-current-region-sensing.md).
+- V13 **animates token movement**: at the `updateToken` hook the document is already at the destination, but the placeable (`token.object.center`) and `TokenDocument#getCenterPoint()` still report the *animating* position — the spot the token just left. Any Scene Region containment / "where is this token" read at the hook is off-by-one if it uses the placeable. Read `TokenDocument#regions` (authoritative membership) or compute the centre from the document `x/y` + footprint, and defer until the move animation settles. See [`docs/agents/travel-current-realm-sensing.md`](docs/agents/travel-current-realm-sensing.md).
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
 - Use `sheet.changeTab(tabName, groupName)` for ApplicationV2 tab switches.
@@ -118,7 +118,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - [`docs/agents/smoke-harness.md`](docs/agents/smoke-harness.md) — how `npm run test:foundry` is organized, where its outputs land, and which Phase D0 selectors routinely drift when manager markup changes.
 - [`docs/agents/ui-pr-screenshots.md`](docs/agents/ui-pr-screenshots.md) — how UI PR screenshot evidence is planned, collected from smoke artifacts, embedded in PR descriptions, and validated in CI.
 - [`docs/agents/foundry-css-overrides.md`](docs/agents/foundry-css-overrides.md) — where Foundry core styles fight Fabricate styles (button layout, focus rings) and the global per-area override map in `styles/fabricate.css`, including the specificity ladder that keeps area defaults from clobbering per-component rules.
-- [`docs/agents/travel-current-region-sensing.md`](docs/agents/travel-current-region-sensing.md) — how a gathering party's current Fabricate region is resolved live from its travel-marker token, and the V13 token-movement timing trap (placeable centre lags the move → off-by-one) plus the three mitigations.
+- [`docs/agents/travel-current-realm-sensing.md`](docs/agents/travel-current-realm-sensing.md) — how a gathering party's current Fabricate **realm** is resolved live from its travel-marker token (mapped from Foundry Scene Regions many-to-one via each realm's `sceneMappings[].sceneRegionUuid`), and the V13 token-movement timing trap (placeable centre lags the move → off-by-one) plus the three mitigations.
 
 ## Git Conventions
 

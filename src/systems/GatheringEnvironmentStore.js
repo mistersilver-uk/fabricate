@@ -272,8 +272,10 @@ export class GatheringEnvironmentStore {
       biomes: normalizeStringList(data?.biomes ?? data?.biome),
       // Explicit location availability rules (additive, opt-in). Legacy
       // `region`/`biomes` above stay untouched as compatibility/display metadata.
-      includedRegionIds: normalizeIdList(data?.includedRegionIds),
-      excludedRegionIds: normalizeIdList(data?.excludedRegionIds),
+      // Accept the legacy realm-schema keys on read (imported or pre-1.1.0-migration
+      // payloads) so an old export still loads before the startup migration runs.
+      includedRealmIds: normalizeIdList(data?.includedRealmIds ?? data?.includedRegionIds),
+      excludedRealmIds: normalizeIdList(data?.excludedRealmIds ?? data?.excludedRegionIds),
       includedBiomeIds: normalizeStringList(data?.includedBiomeIds),
       excludedBiomeIds: normalizeStringList(data?.excludedBiomeIds),
       dangerTags: normalizeStringList(data?.dangerTags ?? data?.risk),
@@ -325,22 +327,22 @@ export class GatheringEnvironmentStore {
       errors.push(`Environment "${label}" references unresolved craftingSystemId "${normalized.craftingSystemId}"`);
     }
 
-    // Region-id availability validation runs only at save boundaries where the
-    // owning system context resolves (regions live on the system, environments in
+    // Realm-id availability validation runs only at save boundaries where the
+    // owning system context resolves (realms live on the system, environments in
     // a world setting). Load paths never reach here with a throw because the
     // load path normalizes without validating. Stale biome ids are not rejected
     // here — they remain compatibility input until a biome vocabulary surface
     // ships.
-    if (system && Array.isArray(system.gatheringRegions)) {
-      const regionIds = new Set(system.gatheringRegions.map(region => region?.id).filter(Boolean));
-      for (const regionId of normalized.includedRegionIds) {
-        if (!regionIds.has(regionId)) {
-          errors.push(`Environment "${label}" includedRegionIds references unknown region "${regionId}"`);
+    if (system && Array.isArray(system.gatheringRealms)) {
+      const realmIds = new Set(system.gatheringRealms.map(realm => realm?.id).filter(Boolean));
+      for (const realmId of normalized.includedRealmIds) {
+        if (!realmIds.has(realmId)) {
+          errors.push(`Environment "${label}" includedRealmIds references unknown realm "${realmId}"`);
         }
       }
-      for (const regionId of normalized.excludedRegionIds) {
-        if (!regionIds.has(regionId)) {
-          errors.push(`Environment "${label}" excludedRegionIds references unknown region "${regionId}"`);
+      for (const realmId of normalized.excludedRealmIds) {
+        if (!realmIds.has(realmId)) {
+          errors.push(`Environment "${label}" excludedRealmIds references unknown realm "${realmId}"`);
         }
       }
     }

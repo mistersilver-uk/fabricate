@@ -17,6 +17,7 @@ import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
+import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,17 @@ const MIGRATIONS = [
     migrate(data) {
       return migrateRenameGatheringHazardsToEvents(data);
     }
+  },
+  {
+    version: '1.1.0',
+    label: 'Rename gathering Region concept to Realm (system/environment/party keys)',
+    // Must run strictly after 1.0.0, which still reads the pre-rename
+    // `gatheringRegions` key for its per-region modifier rewrite. Semver-sorted
+    // application keeps 1.1.0 last, so the rename only fires once the earlier
+    // migrations have consumed the old schema.
+    migrate(data) {
+      return migrateRenameGatheringRegionsToRealms(data);
+    }
   }
   // Future migrations added here in version order
 ];
@@ -171,17 +183,20 @@ export class MigrationRunner {
     const rawSystems = this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [];
     const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
     const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
+    const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
     const originalGatheringConfigJson = JSON.stringify(rawGatheringConfig);
     const originalEnvironmentsJson = JSON.stringify(rawEnvironments);
+    const originalGatheringPartiesJson = JSON.stringify(rawGatheringParties);
 
     let data = {
       recipes: rawRecipes,
       systems: rawSystems,
       gatheringConfig: rawGatheringConfig,
-      environments: rawEnvironments
+      environments: rawEnvironments,
+      gatheringParties: rawGatheringParties
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -222,6 +237,7 @@ export class MigrationRunner {
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged = JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
     const environmentsChanged = JSON.stringify(data.environments) !== originalEnvironmentsJson;
+    const gatheringPartiesChanged = JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
 
     if (recipesChanged) {
       await this._setSetting(SETTING_KEYS.RECIPES, data.recipes);
@@ -234,6 +250,9 @@ export class MigrationRunner {
     }
     if (environmentsChanged) {
       await this._setSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS, data.environments);
+    }
+    if (gatheringPartiesChanged) {
+      await this._setSetting(SETTING_KEYS.GATHERING_PARTIES, data.gatheringParties);
     }
 
     await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);

@@ -11,7 +11,7 @@
 
   const TABS = [
     { id: 'parties', icon: 'fas fa-people-group', key: 'Parties', fallback: 'Parties' },
-    { id: 'regions', icon: 'fas fa-map-location-dot', key: 'Regions', fallback: 'Regions' },
+    { id: 'realms', icon: 'fas fa-map-location-dot', key: 'Realms', fallback: 'Realms' },
     { id: 'map', icon: 'fas fa-diagram-project', key: 'MapLinks', fallback: 'Map Region Links' }
   ];
 

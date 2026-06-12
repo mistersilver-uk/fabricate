@@ -843,13 +843,13 @@ function _emptyTravelState() {
     travelSaving: false,
     travelError: null,
     travelFieldErrors: {},
-    selectedSystemRegions: [],
+    selectedSystemRealms: [],
     actorOptions: []
   };
 }
 
 /**
- * Map a thrown party/region store error to inline field errors plus a summary.
+ * Map a thrown party/realm store error to inline field errors plus a summary.
  *
  * The party store emits a single COMPOSITE uniqueness message
  * (`Actor "<uuid>" is associated with more than one enabled party`) for both
@@ -1952,9 +1952,9 @@ export function createAdminStore(services) {
   }
 
   // ---------------------------------------------------------------------------
-  // Travel section (world-level parties + per-system current-region overrides).
+  // Travel section (world-level parties + per-system current-realm overrides).
   // Kept thin: uniqueness/invariant validation lives in GatheringPartyStore and
-  // GatheringRegionStore; this section surfaces their errors inline and refreshes
+  // GatheringRealmStore; this section surfaces their errors inline and refreshes
   // derived view state. Confirmations always route through services.confirmDialog.
   // ---------------------------------------------------------------------------
   const travel = _createTravelSection();
@@ -1963,8 +1963,8 @@ export function createAdminStore(services) {
     function getPartyStore() {
       return services.getGatheringPartyStore?.() || null;
     }
-    function getRegionStore() {
-      return services.getGatheringRegionStore?.() || null;
+    function getRealmStore() {
+      return services.getGatheringRealmStore?.() || null;
     }
     function getLocationService() {
       return services.getGatheringLocationService?.() || null;
@@ -1987,7 +1987,7 @@ export function createAdminStore(services) {
 
     function buildState() {
       const partyStore = getPartyStore();
-      const regionStore = getRegionStore();
+      const realmStore = getRealmStore();
       const systemId = get(selectedSystemId);
       const parties = partyStore?.list ? _clonePlain(partyStore.list() || []) : [];
       const actorOptions = getActorOptions();
@@ -1998,23 +1998,23 @@ export function createAdminStore(services) {
       if (!selectedId && parties.length > 0) selectedId = parties[0].id;
       if (selectedId !== get(travelSelectedPartyId)) travelSelectedPartyId.set(selectedId);
 
-      const regions = (systemId && regionStore?.listBySystem)
-        ? _clonePlain(regionStore.listBySystem(systemId) || [])
+      const realms = (systemId && realmStore?.listBySystem)
+        ? _clonePlain(realmStore.listBySystem(systemId) || [])
         : [];
-      const regionById = new Map(regions.map(region => [region.id, region]));
+      const realmById = new Map(realms.map(realm => [realm.id, realm]));
       const locationService = getLocationService();
 
-      // Resolve each party's current regions ONCE (manual override OR live travel-
-      // marker sensing) and bucket by region id, so every region→party list below
+      // Resolve each party's current realms ONCE (manual override OR live travel-
+      // marker sensing) and bucket by realm id, so every realm-to-party list below
       // reflects auto mode — not just stored overrides.
       const partyEvidence = new Map();
-      const partyResolvedRegionIds = new Map();
+      const partyResolvedRealmIds = new Map();
       for (const party of parties) {
-        const evidence = (systemId && locationService?.resolveCurrentRegions)
-          ? locationService.resolveCurrentRegions({ partyId: party.id, systemId })
-          : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+        const evidence = (systemId && locationService?.resolveCurrentRealms)
+          ? locationService.resolveCurrentRealms({ partyId: party.id, systemId })
+          : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
         partyEvidence.set(party.id, evidence);
-        partyResolvedRegionIds.set(party.id, new Set(Array.isArray(evidence.regionIds) ? evidence.regionIds : []));
+        partyResolvedRealmIds.set(party.id, new Set(Array.isArray(evidence.realmIds) ? evidence.realmIds : []));
       }
 
       const travelParties = parties.map(party => {
@@ -2023,9 +2023,9 @@ export function createAdminStore(services) {
           ? party.travelActorUuid
           : null;
         const evidence = partyEvidence.get(party.id)
-          || { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
-        const override = party.currentRegionOverrides?.[systemId] || null;
-        const overrideRegionIds = override?.mode === 'manual' ? (override.regionIds || []) : [];
+          || { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
+        const override = party.currentRealmOverrides?.[systemId] ?? party.currentRegionOverrides?.[systemId] ?? null;
+        const overrideRealmIds = override?.mode === 'manual' ? (override.realmIds ?? override.regionIds ?? []) : [];
         const memberCards = party.memberActorUuids.map(uuid => ({
           uuid,
           name: actorByUuid.get(uuid)?.name || '',
@@ -2039,33 +2039,33 @@ export function createAdminStore(services) {
           travelActor: party.travelActorUuid ? (actorByUuid.get(party.travelActorUuid) || null) : null,
           staleMembers,
           staleTravelActor,
-          staleRegionIds: Array.isArray(evidence.staleRegionIds) ? evidence.staleRegionIds : [],
+          staleRealmIds: Array.isArray(evidence.staleRealmIds) ? evidence.staleRealmIds : [],
           hasStaleReference: staleMembers.length > 0 || !!staleTravelActor
-            || (Array.isArray(evidence.staleRegionIds) && evidence.staleRegionIds.length > 0),
+            || (Array.isArray(evidence.staleRealmIds) && evidence.staleRealmIds.length > 0),
           overrideMode: override?.mode || 'none',
-          overrideRegionIds,
-          currentRegionEvidence: {
+          overrideRealmIds,
+          currentRealmEvidence: {
             source: evidence.source,
             resolved: evidence.resolved === true,
-            regions: (evidence.regions || []).map(region => ({
-              id: region.id,
-              name: regionById.get(region.id)?.name ?? region.name ?? '',
-              enabled: region.enabled !== false
+            realms: (evidence.realms || []).map(realm => ({
+              id: realm.id,
+              name: realmById.get(realm.id)?.name ?? realm.name ?? '',
+              enabled: realm.enabled !== false
             })),
-            staleRegionIds: Array.isArray(evidence.staleRegionIds) ? evidence.staleRegionIds : []
+            staleRealmIds: Array.isArray(evidence.staleRealmIds) ? evidence.staleRealmIds : []
           }
         };
       });
 
-      // Per-region counts for the Regions tab header chips. Environments are
+      // Per-realm counts for the Realms tab header chips. Environments are
       // fetched once (sync arrays only — listBySystem may be async); parties
       // reuse the raw list already built above.
-      const regionEnvList = (() => {
-        if (regions.length === 0) return [];
+      const realmEnvList = (() => {
+        if (realms.length === 0) return [];
         const environmentStore = _getEnvironmentStore();
         if (!environmentStore) return [];
         // listBySystem may be async; prefer its synchronous array, else fall
-        // back to a synchronous list() (region ids are unique per system).
+        // back to a synchronous list() (realm ids are unique per system).
         const bySystem = typeof environmentStore.listBySystem === 'function'
           ? environmentStore.listBySystem(systemId)
           : null;
@@ -2073,28 +2073,28 @@ export function createAdminStore(services) {
         const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
         return Array.isArray(all) ? all : [];
       })();
-      const regionEnvironments = (regionId) => regionEnvList
-        .filter(env => Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId))
+      const realmEnvironments = (realmId) => realmEnvList
+        .filter(env => Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId))
         .map(env => ({ id: env.id, name: env.name, img: env.img || '' }));
-      // Parties whose RESOLVED current region (manual or live auto) includes the
-      // region — reuses the precomputed buckets so auto-mode parties are included.
-      const regionParties = (regionId) => parties
-        .filter(party => partyResolvedRegionIds.get(party.id)?.has(regionId))
+      // Parties whose RESOLVED current realm (manual or live auto) includes the
+      // realm — reuses the precomputed buckets so auto-mode parties are included.
+      const realmParties = (realmId) => parties
+        .filter(party => partyResolvedRealmIds.get(party.id)?.has(realmId))
         .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
 
       // Map Region Links tab: the current scene's regions, each annotated with the
-      // Fabricate region (if any) whose sceneMappings already claim it on this
+      // Fabricate realm (if any) whose sceneMappings already claim it on this
       // scene. The link is single-valued per scene region (first mapping wins).
       const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
       const currentSceneUuid = String(sceneData.sceneUuid || '');
       const linkBySceneRegionUuid = new Map();
-      for (const region of regions) {
-        const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
+      for (const realm of realms) {
+        const mappings = Array.isArray(realm.sceneMappings) ? realm.sceneMappings : [];
         for (const mapping of mappings) {
           if (!mapping?.sceneRegionUuid) continue;
           if (currentSceneUuid && mapping.sceneUuid && mapping.sceneUuid !== currentSceneUuid) continue;
           if (!linkBySceneRegionUuid.has(mapping.sceneRegionUuid)) {
-            linkBySceneRegionUuid.set(mapping.sceneRegionUuid, region.id);
+            linkBySceneRegionUuid.set(mapping.sceneRegionUuid, realm.id);
           }
         }
       }
@@ -2112,9 +2112,9 @@ export function createAdminStore(services) {
           const partiesInMapRegion = partiesWithMarker
             .filter(party => insideUuids.has(String(party.travelActorUuid)))
             .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
-          // Parties whose current region includes the linked Fabricate region.
-          const partiesInFabricateRegion = linkedRegionId ? regionParties(linkedRegionId) : [];
-          return { ...sceneRegion, linkedRegionId, partiesInMapRegion, partiesInFabricateRegion };
+          // Parties whose current realm includes the linked Fabricate realm.
+          const partiesInFabricateRealm = linkedRegionId ? realmParties(linkedRegionId) : [];
+          return { ...sceneRegion, linkedRegionId, partiesInMapRegion, partiesInFabricateRealm };
         });
 
       return {
@@ -2125,25 +2125,25 @@ export function createAdminStore(services) {
         travelSaving: get(travelSaving),
         travelError: get(travelError),
         travelFieldErrors: _clonePlain(get(travelFieldErrors)),
-        selectedSystemRegions: regions.map(region => {
-          const environments = regionEnvironments(region.id);
-          const partiesInRegion = regionParties(region.id);
+        selectedSystemRealms: realms.map(realm => {
+          const environments = realmEnvironments(realm.id);
+          const partiesInRealm = realmParties(realm.id);
           return {
-            id: region.id,
-            name: region.name,
-            description: String(region.description || ''),
-            img: region.img || null,
-            enabled: region.enabled !== false,
-            secret: region.secret === true,
-            biomes: Array.isArray(region.biomes) ? region.biomes : [],
+            id: realm.id,
+            name: realm.name,
+            description: String(realm.description || ''),
+            img: realm.img || null,
+            enabled: realm.enabled !== false,
+            secret: realm.secret === true,
+            biomes: Array.isArray(realm.biomes) ? realm.biomes : [],
             environmentCount: environments.length,
-            partyCount: partiesInRegion.length,
+            partyCount: partiesInRealm.length,
             environments,
-            parties: partiesInRegion
+            parties: partiesInRealm
           };
         }),
-        gatheringRegionSettings: (systemId && regionStore?.getRegionSettings)
-          ? regionStore.getRegionSettings(systemId)
+        gatheringRealmSettings: (systemId && realmStore?.getRealmSettings)
+          ? realmStore.getRealmSettings(systemId)
           : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
         actorOptions
       };
@@ -2257,11 +2257,11 @@ export function createAdminStore(services) {
       async clearPartyTravelActor(partyId) {
         return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
       },
-      async setPartyRegionOverride(partyId, systemId, regionIds) {
-        return withSave((partyStore) => partyStore.setCurrentRegionOverride(partyId, systemId, regionIds || []));
+      async setPartyRealmOverride(partyId, systemId, realmIds) {
+        return withSave((partyStore) => partyStore.setCurrentRealmOverride(partyId, systemId, realmIds || []));
       },
-      async clearPartyRegionOverride(partyId, systemId) {
-        return withSave((partyStore) => partyStore.clearCurrentRegionOverride(partyId, systemId));
+      async clearPartyRealmOverride(partyId, systemId) {
+        return withSave((partyStore) => partyStore.clearCurrentRealmOverride(partyId, systemId));
       },
       async removeStaleMember(partyId, actorUuid) {
         return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid));
@@ -2269,26 +2269,27 @@ export function createAdminStore(services) {
       async clearStaleTravelActor(partyId) {
         return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
       },
-      async dropStaleOverrideRegion(partyId, systemId, regionId) {
+      async dropStaleOverrideRealm(partyId, systemId, realmId) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const party = partyStore.get?.(partyId);
-        const override = party?.currentRegionOverrides?.[systemId];
-        const nextIds = Array.isArray(override?.regionIds)
-          ? override.regionIds.filter(id => id !== regionId)
+        const override = party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
+        const overrideIds = override?.realmIds ?? override?.regionIds;
+        const nextIds = Array.isArray(overrideIds)
+          ? overrideIds.filter(id => id !== realmId)
           : [];
-        return withSave((store) => store.setCurrentRegionOverride(partyId, systemId, nextIds));
+        return withSave((store) => store.setCurrentRealmOverride(partyId, systemId, nextIds));
       },
-      // --- Region quick list (name/enabled only; never touches other fields). ---
-      async createRegionQuick(systemId, name) {
-        const regionStore = getRegionStore();
-        if (!regionStore || !systemId) return false;
+      // --- Realm quick list (name/enabled only; never touches other fields). ---
+      async createRealmQuick(systemId, name) {
+        const realmStore = getRealmStore();
+        if (!realmStore || !systemId) return false;
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          const created = await regionStore.create(systemId, { name: String(name ?? '').trim() });
-          // Return the new region id so callers can select it; fall back to true.
+          const created = await realmStore.create(systemId, { name: String(name ?? '').trim() });
+          // Return the new realm id so callers can select it; fall back to true.
           return created?.id || true;
         } catch (err) {
           applyError(err);
@@ -2298,53 +2299,53 @@ export function createAdminStore(services) {
           patch();
         }
       },
-      async renameRegion(systemId, regionId, name) {
-        return _regionPatch(systemId, regionId, { name: String(name ?? '') });
+      async renameRealm(systemId, realmId, name) {
+        return _realmPatch(systemId, realmId, { name: String(name ?? '') });
       },
-      async toggleRegionEnabled(systemId, regionId, enabled) {
-        return _regionPatch(systemId, regionId, { enabled: enabled === true });
+      async toggleRealmEnabled(systemId, realmId, enabled) {
+        return _realmPatch(systemId, realmId, { enabled: enabled === true });
       },
-      // Merge-patch a single region; the store merges over the existing record so
+      // Merge-patch a single realm; the store merges over the existing record so
       // fields the caller omits round-trip untouched. Backs the full Travel
-      // region authoring surface (description/img/secret/biomes).
-      async updateRegion(systemId, regionId, patch = {}) {
-        return _regionPatch(systemId, regionId, patch && typeof patch === 'object' ? patch : {});
+      // realm authoring surface (description/img/secret/biomes).
+      async updateRealm(systemId, realmId, patch = {}) {
+        return _realmPatch(systemId, realmId, patch && typeof patch === 'object' ? patch : {});
       },
       // Link (or unlink) a Foundry Scene Region on the current scene to a Fabricate
-      // region. Single-valued: the scene region is stripped from every region's
-      // sceneMappings (on this scene) before being attached to the chosen region;
-      // a falsy regionId just clears the link. Only regions that actually change
+      // realm. Single-valued: the scene region is stripped from every realm's
+      // sceneMappings (on this scene) before being attached to the chosen realm;
+      // a falsy realmId just clears the link. Only realms that actually change
       // are persisted, so this is a no-op write when nothing moved.
-      async setMapRegionLink(sceneRegionUuid, fabricateRegionId) {
-        const regionStore = getRegionStore();
+      async setMapRegionLink(sceneRegionUuid, fabricateRealmId) {
+        const realmStore = getRealmStore();
         const systemId = get(selectedSystemId);
         const targetSceneRegionUuid = String(sceneRegionUuid || '');
-        if (!regionStore || !systemId || !targetSceneRegionUuid) return false;
+        if (!realmStore || !systemId || !targetSceneRegionUuid) return false;
         const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
         const sceneUuid = String(sceneData.sceneUuid || '');
-        const nextRegionId = fabricateRegionId ? String(fabricateRegionId) : '';
+        const nextRealmId = fabricateRealmId ? String(fabricateRealmId) : '';
         const matchesTarget = (mapping) => mapping?.sceneRegionUuid === targetSceneRegionUuid
           && (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          const regions = regionStore.listBySystem?.(systemId) || [];
-          const regionList = Array.isArray(regions) ? regions : [];
+          const realms = realmStore.listBySystem?.(systemId) || [];
+          const realmList = Array.isArray(realms) ? realms : [];
 
-          for (const region of regionList) {
-            const mappings = Array.isArray(region.sceneMappings) ? region.sceneMappings : [];
+          for (const realm of realmList) {
+            const mappings = Array.isArray(realm.sceneMappings) ? realm.sceneMappings : [];
             const filtered = mappings.filter(mapping => !matchesTarget(mapping));
-            if (nextRegionId && region.id === nextRegionId) {
-              await regionStore.update(systemId, region.id, {
+            if (nextRealmId && realm.id === nextRealmId) {
+              await realmStore.update(systemId, realm.id, {
                 sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }]
               });
             } else if (filtered.length !== mappings.length) {
-              await regionStore.update(systemId, region.id, { sceneMappings: filtered });
+              await realmStore.update(systemId, realm.id, { sceneMappings: filtered });
             }
           }
 
-          // No current-region writes here: a party's current region is derived
+          // No current-realm writes here: a party's current realm is derived
           // LIVE from its travel marker's position (GatheringLocationService auto
           // sensing), so inside markers resolve to the new link automatically.
           return true;
@@ -2356,14 +2357,14 @@ export function createAdminStore(services) {
           patch();
         }
       },
-      async setGatheringRegionsEnabled(systemId, enabled) {
-        const regionStore = getRegionStore();
-        if (!regionStore?.updateRegionSettings || !systemId) return false;
+      async setGatheringRealmsEnabled(systemId, enabled) {
+        const realmStore = getRealmStore();
+        if (!realmStore?.updateRealmSettings || !systemId) return false;
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          await regionStore.updateRegionSettings(systemId, { enabled: enabled === true });
+          await realmStore.updateRealmSettings(systemId, { enabled: enabled === true });
           return true;
         } catch (err) {
           applyError(err);
@@ -2373,26 +2374,26 @@ export function createAdminStore(services) {
           patch();
         }
       },
-      async deleteRegion(systemId, regionId) {
-        const regionStore = getRegionStore();
-        if (!regionStore || !systemId) return false;
-        const region = regionStore.get?.(systemId, regionId);
-        const name = _escapeHtml(region?.name || regionId);
-        // Collect referenced-by evidence WITHOUT deleting first: GatheringRegionStore.delete
+      async deleteRealm(systemId, realmId) {
+        const realmStore = getRealmStore();
+        if (!realmStore || !systemId) return false;
+        const realm = realmStore.get?.(systemId, realmId);
+        const name = _escapeHtml(realm?.name || realmId);
+        // Collect referenced-by evidence WITHOUT deleting first: GatheringRealmStore.delete
         // returns it post-delete, but we surface it in the confirm copy beforehand by
         // probing the collaborators the store uses.
-        const references = _collectRegionReferences(systemId, regionId);
+        const references = _collectRealmReferences(systemId, realmId);
         const refLine = (references.environments.length > 0 || references.parties.length > 0)
-          ? `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Regions.DeleteReferenced', {
+          ? `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteReferenced', {
             environments: references.environments.length,
             parties: references.parties.length
           }) || `It is still referenced by ${references.environments.length} environment(s) and ${references.parties.length} party override(s).`}</p>`
           : '';
         const confirmed = await services.confirmDialog?.({
-          title: services.localize?.('FABRICATE.Admin.Manager.Travel.Regions.DeleteTitle', { name })
+          title: services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteTitle', { name })
             || `Delete ${name}?`,
-          content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Regions.DeleteContent', { name })
-            || `Delete region <strong>${name}</strong>?`}</p>${refLine}`,
+          content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', { name })
+            || `Delete realm <strong>${name}</strong>?`}</p>${refLine}`,
           yes: () => true,
           no: () => false
         });
@@ -2401,7 +2402,7 @@ export function createAdminStore(services) {
         travelSaving.set(true);
         patch();
         try {
-          await regionStore.delete(systemId, regionId, {
+          await realmStore.delete(systemId, realmId, {
             environmentStore: _getEnvironmentStore(),
             partyStore: getPartyStore()
           });
@@ -2416,7 +2417,7 @@ export function createAdminStore(services) {
       }
     };
 
-    function _collectRegionReferences(systemId, regionId) {
+    function _collectRealmReferences(systemId, realmId) {
       const environments = [];
       const parties = [];
       const environmentStore = _getEnvironmentStore();
@@ -2426,30 +2427,31 @@ export function createAdminStore(services) {
       // listBySystem may be async (environment store); only use synchronous arrays here.
       if (Array.isArray(envList)) {
         for (const env of envList) {
-          const included = Array.isArray(env?.includedRegionIds) && env.includedRegionIds.includes(regionId);
-          const excluded = Array.isArray(env?.excludedRegionIds) && env.excludedRegionIds.includes(regionId);
+          const included = Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);
+          const excluded = Array.isArray(env?.excludedRealmIds) && env.excludedRealmIds.includes(realmId);
           if (included || excluded) environments.push({ id: env.id, name: env.name });
         }
       }
       const partyStore = getPartyStore();
       const partyList = typeof partyStore?.list === 'function' ? partyStore.list() : [];
       for (const party of Array.isArray(partyList) ? partyList : []) {
-        const override = party?.currentRegionOverrides?.[systemId];
-        if (override && Array.isArray(override.regionIds) && override.regionIds.includes(regionId)) {
+        const override = party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
+        const overrideIds = override?.realmIds ?? override?.regionIds;
+        if (override && Array.isArray(overrideIds) && overrideIds.includes(realmId)) {
           parties.push({ id: party.id, name: party.name });
         }
       }
       return { environments, parties };
     }
 
-    async function _regionPatch(systemId, regionId, patchData) {
-      const regionStore = getRegionStore();
-      if (!regionStore || !systemId) return false;
+    async function _realmPatch(systemId, realmId, patchData) {
+      const realmStore = getRealmStore();
+      if (!realmStore || !systemId) return false;
       clearErrors();
       travelSaving.set(true);
       patch();
       try {
-        await regionStore.update(systemId, regionId, patchData);
+        await realmStore.update(systemId, realmId, patchData);
         return true;
       } catch (err) {
         applyError(err);
@@ -3552,7 +3554,7 @@ export function createAdminStore(services) {
       'selectionMode',
       'compositionMode',
       'sceneUuid',
-      'includedRegionIds',
+      'includedRealmIds',
       'biomes',
       'dangerTags',
       'dangerLevel',
@@ -3588,7 +3590,7 @@ export function createAdminStore(services) {
         next.img = normalized || null;
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['includedRegionIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledEventIds', 'disabledEventIds', 'forcedTaskIds', 'forcedEventIds', 'taskOrder', 'eventOrder'].includes(field)) {
+      } else if (['includedRealmIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledEventIds', 'disabledEventIds', 'forcedTaskIds', 'forcedEventIds', 'taskOrder', 'eventOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
@@ -3966,13 +3968,13 @@ export function createAdminStore(services) {
     }
   }
 
-  // Add or remove a region "tag" on a specific environment's includedRegionIds,
-  // persisting immediately. Driven from the Regions tab membership editor; the
-  // inverse of the environment editor's own region selector.
-  async function setEnvironmentRegionMembership(environmentId, regionId, included) {
+  // Add or remove a realm "tag" on a specific environment's includedRealmIds,
+  // persisting immediately. Driven from the Realms tab membership editor; the
+  // inverse of the environment editor's own realm selector.
+  async function setEnvironmentRealmMembership(environmentId, realmId, included) {
     const targetId = environmentId || '';
-    const region = String(regionId ?? '');
-    if (!targetId || !region) return false;
+    const realm = String(realmId ?? '');
+    if (!targetId || !realm) return false;
 
     const environmentStore = _getEnvironmentStore();
     if (!environmentStore?.update) return false;
@@ -3981,13 +3983,13 @@ export function createAdminStore(services) {
     const target = environments.find(environment => environment.id === targetId);
     if (!target) return false;
 
-    const current = Array.isArray(target.includedRegionIds) ? target.includedRegionIds : [];
-    const has = current.includes(region);
+    const current = Array.isArray(target.includedRealmIds) ? target.includedRealmIds : [];
+    const has = current.includes(realm);
     if (included === has) return true; // already in the desired state
-    const nextIds = included ? [...current, region] : current.filter(id => id !== region);
+    const nextIds = included ? [...current, realm] : current.filter(id => id !== realm);
     const payload = {
       ..._clonePlain(target),
-      includedRegionIds: nextIds
+      includedRealmIds: nextIds
     };
 
     try {
@@ -3998,7 +4000,7 @@ export function createAdminStore(services) {
           if (currentDraft?.id === targetId) {
             environmentDraft.set({
               ...currentDraft,
-              includedRegionIds: Array.isArray(saved.includedRegionIds) ? saved.includedRegionIds : nextIds
+              includedRealmIds: Array.isArray(saved.includedRealmIds) ? saved.includedRealmIds : nextIds
             });
             persistedEnvironmentDraft.set(saved);
           }
@@ -5333,7 +5335,7 @@ export function createAdminStore(services) {
     travel.patch();
   }) || null;
 
-  // Refresh the live current-region view when a party's travel marker token moves
+  // Refresh the live current-realm view when a party's travel marker token moves
   // (or is added/removed). Only re-patch for tokens that are actually a party's
   // travel marker, so unrelated token moves don't churn the Travel view.
   unsubscribeTravelMarkerMove = services.subscribeTravelMarkerMove?.((actorUuid) => {
@@ -5387,7 +5389,7 @@ export function createAdminStore(services) {
     reorderEnvironments,
     moveEnvironmentDraft,
     toggleEnvironmentEnabled,
-    setEnvironmentRegionMembership,
+    setEnvironmentRealmMembership,
     toggleSystemEnabled,
     toggleFeature,
     toggleAdvancedOptions,
@@ -5466,7 +5468,7 @@ export function createAdminStore(services) {
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,
-    // --- Travel (parties + per-system current-region overrides) ---
+    // --- Travel (parties + per-system current-realm overrides) ---
     refreshTravelParties: travel.refreshTravelParties,
     selectParty: travel.selectParty,
     createParty: travel.createParty,
@@ -5479,18 +5481,18 @@ export function createAdminStore(services) {
     movePartyMember: travel.movePartyMember,
     setPartyTravelActor: travel.setPartyTravelActor,
     clearPartyTravelActor: travel.clearPartyTravelActor,
-    setPartyRegionOverride: travel.setPartyRegionOverride,
-    clearPartyRegionOverride: travel.clearPartyRegionOverride,
+    setPartyRealmOverride: travel.setPartyRealmOverride,
+    clearPartyRealmOverride: travel.clearPartyRealmOverride,
     removeStaleMember: travel.removeStaleMember,
     clearStaleTravelActor: travel.clearStaleTravelActor,
-    dropStaleOverrideRegion: travel.dropStaleOverrideRegion,
-    createRegionQuick: travel.createRegionQuick,
-    renameRegion: travel.renameRegion,
-    toggleRegionEnabled: travel.toggleRegionEnabled,
-    updateRegion: travel.updateRegion,
+    dropStaleOverrideRealm: travel.dropStaleOverrideRealm,
+    createRealmQuick: travel.createRealmQuick,
+    renameRealm: travel.renameRealm,
+    toggleRealmEnabled: travel.toggleRealmEnabled,
+    updateRealm: travel.updateRealm,
     setMapRegionLink: travel.setMapRegionLink,
-    deleteRegion: travel.deleteRegion,
-    setGatheringRegionsEnabled: travel.setGatheringRegionsEnabled,
+    deleteRealm: travel.deleteRealm,
+    setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
     refresh,
     refreshGatheringConfig,
     destroy

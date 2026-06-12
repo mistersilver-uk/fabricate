@@ -389,7 +389,7 @@ test('scene access adapter accepts Foundry V13 TokenDocument parent scene shape'
     'scene access should accept V13 TokenDocument parent UUID and legacy fake/placeable shapes'
   );
   // The scene-token gate applies to ALL users (no GM exemption), additive with
-  // the region/stamina/node gates.
+  // the realm/stamina/node gates.
   assert.doesNotMatch(
     adaptersSource,
     /isGM === true\) return \{ allowed: true \}/,

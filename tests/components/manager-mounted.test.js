@@ -48,17 +48,17 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionsTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RegionEnvironmentsEditor.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RegionNameField.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RealmNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionQuickList.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -853,9 +853,9 @@ function createStore(calls = [], options = {}) {
     addGatheringVocabularyValue: (...args) => calls.push(['addGatheringVocabularyValue', ...args]),
     updateGatheringVocabularyValue: (...args) => calls.push(['updateGatheringVocabularyValue', ...args]),
     deleteGatheringVocabularyValue: (...args) => calls.push(['deleteGatheringVocabularyValue', ...args]),
-    setGatheringRegionsEnabled: (systemId, enabled) => {
-      calls.push(['setGatheringRegionsEnabled', systemId, enabled]);
-      viewState.update(state => ({ ...state, gatheringRegionSettings: { ...(state.gatheringRegionSettings || {}), enabled } }));
+    setGatheringRealmsEnabled: (systemId, enabled) => {
+      calls.push(['setGatheringRealmsEnabled', systemId, enabled]);
+      viewState.update(state => ({ ...state, gatheringRealmSettings: { ...(state.gatheringRealmSettings || {}), enabled } }));
       return true;
     },
     addGatheringLibraryTask: (systemId) => {
@@ -2351,7 +2351,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringParent.classList.contains('is-active'), false);
     assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
     // The parent count is the sum of records (environments + tasks + events), not
-    // the subitem count. Travel is hidden by default (Travel & Regions toggle off).
+    // the subitem count. Travel is hidden by default (Travel & Realms toggle off).
     assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
@@ -2912,12 +2912,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
     assert.equal(target.querySelector('[data-gathering-vocabulary-panel="regions"]'), null);
     assert.ok(target.querySelector('[data-gathering-vocabulary-panel="biomes"]'));
-    // The Travel & Regions toggle card hosts the subsystem flag.
-    assert.ok(target.querySelector('[data-gathering-region-toggle-panel]'));
-    assert.ok(target.querySelector('[data-gathering-region-toggle]'));
+    // The Travel & Realms toggle card hosts the subsystem flag.
+    assert.ok(target.querySelector('[data-gathering-realm-toggle-panel]'));
+    assert.ok(target.querySelector('[data-gathering-realm-toggle]'));
     assert.ok(target.textContent.includes('Times of day'));
     assert.ok(target.textContent.includes('Weather conditions'));
-    assert.ok(target.textContent.includes('Travel & Regions'));
+    assert.ok(target.textContent.includes('Travel & Realms'));
     assert.ok(target.textContent.includes('Biomes'));
     assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.'));
     assert.ok(target.textContent.includes('These values control weather matching for gathering tasks and events. Click the name of a condition to edit it.'));
@@ -3159,7 +3159,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Quiet Cavern'));
   });
 
-  it('flips the Travel & Regions toggle (aria-pressed) and reveals the Travel nav item', async () => {
+  it('flips the Travel & Realms toggle (aria-pressed) and reveals the Travel nav item', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3178,22 +3178,22 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Travel is hidden while the toggle is off.
     assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden by default');
-    const toggle = target.querySelector('[data-gathering-region-toggle]');
-    assert.ok(toggle, 'region toggle card renders on the settings tab');
+    const toggle = target.querySelector('[data-gathering-realm-toggle]');
+    assert.ok(toggle, 'realm toggle card renders on the settings tab');
     assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle starts unpressed');
 
     toggle.click();
     await tick();
     flushSync();
 
-    assert.ok(calls.some(call => call[0] === 'setGatheringRegionsEnabled' && call[1] === 'alchemy' && call[2] === true),
-      'clicking the toggle calls setGatheringRegionsEnabled with the flipped value');
-    assert.equal(target.querySelector('[data-gathering-region-toggle]').getAttribute('aria-pressed'), 'true', 'toggle reflects the new pressed state');
+    assert.ok(calls.some(call => call[0] === 'setGatheringRealmsEnabled' && call[1] === 'alchemy' && call[2] === true),
+      'clicking the toggle calls setGatheringRealmsEnabled with the flipped value');
+    assert.equal(target.querySelector('[data-gathering-realm-toggle]').getAttribute('aria-pressed'), 'true', 'toggle reflects the new pressed state');
     // Enabling the flag reveals the Travel nav item.
-    assert.ok(gatheringSubitem('Travel'), 'Travel nav item appears once Travel & Regions is enabled');
+    assert.ok(gatheringSubitem('Travel'), 'Travel nav item appears once Travel & Realms is enabled');
   });
 
-  it('falls back from a stale Travel tab to Environments when Travel & Regions is disabled', async () => {
+  it('falls back from a stale Travel tab to Environments when Travel & Realms is disabled', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3211,7 +3211,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     gatheringSubitem('Settings').click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-region-toggle]').click();
+    target.querySelector('[data-gathering-realm-toggle]').click();
     await tick();
     flushSync();
     gatheringSubitem('Travel').click();
@@ -3225,7 +3225,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     gatheringSubitem('Settings').click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-region-toggle]').click();
+    target.querySelector('[data-gathering-realm-toggle]').click();
     await tick();
     flushSync();
 

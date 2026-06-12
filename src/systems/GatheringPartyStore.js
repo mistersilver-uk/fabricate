@@ -13,18 +13,18 @@ export class GatheringPartyValidationError extends Error {
 /**
  * Persists and validates Fabricate-managed gathering parties to the world
  * setting `gatheringParties`. Parties are world/cross-system records that key
- * their current-region overrides by `systemId` because regions are per crafting
+ * their current-realm overrides by `systemId` because realms are per crafting
  * system.
  *
  * The store owns the composite cross-record uniqueness invariant: an actor uuid
  * may associate with at most one ENABLED party in total (as a member, as the
  * travel actor, or both — and when both, the same party). Disabled parties never
- * count toward this invariant, and stale actor/system/region references are
+ * count toward this invariant, and stale actor/system/realm references are
  * preserved verbatim for GM repair. Enabling a party requires exactly one travel
  * actor; the invariant runs across the whole list at every save boundary.
  *
  * Mutators stamp `updatedAt`/`updatedByUserId` on override writes (including the
- * `mode: 'none'` clear, which still stamps and empties `regionIds`). `moveMember`
+ * `mode: 'none'` clear, which still stamps and empties `realmIds`). `moveMember`
  * is a single persisted write so a member never momentarily belongs to two
  * enabled parties mid-move.
  */
@@ -152,16 +152,16 @@ export class GatheringPartyStore {
     return this._mutateParty(partyId, party => ({ ...party, enabled: enabled === true }));
   }
 
-  async setCurrentRegionOverride(partyId, systemId, regionIds = []) {
+  async setCurrentRealmOverride(partyId, systemId, realmIds = []) {
     const sysId = stringOrEmpty(systemId);
-    const ids = normalizeIdList(regionIds);
+    const ids = normalizeIdList(realmIds);
     return this._mutateParty(partyId, party => ({
       ...party,
-      currentRegionOverrides: {
-        ...party.currentRegionOverrides,
+      currentRealmOverrides: {
+        ...party.currentRealmOverrides,
         [sysId]: {
           mode: 'manual',
-          regionIds: ids,
+          realmIds: ids,
           updatedAt: this.now(),
           updatedByUserId: stringOrEmpty(this.getUserId())
         }
@@ -169,15 +169,15 @@ export class GatheringPartyStore {
     }));
   }
 
-  async clearCurrentRegionOverride(partyId, systemId) {
+  async clearCurrentRealmOverride(partyId, systemId) {
     const sysId = stringOrEmpty(systemId);
     return this._mutateParty(partyId, party => ({
       ...party,
-      currentRegionOverrides: {
-        ...party.currentRegionOverrides,
+      currentRealmOverrides: {
+        ...party.currentRealmOverrides,
         [sysId]: {
           mode: 'none',
-          regionIds: [],
+          realmIds: [],
           updatedAt: this.now(),
           updatedByUserId: stringOrEmpty(this.getUserId())
         }
@@ -234,7 +234,7 @@ export class GatheringPartyStore {
       enabled: data?.enabled === true,
       memberActorUuids: normalizeIdList(data?.memberActorUuids),
       travelActorUuid: optionalString(data?.travelActorUuid),
-      currentRegionOverrides: normalizeOverrides(data?.currentRegionOverrides)
+      currentRealmOverrides: normalizeOverrides(data?.currentRealmOverrides ?? data?.currentRegionOverrides)
     };
   }
 
@@ -280,7 +280,7 @@ export class GatheringPartyStore {
 
     // Override mode vocab.
     for (const party of parties) {
-      for (const [systemId, override] of Object.entries(party.currentRegionOverrides)) {
+      for (const [systemId, override] of Object.entries(party.currentRealmOverrides)) {
         if (!OVERRIDE_MODES.has(override.mode)) {
           errors.push(`Party "${party.name}" override for system "${systemId}" has invalid mode "${override.mode}"`);
         }
@@ -299,7 +299,7 @@ function normalizeOverrides(value) {
     if (!key || !override || typeof override !== 'object') continue;
     result[key] = {
       mode: OVERRIDE_MODES.has(override.mode) ? override.mode : 'none',
-      regionIds: normalizeIdList(override.regionIds),
+      realmIds: normalizeIdList(override.realmIds ?? override.regionIds),
       updatedAt: Number.isFinite(Number(override.updatedAt)) ? Number(override.updatedAt) : 0,
       updatedByUserId: stringOrEmpty(override.updatedByUserId)
     };

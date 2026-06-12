@@ -52,13 +52,13 @@ game.fabricate.setGatheringWeather(weatherTag) // GM-only gathering weather upda
 game.fabricate.setGatheringTimeOfDay(timeOfDayTag) // GM-only gathering time update
 game.fabricate.setGatheringConditions({ weather, timeOfDay }) // GM-only conditions update
 game.fabricate.getGatheringPartyStore()      // Fabricate-managed gathering parties (world-level)
-game.fabricate.getGatheringRegionStore()     // Per-system gathering region CRUD and settings
-game.fabricate.getGatheringLocationService() // Party current-region resolution
-game.fabricate.getGatheringLocationForActor({ actor, systemId }) // Redaction-safe current-region summary
-game.fabricate.setGatheringPartyRegionOverride({ partyId, systemId, regionIds }) // GM-only region override
-game.fabricate.clearGatheringPartyRegionOverride({ partyId, systemId }) // GM-only override clear
-game.fabricate.revealGatheringRegionForActor({ actor, systemId, regionId }) // GM-only discovery reveal
-game.fabricate.hideGatheringRegionForActor({ actor, systemId, regionId }) // GM-only discovery hide
+game.fabricate.getGatheringRealmStore()      // Per-system gathering realm CRUD and settings (was getGatheringRegionStore — deprecated alias kept)
+game.fabricate.getGatheringLocationService() // Party current-realm resolution
+game.fabricate.getGatheringLocationForActor({ actor, systemId }) // Redaction-safe current-realm summary
+game.fabricate.setGatheringPartyRealmOverride({ partyId, systemId, realmIds }) // GM-only realm override (was setGatheringPartyRegionOverride)
+game.fabricate.clearGatheringPartyRealmOverride({ partyId, systemId }) // GM-only override clear
+game.fabricate.revealGatheringRealmForActor({ actor, systemId, realmId }) // GM-only discovery reveal
+game.fabricate.hideGatheringRealmForActor({ actor, systemId, realmId }) // GM-only discovery hide
 game.fabricate.getGatheringEconomy({ systemId }) // Gathering economy block
 game.fabricate.setGatheringEconomy({ systemId, economy }) // GM-only economy update
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
@@ -87,7 +87,7 @@ const {
   CraftingSystemManager,
   CraftingRunManager, SalvageRunManager,
   GatheringEnvironmentStore, GatheringRunManager,
-  GatheringRegionStore, GatheringPartyStore,
+  GatheringRealmStore, GatheringPartyStore,
   GatheringLocationService,
   GatheringGateAndCheckEvaluator, GatheringEngine,
   RecipeVisibilityService, ResolutionModeService,
@@ -166,31 +166,31 @@ Hooks.once('fabricate.ready', async () => {
 
 The flags map onto the rich-state service accessors `staminaEnabled(systemId)` and `nodesEnabled(systemId)` (the single read used by enforcement, world-time regen/respawn drivers, and every UI surface). The derived `economyMode(systemId)` accessor is retained for back-compat and now returns `'both' | 'stamina' | 'nodes' | 'none'` (the `'both'` value is new in `0.8.0`). Worlds upgraded from before `0.8.0` have their legacy `economy.mode` enum migrated into these flags automatically (see [Gathering Limitations]({% link gathering-environments.md %}#gathering-limitations)).
 
-### Regions, Parties, And Location
+### Realms, Parties, And Location
 
-Location-aware gathering adds stores for per-system regions and world-level parties, a current-region resolver, and GM discovery controls. The whole subsystem is gated per crafting system by the `gatheringRegionSettings.enabled` flag (default off; the **Enable Travel & Regions** toggle in gathering Settings): while it is disabled, `getGatheringLocationForActor`, the override setters, and the discovery reveal/hide methods are inert (return `null` / `false` / no-op). Each method also has a shorter alias on the `game.fabricate.gathering` facade (`getPartyStore`, `getRegionStore`, `getLocationService`, `getLocationForActor`, `setPartyRegionOverride`, `clearPartyRegionOverride`, `revealRegionForActor`, `hideRegionForActor`):
+Location-aware gathering adds stores for per-system realms and world-level parties, a current-realm resolver, and GM discovery controls. A **Gathering Realm** is the Fabricate geography concept (renamed from *Gathering Region* to avoid the collision with Foundry's own Scene `RegionDocument`; a realm maps many-to-one onto Foundry Scene Regions through its scene mappings). The whole subsystem is gated per crafting system by the `gatheringRealmSettings.enabled` flag (default off; the **Enable Travel & Realms** toggle in gathering Settings): while it is disabled, `getGatheringLocationForActor`, the override setters, and the discovery reveal/hide methods are inert (return `null` / `false` / no-op). Each method also has a shorter alias on the `game.fabricate.gathering` facade (`getPartyStore`, `getRealmStore`, `getLocationService`, `getLocationForActor`, `setPartyRealmOverride`, `clearPartyRealmOverride`, `revealRealmForActor`, `hideRealmForActor`). The pre-rename `*Region*` method and alias names are retained as deprecated delegates that warn once and forward, so existing macros keep working:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
   const systemId = game.fabricate.listCraftingSystems()[0]?.id;
 
-  const partyStore = game.fabricate.getGatheringPartyStore();   // party CRUD, members, travel actor
-  const regionStore = game.fabricate.getGatheringRegionStore(); // per-system region CRUD + settings
-  const locations = game.fabricate.getGatheringLocationService(); // current-region resolution
+  const partyStore = game.fabricate.getGatheringPartyStore();  // party CRUD, members, travel actor
+  const realmStore = game.fabricate.getGatheringRealmStore();  // per-system realm CRUD + settings
+  const locations = game.fabricate.getGatheringLocationService(); // current-realm resolution
 
   // GM-only writes.
-  await game.fabricate.setGatheringPartyRegionOverride({ partyId, systemId, regionIds: [regionId] });
-  await game.fabricate.clearGatheringPartyRegionOverride({ partyId, systemId });
-  await game.fabricate.revealGatheringRegionForActor({ actor, systemId, regionId });
-  await game.fabricate.hideGatheringRegionForActor({ actor, systemId, regionId });
+  await game.fabricate.setGatheringPartyRealmOverride({ partyId, systemId, realmIds: [realmId] });
+  await game.fabricate.clearGatheringPartyRealmOverride({ partyId, systemId });
+  await game.fabricate.revealGatheringRealmForActor({ actor, systemId, realmId });
+  await game.fabricate.hideGatheringRealmForActor({ actor, systemId, realmId });
 
-  // Player-callable, redaction-safe read: secret undiscovered region ids/names
+  // Player-callable, redaction-safe read: secret undiscovered realm ids/names
   // are never disclosed to non-GM callers.
   const summary = game.fabricate.getGatheringLocationForActor({ actor, systemId });
 });
 ```
 
-See [Gathering Regions & Travel]({% link gathering-regions.md %}) for the full feature guide, including the GM Travel route, environment location rules, and the disclosure policy.
+See [Gathering Realms & Travel]({% link gathering-realms.md %}) for the full feature guide, including the GM Travel route, environment location rules, and the disclosure policy.
 
 ## Data Persistence
 
@@ -198,8 +198,8 @@ Fabricate stores data in Foundry's settings and flags:
 
 | Location | Key | Contents |
 |:---------|:----|:---------|
-| World setting | `fabricate.craftingSystems` | All crafting system configurations, including each system's gathering regions and region settings |
-| World setting | `fabricate.gatheringParties` | Fabricate-managed gathering parties (members, travel actor, per-system current-region overrides) |
+| World setting | `fabricate.craftingSystems` | All crafting system configurations, including each system's gathering realms and realm settings |
+| World setting | `fabricate.gatheringParties` | Fabricate-managed gathering parties (members, travel actor, per-system current-realm overrides) |
 | World setting | `fabricate.recipes` | All recipes |
 | World setting | `fabricate.gatheringEnvironments` | Gathering environment and task configurations |
 | World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
@@ -219,7 +219,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Actor flag | `fabricate.gatheringRuns.active` | In-progress gathering runs |
 | Actor flag | `fabricate.gatheringRuns.history` | Completed gathering runs |
 | Actor flag | `fabricate.learnedRecipes` | Learned recipe records |
-| Actor flag | `fabricate.discoveredGatheringRegions` | Per-system gathering region discovery entries for the actor |
+| Actor flag | `fabricate.discoveredGatheringRealms` | Per-system gathering realm discovery entries for the actor (legacy `fabricate.discoveredGatheringRegions` flag read as a fallback) |
 | Item flag | `fabricate.toolUsage` | `{ timesUsed }` for `limitedUses` tool tracking (falls back to legacy `fabricate.catalystItemUsage` when absent) |
 | Item flag | `fabricate.toolBroken` | `true` when a tool's `flagBroken` on-break action has fired |
 | Item flag | `fabricate.recipeItemUsage` | `{ timesUsed }` for recipe item tracking |

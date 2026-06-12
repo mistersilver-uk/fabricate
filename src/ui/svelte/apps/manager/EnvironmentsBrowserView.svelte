@@ -11,7 +11,7 @@
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringTravelTabs from './GatheringTravelTabs.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
-  import GatheringRegionsTab from './GatheringRegionsTab.svelte';
+  import GatheringRealmsTab from './GatheringRealmsTab.svelte';
   import GatheringMapLinksTab from './GatheringMapLinksTab.svelte';
 
   let {
@@ -62,8 +62,8 @@
     onAddGatheringVocabularyValue = () => {},
     onUpdateGatheringVocabularyValue = () => {},
     onDeleteGatheringVocabularyValue = () => {},
-    gatheringRegionSettings = { enabled: false },
-    onSetGatheringRegionsEnabled = () => {},
+    gatheringRealmSettings = { enabled: false },
+    onSetGatheringRealmsEnabled = () => {},
     onPickImagePath = null,
     travelParties = [],
     travelSelectedPartyId = '',
@@ -71,11 +71,11 @@
     travelError = null,
     travelFieldErrors = {},
     travelActorOptions = [],
-    travelSystemRegions = [],
-    travelSelectedRegionId = '',
-    onSelectRegion = () => {},
-    onAddEnvironmentToRegion = () => {},
-    onRemoveEnvironmentFromRegion = () => {},
+    travelSystemRealms = [],
+    travelSelectedRealmId = '',
+    onSelectRealm = () => {},
+    onAddEnvironmentToRealm = () => {},
+    onRemoveEnvironmentFromRealm = () => {},
     onSelectParty = () => {},
     onCreateParty = () => {},
     onRenameParty = () => {},
@@ -86,16 +86,16 @@
     onMovePartyMember = () => {},
     onSetPartyTravelActor = () => {},
     onClearPartyTravelActor = () => {},
-    onSetPartyRegionOverride = () => {},
-    onClearPartyRegionOverride = () => {},
+    onSetPartyRealmOverride = () => {},
+    onClearPartyRealmOverride = () => {},
     onRemoveStaleMember = () => {},
     onClearStaleTravelActor = () => {},
-    onDropStaleOverrideRegion = () => {},
-    onCreateRegionQuick = () => {},
-    onRenameRegion = () => {},
-    onToggleRegionEnabled = () => {},
-    onUpdateRegion = () => {},
-    onDeleteRegion = () => {},
+    onDropStaleOverrideRealm = () => {},
+    onCreateRealmQuick = () => {},
+    onRenameRealm = () => {},
+    onToggleRealmEnabled = () => {},
+    onUpdateRealm = () => {},
+    onDeleteRealm = () => {},
     travelCurrentSceneRegions = [],
     travelCurrentSceneUuid = '',
     mapSelectedRegionUuid = '',
@@ -159,7 +159,7 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
       titleFallback: 'Travel and parties',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
-      hintFallback: 'Manage Fabricate parties and set the current region for this crafting system.'
+      hintFallback: 'Manage Fabricate parties and set the current realm for this crafting system.'
     },
     {
       id: 'settings',
@@ -193,13 +193,13 @@
   });
 
   const environmentList = $derived(environments || []);
-  // Lightweight projection for the Regions tab membership editor.
-  const regionEnvironmentOptions = $derived(environmentList.map(environment => ({
+  // Lightweight projection for the Realms tab membership editor.
+  const realmEnvironmentOptions = $derived(environmentList.map(environment => ({
     id: environment.id,
     name: environment.name,
     img: environment.img || '',
     enabled: environment.enabled !== false,
-    includedRegionIds: Array.isArray(environment.includedRegionIds) ? environment.includedRegionIds : []
+    includedRealmIds: Array.isArray(environment.includedRealmIds) ? environment.includedRealmIds : []
   })));
   const selectedGatheringSystemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
   // Top-level vocabularies from the admin store are normalised into
@@ -221,7 +221,7 @@
   });
   const biomeVocabularyOptions = $derived(Array.isArray(biomeVocabulary?.values) ? biomeVocabulary.values : []);
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
-  const regionsEnabled = $derived(gatheringRegionSettings?.enabled === true);
+  const realmsEnabled = $derived(gatheringRealmSettings?.enabled === true);
   const biomeOptions = $derived(uniqueSorted(environmentList.flatMap(environment =>
     Array.isArray(environment.biomes) ? environment.biomes : (environment.biome ? [environment.biome] : []))));
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -864,13 +864,13 @@
         <GatheringPartiesTab
           parties={travelParties}
           systemId={selectedSystemId}
-          systemRegions={travelSystemRegions}
+          systemRealms={travelSystemRealms}
           selectedPartyId={travelSelectedPartyId}
           actorOptions={travelActorOptions}
           saving={travelSaving}
           {onSelectParty}
-          onSetRegionOverride={onSetPartyRegionOverride}
-          onClearRegionOverride={onClearPartyRegionOverride}
+          onSetRealmOverride={onSetPartyRealmOverride}
+          onClearRealmOverride={onClearPartyRealmOverride}
           {onRenameParty}
           onAddMember={onAddPartyMember}
           onRemoveMember={onRemovePartyMember}
@@ -878,22 +878,22 @@
           onSetTravelActor={onSetPartyTravelActor}
           onClearTravelActor={onClearPartyTravelActor}
         />
-      {:else if activeTravelTab === 'regions'}
-        <GatheringRegionsTab
-          regions={travelSystemRegions}
-          selectedRegionId={travelSelectedRegionId}
-          environments={regionEnvironmentOptions}
+      {:else if activeTravelTab === 'realms'}
+        <GatheringRealmsTab
+          realms={travelSystemRealms}
+          selectedRealmId={travelSelectedRealmId}
+          environments={realmEnvironmentOptions}
           saving={travelSaving}
-          {onSelectRegion}
-          onAddEnvironment={onAddEnvironmentToRegion}
-          onRemoveEnvironment={onRemoveEnvironmentFromRegion}
+          {onSelectRealm}
+          onAddEnvironment={onAddEnvironmentToRealm}
+          onRemoveEnvironment={onRemoveEnvironmentFromRealm}
         />
       {:else if activeTravelTab === 'map'}
         <GatheringMapLinksTab
           sceneRegions={travelCurrentSceneRegions}
           sceneUuid={travelCurrentSceneUuid}
           selectedRegionUuid={mapSelectedRegionUuid}
-          regions={travelSystemRegions}
+          regions={travelSystemRealms}
           saving={travelSaving}
           onSelect={onSelectMapRegion}
           onSetLink={onSetMapRegionLink}
@@ -909,31 +909,31 @@
     >
       <GatheringEconomyView {services} systemId={selectedSystemId} />
 
-      <section class="manager-condition-panel manager-region-toggle-panel" data-gathering-region-toggle-panel aria-label={text('FABRICATE.Admin.Manager.Environment.RegionToggle.Title', 'Travel & Regions')}>
+      <section class="manager-condition-panel manager-realm-toggle-panel" data-gathering-realm-toggle-panel aria-label={text('FABRICATE.Admin.Manager.Environment.RealmToggle.Title', 'Travel & Realms')}>
         <header class="manager-condition-panel-header">
           <span class="manager-condition-panel-title">
             <i class="fas fa-route" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Environment.RegionToggle.Title', 'Travel & Regions')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Environment.RealmToggle.Title', 'Travel & Realms')}</span>
           </span>
           <button
             type="button"
-            class={`manager-status-toggle ${regionsEnabled ? 'is-on' : 'is-off'}`}
-            data-gathering-region-toggle
-            aria-pressed={regionsEnabled}
-            aria-label={regionsEnabled
-              ? text('FABRICATE.Admin.Manager.Environment.RegionToggle.Disable', 'Disable Travel & Regions')
-              : text('FABRICATE.Admin.Manager.Environment.RegionToggle.Enable', 'Enable Travel & Regions')}
-            onclick={() => onSetGatheringRegionsEnabled?.(selectedSystemId, !regionsEnabled)}
+            class={`manager-status-toggle ${realmsEnabled ? 'is-on' : 'is-off'}`}
+            data-gathering-realm-toggle
+            aria-pressed={realmsEnabled}
+            aria-label={realmsEnabled
+              ? text('FABRICATE.Admin.Manager.Environment.RealmToggle.Disable', 'Disable Travel & Realms')
+              : text('FABRICATE.Admin.Manager.Environment.RealmToggle.Enable', 'Enable Travel & Realms')}
+            onclick={() => onSetGatheringRealmsEnabled?.(selectedSystemId, !realmsEnabled)}
           >
             <span class="manager-status-toggle-track" aria-hidden="true">
               <span class="manager-status-toggle-knob"></span>
             </span>
             <span class="manager-status-toggle-label">
-              {regionsEnabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+              {realmsEnabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
             </span>
           </button>
         </header>
-        <p class="manager-condition-panel-hint">{text('FABRICATE.Admin.Manager.Environment.RegionToggle.Hint', 'Enabling this reveals the Travel tab, where you build regions and place parties, and lets environments be assigned to regions. Leave it off if your game does not use travel or location-gated gathering.')}</p>
+        <p class="manager-condition-panel-hint">{text('FABRICATE.Admin.Manager.Environment.RealmToggle.Hint', 'Enabling this reveals the Travel tab, where you build realms and place parties, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering.')}</p>
       </section>
 
       {#each [

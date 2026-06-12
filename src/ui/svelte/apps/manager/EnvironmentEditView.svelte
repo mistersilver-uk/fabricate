@@ -31,8 +31,8 @@
     environmentDraft = null,
     composition = { compositionMode: 'automatic', conditions: {}, tasks: [], events: [], counts: {} },
     eventSelectionMode = 'allDrops',
-    regionRecords = [],
-    regionsEnabled = false,
+    realmRecords = [],
+    realmsEnabled = false,
     biomeOptions = [],
     dangerOptions = [],
     linkedSceneImage = '',
@@ -114,8 +114,8 @@
         <EnvironmentOverviewTab
           environment={environmentDraft}
           {composition}
-          {regionRecords}
-          {regionsEnabled}
+          {realmRecords}
+          {realmsEnabled}
           {biomeOptions}
           {dangerOptions}
           {linkedSceneImage}

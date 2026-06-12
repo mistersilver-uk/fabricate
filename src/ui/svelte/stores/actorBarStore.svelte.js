@@ -29,12 +29,12 @@ export function createActorBarStore({ services } = {}) {
   // shown so non-gathering tabs and the pre-load window keep prior behavior; the
   // gathering tab pushes the selected environment's flags via setConditionVisibility.
   let conditionVisibility = $state({ weather: true, timeOfDay: true });
-  // The party's current-region summary for the header bar, mirroring the active
-  // gathering system's region/travel subsystem. `enabled` gates the chip;
-  // `regions` is the redaction-safe disclosure list (empty → "no region
+  // The party's current-realm summary for the header bar, mirroring the active
+  // gathering system's realm/travel subsystem. `enabled` gates the chip;
+  // `realms` is the redaction-safe disclosure list (empty → "no realm
   // selected"). Defaults to disabled so the chip is hidden until the gathering
-  // tab pushes the selected environment's region summary via setRegionContext.
-  let regionContext = $state({ enabled: false, regions: [] });
+  // tab pushes the selected environment's realm summary via setRealmContext.
+  let realmContext = $state({ enabled: false, realms: [] });
   let loaded = $state(false);
 
   const selectedActor = $derived(
@@ -138,16 +138,16 @@ export function createActorBarStore({ services } = {}) {
   }
 
   /**
-   * Set the header bar's current-region summary, mirroring the selected gathering
-   * environment's region/travel subsystem. `enabled` gates the chip; `regions` is
-   * the redaction-safe disclosure list (empty → "no region selected").
+   * Set the header bar's current-realm summary, mirroring the selected gathering
+   * environment's realm/travel subsystem. `enabled` gates the chip; `realms` is
+   * the redaction-safe disclosure list (empty → "no realm selected").
    *
-   * @param {{ enabled?: boolean, regions?: object[] }|null} next Region summary.
+   * @param {{ enabled?: boolean, realms?: object[] }|null} next Realm summary.
    */
-  function setRegionContext(next) {
-    regionContext = {
+  function setRealmContext(next) {
+    realmContext = {
       enabled: next?.enabled === true,
-      regions: Array.isArray(next?.regions) ? next.regions : []
+      realms: Array.isArray(next?.realms) ? next.realms : []
     };
   }
 
@@ -167,8 +167,8 @@ export function createActorBarStore({ services } = {}) {
     get conditionVisibility() {
       return conditionVisibility;
     },
-    get regionContext() {
-      return regionContext;
+    get realmContext() {
+      return realmContext;
     },
     get loaded() {
       return loaded;
@@ -182,6 +182,6 @@ export function createActorBarStore({ services } = {}) {
     setStaminaPool,
     refreshConditions,
     setConditionVisibility,
-    setRegionContext
+    setRealmContext
   };
 }

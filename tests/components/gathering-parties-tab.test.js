@@ -24,8 +24,8 @@ function makeParty(overrides = {}) {
     enabled: false,
     travelActor: null,
     overrideMode: 'none',
-    overrideRegionIds: [],
-    currentRegionEvidence: { source: 'unresolved', resolved: false, regions: [], staleRegionIds: [] },
+    overrideRealmIds: [],
+    currentRealmEvidence: { source: 'unresolved', resolved: false, realms: [], staleRealmIds: [] },
     ...overrides
   };
 }
@@ -39,7 +39,7 @@ async function mountTab(props) {
   document.body.appendChild(target);
   mounted = mount(GatheringPartiesTab, {
     target,
-    props: { parties: [], systemId: 'sys-1', systemRegions: [], onSetRegionOverride: () => {}, onClearRegionOverride: () => {}, ...props }
+    props: { parties: [], systemId: 'sys-1', systemRealms: [], onSetRealmOverride: () => {}, onClearRealmOverride: () => {}, ...props }
   });
   flushSync();
   await tick();
@@ -71,7 +71,7 @@ describe('GatheringPartiesTab mounted behavior', () => {
     writeRawModule('src/ui/svelte/actions/dragDrop.js');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/RegionOverridePicker.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
@@ -127,11 +127,11 @@ describe('GatheringPartiesTab mounted behavior', () => {
     remount();
   });
 
-  it('does not duplicate the current region in the row header (it lives in the inspector)', async () => {
+  it('does not duplicate the current realm in the row header (it lives in the inspector)', async () => {
     await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'A', currentRegionEvidence: { source: 'manualOverride', resolved: true, regions: [{ id: 'r1', name: 'Northreach', enabled: true }], staleRegionIds: [] } })]
+      parties: [makeParty({ id: 'p1', name: 'A', currentRealmEvidence: { source: 'manualOverride', resolved: true, realms: [{ id: 'r1', name: 'Northreach', enabled: true }], staleRealmIds: [] } })]
     });
-    assert.equal(target.querySelector('.manager-travel-parties-current-region'), null);
+    assert.equal(target.querySelector('.manager-travel-parties-current-realm'), null);
     remount();
   });
 
@@ -191,16 +191,16 @@ describe('GatheringPartiesTab mounted behavior', () => {
     remount();
   });
 
-  it('sets and clears the region override from a searchable popover without selecting the row', async () => {
+  it('sets and clears the realm override from a searchable popover without selecting the row', async () => {
     const calls = [];
     const selections = [];
     await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens', overrideMode: 'manual', overrideRegionIds: ['r1'] })],
+      parties: [makeParty({ id: 'p1', name: 'Wardens', overrideMode: 'manual', overrideRealmIds: ['r1'] })],
       selectedPartyId: '',
-      systemRegions: [{ id: 'r1', name: 'Northreach', enabled: true }, { id: 'r2', name: 'Ashen March', enabled: true }],
+      systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }, { id: 'r2', name: 'Ashen March', enabled: true }],
       onSelectParty: (id) => selections.push(id),
-      onSetRegionOverride: (partyId, systemId, ids) => calls.push(['set', partyId, systemId, ids]),
-      onClearRegionOverride: (partyId, systemId) => calls.push(['clear', partyId, systemId])
+      onSetRealmOverride: (partyId, systemId, ids) => calls.push(['set', partyId, systemId, ids]),
+      onClearRealmOverride: (partyId, systemId) => calls.push(['clear', partyId, systemId])
     });
 
     // No native select; the override is a popover trigger.
@@ -216,7 +216,7 @@ describe('GatheringPartiesTab mounted behavior', () => {
     assert.ok(target.querySelector('.manager-travel-popover'));
     assert.deepEqual(selections, []);
 
-    // The popover offers a search field plus an Auto option and one option per region.
+    // The popover offers a search field plus an Auto option and one option per realm.
     assert.ok(target.querySelector('.manager-travel-popover-search input'));
     const optionFor = (label) => Array.from(target.querySelectorAll('.manager-travel-option'))
       .find(button => button.textContent.includes(label));
@@ -238,18 +238,18 @@ describe('GatheringPartiesTab mounted behavior', () => {
     remount();
   });
 
-  it('filters the override options by region search', async () => {
+  it('filters the override options by realm search', async () => {
     await mountTab({
       parties: [makeParty({ id: 'p1', name: 'Wardens' })],
-      systemRegions: [{ id: 'r1', name: 'Northreach', enabled: true }, { id: 'r2', name: 'Ashen March', enabled: true }]
+      systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }, { id: 'r2', name: 'Ashen March', enabled: true }]
     });
     target.querySelector('.manager-travel-parties-override-trigger').click();
     flushSync();
     await tick();
     flushSync();
-    const regionSearch = target.querySelector('.manager-travel-popover-search input');
-    regionSearch.value = 'ashen';
-    regionSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const realmSearch = target.querySelector('.manager-travel-popover-search input');
+    realmSearch.value = 'ashen';
+    realmSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     await tick();
     flushSync();

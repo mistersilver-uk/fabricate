@@ -409,13 +409,13 @@ test('normalizes the four location availability id lists; legacy region/biomes p
     name: 'Located',
     region: 'forest',
     biomes: ['Forest', 'forest'],
-    includedRegionIds: ['r1', 'r1', ''],
-    excludedRegionIds: ['r2'],
+    includedRealmIds: ['r1', 'r1', ''],
+    excludedRealmIds: ['r2'],
     includedBiomeIds: ['Temperate', 'temperate'],
     excludedBiomeIds: ['Arid']
   }));
-  assert.deepEqual(created.includedRegionIds, ['r1']);
-  assert.deepEqual(created.excludedRegionIds, ['r2']);
+  assert.deepEqual(created.includedRealmIds, ['r1']);
+  assert.deepEqual(created.excludedRealmIds, ['r2']);
   assert.deepEqual(created.includedBiomeIds, ['temperate']);
   assert.deepEqual(created.excludedBiomeIds, ['arid']);
   // Legacy display metadata untouched.
@@ -423,35 +423,35 @@ test('normalizes the four location availability id lists; legacy region/biomes p
   assert.deepEqual(created.biomes, ['forest']);
 });
 
-test('save-time validation rejects an includedRegionId not present on the owning system', async () => {
+test('save-time validation rejects an includedRealmId not present on the owning system', async () => {
   const { store } = makeMemoryStore({
     systems: [
-      { id: 'system-a', features: { gathering: true }, components: [{ id: 'component-gem', difficulty: 1 }], gatheringRegions: [{ id: 'known' }] },
+      { id: 'system-a', features: { gathering: true }, components: [{ id: 'component-gem', difficulty: 1 }], gatheringRealms: [{ id: 'known' }] },
       { id: 'system-disabled', features: { gathering: false } }
     ],
     ids: ['env-bad', 'task-bad']
   });
   store.load();
   await assert.rejects(
-    () => store.create(environment({ id: undefined, name: 'Bad', includedRegionIds: ['unknown'] })),
-    /unknown region/
+    () => store.create(environment({ id: undefined, name: 'Bad', includedRealmIds: ['unknown'] })),
+    /unknown realm/
   );
-  // A known region id passes.
-  const ok = await store.create(environment({ id: undefined, name: 'Good', includedRegionIds: ['known'] }));
-  assert.deepEqual(ok.includedRegionIds, ['known']);
+  // A known realm id passes.
+  const ok = await store.create(environment({ id: undefined, name: 'Good', includedRealmIds: ['known'] }));
+  assert.deepEqual(ok.includedRealmIds, ['known']);
 });
 
-test('load never throws on a stale includedRegionId (validation is save-time only)', () => {
+test('load never throws on a stale includedRealmId (validation is save-time only)', () => {
   const { store } = makeMemoryStore({
-    saved: [environment({ id: 'env-stale', includedRegionIds: ['gone'] })],
+    saved: [environment({ id: 'env-stale', includedRealmIds: ['gone'] })],
     systems: [
-      { id: 'system-a', features: { gathering: true }, components: [], gatheringRegions: [{ id: 'known' }] },
+      { id: 'system-a', features: { gathering: true }, components: [], gatheringRealms: [{ id: 'known' }] },
       { id: 'system-disabled', features: { gathering: false } }
     ]
   });
   // load() normalizes without validating; no throw, stale id preserved.
   const loaded = store.load();
-  assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRegionIds, ['gone']);
+  assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRealmIds, ['gone']);
 });
 
 // ---------------------------------------------------------------------------
@@ -486,4 +486,26 @@ test('_normalizeEnvironment defaults an unknown event policy to successWithEvent
   const { store } = makeMemoryStore();
   const normalized = store._normalizeEnvironment({ craftingSystemId: 'system-a', hazardPolicy: 'nonsense' });
   assert.equal(normalized.eventPolicy, 'successWithEvent');
+});
+
+test('_normalizeEnvironment accepts legacy region-schema id lists on read (pre-1.1.0 import)', () => {
+  const { store } = makeMemoryStore();
+  const normalized = store._normalizeEnvironment({
+    id: 'env-legacy-realm',
+    craftingSystemId: 'system-a',
+    includedRegionIds: ['r1', 'r2'],
+    excludedRegionIds: ['r3']
+  });
+  assert.deepEqual(normalized.includedRealmIds, ['r1', 'r2'], 'legacy includedRegionIds read as includedRealmIds');
+  assert.deepEqual(normalized.excludedRealmIds, ['r3'], 'legacy excludedRegionIds read as excludedRealmIds');
+});
+
+test('_normalizeEnvironment prefers the new realm id lists when both are present', () => {
+  const { store } = makeMemoryStore();
+  const normalized = store._normalizeEnvironment({
+    craftingSystemId: 'system-a',
+    includedRealmIds: ['new'],
+    includedRegionIds: ['legacy']
+  });
+  assert.deepEqual(normalized.includedRealmIds, ['new'], 'new key wins over legacy when both present');
 });

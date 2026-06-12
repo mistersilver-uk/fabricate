@@ -19,7 +19,7 @@ test('scene gate allows environments without a linked scene', () => {
 });
 
 test('the scene gate applies to GMs too — wrong scene is blocked', () => {
-  // The restriction is additive with the region/stamina/node gates, which also
+  // The restriction is additive with the realm/stamina/node gates, which also
   // gate GMs; GMs are NOT exempt from the scene-token presence requirement.
   const access = createGatheringSceneAccess({
     getCurrentScene: () => ({ uuid: 'Scene.other' })

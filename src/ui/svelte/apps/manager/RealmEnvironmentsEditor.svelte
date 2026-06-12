@@ -1,17 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Expanded-body editor for a region row on the Travel > Regions tab. Two
-  columns: available environments (not in the region) on the left with an Add
-  button, and included environments (in the region) on the right with a Remove
-  button. Add/Remove toggle the region "tag" on the environment's
-  includedRegionIds; each list is searchable and paginated independently.
+  Expanded-body editor for a realm row on the Travel > Realms tab. Two
+  columns: available environments (not in the realm) on the left with an Add
+  button, and included environments (in the realm) on the right with a Remove
+  button. Add/Remove toggle the realm "tag" on the environment's
+  includedRealmIds; each list is searchable and paginated independently.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
 
   let {
-    region = null,
+    realm = null,
     environments = [],
     saving = false,
     onAdd = () => {},
@@ -31,14 +31,14 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const regionId = $derived(region?.id || '');
+  const realmId = $derived(realm?.id || '');
 
-  function inRegion(environment) {
-    return Array.isArray(environment?.includedRegionIds) && environment.includedRegionIds.includes(regionId);
+  function inRealm(environment) {
+    return Array.isArray(environment?.includedRealmIds) && environment.includedRealmIds.includes(realmId);
   }
 
-  const includedEnvironments = $derived(environments.filter(inRegion));
-  const availableEnvironments = $derived(environments.filter(environment => !inRegion(environment)));
+  const includedEnvironments = $derived(environments.filter(inRealm));
+  const availableEnvironments = $derived(environments.filter(environment => !inRealm(environment)));
 
   function filterByName(list, term) {
     const normalized = term.trim().toLowerCase();
@@ -62,43 +62,43 @@
   const pagedIncluded = $derived(filteredIncluded.slice(includedPage * PAGE_SIZE, (includedPage + 1) * PAGE_SIZE));
 </script>
 
-{#if region}
-  <div class="manager-region-env-editor" data-manager-region-env-editor={regionId}>
-    <section class="manager-region-env-column" data-region-env-column="available">
-      <h4 class="manager-card-subtitle"><i class="fas fa-circle-plus" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.AvailableEnvironments', 'Available environments')}</h4>
+{#if realm}
+  <div class="manager-realm-env-editor" data-manager-realm-env-editor={realmId}>
+    <section class="manager-realm-env-column" data-realm-env-column="available">
+      <h4 class="manager-card-subtitle"><i class="fas fa-circle-plus" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Realms.AvailableEnvironments', 'Available environments')}</h4>
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
         <input
           type="search"
           bind:value={availableSearch}
-          placeholder={text('FABRICATE.Admin.Manager.Travel.Regions.EnvSearchPlaceholder', 'Search environments...')}
-          aria-label={text('FABRICATE.Admin.Manager.Travel.Regions.EnvSearchLabel', 'Search environments')}
+          placeholder={text('FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder', 'Search environments...')}
+          aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel', 'Search environments')}
         />
       </label>
       {#if filteredAvailable.length === 0}
         <p class="manager-muted">
           {availableEnvironments.length === 0
-            ? text('FABRICATE.Admin.Manager.Travel.Regions.NoAvailableEnvironments', 'All environments are in this region.')
-            : text('FABRICATE.Admin.Manager.Travel.Regions.NoEnvironmentMatches', 'No environments match your search.')}
+            ? text('FABRICATE.Admin.Manager.Travel.Realms.NoAvailableEnvironments', 'All environments are in this realm.')
+            : text('FABRICATE.Admin.Manager.Travel.Realms.NoEnvironmentMatches', 'No environments match your search.')}
         </p>
       {:else}
-        <ul class="manager-region-env-list" role="list">
+        <ul class="manager-realm-env-list" role="list">
           {#each pagedAvailable as environment (environment.id)}
-            <li class="manager-region-env-row" data-environment-id={environment.id}>
+            <li class="manager-realm-env-row" data-environment-id={environment.id}>
               <span class="manager-travel-region-thumb" aria-hidden="true">
                 {#if environment.img}<img src={environment.img} alt="" />{:else}<i class={FALLBACK_ICON}></i>{/if}
               </span>
-              <span class="manager-region-env-name">{environment.name}</span>
+              <span class="manager-realm-env-name">{environment.name}</span>
               {#if environment.enabled === false}
                 <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
               {/if}
               <button
                 type="button"
-                class="manager-icon-button manager-region-env-add"
-                aria-label={text('FABRICATE.Admin.Manager.Travel.Regions.AddEnvironment', 'Add environment to region')}
-                title={text('FABRICATE.Admin.Manager.Travel.Regions.AddEnvironment', 'Add environment to region')}
+                class="manager-icon-button manager-realm-env-add"
+                aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment', 'Add environment to realm')}
+                title={text('FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment', 'Add environment to realm')}
                 disabled={saving}
-                onclick={() => onAdd(environment.id, regionId)}
+                onclick={() => onAdd(environment.id, realmId)}
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
               </button>
@@ -115,41 +115,41 @@
       {/if}
     </section>
 
-    <section class="manager-region-env-column" data-region-env-column="included">
-      <h4 class="manager-card-subtitle"><i class="fas fa-circle-check" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.IncludedEnvironments', 'Included environments')}</h4>
+    <section class="manager-realm-env-column" data-realm-env-column="included">
+      <h4 class="manager-card-subtitle"><i class="fas fa-circle-check" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Realms.IncludedEnvironments', 'Included environments')}</h4>
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
         <input
           type="search"
           bind:value={includedSearch}
-          placeholder={text('FABRICATE.Admin.Manager.Travel.Regions.EnvSearchPlaceholder', 'Search environments...')}
-          aria-label={text('FABRICATE.Admin.Manager.Travel.Regions.EnvSearchLabel', 'Search environments')}
+          placeholder={text('FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder', 'Search environments...')}
+          aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel', 'Search environments')}
         />
       </label>
       {#if filteredIncluded.length === 0}
         <p class="manager-muted">
           {includedEnvironments.length === 0
-            ? text('FABRICATE.Admin.Manager.Travel.Regions.NoIncludedEnvironments', 'No environments are in this region yet.')
-            : text('FABRICATE.Admin.Manager.Travel.Regions.NoEnvironmentMatches', 'No environments match your search.')}
+            ? text('FABRICATE.Admin.Manager.Travel.Realms.NoIncludedEnvironments', 'No environments are in this realm yet.')
+            : text('FABRICATE.Admin.Manager.Travel.Realms.NoEnvironmentMatches', 'No environments match your search.')}
         </p>
       {:else}
-        <ul class="manager-region-env-list" role="list">
+        <ul class="manager-realm-env-list" role="list">
           {#each pagedIncluded as environment (environment.id)}
-            <li class="manager-region-env-row" data-environment-id={environment.id}>
+            <li class="manager-realm-env-row" data-environment-id={environment.id}>
               <span class="manager-travel-region-thumb" aria-hidden="true">
                 {#if environment.img}<img src={environment.img} alt="" />{:else}<i class={FALLBACK_ICON}></i>{/if}
               </span>
-              <span class="manager-region-env-name">{environment.name}</span>
+              <span class="manager-realm-env-name">{environment.name}</span>
               {#if environment.enabled === false}
                 <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
               {/if}
               <button
                 type="button"
-                class="manager-icon-button is-danger manager-region-env-remove"
-                aria-label={text('FABRICATE.Admin.Manager.Travel.Regions.RemoveEnvironment', 'Remove environment from region')}
-                title={text('FABRICATE.Admin.Manager.Travel.Regions.RemoveEnvironment', 'Remove environment from region')}
+                class="manager-icon-button is-danger manager-realm-env-remove"
+                aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment', 'Remove environment from realm')}
+                title={text('FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment', 'Remove environment from realm')}
                 disabled={saving}
-                onclick={() => onRemove(environment.id, regionId)}
+                onclick={() => onRemove(environment.id, realmId)}
               >
                 <i class="fas fa-xmark" aria-hidden="true"></i>
               </button>

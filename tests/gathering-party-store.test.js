@@ -24,7 +24,7 @@ test('normalizes defaults: disabled, empty members, null travel actor, empty ove
   assert.equal(party.enabled, false);
   assert.deepEqual(party.memberActorUuids, []);
   assert.equal(party.travelActorUuid, null);
-  assert.deepEqual(party.currentRegionOverrides, {});
+  assert.deepEqual(party.currentRealmOverrides, {});
 });
 
 test('enabling a party without a travel actor is rejected at save', async () => {
@@ -100,23 +100,38 @@ test('stale member and travel actor uuids remain readable', () => {
   assert.equal(party.travelActorUuid, 'Actor.poof');
 });
 
-test('setCurrentRegionOverride stamps updatedAt/updatedByUserId; clear empties regionIds but still stamps', async () => {
+test('setCurrentRealmOverride stamps updatedAt/updatedByUserId; clear empties realmIds but still stamps', async () => {
   let clock = 100;
   const { store } = makeStore({ now: () => (clock += 100), userId: 'gm-7' });
   const party = await store.create({ name: 'Heroes' });
-  const withOverride = await store.setCurrentRegionOverride(party.id, 'system-a', ['r1', 'r2']);
-  const override = withOverride.currentRegionOverrides['system-a'];
+  const withOverride = await store.setCurrentRealmOverride(party.id, 'system-a', ['r1', 'r2']);
+  const override = withOverride.currentRealmOverrides['system-a'];
   assert.equal(override.mode, 'manual');
-  assert.deepEqual(override.regionIds, ['r1', 'r2']);
+  assert.deepEqual(override.realmIds, ['r1', 'r2']);
   assert.equal(override.updatedByUserId, 'gm-7');
   assert.ok(override.updatedAt > 0);
 
-  const cleared = await store.clearCurrentRegionOverride(party.id, 'system-a');
-  const clearedOverride = cleared.currentRegionOverrides['system-a'];
+  const cleared = await store.clearCurrentRealmOverride(party.id, 'system-a');
+  const clearedOverride = cleared.currentRealmOverrides['system-a'];
   assert.equal(clearedOverride.mode, 'none');
-  assert.deepEqual(clearedOverride.regionIds, []);
+  assert.deepEqual(clearedOverride.realmIds, []);
   assert.equal(clearedOverride.updatedByUserId, 'gm-7');
   assert.ok(clearedOverride.updatedAt > override.updatedAt);
+});
+
+test('accepts legacy currentRegionOverrides/regionIds on read (pre-1.1.0 import)', () => {
+  const { store } = makeStore({
+    saved: [{
+      id: 'p-legacy',
+      name: 'Legacy',
+      currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1', 'r2'] } }
+    }]
+  });
+  const party = store.get('p-legacy');
+  const override = party.currentRealmOverrides['system-a'];
+  assert.ok(override, 'legacy currentRegionOverrides read as currentRealmOverrides');
+  assert.equal(override.mode, 'manual');
+  assert.deepEqual(override.realmIds, ['r1', 'r2'], 'legacy regionIds read as realmIds');
 });
 
 test('moveMember is a single persisted write that moves the uuid between parties', async () => {

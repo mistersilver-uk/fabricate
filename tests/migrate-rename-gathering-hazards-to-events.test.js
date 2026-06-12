@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { migrateRenameGatheringHazardsToEvents } from '../src/migration/migrateRenameGatheringHazardsToEvents.js';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
-import { normalizeGatheringRegionModifier } from '../src/systems/gatheringRegions.js';
+import { normalizeGatheringRealmModifier } from '../src/systems/gatheringRealms.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -191,10 +191,10 @@ test('does not mutate its inputs (deep-clones)', () => {
 // Through the runner
 // ---------------------------------------------------------------------------
 
-test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at 1.0.0', async () => {
+test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at 1.1.0', async () => {
   const data = legacyData();
   // Minimal in-memory settings backing the runner; migrationVersion 0.9.0 leaves
-  // only the 1.0.0 migration pending.
+  // the 1.0.0 and 1.1.0 migrations pending.
   const store = new Map([
     ['migrationVersion', '0.9.0'],
     ['craftingSystems', clone(data.systems)],
@@ -208,19 +208,21 @@ test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at 1
 
   await runner.run();
 
-  assert.equal(store.get('migrationVersion'), '1.0.0', 'advances to the new highest version');
+  assert.equal(store.get('migrationVersion'), '1.1.0', 'advances to the new highest version');
   const sys = store.get('gatheringConfig').systems['sys-a'];
   assert.ok(Array.isArray(sys.events), 'persisted gatheringConfig was rewritten to events');
   assert.equal(sys.rules.eventPolicy, 'failureWithEvent');
   assert.deepEqual(store.get('gatheringEnvironments')[0].enabledEventIds, ['h1']);
-  assert.equal(store.get('craftingSystems')[0].gatheringRegions[0].modifiers[0].kind, 'eventChance');
+  // After the 1.1.0 rename migration runs (in semver order, after 1.0.0), the
+  // per-system realm library is persisted under `gatheringRealms`.
+  assert.equal(store.get('craftingSystems')[0].gatheringRealms[0].modifiers[0].kind, 'eventChance');
 });
 
 // ---------------------------------------------------------------------------
 // Legacy-acceptance fallback on read (imports bypass the startup migration)
 // ---------------------------------------------------------------------------
 
-test('region-modifier normalizer accepts the legacy hazardChance kind on read', () => {
-  const modifier = normalizeGatheringRegionModifier({ kind: 'hazardChance', value: 5 });
+test('realm-modifier normalizer accepts the legacy hazardChance kind on read', () => {
+  const modifier = normalizeGatheringRealmModifier({ kind: 'hazardChance', value: 5 });
   assert.equal(modifier.kind, 'eventChance', 'coerced legacy kind, not dropped to custom');
 });
