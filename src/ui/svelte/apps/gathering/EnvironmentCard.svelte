@@ -76,20 +76,20 @@
     localize('FABRICATE.App.Gathering.Environments.LockedAria', { name })
   );
 
-  // Region lock: the environment itself is out of the party's current region. The
+  // Realm lock: the environment itself is out of the party's current realm. The
   // engine surfaces this as a locked teaser carrying location.available === false
-  // plus a NO_CURRENT_REGION / LOCATION_BLOCKED blocked reason. Render a header
+  // plus a NO_CURRENT_REALM / LOCATION_BLOCKED blocked reason. Render a header
   // alert (next to the danger pip) and use the full reason text as its tooltip.
-  const notInRegion = $derived(
+  const notInRealm = $derived(
     locked
       && environment?.location?.gated === true
       && environment?.location?.available === false
   );
-  const regionAlertTitle = $derived(
+  const realmAlertTitle = $derived(
     (Array.isArray(environment?.blockedReasons) ? environment.blockedReasons : [])
-      .find(reason => reason?.code === 'NO_CURRENT_REGION' || reason?.code === 'LOCATION_BLOCKED')
+      .find(reason => reason?.code === 'NO_CURRENT_REALM' || reason?.code === 'LOCATION_BLOCKED')
       ?.message
-    || localize('FABRICATE.App.Gathering.Environments.RegionLockedChip')
+    || localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')
   );
 
   // Danger pill: always shown, icon-only, coloured by the environment's risk
@@ -125,10 +125,10 @@
         <span class="gathering-env-card-blind-label">{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span>
       </span>
     {/if}
-    {#if notInRegion}
-      <span class="gathering-env-card-region-alert" title={regionAlertTitle}>
+    {#if notInRealm}
+      <span class="gathering-env-card-realm-alert" title={realmAlertTitle}>
         <i class="fas fa-location-dot" aria-hidden="true"></i>
-        <span class="gathering-env-card-region-label">{localize('FABRICATE.App.Gathering.Environments.RegionLockedChip')}</span>
+        <span class="gathering-env-card-realm-label">{localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')}</span>
       </span>
     {/if}
     <span class={`gathering-env-card-event ${riskClass}`} aria-label={dangerAria}>
@@ -454,11 +454,11 @@
   }
 
   /*
-    Region-lock alert: shown only when the environment is locked because the party
-    isn't in its region. Mirrors the warning-tone task callout pill so it reads as
-    the same "not in current region" indicator, just promoted to the env header.
+    Realm-lock alert: shown only when the environment is locked because the party
+    isn't in its realm. Mirrors the warning-tone task callout pill so it reads as
+    the same "not in current realm" indicator, just promoted to the env header.
   */
-  .gathering-env-card-region-alert {
+  .gathering-env-card-realm-alert {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -472,7 +472,7 @@
     border: 1px solid var(--fab-warning-border);
   }
 
-  .gathering-env-card-region-alert i {
+  .gathering-env-card-realm-alert i {
     font-size: 11px;
   }
 

@@ -2,46 +2,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  normalizeGatheringRegion,
-  normalizeGatheringRegionList,
-  normalizeGatheringRegionModifier,
-  normalizeGatheringRegionSceneMapping,
-  normalizeGatheringRegionSettings,
-  validateGatheringRegion,
-  validateGatheringRegionList,
-  validateGatheringRegionSettings
-} from '../src/systems/gatheringRegions.js';
+  normalizeGatheringRealm,
+  normalizeGatheringRealmList,
+  normalizeGatheringRealmModifier,
+  normalizeGatheringRealmSceneMapping,
+  normalizeGatheringRealmSettings,
+  validateGatheringRealm,
+  validateGatheringRealmList,
+  validateGatheringRealmSettings
+} from '../src/systems/gatheringRealms.js';
 
 let counter = 0;
 const randomID = () => `id-${++counter}`;
 
-test('normalizeGatheringRegion applies defaults and forces craftingSystemId to owner', () => {
-  const region = normalizeGatheringRegion(
+test('normalizeGatheringRealm applies defaults and forces craftingSystemId to owner', () => {
+  const realm = normalizeGatheringRealm(
     { name: 'Verdant Expanse', craftingSystemId: 'foreign-system' },
     { craftingSystemId: 'system-a', randomID }
   );
-  assert.equal(region.craftingSystemId, 'system-a');
-  assert.equal(region.enabled, true);
-  assert.equal(region.secret, false);
-  assert.deepEqual(region.biomes, []);
-  assert.deepEqual(region.sceneMappings, []);
-  assert.deepEqual(region.modifiers, []);
-  assert.ok(region.id);
+  assert.equal(realm.craftingSystemId, 'system-a');
+  assert.equal(realm.enabled, true);
+  assert.equal(realm.secret, false);
+  assert.deepEqual(realm.biomes, []);
+  assert.deepEqual(realm.sceneMappings, []);
+  assert.deepEqual(realm.modifiers, []);
+  assert.ok(realm.id);
 });
 
-test('normalizeGatheringRegion honors explicit enabled/secret/biomes', () => {
-  const region = normalizeGatheringRegion(
+test('normalizeGatheringRealm honors explicit enabled/secret/biomes', () => {
+  const realm = normalizeGatheringRealm(
     { id: 'r1', name: 'Ashen March', enabled: false, secret: true, biomes: ['Volcanic', 'volcanic', 'Ash'] },
     { craftingSystemId: 'system-a', randomID }
   );
-  assert.equal(region.id, 'r1');
-  assert.equal(region.enabled, false);
-  assert.equal(region.secret, true);
-  assert.deepEqual(region.biomes, ['volcanic', 'ash']);
+  assert.equal(realm.id, 'r1');
+  assert.equal(realm.enabled, false);
+  assert.equal(realm.secret, true);
+  assert.deepEqual(realm.biomes, ['volcanic', 'ash']);
 });
 
-test('normalizeGatheringRegionModifier coerces unknown enums and non-finite value on read', () => {
-  const modifier = normalizeGatheringRegionModifier(
+test('normalizeGatheringRealmModifier coerces unknown enums and non-finite value on read', () => {
+  const modifier = normalizeGatheringRealmModifier(
     { id: 'm1', kind: 'bogus', operation: 'divide', visibility: 'whoKnows', value: 'NaN' },
     { randomID }
   );
@@ -52,8 +52,8 @@ test('normalizeGatheringRegionModifier coerces unknown enums and non-finite valu
   assert.equal(modifier.enabled, true);
 });
 
-test('normalizeGatheringRegionModifier keeps known enums, finite values, and default enabled', () => {
-  const modifier = normalizeGatheringRegionModifier(
+test('normalizeGatheringRealmModifier keeps known enums, finite values, and default enabled', () => {
+  const modifier = normalizeGatheringRealmModifier(
     { id: 'm1', kind: 'yield', operation: 'multiply', visibility: 'gmOnly', value: 1.5, note: ' extra ' },
     { randomID }
   );
@@ -64,17 +64,17 @@ test('normalizeGatheringRegionModifier keeps known enums, finite values, and def
   assert.equal(modifier.note, 'extra');
 });
 
-test('normalizeGatheringRegionSceneMapping preserves stale uuids verbatim', () => {
-  const mapping = normalizeGatheringRegionSceneMapping(
-    { id: 'sm1', sceneUuid: 'Scene.gone', sceneRegionUuid: 'Scene.gone.Region.poof' },
+test('normalizeGatheringRealmSceneMapping preserves stale uuids verbatim', () => {
+  const mapping = normalizeGatheringRealmSceneMapping(
+    { id: 'sm1', sceneUuid: 'Scene.gone', sceneRegionUuid: 'Scene.gone.Realm.poof' },
     { randomID }
   );
   assert.equal(mapping.sceneUuid, 'Scene.gone');
-  assert.equal(mapping.sceneRegionUuid, 'Scene.gone.Region.poof');
+  assert.equal(mapping.sceneRegionUuid, 'Scene.gone.Realm.poof');
 });
 
-test('validateGatheringRegion rejects unknown modifier enums and non-finite values', () => {
-  const errors = validateGatheringRegion({
+test('validateGatheringRealm rejects unknown modifier enums and non-finite values', () => {
+  const errors = validateGatheringRealm({
     name: 'Bad',
     modifiers: [
       { id: 'm1', kind: 'bogus', operation: 'add', visibility: 'visible', value: 1 },
@@ -90,8 +90,8 @@ test('validateGatheringRegion rejects unknown modifier enums and non-finite valu
   assert.ok(errors.some(e => e.includes('value')));
 });
 
-test('validateGatheringRegion rejects duplicate modifier ids and duplicate scene mapping ids', () => {
-  const errors = validateGatheringRegion({
+test('validateGatheringRealm rejects duplicate modifier ids and duplicate scene mapping ids', () => {
+  const errors = validateGatheringRealm({
     name: 'Dupes',
     modifiers: [
       { id: 'm1', kind: 'yield', operation: 'add', visibility: 'visible', value: 1 },
@@ -106,53 +106,53 @@ test('validateGatheringRegion rejects duplicate modifier ids and duplicate scene
   assert.ok(errors.some(e => e.includes('duplicate scene mapping id')));
 });
 
-test('validateGatheringRegionList rejects duplicate region ids', () => {
-  const errors = validateGatheringRegionList([
+test('validateGatheringRealmList rejects duplicate realm ids', () => {
+  const errors = validateGatheringRealmList([
     { id: 'r1', name: 'A' },
     { id: 'r1', name: 'B' }
   ]);
-  assert.ok(errors.some(e => e.includes('Duplicate region id "r1"')));
+  assert.ok(errors.some(e => e.includes('Duplicate realm id "r1"')));
 });
 
-test('normalizeGatheringRegionSettings coerces unknown values to defaults on read (BOTH directions)', () => {
-  assert.deepEqual(normalizeGatheringRegionSettings({}), { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' });
+test('normalizeGatheringRealmSettings coerces unknown values to defaults on read (BOTH directions)', () => {
+  assert.deepEqual(normalizeGatheringRealmSettings({}), { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' });
   assert.deepEqual(
-    normalizeGatheringRegionSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' }),
+    normalizeGatheringRealmSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' }),
     { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }
   );
   assert.deepEqual(
-    normalizeGatheringRegionSettings({ enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),
+    normalizeGatheringRealmSettings({ enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),
     { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }
   );
 });
 
-test('normalizeGatheringRegionSettings: enabled defaults false and only explicit true enables', () => {
-  assert.equal(normalizeGatheringRegionSettings({}).enabled, false, 'missing → false');
-  assert.equal(normalizeGatheringRegionSettings({ enabled: true }).enabled, true, 'true → true');
-  assert.equal(normalizeGatheringRegionSettings({ enabled: false }).enabled, false, 'false → false');
+test('normalizeGatheringRealmSettings: enabled defaults false and only explicit true enables', () => {
+  assert.equal(normalizeGatheringRealmSettings({}).enabled, false, 'missing → false');
+  assert.equal(normalizeGatheringRealmSettings({ enabled: true }).enabled, true, 'true → true');
+  assert.equal(normalizeGatheringRealmSettings({ enabled: false }).enabled, false, 'false → false');
   // Non-boolean truthy/falsey coerce to false (only an explicit boolean true enables).
-  assert.equal(normalizeGatheringRegionSettings({ enabled: 'true' }).enabled, false, 'string "true" → false');
-  assert.equal(normalizeGatheringRegionSettings({ enabled: 1 }).enabled, false, 'number 1 → false');
+  assert.equal(normalizeGatheringRealmSettings({ enabled: 'true' }).enabled, false, 'string "true" → false');
+  assert.equal(normalizeGatheringRealmSettings({ enabled: 1 }).enabled, false, 'number 1 → false');
 });
 
-test('validateGatheringRegionSettings rejects unknown values at save boundary', () => {
-  assert.deepEqual(validateGatheringRegionSettings({ enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), []);
-  const errors = validateGatheringRegionSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
+test('validateGatheringRealmSettings rejects unknown values at save boundary', () => {
+  assert.deepEqual(validateGatheringRealmSettings({ enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), []);
+  const errors = validateGatheringRealmSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
   assert.equal(errors.length, 2);
   assert.ok(errors.some(e => e.includes('revealMode')));
   assert.ok(errors.some(e => e.includes('modifierVisibility')));
 });
 
-test('validateGatheringRegionSettings rejects a non-boolean enabled but accepts booleans', () => {
-  assert.deepEqual(validateGatheringRegionSettings({ enabled: true }), []);
-  assert.deepEqual(validateGatheringRegionSettings({ enabled: false }), []);
-  const errors = validateGatheringRegionSettings({ enabled: 'yes' });
+test('validateGatheringRealmSettings rejects a non-boolean enabled but accepts booleans', () => {
+  assert.deepEqual(validateGatheringRealmSettings({ enabled: true }), []);
+  assert.deepEqual(validateGatheringRealmSettings({ enabled: false }), []);
+  const errors = validateGatheringRealmSettings({ enabled: 'yes' });
   assert.equal(errors.length, 1);
   assert.ok(errors[0].includes('enabled'));
 });
 
-test('normalizeGatheringRegionList preserves stale scene mappings as readable', () => {
-  const list = normalizeGatheringRegionList(
+test('normalizeGatheringRealmList preserves stale scene mappings as readable', () => {
+  const list = normalizeGatheringRealmList(
     [{ id: 'r1', name: 'A', sceneMappings: [{ id: 'sm1', sceneUuid: 'Scene.stale', sceneRegionUuid: 'gone' }] }],
     { craftingSystemId: 'system-a', randomID }
   );

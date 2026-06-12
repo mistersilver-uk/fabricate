@@ -69,16 +69,18 @@ export function validateImportData(data) {
     if (!data.system.name || typeof data.system.name !== 'string') {
       errors.push('System is missing a "name" field');
     }
-    // Gathering regions ride along with the system. If present they must be an
-    // array; each region should carry a name (warning, not a hard error, so a
-    // hand-trimmed export still imports).
-    if (data.system.gatheringRegions !== undefined) {
-      if (!Array.isArray(data.system.gatheringRegions)) {
-        errors.push('System "gatheringRegions" field must be an array');
+    // Gathering realms ride along with the system. If present they must be an
+    // array; each realm should carry a name (warning, not a hard error, so a
+    // hand-trimmed export still imports). Accept the legacy `gatheringRegions`
+    // key on read (pre-1.1.0-migration exports) so an old export still validates.
+    const gatheringRealms = data.system.gatheringRealms ?? data.system.gatheringRegions;
+    if (gatheringRealms !== undefined) {
+      if (!Array.isArray(gatheringRealms)) {
+        errors.push('System "gatheringRealms" field must be an array');
       } else {
-        data.system.gatheringRegions.forEach((region, i) => {
-          if (region && typeof region === 'object' && !region.name) {
-            warnings.push(`Gathering region at index ${i} (id: ${region.id || 'unknown'}) has no name`);
+        gatheringRealms.forEach((realm, i) => {
+          if (realm && typeof realm === 'object' && !realm.name) {
+            warnings.push(`Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`);
           }
         });
       }

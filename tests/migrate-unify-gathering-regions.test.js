@@ -220,7 +220,7 @@ function makeSettings(initial = {}) {
 test('runner: surfaces the GM-notice system names and never persists the transient field', async () => {
   const data = baseData();
   const settings = makeSettings({
-    migrationVersion: '0.8.0', // the 0.9.0 and 1.0.0 migrations are pending
+    migrationVersion: '0.8.0', // the 0.9.0, 1.0.0, and 1.1.0 migrations are pending
     craftingSystems: clone(data.systems),
     gatheringConfig: clone(data.gatheringConfig),
     gatheringEnvironments: clone(data.environments)
@@ -230,7 +230,7 @@ test('runner: surfaces the GM-notice system names and never persists the transie
   const summary = await runner.run();
 
   assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'system names surfaced for the GM notice');
-  assert.equal(settings.store.get('migrationVersion'), '1.0.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.1.0');
 
   // The transient field is never written into any persisted setting payload.
   for (const { value } of settings.calls.set) {
@@ -240,9 +240,9 @@ test('runner: surfaces the GM-notice system names and never persists the transie
 
   // The data transform was actually persisted.
   const savedSystems = settings.store.get('craftingSystems');
-  assert.equal(savedSystems[0].gatheringRegions[0].id, 'north');
+  assert.equal(savedSystems[0].gatheringRealms[0].id, 'north');
   const savedEnvs = settings.store.get('gatheringEnvironments');
-  assert.deepEqual(savedEnvs[0].includedRegionIds, ['north']);
+  assert.deepEqual(savedEnvs[0].includedRealmIds, ['north']);
   const savedConfig = settings.store.get('gatheringConfig');
   assert.deepEqual(savedConfig.systems['sys-a'].vocabularies.regions, { values: [] });
   assert.equal('region' in savedConfig.systems['sys-a'].tasks[0], false);
@@ -264,7 +264,7 @@ test('runner: re-importing pre-unification data upgrades on the next migration r
   // First run upgrades.
   await runner.run();
   const afterFirst = clone(settings.store.get('craftingSystems'));
-  assert.equal(afterFirst[0].gatheringRegions[0].id, 'north');
+  assert.equal(afterFirst[0].gatheringRealms[0].id, 'north');
 
   // Simulate a fresh import of the SAME legacy export over the upgraded world, then
   // a version reset (the import path does not re-run migrations), then next startup.
@@ -276,9 +276,9 @@ test('runner: re-importing pre-unification data upgrades on the next migration r
   const summary = await runner.run();
   assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'the re-imported legacy data is upgraded again');
   const savedSystems = settings.store.get('craftingSystems');
-  assert.equal(savedSystems[0].gatheringRegions[0].id, 'north');
+  assert.equal(savedSystems[0].gatheringRealms[0].id, 'north');
   const savedEnvs = settings.store.get('gatheringEnvironments');
-  assert.deepEqual(savedEnvs[0].includedRegionIds, ['north']);
+  assert.deepEqual(savedEnvs[0].includedRealmIds, ['north']);
 });
 
 test('runner: no GM notice and no gatheringConfig rewrite when there is no legacy region data', async () => {
@@ -296,5 +296,5 @@ test('runner: no GM notice and no gatheringConfig rewrite when there is no legac
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringConfig'), false, 'no rewrite when nothing to unify');
   assert.equal(setKeys.includes('craftingSystems'), false, 'systems untouched when no regions derived');
-  assert.equal(settings.store.get('migrationVersion'), '1.0.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.1.0');
 });

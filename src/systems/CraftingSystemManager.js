@@ -7,7 +7,7 @@ import { cleanupStalePreferences, isGatheringActorSelectableByUser } from '../co
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import { TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST, TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST, TOOL_REQUIREMENT_PROVIDERS as TOOL_REQUIREMENT_PROVIDER_LIST } from '../models/Tool.js';
-import { normalizeGatheringRegionList, normalizeGatheringRegionSettings } from './gatheringRegions.js';
+import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -111,16 +111,19 @@ export class CraftingSystemManager {
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
       tools: Array.isArray(system.tools) ? system.tools.map(t => this._normalizeTool(t)) : [],
-      // Per-system gathering region library (geography) + region behavior
-      // settings. Regions ride along with export/import for free because the
+      // Per-system gathering realm library (geography) + realm behavior
+      // settings. Realms ride along with export/import for free because the
       // exporter clones the normalized system and import funnels back through
-      // _normalizeSystem, which forces each region's craftingSystemId to this
+      // _normalizeSystem, which forces each realm's craftingSystemId to this
       // system id (self-heal on a copy-import that rebinds the system id).
-      gatheringRegions: normalizeGatheringRegionList(system.gatheringRegions, {
+      // Accept the legacy `gatheringRegions`/`gatheringRegionSettings` keys on
+      // read (imported or pre-1.1.0-migration payloads) so an old export still
+      // loads before the startup migration runs.
+      gatheringRealms: normalizeGatheringRealmList(system.gatheringRealms ?? system.gatheringRegions, {
         craftingSystemId: systemId,
         randomID: () => foundry.utils.randomID()
       }),
-      gatheringRegionSettings: normalizeGatheringRegionSettings(system.gatheringRegionSettings)
+      gatheringRealmSettings: normalizeGatheringRealmSettings(system.gatheringRealmSettings ?? system.gatheringRegionSettings)
     };
   }
 

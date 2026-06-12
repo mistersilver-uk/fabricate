@@ -2,13 +2,13 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { classifyGatheringToolStates, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
-  buildRegionDisclosure,
+  buildRealmDisclosure,
   buildTravelGuidance,
   environmentHasLocationRules,
   evaluateLocationAvailability
 } from './gatheringLocation.js';
-import { getDiscoveredRegionIdsForSystem } from './gatheringRegionDiscovery.js';
-import { isGatheringRegionsEnabled } from './gatheringRegions.js';
+import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
+import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -35,7 +35,7 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate',
   CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked',
   LOCATION_BLOCKED: 'FABRICATE.Gathering.Blocked.LocationBlocked',
-  NO_CURRENT_REGION: 'FABRICATE.Gathering.Blocked.NoCurrentRegion'
+  NO_CURRENT_REALM: 'FABRICATE.Gathering.Blocked.NoCurrentRealm'
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -79,9 +79,9 @@ const FAILURE_KEYWORDS = new Set([
  *
  * When a `locationResolver` collaborator (a GatheringLocationService) is
  * injected, listings additionally evaluate each environment's location
- * availability against the party's resolved current regions — emitting a
+ * availability against the party's resolved current realms — emitting a
  * redaction-safe `location` listing field plus `LOCATION_BLOCKED` /
- * `NO_CURRENT_REGION` blocked reasons — and attempt starts re-resolve location
+ * `NO_CURRENT_REALM` blocked reasons — and attempt starts re-resolve location
  * fresh so a stale listing cannot start a location-gated attempt. Without the
  * resolver, or for environments that declare no location rules, listing and
  * start behavior is unchanged.
@@ -130,7 +130,7 @@ export class GatheringEngine {
     this.failureFeedback = failureFeedback;
     this.eventSceneTrigger = eventSceneTrigger;
     this.getRunViewer = getRunViewer;
-    // Constructor-injected current-region resolver (GatheringLocationService),
+    // Constructor-injected current-realm resolver (GatheringLocationService),
     // NOT a module import — keeps the engine system-agnostic and testable.
     this.locationResolver = locationResolver;
     this.random = typeof random === 'function' ? random : Math.random;
@@ -670,8 +670,8 @@ export class GatheringEngine {
 
     const hidden = { targeted: 0, blind: 0 };
     const environmentModels = [];
-    // Resolve each system's current-region context at most once per listing call.
-    const regionContextCache = new Map();
+    // Resolve each system's current-realm context at most once per listing call.
+    const realmContextCache = new Map();
     for (const environment of environments) {
       const model = await this._buildEnvironmentListing({
         environment,
@@ -679,7 +679,7 @@ export class GatheringEngine {
         viewer,
         actor: selectedActor,
         presentTools,
-        regionContextCache
+        realmContextCache
       });
       if (model.visible) {
         environmentModels.push(model);
@@ -990,7 +990,7 @@ export class GatheringEngine {
     return environment;
   }
 
-  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null, regionContextCache = null }) {
+  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null, realmContextCache = null }) {
     // Disabled environments surface to every viewer (players and GMs alike) as
     // non-interactive "locked" teasers. Build them before any task-visibility
     // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
@@ -1001,11 +1001,11 @@ export class GatheringEngine {
     }
 
     // A location-gated environment the party is NOT in is itself the "thing" out
-    // of region: surface it as a locked teaser (identity only, unselectable) with
+    // of realm: surface it as a locked teaser (identity only, unselectable) with
     // the location reason + travel guidance, rather than a selectable environment
-    // whose every task carries the region block. Evaluated before task-visibility
+    // whose every task carries the realm block. Evaluated before task-visibility
     // gating so it is never dropped, mirroring the disabled-teaser path above.
-    const locationGate = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    const locationGate = this._locationBlockedReasons({ environment, system, viewer, actor, realmContextCache });
     if (locationGate.location?.gated === true && locationGate.location?.available === false) {
       return this._lockedEnvironmentListing({
         environment,
@@ -1035,14 +1035,14 @@ export class GatheringEngine {
       };
     }
 
-    const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, system, viewer, actor, realmContextCache });
     // Redaction-safe location field — reuse the gate computed above (here the
-    // environment is region-available, so this is the ungated/available shape).
+    // environment is realm-available, so this is the ungated/available shape).
     const location = locationGate.location;
-    // Party current-region summary for the header bar (regardless of this
-    // environment's gating), so the player app can show the current region or
-    // "no region selected" when the region/travel subsystem is enabled.
-    const regionSummary = this._currentRegionSummary({ environment, system, viewer, actor, regionContextCache });
+    // Party current-realm summary for the header bar (regardless of this
+    // environment's gating), so the player app can show the current realm or
+    // "no realm selected" when the realm/travel subsystem is enabled.
+    const realmSummary = this._currentRealmSummary({ environment, system, viewer, actor, realmContextCache });
     // Stash each visible task's blocked reasons so both the player task models
     // and the blind "discovered tasks" list draw from one computation — no
     // extra visibility pass that could surface unrevealed tasks.
@@ -1137,8 +1137,8 @@ export class GatheringEngine {
         ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) || null
         : null,
       conditions: plainObjectOrNull(environment.conditions) || {},
-      regionsEnabled: regionSummary.regionsEnabled,
-      currentRegions: regionSummary.currentRegions,
+      realmsEnabled: realmSummary.realmsEnabled,
+      currentRealms: realmSummary.currentRealms,
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
@@ -1255,12 +1255,12 @@ export class GatheringEngine {
       nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
       weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
       timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
-      // A disabled teaser resolves no actor, so its current region is empty ("no
-      // region selected"); a location-lock teaser DOES have an actor + resolved
-      // location, so it carries the disclosed current regions. The flag mirrors
+      // A disabled teaser resolves no actor, so its current realm is empty ("no
+      // realm selected"); a location-lock teaser DOES have an actor + resolved
+      // location, so it carries the disclosed current realms. The flag mirrors
       // the system so the header chip appears when the subsystem is enabled.
-      regionsEnabled: isGatheringRegionsEnabled(system),
-      currentRegions: Array.isArray(location?.currentRegions) ? location.currentRegions : [],
+      realmsEnabled: isGatheringRealmsEnabled(system),
+      currentRealms: Array.isArray(location?.currentRealms) ? location.currentRealms : [],
       staminaPool: null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
@@ -1268,11 +1268,11 @@ export class GatheringEngine {
       visible: true,
       attemptable: false,
       // Disabled teaser defaults to ENVIRONMENT_DISABLED; a location-lock passes
-      // its NO_CURRENT_REGION / LOCATION_BLOCKED reason (with travel guidance).
+      // its NO_CURRENT_REALM / LOCATION_BLOCKED reason (with travel guidance).
       blockedReasons: blockedReasons ?? [this._blockedReason('ENVIRONMENT_DISABLED')],
       // The redaction-safe location field is surfaced on the teaser so the card
-      // can show the "Not in current region" alert and its guidance tooltip.
-      location: location ?? { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null },
+      // can show the "Not in current realm" alert and its guidance tooltip.
+      location: location ?? { gated: false, available: true, source: 'unresolved', currentRealms: [], guidance: null },
       tasks: [],
       discoveredTasks: [],
       events: [],
@@ -1464,7 +1464,7 @@ export class GatheringEngine {
     });
   }
 
-  async _environmentBlockedReasons({ environment, system = null, viewer, actor, regionContextCache = null }) {
+  async _environmentBlockedReasons({ environment, system = null, viewer, actor, realmContextCache = null }) {
     const blockedReasons = [];
     if (environment.enabled === false) {
       blockedReasons.push(this._blockedReason('ENVIRONMENT_DISABLED'));
@@ -1481,14 +1481,14 @@ export class GatheringEngine {
       }
     }
 
-    const location = this._locationBlockedReasons({ environment, system, viewer, actor, regionContextCache });
+    const location = this._locationBlockedReasons({ environment, system, viewer, actor, realmContextCache });
     blockedReasons.push(...location.blockedReasons);
 
     return blockedReasons;
   }
 
   /**
-   * Resolve the current-region context for one system once per listing call.
+   * Resolve the current-realm context for one system once per listing call.
    * Memoized by systemId in the supplied cache so the per-environment loop in
    * `listForActor` does not re-resolve for every environment of a system.
    *
@@ -1496,13 +1496,13 @@ export class GatheringEngine {
    * @param {object} args.actor Selected actor.
    * @param {string} args.systemId Owning crafting system id.
    * @param {Map<string, object>|null} [args.cache]
-   * @returns {object} Current-region context (resolved/source/regions/...).
+   * @returns {object} Current-realm context (resolved/source/realms/...).
    */
-  _resolveRegionContext({ actor, systemId, cache = null }) {
+  _resolveRealmContext({ actor, systemId, cache = null }) {
     if (cache && cache.has(systemId)) return cache.get(systemId);
-    const context = typeof this.locationResolver?.buildCurrentRegionContext === 'function'
-      ? this.locationResolver.buildCurrentRegionContext({ actor, systemId })
-      : { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [] };
+    const context = typeof this.locationResolver?.buildCurrentRealmContext === 'function'
+      ? this.locationResolver.buildCurrentRealmContext({ actor, systemId })
+      : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
     if (cache) cache.set(systemId, context);
     return context;
   }
@@ -1515,43 +1515,43 @@ export class GatheringEngine {
    * preserved exactly.
    *
    * Non-GM blocked-reason `data` is built entirely from `buildTravelGuidance`,
-   * whose destinations flow through `buildRegionDisclosure`, so secret
-   * undiscovered region ids/names never appear in player-facing data.
+   * whose destinations flow through `buildRealmDisclosure`, so secret
+   * undiscovered realm ids/names never appear in player-facing data.
    *
    * @param {object} args
    * @returns {{ blockedReasons: object[], location: object }}
    */
-  _locationBlockedReasons({ environment, system = null, viewer, actor, regionContextCache = null }) {
-    // When the region/travel subsystem is disabled for this system, behave as if
+  _locationBlockedReasons({ environment, system = null, viewer, actor, realmContextCache = null }) {
+    // When the realm/travel subsystem is disabled for this system, behave as if
     // no environment is location-gated and no travel exists: every environment
     // is available and the listing `location` field is the ungated shape. This
     // is the central choke point (the listing `location` field and the
     // start-attempt location guard both flow through here).
-    if (!isGatheringRegionsEnabled(system)) {
+    if (!isGatheringRealmsEnabled(system)) {
       return {
         blockedReasons: [],
-        location: { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null }
+        location: { gated: false, available: true, source: 'unresolved', currentRealms: [], guidance: null }
       };
     }
     const gated = environmentHasLocationRules(environment);
     if (!this.locationResolver || !gated) {
       return {
         blockedReasons: [],
-        location: { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null }
+        location: { gated: false, available: true, source: 'unresolved', currentRealms: [], guidance: null }
       };
     }
 
     const systemId = stringOrNull(environment?.craftingSystemId);
-    const context = this._resolveRegionContext({ actor, systemId, cache: regionContextCache });
+    const context = this._resolveRealmContext({ actor, systemId, cache: realmContextCache });
     const availability = evaluateLocationAvailability(environment, context);
     const isGM = viewer?.isGM === true;
-    const revealMode = this._regionRevealMode(system);
-    const regionsById = new Map((Array.isArray(system?.gatheringRegions) ? system.gatheringRegions : []).map(region => [region.id, region]));
-    const discoveredRegionIds = actor ? getDiscoveredRegionIdsForSystem(actor, systemId) : new Set();
+    const revealMode = this._realmRevealMode(system);
+    const realmsById = new Map((Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : []).map(realm => [realm.id, realm]));
+    const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
 
-    const currentRegions = (Array.isArray(context?.regions) ? context.regions : []).map(region => buildRegionDisclosure(region, {
+    const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map(realm => buildRealmDisclosure(realm, {
       isGM,
-      discovered: discoveredRegionIds.has(region?.id),
+      discovered: discoveredRealmIds.has(realm?.id),
       revealMode
     }));
 
@@ -1559,7 +1559,7 @@ export class GatheringEngine {
       gated: true,
       available: availability.available === true,
       source: stringOrNull(context?.source) || 'unresolved',
-      currentRegions,
+      currentRealms,
       guidance: null
     };
 
@@ -1569,16 +1569,16 @@ export class GatheringEngine {
 
     const guidance = buildTravelGuidance({
       environment,
-      regionsById,
-      currentRegionContext: context,
+      realmsById,
+      currentRealmContext: context,
       availability,
-      discoveredRegionIds,
+      discoveredRealmIds,
       isGM,
       revealMode
     });
     location.guidance = guidance;
 
-    const code = availability.reasons.includes('NO_CURRENT_REGION') ? 'NO_CURRENT_REGION' : 'LOCATION_BLOCKED';
+    const code = availability.reasons.includes('NO_CURRENT_REALM') ? 'NO_CURRENT_REALM' : 'LOCATION_BLOCKED';
     return {
       blockedReasons: [this._blockedReason(code, { data: guidance })],
       location
@@ -1586,36 +1586,36 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve the party's current-region summary for the header bar, independent of
+   * Resolve the party's current-realm summary for the header bar, independent of
    * whether THIS environment is location-gated. Unlike the `location` field (which
-   * only discloses current regions for a gated environment), this surfaces the
-   * party's current region for the system whenever the region/travel subsystem is
-   * enabled, so the player header can show "current region / no region selected".
-   * Reuses the per-listing region-context cache and the same redaction policy as
-   * the gated path (`buildRegionDisclosure`).
+   * only discloses current realms for a gated environment), this surfaces the
+   * party's current realm for the system whenever the realm/travel subsystem is
+   * enabled, so the player header can show "current realm / no realm selected".
+   * Reuses the per-listing realm-context cache and the same redaction policy as
+   * the gated path (`buildRealmDisclosure`).
    *
    * @param {object} args
-   * @returns {{ regionsEnabled: boolean, currentRegions: object[] }}
+   * @returns {{ realmsEnabled: boolean, currentRealms: object[] }}
    */
-  _currentRegionSummary({ environment, system = null, viewer, actor, regionContextCache = null }) {
-    if (!isGatheringRegionsEnabled(system)) {
-      return { regionsEnabled: false, currentRegions: [] };
+  _currentRealmSummary({ environment, system = null, viewer, actor, realmContextCache = null }) {
+    if (!isGatheringRealmsEnabled(system)) {
+      return { realmsEnabled: false, currentRealms: [] };
     }
     const systemId = stringOrNull(environment?.craftingSystemId);
-    const context = this._resolveRegionContext({ actor, systemId, cache: regionContextCache });
+    const context = this._resolveRealmContext({ actor, systemId, cache: realmContextCache });
     const isGM = viewer?.isGM === true;
-    const revealMode = this._regionRevealMode(system);
-    const discoveredRegionIds = actor ? getDiscoveredRegionIdsForSystem(actor, systemId) : new Set();
-    const currentRegions = (Array.isArray(context?.regions) ? context.regions : []).map(region => buildRegionDisclosure(region, {
+    const revealMode = this._realmRevealMode(system);
+    const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
+    const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map(realm => buildRealmDisclosure(realm, {
       isGM,
-      discovered: discoveredRegionIds.has(region?.id),
+      discovered: discoveredRealmIds.has(realm?.id),
       revealMode
     }));
-    return { regionsEnabled: true, currentRegions };
+    return { realmsEnabled: true, currentRealms };
   }
 
-  _regionRevealMode(system) {
-    const mode = system?.gatheringRegionSettings?.revealMode;
+  _realmRevealMode(system) {
+    const mode = system?.gatheringRealmSettings?.revealMode;
     return mode === 'alwaysVisible' || mode === 'onPartyTokenEntry' ? mode : 'manual';
   }
 

@@ -303,7 +303,7 @@
           "Hint": "Choose a place to gather. Locked environments are unavailable until your GM enables them.",
           "Empty": "No gathering environments are available for this character yet.",
           "BlindChip": "Blind",
-          "RegionLockedChip": "Not in current region",
+          "RealmLockedChip": "Not in current realm",
           "LockedAria": "{name} (locked)",
           "Discovered": "{x} of {y} tasks discovered",
           "SearchPlaceholder": "Search environments…",
@@ -2901,10 +2901,10 @@
         "BlindNoCandidate": "There is nothing you can gather here right now.",
         "ConditionsBlocked": "Current weather or time-of-day does not allow this task.",
         "LocationBlocked": "Not available in the party's current region.",
-        "NoCurrentRegion": "No party region set."
+        "NoCurrentRealm": "No party realm set."
       },
-      "Region": {
-        "UndiscoveredPlaceholder": "Undiscovered region"
+      "Realm": {
+        "UndiscoveredPlaceholder": "Undiscovered realm"
       },
       "Travel": {
         "Guidance": {

@@ -10,12 +10,12 @@ import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
-import { GatheringRegionStore } from './systems/GatheringRegionStore.js';
+import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
-import { revealGatheringRegion, hideGatheringRegion, getDiscoveredRegionIdsForSystem } from './systems/gatheringRegionDiscovery.js';
+import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIdsForSystem } from './systems/gatheringRealmDiscovery.js';
 import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
-import { isGatheringRegionsEnabled } from './systems/gatheringRegions.js';
+import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
@@ -523,7 +523,7 @@ class Fabricate {
     // resolver for location-aware gathering. Parties persist to a world setting;
     // regions live on the crafting system via the region store's updateSystem
     // seam. The resolver is constructor-injected into the engine (not imported).
-    this.gatheringRegionStore = new GatheringRegionStore({ systemManager: this.craftingSystemManager });
+    this.gatheringRegionStore = new GatheringRealmStore({ systemManager: this.craftingSystemManager });
     this.gatheringPartyStore = new GatheringPartyStore({
       getSetting,
       setSetting,
@@ -731,7 +731,7 @@ class Fabricate {
   /**
    * Get the per-system gathering region store.
    *
-   * @returns {GatheringRegionStore|null}
+   * @returns {GatheringRealmStore|null}
    */
   getGatheringRegionStore() {
     this._requireReady();
@@ -760,15 +760,15 @@ class Fabricate {
     this._requireReady();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId) return null;
-    // Region/travel disabled for this system ⇒ no location surface at all.
-    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    const context = this.gatheringLocationService?.buildCurrentRegionContext({ actor: resolvedActor, systemId });
+    // Realm/travel disabled for this system ⇒ no location surface at all.
+    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
+    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor, systemId });
     if (!context) return null;
     const isGM = game.user?.isGM === true;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const revealMode = system?.gatheringRegionSettings?.revealMode || 'manual';
-    const discoveredRegionIds = getDiscoveredRegionIdsForSystem(resolvedActor, systemId);
-    return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRegionIds });
+    const revealMode = system?.gatheringRealmSettings?.revealMode || 'manual';
+    const discoveredRealmIds = getDiscoveredRealmIdsForSystem(resolvedActor, systemId);
+    return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRealmIds });
   }
 
   /**
@@ -781,9 +781,9 @@ class Fabricate {
     this._requireReady();
     this._requireGM();
     if (!partyId || !systemId) return null;
-    // Region/travel disabled ⇒ no-op (no override writes).
-    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.setCurrentRegionOverride(partyId, systemId, regionIds);
+    // Realm/travel disabled ⇒ no-op (no override writes).
+    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
+    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, systemId, regionIds);
   }
 
   /**
@@ -797,9 +797,9 @@ class Fabricate {
     this._requireReady();
     this._requireGM();
     if (!partyId || !systemId) return null;
-    // Region/travel disabled ⇒ no-op (no override writes).
-    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.clearCurrentRegionOverride(partyId, systemId);
+    // Realm/travel disabled ⇒ no-op (no override writes).
+    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
+    return this.gatheringPartyStore?.clearCurrentRealmOverride(partyId, systemId);
   }
 
   /**
@@ -815,14 +815,14 @@ class Fabricate {
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
     const system = this.craftingSystemManager?.getSystem(systemId);
-    // Region/travel disabled ⇒ no-op (no discovery writes).
-    if (!isGatheringRegionsEnabled(system)) return Promise.resolve(false);
-    return revealGatheringRegion(resolvedActor, {
+    // Realm/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);
+    return revealGatheringRealm(resolvedActor, {
       systemId,
-      regionId,
+      realmId: regionId,
       source,
       partyId,
-      validateRegionInSystem: system,
+      validateRealmInSystem: system,
       now: () => Date.now()
     });
   }
@@ -838,9 +838,9 @@ class Fabricate {
     this._requireGM();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
-    // Region/travel disabled ⇒ no-op (no discovery writes).
-    if (!isGatheringRegionsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
-    return hideGatheringRegion(resolvedActor, { systemId, regionId });
+    // Realm/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
+    return hideGatheringRealm(resolvedActor, { systemId, realmId: regionId });
   }
 
   /**
@@ -1323,7 +1323,7 @@ function bindFabricateGlobal() {
     CraftingRunManager,
     SalvageRunManager,
     GatheringEnvironmentStore,
-    GatheringRegionStore,
+    GatheringRegionStore: GatheringRealmStore,
     GatheringPartyStore,
     GatheringLocationService,
     GatheringRunManager,

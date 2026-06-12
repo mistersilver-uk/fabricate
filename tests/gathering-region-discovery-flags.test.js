@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  getDiscoveredGatheringRegions,
-  getDiscoveredRegionIdsForSystem,
-  hideGatheringRegion,
-  isGatheringRegionDiscovered,
-  revealGatheringRegion
-} from '../src/systems/gatheringRegionDiscovery.js';
+  getDiscoveredGatheringRealms,
+  getDiscoveredRealmIdsForSystem,
+  hideGatheringRealm,
+  isGatheringRealmDiscovered,
+  revealGatheringRealm
+} from '../src/systems/gatheringRealmDiscovery.js';
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -45,62 +45,85 @@ class FakeDocument {
   }
 }
 
-const systemSnapshot = { id: 'system-a', gatheringRegions: [{ id: 'r1' }, { id: 'r2' }] };
+const systemSnapshot = { id: 'system-a', gatheringRealms: [{ id: 'r1' }, { id: 'r2' }] };
 
-test('revealGatheringRegion writes a discovery entry validated against the system', async () => {
+test('revealGatheringRealm writes a discovery entry validated against the system', async () => {
   const doc = new FakeDocument();
-  const ok = await revealGatheringRegion(doc, {
-    systemId: 'system-a', regionId: 'r1', source: 'manual', validateRegionInSystem: systemSnapshot, now: () => 42
+  const ok = await revealGatheringRealm(doc, {
+    systemId: 'system-a', realmId: 'r1', source: 'manual', validateRealmInSystem: systemSnapshot, now: () => 42
   });
   assert.equal(ok, true);
-  assert.equal(isGatheringRegionDiscovered(doc, 'system-a', 'r1'), true);
-  const entry = getDiscoveredGatheringRegions(doc)['system-a']['r1'];
+  assert.equal(isGatheringRealmDiscovered(doc, 'system-a', 'r1'), true);
+  const entry = getDiscoveredGatheringRealms(doc)['system-a']['r1'];
   assert.equal(entry.discoveredAt, 42);
   assert.equal(entry.source, 'manual');
 });
 
-test('revealGatheringRegion rejects a region that does not belong to the system', async () => {
+test('revealGatheringRealm rejects a realm that does not belong to the system', async () => {
   const doc = new FakeDocument();
-  const ok = await revealGatheringRegion(doc, {
-    systemId: 'system-a', regionId: 'r-foreign', source: 'manual', validateRegionInSystem: systemSnapshot
+  const ok = await revealGatheringRealm(doc, {
+    systemId: 'system-a', realmId: 'r-foreign', source: 'manual', validateRealmInSystem: systemSnapshot
   });
   assert.equal(ok, false);
-  assert.equal(isGatheringRegionDiscovered(doc, 'system-a', 'r-foreign'), false);
+  assert.equal(isGatheringRealmDiscovered(doc, 'system-a', 'r-foreign'), false);
 });
 
-test('revealGatheringRegion rejects an unknown source token', async () => {
+test('revealGatheringRealm rejects an unknown source token', async () => {
   const doc = new FakeDocument();
-  const ok = await revealGatheringRegion(doc, {
-    systemId: 'system-a', regionId: 'r1', source: 'telepathy', validateRegionInSystem: systemSnapshot
+  const ok = await revealGatheringRealm(doc, {
+    systemId: 'system-a', realmId: 'r1', source: 'telepathy', validateRealmInSystem: systemSnapshot
   });
   assert.equal(ok, false);
 });
 
-test('hideGatheringRegion removes the entry by re-setting the per-system map', async () => {
+test('hideGatheringRealm removes the entry by re-setting the per-system map', async () => {
   const doc = new FakeDocument();
-  await revealGatheringRegion(doc, { systemId: 'system-a', regionId: 'r1', source: 'manual', validateRegionInSystem: systemSnapshot });
-  await revealGatheringRegion(doc, { systemId: 'system-a', regionId: 'r2', source: 'api', validateRegionInSystem: systemSnapshot });
-  const removed = await hideGatheringRegion(doc, { systemId: 'system-a', regionId: 'r1' });
+  await revealGatheringRealm(doc, { systemId: 'system-a', realmId: 'r1', source: 'manual', validateRealmInSystem: systemSnapshot });
+  await revealGatheringRealm(doc, { systemId: 'system-a', realmId: 'r2', source: 'api', validateRealmInSystem: systemSnapshot });
+  const removed = await hideGatheringRealm(doc, { systemId: 'system-a', realmId: 'r1' });
   assert.equal(removed, true);
-  assert.equal(isGatheringRegionDiscovered(doc, 'system-a', 'r1'), false);
-  assert.equal(isGatheringRegionDiscovered(doc, 'system-a', 'r2'), true);
+  assert.equal(isGatheringRealmDiscovered(doc, 'system-a', 'r1'), false);
+  assert.equal(isGatheringRealmDiscovered(doc, 'system-a', 'r2'), true);
 });
 
 test('discovery entry with a stale partyId remains readable', async () => {
   const doc = new FakeDocument();
-  await revealGatheringRegion(doc, {
-    systemId: 'system-a', regionId: 'r1', source: 'partyToken', partyId: 'party-gone', validateRegionInSystem: systemSnapshot
+  await revealGatheringRealm(doc, {
+    systemId: 'system-a', realmId: 'r1', source: 'partyToken', partyId: 'party-gone', validateRealmInSystem: systemSnapshot
   });
-  const entry = getDiscoveredGatheringRegions(doc)['system-a']['r1'];
+  const entry = getDiscoveredGatheringRealms(doc)['system-a']['r1'];
   assert.equal(entry.partyId, 'party-gone');
-  assert.equal(isGatheringRegionDiscovered(doc, 'system-a', 'r1'), true);
+  assert.equal(isGatheringRealmDiscovered(doc, 'system-a', 'r1'), true);
 });
 
 test('actor knowledge survives a party change (discovery is actor-scoped)', async () => {
   const doc = new FakeDocument();
-  await revealGatheringRegion(doc, {
-    systemId: 'system-a', regionId: 'r1', source: 'partyToken', partyId: 'party-1', validateRegionInSystem: systemSnapshot
+  await revealGatheringRealm(doc, {
+    systemId: 'system-a', realmId: 'r1', source: 'partyToken', partyId: 'party-1', validateRealmInSystem: systemSnapshot
   });
   // Simulate the actor joining a different party; discovery flag is untouched.
-  assert.deepEqual([...getDiscoveredRegionIdsForSystem(doc, 'system-a')], ['r1']);
+  assert.deepEqual([...getDiscoveredRealmIdsForSystem(doc, 'system-a')], ['r1']);
+});
+
+test('legacy-read fallback: reads a pre-rename discoveredGatheringRegions flag', () => {
+  // A world saved on the pre-1.1.0 schema still carries the old actor flag key.
+  const doc = new FakeDocument({
+    flags: { fabricate: { fabricate: { discoveredGatheringRegions: { 'system-a': { r1: { discoveredAt: 7, source: 'manual' } } } } } }
+  });
+  assert.deepEqual([...getDiscoveredRealmIdsForSystem(doc, 'system-a')], ['r1']);
+  assert.equal(isGatheringRealmDiscovered(doc, 'system-a', 'r1'), true);
+});
+
+test('legacy upgrade: a discovery write persists only the new discoveredGatheringRealms key', async () => {
+  const doc = new FakeDocument({
+    flags: { fabricate: { fabricate: { discoveredGatheringRegions: { 'system-a': { r1: { discoveredAt: 7, source: 'manual' } } } } } }
+  });
+  await revealGatheringRealm(doc, {
+    systemId: 'system-a', realmId: 'r2', source: 'api', validateRealmInSystem: systemSnapshot, now: () => 9
+  });
+  // The merged map (legacy r1 + new r2) is written under the NEW key.
+  const fresh = new FakeDocument({ flags: { fabricate: { fabricate: { discoveredGatheringRealms: doc.flags.fabricate.fabricate.discoveredGatheringRealms } } } });
+  assert.deepEqual([...getDiscoveredRealmIdsForSystem(fresh, 'system-a')].sort(), ['r1', 'r2']);
+  // The legacy key is not re-derived from the new write.
+  assert.equal(doc.flags.fabricate.fabricate.discoveredGatheringRealms !== undefined, true);
 });

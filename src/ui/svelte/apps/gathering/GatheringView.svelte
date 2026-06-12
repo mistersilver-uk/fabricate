@@ -279,8 +279,8 @@
   // hidden) when no environment is selected or the system has regions off.
   $effect(() => {
     store?.setRegionContext({
-      enabled: selectedEnvironment?.regionsEnabled === true,
-      regions: selectedEnvironment?.currentRegions ?? []
+      enabled: selectedEnvironment?.realmsEnabled === true,
+      regions: selectedEnvironment?.currentRealms ?? []
     });
   });
 </script>

@@ -381,7 +381,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
         listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
         startGatheringAttempt: () => Promise.resolve({
           accepted: false,
-          blockedReasons: [{ code: 'NO_CURRENT_REGION' }]
+          blockedReasons: [{ code: 'NO_CURRENT_REALM' }]
         })
       };
       const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });

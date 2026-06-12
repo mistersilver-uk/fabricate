@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
-import { buildRegionDisclosure, UNDISCOVERED_PLACEHOLDER_KEY } from '../../src/systems/gatheringLocation.js';
+import { buildRealmDisclosure, UNDISCOVERED_PLACEHOLDER_KEY } from '../../src/systems/gatheringLocation.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -223,7 +223,7 @@ describe('GatheringTravelView mounted behavior', () => {
     // Build the disclosure-safe display model the REAL way: a non-GM viewer
     // seeing a secret, undiscovered region (manual reveal mode). The disclosure
     // contract redacts both id and name, returning a placeholder instead.
-    const disclosure = buildRegionDisclosure(
+    const disclosure = buildRealmDisclosure(
       { id: SECRET_ID, name: SECRET_NAME, secret: true, enabled: true },
       { isGM: false, discovered: false, revealMode: 'manual' }
     );
