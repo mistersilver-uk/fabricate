@@ -547,10 +547,15 @@ export class CraftingSystemManager {
   }
 
   _toKey(value) {
+    // Split/filter/join trims leading & trailing separators without the
+    // backtracking-prone `/^-+|-+$/` anchored regex (already-collapsed single
+    // dashes mean this yields the same slug).
     return String(value || '')
       .toLowerCase()
       .replaceAll(/[^a-z0-9]+/g, '-')
-      .replaceAll(/^-+|-+$/g, '');
+      .split('-')
+      .filter(Boolean)
+      .join('-');
   }
 
   _labelFromUuid(uuid) {
@@ -572,14 +577,14 @@ export class CraftingSystemManager {
       template.innerHTML = raw;
       return String(template.content?.textContent || '')
         .replaceAll(/\s+/g, ' ')
-        .replaceAll(/\s+([,.;:!?])/g, '$1')
+        .replaceAll(/ ([,.;:!?])/g, '$1')
         .trim();
     }
 
     return raw
       .replaceAll(/<br\s*\/?>/gi, ' ')
       .replaceAll(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
-      .replaceAll(/<[^>]+>/g, ' ')
+      .replaceAll(/<[^>]{1,2048}>/g, ' ')
       .replaceAll(/&nbsp;/gi, ' ')
       .replaceAll(/&amp;/gi, '&')
       .replaceAll(/&lt;/gi, '<')
@@ -587,7 +592,7 @@ export class CraftingSystemManager {
       .replaceAll(/&quot;/gi, '"')
       .replaceAll(/&#39;|&apos;/gi, "'")
       .replaceAll(/\s+/g, ' ')
-      .replaceAll(/\s+([,.;:!?])/g, '$1')
+      .replaceAll(/ ([,.;:!?])/g, '$1')
       .trim();
   }
 

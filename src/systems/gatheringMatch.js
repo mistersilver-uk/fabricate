@@ -36,7 +36,9 @@ function normalizeConditionId(value) {
     .trim()
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
+    .split('-')
+    .filter(Boolean)
+    .join('-');
 }
 
 function normalizeConditionIdList(value) {
@@ -106,9 +108,7 @@ export function evaluateEnvironmentMatch(
   const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
   const envDangerLevel = resolveEnvironmentDangerLevel(environment);
 
-  const biome = evaluateTagField(normalizeTagList(record?.biomes), envBiomes, {
-    requireAll: false,
-  });
+  const biome = evaluateTagField(normalizeTagList(record?.biomes), envBiomes);
 
   const weatherEnabled = conditionSettings?.weather?.enabled !== false;
   const timeEnabled = conditionSettings?.timeOfDay?.enabled !== false;

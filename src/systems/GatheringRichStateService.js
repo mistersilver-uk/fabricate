@@ -2827,7 +2827,9 @@ function normalizeConditionId(value) {
     .trim()
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
+    .split('-')
+    .filter(Boolean)
+    .join('-');
 }
 
 function normalizeConditionIcon(icon, fallback) {
