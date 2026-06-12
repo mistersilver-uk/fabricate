@@ -1,7 +1,8 @@
+import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
+
+import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';
 import { Result } from './Result.js';
-import { Ingredient } from './Ingredient.js';
-import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 
 /**
  * Represents a crafting recipe
@@ -17,14 +18,14 @@ export class Recipe {
     this.craftingSystemId = data.craftingSystemId || null;
     this.system = data.system || 'all';
     this.tags = Array.isArray(data.tags) ? data.tags : [];
-    this.enabled = data.enabled !== undefined ? data.enabled : true;
+    this.enabled = data.enabled === undefined ? true : data.enabled;
     this.locked = data.locked === true;
     this.recipeItemId = data.recipeItemId || null;
     this.linkedRecipeItemUuid = data.linkedRecipeItemUuid || null;
     this.visibility = this._normalizeVisibility(data.visibility);
 
     // Input requirements (at least one set must be satisfied)
-    this.ingredientSets = (data.ingredientSets || []).map(s =>
+    this.ingredientSets = (data.ingredientSets || []).map((s) =>
       s instanceof IngredientSet ? s : IngredientSet.fromJSON(s)
     );
     this.steps = Array.isArray(data.steps)
@@ -33,17 +34,18 @@ export class Recipe {
 
     // Output groups (canonical). Legacy flat `results` is still accepted and flattened for compatibility.
     this.resultGroups = this._normalizeResultGroups(data);
-    this.results = this.resultGroups.flatMap(group => group.results);
+    this.results = this.resultGroups.flatMap((group) => group.results);
 
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
 
     // Recipe behaviour
-    this.isVariable = data.isVariable !== undefined ? data.isVariable : false;
-    this.transferEffects = data.transferEffects !== undefined ? data.transferEffects : false;
-    this.outcomeRouting = data.outcomeRouting && typeof data.outcomeRouting === 'object'
-      ? { ...data.outcomeRouting }
-      : null;
+    this.isVariable = data.isVariable === undefined ? false : data.isVariable;
+    this.transferEffects = data.transferEffects === undefined ? false : data.transferEffects;
+    this.outcomeRouting =
+      data.outcomeRouting && typeof data.outcomeRouting === 'object'
+        ? { ...data.outcomeRouting }
+        : null;
     this.resultSelection = this._normalizeResultSelection(data.resultSelection);
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
@@ -53,7 +55,7 @@ export class Recipe {
       created: Date.now(),
       modified: Date.now(),
       author: game?.user?.name || 'Unknown',
-      version: '1.0.0'
+      version: '1.0.0',
     };
   }
 
@@ -76,29 +78,28 @@ export class Recipe {
   isSimpleRecipe() {
     // Single ingredient set with exact item matching (no tags)
     const firstSet = this.ingredientSets[0];
-    const groups = Array.isArray(firstSet?.ingredientGroups)
-      ? firstSet.ingredientGroups
-      : [];
+    const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
     const hasSimpleIngredients =
       this.ingredientSets.length === 1 &&
       groups.length > 0 &&
-      groups.every(group =>
-        Array.isArray(group.options) &&
-        group.options.length === 1 &&
-        !!group.options[0] &&
-        (
-          !!group.options[0].itemUuid ||
-          ((group.options[0].match?.type === 'component' || group.options[0].match?.type === 'systemItem') && !!(group.options[0].match?.componentId || group.options[0].match?.systemItemId)) ||
-          !!(group.options[0].componentId || group.options[0].systemItemId)
-        ) &&
-        !(group.options[0].match?.type === 'tags') &&
-        !group.options[0].tag
+      groups.every(
+        (group) =>
+          Array.isArray(group.options) &&
+          group.options.length === 1 &&
+          !!group.options[0] &&
+          (!!group.options[0].itemUuid ||
+            ((group.options[0].match?.type === 'component' ||
+              group.options[0].match?.type === 'systemItem') &&
+              !!(group.options[0].match?.componentId || group.options[0].match?.systemItemId)) ||
+            !!(group.options[0].componentId || group.options[0].systemItemId)) &&
+          !(group.options[0].match?.type === 'tags') &&
+          !group.options[0].tag
       ) &&
       Object.keys(firstSet?.essences || {}).length === 0;
 
     const hasNoTools =
       (this.toolIds?.length || 0) === 0 &&
-      this.ingredientSets.every(set => (set.toolIds?.length || 0) === 0);
+      this.ingredientSets.every((set) => (set.toolIds?.length || 0) === 0);
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
 
@@ -133,7 +134,9 @@ export class Recipe {
           for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
             const value = Number(step.timeRequirement?.[unit] || 0);
             if (!Number.isFinite(value) || value < 0) {
-              errors.push(`Step "${step.name || step.id}" has invalid time requirement value for "${unit}"`);
+              errors.push(
+                `Step "${step.name || step.id}" has invalid time requirement value for "${unit}"`
+              );
             }
           }
         }
@@ -152,7 +155,9 @@ export class Recipe {
       for (const ingredientSet of this.ingredientSets) {
         const setValidation = ingredientSet.validate();
         if (!setValidation.valid) {
-          errors.push(`Ingredient set "${ingredientSet.name || ingredientSet.id}": ${setValidation.errors.join(', ')}`);
+          errors.push(
+            `Ingredient set "${ingredientSet.name || ingredientSet.id}": ${setValidation.errors.join(', ')}`
+          );
         }
       }
     }
@@ -164,26 +169,34 @@ export class Recipe {
     }
 
     const resultContainers = hasSteps
-      ? this.steps.map(step => ({
-        label: `Step "${step.name || step.id}"`,
-        resultGroups: Array.isArray(step.resultGroups) ? step.resultGroups : [],
-        resultSelection: step.resultSelection || this.resultSelection
-      }))
-      : [{
-        label: 'Recipe',
-        resultGroups: this.resultGroups,
-        resultSelection: this.resultSelection
-      }];
+      ? this.steps.map((step) => ({
+          label: `Step "${step.name || step.id}"`,
+          resultGroups: Array.isArray(step.resultGroups) ? step.resultGroups : [],
+          resultSelection: step.resultSelection || this.resultSelection,
+        }))
+      : [
+          {
+            label: 'Recipe',
+            resultGroups: this.resultGroups,
+            resultSelection: this.resultSelection,
+          },
+        ];
 
     for (const container of resultContainers) {
       this._validateResultGroups(container.resultGroups, container.label, errors);
-      this._validateRollTableResultSelection(container.resultSelection, container.resultGroups, errors);
+      this._validateRollTableResultSelection(
+        container.resultSelection,
+        container.resultGroups,
+        errors
+      );
     }
 
-    const resultGroupIds = new Set(this.resultGroups.map(group => group.id));
-    const resultIds = new Set(this.resultGroups.flatMap(group => (group.results || []).map(result => result.id)));
+    const resultGroupIds = new Set(this.resultGroups.map((group) => group.id));
+    const resultIds = new Set(
+      this.resultGroups.flatMap((group) => (group.results || []).map((result) => result.id))
+    );
     const routableResultGroupIds = hasSteps
-      ? new Set(this.steps.flatMap(step => (step.resultGroups || []).map(group => group.id)))
+      ? new Set(this.steps.flatMap((step) => (step.resultGroups || []).map((group) => group.id)))
       : resultGroupIds;
 
     // Variable recipe validation
@@ -192,7 +205,9 @@ export class Recipe {
         for (const mappingId of ingredientSet.resultMapping) {
           const valid = resultGroupIds.has(mappingId) || resultIds.has(mappingId);
           if (!valid) {
-            errors.push(`Ingredient set "${ingredientSet.name || ingredientSet.id}" references invalid result mapping ID: ${mappingId}`);
+            errors.push(
+              `Ingredient set "${ingredientSet.name || ingredientSet.id}" references invalid result mapping ID: ${mappingId}`
+            );
           }
         }
       }
@@ -201,14 +216,16 @@ export class Recipe {
     if (this.outcomeRouting && typeof this.outcomeRouting === 'object') {
       for (const [outcome, resultGroupId] of Object.entries(this.outcomeRouting)) {
         if (resultGroupId && !routableResultGroupIds.has(resultGroupId)) {
-          errors.push(`Outcome routing "${outcome}" references invalid result group ID: ${resultGroupId}`);
+          errors.push(
+            `Outcome routing "${outcome}" references invalid result group ID: ${resultGroupId}`
+          );
         }
       }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -250,9 +267,13 @@ export class Recipe {
       const MISS_KEYWORDS = new Set(['miss', 'missed', 'm', 'nothing', 'none', 'whiff', 'whiffed']);
       const seenNames = new Map();
       for (const group of resultGroups) {
-        const normalized = String(group.name || '').trim().toLowerCase();
+        const normalized = String(group.name || '')
+          .trim()
+          .toLowerCase();
         if (seenNames.has(normalized)) {
-          errors.push(`Duplicate result group name "${group.name}" (case-insensitive) — rollTableOutcome requires unique names`);
+          errors.push(
+            `Duplicate result group name "${group.name}" (case-insensitive) — rollTableOutcome requires unique names`
+          );
         }
         seenNames.set(normalized, group.id);
         if (FAIL_KEYWORDS.has(normalized) || MISS_KEYWORDS.has(normalized)) {
@@ -277,32 +298,34 @@ export class Recipe {
       recipeItemId: this.recipeItemId,
       linkedRecipeItemUuid: this.linkedRecipeItemUuid,
       visibility: this.visibility,
-      steps: this.steps.map(step => ({
+      steps: this.steps.map((step) => ({
         ...step,
-        ingredientSets: (step.ingredientSets || []).map(set => set.toJSON ? set.toJSON() : set),
-        resultGroups: (step.resultGroups || []).map(group => ({
+        ingredientSets: (step.ingredientSets || []).map((set) => (set.toJSON ? set.toJSON() : set)),
+        resultGroups: (step.resultGroups || []).map((group) => ({
           id: group.id,
           name: group.name,
-          results: (group.results || []).map(result => result.toJSON ? result.toJSON() : result)
+          results: (group.results || []).map((result) =>
+            result.toJSON ? result.toJSON() : result
+          ),
         })),
-        toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : []
+        toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : [],
       })),
-      ingredientSets: this.ingredientSets.map(s => s.toJSON()),
-      resultGroups: this.resultGroups.map(group => ({
+      ingredientSets: this.ingredientSets.map((s) => s.toJSON()),
+      resultGroups: this.resultGroups.map((group) => ({
         id: group.id,
         name: group.name,
-        results: group.results.map(r => r.toJSON())
+        results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
       // Legacy alias retained for compatibility with older consumers.
-      results: this.results.map(r => r.toJSON()),
+      results: this.results.map((r) => r.toJSON()),
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
       outcomeRouting: this.outcomeRouting,
       resultSelection: this.resultSelection,
       currencyCost: this.currencyCost,
       teaser: this.teaser,
-      metadata: this.metadata
+      metadata: this.metadata,
     };
   }
 
@@ -328,11 +351,11 @@ export class Recipe {
             options: [
               new Ingredient({
                 itemUuid: ing.itemUuid,
-                quantity: ing.quantity || 1
-              })
-            ]
-          }))
-        })
+                quantity: ing.quantity || 1,
+              }),
+            ],
+          })),
+        }),
       ],
       resultGroups: [
         {
@@ -342,13 +365,13 @@ export class Recipe {
             new Result({
               id: 'default-result',
               itemUuid: result.itemUuid,
-              quantity: result.quantity || 1
-            })
-          ]
-        }
+              quantity: result.quantity || 1,
+            }),
+          ],
+        },
       ],
       isVariable: false,
-      transferEffects: false
+      transferEffects: false,
     });
   }
 
@@ -360,7 +383,7 @@ export class Recipe {
     return {
       provider,
       macroUuid: resultSelection.macroUuid || null,
-      rollTableUuid: resultSelection.rollTableUuid || null
+      rollTableUuid: resultSelection.rollTableUuid || null,
     };
   }
 
@@ -369,7 +392,7 @@ export class Recipe {
       return data.resultGroups.map((group, idx) => ({
         id: group?.id || foundry.utils.randomID(),
         name: group?.name || `Result Group ${idx + 1}`,
-        results: (group?.results || []).map(r => (r instanceof Result ? r : Result.fromJSON(r)))
+        results: (group?.results || []).map((r) => (r instanceof Result ? r : Result.fromJSON(r))),
       }));
     }
 
@@ -379,7 +402,7 @@ export class Recipe {
       return {
         id: result.id || foundry.utils.randomID(),
         name: `Result Group ${idx + 1}`,
-        results: [result]
+        results: [result],
       };
     });
   }
@@ -389,7 +412,7 @@ export class Recipe {
       id: step.id || foundry.utils.randomID(),
       name: step.name || `Step ${idx + 1}`,
       description: step.description || '',
-      ingredientSets: (step.ingredientSets || []).map(set =>
+      ingredientSets: (step.ingredientSets || []).map((set) =>
         set instanceof IngredientSet ? set : IngredientSet.fromJSON(set)
       ),
       resultGroups: this._normalizeResultGroups(step),
@@ -397,10 +420,11 @@ export class Recipe {
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
       currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
       currencyCost: this._normalizeCurrencyCost(step.currencyCost),
-      outcomeRouting: step.outcomeRouting && typeof step.outcomeRouting === 'object'
-        ? { ...step.outcomeRouting }
-        : null,
-      resultSelection: this._normalizeResultSelection(step.resultSelection)
+      outcomeRouting:
+        step.outcomeRouting && typeof step.outcomeRouting === 'object'
+          ? { ...step.outcomeRouting }
+          : null,
+      resultSelection: this._normalizeResultSelection(step.resultSelection),
     };
   }
 
@@ -411,9 +435,14 @@ export class Recipe {
       hours: Math.max(0, Number(timeRequirement.hours || 0) || 0),
       days: Math.max(0, Number(timeRequirement.days || 0) || 0),
       months: Math.max(0, Number(timeRequirement.months || 0) || 0),
-      years: Math.max(0, Number(timeRequirement.years || 0) || 0)
+      years: Math.max(0, Number(timeRequirement.years || 0) || 0),
     };
-    const total = normalized.minutes + normalized.hours + normalized.days + normalized.months + normalized.years;
+    const total =
+      normalized.minutes +
+      normalized.hours +
+      normalized.days +
+      normalized.months +
+      normalized.years;
     return total > 0 ? normalized : null;
   }
 
@@ -421,18 +450,18 @@ export class Recipe {
     if (!currencyRequirement || typeof currencyRequirement !== 'object') return null;
     const unit = String(currencyRequirement.unit || '').trim();
     const amount = Math.max(0, Number(currencyRequirement.amount || 0) || 0);
-    return (unit && amount > 0) ? { unit, amount } : null;
+    return unit && amount > 0 ? { unit, amount } : null;
   }
 
   _normalizeCurrencyCost(cost) {
     if (!cost || typeof cost !== 'object') return null;
     const currencies = Array.isArray(cost.currencies) ? cost.currencies : [];
     const normalized = currencies
-      .map(c => ({
+      .map((c) => ({
         abbreviation: String(c.abbreviation || '').trim(),
-        amount: Math.max(0, Number(c.amount) || 0)
+        amount: Math.max(0, Number(c.amount) || 0),
       }))
-      .filter(c => c.abbreviation && c.amount > 0);
+      .filter((c) => c.abbreviation && c.amount > 0);
     return normalized.length > 0 ? { currencies: normalized } : null;
   }
 
@@ -442,17 +471,17 @@ export class Recipe {
         enabled: true,
         hiddenFields: ['ingredients', 'results', 'description'],
         revealThreshold: 100,
-        teaserDescription: ''
+        teaserDescription: '',
       };
     }
     const VALID_FIELDS = ['ingredients', 'results', 'description', 'tools', 'essences'];
     return {
       enabled: teaser.enabled !== false,
       hiddenFields: Array.isArray(teaser.hiddenFields)
-        ? teaser.hiddenFields.filter(f => VALID_FIELDS.includes(f))
+        ? teaser.hiddenFields.filter((f) => VALID_FIELDS.includes(f))
         : ['ingredients', 'results', 'description'],
       revealThreshold: Math.min(100, Math.max(0, Number(teaser.revealThreshold) || 100)),
-      teaserDescription: String(teaser.teaserDescription || '').trim()
+      teaserDescription: String(teaser.teaserDescription || '').trim(),
     };
   }
 
@@ -479,7 +508,9 @@ export class Recipe {
     if (!visibility || typeof visibility !== 'object') return null;
     return {
       restricted: visibility.restricted === true,
-      allowedUserIds: Array.isArray(visibility.allowedUserIds) ? [...visibility.allowedUserIds] : []
+      allowedUserIds: Array.isArray(visibility.allowedUserIds)
+        ? [...visibility.allowedUserIds]
+        : [],
     };
   }
 
@@ -488,17 +519,19 @@ export class Recipe {
       return this.steps;
     }
 
-    return [{
-      id: 'implicit-step',
-      name: 'Step 1',
-      description: '',
-      ingredientSets: this.ingredientSets,
-      resultGroups: this.resultGroups,
-      toolIds: this.toolIds || [],
-      timeRequirement: null,
-      currencyRequirement: null,
-      outcomeRouting: this.outcomeRouting || null,
-      resultSelection: this.resultSelection || null
-    }];
+    return [
+      {
+        id: 'implicit-step',
+        name: 'Step 1',
+        description: '',
+        ingredientSets: this.ingredientSets,
+        resultGroups: this.resultGroups,
+        toolIds: this.toolIds || [],
+        timeRequirement: null,
+        currencyRequirement: null,
+        outcomeRouting: this.outcomeRouting || null,
+        resultSelection: this.resultSelection || null,
+      },
+    ];
   }
 }

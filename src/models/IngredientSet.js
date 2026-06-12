@@ -1,6 +1,6 @@
-import { Ingredient } from './Ingredient.js';
-import { IngredientGroup } from './IngredientGroup.js';
 import { getFabricateFlag } from '../config/flags.js';
+
+import { IngredientGroup } from './IngredientGroup.js';
 
 /**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
@@ -12,16 +12,17 @@ export class IngredientSet {
     this.name = data.name || '';
 
     // Ingredient groups: all groups required, one option satisfies each group.
-    const groups = Array.isArray(data.ingredientGroups) && data.ingredientGroups.length > 0
-      ? data.ingredientGroups
-      : this._legacyIngredientsToGroups(data.ingredients || []);
-    this.ingredientGroups = groups.map(group =>
+    const groups =
+      Array.isArray(data.ingredientGroups) && data.ingredientGroups.length > 0
+        ? data.ingredientGroups
+        : this._legacyIngredientsToGroups(data.ingredients || []);
+    this.ingredientGroups = groups.map((group) =>
       group instanceof IngredientGroup ? group : IngredientGroup.fromJSON(group)
     );
 
     // Legacy alias retained for older UI code paths.
     this.ingredients = this.ingredientGroups
-      .map(group => group.options?.[0] || null)
+      .map((group) => group.options?.[0] || null)
       .filter(Boolean);
 
     // Required essences (accumulated from ingredients)
@@ -60,7 +61,7 @@ export class IngredientSet {
     return (ingredients || []).map((ingredient, idx) => ({
       id: foundry.utils.randomID(),
       name: `Group ${idx + 1}`,
-      options: [ingredient]
+      options: [ingredient],
     }));
   }
 
@@ -79,7 +80,9 @@ export class IngredientSet {
     for (const group of this.ingredientGroups) {
       const groupValidation = group.validate();
       if (!groupValidation.valid) {
-        errors.push(`Ingredient group "${group.name || group.id}": ${groupValidation.errors.join(', ')}`);
+        errors.push(
+          `Ingredient group "${group.name || group.id}": ${groupValidation.errors.join(', ')}`
+        );
       }
     }
 
@@ -92,7 +95,7 @@ export class IngredientSet {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -177,7 +180,7 @@ export class IngredientSet {
       if (!chosen) {
         missingGroups.push({
           group,
-          ...bestMissing
+          ...bestMissing,
         });
         continue;
       }
@@ -195,7 +198,7 @@ export class IngredientSet {
       success: missingGroups.length === 0,
       selectedIngredients,
       plan,
-      missingGroups
+      missingGroups,
     };
   }
 
@@ -204,7 +207,7 @@ export class IngredientSet {
     const optionPlan = [];
     let totalAvailable = 0;
 
-    const matchingItems = availableItems.filter(item =>
+    const matchingItems = availableItems.filter((item) =>
       matcher ? matcher(ingredient, item) : ingredient.matches(item)
     );
 
@@ -220,7 +223,7 @@ export class IngredientSet {
       optionPlan.push({
         item,
         quantity: toConsume,
-        ingredient
+        ingredient,
       });
       neededQuantity -= toConsume;
     }
@@ -228,7 +231,7 @@ export class IngredientSet {
     return {
       ok: neededQuantity <= 0,
       plan: optionPlan,
-      have: totalAvailable
+      have: totalAvailable,
     };
   }
 
@@ -240,9 +243,9 @@ export class IngredientSet {
     return {
       id: this.id,
       name: this.name,
-      ingredientGroups: this.ingredientGroups.map(group => group.toJSON()),
+      ingredientGroups: this.ingredientGroups.map((group) => group.toJSON()),
       // Legacy alias retained for compatibility with older consumers.
-      ingredients: this.ingredients.map(i => i.toJSON()),
+      ingredients: this.ingredients.map((i) => i.toJSON()),
       essences: this.essences,
       toolIds: [...this.toolIds],
       resultMapping: this.resultMapping,

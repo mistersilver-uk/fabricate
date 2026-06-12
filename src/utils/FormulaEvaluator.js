@@ -2,72 +2,72 @@
  * Safe formula evaluator that supports basic math expressions
  * Replaces eval() with a safe expression parser
  */
-export class FormulaEvaluator {
+export const FormulaEvaluator = {
   /**
    * Evaluate a formula with the given context
    * @param {string} formula - The formula to evaluate
    * @param {Object} context - Variables to substitute
    * @returns {number}
    */
-  static evaluate(formula, context = {}) {
+  evaluate(formula, context = {}) {
     try {
       // Replace context variables with their values
       let expression = formula;
       for (const [key, value] of Object.entries(context)) {
         // Replace whole words only to avoid partial replacements
-        expression = expression.replace(new RegExp(`\\b${key}\\b`, 'g'), value);
+        expression = expression.replaceAll(new RegExp(String.raw`\b${key}\b`, 'g'), value);
       }
 
       // Parse and evaluate the expression safely
       return this._parseExpression(expression);
-    } catch (err) {
-      console.error('Fabricate | Formula evaluation error:', err);
+    } catch (error) {
+      console.error('Fabricate | Formula evaluation error:', error);
       return 0;
     }
-  }
+  },
 
   /**
    * Parse and evaluate a mathematical expression safely
    * Supports: +, -, *, /, (), dice notation (1d6), Math.floor, Math.ceil, Math.round
    * @private
    */
-  static _parseExpression(expr) {
+  _parseExpression(exprInput) {
     // Remove whitespace
-    expr = expr.replace(/\s+/g, '');
+    let expr = exprInput.replaceAll(/\s+/g, '');
 
     // Handle dice notation (e.g., "1d6", "2d8")
-    expr = expr.replace(/(\d+)d(\d+)/gi, (match, count, sides) => {
-      return this._rollDice(parseInt(count), parseInt(sides));
+    expr = expr.replaceAll(/(\d+)d(\d+)/gi, (match, count, sides) => {
+      return this._rollDice(Number.parseInt(count), Number.parseInt(sides));
     });
 
     // Handle Math functions (floor, ceil, round)
-    expr = expr.replace(/Math\.(floor|ceil|round)\(([^)]+)\)/g, (match, func, inner) => {
+    expr = expr.replaceAll(/Math\.(floor|ceil|round)\(([^)]+)\)/g, (match, func, inner) => {
       const value = this._parseExpression(inner);
       return Math[func](value);
     });
 
     // Evaluate the expression using a safe parser
     return this._evaluateMath(expr);
-  }
+  },
 
   /**
    * Roll dice
    * @private
    */
-  static _rollDice(count, sides) {
+  _rollDice(count, sides) {
     let total = 0;
     for (let i = 0; i < count; i++) {
       total += Math.floor(Math.random() * sides) + 1;
     }
     return total;
-  }
+  },
 
   /**
    * Safely evaluate a mathematical expression
    * Uses operator precedence parsing (Shunting Yard algorithm)
    * @private
    */
-  static _evaluateMath(expr) {
+  _evaluateMath(expr) {
     // Tokenize
     const tokens = this._tokenize(expr);
 
@@ -76,13 +76,13 @@ export class FormulaEvaluator {
 
     // Evaluate postfix expression
     return this._evaluatePostfix(postfix);
-  }
+  },
 
   /**
    * Tokenize an expression
    * @private
    */
-  static _tokenize(expr) {
+  _tokenize(expr) {
     const tokens = [];
     let i = 0;
 
@@ -96,7 +96,7 @@ export class FormulaEvaluator {
           num += expr[i];
           i++;
         }
-        tokens.push(parseFloat(num));
+        tokens.push(Number.parseFloat(num));
         continue;
       }
 
@@ -112,13 +112,13 @@ export class FormulaEvaluator {
     }
 
     return tokens;
-  }
+  },
 
   /**
    * Convert infix notation to postfix (Shunting Yard algorithm)
    * @private
    */
-  static _toPostfix(tokens) {
+  _toPostfix(tokens) {
     const output = [];
     const operators = [];
     const precedence = { '+': 1, '-': 1, '*': 2, '/': 2 };
@@ -129,15 +129,15 @@ export class FormulaEvaluator {
       } else if (token === '(') {
         operators.push(token);
       } else if (token === ')') {
-        while (operators.length > 0 && operators[operators.length - 1] !== '(') {
+        while (operators.length > 0 && operators.at(-1) !== '(') {
           output.push(operators.pop());
         }
         operators.pop(); // Remove '('
       } else if (['+', '-', '*', '/'].includes(token)) {
         while (
           operators.length > 0 &&
-          operators[operators.length - 1] !== '(' &&
-          precedence[operators[operators.length - 1]] >= precedence[token]
+          operators.at(-1) !== '(' &&
+          precedence[operators.at(-1)] >= precedence[token]
         ) {
           output.push(operators.pop());
         }
@@ -150,13 +150,13 @@ export class FormulaEvaluator {
     }
 
     return output;
-  }
+  },
 
   /**
    * Evaluate a postfix expression
    * @private
    */
-  static _evaluatePostfix(postfix) {
+  _evaluatePostfix(postfix) {
     const stack = [];
 
     for (const token of postfix) {
@@ -167,23 +167,26 @@ export class FormulaEvaluator {
         const a = stack.pop();
 
         switch (token) {
-          case '+':
+          case '+': {
             stack.push(a + b);
             break;
-          case '-':
+          }
+          case '-': {
             stack.push(a - b);
             break;
-          case '*':
+          }
+          case '*': {
             stack.push(a * b);
             break;
-          case '/':
+          }
+          case '/': {
             stack.push(a / b);
             break;
+          }
         }
       }
     }
 
     return stack[0] || 0;
-  }
-}
-
+  },
+};

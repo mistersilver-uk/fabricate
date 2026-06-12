@@ -10,19 +10,18 @@ export class Ingredient {
     this.match = this._normalizeMatch(data);
 
     // componentId: resolved from match object or bare data field
-    this.componentId = (this.match?.type === 'component')
-      ? (this.match.componentId || null) : null;
+    this.componentId = this.match?.type === 'component' ? this.match.componentId || null : null;
 
     // Legacy transitional alias
     this.systemItemId = this.componentId;
 
     this.itemUuid = data.itemUuid || null;
-    this.tag = this.match?.type === 'tags' ? (this.match.tags?.[0] || null) : (data.tag || null);
+    this.tag = this.match?.type === 'tags' ? this.match.tags?.[0] || null : data.tag || null;
 
     this.alternatives = data.alternatives || []; // Array of Ingredient objects
 
     // Effect extraction settings
-    this.extractEffects = data.extractEffects !== undefined ? data.extractEffects : false;
+    this.extractEffects = data.extractEffects === undefined ? false : data.extractEffects;
     this.effectFilter = data.effectFilter || null; // Regex or array of effect names to extract
   }
 
@@ -31,20 +30,21 @@ export class Ingredient {
     if (raw) {
       if (raw.type === 'tags') {
         const tags = Array.isArray(raw.tags)
-          ? raw.tags.map(t => String(t || '').trim()).filter(Boolean)
+          ? raw.tags.map((t) => String(t || '').trim()).filter(Boolean)
           : [];
         return {
           type: 'tags',
           tags,
-          tagMatch: raw.tagMatch === 'all' ? 'all' : 'any'
+          tagMatch: raw.tagMatch === 'all' ? 'all' : 'any',
         };
       }
 
       // Accept both 'component' (primary) and 'systemItem' (legacy fallback)
-      const componentId = raw.componentId || raw.systemItemId || data.componentId || data.systemItemId || null;
+      const componentId =
+        raw.componentId || raw.systemItemId || data.componentId || data.systemItemId || null;
       return {
         type: 'component',
-        componentId
+        componentId,
       };
     }
 
@@ -53,18 +53,20 @@ export class Ingredient {
     if (bareComponentId) {
       return {
         type: 'component',
-        componentId: bareComponentId
+        componentId: bareComponentId,
       };
     }
 
     const tags = Array.isArray(data.tags)
-      ? data.tags.map(t => String(t || '').trim()).filter(Boolean)
-      : (data.tag ? [String(data.tag).trim()] : []);
+      ? data.tags.map((t) => String(t || '').trim()).filter(Boolean)
+      : data.tag
+        ? [String(data.tag).trim()]
+        : [];
     if (tags.length > 0) {
       return {
         type: 'tags',
         tags,
-        tagMatch: data.tagMatch === 'all' ? 'all' : 'any'
+        tagMatch: data.tagMatch === 'all' ? 'all' : 'any',
       };
     }
 
@@ -83,9 +85,10 @@ export class Ingredient {
     if (this.match?.type === 'tags') {
       const itemTags = getFabricateFlag(item, 'tags', []);
       const requiredTags = this.match.tags || [];
-      const matched = this.match.tagMatch === 'all'
-        ? requiredTags.every(tag => itemTags.includes(tag))
-        : requiredTags.some(tag => itemTags.includes(tag));
+      const matched =
+        this.match.tagMatch === 'all'
+          ? requiredTags.every((tag) => itemTags.includes(tag))
+          : requiredTags.some((tag) => itemTags.includes(tag));
       if (!matched) {
         return false;
       }
@@ -93,7 +96,7 @@ export class Ingredient {
     }
 
     // Check alternatives
-    return this.alternatives.some(alt => alt.matches(item));
+    return this.alternatives.some((alt) => alt.matches(item));
   }
 
   /**
@@ -103,13 +106,17 @@ export class Ingredient {
   validate() {
     const errors = [];
     const hasComponentMatch = this.match?.type === 'component' && !!this.match.componentId;
-    const hasTagMatch = this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
+    const hasTagMatch =
+      this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
 
     if (!hasComponentMatch && !hasTagMatch && !this.itemUuid) {
       errors.push('Ingredient must include a match rule or specific item UUID');
     }
 
-    if (this.match?.type === 'tags' && (!Array.isArray(this.match.tags) || this.match.tags.length === 0)) {
+    if (
+      this.match?.type === 'tags' &&
+      (!Array.isArray(this.match.tags) || this.match.tags.length === 0)
+    ) {
       errors.push('Tag-based ingredient match requires at least one tag');
     }
 
@@ -127,7 +134,7 @@ export class Ingredient {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -142,7 +149,11 @@ export class Ingredient {
     if (this.itemUuid) {
       return `${this.quantity}x specific item`;
     }
-    if (this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0) {
+    if (
+      this.match?.type === 'tags' &&
+      Array.isArray(this.match.tags) &&
+      this.match.tags.length > 0
+    ) {
       const joined = this.match.tags.join(this.match.tagMatch === 'all' ? ' & ' : ' | ');
       return `${this.quantity}x ${joined}`;
     }
@@ -160,16 +171,16 @@ export class Ingredient {
       itemUuid: this.itemUuid,
       quantity: this.quantity,
       tag: this.tag,
-      alternatives: this.alternatives.map(alt => alt.toJSON()),
+      alternatives: this.alternatives.map((alt) => alt.toJSON()),
       extractEffects: this.extractEffects,
-      effectFilter: this.effectFilter
+      effectFilter: this.effectFilter,
     };
   }
 
   static fromJSON(data) {
     const ingredient = new Ingredient(data);
     if (data.alternatives) {
-      ingredient.alternatives = data.alternatives.map(alt => Ingredient.fromJSON(alt));
+      ingredient.alternatives = data.alternatives.map((alt) => Ingredient.fromJSON(alt));
     }
     return ingredient;
   }

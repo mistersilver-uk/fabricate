@@ -24,12 +24,16 @@ const MINIMUM_VERSION = '3.1.0';
  * @returns {boolean}
  */
 function meetsMinimumVersion(actual, required) {
-  const parse = (v) => String(v || '0')
-    .split('.')
-    .map(n => parseInt(n, 10) || 0)
-    .slice(0, 3)
-    .concat([0, 0, 0])
-    .slice(0, 3);
+  const parse = (v) =>
+    [
+      ...String(v || '0')
+        .split('.')
+        .map((n) => Number.parseInt(n, 10) || 0)
+        .slice(0, 3),
+      0,
+      0,
+      0,
+    ].slice(0, 3);
 
   const [aMaj, aMin, aPat] = parse(actual);
   const [rMaj, rMin, rPat] = parse(required);
@@ -61,21 +65,6 @@ function meetsMinimumVersion(actual, required) {
  * });
  */
 export class ItemPilesIntegration {
-  constructor() {
-    /**
-     * Whether Item Piles is installed, active, and meets the minimum version.
-     * Set by {@link ItemPilesIntegration#detect}; `false` until detection runs.
-     * @type {boolean}
-     */
-    this.available = false;
-
-    /**
-     * The detected Item Piles module version string, or `null` if undetected.
-     * @type {string|null}
-     */
-    this.detectedVersion = null;
-  }
-
   /**
    * Detect whether Item Piles is installed, active, and meets the minimum version.
    *
@@ -182,19 +171,24 @@ export class ItemPilesIntegration {
       if (!Array.isArray(result)) return false;
 
       for (const requirement of currencies) {
-        const abbr = String(requirement.abbreviation || '').trim().toLowerCase();
+        const abbr = String(requirement.abbreviation || '')
+          .trim()
+          .toLowerCase();
         const needed = Number(requirement.amount) || 0;
         if (needed <= 0) continue;
 
         const held = result.find(
-          c => String(c.abbreviation || '').trim().toLowerCase() === abbr
+          (c) =>
+            String(c.abbreviation || '')
+              .trim()
+              .toLowerCase() === abbr
         );
         const heldAmount = Number(held?.quantity ?? held?.amount ?? 0);
         if (heldAmount < needed) return false;
       }
       return true;
-    } catch (err) {
-      console.error('Fabricate | ItemPilesIntegration.canAfford failed', err);
+    } catch (error) {
+      console.error('Fabricate | ItemPilesIntegration.canAfford failed', error);
       return false;
     }
   }
@@ -263,8 +257,8 @@ export class ItemPilesIntegration {
     try {
       const items = await game.itempiles.API.getMerchantItems(merchantActor);
       return Array.isArray(items) ? items : [];
-    } catch (err) {
-      console.error('Fabricate | ItemPilesIntegration.getMerchantItems failed', err);
+    } catch (error) {
+      console.error('Fabricate | ItemPilesIntegration.getMerchantItems failed', error);
       return [];
     }
   }
@@ -296,8 +290,8 @@ export class ItemPilesIntegration {
     try {
       const contents = await game.itempiles.API.getItemPileItems(containerActor);
       return Array.isArray(contents) ? contents : [];
-    } catch (err) {
-      console.error('Fabricate | ItemPilesIntegration.getContainerContents failed', err);
+    } catch (error) {
+      console.error('Fabricate | ItemPilesIntegration.getContainerContents failed', error);
       return [];
     }
   }
@@ -308,6 +302,8 @@ export class ItemPilesIntegration {
       throw new Error('Fabricate | ItemPilesIntegration: Item Piles is not available');
     }
   }
+  available = false;
+  detectedVersion = null;
 }
 
 export { MINIMUM_VERSION as ITEM_PILES_MINIMUM_VERSION };

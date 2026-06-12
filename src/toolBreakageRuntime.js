@@ -31,16 +31,18 @@ import { Tool } from './models/Tool.js';
  * Writes always go to `toolUsage` (authoritative); `catalystItemUsage` is never back-filled.
  */
 export function readToolUsage(item) {
-  const toolUsage = item?.getFlag?.('fabricate', 'toolUsage')
-    ?? item?.getFlag?.('fabricate', 'fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.toolUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage');
+  const toolUsage =
+    item?.getFlag?.('fabricate', 'toolUsage') ??
+    item?.getFlag?.('fabricate', 'fabricate.toolUsage') ??
+    globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.toolUsage') ??
+    globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage');
   if (toolUsage) return toolUsage;
 
-  const catalystUsage = item?.getFlag?.('fabricate', 'catalystItemUsage')
-    ?? item?.getFlag?.('fabricate', 'fabricate.catalystItemUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.catalystItemUsage')
-    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.catalystItemUsage');
+  const catalystUsage =
+    item?.getFlag?.('fabricate', 'catalystItemUsage') ??
+    item?.getFlag?.('fabricate', 'fabricate.catalystItemUsage') ??
+    globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.catalystItemUsage') ??
+    globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.catalystItemUsage');
   if (catalystUsage) return catalystUsage;
 
   return { timesUsed: 0 };
@@ -78,7 +80,7 @@ export function plannedToolBreakageOutcome(tool) {
   if (tool.onBreak?.mode === 'replaceWith') {
     return {
       action: 'replaced',
-      replacementComponentId: tool.onBreak.replacementComponentId
+      replacementComponentId: tool.onBreak.replacementComponentId,
     };
   }
   return { action: 'none' };
@@ -112,7 +114,7 @@ export async function applyToolUsageAndBreakage({
   planned,
   evaluateExpression,
   buildItemRef,
-  createReplacement
+  createReplacement,
 } = {}) {
   await tool.applyUsage(item);
   const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
@@ -124,7 +126,7 @@ export async function applyToolUsageAndBreakage({
     itemRef,
     mode: breakageResult.mode,
     broken: breakageResult.broken,
-    evidence: breakageResult.evidence
+    evidence: breakageResult.evidence,
   };
   if (breakageResult.broken) {
     entry.onBreak = await tool.applyBreakage({ item, actor, createReplacement });
@@ -152,15 +154,16 @@ export function createToolBreakageRuntime({
   buildItemRef,
   resolveReplacementSource,
   evaluateExpression,
-  planKey
+  planKey,
 } = {}) {
   const pendingPlans = new Map();
-  const keyOf = typeof planKey === 'function'
-    ? planKey
-    : ({ actor, task } = {}) => `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
+  const keyOf =
+    typeof planKey === 'function'
+      ? planKey
+      : ({ actor, task } = {}) => `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
 
   function makeCreateReplacement(actor, system) {
-    if (typeof resolveReplacementSource !== 'function') return undefined;
+    if (typeof resolveReplacementSource !== 'function') return;
     return async ({ actor: replacementActor, componentId }) => {
       const source = resolveReplacementSource({ componentId, system });
       if (!source || typeof replacementActor?.createEmbeddedDocuments !== 'function') return;
@@ -169,8 +172,8 @@ export function createToolBreakageRuntime({
         img: source.img ?? 'icons/svg/item-bag.svg',
         type: source.type ?? 'loot',
         system: source.system
-          ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system }
-          : {}
+          ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
+          : {},
       };
       itemData.system ??= {};
       if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
@@ -189,13 +192,17 @@ export function createToolBreakageRuntime({
         // Virtual-present (canvas-tool) matches have no owned item to break/use.
         if (virtual || !item) continue;
         const model = tool instanceof Tool ? tool : Tool.fromJSON(tool);
-        const breakageResult = await evaluateToolBreakagePlan(model, { actor, item, evaluateExpression });
+        const breakageResult = await evaluateToolBreakagePlan(model, {
+          actor,
+          item,
+          evaluateExpression,
+        });
         const entry = {
           componentId: model.componentId,
           itemRef: typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null,
           mode: breakageResult.mode,
           broken: breakageResult.broken,
-          evidence: breakageResult.evidence
+          evidence: breakageResult.evidence,
         };
         if (breakageResult.broken) {
           entry.onBreak = plannedToolBreakageOutcome(model);
@@ -209,8 +216,12 @@ export function createToolBreakageRuntime({
     async apply({ actor, system, task, tools = [], presentTools = null } = {}) {
       const matched = matchTools({ actor, system, task, tools, presentTools });
       const key = keyOf({ actor, task });
-      const plannedByItem = new Map((pendingPlans.get(key) || [])
-        .map(entry => [stringOrEmpty(entry?.itemRef?.itemUuid), entry]));
+      const plannedByItem = new Map(
+        (pendingPlans.get(key) || []).map((entry) => [
+          stringOrEmpty(entry?.itemRef?.itemUuid),
+          entry,
+        ])
+      );
       pendingPlans.delete(key);
       const evidence = [];
       for (const { tool: toolData, item, virtual } of matched.items) {
@@ -226,11 +237,11 @@ export function createToolBreakageRuntime({
           planned,
           evaluateExpression,
           buildItemRef,
-          createReplacement: makeCreateReplacement(actor, system)
+          createReplacement: makeCreateReplacement(actor, system),
         });
         evidence.push(entry);
       }
       return evidence;
-    }
+    },
   };
 }

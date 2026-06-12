@@ -40,7 +40,7 @@ export class Result {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -59,7 +59,7 @@ export class Result {
       systemItemId: this.componentId,
       itemUuid: this.itemUuid,
       quantity: this.quantity,
-      propertyMacroUuid: this.propertyMacroUuid
+      propertyMacroUuid: this.propertyMacroUuid,
     };
   }
 
