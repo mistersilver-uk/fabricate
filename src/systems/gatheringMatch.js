@@ -8,7 +8,7 @@
  * service (`GatheringRichStateService`) and the Manager V2 admin store, so match
  * results and the GM-facing match evidence never drift.
  *
- * Region is NOT a composition axis: geography (`GatheringRegion`) drives
+ * Geography is NOT a composition axis: a realm (`GatheringRealm`) drives
  * location availability and travel, not which tasks/events belong to an
  * environment. Composition is biome (+ danger for events) only.
  *
