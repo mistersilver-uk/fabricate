@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Inline region-name editor for the Travel > Regions inspector. Keeps a local
-  draft seeded from the upstream name (reseeded when a different region is
+  Inline realm-name editor for the Travel > Realms inspector. Keeps a local
+  draft seeded from the upstream name (reseeded when a different realm is
   selected or the name changes externally) and commits on blur / Enter; Escape
   reverts.
 -->
@@ -45,14 +45,14 @@
   }
 </script>
 
-<div class="manager-field manager-region-name-field" data-manager-region-name-field>
-  <span>{text('FABRICATE.Admin.Manager.Travel.Regions.RenameLabel', 'Region name')}</span>
+<div class="manager-field manager-realm-name-field" data-manager-realm-name-field>
+  <span>{text('FABRICATE.Admin.Manager.Travel.Realms.RenameLabel', 'Realm name')}</span>
   <input
     type="text"
     bind:value={draft}
     {disabled}
     onblur={commit}
     onkeydown={onKeydown}
-    aria-label={text('FABRICATE.Admin.Manager.Travel.Regions.RenameLabel', 'Region name')}
+    aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.RenameLabel', 'Realm name')}
   />
 </div>

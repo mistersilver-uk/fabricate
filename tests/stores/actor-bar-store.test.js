@@ -215,24 +215,24 @@ describe('actorBarStore', () => {
     assert.deepEqual(store.conditionVisibility, { weather: true, timeOfDay: false });
   });
 
-  it('setRegionContext defaults to disabled/empty and reflects pushed summaries', () => {
+  it('setRealmContext defaults to disabled/empty and reflects pushed summaries', () => {
     const { services } = makeServices({ actors: ACTORS });
     const store = createActorBarStore({ services });
 
     assert.deepEqual(
-      store.regionContext,
-      { enabled: false, regions: [] },
-      'region chip hidden by default'
+      store.realmContext,
+      { enabled: false, realms: [] },
+      'realm chip hidden by default'
     );
 
-    const regions = [{ id: 'r1', label: 'Whispering Wood', placeholder: false }];
-    store.setRegionContext({ enabled: true, regions });
+    const realms = [{ id: 'r1', label: 'Whispering Wood', placeholder: false }];
+    store.setRealmContext({ enabled: true, realms });
     flushSync();
-    assert.deepEqual(store.regionContext, { enabled: true, regions });
+    assert.deepEqual(store.realmContext, { enabled: true, realms });
 
     // A null/partial push normalizes to disabled + empty.
-    store.setRegionContext(null);
+    store.setRealmContext(null);
     flushSync();
-    assert.deepEqual(store.regionContext, { enabled: false, regions: [] });
+    assert.deepEqual(store.realmContext, { enabled: false, realms: [] });
   });
 });

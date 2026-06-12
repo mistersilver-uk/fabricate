@@ -19,10 +19,10 @@ const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, (
 
 function baseProps(overrides = {}) {
   return {
-    environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRegionIds: [] },
+    environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: [] },
     composition: { counts: {}, conditions: {} },
-    regionRecords: [],
-    regionsEnabled: false,
+    realmRecords: [],
+    realmsEnabled: false,
     biomeOptions: [],
     dangerOptions: [],
     linkedSceneImage: '',
@@ -47,7 +47,7 @@ function remount() {
   target?.remove();
 }
 
-describe('EnvironmentOverviewTab multi-region selector', () => {
+describe('EnvironmentOverviewTab multi-realm selector', () => {
   before(async () => {
     setupDOM();
     installComponentTestGlobals();
@@ -69,37 +69,37 @@ describe('EnvironmentOverviewTab multi-region selector', () => {
     if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('hides the region field entirely when the Travel & Regions toggle is off', async () => {
-    await mountTab(baseProps({ regionsEnabled: false, regionRecords: [{ id: 'r1', name: 'Verdant' }] }));
-    assert.equal(target.querySelector('[data-environment-field="includedRegionIds"]'), null, 'region field is hidden when disabled');
+  it('hides the realm field entirely when the Travel & Realms toggle is off', async () => {
+    await mountTab(baseProps({ realmsEnabled: false, realmRecords: [{ id: 'r1', name: 'Verdant' }] }));
+    assert.equal(target.querySelector('[data-environment-field="includedRealmIds"]'), null, 'realm field is hidden when disabled');
     // The legacy single-region <select> must not appear either.
     assert.equal(target.querySelector('[data-environment-field="region"]'), null, 'legacy single-region select is removed');
     remount();
   });
 
-  it('shows an empty-state hint pointing to the Travel tab when enabled but no regions exist', async () => {
-    await mountTab(baseProps({ regionsEnabled: true, regionRecords: [] }));
-    const field = target.querySelector('[data-environment-field="includedRegionIds"]');
-    assert.ok(field, 'region field renders when enabled');
-    assert.ok(target.querySelector('[data-environment-region-empty]'), 'empty-state hint renders');
-    assert.equal(field.querySelector('select'), null, 'no add-select when there are no regions');
+  it('shows an empty-state hint pointing to the Travel tab when enabled but no realms exist', async () => {
+    await mountTab(baseProps({ realmsEnabled: true, realmRecords: [] }));
+    const field = target.querySelector('[data-environment-field="includedRealmIds"]');
+    assert.ok(field, 'realm field renders when enabled');
+    assert.ok(target.querySelector('[data-environment-realm-empty]'), 'empty-state hint renders');
+    assert.equal(field.querySelector('select'), null, 'no add-select when there are no realms');
     remount();
   });
 
-  it('adds and removes region chips bound to includedRegionIds', async () => {
+  it('adds and removes realm chips bound to includedRealmIds', async () => {
     const updates = [];
     await mountTab(baseProps({
-      regionsEnabled: true,
-      regionRecords: [
+      realmsEnabled: true,
+      realmRecords: [
         { id: 'r1', name: 'Verdant' },
         { id: 'r2', name: 'Dunes' }
       ],
-      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRegionIds: ['r1'] },
+      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: ['r1'] },
       onUpdate: (patch) => updates.push(patch)
     }));
 
-    const field = target.querySelector('[data-environment-field="includedRegionIds"]');
-    assert.ok(field, 'region field renders');
+    const field = target.querySelector('[data-environment-field="includedRealmIds"]');
+    assert.ok(field, 'realm field renders');
     // r1 already selected → its chip shows; only r2 remains in the add-select.
     const options = Array.from(field.querySelectorAll('select option')).map(o => o.value).filter(Boolean);
     assert.deepEqual(options, ['r2']);
@@ -109,12 +109,12 @@ describe('EnvironmentOverviewTab multi-region selector', () => {
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.deepEqual(updates.at(-1), { includedRegionIds: ['r1', 'r2'] });
+    assert.deepEqual(updates.at(-1), { includedRealmIds: ['r1', 'r2'] });
 
-    field.querySelector('.manager-availability-pill.is-region .manager-availability-remove').click();
+    field.querySelector('.manager-availability-pill.is-realm .manager-availability-remove').click();
     await tick();
     flushSync();
-    assert.deepEqual(updates.at(-1), { includedRegionIds: [] });
+    assert.deepEqual(updates.at(-1), { includedRealmIds: [] });
     remount();
   });
 });

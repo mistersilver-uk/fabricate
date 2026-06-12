@@ -28,7 +28,7 @@ describe('gatheringBlockedReasons', () => {
 
   it('covers the location codes that caused the silent no-op', () => {
     assert.equal(BLOCK_LABEL_KEYS.LOCATION_BLOCKED, 'FABRICATE.App.Gathering.Detail.Callout.Location');
-    assert.equal(BLOCK_LABEL_KEYS.NO_CURRENT_REALM, 'FABRICATE.App.Gathering.Detail.Callout.NoRegion');
+    assert.equal(BLOCK_LABEL_KEYS.NO_CURRENT_REALM, 'FABRICATE.App.Gathering.Detail.Callout.NoRealm');
   });
 
   it('falls back to the reason message, then a generic label, for unknown codes', () => {
@@ -45,7 +45,7 @@ describe('gatheringBlockedReasons', () => {
   it('describeBlockedReasons builds a "Can\'t attempt — …" sentence', () => {
     const sentence = describeBlockedReasons([{ code: 'NO_CURRENT_REALM' }], localize);
     assert.match(sentence, /^FABRICATE\.App\.Gathering\.Detail\.CannotAttempt:/);
-    assert.match(sentence, /Callout\.NoRegion/);
+    assert.match(sentence, /Callout\.NoRealm/);
   });
 
   it('describeBlockedReasons returns the generic label for an empty/garbage list', () => {

@@ -27,7 +27,7 @@ function baseProps(overrides = {}) {
     error: null,
     fieldErrors: {},
     actorOptions: [],
-    systemRegions: [],
+    systemRealms: [],
     ...overrides
   };
 }
@@ -44,11 +44,11 @@ function makeParty(overrides = {}) {
     travelActor: null,
     staleMembers: [],
     staleTravelActor: null,
-    staleRegionIds: [],
+    staleRealmIds: [],
     hasStaleReference: false,
     overrideMode: 'none',
-    overrideRegionIds: [],
-    currentRegionEvidence: { source: 'unresolved', resolved: false, regions: [], staleRegionIds: [] },
+    overrideRealmIds: [],
+    currentRealmEvidence: { source: 'unresolved', resolved: false, realms: [], staleRealmIds: [] },
     ...overrides
   };
 }
@@ -77,7 +77,7 @@ describe('GatheringTravelView mounted behavior', () => {
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionQuickList.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringTravelView.svelte.js')).href);
     GatheringTravelView = mod.default;
@@ -187,7 +187,7 @@ describe('GatheringTravelView mounted behavior', () => {
         travelActorUuid: 'Actor.also-gone',
         staleMembers: ['Actor.gone'],
         staleTravelActor: 'Actor.also-gone',
-        staleRegionIds: ['r-missing'],
+        staleRealmIds: ['r-missing'],
         hasStaleReference: true
       })],
       selectedPartyId: 'p1'
@@ -196,7 +196,7 @@ describe('GatheringTravelView mounted behavior', () => {
     assert.ok(staleSection, 'stale section should render');
     assert.ok(staleSection.querySelector('[data-stale-member="Actor.gone"] button'), 'stale member row should have a button');
     assert.ok(staleSection.querySelector('[data-stale-travel-actor="Actor.also-gone"] button'), 'stale travel actor row should have a button');
-    assert.ok(staleSection.querySelector('[data-stale-region="r-missing"] button'), 'stale region row should have a button');
+    assert.ok(staleSection.querySelector('[data-stale-realm="r-missing"] button'), 'stale region row should have a button');
     remount();
   });
 
@@ -205,18 +205,18 @@ describe('GatheringTravelView mounted behavior', () => {
       parties: [makeParty({ memberCards: [{ uuid: 'Actor.a', name: 'Aria', img: '', stale: false }], memberCount: 1, travelActorUuid: 'Actor.a', travelActor: { uuid: 'Actor.a', name: 'Aria', img: '' } })],
       selectedPartyId: 'p1',
       actorOptions: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
-      systemRegions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false }]
+      systemRealms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false }]
     }));
     // Every clickable action is a real button: party rows, toggles, pickers,
     // region chips, override Set/Clear, and remove/clear icon buttons.
     const interactiveDivs = Array.from(target.querySelectorAll('[onclick]'))
       .filter(node => node.tagName !== 'BUTTON');
     assert.equal(interactiveDivs.length, 0, 'no non-button element should carry a click handler');
-    assert.ok(target.querySelector('.manager-travel-region-chip'), 'region chips render as buttons');
+    assert.ok(target.querySelector('.manager-travel-realm-chip'), 'region chips render as buttons');
     remount();
   });
 
-  it('redaction guard: a secret undiscovered region routed through buildRegionDisclosure leaks nothing but renders the placeholder', async () => {
+  it('redaction guard: a secret undiscovered region routed through buildRealmDisclosure leaks nothing but renders the placeholder', async () => {
     const SECRET_NAME = 'SECRET_SANCTUM';
     const SECRET_ID = 'region-secret-xyz';
 
@@ -240,7 +240,7 @@ describe('GatheringTravelView mounted behavior', () => {
     // disclosure.id is null and disclosure.label is undefined for a redacted
     // region, so the view receives a synthetic id (not the secret one) and the
     // localized placeholder key in place of the name.
-    const placeholderRegion = {
+    const placeholderRealm = {
       id: disclosure.id ?? 'placeholder-region',
       name: disclosure.label ?? disclosure.labelKey ?? PLACEHOLDER_LABEL,
       enabled: true,
@@ -249,15 +249,15 @@ describe('GatheringTravelView mounted behavior', () => {
 
     await mountView(baseProps({
       parties: [makeParty({
-        currentRegionEvidence: {
+        currentRealmEvidence: {
           source: 'manualOverride',
           resolved: true,
-          regions: [{ id: placeholderRegion.id, name: placeholderRegion.name, enabled: true }],
-          staleRegionIds: []
+          realms: [{ id: placeholderRealm.id, name: placeholderRealm.name, enabled: true }],
+          staleRealmIds: []
         }
       })],
       selectedPartyId: 'p1',
-      systemRegions: [placeholderRegion]
+      systemRealms: [placeholderRealm]
     }));
 
     const html = target.innerHTML;
@@ -275,20 +275,20 @@ describe('GatheringTravelView mounted behavior', () => {
       }
     }
     // The placeholder label DOES render via the disclosure-safe path.
-    const chip = target.querySelector(`.manager-travel-region-chip[data-region-id="${placeholderRegion.id}"]`);
+    const chip = target.querySelector(`.manager-travel-realm-chip[data-realm-id="${placeholderRealm.id}"]`);
     assert.ok(chip, 'placeholder region chip should render');
     assert.ok(chip.textContent.includes(PLACEHOLDER_LABEL), 'placeholder label should render in place of the secret name');
     remount();
   });
 
-  it('expanded region authoring edits description, secret, image, and biomes through onUpdateRegion', async () => {
+  it('expanded region authoring edits description, secret, image, and biomes through onUpdateRealm', async () => {
     const updates = [];
     const toggles = [];
     const deletes = [];
     await mountView(baseProps({
       parties: [makeParty()],
       selectedPartyId: 'p1',
-      systemRegions: [
+      systemRealms: [
         { id: 'r1', name: 'Verdant', description: 'Old wood', img: 'icons/svg/direction.svg', enabled: true, secret: false, biomes: ['forest'] },
         { id: 'r2', name: 'Dunes', description: '', img: null, enabled: false, secret: true, biomes: [] }
       ],
@@ -296,38 +296,38 @@ describe('GatheringTravelView mounted behavior', () => {
         { id: 'forest', label: 'Forest' },
         { id: 'cavern', label: 'Crystal Cavern' }
       ],
-      onUpdateRegion: (sys, id, patch) => updates.push([sys, id, patch]),
-      onToggleRegionEnabled: (sys, id, enabled) => toggles.push([sys, id, enabled]),
-      onDeleteRegion: (sys, id) => deletes.push([sys, id])
+      onUpdateRealm: (sys, id, patch) => updates.push([sys, id, patch]),
+      onToggleRealmEnabled: (sys, id, enabled) => toggles.push([sys, id, enabled]),
+      onDeleteRealm: (sys, id) => deletes.push([sys, id])
     }));
 
     // List + detail layout: first region selected by default.
-    const detail = target.querySelector('.manager-travel-region-detail');
+    const detail = target.querySelector('.manager-travel-realm-detail');
     assert.ok(detail, 'region detail pane should render');
-    assert.equal(detail.dataset.regionDetail, 'r1');
+    assert.equal(detail.dataset.realmDetail, 'r1');
 
     // Description edit round-trips a merge patch.
-    const description = detail.querySelector('[data-region-field="description"]');
+    const description = detail.querySelector('[data-realm-field="description"]');
     description.value = 'Ancient moonlit forest';
     description.dispatchEvent(new Event('blur', { bubbles: true }));
     await tick();
     flushSync();
     assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { description: 'Ancient moonlit forest' }]);
 
-    // Secret toggle round-trips through onUpdateRegion (not a quick toggle).
-    detail.querySelector('[data-region-field="secret"]').click();
+    // Secret toggle round-trips through onUpdateRealm (not a quick toggle).
+    detail.querySelector('[data-realm-field="secret"]').click();
     await tick();
     flushSync();
     assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { secret: true }]);
 
-    // Enabled toggle round-trips through onToggleRegionEnabled.
-    detail.querySelector('[data-region-field="enabled"]').click();
+    // Enabled toggle round-trips through onToggleRealmEnabled.
+    detail.querySelector('[data-realm-field="enabled"]').click();
     await tick();
     flushSync();
     assert.deepEqual(toggles.at(-1), ['sys-1', 'r1', false]);
 
     // Biome add appends to the existing biome list.
-    const biomeSelect = detail.querySelector('[data-region-field="biomes"] select');
+    const biomeSelect = detail.querySelector('[data-realm-field="biomes"] select');
     biomeSelect.value = 'cavern';
     biomeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
@@ -335,19 +335,19 @@ describe('GatheringTravelView mounted behavior', () => {
     assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { biomes: ['forest', 'cavern'] }]);
 
     // Biome remove drops the chip.
-    detail.querySelector('[data-region-field="biomes"] .manager-availability-remove').click();
+    detail.querySelector('[data-realm-field="biomes"] .manager-availability-remove').click();
     await tick();
     flushSync();
     assert.deepEqual(updates.at(-1), ['sys-1', 'r1', { biomes: [] }]);
 
     // Selecting the second region swaps the detail pane.
-    target.querySelector('[data-region-select="r2"]').click();
+    target.querySelector('[data-realm-select="r2"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-travel-region-detail').dataset.regionDetail, 'r2');
+    assert.equal(target.querySelector('.manager-travel-realm-detail').dataset.realmDetail, 'r2');
 
     // Delete routes through the (store-owned) delete handler.
-    target.querySelector('[data-region-id="r2"] .manager-icon-button.is-danger').click();
+    target.querySelector('[data-realm-id="r2"] .manager-icon-button.is-danger').click();
     await tick();
     flushSync();
     assert.deepEqual(deletes.at(-1), ['sys-1', 'r2']);

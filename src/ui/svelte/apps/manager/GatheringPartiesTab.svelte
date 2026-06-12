@@ -8,9 +8,9 @@
     inspector can show its details. Selection and expansion are the same state:
     the selected party's row is the expanded one.
   - The row header shows the travel-actor image (or a default icon), the party
-    name, an enabled/disabled chip and a region selection-mode chip on the left,
-    and the party's current region plus a searchable region-override popover
-    (RegionOverridePicker) on the right.
+    name, an enabled/disabled chip and a realm selection-mode chip on the left,
+    and the party's current realm plus a searchable realm-override popover
+    (RealmOverridePicker) on the right.
   - The expanded accordion body is intentionally empty for now.
 
   Uses a `.manager-travel-parties-*` (plural) class namespace to stay clear of
@@ -19,19 +19,19 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import RegionOverridePicker from './RegionOverridePicker.svelte';
+  import RealmOverridePicker from './RealmOverridePicker.svelte';
   import PartyExpandedBody from './PartyExpandedBody.svelte';
 
   let {
     parties = [],
     systemId = '',
-    systemRegions = [],
+    systemRealms = [],
     selectedPartyId = '',
     actorOptions = [],
     saving = false,
     onSelectParty = () => {},
-    onSetRegionOverride = () => {},
-    onClearRegionOverride = () => {},
+    onSetRealmOverride = () => {},
+    onClearRealmOverride = () => {},
     onRenameParty = () => {},
     onAddMember = () => {},
     onRemoveMember = () => {},
@@ -77,17 +77,17 @@
   }
 
   function overrideValue(party) {
-    if (party?.overrideMode === 'manual' && Array.isArray(party.overrideRegionIds) && party.overrideRegionIds.length > 0) {
-      return party.overrideRegionIds[0];
+    if (party?.overrideMode === 'manual' && Array.isArray(party.overrideRealmIds) && party.overrideRealmIds.length > 0) {
+      return party.overrideRealmIds[0];
     }
     return '';
   }
 
-  function chooseOverride(party, regionId) {
-    if (regionId) {
-      onSetRegionOverride(party.id, systemId, [regionId]);
+  function chooseOverride(party, realmId) {
+    if (realmId) {
+      onSetRealmOverride(party.id, systemId, [realmId]);
     } else {
-      onClearRegionOverride(party.id, systemId);
+      onClearRealmOverride(party.id, systemId);
     }
   }
 
@@ -162,10 +162,10 @@
             </div>
 
             <div class="manager-travel-parties-right">
-              <RegionOverridePicker
+              <RealmOverridePicker
                 value={overrideValue(party)}
-                regions={systemRegions}
-                onChoose={(regionId) => chooseOverride(party, regionId)}
+                realms={systemRealms}
+                onChoose={(realmId) => chooseOverride(party, realmId)}
               />
 
               <span class="manager-travel-parties-chevron" aria-hidden="true">

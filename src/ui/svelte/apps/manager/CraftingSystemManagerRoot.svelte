@@ -10,7 +10,7 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringEventEditView from './GatheringEventEditView.svelte';
-  import RegionNameField from './RegionNameField.svelte';
+  import RealmNameField from './RealmNameField.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -42,7 +42,7 @@
   let gatheringMenuExpanded = $state(false);
 
   function selectTravelTab(tabId) {
-    if (['parties', 'regions', 'map'].includes(tabId)) activeTravelTab = tabId;
+    if (['parties', 'realms', 'map'].includes(tabId)) activeTravelTab = tabId;
   }
   let selectedGatheringTaskId = $state('');
   let selectedGatheringEventId = $state('');
@@ -497,7 +497,7 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
       titleFallback: 'Travel and parties',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
-      hintFallback: 'Manage Fabricate parties and set the current region for this crafting system.'
+      hintFallback: 'Manage Fabricate parties and set the current realm for this crafting system.'
     },
     {
       id: 'settings',
@@ -510,13 +510,13 @@
       hintFallback: 'Set system-level rules for gathering.'
     }
   ];
-  // The Travel/Regions subsystem is opt-in per system. When disabled, the Travel
+  // The Travel/Realms subsystem is opt-in per system. When disabled, the Travel
   // nav item is hidden AND removed from the tab-resolution lists so a stale
   // `activeGatheringTab === 'travel'` falls back to environments (filtering the
   // render alone is insufficient — the guards below validate against this list).
-  const gatheringRegionsEnabled = $derived($viewState.gatheringRegionSettings?.enabled === true);
+  const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
   const visibleGatheringNavItems = $derived(
-    gatheringRegionsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')
+    gatheringRealmsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')
   );
   const gatheringInspectorTabs = $derived(visibleGatheringNavItems.filter(tab => tab.id !== 'environments'));
   const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit');
@@ -527,7 +527,7 @@
     gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
   );
   // Stale-tab guard: if the active tab is no longer visible (e.g. Travel after the
-  // GM disables Travel & Regions), fall back to Environments.
+  // GM disables Travel & Realms), fall back to Environments.
   $effect(() => {
     if (!visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)) {
       activeGatheringTab = 'environments';
@@ -578,20 +578,20 @@
   const selectedTravelParty = $derived(
     travelParties.find(party => party.id === selectedTravelPartyId) || null
   );
-  // Region selection is UI-local (no store resolution needed); the inspector
-  // reads the selected region from the system-region projection.
-  let selectedTravelRegionId = $state('');
-  const travelSystemRegions = $derived($viewState.selectedSystemRegions || []);
-  const selectedTravelRegion = $derived(
-    travelSystemRegions.find(region => region.id === selectedTravelRegionId) || null
+  // Realm selection is UI-local (no store resolution needed); the inspector
+  // reads the selected realm from the system-realm projection.
+  let selectedTravelRealmId = $state('');
+  const travelSystemRealms = $derived($viewState.selectedSystemRealms || []);
+  const selectedTravelRealm = $derived(
+    travelSystemRealms.find(realm => realm.id === selectedTravelRealmId) || null
   );
-  // Mirror the Parties tab: keep a region selected whenever one exists, falling
-  // back to the first region when nothing is selected or the selection is gone.
+  // Mirror the Parties tab: keep a realm selected whenever one exists, falling
+  // back to the first realm when nothing is selected or the selection is gone.
   $effect(() => {
-    if (travelSystemRegions.length === 0) {
-      if (selectedTravelRegionId) selectedTravelRegionId = '';
-    } else if (!travelSystemRegions.some(region => region.id === selectedTravelRegionId)) {
-      selectedTravelRegionId = travelSystemRegions[0].id;
+    if (travelSystemRealms.length === 0) {
+      if (selectedTravelRealmId) selectedTravelRealmId = '';
+    } else if (!travelSystemRealms.some(realm => realm.id === selectedTravelRealmId)) {
+      selectedTravelRealmId = travelSystemRealms[0].id;
     }
   });
   // Map Region Links tab: selection over the current scene's regions (UI-local).
@@ -1005,7 +1005,7 @@
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.Manager.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
-    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current region for the selected crafting system.');
+    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current realm for the selected crafting system.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') {
@@ -2925,10 +2925,10 @@
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
         </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'regions'}
-        <button type="button" class="manager-button is-primary" onclick={async () => { const created = await store.createRegionQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRegionName', 'New region')); if (typeof created === 'string' && created) selectedTravelRegionId = created; }} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
+      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'realms'}
+        <button type="button" class="manager-button is-primary" onclick={async () => { const created = await store.createRealmQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')); if (typeof created === 'string' && created) selectedTravelRealmId = created; }} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
           <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Travel.CreateRegion', 'Create region')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
         </button>
       {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
         <!-- Map Region Links tab has no create action. -->
@@ -3197,8 +3197,8 @@
         onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}
         onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
         onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
-        gatheringRegionSettings={$viewState.gatheringRegionSettings || { enabled: false }}
-        onSetGatheringRegionsEnabled={(sys, enabled) => store.setGatheringRegionsEnabled?.(sys, enabled)}
+        gatheringRealmSettings={$viewState.gatheringRealmSettings || { enabled: false }}
+        onSetGatheringRealmsEnabled={(sys, enabled) => store.setGatheringRealmsEnabled?.(sys, enabled)}
         onPickImagePath={services?.pickImagePath}
         travelParties={travelParties}
         travelSelectedPartyId={selectedTravelPartyId}
@@ -3206,11 +3206,11 @@
         travelError={$viewState.travelError}
         travelFieldErrors={$viewState.travelFieldErrors || {}}
         travelActorOptions={$viewState.actorOptions || []}
-        travelSystemRegions={$viewState.selectedSystemRegions || []}
-        travelSelectedRegionId={selectedTravelRegionId}
-        onSelectRegion={(id) => selectedTravelRegionId = id}
-        onAddEnvironmentToRegion={(envId, regionId) => store.setEnvironmentRegionMembership?.(envId, regionId, true)}
-        onRemoveEnvironmentFromRegion={(envId, regionId) => store.setEnvironmentRegionMembership?.(envId, regionId, false)}
+        travelSystemRealms={$viewState.selectedSystemRealms || []}
+        travelSelectedRealmId={selectedTravelRealmId}
+        onSelectRealm={(id) => selectedTravelRealmId = id}
+        onAddEnvironmentToRealm={(envId, realmId) => store.setEnvironmentRealmMembership?.(envId, realmId, true)}
+        onRemoveEnvironmentFromRealm={(envId, realmId) => store.setEnvironmentRealmMembership?.(envId, realmId, false)}
         onSelectParty={(id) => store.selectParty?.(id)}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
@@ -3221,21 +3221,21 @@
         onMovePartyMember={(from, to, uuid) => store.movePartyMember?.(from, to, uuid)}
         onSetPartyTravelActor={(id, uuid) => store.setPartyTravelActor?.(id, uuid)}
         onClearPartyTravelActor={(id) => store.clearPartyTravelActor?.(id)}
-        onSetPartyRegionOverride={(id, sys, ids) => store.setPartyRegionOverride?.(id, sys, ids)}
-        onClearPartyRegionOverride={(id, sys) => store.clearPartyRegionOverride?.(id, sys)}
+        onSetPartyRealmOverride={(id, sys, ids) => store.setPartyRealmOverride?.(id, sys, ids)}
+        onClearPartyRealmOverride={(id, sys) => store.clearPartyRealmOverride?.(id, sys)}
         onRemoveStaleMember={(id, uuid) => store.removeStaleMember?.(id, uuid)}
         onClearStaleTravelActor={(id) => store.clearStaleTravelActor?.(id)}
-        onDropStaleOverrideRegion={(id, sys, regionId) => store.dropStaleOverrideRegion?.(id, sys, regionId)}
-        onCreateRegionQuick={(sys, name) => store.createRegionQuick?.(sys, name)}
-        onRenameRegion={(sys, id, name) => store.renameRegion?.(sys, id, name)}
-        onToggleRegionEnabled={(sys, id, enabled) => store.toggleRegionEnabled?.(sys, id, enabled)}
-        onUpdateRegion={(sys, id, patch) => store.updateRegion?.(sys, id, patch)}
-        onDeleteRegion={(sys, id) => store.deleteRegion?.(sys, id)}
+        onDropStaleOverrideRealm={(id, sys, realmId) => store.dropStaleOverrideRealm?.(id, sys, realmId)}
+        onCreateRealmQuick={(sys, name) => store.createRealmQuick?.(sys, name)}
+        onRenameRealm={(sys, id, name) => store.renameRealm?.(sys, id, name)}
+        onToggleRealmEnabled={(sys, id, enabled) => store.toggleRealmEnabled?.(sys, id, enabled)}
+        onUpdateRealm={(sys, id, patch) => store.updateRealm?.(sys, id, patch)}
+        onDeleteRealm={(sys, id) => store.deleteRealm?.(sys, id)}
         travelCurrentSceneRegions={mapCurrentSceneRegions}
         travelCurrentSceneUuid={$viewState.currentSceneUuid || ''}
         mapSelectedRegionUuid={selectedMapRegionUuid}
         onSelectMapRegion={(uuid) => selectedMapRegionUuid = uuid}
-        onSetMapRegionLink={(sceneRegionUuid, regionId) => store.setMapRegionLink?.(sceneRegionUuid, regionId)}
+        onSetMapRegionLink={(sceneRegionUuid, realmId) => store.setMapRegionLink?.(sceneRegionUuid, realmId)}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}>
@@ -3246,8 +3246,8 @@
             eventSelectionMode={selectedGatheringRules.eventSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
             linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
-            regionRecords={$viewState.selectedSystemRegions || []}
-            regionsEnabled={gatheringRegionsEnabled}
+            realmRecords={$viewState.selectedSystemRealms || []}
+            realmsEnabled={gatheringRealmsEnabled}
             biomeOptions={gatheringVocabularyOptions('biomes')}
             dangerOptions={gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
@@ -4278,20 +4278,20 @@
                 </div>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current region')}</h3>
-                  {#if selectedTravelParty.currentRegionEvidence.regions.length > 0}
-                    <ul class="manager-travel-evidence-regions">
-                      {#each selectedTravelParty.currentRegionEvidence.regions as region (region.id)}
+                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}</h3>
+                  {#if selectedTravelParty.currentRealmEvidence.realms.length > 0}
+                    <ul class="manager-travel-evidence-realms">
+                      {#each selectedTravelParty.currentRealmEvidence.realms as realm (realm.id)}
                         <li>
-                          {region.name}
-                          {#if !region.enabled}
-                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRegionChip', 'Disabled')}</span>
+                          {realm.name}
+                          {#if !realm.enabled}
+                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span>
                           {/if}
                         </li>
                       {/each}
                     </ul>
                   {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRegions', 'No current region set for this system.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRealms', 'No current realm set for this system.')}</p>
                   {/if}
                 </section>
 
@@ -4333,15 +4333,15 @@
               {:else}
                 <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>
               {/if}
-            {:else if activeTravelTab === 'regions'}
-              {#if selectedTravelRegion}
+            {:else if activeTravelTab === 'realms'}
+              {#if selectedTravelRealm}
                 <div class="manager-inspector-title-row">
                   <span class="manager-inspector-icon" aria-hidden="true">
                     <i class="fas fa-map-location-dot"></i>
                   </span>
                   <div class="manager-inspector-copy">
-                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.Regions.InspectorKicker', 'Selected region')}</p>
-                    <h2 class="manager-inspector-name">{selectedTravelRegion.name}</h2>
+                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.Realms.InspectorKicker', 'Selected realm')}</p>
+                    <h2 class="manager-inspector-name">{selectedTravelRealm.name}</h2>
                   </div>
                 </div>
 
@@ -4350,26 +4350,26 @@
                     type="button"
                     class="manager-button is-danger"
                     disabled={$viewState.travelSaving === true}
-                    onclick={() => store.deleteRegion?.(selectedSystemId, selectedTravelRegion.id)}
+                    onclick={() => store.deleteRealm?.(selectedSystemId, selectedTravelRealm.id)}
                   >
                     <i class="fas fa-trash" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.Travel.Regions.Delete', 'Delete region')}</span>
+                    <span>{text('FABRICATE.Admin.Manager.Travel.Realms.Delete', 'Delete realm')}</span>
                   </button>
                 </div>
 
                 <section class="manager-inspector-card">
-                  <RegionNameField
-                    name={selectedTravelRegion.name}
+                  <RealmNameField
+                    name={selectedTravelRealm.name}
                     disabled={$viewState.travelSaving === true}
-                    onRename={(name) => store.renameRegion?.(selectedSystemId, selectedTravelRegion.id, name)}
+                    onRename={(name) => store.renameRealm?.(selectedSystemId, selectedTravelRealm.id, name)}
                   />
                 </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-seedling" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.EnvironmentsCardTitle', 'Environments')}</h3>
-                  {#if selectedTravelRegion.environments.length > 0}
+                  <h3 class="manager-card-title"><i class="fas fa-seedling" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Realms.EnvironmentsCardTitle', 'Environments')}</h3>
+                  {#if selectedTravelRealm.environments.length > 0}
                     <ul class="manager-travel-region-environments">
-                      {#each selectedTravelRegion.environments as environment (environment.id)}
+                      {#each selectedTravelRealm.environments as environment (environment.id)}
                         <li>
                           <span class="manager-travel-region-thumb" aria-hidden="true">
                             {#if environment.img}<img src={environment.img} alt="" />{:else}<i class="fas fa-seedling"></i>{/if}
@@ -4379,15 +4379,15 @@
                       {/each}
                     </ul>
                   {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Regions.NoEnvironments', 'No environments include this region yet.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Realms.NoEnvironments', 'No environments include this realm yet.')}</p>
                   {/if}
                 </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Regions.PartiesCardTitle', 'Parties in this region')}</h3>
-                  {#if selectedTravelRegion.parties.length > 0}
+                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Realms.PartiesCardTitle', 'Parties in this realm')}</h3>
+                  {#if selectedTravelRealm.parties.length > 0}
                     <ul class="manager-travel-region-parties">
-                      {#each selectedTravelRegion.parties as party (party.id)}
+                      {#each selectedTravelRealm.parties as party (party.id)}
                         <li>
                           <span class="manager-travel-region-thumb" aria-hidden="true">
                             {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
@@ -4397,11 +4397,11 @@
                       {/each}
                     </ul>
                   {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Regions.NoParties', 'No parties are currently in this region.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Realms.NoParties', 'No parties are currently in this realm.')}</p>
                   {/if}
                 </section>
               {:else}
-                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RegionsPlaceholder', 'Select a region to see its details.')}</p>
+                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RealmsPlaceholder', 'Select a realm to see its details.')}</p>
               {/if}
             {:else if activeTravelTab === 'map'}
               {#if selectedMapRegion}
@@ -4416,20 +4416,20 @@
                 </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-link" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkSectionTitle', 'Linked Fabricate region')}</h3>
+                  <h3 class="manager-card-title"><i class="fas fa-link" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkSectionTitle', 'Linked Fabricate realm')}</h3>
                   {#if selectedMapRegion.linkedRegionId}
-                    {@const linkedRegion = travelSystemRegions.find(region => region.id === selectedMapRegion.linkedRegionId)}
+                    {@const linkedRealm = travelSystemRealms.find(realm => realm.id === selectedMapRegion.linkedRegionId)}
                     <ul class="manager-travel-region-parties">
                       <li>
                         <span class="manager-travel-region-thumb" aria-hidden="true"><i class="fas fa-map-location-dot"></i></span>
-                        <span class="manager-travel-region-item-name">{linkedRegion?.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown region')}</span>
-                        {#if linkedRegion && !linkedRegion.enabled}
+                        <span class="manager-travel-region-item-name">{linkedRealm?.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown realm')}</span>
+                        {#if linkedRealm && !linkedRealm.enabled}
                           <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
                         {/if}
                       </li>
                     </ul>
                   {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate region.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate realm.')}</p>
                   {/if}
                 </section>
 
@@ -4452,12 +4452,12 @@
                 </section>
 
                 <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInFabricateRegionTitle', 'Parties in this Fabricate region')}</h3>
+                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInFabricateRegionTitle', 'Parties in this Fabricate realm')}</h3>
                   {#if !selectedMapRegion.linkedRegionId}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate region.')}</p>
-                  {:else if selectedMapRegion.partiesInFabricateRegion?.length > 0}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate realm.')}</p>
+                  {:else if selectedMapRegion.partiesInFabricateRealm?.length > 0}
                     <ul class="manager-travel-region-parties">
-                      {#each selectedMapRegion.partiesInFabricateRegion as party (party.id)}
+                      {#each selectedMapRegion.partiesInFabricateRealm as party (party.id)}
                         <li>
                           <span class="manager-travel-region-thumb" aria-hidden="true">
                             {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
@@ -4467,7 +4467,7 @@
                       {/each}
                     </ul>
                   {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInFabricateRegion', 'No parties are in this Fabricate region.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInFabricateRegion', 'No parties are in this Fabricate realm.')}</p>
                   {/if}
                 </section>
               {:else}

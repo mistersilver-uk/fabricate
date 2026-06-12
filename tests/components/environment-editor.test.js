@@ -56,7 +56,7 @@ describe('environment editor localization', () => {
     const editor = lang.FABRICATE.Admin.Manager.EnvironmentEditor;
     assert.ok(editor, 'EnvironmentEditor namespace should exist');
     const checks = [
-      ['Overview', 'RegionsHint'],
+      ['Overview', 'RealmsHint'],
       ['Overview', 'BiomesHint'],
       ['Overview', 'DangerHint'],
       ['Composition', 'Automatic'],
@@ -168,31 +168,31 @@ describe('environment editor localization', () => {
   });
 });
 
-describe('environment multi-region selector', () => {
-  it('replaces the single-region select with a toggle-gated includedRegionIds chip control', () => {
+describe('environment multi-realm selector', () => {
+  it('replaces the single-region select with a toggle-gated includedRealmIds chip control', () => {
     // The legacy single-region <select> bound to environment.region is gone.
     assert.equal(overviewSource.includes("data-environment-field=\"region\""), false, 'legacy single-region select should be removed');
     assert.equal(overviewSource.includes('onUpdate({ region:'), false, 'editor should not write the legacy region string');
 
-    // The multi-region chip control is bound to includedRegionIds and gated on the toggle.
-    assert.ok(overviewSource.includes("data-environment-field=\"includedRegionIds\""), 'region chip control should hook includedRegionIds');
-    assert.ok(overviewSource.includes('{#if regionsEnabled}'), 'region field is gated on the Travel & Regions toggle');
-    assert.ok(overviewSource.includes('onUpdate({ includedRegionIds:'), 'add/remove writes includedRegionIds');
-    assert.ok(/function\s+addRegion\s*\(/.test(overviewSource), 'addRegion handler should exist');
-    assert.ok(/function\s+removeRegion\s*\(/.test(overviewSource), 'removeRegion handler should exist');
+    // The multi-realm chip control is bound to includedRealmIds and gated on the toggle.
+    assert.ok(overviewSource.includes("data-environment-field=\"includedRealmIds\""), 'realm chip control should hook includedRealmIds');
+    assert.ok(overviewSource.includes('{#if realmsEnabled}'), 'realm field is gated on the Travel & Realms toggle');
+    assert.ok(overviewSource.includes('onUpdate({ includedRealmIds:'), 'add/remove writes includedRealmIds');
+    assert.ok(/function\s+addRealm\s*\(/.test(overviewSource), 'addRealm handler should exist');
+    assert.ok(/function\s+removeRealm\s*\(/.test(overviewSource), 'removeRealm handler should exist');
 
-    // Empty-state hint points to the Travel tab when no regions exist.
-    assert.ok(overviewSource.includes('data-environment-region-empty'), 'empty-state hint hook should exist');
-    assert.ok(overviewSource.includes('regionOptions.length === 0'), 'empty state guards on no region options');
-    assert.equal(typeof lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsEmpty, 'string');
-    assert.ok(lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionsEmpty.includes('Travel'), 'empty-state hint names the Travel tab');
+    // Empty-state hint points to the Travel tab when no realms exist.
+    assert.ok(overviewSource.includes('data-environment-realm-empty'), 'empty-state hint hook should exist');
+    assert.ok(overviewSource.includes('realmOptions.length === 0'), 'empty state guards on no realm options');
+    assert.equal(typeof lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty, 'string');
+    assert.ok(lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty.includes('Travel'), 'empty-state hint names the Travel tab');
   });
 
-  it('sources region options from GatheringRegion records, not the removed vocabulary', () => {
-    assert.ok(overviewSource.includes('regionRecords'), 'overview consumes regionRecords (GatheringRegion records)');
-    assert.equal(shellSource.includes("regionOptions={gatheringVocabularyOptions('regions')}"), false, 'no longer sources region from the vocabulary');
-    assert.ok(managerRootSource.includes('regionRecords={$viewState.selectedSystemRegions'), 'root threads region records into the editor');
-    assert.ok(managerRootSource.includes('regionsEnabled={gatheringRegionsEnabled}'), 'root threads the toggle gate into the editor');
+  it('sources realm options from GatheringRealm records, not the removed vocabulary', () => {
+    assert.ok(overviewSource.includes('realmRecords'), 'overview consumes realmRecords (GatheringRealm records)');
+    assert.equal(shellSource.includes("realmOptions={gatheringVocabularyOptions('realms')}"), false, 'no longer sources realm from the vocabulary');
+    assert.ok(managerRootSource.includes('realmRecords={$viewState.selectedSystemRealms'), 'root threads realm records into the editor');
+    assert.ok(managerRootSource.includes('realmsEnabled={gatheringRealmsEnabled}'), 'root threads the toggle gate into the editor');
   });
 });
 

@@ -439,6 +439,24 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
  * Main module entry point
  */
 
+// Tracks which deprecated API names have already warned so the notice fires
+// once per old name rather than on every call.
+const _deprecationWarned = new Set();
+
+/**
+ * Emit a one-time console deprecation notice for a renamed public API method.
+ * Used by the `*Region*` → `*Realm*` delegates so existing macros/modules keep
+ * working while nudging callers to the canonical name. Never throws.
+ *
+ * @param {string} oldName the deprecated method/helper name
+ * @param {string} newName the canonical replacement
+ */
+function deprecate(oldName, newName) {
+  if (_deprecationWarned.has(oldName)) return;
+  _deprecationWarned.add(oldName);
+  console.warn(`Fabricate: ${oldName} is deprecated; use ${newName} instead.`);
+}
+
 class Fabricate {
   constructor() {
     this.recipeManager = null;
@@ -519,11 +537,11 @@ class Fabricate {
       }
     });
     this.gatheringEnvironmentStore.load();
-    // Per-system gathering regions + Fabricate-managed parties + current-region
+    // Per-system gathering realms + Fabricate-managed parties + current-realm
     // resolver for location-aware gathering. Parties persist to a world setting;
-    // regions live on the crafting system via the region store's updateSystem
+    // realms live on the crafting system via the realm store's updateSystem
     // seam. The resolver is constructor-injected into the engine (not imported).
-    this.gatheringRegionStore = new GatheringRealmStore({ systemManager: this.craftingSystemManager });
+    this.gatheringRealmStore = new GatheringRealmStore({ systemManager: this.craftingSystemManager });
     this.gatheringPartyStore = new GatheringPartyStore({
       getSetting,
       setSetting,
@@ -654,15 +672,15 @@ class Fabricate {
       ui.notifications?.info?.(message);
     }
 
-    // One-time GM-facing notice: when the 0.9.0 migration unified legacy regions on
-    // one or more systems, name them so the GM can re-enable Travel & Regions (the
-    // subsystem stays disabled by default) and knows region-scoped records may now
+    // One-time GM-facing notice: when the 0.9.0 migration unified legacy realms on
+    // one or more systems, name them so the GM can re-enable Travel & Realms (the
+    // subsystem stays disabled by default) and knows realm-scoped records may now
     // appear in more environments. GM-only; only when something was migrated.
     const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
     if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
       const systemList = unifiedRegionSystems.join(', ');
       const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
-        || `Fabricate unified gathering regions for: ${systemList}. Travel & Regions is disabled by default — enable it per system. Region-scoped tasks/events may now appear in more environments.`;
+        || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
       ui.notifications?.info?.(message);
     }
   }
@@ -729,17 +747,26 @@ class Fabricate {
   }
 
   /**
-   * Get the per-system gathering region store.
+   * Get the per-system gathering realm store.
    *
    * @returns {GatheringRealmStore|null}
    */
-  getGatheringRegionStore() {
+  getGatheringRealmStore() {
     this._requireReady();
-    return this.gatheringRegionStore;
+    return this.gatheringRealmStore;
   }
 
   /**
-   * Get the current-region resolver used for location-aware gathering.
+   * @deprecated Use {@link getGatheringRealmStore}.
+   * @returns {GatheringRealmStore|null}
+   */
+  getGatheringRegionStore() {
+    deprecate('getGatheringRegionStore', 'getGatheringRealmStore');
+    return this.getGatheringRealmStore();
+  }
+
+  /**
+   * Get the current-realm resolver used for location-aware gathering.
    *
    * @returns {GatheringLocationService|null}
    */
@@ -749,12 +776,12 @@ class Fabricate {
   }
 
   /**
-   * Read redaction-safe current-region evidence for a selected actor and system.
+   * Read redaction-safe current-realm evidence for a selected actor and system.
    * Player-callable: the result reports only the resolved source token and
-   * disclosure-safe region display data, never raw secret region records.
+   * disclosure-safe realm display data, never raw secret realm records.
    *
    * @param {{ actorId?: string, actor?: object, systemId: string }} options
-   * @returns {{ resolved: boolean, source: string, regions: object[], regionIds: string[], staleRegionIds: string[] }|null}
+   * @returns {{ resolved: boolean, source: string, realms: object[], realmIds: string[], staleRealmIds: string[] }|null}
    */
   getGatheringLocationForActor({ actorId = null, actor = null, systemId = null } = {}) {
     this._requireReady();
@@ -772,28 +799,38 @@ class Fabricate {
   }
 
   /**
-   * Set a party's manual current-region override for one crafting system. GM-only.
+   * Set a party's manual current-realm override for one crafting system. GM-only.
    *
-   * @param {{ partyId: string, systemId: string, regionIds?: string[] }} options
+   * @param {{ partyId: string, systemId: string, realmIds?: string[] }} options
    * @returns {Promise<object|null>}
    */
-  setGatheringPartyRegionOverride({ partyId = null, systemId = null, regionIds = [] } = {}) {
+  setGatheringPartyRealmOverride({ partyId = null, systemId = null, realmIds = [] } = {}) {
     this._requireReady();
     this._requireGM();
     if (!partyId || !systemId) return null;
     // Realm/travel disabled ⇒ no-op (no override writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, systemId, regionIds);
+    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, systemId, realmIds);
   }
 
   /**
-   * Clear a party's current-region override for one crafting system (stamped,
-   * empties regionIds). GM-only.
+   * @deprecated Use {@link setGatheringPartyRealmOverride}.
+   * @param {{ partyId: string, systemId: string, regionIds?: string[] }} options
+   * @returns {Promise<object|null>}
+   */
+  setGatheringPartyRegionOverride({ partyId = null, systemId = null, regionIds = [] } = {}) {
+    deprecate('setGatheringPartyRegionOverride', 'setGatheringPartyRealmOverride');
+    return this.setGatheringPartyRealmOverride({ partyId, systemId, realmIds: regionIds });
+  }
+
+  /**
+   * Clear a party's current-realm override for one crafting system (stamped,
+   * empties realmIds). GM-only.
    *
    * @param {{ partyId: string, systemId: string }} options
    * @returns {Promise<object|null>}
    */
-  clearGatheringPartyRegionOverride({ partyId = null, systemId = null } = {}) {
+  clearGatheringPartyRealmOverride({ partyId = null, systemId = null } = {}) {
     this._requireReady();
     this._requireGM();
     if (!partyId || !systemId) return null;
@@ -803,23 +840,33 @@ class Fabricate {
   }
 
   /**
-   * Reveal a region's discovery on an actor. GM-only; validates the region
+   * @deprecated Use {@link clearGatheringPartyRealmOverride}.
+   * @param {{ partyId: string, systemId: string }} options
+   * @returns {Promise<object|null>}
+   */
+  clearGatheringPartyRegionOverride({ partyId = null, systemId = null } = {}) {
+    deprecate('clearGatheringPartyRegionOverride', 'clearGatheringPartyRealmOverride');
+    return this.clearGatheringPartyRealmOverride({ partyId, systemId });
+  }
+
+  /**
+   * Reveal a realm's discovery on an actor. GM-only; validates the realm
    * belongs to the referenced crafting system before writing.
    *
-   * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string, source?: string, partyId?: string }} options
+   * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string, source?: string, partyId?: string }} options
    * @returns {Promise<boolean>}
    */
-  revealGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null, source = 'manual', partyId = null } = {}) {
+  revealGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null, source = 'manual', partyId = null } = {}) {
     this._requireReady();
     this._requireGM();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
-    if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
+    if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
     const system = this.craftingSystemManager?.getSystem(systemId);
     // Realm/travel disabled ⇒ no-op (no discovery writes).
     if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);
     return revealGatheringRealm(resolvedActor, {
       systemId,
-      realmId: regionId,
+      realmId,
       source,
       partyId,
       validateRealmInSystem: system,
@@ -828,19 +875,39 @@ class Fabricate {
   }
 
   /**
-   * Hide (remove) a region's discovery on an actor. GM-only.
+   * @deprecated Use {@link revealGatheringRealmForActor}.
+   * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string, source?: string, partyId?: string }} options
+   * @returns {Promise<boolean>}
+   */
+  revealGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null, source = 'manual', partyId = null } = {}) {
+    deprecate('revealGatheringRegionForActor', 'revealGatheringRealmForActor');
+    return this.revealGatheringRealmForActor({ actorId, actor, systemId, realmId: regionId, source, partyId });
+  }
+
+  /**
+   * Hide (remove) a realm's discovery on an actor. GM-only.
    *
+   * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string }} options
+   * @returns {Promise<boolean>}
+   */
+  hideGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null } = {}) {
+    this._requireReady();
+    this._requireGM();
+    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
+    if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
+    // Realm/travel disabled ⇒ no-op (no discovery writes).
+    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
+    return hideGatheringRealm(resolvedActor, { systemId, realmId });
+  }
+
+  /**
+   * @deprecated Use {@link hideGatheringRealmForActor}.
    * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string }} options
    * @returns {Promise<boolean>}
    */
   hideGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null } = {}) {
-    this._requireReady();
-    this._requireGM();
-    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
-    if (!resolvedActor || !systemId || !regionId) return Promise.resolve(false);
-    // Realm/travel disabled ⇒ no-op (no discovery writes).
-    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
-    return hideGatheringRealm(resolvedActor, { systemId, realmId: regionId });
+    deprecate('hideGatheringRegionForActor', 'hideGatheringRealmForActor');
+    return this.hideGatheringRealmForActor({ actorId, actor, systemId, realmId: regionId });
   }
 
   /**
@@ -1301,13 +1368,20 @@ function bindFabricateGlobal() {
     setTimeOfDay: (timeOfDayTag) => fabricate.setGatheringTimeOfDay(timeOfDayTag),
     setConditions: (conditions) => fabricate.setGatheringConditions(conditions),
     getPartyStore: () => fabricate.getGatheringPartyStore(),
-    getRegionStore: () => fabricate.getGatheringRegionStore(),
+    getRealmStore: () => fabricate.getGatheringRealmStore(),
     getLocationService: () => fabricate.getGatheringLocationService(),
     getLocationForActor: (options) => fabricate.getGatheringLocationForActor(options),
-    setPartyRegionOverride: (options) => fabricate.setGatheringPartyRegionOverride(options),
-    clearPartyRegionOverride: (options) => fabricate.clearGatheringPartyRegionOverride(options),
-    revealRegionForActor: (options) => fabricate.revealGatheringRegionForActor(options),
-    hideRegionForActor: (options) => fabricate.hideGatheringRegionForActor(options)
+    setPartyRealmOverride: (options) => fabricate.setGatheringPartyRealmOverride(options),
+    clearPartyRealmOverride: (options) => fabricate.clearGatheringPartyRealmOverride(options),
+    revealRealmForActor: (options) => fabricate.revealGatheringRealmForActor(options),
+    hideRealmForActor: (options) => fabricate.hideGatheringRealmForActor(options),
+    // DEPRECATED region-named helper aliases — forward to the realm method and
+    // warn once. Kept so existing macros/modules keep working.
+    getRegionStore: () => { deprecate('gathering.getRegionStore', 'gathering.getRealmStore'); return fabricate.getGatheringRealmStore(); },
+    setPartyRegionOverride: (options) => { deprecate('gathering.setPartyRegionOverride', 'gathering.setPartyRealmOverride'); return fabricate.setGatheringPartyRealmOverride({ ...options, realmIds: options?.realmIds ?? options?.regionIds }); },
+    clearPartyRegionOverride: (options) => { deprecate('gathering.clearPartyRegionOverride', 'gathering.clearPartyRealmOverride'); return fabricate.clearGatheringPartyRealmOverride(options); },
+    revealRegionForActor: (options) => { deprecate('gathering.revealRegionForActor', 'gathering.revealRealmForActor'); return fabricate.revealGatheringRealmForActor({ ...options, realmId: options?.realmId ?? options?.regionId }); },
+    hideRegionForActor: (options) => { deprecate('gathering.hideRegionForActor', 'gathering.hideRealmForActor'); return fabricate.hideGatheringRealmForActor({ ...options, realmId: options?.realmId ?? options?.regionId }); }
   };
 
   // Expose classes for advanced users
@@ -1323,6 +1397,8 @@ function bindFabricateGlobal() {
     CraftingRunManager,
     SalvageRunManager,
     GatheringEnvironmentStore,
+    GatheringRealmStore,
+    // DEPRECATED alias for backwards compatibility — same class.
     GatheringRegionStore: GatheringRealmStore,
     GatheringPartyStore,
     GatheringLocationService,

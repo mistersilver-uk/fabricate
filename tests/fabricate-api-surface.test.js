@@ -30,15 +30,26 @@ test('Fabricate macro helper exposes deleteRecipe', () => {
   );
 });
 
-test('Fabricate exposes the new gathering location getters and mutators', () => {
+test('Fabricate exposes the canonical gathering location getters and mutators', () => {
   assert.ok(mainSource.includes('getGatheringPartyStore()'), 'getGatheringPartyStore method');
-  assert.ok(mainSource.includes('getGatheringRegionStore()'), 'getGatheringRegionStore method');
+  assert.ok(mainSource.includes('getGatheringRealmStore()'), 'getGatheringRealmStore method');
   assert.ok(mainSource.includes('getGatheringLocationService()'), 'getGatheringLocationService method');
   assert.ok(mainSource.includes('getGatheringLocationForActor('), 'getGatheringLocationForActor method');
-  assert.ok(mainSource.includes('setGatheringPartyRegionOverride('), 'setGatheringPartyRegionOverride method');
-  assert.ok(mainSource.includes('clearGatheringPartyRegionOverride('), 'clearGatheringPartyRegionOverride method');
-  assert.ok(mainSource.includes('revealGatheringRegionForActor('), 'revealGatheringRegionForActor method');
-  assert.ok(mainSource.includes('hideGatheringRegionForActor('), 'hideGatheringRegionForActor method');
+  assert.ok(mainSource.includes('setGatheringPartyRealmOverride('), 'setGatheringPartyRealmOverride method');
+  assert.ok(mainSource.includes('clearGatheringPartyRealmOverride('), 'clearGatheringPartyRealmOverride method');
+  assert.ok(mainSource.includes('revealGatheringRealmForActor('), 'revealGatheringRealmForActor method');
+  assert.ok(mainSource.includes('hideGatheringRealmForActor('), 'hideGatheringRealmForActor method');
+});
+
+test('Fabricate retains the deprecated *Region* delegates that forward to the realm methods', () => {
+  assert.ok(mainSource.includes('getGatheringRegionStore()'), 'getGatheringRegionStore delegate');
+  assert.ok(mainSource.includes('setGatheringPartyRegionOverride('), 'setGatheringPartyRegionOverride delegate');
+  assert.ok(mainSource.includes('clearGatheringPartyRegionOverride('), 'clearGatheringPartyRegionOverride delegate');
+  assert.ok(mainSource.includes('revealGatheringRegionForActor('), 'revealGatheringRegionForActor delegate');
+  assert.ok(mainSource.includes('hideGatheringRegionForActor('), 'hideGatheringRegionForActor delegate');
+  // The delegates forward to the canonical realm method via the shared deprecate() helper.
+  assert.ok(mainSource.includes("deprecate('getGatheringRegionStore', 'getGatheringRealmStore')"), 'getGatheringRegionStore warns + forwards');
+  assert.ok(mainSource.includes('return this.getGatheringRealmStore();'), 'delegate forwards to canonical realm method');
 });
 
 test('the location API methods gate on isGatheringRealmsEnabled (no-op when disabled)', () => {
@@ -56,11 +67,11 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
   );
   assert.ok(
     mainSource.includes('if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);'),
-    'revealGatheringRegionForActor no-ops (false) when disabled'
+    'revealGatheringRealmForActor no-ops (false) when disabled'
   );
   assert.ok(
     mainSource.includes('if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);'),
-    'hideGatheringRegionForActor no-ops (false) when disabled'
+    'hideGatheringRealmForActor no-ops (false) when disabled'
   );
 });
 
@@ -69,15 +80,17 @@ test('Fabricate registers a GM-only discipline on realm mutators', () => {
   assert.ok(mainSource.includes('validateRealmInSystem: system'), 'reveal validates realm belongs to system');
 });
 
-test('game.fabricate.api exposes the new gathering location classes', () => {
+test('game.fabricate.api exposes the canonical realm class + deprecated alias', () => {
+  assert.ok(mainSource.includes('GatheringRealmStore,'), 'GatheringRealmStore canonical in api');
   assert.ok(mainSource.includes('GatheringRegionStore: GatheringRealmStore,'), 'GatheringRegionStore alias in api');
   assert.ok(mainSource.includes('GatheringPartyStore,'), 'GatheringPartyStore in api');
   assert.ok(mainSource.includes('GatheringLocationService,'), 'GatheringLocationService in api');
 });
 
-test('game.fabricate.gathering exposes the new location helpers', () => {
+test('game.fabricate.gathering exposes the canonical realm helpers', () => {
   assert.ok(mainSource.includes('getPartyStore: () => fabricate.getGatheringPartyStore()'), 'getPartyStore helper');
+  assert.ok(mainSource.includes('getRealmStore: () => fabricate.getGatheringRealmStore()'), 'getRealmStore helper');
   assert.ok(mainSource.includes('getLocationForActor: (options) => fabricate.getGatheringLocationForActor(options)'), 'getLocationForActor helper');
-  assert.ok(mainSource.includes('setPartyRegionOverride: (options) => fabricate.setGatheringPartyRegionOverride(options)'), 'setPartyRegionOverride helper');
-  assert.ok(mainSource.includes('revealRegionForActor: (options) => fabricate.revealGatheringRegionForActor(options)'), 'revealRegionForActor helper');
+  assert.ok(mainSource.includes('setPartyRealmOverride: (options) => fabricate.setGatheringPartyRealmOverride(options)'), 'setPartyRealmOverride helper');
+  assert.ok(mainSource.includes('revealRealmForActor: (options) => fabricate.revealGatheringRealmForActor(options)'), 'revealRealmForActor helper');
 });

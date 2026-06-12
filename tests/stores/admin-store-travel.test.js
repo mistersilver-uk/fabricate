@@ -21,7 +21,7 @@ function makeSystem(overrides = {}) {
     essenceDefinitions: [],
     items: [],
     components: [],
-    gatheringRegions: overrides.gatheringRegions || [],
+    gatheringRealms: overrides.gatheringRealms || [],
     requirements: { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
     craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
     recipeVisibility: { listMode: 'global' },
@@ -39,7 +39,7 @@ class PartyValidationError extends Error {
 
 function createServices({
   parties = [],
-  regions = [],
+  realms = [],
   actors = [],
   environments = [],
   confirmResult = true,
@@ -49,7 +49,7 @@ function createServices({
   autoRegionIds = {}
 } = {}) {
   const settings = { lastManagedCraftingSystem: 'system-a' };
-  const system = makeSystem({ gatheringRegions: regions });
+  const system = makeSystem({ gatheringRealms: realms });
   const systemManager = {
     getSystems: () => [system],
     getSystem: (id) => (id === system.id ? system : null),
@@ -62,7 +62,7 @@ function createServices({
   const calls = {
     create: [], update: [], delete: [], addMember: [], removeMember: [],
     moveMember: [], setTravelActor: [], setEnabled: [], setOverride: [], clearOverride: [],
-    regionCreate: [], regionUpdate: [], regionDelete: [], regionSettings: []
+    realmCreate: [], realmUpdate: [], realmDelete: [], realmSettings: []
   };
   const confirmCalls = [];
   const markerMoveHandlers = [];
@@ -78,7 +78,7 @@ function createServices({
     create: async (data) => {
       calls.create.push(clone(data));
       maybeThrow();
-      const party = { id: `party-${partyRecords.length + 1}`, name: data?.name || 'New party', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} };
+      const party = { id: `party-${partyRecords.length + 1}`, name: data?.name || 'New party', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} };
       partyRecords.push(party);
       return clone(party);
     },
@@ -129,53 +129,53 @@ function createServices({
       if (party) party.enabled = enabled === true;
       return clone(party);
     },
-    setCurrentRegionOverride: async (id, sys, ids) => {
+    setCurrentRealmOverride: async (id, sys, ids) => {
       calls.setOverride.push({ id, sys, ids: clone(ids) });
       maybeThrow();
       const party = partyRecords.find(p => p.id === id);
-      if (party) party.currentRegionOverrides = { ...party.currentRegionOverrides, [sys]: { mode: 'manual', regionIds: clone(ids) } };
+      if (party) party.currentRealmOverrides = { ...party.currentRealmOverrides, [sys]: { mode: 'manual', realmIds: clone(ids) } };
       return clone(party);
     },
-    clearCurrentRegionOverride: async (id, sys) => {
+    clearCurrentRealmOverride: async (id, sys) => {
       calls.clearOverride.push({ id, sys });
       const party = partyRecords.find(p => p.id === id);
-      if (party) party.currentRegionOverrides = { ...party.currentRegionOverrides, [sys]: { mode: 'none', regionIds: [] } };
+      if (party) party.currentRealmOverrides = { ...party.currentRealmOverrides, [sys]: { mode: 'none', realmIds: [] } };
       return clone(party);
     }
   };
 
-  const regionStore = {
-    listBySystem: (sys) => clone(system.gatheringRegions.filter(r => !r.craftingSystemId || r.craftingSystemId === sys)),
-    get: (sys, id) => clone(system.gatheringRegions.find(r => r.id === id) || null),
-    create: async (sys, data) => { calls.regionCreate.push({ sys, data: clone(data) }); system.gatheringRegions.push({ id: `region-${system.gatheringRegions.length + 1}`, name: data.name, enabled: true, secret: false, biomes: [], description: 'keep', img: 'keep.webp' }); return true; },
-    update: async (sys, id, patch) => { calls.regionUpdate.push({ sys, id, patch: clone(patch) }); const r = system.gatheringRegions.find(x => x.id === id); if (r) Object.assign(r, patch); return clone(r); },
-    delete: async (sys, id, collaborators) => { calls.regionDelete.push({ sys, id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } }); system.gatheringRegions = system.gatheringRegions.filter(r => r.id !== id); return { deleted: { id }, referencedBy: { environments: [], partyOverrides: [] } }; },
-    getRegionSettings: () => clone(system.gatheringRegionSettings || { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }),
-    updateRegionSettings: async (sys, patch) => { calls.regionSettings.push({ sys, patch: clone(patch) }); system.gatheringRegionSettings = { ...(system.gatheringRegionSettings || { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), ...patch }; return clone(system.gatheringRegionSettings); }
+  const realmStore = {
+    listBySystem: (sys) => clone(system.gatheringRealms.filter(r => !r.craftingSystemId || r.craftingSystemId === sys)),
+    get: (sys, id) => clone(system.gatheringRealms.find(r => r.id === id) || null),
+    create: async (sys, data) => { calls.realmCreate.push({ sys, data: clone(data) }); system.gatheringRealms.push({ id: `region-${system.gatheringRealms.length + 1}`, name: data.name, enabled: true, secret: false, biomes: [], description: 'keep', img: 'keep.webp' }); return true; },
+    update: async (sys, id, patch) => { calls.realmUpdate.push({ sys, id, patch: clone(patch) }); const r = system.gatheringRealms.find(x => x.id === id); if (r) Object.assign(r, patch); return clone(r); },
+    delete: async (sys, id, collaborators) => { calls.realmDelete.push({ sys, id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } }); system.gatheringRealms = system.gatheringRealms.filter(r => r.id !== id); return { deleted: { id }, referencedBy: { environments: [], partyOverrides: [] } }; },
+    getRealmSettings: () => clone(system.gatheringRealmSettings || { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }),
+    updateRealmSettings: async (sys, patch) => { calls.realmSettings.push({ sys, patch: clone(patch) }); system.gatheringRealmSettings = { ...(system.gatheringRealmSettings || { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), ...patch }; return clone(system.gatheringRealmSettings); }
   };
 
   const locationService = {
-    resolveCurrentRegions: ({ partyId, systemId }) => {
+    resolveCurrentRealms: ({ partyId, systemId }) => {
       const party = partyRecords.find(p => p.id === partyId);
-      const override = party?.currentRegionOverrides?.[systemId];
-      if (override?.mode === 'manual' && override.regionIds.length > 0) {
-        const regionsById = new Map(system.gatheringRegions.map(r => [r.id, r]));
-        const resolvedRegions = [];
-        const staleRegionIds = [];
-        for (const rid of override.regionIds) {
-          if (regionsById.has(rid)) resolvedRegions.push(regionsById.get(rid));
-          else staleRegionIds.push(rid);
+      const override = party?.currentRealmOverrides?.[systemId];
+      if (override?.mode === 'manual' && override.realmIds.length > 0) {
+        const regionsById = new Map(system.gatheringRealms.map(r => [r.id, r]));
+        const resolvedRealms = [];
+        const staleRealmIds = [];
+        for (const rid of override.realmIds) {
+          if (regionsById.has(rid)) resolvedRealms.push(regionsById.get(rid));
+          else staleRealmIds.push(rid);
         }
-        return { resolved: resolvedRegions.length > 0, source: resolvedRegions.length > 0 ? 'manualOverride' : 'unresolved', regions: resolvedRegions, regionIds: resolvedRegions.map(r => r.id), staleRegionIds, partyId, systemId };
+        return { resolved: resolvedRealms.length > 0, source: resolvedRealms.length > 0 ? 'manualOverride' : 'unresolved', realms: resolvedRealms, realmIds: resolvedRealms.map(r => r.id), staleRealmIds, partyId, systemId };
       }
       // Auto (travel-actor) sensing — driven by the mutable autoRegionIds map.
       const autoIds = autoRegionIds[partyId];
       if (Array.isArray(autoIds) && autoIds.length > 0) {
-        const regionsById = new Map(system.gatheringRegions.map(r => [r.id, r]));
-        const regions = autoIds.filter(id => regionsById.has(id)).map(id => regionsById.get(id));
-        return { resolved: regions.length > 0, source: regions.length > 0 ? 'travelActor' : 'unresolved', regions, regionIds: regions.map(r => r.id), staleRegionIds: [], partyId, systemId };
+        const regionsById = new Map(system.gatheringRealms.map(r => [r.id, r]));
+        const realms = autoIds.filter(id => regionsById.has(id)).map(id => regionsById.get(id));
+        return { resolved: realms.length > 0, source: realms.length > 0 ? 'travelActor' : 'unresolved', realms, realmIds: realms.map(r => r.id), staleRealmIds: [], partyId, systemId };
       }
-      return { resolved: false, source: 'unresolved', regions: [], regionIds: [], staleRegionIds: [], partyId, systemId };
+      return { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [], partyId, systemId };
     }
   };
 
@@ -186,7 +186,7 @@ function createServices({
     getRecipeManager: () => recipeManager,
     getGatheringEnvironmentStore: () => ({ listBySystem: async () => clone(environments), list: () => clone(environments) }),
     getGatheringPartyStore: () => partyStore,
-    getGatheringRegionStore: () => regionStore,
+    getGatheringRealmStore: () => realmStore,
     getGatheringLocationService: () => locationService,
     getCurrentSceneRegions: () => clone(sceneRegions || { sceneUuid: '', regions: [] }),
     subscribeSceneChange: () => () => {},
@@ -215,8 +215,8 @@ async function flush() {
 describe('adminStore travel section', () => {
   it('exposes parties, regions, and actor options in view state', async () => {
     const { services } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'Old wood', img: 'verdant.webp' }],
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }],
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'Old wood', img: 'verdant.webp' }],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }]
     });
     const store = createAdminStore(services);
@@ -224,9 +224,9 @@ describe('adminStore travel section', () => {
     const state = get(store.viewState);
     assert.equal(state.travelParties.length, 1);
     assert.equal(state.travelParties[0].name, 'Vanguard');
-    assert.equal(state.selectedSystemRegions.length, 1);
+    assert.equal(state.selectedSystemRealms.length, 1);
     // The Travel view-model carries the full authoring projection plus per-region counts and lists.
-    assert.deepEqual(state.selectedSystemRegions[0], {
+    assert.deepEqual(state.selectedSystemRealms[0], {
       id: 'r1',
       name: 'Verdant',
       description: 'Old wood',
@@ -244,28 +244,28 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
-  it('selectedSystemRegions includes per-region environment and party counts and lists', async () => {
+  it('selectedSystemRealms includes per-region environment and party counts and lists', async () => {
     const { services } = createServices({
       parties: [
-        { id: 'p1', name: 'A', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
-        { id: 'p2', name: 'B', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }
+        { id: 'p1', name: 'A', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r1'] } } },
+        { id: 'p2', name: 'B', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }
       ],
-      regions: [
+      realms: [
         { id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] },
         { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [] }
       ],
       actors: [{ uuid: 'Actor.t', id: 't', name: 'Marker', img: 'marker.webp' }],
       environments: [
-        { id: 'e1', name: 'Grove', img: 'grove.webp', includedRegionIds: ['r1'] },
-        { id: 'e2', name: 'Glade', includedRegionIds: ['r1', 'r2'] },
-        { id: 'e3', name: 'Bare', includedRegionIds: [] }
+        { id: 'e1', name: 'Grove', img: 'grove.webp', includedRealmIds: ['r1'] },
+        { id: 'e2', name: 'Glade', includedRealmIds: ['r1', 'r2'] },
+        { id: 'e3', name: 'Bare', includedRealmIds: [] }
       ]
     });
     const store = createAdminStore(services);
     await store.refresh();
     const state = get(store.viewState);
-    const r1 = state.selectedSystemRegions.find(r => r.id === 'r1');
-    const r2 = state.selectedSystemRegions.find(r => r.id === 'r2');
+    const r1 = state.selectedSystemRealms.find(r => r.id === 'r1');
+    const r2 = state.selectedSystemRealms.find(r => r.id === 'r2');
     assert.equal(r1.environmentCount, 2);
     assert.equal(r1.partyCount, 1);
     assert.equal(r2.environmentCount, 1);
@@ -281,19 +281,19 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
-  it('createRegionQuick appends a region to the selected system view-model', async () => {
+  it('createRealmQuick appends a region to the selected system view-model', async () => {
     const { services, calls } = createServices({
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }]
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }]
     });
     const store = createAdminStore(services);
     await store.refresh();
-    assert.equal(get(store.viewState).selectedSystemRegions.length, 1);
-    const result = await store.createRegionQuick('system-a', 'New region');
+    assert.equal(get(store.viewState).selectedSystemRealms.length, 1);
+    const result = await store.createRealmQuick('system-a', 'New region');
     await flush();
-    assert.equal(calls.regionCreate.length, 1);
-    assert.equal(calls.regionCreate[0].data.name, 'New region');
+    assert.equal(calls.realmCreate.length, 1);
+    assert.equal(calls.realmCreate[0].data.name, 'New region');
     assert.ok(result);
-    assert.equal(get(store.viewState).selectedSystemRegions.length, 2);
+    assert.equal(get(store.viewState).selectedSystemRealms.length, 2);
     store.destroy();
   });
 
@@ -310,8 +310,8 @@ describe('adminStore travel section', () => {
 
   it('member/travel-actor/override actions call through to the party store', async () => {
     const { services, calls } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }],
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }],
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }]
     });
     const store = createAdminStore(services);
@@ -319,7 +319,7 @@ describe('adminStore travel section', () => {
     await store.addPartyMember('p1', 'Actor.a');
     await store.setPartyTravelActor('p1', 'Actor.a');
     await store.setPartyEnabled('p1', true);
-    await store.setPartyRegionOverride('p1', 'system-a', ['r1']);
+    await store.setPartyRealmOverride('p1', 'system-a', ['r1']);
     await flush();
     assert.deepEqual(calls.addMember, [{ id: 'p1', uuid: 'Actor.a' }]);
     assert.deepEqual(calls.setTravelActor, [{ id: 'p1', uuid: 'Actor.a' }]);
@@ -336,8 +336,8 @@ describe('adminStore travel section', () => {
   it('routes the composite uniqueness error to the travelActor field when setPartyTravelActor fails', async () => {
     const { services } = createServices({
       parties: [
-        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t1', currentRegionOverrides: {} },
-        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t2', currentRegionOverrides: {} }
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t1', currentRealmOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t2', currentRealmOverrides: {} }
       ],
       actors: [
         { uuid: 'Actor.t1', id: 't1', name: 'Tam', img: '' },
@@ -361,8 +361,8 @@ describe('adminStore travel section', () => {
   it('routes the composite uniqueness error to the members field when addPartyMember fails', async () => {
     const { services } = createServices({
       parties: [
-        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t1', currentRegionOverrides: {} },
-        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: 'Actor.t2', currentRegionOverrides: {} }
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.t1', currentRealmOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: 'Actor.t2', currentRealmOverrides: {} }
       ],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
       // Same composite message — the field is resolved purely from operation context.
@@ -381,7 +381,7 @@ describe('adminStore travel section', () => {
 
   it('addOrMovePartyMember adds directly when the actor is in no other party', async () => {
     const { services, calls, confirmCalls } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }]
     });
     const store = createAdminStore(services);
@@ -397,8 +397,8 @@ describe('adminStore travel section', () => {
   it('addOrMovePartyMember confirms and moves when the actor is already in another party', async () => {
     const { services, calls, confirmCalls } = createServices({
       parties: [
-        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} },
-        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRegionOverrides: {} }
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRealmOverrides: {} }
       ],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
       confirmResult: true
@@ -416,8 +416,8 @@ describe('adminStore travel section', () => {
   it('addOrMovePartyMember does nothing when the move is declined', async () => {
     const { services, calls } = createServices({
       parties: [
-        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} },
-        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRegionOverrides: {} }
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRealmOverrides: {} }
       ],
       actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }],
       confirmResult: false
@@ -433,7 +433,7 @@ describe('adminStore travel section', () => {
 
   it('deleteParty confirms via confirmDialog before deleting', async () => {
     const { services, calls, confirmCalls } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }]
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }]
     });
     const store = createAdminStore(services);
     await flush();
@@ -446,7 +446,7 @@ describe('adminStore travel section', () => {
 
   it('deleteParty does not delete when confirmation is declined', async () => {
     const { services, calls, confirmCalls } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRegionOverrides: {} }],
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }],
       confirmResult: false
     });
     const store = createAdminStore(services);
@@ -460,69 +460,69 @@ describe('adminStore travel section', () => {
 
   it('region quick-list create/rename/toggle call through with name/enabled only', async () => {
     const { services, calls } = createServices({
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], description: 'lore', img: 'pic.webp' }]
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], description: 'lore', img: 'pic.webp' }]
     });
     const store = createAdminStore(services);
     await flush();
-    await store.createRegionQuick('system-a', 'Ashen March');
-    await store.renameRegion('system-a', 'r1', 'Verdant Expanse');
-    await store.toggleRegionEnabled('system-a', 'r1', false);
+    await store.createRealmQuick('system-a', 'Ashen March');
+    await store.renameRealm('system-a', 'r1', 'Verdant Expanse');
+    await store.toggleRealmEnabled('system-a', 'r1', false);
     await flush();
-    assert.equal(calls.regionCreate.length, 1);
-    assert.deepEqual(calls.regionUpdate[0].patch, { name: 'Verdant Expanse' });
-    assert.deepEqual(calls.regionUpdate[1].patch, { enabled: false });
+    assert.equal(calls.realmCreate.length, 1);
+    assert.deepEqual(calls.realmUpdate[0].patch, { name: 'Verdant Expanse' });
+    assert.deepEqual(calls.realmUpdate[1].patch, { enabled: false });
     store.destroy();
   });
 
-  it('updateRegion merge-patches authoring fields (description/img/secret/biomes) without touching others', async () => {
+  it('updateRealm merge-patches authoring fields (description/img/secret/biomes) without touching others', async () => {
     const { services, calls, system } = createServices({
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'lore', img: 'pic.webp' }]
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'lore', img: 'pic.webp' }]
     });
     const store = createAdminStore(services);
     await flush();
-    await store.updateRegion('system-a', 'r1', { description: 'Ancient wood' });
-    await store.updateRegion('system-a', 'r1', { secret: true });
-    await store.updateRegion('system-a', 'r1', { biomes: ['forest', 'cavern'] });
+    await store.updateRealm('system-a', 'r1', { description: 'Ancient wood' });
+    await store.updateRealm('system-a', 'r1', { secret: true });
+    await store.updateRealm('system-a', 'r1', { biomes: ['forest', 'cavern'] });
     await flush();
-    assert.deepEqual(calls.regionUpdate.map(c => c.patch), [
+    assert.deepEqual(calls.realmUpdate.map(c => c.patch), [
       { description: 'Ancient wood' },
       { secret: true },
       { biomes: ['forest', 'cavern'] }
     ]);
     // The store merges over the existing record, so unedited fields survive.
-    const region = system.gatheringRegions.find(r => r.id === 'r1');
+    const region = system.gatheringRealms.find(r => r.id === 'r1');
     assert.equal(region.name, 'Verdant');
     assert.equal(region.img, 'pic.webp');
     store.destroy();
   });
 
-  it('setGatheringRegionsEnabled writes the enabled flag through GatheringRegionStore.updateRegionSettings', async () => {
+  it('setGatheringRealmsEnabled writes the enabled flag through GatheringRealmStore.updateRealmSettings', async () => {
     const { services, calls, system } = createServices();
     const store = createAdminStore(services);
     await flush();
-    await store.setGatheringRegionsEnabled('system-a', true);
+    await store.setGatheringRealmsEnabled('system-a', true);
     await flush();
-    assert.equal(calls.regionSettings.length, 1);
-    assert.deepEqual(calls.regionSettings[0].patch, { enabled: true });
-    assert.equal(system.gatheringRegionSettings.enabled, true);
-    await store.setGatheringRegionsEnabled('system-a', false);
+    assert.equal(calls.realmSettings.length, 1);
+    assert.deepEqual(calls.realmSettings[0].patch, { enabled: true });
+    assert.equal(system.gatheringRealmSettings.enabled, true);
+    await store.setGatheringRealmsEnabled('system-a', false);
     await flush();
-    assert.equal(system.gatheringRegionSettings.enabled, false);
+    assert.equal(system.gatheringRealmSettings.enabled, false);
     store.destroy();
   });
 
-  it('deleteRegion confirms then passes environment/party collaborators for referenced-by evidence', async () => {
+  it('deleteRealm confirms then passes environment/party collaborators for referenced-by evidence', async () => {
     const { services, calls, confirmCalls } = createServices({
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }]
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }]
     });
     const store = createAdminStore(services);
     await flush();
-    await store.deleteRegion('system-a', 'r1');
+    await store.deleteRealm('system-a', 'r1');
     await flush();
     assert.equal(confirmCalls.length, 1);
-    assert.equal(calls.regionDelete.length, 1);
-    assert.equal(calls.regionDelete[0].collaborators.hasEnv, true);
-    assert.equal(calls.regionDelete[0].collaborators.hasParty, true);
+    assert.equal(calls.realmDelete.length, 1);
+    assert.equal(calls.realmDelete[0].collaborators.hasEnv, true);
+    assert.equal(calls.realmDelete[0].collaborators.hasParty, true);
     store.destroy();
   });
 
@@ -531,9 +531,9 @@ describe('adminStore travel section', () => {
       parties: [{
         id: 'p1', name: 'Vanguard', enabled: false,
         memberActorUuids: ['Actor.gone'], travelActorUuid: 'Actor.also-gone',
-        currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r-missing'] } }
+        currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-missing'] } }
       }],
-      regions: [],
+      realms: [],
       actors: []
     });
     const store = createAdminStore(services);
@@ -541,7 +541,7 @@ describe('adminStore travel section', () => {
     const party = get(store.viewState).travelParties[0];
     assert.deepEqual(party.staleMembers, ['Actor.gone']);
     assert.equal(party.staleTravelActor, 'Actor.also-gone');
-    assert.deepEqual(party.staleRegionIds, ['r-missing']);
+    assert.deepEqual(party.staleRealmIds, ['r-missing']);
     assert.equal(party.hasStaleReference, true);
     store.destroy();
   });
@@ -558,7 +558,7 @@ describe('adminStore Map Region Links', () => {
 
   it('exposes the current scene regions with their existing Fabricate links', async () => {
     const { services } = createServices({
-      regions: [
+      realms: [
         {
           id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
           sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
@@ -572,8 +572,8 @@ describe('adminStore Map Region Links', () => {
     const state = get(store.viewState);
     assert.equal(state.currentSceneUuid, 'Scene.s1');
     assert.deepEqual(state.currentSceneRegions, [
-      { sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f', linkedRegionId: 'r1', partiesInMapRegion: [], partiesInFabricateRegion: [] },
-      { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322', linkedRegionId: '', partiesInMapRegion: [], partiesInFabricateRegion: [] }
+      { sceneRegionUuid: 'Scene.s1.Region.a', name: 'Northwood', color: '#1a9c4f', linkedRegionId: 'r1', partiesInMapRegion: [], partiesInFabricateRealm: [] },
+      { sceneRegionUuid: 'Scene.s1.Region.b', name: 'Southmoor', color: '#883322', linkedRegionId: '', partiesInMapRegion: [], partiesInFabricateRealm: [] }
     ]);
     store.destroy();
   });
@@ -582,11 +582,11 @@ describe('adminStore Map Region Links', () => {
     const { services } = createServices({
       parties: [
         // Marker inside the scene region, and current region includes the linked region r1.
-        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } },
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r1'] } } },
         // Current region includes r1 (in the Fabricate region) but marker NOT inside the map region.
-        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m2', currentRegionOverrides: { 'system-a': { mode: 'manual', regionIds: ['r1'] } } }
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m2', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r1'] } } }
       ],
-      regions: [{
+      realms: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
       }],
@@ -603,16 +603,16 @@ describe('adminStore Map Region Links', () => {
     // Marker-inside list: only p1.
     assert.deepEqual(regionA.partiesInMapRegion, [{ id: 'p1', name: 'Vanguard', img: 'm1.webp' }]);
     // Fabricate-region list (current region includes r1): both p1 and p2.
-    assert.deepEqual([...regionA.partiesInFabricateRegion.map(p => p.id)].sort((a, b) => a.localeCompare(b)), ['p1', 'p2']);
+    assert.deepEqual([...regionA.partiesInFabricateRealm.map(p => p.id)].sort((a, b) => a.localeCompare(b)), ['p1', 'p2']);
     // The unlinked region has no Fabricate-region parties.
     const regionB = get(store.viewState).currentSceneRegions.find(r => r.sceneRegionUuid === 'Scene.s1.Region.b');
-    assert.deepEqual(regionB.partiesInFabricateRegion, []);
+    assert.deepEqual(regionB.partiesInFabricateRealm, []);
     store.destroy();
   });
 
   it('setMapRegionLink attaches a scene region to the chosen Fabricate region', async () => {
     const { services, calls, system } = createServices({
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
       sceneRegions: SCENE_REGIONS
     });
     const store = createAdminStore(services);
@@ -620,11 +620,11 @@ describe('adminStore Map Region Links', () => {
     const ok = await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
     await flush();
     assert.equal(ok, true);
-    assert.equal(calls.regionUpdate.length, 1);
-    assert.deepEqual(calls.regionUpdate[0].patch.sceneMappings, [
+    assert.equal(calls.realmUpdate.length, 1);
+    assert.deepEqual(calls.realmUpdate[0].patch.sceneMappings, [
       { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
     ]);
-    assert.deepEqual(system.gatheringRegions[0].sceneMappings, [
+    assert.deepEqual(system.gatheringRealms[0].sceneMappings, [
       { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
     ]);
     store.destroy();
@@ -632,7 +632,7 @@ describe('adminStore Map Region Links', () => {
 
   it('setMapRegionLink moves an existing link off the previous region', async () => {
     const { services, calls, system } = createServices({
-      regions: [
+      realms: [
         {
           id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
           sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
@@ -646,18 +646,18 @@ describe('adminStore Map Region Links', () => {
     await store.setMapRegionLink('Scene.s1.Region.a', 'r2');
     await flush();
     // r1 had the mapping stripped; r2 gained it.
-    assert.deepEqual(system.gatheringRegions.find(r => r.id === 'r1').sceneMappings, []);
-    assert.deepEqual(system.gatheringRegions.find(r => r.id === 'r2').sceneMappings, [
+    assert.deepEqual(system.gatheringRealms.find(r => r.id === 'r1').sceneMappings, []);
+    assert.deepEqual(system.gatheringRealms.find(r => r.id === 'r2').sceneMappings, [
       { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
     ]);
     // Both regions were persisted (one cleared, one set).
-    assert.equal(calls.regionUpdate.length, 2);
+    assert.equal(calls.realmUpdate.length, 2);
     store.destroy();
   });
 
   it('setMapRegionLink with a falsy region clears the link everywhere on the scene', async () => {
     const { services, calls, system } = createServices({
-      regions: [{
+      realms: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
       }],
@@ -667,14 +667,14 @@ describe('adminStore Map Region Links', () => {
     await flush();
     await store.setMapRegionLink('Scene.s1.Region.a', null);
     await flush();
-    assert.deepEqual(system.gatheringRegions[0].sceneMappings, []);
-    assert.equal(calls.regionUpdate.length, 1);
+    assert.deepEqual(system.gatheringRealms[0].sceneMappings, []);
+    assert.equal(calls.realmUpdate.length, 1);
     store.destroy();
   });
 
   it('setMapRegionLink leaves other scenes’ mappings untouched', async () => {
     const { services, system } = createServices({
-      regions: [{
+      realms: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.other', sceneRegionUuid: 'Scene.other.Region.z' }]
       }],
@@ -685,7 +685,7 @@ describe('adminStore Map Region Links', () => {
     await store.setMapRegionLink('Scene.s1.Region.a', 'r1');
     await flush();
     // The other scene's mapping is preserved verbatim; the current scene's link is appended.
-    assert.deepEqual(system.gatheringRegions[0].sceneMappings, [
+    assert.deepEqual(system.gatheringRealms[0].sceneMappings, [
       { id: 'm1', sceneUuid: 'Scene.other', sceneRegionUuid: 'Scene.other.Region.z' },
       { sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }
     ]);
@@ -701,8 +701,8 @@ describe('adminStore Map Region Links — live auto current region', () => {
 
   it('setMapRegionLink only updates sceneMappings (no party current-region writes)', async () => {
     const { services, calls } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
-      regions: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRealmOverrides: {} }],
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [], sceneMappings: [] }],
       sceneRegions: SCENE_REGIONS,
       insideActorUuids: ['Actor.m1']
     });
@@ -712,14 +712,14 @@ describe('adminStore Map Region Links — live auto current region', () => {
     await flush();
     // The marker's current region is now DERIVED live; linking writes no override.
     assert.deepEqual(calls.setOverride, []);
-    assert.equal(calls.regionUpdate.length, 1);
+    assert.equal(calls.realmUpdate.length, 1);
     store.destroy();
   });
 
   it('region→party lists reflect AUTO-resolved parties (no manual override)', async () => {
     const { services } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
-      regions: [{
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRealmOverrides: {} }],
+      realms: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
       }],
@@ -731,23 +731,23 @@ describe('adminStore Map Region Links — live auto current region', () => {
     await store.refresh();
     const state = get(store.viewState);
     // Regions tab: the auto-resolved party is listed in the region.
-    const r1 = state.selectedSystemRegions.find(r => r.id === 'r1');
+    const r1 = state.selectedSystemRealms.find(r => r.id === 'r1');
     assert.deepEqual(r1.parties.map(p => p.id), ['p1']);
     assert.equal(r1.partyCount, 1);
     // Map tab: parties-in-fabricate-region also reflects the live resolution.
     const regionA = state.currentSceneRegions.find(r => r.sceneRegionUuid === 'Scene.s1.Region.a');
-    assert.deepEqual(regionA.partiesInFabricateRegion.map(p => p.id), ['p1']);
+    assert.deepEqual(regionA.partiesInFabricateRealm.map(p => p.id), ['p1']);
     // And the Parties inspector evidence is resolved via travelActor sensing.
-    assert.equal(state.travelParties[0].currentRegionEvidence.source, 'travelActor');
-    assert.deepEqual(state.travelParties[0].currentRegionEvidence.regions.map(r => r.id), ['r1']);
+    assert.equal(state.travelParties[0].currentRealmEvidence.source, 'travelActor');
+    assert.deepEqual(state.travelParties[0].currentRealmEvidence.realms.map(r => r.id), ['r1']);
     store.destroy();
   });
 
   it('refreshes the travel view-model when a party travel marker moves', async () => {
     const auto = { p1: [] };
     const { services, markerMoveHandlers } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
-      regions: [{
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRealmOverrides: {} }],
+      realms: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
       }],
@@ -756,23 +756,23 @@ describe('adminStore Map Region Links — live auto current region', () => {
     });
     const store = createAdminStore(services);
     await store.refresh();
-    assert.equal(get(store.viewState).travelParties[0].currentRegionEvidence.resolved, false);
+    assert.equal(get(store.viewState).travelParties[0].currentRealmEvidence.resolved, false);
     assert.ok(markerMoveHandlers.length >= 1, 'the store subscribes to travel-marker movement');
 
     // Marker moves into Region.a → r1; firing the move handler must re-patch.
     auto.p1 = ['r1'];
     markerMoveHandlers.forEach(handler => handler('Actor.m1'));
     await flush();
-    assert.equal(get(store.viewState).travelParties[0].currentRegionEvidence.resolved, true);
-    assert.deepEqual(get(store.viewState).travelParties[0].currentRegionEvidence.regions.map(r => r.id), ['r1']);
+    assert.equal(get(store.viewState).travelParties[0].currentRealmEvidence.resolved, true);
+    assert.deepEqual(get(store.viewState).travelParties[0].currentRealmEvidence.realms.map(r => r.id), ['r1']);
     store.destroy();
   });
 
   it('ignores movement of tokens that are not a party travel marker', async () => {
     const auto = { p1: [] };
     const { services, markerMoveHandlers } = createServices({
-      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRegionOverrides: {} }],
-      regions: [{
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: 'Actor.m1', currentRealmOverrides: {} }],
+      realms: [{
         id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [],
         sceneMappings: [{ id: 'm1', sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.a' }]
       }],
@@ -786,7 +786,7 @@ describe('adminStore Map Region Links — live auto current region', () => {
     auto.p1 = ['r1'];
     markerMoveHandlers.forEach(handler => handler('Actor.someone-else'));
     await flush();
-    assert.equal(get(store.viewState).travelParties[0].currentRegionEvidence.resolved, false);
+    assert.equal(get(store.viewState).travelParties[0].currentRealmEvidence.resolved, false);
     store.destroy();
   });
 });

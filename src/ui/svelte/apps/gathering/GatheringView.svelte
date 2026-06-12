@@ -247,9 +247,9 @@
   // without reopening the app. No-ops outside the Foundry runtime.
   $effect(() => subscribeSceneChange(() => load(true)));
 
-  // A party's current Fabricate region is derived live from its travel-marker
+  // A party's current Fabricate realm is derived live from its travel-marker
   // token position. When a travel marker moves, re-fetch (quietly) so the current
-  // region and any region-gated availability update without reopening the app.
+  // realm and any realm-gated availability update without reopening the app.
   // Filtered to actual travel markers so ordinary token moves don't re-fetch.
   $effect(() => subscribeTravelMarkerMove((actorUuid) => {
     if (services?.isTravelMarkerActor?.(actorUuid)) load(true);
@@ -273,14 +273,14 @@
     });
   });
 
-  // Report the party's current-region summary for the selected environment's
-  // system so the header bar can show the current region (or "no region
-  // selected") when the region/travel subsystem is enabled. Disabled (chip
-  // hidden) when no environment is selected or the system has regions off.
+  // Report the party's current-realm summary for the selected environment's
+  // system so the header bar can show the current realm (or "no realm
+  // selected") when the realm/travel subsystem is enabled. Disabled (chip
+  // hidden) when no environment is selected or the system has realms off.
   $effect(() => {
-    store?.setRegionContext({
+    store?.setRealmContext({
       enabled: selectedEnvironment?.realmsEnabled === true,
-      regions: selectedEnvironment?.currentRealms ?? []
+      realms: selectedEnvironment?.currentRealms ?? []
     });
   });
 </script>

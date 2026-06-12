@@ -2373,43 +2373,43 @@ async function main() {
         // app .show() because entering the Travel tab does not itself re-read the
         // party store. Idempotent across reruns: clears any prior party first.
         await page.evaluate(async (sysId) => {
-          const regionStore = game.fabricate.getGatheringRegionStore?.();
+          const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
-          if (!regionStore || !partyStore) {
-            throw new Error('Gathering region/party stores unavailable for Travel seeding.');
+          if (!realmStore || !partyStore) {
+            throw new Error('Gathering realm/party stores unavailable for Travel seeding.');
           }
           const alara = game.actors.getName('Alara the Alchemist');
           const bromm = game.actors.getName('Bromm the Blacksmith');
           if (!alara) {
             throw new Error('Smoke actor "Alara the Alchemist" not found for Travel seeding.');
           }
-          // Travel & Regions is disabled by default (#286). Enable it on this
+          // Travel & Realms is disabled by default (#286). Enable it on this
           // system before the manager opens so the Travel nav item is visible
           // for the capture step.
-          await regionStore.updateRegionSettings(sysId, { enabled: true });
+          await realmStore.updateRealmSettings(sysId, { enabled: true });
           for (const party of partyStore.list()) {
             await partyStore.delete(party.id);
           }
-          const existingRegion = regionStore.listBySystem(sysId)
-            .find(region => region.name === 'Northreach Vale');
-          const region = existingRegion
-            || await regionStore.create(sysId, { name: 'Northreach Vale', enabled: true });
+          const existingRealm = realmStore.listBySystem(sysId)
+            .find(realm => realm.name === 'Northreach Vale');
+          const realm = existingRealm
+            || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
           const party = await partyStore.create({ name: 'The Smoke Wardens' });
           await partyStore.addMember(party.id, alara.uuid);
           if (bromm) await partyStore.addMember(party.id, bromm.uuid);
           await partyStore.setTravelActor(party.id, alara.uuid);
           await partyStore.setEnabled(party.id, true);
-          await partyStore.setCurrentRegionOverride(party.id, sysId, [region.id]);
+          await partyStore.setCurrentRealmOverride(party.id, sysId, [realm.id]);
 
-          // Region-lock evidence (#294): a second region the party is NOT in, plus
+          // Realm-lock evidence (#294): a second realm the party is NOT in, plus
           // an environment that REQUIRES it. The player Gathering tab then shows a
-          // region-locked environment card with the "Not in current region" alert
-          // (LOCATION_BLOCKED for a party member; NO_CURRENT_REGION for a viewer
+          // realm-locked environment card with the "Not in current realm" alert
+          // (LOCATION_BLOCKED for a party member; NO_CURRENT_REALM for a viewer
           // with no party — either way the card locks). Idempotent across reruns.
           const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
           if (environmentStore) {
-            const hiddenVale = regionStore.listBySystem(sysId).find(r => r.name === 'Hidden Vale')
-              || await regionStore.create(sysId, { name: 'Hidden Vale', enabled: true });
+            const hiddenVale = realmStore.listBySystem(sysId).find(r => r.name === 'Hidden Vale')
+              || await realmStore.create(sysId, { name: 'Hidden Vale', enabled: true });
             const existingEnvs = (typeof environmentStore.listBySystem === 'function')
               ? (environmentStore.listBySystem(sysId) || [])
               : [];
@@ -2419,13 +2419,13 @@ async function main() {
               await environmentStore.create({
                 craftingSystemId: sysId,
                 name: 'Hidden Hollow',
-                description: "Out of the party's current region — locked until they travel there.",
+                description: "Out of the party's current realm — locked until they travel there.",
                 enabled: true,
                 selectionMode: 'targeted',
                 sceneUuid: '',
                 compositionMode: 'manual',
                 forcedTaskIds: ['smoke-meadow-herbs'],
-                includedRegionIds: [hiddenVale.id]
+                includedRealmIds: [hiddenVale.id]
               });
             }
           }
@@ -2832,7 +2832,7 @@ async function main() {
         if ((await lockedEnvCard.count()) > 0) {
           await lockedEnvCard.first().scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
           await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'player-gathering-region-locked');
+          await screenshot(page, 'player-gathering-realm-locked');
         }
 
         await closeOpenApplications(page);
