@@ -233,8 +233,8 @@ export class CompendiumImporter {
       }
 
       // Check exact UUID match
-      const exactMatch = await this._tryResolveUuid(sourceItemUuid);
-      if (exactMatch) {
+      const exactDoc = await this._resolveUuidDocument(sourceItemUuid);
+      if (exactDoc) {
         summary.components.remapped.push({
           componentId: compId,
           componentName: compName,
@@ -242,7 +242,10 @@ export class CompendiumImporter {
           newUuid: sourceItemUuid,
           method: 'exact'
         });
-        remapped.push({ ...component, fallbackItemIds: mergedFallbacks });
+        remapped.push(this._withResolvedSourceMetadata(
+          { ...component, fallbackItemIds: mergedFallbacks },
+          exactDoc
+        ));
         continue;
       }
 
@@ -260,7 +263,11 @@ export class CompendiumImporter {
           newUuid: foundUuid,
           method: 'sourceName'
         });
-        remapped.push({ ...component, sourceItemUuid: foundUuid, sourceUuid: foundUuid, fallbackItemIds: mergedFallbacks });
+        const foundDoc = await this._resolveUuidDocument(foundUuid);
+        remapped.push(this._withResolvedSourceMetadata(
+          { ...component, sourceItemUuid: foundUuid, sourceUuid: foundUuid, fallbackItemIds: mergedFallbacks },
+          foundDoc
+        ));
         continue;
       }
 
@@ -286,17 +293,52 @@ export class CompendiumImporter {
   }
 
   /**
-   * Try to resolve a UUID via fromUuid. Returns true if successful.
+   * Resolve a UUID via fromUuid. Returns the document, or null if it is
+   * missing or unresolvable.
    * @private
    */
-  async _tryResolveUuid(uuid) {
-    if (!uuid) return false;
+  async _resolveUuidDocument(uuid) {
+    if (!uuid) return null;
     try {
-      const result = await fromUuid(uuid);
-      return result != null;
+      return (await fromUuid(uuid)) ?? null;
     } catch {
-      return false;
+      return null;
     }
+  }
+
+  /**
+   * Bring a resolved pack component to parity with the interactive drop path
+   * (CraftingSystemManager.addItemFromUuid), which snapshots a live Item's
+   * img/description onto the component it creates. Pre-built premium systems
+   * leave these off components backed by a foreign pack (e.g. the dnd5e SRD)
+   * because that pack isn't available to the build, so the live item at import
+   * time is the only icon/description source. Without this, such components
+   * fall back to icons/svg/item-bag.svg and show no description in the manager.
+   *
+   * Only fills what the pack JSON omitted, so baked in-module art/copy (set by
+   * the premium build for contentRef components) is preserved.
+   *
+   * @private
+   */
+  _withResolvedSourceMetadata(component, sourceDoc) {
+    if (!sourceDoc) return component;
+    const enriched = { ...component };
+
+    const storedImg = typeof component.img === 'string' ? component.img.trim() : '';
+    if ((!storedImg || storedImg === 'icons/svg/item-bag.svg') && sourceDoc.img) {
+      enriched.img = sourceDoc.img;
+    }
+
+    const storedDescription = typeof component.description === 'string' ? component.description.trim() : '';
+    if (!storedDescription) {
+      const extract = this._craftingSystemManager?._extractSourceDescription;
+      const description = typeof extract === 'function'
+        ? extract.call(this._craftingSystemManager, sourceDoc)
+        : '';
+      if (description) enriched.description = description;
+    }
+
+    return enriched;
   }
 
   /**
