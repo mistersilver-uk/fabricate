@@ -1,7 +1,7 @@
 /**
  * Shared, dependency-free environment matching for gathering library records.
  *
- * A reusable task/hazard "matches" an environment when none of its declared
+ * A reusable task/event "matches" an environment when none of its declared
  * biome / weather / time / danger constraints conflict with the environment
  * context. An empty constraint means "any" and never blocks a match. This
  * module is the single source of truth consumed by both the runtime composition
@@ -9,8 +9,8 @@
  * results and the GM-facing match evidence never drift.
  *
  * Region is NOT a composition axis: geography (`GatheringRegion`) drives
- * location availability and travel, not which tasks/hazards belong to an
- * environment. Composition is biome (+ danger for hazards) only.
+ * location availability and travel, not which tasks/events belong to an
+ * environment. Composition is biome (+ danger for events) only.
  *
  * @typedef {'match' | 'any' | 'mismatch'} MatchFieldState
  * @typedef {{ state: MatchFieldState, recordValues: string[], envValues: string[], applicable: boolean }} MatchFieldEvidence
@@ -48,8 +48,8 @@ function hasAny(left, right) {
 
 /**
  * Canonical danger-level severity scale (ascending). An environment carries a
- * single danger level; a hazard is eligible when its highest danger tag ranks
- * at or below the environment's level ("hazards up to and including").
+ * single danger level; an event is eligible when its highest danger tag ranks
+ * at or below the environment's level ("events up to and including").
  */
 export const DANGER_LEVELS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
 
@@ -75,18 +75,18 @@ export function resolveEnvironmentDangerLevel(environment = {}) {
  * Evaluate whether a record matches an environment and produce per-dimension
  * evidence for display.
  *
- * Matching is decided by biome and (for hazards) danger only — weather and
+ * Matching is decided by biome and (for events) danger only — weather and
  * time-of-day are runtime gates, not match criteria, and region is geography
  * (not composition). A record with the right biome/danger but the wrong current
  * weather/time still matches the environment; `conditionsMet` is `false` in that
  * case so callers can mark it inactive at runtime without dropping it from
  * composition.
  *
- * @param {object} record Library task or hazard.
+ * @param {object} record Library task or event.
  * @param {object} environment Environment (raw or composed).
  * @param {{ weather?: string, timeOfDay?: string }} [conditions] Current conditions.
  * @param {object} [options]
- * @param {boolean} [options.includeDanger] Apply danger-tag matching (hazards only).
+ * @param {boolean} [options.includeDanger] Apply danger-tag matching (events only).
  * @param {object} [options.conditionSettings] Per-system condition enablement.
  * @returns {{ matches: boolean, conditionsMet: boolean, evidence: MatchEvidence }}
  */
@@ -130,8 +130,8 @@ function evaluateDangerField(recordTags, envLevel) {
   if (recordTags.length === 0) {
     return { state: 'any', recordValues: recordTags, envValues, applicable: true };
   }
-  const hazardRank = recordTags.reduce((max, tag) => Math.max(max, dangerRank(tag)), -1);
-  const state = hazardRank <= dangerRank(envLevel) ? 'match' : 'mismatch';
+  const eventRank = recordTags.reduce((max, tag) => Math.max(max, dangerRank(tag)), -1);
+  const state = eventRank <= dangerRank(envLevel) ? 'match' : 'mismatch';
   return { state, recordValues: recordTags, envValues, applicable: true };
 }
 

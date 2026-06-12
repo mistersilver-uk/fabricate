@@ -7,7 +7,7 @@
   so it renders correctly outside the .fabricate-manager scope (the same porting
   the player columns do for Pagination).
 
-  Two tabs: Tasks (default) and Hazards. Props: { activeTab, onSelect }.
+  Two tabs: Tasks (default) and Events. Props: { activeTab, onSelect }.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -16,7 +16,7 @@
 
   const TABS = [
     { id: 'tasks', icon: 'fas fa-clipboard-list', key: 'FABRICATE.App.Gathering.Detail.Tabs.Tasks' },
-    { id: 'hazards', icon: 'fas fa-triangle-exclamation', key: 'FABRICATE.App.Gathering.Detail.Tabs.Hazards' }
+    { id: 'events', icon: 'fas fa-triangle-exclamation', key: 'FABRICATE.App.Gathering.Detail.Tabs.Events' }
   ];
 
   function onKeydown(event, index) {

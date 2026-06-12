@@ -149,7 +149,7 @@ Pull requests that change UI files MUST include smoke-run screenshot evidence fo
 
 #### Scenario: smoke screenshots need images
 
-- **WHEN** smoke fixture data needs item, environment, hazard, or placeholder imagery
+- **WHEN** smoke fixture data needs item, environment, event, or placeholder imagery
 - **THEN** it uses Foundry VTT core or dnd5e non-SVG raster icon paths directly
 - **AND** it does not invent custom SVG preview art for smoke screenshots
 

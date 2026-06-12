@@ -137,12 +137,12 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/HazardChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/EventChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardRow.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');

@@ -48,24 +48,24 @@ export function resolveDefaultTaskSelection(tasks, selectedTaskId) {
   return list.find(task => task?.attemptable === true)?.id ?? null;
 }
 
-// The hazards the player can see (and therefore select) for an environment. The
+// The events the player can see (and therefore select) for an environment. The
 // engine redacts the list to `[]` for a non-GM viewer of a blind site, so this
-// is simply the listing's `hazards` array. The task analogue is visibleTasksFor.
-export function visibleHazardsFor(environment) {
-  return Array.isArray(environment?.hazards) ? environment.hazards : [];
+// is simply the listing's `events` array. The task analogue is visibleTasksFor.
+export function visibleEventsFor(environment) {
+  return Array.isArray(environment?.events) ? environment.events : [];
 }
 
-// Pure default hazard-selection for the right-column hazard inspector, the hazard
+// Pure default event-selection for the right-column event inspector, the event
 // analogue of resolveDefaultTaskSelection:
-//   - preserve `selectedHazardId` when a hazard with that id is still present;
-//   - otherwise default to the first hazard's `.id` (hazards are not
+//   - preserve `selectedEventId` when an event with that id is still present;
+//   - otherwise default to the first event's `.id` (events are not
 //     "attemptable" — any one is a fine default so the inspector isn't empty);
-//   - otherwise `null` (no hazards, or hazards redacted for a blind site).
-export function resolveDefaultHazardSelection(hazards, selectedHazardId) {
-  const list = Array.isArray(hazards) ? hazards : [];
-  const stillValid = selectedHazardId !== null
-    && selectedHazardId !== undefined
-    && list.some(hazard => String(hazard?.id) === String(selectedHazardId));
-  if (stillValid) return selectedHazardId;
+//   - otherwise `null` (no events, or events redacted for a blind site).
+export function resolveDefaultEventSelection(events, selectedEventId) {
+  const list = Array.isArray(events) ? events : [];
+  const stillValid = selectedEventId !== null
+    && selectedEventId !== undefined
+    && list.some(event => String(event?.id) === String(selectedEventId));
+  if (stillValid) return selectedEventId;
   return list[0]?.id ?? null;
 }

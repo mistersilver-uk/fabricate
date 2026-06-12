@@ -336,7 +336,7 @@ function createServices({
         'FABRICATE.Admin.Environments.ValidationSummary': 'Resolve {count} validation issues before saving.',
         'FABRICATE.Admin.Environments.ValidationSummaryOne': 'Resolve 1 validation issue before saving.',
         'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice': 'Disabled task “{name}” — no longer available in {count} environment(s): {environments}.',
-        'FABRICATE.Admin.Manager.Environment.Hazards.DisabledNotice': 'Disabled hazard “{name}” — no longer available in {count} environment(s): {environments}.'
+        'FABRICATE.Admin.Manager.Environment.Events.DisabledNotice': 'Disabled event “{name}” — no longer available in {count} environment(s): {environments}.'
       };
       return Object.entries(data).reduce(
         (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
@@ -879,7 +879,7 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(lastUpdate.environment.nodeRuntime['mine-ore'].max, 5);
   });
 
-  it('summarizes task and hazard drop-rate adjustments in environment composition view state', async () => {
+  it('summarizes task and event drop-rate adjustments in environment composition view state', async () => {
     const services = createServices({
       systems: [makeSystem({
         id: 'system-a',
@@ -890,7 +890,7 @@ describe('adminStore gathering environments tab state', () => {
         id: 'environment-a',
         tasks: [],
         taskDropRateAdjustments: { 'task-library': { 'drop-ore': 25 } },
-        hazardDropRateAdjustments: { 'hazard-cave-in': -10 }
+        eventDropRateAdjustments: { 'event-cave-in': -10 }
       })],
       gatheringConfig: {
         systems: {
@@ -898,8 +898,8 @@ describe('adminStore gathering environments tab state', () => {
             tasks: [
               { id: 'task-library', name: 'Mine Ore', dropRows: [{ id: 'drop-ore', componentId: 'ore', quantity: 1, dropRate: 40 }] }
             ],
-            hazards: [
-              { id: 'hazard-cave-in', name: 'Cave-in', dropRate: 30 }
+            events: [
+              { id: 'event-cave-in', name: 'Cave-in', dropRate: 30 }
             ]
           }
         }
@@ -915,19 +915,19 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].img, 'ore.png');
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
-    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
-    assert.equal(composition.hazards[0].dropRateAdjustment, -10);
-    assert.equal(composition.hazards[0].effectiveDropRate, 20);
+    assert.equal(composition.events[0].hasDropRateAdjustment, true);
+    assert.equal(composition.events[0].dropRateAdjustment, -10);
+    assert.equal(composition.events[0].effectiveDropRate, 20);
 
     store.updateEnvironmentDraft({
       taskDropRateAdjustments: { 'task-library': { 'drop-ore': 0 } },
-      hazardDropRateAdjustments: { 'hazard-cave-in': 0 }
+      eventDropRateAdjustments: { 'event-cave-in': 0 }
     });
     composition = get(store.viewState).environmentComposition;
     assert.equal(composition.tasks[0].hasDropRateAdjustment, false);
-    assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
+    assert.equal(composition.events[0].hasDropRateAdjustment, false);
     assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustments, {});
-    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustments, {});
+    assert.deepEqual(get(store.viewState).environmentDraft.eventDropRateAdjustments, {});
 
     store.updateEnvironmentDraft({
       taskDropRateAdjustments: { 'task-library': { 'drop-ore': 25 } },
@@ -951,26 +951,26 @@ describe('adminStore gathering environments tab state', () => {
     assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustmentsEnabled, {});
 
     store.updateEnvironmentDraft({
-      hazardDropRateAdjustments: { 'hazard-cave-in': -10 },
-      hazardDropRateAdjustmentsEnabled: { 'hazard-cave-in': false }
+      eventDropRateAdjustments: { 'event-cave-in': -10 },
+      eventDropRateAdjustmentsEnabled: { 'event-cave-in': false }
     });
     composition = get(store.viewState).environmentComposition;
-    assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, false);
-    assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
-    assert.equal(composition.hazards[0].hasStoredDropRateAdjustment, true);
-    assert.equal(composition.hazards[0].dropRateAdjustment, -10);
-    assert.equal(composition.hazards[0].effectiveDropRate, 30);
-    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, { 'hazard-cave-in': false });
+    assert.equal(composition.events[0].dropRateAdjustmentsEnabled, false);
+    assert.equal(composition.events[0].hasDropRateAdjustment, false);
+    assert.equal(composition.events[0].hasStoredDropRateAdjustment, true);
+    assert.equal(composition.events[0].dropRateAdjustment, -10);
+    assert.equal(composition.events[0].effectiveDropRate, 30);
+    assert.deepEqual(get(store.viewState).environmentDraft.eventDropRateAdjustmentsEnabled, { 'event-cave-in': false });
 
     store.updateEnvironmentDraft({
-      hazardDropRateAdjustmentsEnabled: { 'hazard-cave-in': true }
+      eventDropRateAdjustmentsEnabled: { 'event-cave-in': true }
     });
     composition = get(store.viewState).environmentComposition;
-    assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, true);
-    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
-    assert.equal(composition.hazards[0].hasStoredDropRateAdjustment, true);
-    assert.equal(composition.hazards[0].effectiveDropRate, 20);
-    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, {});
+    assert.equal(composition.events[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.events[0].hasDropRateAdjustment, true);
+    assert.equal(composition.events[0].hasStoredDropRateAdjustment, true);
+    assert.equal(composition.events[0].effectiveDropRate, 20);
+    assert.deepEqual(get(store.viewState).environmentDraft.eventDropRateAdjustmentsEnabled, {});
   });
 
   it('create, duplicate, delete, and reorder use the environment store and refresh selection safely', async () => {
@@ -1237,7 +1237,7 @@ describe('adminStore gathering environments tab state', () => {
 
 describe('adminStore gathering library match-loss handling', () => {
   function gatheringConfigWithTask() {
-    return { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: true, biomes: ['forest'], regions: [], dropRows: [] }], hazards: [] } } };
+    return { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: true, biomes: ['forest'], regions: [], dropRows: [] }], events: [] } } };
   }
 
   it('classifies a non-matching library task as notMatching in automatic mode even with a stale enabled entry', async () => {
@@ -1320,17 +1320,17 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(services._confirmCalls.length, 0);
   });
 
-  it('warns when raising a hazard danger tag above an environment danger level drops the match', async () => {
+  it('warns when raising an event danger tag above an environment danger level drops the match', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'], dangerLevel: 'hazardous' })],
-      gatheringConfig: { systems: { 'system-a': { tasks: [], hazards: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
+      gatheringConfig: { systems: { 'system-a': { tasks: [], events: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
       confirmResult: true
     });
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryHazardCompositionLoss('system-a', 'lib-haz', { dangerTags: ['extreme'] });
+    const proceed = await store.confirmGatheringLibraryEventCompositionLoss('system-a', 'lib-haz', { dangerTags: ['extreme'] });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 1);
@@ -1355,17 +1355,17 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.match(services._confirmCalls[0].content, /Used by/);
   });
 
-  it('lists manual force-included environments when deleting a library hazard even without a match', async () => {
+  it('lists manual force-included environments when deleting a library event even without a match', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
-      environments: [makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedHazardIds: ['lib-haz'] })],
-      gatheringConfig: { systems: { 'system-a': { tasks: [], hazards: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
+      environments: [makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedEventIds: ['lib-haz'] })],
+      gatheringConfig: { systems: { 'system-a': { tasks: [], events: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
       confirmResult: false
     });
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const removed = await store.deleteGatheringLibraryHazard('system-a', 'lib-haz');
+    const removed = await store.deleteGatheringLibraryEvent('system-a', 'lib-haz');
 
     assert.equal(removed, false);
     assert.equal(services._confirmCalls.length, 1);
@@ -1397,7 +1397,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
-      gatheringConfig: { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: false, biomes: ['forest'], regions: [], dropRows: [] }], hazards: [] } } },
+      gatheringConfig: { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: false, biomes: ['forest'], regions: [], dropRows: [] }], events: [] } } },
       confirmResult: true
     });
     const store = createAdminStore(services);
@@ -1466,16 +1466,16 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.match(message, /Forced Cave/);
   });
 
-  it('notifies when a hazard is disabled and enumerates its environments', async () => {
+  it('notifies when an event is disabled and enumerates its environments', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'], dangerLevel: 'hazardous' })],
-      gatheringConfig: { systems: { 'system-a': { tasks: [], hazards: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } }
+      gatheringConfig: { systems: { 'system-a': { tasks: [], events: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } }
     });
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const ok = await store.updateGatheringLibraryHazard('system-a', 'lib-haz', { enabled: false });
+    const ok = await store.updateGatheringLibraryEvent('system-a', 'lib-haz', { enabled: false });
 
     assert.equal(ok, true);
     assert.equal(services._notify.warn.length, 1);

@@ -18,13 +18,13 @@
  *    `includedRegionIds` empty and the inert `region` string in place (no data
  *    loss, no stale reference).
  * 3. `region` / `regions` tags are stripped from gathering-config tasks and
- *    hazards (region is no longer a composition axis — composition is biome +
+ *    events (region is no longer a composition axis — composition is biome +
  *    danger only).
  * 4. Each migrated system's `vocabularies.regions` is cleared to `{ values: [] }`.
  * 5. `gatheringRegionSettings.enabled` is left unset (normalizes to `false`), so
  *    migrated systems keep the region/travel subsystem opt-in. The runner fires a
  *    one-time GM notice naming the systems that had regions, warning that
- *    region-scoped tasks/hazards may now appear in MORE environments.
+ *    region-scoped tasks/events may now appear in MORE environments.
  *
  * Pure function: no I/O, no Foundry calls, deep-clones its inputs. Idempotent —
  * the id-dedupe on regions, the empty-`includedRegionIds` guard, the
@@ -161,11 +161,11 @@ export function migrateUnifyGatheringRegions(data = {}) {
     return name || sysId;
   });
 
-  // Strip region/regions tags from gathering-config tasks and hazards (region is
+  // Strip region/regions tags from gathering-config tasks and events (region is
   // no longer a composition axis).
   for (const systemConfig of Object.values(configSystems)) {
     if (!isPlainObject(systemConfig)) continue;
-    for (const collectionKey of ['tasks', 'hazards']) {
+    for (const collectionKey of ['tasks', 'events']) {
       const collection = systemConfig[collectionKey];
       if (!Array.isArray(collection)) continue;
       for (const record of collection) {

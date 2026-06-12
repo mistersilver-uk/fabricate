@@ -28,21 +28,21 @@
     hasDanger: ['CheckDanger', 'Has a danger level'],
     hasCompositionMode: ['CheckCompositionMode', 'Has a composition mode'],
     hasAvailableTask: ['CheckAvailableTask', 'Has at least one available task'],
-    noStaleIncluded: ['CheckNoStale', 'Has no stale included tasks or hazards']
+    noStaleIncluded: ['CheckNoStale', 'Has no stale included tasks or events']
   };
   const ISSUE_LABELS = {
     noAvailableTasks: ['IssueNoAvailableTasks', 'No tasks are available to players.'],
     activeNoComposition: ['IssueActiveNoComposition', 'Environment is active but has no valid task composition.'],
-    staleIncluded: ['IssueStaleIncluded', 'Included task or hazard no longer matches the environment.'],
+    staleIncluded: ['IssueStaleIncluded', 'Included task or event no longer matches the environment.'],
     noScene: ['IssueNoScene', 'No scene is linked.'],
-    noHazardsAtDanger: ['IssueNoHazardsAtDanger', 'Danger is set but no hazards are available.'],
+    noEventsAtDanger: ['IssueNoEventsAtDanger', 'Danger is set but no events are available.'],
     taskNoDescription: ['IssueTaskNoDescription', 'Available task has no player-facing description.'],
-    locallyExcluded: ['IssueLocallyExcluded', 'Some tasks or hazards are excluded locally.']
+    locallyExcluded: ['IssueLocallyExcluded', 'Some tasks or events are excluded locally.']
   };
   const RECORD_ISSUE_LABELS = {
     staleIncluded: {
       task: ['IssueStaleIncludedTask', 'The task "{name}" no longer matches this environment.'],
-      hazard: ['IssueStaleIncludedHazard', 'The hazard "{name}" no longer matches this environment.']
+      event: ['IssueStaleIncludedEvent', 'The event "{name}" no longer matches this environment.']
     },
     taskNoDescription: {
       task: ['IssueTaskNoDescriptionTask', 'The task "{name}" has no player-facing description.']
@@ -54,7 +54,7 @@
     return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
   }
   function issueTitle(issue) {
-    const recordKind = issue.recordKind === 'hazard' ? 'hazard' : 'task';
+    const recordKind = issue.recordKind === 'event' ? 'event' : 'task';
     const recordMeta = issue.recordName ? RECORD_ISSUE_LABELS[issue.id]?.[recordKind] : null;
     if (recordMeta) {
       return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${recordMeta[0]}`, recordMeta[1])
@@ -62,7 +62,7 @@
     }
     const meta = ISSUE_LABELS[issue.id] || [issue.id, issue.id];
     const base = text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
-    return issue.recordName ? `${recordKind === 'hazard' ? 'Hazard' : 'Task'} "${issue.recordName}": ${base}` : base;
+    return issue.recordName ? `${recordKind === 'event' ? 'Event' : 'Task'} "${issue.recordName}": ${base}` : base;
   }
 </script>
 
@@ -93,7 +93,7 @@
                 <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
                 {#if issue.recordId}
                   <button type="button" class="manager-button manager-environment-issue-action" onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}>
-                    {issue.recordKind === 'hazard' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewHazard', 'View hazard') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask', 'View task')}
+                    {issue.recordKind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewEvent', 'View event') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask', 'View task')}
                   </button>
                 {/if}
               </li>

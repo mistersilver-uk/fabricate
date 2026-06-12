@@ -11,27 +11,27 @@
      blind gather omits the task id so the engine picks a candidate) plus — when
      the effective reveal policy is not `never` — a "Discovered Tasks (x/y)" list;
      for targeted environments the selectable task list. Searchable + paginated.
-   - Hazards: the aggregate Highest-Danger + hazard-chance summary, then a
-     searchable, paginated list of selectable hazard rows (GatheringHazardRow).
+   - Events: the aggregate Highest-Danger + event-chance summary, then a
+     searchable, paginated list of selectable event rows (GatheringEventRow).
      The list is redacted (engine sends `[]`) for a non-GM viewer of a blind
      environment, in which case a "hidden" hint is shown in place of the rows.
 
-  Task and hazard rows are selectable: clicking one drives the right-column
-  inspector (the task inspector carries the per-task Attempt action; the hazard
-  inspector is read-only). `activeTab`, `selectedTaskId`, and `selectedHazardId`
+  Task and event rows are selectable: clicking one drives the right-column
+  inspector (the task inspector carries the per-task Attempt action; the event
+  inspector is read-only). `activeTab`, `selectedTaskId`, and `selectedEventId`
   are owned by GatheringView so the right column can swap inspectors with the tab.
   The blind "Attempt gathering" button and the task inspector's Attempt both call
   the `onAttempt` handler (lifted to GatheringView), which runs
   services.startGatheringAttempt and re-fetches the listing; `busy` guards against
-  double-submits. Tasks and hazards keep independent search + pagination state.
+  double-submits. Tasks and events keep independent search + pagination state.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
-  import GatheringHazardRow from './GatheringHazardRow.svelte';
-  import HazardChanceBar from './HazardChanceBar.svelte';
+  import GatheringEventRow from './GatheringEventRow.svelte';
+  import EventChanceBar from './EventChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
 
   let {
@@ -43,8 +43,8 @@
     onSelectTask = null,
     activeTab = 'tasks',
     onTabChange = null,
-    selectedHazardId = null,
-    onSelectHazard = null
+    selectedEventId = null,
+    onSelectEvent = null
   } = $props();
 
   const env = $derived(environment);
@@ -91,30 +91,30 @@
   // base danger colour.
   const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
 
-  // The GM-configured hazard visibility tier the engine resolved for this viewer:
+  // The GM-configured event visibility tier the engine resolved for this viewer:
   // 'dangerLevelOnly' shows only the danger pip + a risk note above the tasks,
   // 'encounterChance' adds the encounter-chance bar above the tasks, 'full' shows the
-  // dedicated Hazards tab with the searchable hazard list. GMs always resolve to 'full'.
-  const hazardVisibility = $derived(String(env?.hazardVisibility ?? 'full'));
-  // The Hazards tab (and its tab strip) only exists in the 'full' tier; the restricted
+  // dedicated Events tab with the searchable event list. GMs always resolve to 'full'.
+  const eventVisibility = $derived(String(env?.eventVisibility ?? 'full'));
+  // The Events tab (and its tab strip) only exists in the 'full' tier; the restricted
   // tiers surface their summary above the tasks instead. effectiveTab guards against a
-  // stale 'hazards' selection when the strip is hidden.
-  const showHazardsTab = $derived(hazardVisibility === 'full');
-  const effectiveTab = $derived(showHazardsTab ? activeTab : 'tasks');
+  // stale 'events' selection when the strip is hidden.
+  const showEventsTab = $derived(eventVisibility === 'full');
+  const effectiveTab = $derived(showEventsTab ? activeTab : 'tasks');
 
-  // Environment-level "chance of encountering a hazard" (0..1) the engine carries
-  // on the listing. > 0 shows the hazard bar; 0 shows the "safe" hint instead.
-  const hazardChance = $derived(Math.max(0, Math.min(1, Number(env?.hazardChance ?? 0))));
-  const hasHazard = $derived(hazardChance > 0);
+  // Environment-level "chance of encountering an event" (0..1) the engine carries
+  // on the listing. > 0 shows the event bar; 0 shows the "safe" hint instead.
+  const eventChance = $derived(Math.max(0, Math.min(1, Number(env?.eventChance ?? 0))));
+  const hasEvent = $derived(eventChance > 0);
 
   // The list the center column paginates: discovered tasks for blind sites,
   // the full task list for targeted ones.
   const activeTasks = $derived(isBlind ? discoveredTasks : tasks);
 
-  // Individual hazards surfaced by the engine listing. Redacted to `[]` for a
-  // non-GM viewer of a blind environment, so an empty list while hazardChance > 0
-  // means "hidden", not "safe" (see hazardsHidden below).
-  const hazards = $derived(Array.isArray(env?.hazards) ? env.hazards : []);
+  // Individual events surfaced by the engine listing. Redacted to `[]` for a
+  // non-GM viewer of a blind environment, so an empty list while eventChance > 0
+  // means "hidden", not "safe" (see eventsHidden below).
+  const events = $derived(Array.isArray(env?.events) ? env.events : []);
 
   const pageSizeOptions = [6, 9, 12];
 
@@ -130,30 +130,30 @@
   let taskPageSize = $state(6);
   const paginatedTasks = $derived(filteredTasks.slice(taskPageIndex * taskPageSize, (taskPageIndex + 1) * taskPageSize));
 
-  // Hazards: an independent search + pagination set, beneath the task list.
-  let hazardSearchTerm = $state('');
-  const normalizedHazardSearch = $derived(hazardSearchTerm.trim().toLowerCase());
-  const filteredHazards = $derived(hazards.filter(hazard =>
-    !normalizedHazardSearch
-    || `${hazard?.name ?? ''} ${hazard?.description ?? ''}`.toLowerCase().includes(normalizedHazardSearch)
+  // Events: an independent search + pagination set, beneath the task list.
+  let eventSearchTerm = $state('');
+  const normalizedEventSearch = $derived(eventSearchTerm.trim().toLowerCase());
+  const filteredEvents = $derived(events.filter(event =>
+    !normalizedEventSearch
+    || `${event?.name ?? ''} ${event?.description ?? ''}`.toLowerCase().includes(normalizedEventSearch)
   ));
-  let hazardPageIndex = $state(0);
-  let hazardPageSize = $state(6);
-  const paginatedHazards = $derived(filteredHazards.slice(hazardPageIndex * hazardPageSize, (hazardPageIndex + 1) * hazardPageSize));
+  let eventPageIndex = $state(0);
+  let eventPageSize = $state(6);
+  const paginatedEvents = $derived(filteredEvents.slice(eventPageIndex * eventPageSize, (eventPageIndex + 1) * eventPageSize));
 
-  // The center column shows the hazard list whenever individual hazards are
+  // The center column shows the event list whenever individual events are
   // present. An empty list with a non-zero chance on a blind environment means
-  // the engine redacted the hazards, so show a "hidden" hint instead of nothing.
-  const showHazardList = $derived(hazards.length > 0);
-  const hazardsHidden = $derived(hazards.length === 0 && hazardChance > 0 && isBlind);
+  // the engine redacted the events, so show a "hidden" hint instead of nothing.
+  const showEventList = $derived(events.length > 0);
+  const eventsHidden = $derived(events.length === 0 && eventChance > 0 && isBlind);
 
   // Reset search + pagination when the selected environment changes.
   $effect(() => {
     envId;
     taskPageIndex = 0;
-    hazardPageIndex = 0;
+    eventPageIndex = 0;
     taskSearchTerm = '';
-    hazardSearchTerm = '';
+    eventSearchTerm = '';
   });
 
   // Snap each list back to its first page if a search shrinks it past the offset.
@@ -161,7 +161,7 @@
     if (taskPageIndex > 0 && taskPageIndex * taskPageSize >= filteredTasks.length) taskPageIndex = 0;
   });
   $effect(() => {
-    if (hazardPageIndex > 0 && hazardPageIndex * hazardPageSize >= filteredHazards.length) hazardPageIndex = 0;
+    if (eventPageIndex > 0 && eventPageIndex * eventPageSize >= filteredEvents.length) eventPageIndex = 0;
   });
 
   function biomeChipStyle(tag) {
@@ -255,100 +255,100 @@
       </section>
     {/if}
 
-    {#if showHazardsTab}
+    {#if showEventsTab}
       <GatheringDetailTabs {activeTab} onSelect={onTabChange} />
     {/if}
 
     <div
       class="gathering-detail-panel"
-      role={showHazardsTab ? 'tabpanel' : undefined}
-      id={showHazardsTab ? `gathering-detail-panel-${effectiveTab}` : undefined}
-      aria-labelledby={showHazardsTab ? `gathering-detail-tab-${effectiveTab}` : undefined}
+      role={showEventsTab ? 'tabpanel' : undefined}
+      id={showEventsTab ? `gathering-detail-panel-${effectiveTab}` : undefined}
+      aria-labelledby={showEventsTab ? `gathering-detail-tab-${effectiveTab}` : undefined}
     >
-      {#if effectiveTab === 'hazards'}
-        <div class="gathering-detail-hazard" data-gathering-hazard-section>
-          <div class="gathering-detail-hazard-danger">
-            <span class="gathering-detail-hazard-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
-            <span class={`gathering-detail-hazard-level is-danger ${dangerRiskClass}`}>
+      {#if effectiveTab === 'events'}
+        <div class="gathering-detail-event" data-gathering-event-section>
+          <div class="gathering-detail-event-danger">
+            <span class="gathering-detail-event-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
+            <span class={`gathering-detail-event-level is-danger ${dangerRiskClass}`}>
               <i class="fas fa-skull" aria-hidden="true"></i>
               <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
             </span>
           </div>
 
-          {#if hasHazard}
-            <HazardChanceBar value={hazardChance} />
-            <p class="gathering-detail-hazard-hint">{localize('FABRICATE.App.Gathering.Detail.HazardChanceHint')}</p>
+          {#if hasEvent}
+            <EventChanceBar value={eventChance} />
+            <p class="gathering-detail-event-hint">{localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}</p>
           {:else}
-            <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
-              {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+            <p class="gathering-detail-event-hint" data-gathering-safe-hint>
+              {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
             </p>
           {/if}
         </div>
 
-        {#if showHazardList}
-          <section class="gathering-detail-section" data-gathering-hazards-section>
+        {#if showEventList}
+          <section class="gathering-detail-section" data-gathering-events-section>
             <header class="gathering-detail-section-head">
               <h3 class="gathering-detail-section-title">
-                {localize('FABRICATE.App.Gathering.Detail.HazardsHeading')}
+                {localize('FABRICATE.App.Gathering.Detail.EventsHeading')}
               </h3>
               <label class="gathering-detail-search">
                 <i class="fas fa-search" aria-hidden="true"></i>
                 <input
                   type="search"
-                  bind:value={hazardSearchTerm}
-                  placeholder={localize('FABRICATE.App.Gathering.Detail.HazardSearchPlaceholder')}
-                  aria-label={localize('FABRICATE.App.Gathering.Detail.HazardSearchLabel')}
-                  data-gathering-hazard-search
+                  bind:value={eventSearchTerm}
+                  placeholder={localize('FABRICATE.App.Gathering.Detail.EventSearchPlaceholder')}
+                  aria-label={localize('FABRICATE.App.Gathering.Detail.EventSearchLabel')}
+                  data-gathering-event-search
                 />
               </label>
             </header>
 
-            {#if filteredHazards.length === 0}
-              <p class="gathering-detail-empty" data-gathering-no-hazard-matches>
-                {localize('FABRICATE.App.Gathering.Detail.NoHazardMatches')}
+            {#if filteredEvents.length === 0}
+              <p class="gathering-detail-empty" data-gathering-no-event-matches>
+                {localize('FABRICATE.App.Gathering.Detail.NoEventMatches')}
               </p>
             {:else}
-              <div class="gathering-detail-hazard-list" role="list">
-                {#each paginatedHazards as hazard (hazard.id)}
-                  <GatheringHazardRow
-                    {hazard}
-                    selected={String(hazard.id) === String(selectedHazardId)}
-                    onSelect={onSelectHazard}
+              <div class="gathering-detail-event-list" role="list">
+                {#each paginatedEvents as event (event.id)}
+                  <GatheringEventRow
+                    {event}
+                    selected={String(event.id) === String(selectedEventId)}
+                    onSelect={onSelectEvent}
                   />
                 {/each}
               </div>
             {/if}
 
-            {#if filteredHazards.length > 0}
+            {#if filteredEvents.length > 0}
               <div class="gathering-detail-pagination">
                 <Pagination
-                  totalCount={filteredHazards.length}
-                  pageSize={hazardPageSize}
-                  pageIndex={hazardPageIndex}
+                  totalCount={filteredEvents.length}
+                  pageSize={eventPageSize}
+                  pageIndex={eventPageIndex}
                   {pageSizeOptions}
-                  onPageChange={(n) => hazardPageIndex = n}
-                  onPageSizeChange={(n) => { hazardPageSize = n; hazardPageIndex = 0; }}
+                  onPageChange={(n) => eventPageIndex = n}
+                  onPageSizeChange={(n) => { eventPageSize = n; eventPageIndex = 0; }}
                 />
               </div>
             {/if}
           </section>
-        {:else if hazardsHidden}
-          <p class="gathering-detail-empty" data-gathering-hazards-hidden>
-            {localize('FABRICATE.App.Gathering.Detail.HazardsHiddenHint')}
+        {:else if eventsHidden}
+          <p class="gathering-detail-empty" data-gathering-events-hidden>
+            {localize('FABRICATE.App.Gathering.Detail.EventsHiddenHint')}
           </p>
         {/if}
       {:else}
-        {#if hazardVisibility === 'dangerLevelOnly'}
-          <p class="gathering-detail-hazard-hint" data-gathering-hazard-risk-note>
-            {localize('FABRICATE.App.Gathering.Detail.HazardRiskNote')}
+        {#if eventVisibility === 'dangerLevelOnly'}
+          <p class="gathering-detail-event-hint" data-gathering-event-risk-note>
+            {localize('FABRICATE.App.Gathering.Detail.EventRiskNote')}
           </p>
-        {:else if hazardVisibility === 'encounterChance'}
-          <div class="gathering-detail-hazard" data-gathering-hazard-summary>
-            {#if hasHazard}
-              <HazardChanceBar value={hazardChance} />
+        {:else if eventVisibility === 'encounterChance'}
+          <div class="gathering-detail-event" data-gathering-event-summary>
+            {#if hasEvent}
+              <EventChanceBar value={eventChance} />
             {:else}
-              <p class="gathering-detail-hazard-hint" data-gathering-safe-hint>
-                {localize('FABRICATE.App.Gathering.Detail.HazardSafeHint')}
+              <p class="gathering-detail-event-hint" data-gathering-safe-hint>
+                {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
               </p>
             {/if}
           </div>
@@ -577,8 +577,8 @@
     color: var(--fab-text-muted);
   }
 
-  /* Environment safety readout: highest danger level + hazard-chance bar (or a
-     "safe" hint when there is no hazard chance). */
+  /* Environment safety readout: highest danger level + event-chance bar (or a
+     "safe" hint when there is no event chance). */
   .gathering-detail-economy {
     display: flex;
     flex-wrap: wrap;
@@ -602,7 +602,7 @@
     color: var(--fab-text-muted);
   }
 
-  .gathering-detail-hazard {
+  .gathering-detail-event {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
@@ -613,21 +613,21 @@
     background: var(--fab-surface-soft);
   }
 
-  .gathering-detail-hazard-danger {
+  .gathering-detail-event-danger {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
   }
 
-  .gathering-detail-hazard-caption {
+  .gathering-detail-event-caption {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--fab-text-muted);
   }
 
-  .gathering-detail-hazard-level {
+  .gathering-detail-event-level {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -637,32 +637,32 @@
   }
 
   /* Danger-tier icon colour, mirroring the header danger pip. */
-  .gathering-detail-hazard-level.is-danger i {
+  .gathering-detail-event-level.is-danger i {
     color: var(--fab-danger, var(--fab-text-muted));
   }
 
-  .gathering-detail-hazard-level.is-danger.risk-safe i {
+  .gathering-detail-event-level.is-danger.risk-safe i {
     color: var(--fab-success);
   }
 
-  .gathering-detail-hazard-level.is-danger.risk-unsafe i {
+  .gathering-detail-event-level.is-danger.risk-unsafe i {
     color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
   }
 
-  .gathering-detail-hazard-level.is-danger.risk-hazardous i {
+  .gathering-detail-event-level.is-danger.risk-hazardous i {
     color: var(--fab-warning);
   }
 
-  .gathering-detail-hazard-level.is-danger.risk-dangerous i {
+  .gathering-detail-event-level.is-danger.risk-dangerous i {
     color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
   }
 
-  .gathering-detail-hazard-level.is-danger.risk-deadly i,
-  .gathering-detail-hazard-level.is-danger.risk-extreme i {
+  .gathering-detail-event-level.is-danger.risk-deadly i,
+  .gathering-detail-event-level.is-danger.risk-extreme i {
     color: var(--fab-danger);
   }
 
-  .gathering-detail-hazard-hint {
+  .gathering-detail-event-hint {
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
@@ -754,7 +754,7 @@
   /*
     Sections stack at their natural height and the column (.gathering-detail,
     overflow-y: auto) scrolls. They must NOT flex-grow/shrink: with two stacked
-    sections (tasks + hazards), `flex: 1 1 auto` + `min-height: 0` shrinks each
+    sections (tasks + events), `flex: 1 1 auto` + `min-height: 0` shrinks each
     box below its content, and the inner row lists (no own scroll) overflow and
     paint over the neighbouring section.
   */
@@ -822,7 +822,7 @@
     outline-offset: 1px;
   }
 
-  /* Hazards section sits beneath the tasks list, divided by a soft rule. */
+  /* Events section sits beneath the tasks list, divided by a soft rule. */
   /* The active tab's content: fills the remaining column height and scrolls on
      its own, keeping the header/economy/scene strip and the tab strip pinned. */
   .gathering-detail-panel {
@@ -834,7 +834,7 @@
     overflow-y: auto;
   }
 
-  .gathering-detail-hazard-list {
+  .gathering-detail-event-list {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);

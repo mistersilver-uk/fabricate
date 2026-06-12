@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 
 import { makeRichState, makeEngine, makeFakeActor, environment } from './helpers/gathering.js';
 
-function configFor({ entries = [], hazards = [] } = {}) {
+function configFor({ entries = [], events = [] } = {}) {
   return {
     systems: {
       'system-test': {
-        rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
+        rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
         characterModifiers: entries,
-        hazards
+        events
       }
     }
   };
@@ -21,7 +21,7 @@ function environmentWithLibrary(service) {
     craftingSystemId: 'system-test',
     tasks: []
   }, { id: 'system-test' });
-  composed.rules = { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops', rewardLimit: 99, hazardLimit: 99, hazardPolicy: 'successWithHazard' };
+  composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
   return composed;
 }
 
@@ -39,7 +39,7 @@ test('missing library modifier aborts attempt with diagnostic', async () => {
   });
   assert.equal(result.status, 'misconfigured');
   assert.equal(result.items.length, 0);
-  assert.equal(result.hazards.length, 0);
+  assert.equal(result.events.length, 0);
   assert.equal(result.diagnostics.length, 1);
   assert.equal(result.diagnostics[0].code, 'MISSING_CHARACTER_MODIFIER');
   assert.equal(result.diagnostics[0].modifierId, 'gone');

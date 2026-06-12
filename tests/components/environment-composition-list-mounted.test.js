@@ -234,10 +234,10 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('.manager-environment-comp-quick-action'), null);
   });
 
-  it('hazard manual mode renders Included plus Available to add with task-style quick actions', async () => {
+  it('event manual mode renders Included plus Available to add with task-style quick actions', async () => {
     const calls = [];
     await renderComposition({
-      kind: 'hazard',
+      kind: 'event',
       mode: 'manual',
       onInclude: (kind, id) => calls.push(['include', kind, id]),
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
@@ -255,47 +255,47 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-section="candidates"]'), null);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
-    assert.equal(target.querySelector('.manager-environment-comp-handle'), null, 'all-drops hazard mode does not render rank handles');
-    assert.equal(target.querySelector('[data-record-id="included"]').getAttribute('draggable'), null, 'all-drops hazard rows are not draggable');
+    assert.equal(target.querySelector('.manager-environment-comp-handle'), null, 'all-drops event mode does not render rank handles');
+    assert.equal(target.querySelector('[data-record-id="included"]').getAttribute('draggable'), null, 'all-drops event rows are not draggable');
 
     const removeQuick = quickAction('included', 'exclude');
-    assert.ok(removeQuick, 'included manual hazard rows render a quick remove action');
+    assert.ok(removeQuick, 'included manual event rows render a quick remove action');
     assert.equal(removeQuick.getAttribute('title'), 'Remove');
     removeQuick.click();
-    assert.deepEqual(calls.at(-1), ['exclude', 'hazard', 'included']);
+    assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
     assert.equal(
-      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source hazard"]'),
+      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source event"]'),
       null,
-      'included manual hazard rows do not render a standalone edit-source action'
+      'included manual event rows do not render a standalone edit-source action'
     );
 
     const includeQuick = quickAction('candidate', 'include');
-    assert.ok(includeQuick, 'matching available hazard rows render a quick add action');
+    assert.ok(includeQuick, 'matching available event rows render a quick add action');
     includeQuick.click();
-    assert.deepEqual(calls.at(-1), ['include', 'hazard', 'candidate']);
+    assert.deepEqual(calls.at(-1), ['include', 'event', 'candidate']);
 
     const forceIncludeQuick = quickAction('nonmatching', 'force-include');
-    assert.ok(forceIncludeQuick, 'non-matching available hazard rows render a quick force-add action');
+    assert.ok(forceIncludeQuick, 'non-matching available event rows render a quick force-add action');
     forceIncludeQuick.click();
-    assert.deepEqual(calls.at(-1), ['forceInclude', 'hazard', 'nonmatching']);
+    assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
 
     assert.equal(
       target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
       null,
-      'library-disabled hazard rows do not render a quick composition action'
+      'library-disabled event rows do not render a quick composition action'
     );
 
     const menu = await openRowMenu('disabled');
     assert.ok(menu.textContent.includes('Enable in library first'));
     menu.querySelectorAll('button').item(1).click();
-    assert.deepEqual(calls.at(-1), ['openSource', 'hazard', 'disabled']);
+    assert.deepEqual(calls.at(-1), ['openSource', 'event', 'disabled']);
   });
 
-  it('hazard highest-ranked mode renders rank handles only on included rows', async () => {
+  it('event highest-ranked mode renders rank handles only on included rows', async () => {
     const calls = [];
     await renderComposition({
-      kind: 'hazard',
-      hazardSelectionMode: 'highestRankedDrop',
+      kind: 'event',
+      eventSelectionMode: 'highestRankedDrop',
       records: [
         record('first', 'First', 'explicitlyIncluded', { runtimeState: 'available' }),
         record('second', 'Second', 'explicitlyIncluded', { runtimeState: 'available' }),
@@ -309,41 +309,41 @@ describe('CompositionList mounted layout', () => {
     });
 
     const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
-    assert.ok(includedRow.classList.contains('has-rank-controls'), 'included ranked hazard rows opt into the handle grid');
-    assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked hazard rows are draggable');
-    assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked hazard rows render the grip handle');
-    assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked hazard rows render the rank number');
+    assert.ok(includedRow.classList.contains('has-rank-controls'), 'included ranked event rows opt into the handle grid');
+    assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked event rows are draggable');
+    assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked event rows render the grip handle');
+    assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked event rows render the rank number');
     const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
-    assert.ok(forcedRow.classList.contains('has-rank-controls'), 'force-included hazard rows also opt into rank controls');
-    assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked hazard rows are draggable');
+    assert.ok(forcedRow.classList.contains('has-rank-controls'), 'force-included event rows also opt into rank controls');
+    assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked event rows are draggable');
     assert.ok(forcedRow.querySelector('.manager-environment-comp-order').textContent.includes('4'), 'force-included rows receive their visible rank');
     const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
-    assert.ok(blockedRow.classList.contains('has-rank-controls'), 'condition-blocked included hazard rows opt into rank controls');
-    assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included hazard rows are draggable');
+    assert.ok(blockedRow.classList.contains('has-rank-controls'), 'condition-blocked included event rows opt into rank controls');
+    assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included event rows are draggable');
     assert.ok(blockedRow.querySelector('.manager-environment-comp-order').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
 
     assert.equal(
       target.querySelector('[data-section="available-to-add"] .manager-environment-comp-handle'),
       null,
-      'available-to-add hazards do not reserve a blank handle placeholder'
+      'available-to-add events do not reserve a blank handle placeholder'
     );
     assert.equal(
       target.querySelector('[data-section="available-to-add"] .manager-environment-comp-row.has-rank-controls'),
       null,
-      'available-to-add hazards keep the non-handle grid'
+      'available-to-add events keep the non-handle grid'
     );
 
     const menu = await openRowMenu('first');
-    assert.ok(menu.textContent.includes('Move up'), 'ranked hazard menus include move up');
-    assert.ok(menu.textContent.includes('Move down'), 'ranked hazard menus include move down');
+    assert.ok(menu.textContent.includes('Move up'), 'ranked event menus include move up');
+    assert.ok(menu.textContent.includes('Move down'), 'ranked event menus include move down');
     menu.querySelectorAll('button').item(1).click();
-    assert.deepEqual(calls.at(-1), ['reorder', 'hazard', 0, 1]);
+    assert.deepEqual(calls.at(-1), ['reorder', 'event', 0, 1]);
   });
 
-  it('hazard all-drops mode hides rank controls and move actions', async () => {
+  it('event all-drops mode hides rank controls and move actions', async () => {
     await renderComposition({
-      kind: 'hazard',
-      hazardSelectionMode: 'allDrops',
+      kind: 'event',
+      eventSelectionMode: 'allDrops',
       records: [
         record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
         record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
@@ -360,10 +360,10 @@ describe('CompositionList mounted layout', () => {
     assert.equal(menu.textContent.includes('Move down'), false);
   });
 
-  it('hazard limited-drops mode hides rank controls for force-included rows', async () => {
+  it('event limited-drops mode hides rank controls for force-included rows', async () => {
     await renderComposition({
-      kind: 'hazard',
-      hazardSelectionMode: 'limitedDrops',
+      kind: 'event',
+      eventSelectionMode: 'limitedDrops',
       records: [
         record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
         record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
@@ -377,8 +377,8 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'), null);
   });
 
-  it('hazard automatic mode retains Excluded and standalone Non-matching sections', async () => {
-    await renderComposition({ kind: 'hazard', mode: 'automatic' });
+  it('event automatic mode retains Excluded and standalone Non-matching sections', async () => {
+    await renderComposition({ kind: 'event', mode: 'automatic' });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
     assert.equal(target.querySelector('[data-section="available-to-add"]'), null);

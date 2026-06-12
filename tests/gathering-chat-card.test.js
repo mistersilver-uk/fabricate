@@ -16,7 +16,7 @@ function fullModel(overrides = {}) {
       { name: 'Sage Leaf', img: 'icons/sage.png', quantity: 3 },
       { name: 'Wild Root', img: 'icons/root.png', quantity: 1 }
     ],
-    hazards: [{ name: 'Thornpatch', img: 'icons/thorn.png' }],
+    events: [{ name: 'Thornpatch', img: 'icons/thorn.png' }],
     brokenTools: [{ name: 'Worn Sickle', img: 'icons/sickle.png' }],
     staminaSpent: 5,
     nodesRemaining: 2,
@@ -39,11 +39,11 @@ test('renders components with quantity prefix and image src', () => {
   assert.ok(content.includes('src="icons/sage.png"'), 'component image src');
 });
 
-test('renders hazards and broken tools with images', () => {
+test('renders events and broken tools with images', () => {
   const content = buildGatheringChatContent(fullModel());
-  assert.ok(content.includes('FABRICATE.Chat.GatherHazards'), 'hazards heading');
-  assert.ok(content.includes('Thornpatch'), 'hazard name');
-  assert.ok(content.includes('src="icons/thorn.png"'), 'hazard image');
+  assert.ok(content.includes('FABRICATE.Chat.GatherEvents'), 'events heading');
+  assert.ok(content.includes('Thornpatch'), 'event name');
+  assert.ok(content.includes('src="icons/thorn.png"'), 'event image');
   assert.ok(content.includes('FABRICATE.Chat.GatherToolsBroken'), 'broken tools heading');
   assert.ok(content.includes('Worn Sickle'), 'broken tool name');
   assert.ok(content.includes('src="icons/sickle.png"'), 'broken tool image');
@@ -64,7 +64,7 @@ test('failure status uses failure header and modifier', () => {
   assert.ok(content.includes('fabricate-gather-chat--failure'), 'failure modifier');
   assert.ok(content.includes('FABRICATE.Chat.GatherFailure'), 'failure title');
   assert.ok(!content.includes('FABRICATE.Chat.GatherComponents'), 'empty components section omitted');
-  assert.ok(content.includes('Thornpatch'), 'hazards still shown on failure');
+  assert.ok(content.includes('Thornpatch'), 'events still shown on failure');
 });
 
 test('omits empty arrays and null economy sections', () => {
@@ -73,12 +73,12 @@ test('omits empty arrays and null economy sections', () => {
     actorName: 'Aria',
     taskName: 'Forage Herbs',
     components: [{ name: 'Sage Leaf', img: 'icons/sage.png', quantity: 1 }],
-    hazards: [],
+    events: [],
     brokenTools: [],
     staminaSpent: null,
     nodesRemaining: null
   });
-  assert.ok(!content.includes('FABRICATE.Chat.GatherHazards'), 'no hazard section');
+  assert.ok(!content.includes('FABRICATE.Chat.GatherEvents'), 'no event section');
   assert.ok(!content.includes('FABRICATE.Chat.GatherToolsBroken'), 'no broken tools section');
   assert.ok(!content.includes('FABRICATE.Chat.GatherStamina'), 'no stamina stat');
   assert.ok(!content.includes('FABRICATE.Chat.GatherNodes'), 'no nodes stat');
@@ -104,7 +104,7 @@ test('escapes HTML in user-authored names', () => {
 test('routes every label through the localize function', () => {
   const seen = [];
   buildGatheringChatContent(fullModel(), (key) => { seen.push(key); return `loc:${key}`; });
-  for (const key of ['GatherSuccess', 'GatherActor', 'GatherTask', 'GatherComponents', 'GatherHazards', 'GatherToolsBroken', 'GatherStamina', 'GatherNodes']) {
+  for (const key of ['GatherSuccess', 'GatherActor', 'GatherTask', 'GatherComponents', 'GatherEvents', 'GatherToolsBroken', 'GatherStamina', 'GatherNodes']) {
     assert.ok(seen.includes(`FABRICATE.Chat.${key}`), `localize asked for FABRICATE.Chat.${key}`);
   }
 });

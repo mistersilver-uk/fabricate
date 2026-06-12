@@ -779,7 +779,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-essence-row',
       '.manager-vocabulary-row',
       '.manager-gathering-task-row',
-      '.manager-gathering-hazard-row',
+      '.manager-gathering-event-row',
       '.manager-tools-row',
       '.manager-inspector-card',
       '.manager-system-edit-form',
@@ -789,7 +789,7 @@ async function assertManagerLayoutStable(page, label) {
       '.environment-draft-editor',
       '.manager-environment-edit-view',
       '.manager-gathering-task-edit-view',
-      '.manager-gathering-hazard-edit-view',
+      '.manager-gathering-event-edit-view',
       '.manager-environment-workspace',
       '.environment-fields',
       '.environment-task-layout',
@@ -825,7 +825,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-essence-row'
       || metric.selector === '.manager-vocabulary-row'
       || metric.selector === '.manager-gathering-task-row'
-      || metric.selector === '.manager-gathering-hazard-row'
+      || metric.selector === '.manager-gathering-event-row'
       || metric.selector === '.manager-tools-row'
       || metric.selector === '.manager-travel-parties-row'
   ).length;
@@ -834,7 +834,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-environment-editor-shell'
       || metric.selector === '.manager-environment-edit-view'
       || metric.selector === '.manager-gathering-task-edit-view'
-      || metric.selector === '.manager-gathering-hazard-edit-view'
+      || metric.selector === '.manager-gathering-event-edit-view'
       || metric.selector === '.manager-essence-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
@@ -1018,12 +1018,12 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           onBreak: { mode: 'flagBroken' }
         }
       ],
-      hazards: [
-        ...withoutIds(systemConfig.hazards, new Set(['smoke-bramble-hazard'])),
+      events: [
+        ...withoutIds(systemConfig.events, new Set(['smoke-bramble-event'])),
         {
-          id: 'smoke-bramble-hazard',
+          id: 'smoke-bramble-event',
           name: 'Smoke Bramble Snare',
-          description: 'Reusable hazard for Manager gathering composition screenshots.',
+          description: 'Reusable event for Manager gathering composition screenshots.',
           img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
           enabled: true,
           dangerTags: ['hazardous'],
@@ -1990,10 +1990,10 @@ async function main() {
           region: 'northreach',
           biomes: ['forest', 'ruins'],
           dangerTags: ['hazardous'],
-          hazardSelectionMode: 'highestRankedDrop',
-          hazardPolicy: 'successWithHazard',
+          eventSelectionMode: 'highestRankedDrop',
+          eventPolicy: 'successWithEvent',
           enabledTaskIds: ['smoke-forage-library'],
-          enabledHazardIds: ['smoke-bramble-hazard']
+          enabledEventIds: ['smoke-bramble-event']
         });
 
         const playerGatheringFixtures = [];
@@ -2098,10 +2098,10 @@ async function main() {
                 breakage: { mode: 'limitedUses', maxUses: 5 },
                 onBreak: { mode: 'flagBroken' }
               }],
-              hazards: [{
-                id: 'smoke-bramble-hazard',
+              events: [{
+                id: 'smoke-bramble-event',
                 name: 'Smoke Bramble Snare',
-                description: 'Reusable hazard for Manager gathering composition screenshots.',
+                description: 'Reusable event for Manager gathering composition screenshots.',
                 img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
                 enabled: true,
                 dangerTags: ['hazardous'],
@@ -2232,14 +2232,14 @@ async function main() {
           const viewSystem = state?.gatheringConfig?.systems?.[sysId] || {};
           return {
             rawTasks: Array.isArray(rawSystem.tasks) ? rawSystem.tasks.length : 0,
-            rawHazards: Array.isArray(rawSystem.hazards) ? rawSystem.hazards.length : 0,
+            rawEvents: Array.isArray(rawSystem.events) ? rawSystem.events.length : 0,
             rawTools: Array.isArray(rawSystem.tools) ? rawSystem.tools.length : 0,
             viewTasks: Array.isArray(viewSystem.tasks) ? viewSystem.tasks.length : 0,
-            viewHazards: Array.isArray(viewSystem.hazards) ? viewSystem.hazards.length : 0,
+            viewEvents: Array.isArray(viewSystem.events) ? viewSystem.events.length : 0,
             viewTools: Array.isArray(viewSystem.tools) ? viewSystem.tools.length : 0
           };
         }, craftingSetup.systemId);
-        if (smokeLibraryCounts.viewTasks < 1 || smokeLibraryCounts.viewHazards < 1 || smokeLibraryCounts.viewTools < 1) {
+        if (smokeLibraryCounts.viewTasks < 1 || smokeLibraryCounts.viewEvents < 1 || smokeLibraryCounts.viewTools < 1) {
           throw new Error(`Manager smoke gathering library was not loaded: ${JSON.stringify(smokeLibraryCounts)}`);
         }
         let navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
@@ -2598,14 +2598,14 @@ async function main() {
             expectedSystemId: sysId,
             selectedSystemId,
             rawTasks: Array.isArray(rawSystem.tasks) ? rawSystem.tasks.length : 0,
-            rawHazards: Array.isArray(rawSystem.hazards) ? rawSystem.hazards.length : 0,
+            rawEvents: Array.isArray(rawSystem.events) ? rawSystem.events.length : 0,
             rawTools: Array.isArray(rawSystem.tools) ? rawSystem.tools.length : 0,
             viewTasks: Array.isArray(viewSystem.tasks) ? viewSystem.tasks.length : 0,
-            viewHazards: Array.isArray(viewSystem.hazards) ? viewSystem.hazards.length : 0,
+            viewEvents: Array.isArray(viewSystem.events) ? viewSystem.events.length : 0,
             viewTools: Array.isArray(viewSystem.tools) ? viewSystem.tools.length : 0
           };
         }, craftingSetup.systemId);
-        if (preTaskLibraryCounts.viewTasks < 1 || preTaskLibraryCounts.viewHazards < 1 || preTaskLibraryCounts.viewTools < 1) {
+        if (preTaskLibraryCounts.viewTasks < 1 || preTaskLibraryCounts.viewEvents < 1 || preTaskLibraryCounts.viewTools < 1) {
           throw new Error(`Manager smoke gathering library disappeared before task screenshot: ${JSON.stringify(preTaskLibraryCounts)}`);
         }
         await page.locator('.fabricate-manager #manager-gathering-nav-tasks').first().click();
@@ -2664,22 +2664,22 @@ async function main() {
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager #manager-gathering-nav-encounters').first().click();
-        await page.locator('.fabricate-manager .manager-gathering-hazard-row:has-text("Smoke Bramble Snare")').first()
+        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Smoke Bramble Snare")').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertManagerLayoutStable(page, 'gathering hazards normal');
+        await assertManagerLayoutStable(page, 'gathering events normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-gathering-hazards-normal');
+        await screenshot(page, 'manager-gathering-events-normal');
 
-        await page.locator('.fabricate-manager .manager-gathering-hazard-row:has-text("Smoke Bramble Snare") [aria-label^="Edit"]').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="gathering-hazard-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        for (const expected of ['Hazard Identity', 'Hazard Matching']) {
+        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Smoke Bramble Snare") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="gathering-event-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        for (const expected of ['Event Identity', 'Event Matching']) {
           if (await page.locator('.fabricate-manager').filter({ hasText: expected }).count() === 0) {
-            throw new Error(`Manager gathering hazard editor is missing "${expected}".`);
+            throw new Error(`Manager gathering event editor is missing "${expected}".`);
           }
         }
-        await assertManagerLayoutStable(page, 'gathering hazard editor normal');
+        await assertManagerLayoutStable(page, 'gathering event editor normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-gathering-hazard-editor-normal');
+        await screenshot(page, 'manager-gathering-event-editor-normal');
 
         // Travel route (#257): clicks the gathering Travel subitem and screenshots
         // the party/region management surface. The subitem is targeted by id so

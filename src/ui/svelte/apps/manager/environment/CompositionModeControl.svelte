@@ -10,8 +10,8 @@
   }
 
   const OPTIONS = [
-    { value: 'automatic', icon: 'fas fa-wand-magic-sparkles', key: 'Automatic', fallback: 'Automatic', descKey: 'AutomaticHint', descFallback: 'All matching enabled tasks and hazards are available unless locally excluded.' },
-    { value: 'manual', icon: 'fas fa-hand-pointer', key: 'Manual', fallback: 'Manual', descKey: 'ManualHint', descFallback: 'Only explicitly included tasks and hazards are available; GMs can force add enabled non-matching tasks and hazards.' }
+    { value: 'automatic', icon: 'fas fa-wand-magic-sparkles', key: 'Automatic', fallback: 'Automatic', descKey: 'AutomaticHint', descFallback: 'All matching enabled tasks and events are available unless locally excluded.' },
+    { value: 'manual', icon: 'fas fa-hand-pointer', key: 'Manual', fallback: 'Manual', descKey: 'ManualHint', descFallback: 'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.' }
   ];
 
   const current = $derived(mode === 'manual' ? 'manual' : 'automatic');

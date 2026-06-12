@@ -52,18 +52,18 @@ test('weather/time constraints are ignored when the dimension is disabled', () =
   assert.equal(evidence.time.applicable, false);
 });
 
-test('danger is only applied when includeDanger is set (hazards)', () => {
+test('danger is only applied when includeDanger is set (events)', () => {
   const record = { dangerTags: ['deadly'] };
   const taskView = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
   assert.equal(taskView.matches, true);
   assert.equal(taskView.evidence.danger.applicable, false);
 
-  const hazardView = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: true });
-  assert.equal(hazardView.matches, false);
-  assert.equal(hazardView.evidence.danger.state, 'mismatch');
+  const eventView = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: true });
+  assert.equal(eventView.matches, false);
+  assert.equal(eventView.evidence.danger.state, 'mismatch');
 });
 
-test('danger is a severity ceiling: hazards at or below the environment level match', () => {
+test('danger is a severity ceiling: events at or below the environment level match', () => {
   const env = { dangerLevel: 'dangerous' };
   const below = evaluateEnvironmentMatch({ dangerTags: ['hazardous'] }, env, conditions, { includeDanger: true });
   assert.equal(below.evidence.danger.state, 'match');
@@ -76,7 +76,7 @@ test('danger is a severity ceiling: hazards at or below the environment level ma
   assert.equal(none.evidence.danger.state, 'any');
 });
 
-test('a hazard is ranked by its highest danger tag against the ceiling', () => {
+test('an event is ranked by its highest danger tag against the ceiling', () => {
   const env = { dangerLevel: 'dangerous' };
   const mixed = evaluateEnvironmentMatch({ dangerTags: ['safe', 'deadly'] }, env, conditions, { includeDanger: true });
   assert.equal(mixed.evidence.danger.state, 'mismatch');

@@ -36,7 +36,7 @@
 //   }
 //
 // The component still owns the Foundry/store edges and the downstream task /
-// hazard default resolution; this only encodes the env-selection + tab + task
+// event default resolution; this only encodes the env-selection + tab + task
 // preference decision.
 export function resolveScopedGatheringSelection({
   environments,

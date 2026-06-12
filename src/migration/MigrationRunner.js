@@ -16,6 +16,7 @@ import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -120,6 +121,13 @@ const MIGRATIONS = [
       // so it sees that vocab. Surfaces the names of systems that had regions via
       // a transient `_unifiedRegionSystems` field for the runner's GM notice.
       return migrateUnifyGatheringRegions(data);
+    }
+  },
+  {
+    version: '1.0.0',
+    label: 'Rename gathering Hazard concept to Event (keys, policy values, region-modifier kind)',
+    migrate(data) {
+      return migrateRenameGatheringHazardsToEvents(data);
     }
   }
   // Future migrations added here in version order

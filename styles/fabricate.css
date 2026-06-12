@@ -4425,7 +4425,7 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.fabricate-manager .manager-gathering-panel-hazards {
+.fabricate-manager .manager-gathering-panel-events {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
@@ -4437,30 +4437,30 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazards-table {
-  --fab-mv2-gathering-hazard-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
+.fabricate-manager .manager-gathering-events-table {
+  --fab-mv2-gathering-event-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-table-head,
-.fabricate-manager .manager-gathering-hazard-row {
+.fabricate-manager .manager-gathering-event-table-head,
+.fabricate-manager .manager-gathering-event-row {
   display: grid;
-  grid-template-columns: var(--fab-mv2-gathering-hazard-grid);
+  grid-template-columns: var(--fab-mv2-gathering-event-grid);
   gap: 8px;
   align-items: center;
   align-content: center;
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-table-head > *,
-.fabricate-manager .manager-gathering-hazard-row > * {
+.fabricate-manager .manager-gathering-event-table-head > *,
+.fabricate-manager .manager-gathering-event-row > * {
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-row {
+.fabricate-manager .manager-gathering-event-row {
   width: 100%;
   min-height: 76px;
   padding: 9px 10px;
@@ -4470,20 +4470,20 @@
   background: var(--fab-mv2-surface-2);
 }
 
-.fabricate-manager .manager-gathering-hazard-row:hover {
+.fabricate-manager .manager-gathering-event-row:hover {
   border-color: var(--fab-mv2-border-strong);
 }
 
-.fabricate-manager .manager-gathering-hazard-row.is-selected {
+.fabricate-manager .manager-gathering-event-row.is-selected {
   border-color: var(--fab-mv2-accent);
   background: var(--fab-mv2-surface-1);
 }
 
-.fabricate-manager .manager-gathering-hazard-row .manager-status-cell {
+.fabricate-manager .manager-gathering-event-row .manager-status-cell {
   justify-self: start;
 }
 
-.fabricate-manager .manager-gathering-hazard-identity {
+.fabricate-manager .manager-gathering-event-identity {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -4496,16 +4496,16 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-gathering-hazard-identity:focus {
+.fabricate-manager .manager-gathering-event-identity:focus {
   outline: none;
 }
 
-.fabricate-manager .manager-gathering-hazard-identity:focus-visible {
+.fabricate-manager .manager-gathering-event-identity:focus-visible {
   outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 2px;
 }
 
-.fabricate-manager .manager-gathering-hazard-thumb {
+.fabricate-manager .manager-gathering-event-thumb {
   width: 36px;
   height: 36px;
   flex: 0 0 36px;
@@ -4514,7 +4514,7 @@
   background: var(--fab-overlay-dark-18);
 }
 
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity {
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
@@ -4523,7 +4523,7 @@
   min-height: 64px;
 }
 
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-gathering-hazard-thumb {
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-gathering-event-thumb {
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
@@ -4531,7 +4531,7 @@
   align-self: center;
 }
 
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-system-copy {
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-system-copy {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4539,26 +4539,26 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-system-description {
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-system-description {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
 
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-row .manager-status-cell,
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-row .manager-action-group {
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-status-cell,
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-action-group {
   align-self: center;
 }
 
 /* Keep the action buttons on a single row (like the environments browser) so the row
    height is driven by the 64px thumbnail, not a wrapped second button row. */
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-row .manager-action-group {
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-action-group {
   flex-wrap: nowrap;
   gap: 4px;
 }
 
-.fabricate-manager .manager-gathering-hazard-tags-cell {
+.fabricate-manager .manager-gathering-event-tags-cell {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -4656,7 +4656,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-view {
+.fabricate-manager .manager-gathering-event-edit-view {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4666,11 +4666,11 @@
   overflow: auto;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-view > * {
+.fabricate-manager .manager-gathering-event-edit-view > * {
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-row {
+.fabricate-manager .manager-gathering-event-edit-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
@@ -4678,17 +4678,17 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-row > .manager-task-availability-card {
+.fabricate-manager .manager-gathering-event-edit-row > .manager-task-availability-card {
   min-width: 0;
   align-content: start;
 }
 
-.fabricate-manager [data-gathering-hazard-drop-rate] .manager-task-availability-row,
-.fabricate-manager [data-gathering-hazard-danger-tags] .manager-task-availability-row {
+.fabricate-manager [data-gathering-event-drop-rate] .manager-task-availability-row,
+.fabricate-manager [data-gathering-event-danger-tags] .manager-task-availability-row {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.fabricate-manager .manager-gathering-hazard-scene-dropzone {
+.fabricate-manager .manager-gathering-event-scene-dropzone {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4702,13 +4702,13 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-gathering-hazard-scene-dropzone.is-drop-active {
+.fabricate-manager .manager-gathering-event-scene-dropzone.is-drop-active {
   border-color: var(--fab-mv2-accent);
   background: var(--fab-success-soft);
   color: var(--fab-mv2-text);
 }
 
-.fabricate-manager .manager-gathering-hazard-scene-linked {
+.fabricate-manager .manager-gathering-event-scene-linked {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4719,7 +4719,7 @@
   background: var(--fab-mv2-surface-1);
 }
 
-.fabricate-manager .manager-gathering-hazard-scene-thumb {
+.fabricate-manager .manager-gathering-event-scene-thumb {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -4733,7 +4733,7 @@
   background: var(--fab-overlay-light-06);
 }
 
-.fabricate-manager .manager-gathering-hazard-scene-name {
+.fabricate-manager .manager-gathering-event-scene-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -4752,11 +4752,11 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-gathering-hazard-scene-name:hover {
+.fabricate-manager .manager-gathering-event-scene-name:hover {
   text-decoration: underline;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
@@ -4767,18 +4767,18 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 32px;
   padding: 5px 9px;
 }
 
-.fabricate-manager .manager-gathering-hazard-edit-view textarea {
+.fabricate-manager .manager-gathering-event-edit-view textarea {
   min-height: 54px;
   padding: 7px 9px;
   resize: vertical;
 }
 
-.fabricate-manager .manager-gathering-hazard-character-modifiers-list {
+.fabricate-manager .manager-gathering-event-character-modifiers-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -4787,7 +4787,7 @@
   gap: 8px;
 }
 
-.fabricate-manager .manager-gathering-hazard-character-modifier-row {
+.fabricate-manager .manager-gathering-event-character-modifier-row {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) 90px 90px 90px minmax(0, 1.4fr) 40px;
   align-items: end;
@@ -4798,14 +4798,14 @@
   background: var(--fab-mv2-surface-2);
 }
 
-.fabricate-manager .manager-gathering-hazard-character-modifier-summary {
+.fabricate-manager .manager-gathering-event-character-modifier-summary {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-character-modifier-override {
+.fabricate-manager .manager-gathering-event-character-modifier-override {
   grid-column: span 1;
 }
 
@@ -5393,7 +5393,7 @@
 }
 
 .fabricate-manager .manager-task-environment-usage-grid,
-.fabricate-manager .manager-hazard-environment-usage-grid {
+.fabricate-manager .manager-event-environment-usage-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -5401,12 +5401,12 @@
 }
 
 .fabricate-manager [data-task-environment-usage] > [data-task-environment-usage-empty],
-.fabricate-manager [data-hazard-environment-usage] > [data-hazard-environment-usage-empty] {
+.fabricate-manager [data-event-environment-usage] > [data-event-environment-usage-empty] {
   margin-top: 10px;
 }
 
 .fabricate-manager .manager-task-environment-usage-card,
-.fabricate-manager .manager-hazard-environment-usage-card {
+.fabricate-manager .manager-event-environment-usage-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -5414,7 +5414,7 @@
 }
 
 .fabricate-manager .manager-task-environment-usage-thumb,
-.fabricate-manager .manager-hazard-environment-usage-thumb {
+.fabricate-manager .manager-event-environment-usage-thumb {
   width: 100%;
   aspect-ratio: 1 / 1;
   height: auto;
@@ -5425,7 +5425,7 @@
 }
 
 .fabricate-manager .manager-task-environment-usage-name,
-.fabricate-manager .manager-hazard-environment-usage-name {
+.fabricate-manager .manager-event-environment-usage-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8856,7 +8856,7 @@
   margin-top: 8px;
 }
 
-/* Tasks/Hazards composition tab header + callout */
+/* Tasks/Events composition tab header + callout */
 .fabricate-manager .manager-environment-comp-callout {
   display: flex;
   align-items: flex-start;
@@ -9650,7 +9650,7 @@
   opacity: 0.58;
 }
 
-.fabricate-gather-chat__section--hazard .fabricate-gather-chat__heading {
+.fabricate-gather-chat__section--event .fabricate-gather-chat__heading {
   color: var(--fab-danger);
   opacity: 0.95;
 }

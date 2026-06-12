@@ -120,7 +120,7 @@ test('evaluator injection passes through with kind=characterModifier', async () 
     }
   );
   const composed = service.composeEnvironment({
-    id: 'env', craftingSystemId: 'system-a', tasks: [], hazards: []
+    id: 'env', craftingSystemId: 'system-a', tasks: [], events: []
   }, { id: 'system-a' });
   const result = await service.resolveD100Attempt({
     task: {

@@ -3,33 +3,33 @@ import assert from 'node:assert/strict';
 
 import { makeRichState } from './helpers/gathering.js';
 
-function configFor({ entries = [], hazards = [] } = {}) {
+function configFor({ entries = [], events = [] } = {}) {
   return {
     systems: {
       'system-a': {
-        rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
+        rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
         characterModifiers: entries,
-        hazards
+        events
       }
     }
   };
 }
 
-function environmentWithLibrary(service, { hazards = [], conditions = null } = {}) {
+function environmentWithLibrary(service, { events = [], conditions = null } = {}) {
   const composed = service.composeEnvironment({
     id: 'env',
     craftingSystemId: 'system-a',
     tasks: []
   }, { id: 'system-a' });
-  // Override conditions and hazards inline (composeEnvironment uses system defaults)
+  // Override conditions and events inline (composeEnvironment uses system defaults)
   if (conditions) composed.conditions = conditions;
-  if (hazards.length > 0) composed.hazards = hazards;
-  composed.rules = { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops', rewardLimit: 99, hazardLimit: 99, hazardPolicy: 'successWithHazard' };
+  if (events.length > 0) composed.events = events;
+  composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
   return composed;
 }
 
-function composeAndResolve(service, { task, hazards = [], conditions = null } = {}) {
-  const composed = environmentWithLibrary(service, { hazards, conditions });
+function composeAndResolve(service, { task, events = [], conditions = null } = {}) {
+  const composed = environmentWithLibrary(service, { events, conditions });
   return service.resolveD100Attempt({
     task,
     environment: composed,
@@ -95,7 +95,7 @@ test('character modifier composes with condition modifier worked example', async
   assert.equal(drop.effectiveRoll, 110);
 });
 
-test('hazard threshold reduced by negative character modifier', async () => {
+test('event threshold reduced by negative character modifier', async () => {
   const { service } = makeRichState({
     config: configFor({
       entries: [{ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', provider: 'dnd5e', expression: '@stealth' }]
@@ -105,19 +105,19 @@ test('hazard threshold reduced by negative character modifier', async () => {
   });
   const result = await composeAndResolve(service, {
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
-    hazards: [{
+    events: [{
       id: 'h1',
       name: 'Trap',
       dropRate: 30,
       characterModifiers: [{ id: 'rh', modifierId: 'stealth', operator: '-' }]
     }]
   });
-  const haz = result.hazards[0];
+  const haz = result.events[0];
   assert.equal(haz.characterModifierTotal, -4);
   assert.equal(haz.finalDropRate, 26);
 });
 
-test('hazardModifier and characterModifiers are independent on the same hazard', async () => {
+test('eventModifier and characterModifiers are independent on the same event', async () => {
   const { service } = makeRichState({
     config: configFor({
       entries: [{ id: 'stealth', provider: 'dnd5e', label: 'Stealth', expression: '@stealth' }]
@@ -127,16 +127,16 @@ test('hazardModifier and characterModifiers are independent on the same hazard',
   });
   const result = await composeAndResolve(service, {
     task: { id: 't', dropRows: [] },
-    hazards: [{
+    events: [{
       id: 'h',
       name: 'Trap',
       dropRate: 30,
-      hazardModifier: { provider: 'static', value: 2 },
+      eventModifier: { provider: 'static', value: 2 },
       characterModifiers: [{ id: 'r', modifierId: 'stealth', operator: '-' }]
     }]
   });
-  const haz = result.hazards[0];
-  assert.equal(haz.modifier, 2, 'roll-side hazardModifier preserved');
+  const haz = result.events[0];
+  assert.equal(haz.modifier, 2, 'roll-side eventModifier preserved');
   assert.equal(haz.characterModifierTotal, -5, 'threshold-side modifier applied');
   assert.equal(haz.finalDropRate, 25);
 });

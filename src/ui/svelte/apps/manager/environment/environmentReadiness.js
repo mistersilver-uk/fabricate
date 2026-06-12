@@ -6,7 +6,7 @@
  * Svelte, Foundry, or store dependencies so it stays unit-testable.
  *
  * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
- * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', recordKind?: 'task' | 'hazard', recordId?: string, recordName?: string }} ReadinessIssue
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', recordKind?: 'task' | 'event', recordId?: string, recordName?: string }} ReadinessIssue
  */
 
 function trimmed(value) {
@@ -19,13 +19,13 @@ function tagList(value) {
 
 /**
  * @param {object} environment Draft environment.
- * @param {object} composition Composition view-model `{ counts, tasks, hazards }`.
+ * @param {object} composition Composition view-model `{ counts, tasks, events }`.
  * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
  */
 export function evaluateEnvironmentReadiness(environment = {}, composition = {}) {
   const counts = composition?.counts || {};
   const tasks = Array.isArray(composition?.tasks) ? composition.tasks : [];
-  const hazards = Array.isArray(composition?.hazards) ? composition.hazards : [];
+  const events = Array.isArray(composition?.events) ? composition.events : [];
 
   const hasName = Boolean(trimmed(environment?.name));
   const hasDescription = Boolean(trimmed(environment?.description));
@@ -35,7 +35,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
     || Boolean(trimmed(environment?.risk));
   const hasCompositionMode = environment?.compositionMode === 'manual' || environment?.compositionMode === 'automatic' || environment?.compositionMode === undefined;
   const hasAvailableTask = Number(counts.availableTasks || 0) > 0;
-  const staleIncluded = Number(counts.unavailableTasks || 0) + Number(counts.unavailableHazards || 0);
+  const staleIncluded = Number(counts.unavailableTasks || 0) + Number(counts.unavailableEvents || 0);
   const noStaleIncluded = staleIncluded === 0;
 
   const checks = [
@@ -57,7 +57,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   if (active && !hasAvailableTask) {
     issues.push({ id: 'activeNoComposition', severity: 'critical' });
   }
-  for (const entry of [...tasks, ...hazards]) {
+  for (const entry of [...tasks, ...events]) {
     if (entry.compositionState === 'includedButUnavailable') {
       issues.push({ id: 'staleIncluded', severity: 'critical', recordKind: entry.kind, recordId: entry.id, recordName: entry.record?.name || entry.id });
     }
@@ -66,8 +66,8 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   if (!trimmed(environment?.sceneUuid)) {
     issues.push({ id: 'noScene', severity: 'warning' });
   }
-  if (hasDanger && Number(counts.availableHazards || 0) === 0) {
-    issues.push({ id: 'noHazardsAtDanger', severity: 'warning' });
+  if (hasDanger && Number(counts.availableEvents || 0) === 0) {
+    issues.push({ id: 'noEventsAtDanger', severity: 'warning' });
   }
   for (const entry of tasks) {
     if (entry.runtimeState === 'available' && !trimmed(entry.record?.description)) {
@@ -75,7 +75,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
     }
   }
 
-  const excluded = Number(counts.excludedTasks || 0) + Number(counts.excludedHazards || 0);
+  const excluded = Number(counts.excludedTasks || 0) + Number(counts.excludedEvents || 0);
   if (excluded > 0) {
     issues.push({ id: 'locallyExcluded', severity: 'info' });
   }

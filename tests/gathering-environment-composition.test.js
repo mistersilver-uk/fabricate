@@ -101,21 +101,21 @@ test('taskOrder applies a deterministic order, with unlisted records following i
   assert.deepEqual(composed.tasks.map(task => task.id), ['t3', 't1', 't2']);
 });
 
-test('hazards compose by danger matching and respect the shared composition mode', () => {
+test('events compose by danger matching and respect the shared composition mode', () => {
   const service = makeService({
-    hazards: [
+    events: [
       { id: 'h1', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
       { id: 'h2', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['deadly'], dropRate: 50 }
     ]
   });
   const composedAuto = service.composeEnvironment(environment({ compositionMode: 'automatic' }), system);
-  assert.deepEqual(composedAuto.hazards.map(hazard => hazard.id), ['h1']);
+  assert.deepEqual(composedAuto.events.map(event => event.id), ['h1']);
 
-  const composedManual = service.composeEnvironment(environment({ compositionMode: 'manual', enabledHazardIds: ['h1'] }), system);
-  assert.deepEqual(composedManual.hazards.map(hazard => hazard.id), ['h1']);
+  const composedManual = service.composeEnvironment(environment({ compositionMode: 'manual', enabledEventIds: ['h1'] }), system);
+  assert.deepEqual(composedManual.events.map(event => event.id), ['h1']);
 
   const composedManualEmpty = service.composeEnvironment(environment({ compositionMode: 'manual' }), system);
-  assert.deepEqual(composedManualEmpty.hazards.map(hazard => hazard.id), []);
+  assert.deepEqual(composedManualEmpty.events.map(event => event.id), []);
 });
 
 test('manual mode force-adds a non-matching task into the composed environment', () => {
@@ -150,25 +150,25 @@ test('manual task disabledTaskIds do not veto force-added tasks', () => {
   assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 'tDesert']);
 });
 
-test('manual hazard disabledHazardIds do not veto enabled or force-added hazards', () => {
+test('manual event disabledEventIds do not veto enabled or force-added events', () => {
   const service = makeService({
-    hazards: [
+    events: [
       { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
       { id: 'hDesert', name: 'Sandstorm', biomes: ['desert'], dangerTags: ['hazardous'], dropRate: 50 }
     ]
   });
   const composed = service.composeEnvironment(environment({
     compositionMode: 'manual',
-    enabledHazardIds: ['hCave'],
-    forcedHazardIds: ['hDesert'],
-    disabledHazardIds: ['hCave', 'hDesert']
+    enabledEventIds: ['hCave'],
+    forcedEventIds: ['hDesert'],
+    disabledEventIds: ['hCave', 'hDesert']
   }), system);
-  assert.deepEqual(composed.hazards.map(hazard => hazard.id).sort(), ['hCave', 'hDesert']);
+  assert.deepEqual(composed.events.map(event => event.id).sort(), ['hCave', 'hDesert']);
 });
 
-test('hazardOrder sorts matching and force-added hazards together', () => {
+test('eventOrder sorts matching and force-added events together', () => {
   const service = makeService({
-    hazards: [
+    events: [
       { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
       { id: 'hStorm', name: 'Storm Surge', biomes: ['cave'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 50 },
       { id: 'hGas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
@@ -177,61 +177,61 @@ test('hazardOrder sorts matching and force-added hazards together', () => {
   });
   const composed = service.composeEnvironment(environment({
     compositionMode: 'manual',
-    enabledHazardIds: ['hCave', 'hStorm', 'hGas'],
-    forcedHazardIds: ['hDesert'],
-    hazardOrder: ['hDesert', 'hStorm', 'hGas', 'hCave']
+    enabledEventIds: ['hCave', 'hStorm', 'hGas'],
+    forcedEventIds: ['hDesert'],
+    eventOrder: ['hDesert', 'hStorm', 'hGas', 'hCave']
   }), system);
-  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hDesert', 'hStorm', 'hGas', 'hCave']);
+  assert.deepEqual(composed.events.map(event => event.id), ['hDesert', 'hStorm', 'hGas', 'hCave']);
 });
 
-test('automatic mode excludes hazards listed in disabledHazardIds', () => {
+test('automatic mode excludes events listed in disabledEventIds', () => {
   const service = makeService({
-    hazards: [
+    events: [
       { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
       { id: 'hGas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 }
     ]
   });
   const composed = service.composeEnvironment(environment({
     compositionMode: 'automatic',
-    disabledHazardIds: ['hGas']
+    disabledEventIds: ['hGas']
   }), system);
-  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hCave']);
+  assert.deepEqual(composed.events.map(event => event.id), ['hCave']);
 });
 
-test('the environment danger level acts as a ceiling for eligible hazards', () => {
+test('the environment danger level acts as a ceiling for eligible events', () => {
   const service = makeService({
-    hazards: [
+    events: [
       { id: 'h1', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
       { id: 'h2', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['deadly'], dropRate: 50 }
     ]
   });
 
   const deadly = service.composeEnvironment(environment({ compositionMode: 'automatic', dangerLevel: 'deadly' }), system);
-  assert.deepEqual(deadly.hazards.map(hazard => hazard.id).sort(), ['h1', 'h2']);
+  assert.deepEqual(deadly.events.map(event => event.id).sort(), ['h1', 'h2']);
 
   const safe = service.composeEnvironment(environment({ compositionMode: 'automatic', dangerLevel: 'safe' }), system);
-  assert.deepEqual(safe.hazards.map(hazard => hazard.id), []);
+  assert.deepEqual(safe.events.map(event => event.id), []);
 });
 
-test('environment drop-rate adjustments apply to composed task rows and hazards without mutating library records', () => {
+test('environment drop-rate adjustments apply to composed task rows and events without mutating library records', () => {
   const sourceTask = { id: 'tAdjust', name: 'Pick Ore', biomes: ['cave'], dropRows: [{ id: 'dAdjust', componentId: 'ore', quantity: 1, dropRate: 40 }] };
-  const sourceHazard = { id: 'hAdjust', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 };
-  const service = makeService({ tasks: [sourceTask], hazards: [sourceHazard] });
+  const sourceEvent = { id: 'hAdjust', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 };
+  const service = makeService({ tasks: [sourceTask], events: [sourceEvent] });
 
   const composed = service.composeEnvironment(environment({
     compositionMode: 'automatic',
     taskDropRateAdjustments: { tAdjust: { dAdjust: 20 } },
-    hazardDropRateAdjustments: { hAdjust: -15 }
+    eventDropRateAdjustments: { hAdjust: -15 }
   }), system);
 
   assert.equal(composed.tasks[0].dropRows[0].dropRate, 60);
   assert.equal(composed.tasks[0].dropRows[0].baseDropRate, 40);
   assert.equal(composed.tasks[0].dropRows[0].environmentDropRateAdjustment, 20);
-  assert.equal(composed.hazards[0].dropRate, 25);
-  assert.equal(composed.hazards[0].baseDropRate, 40);
-  assert.equal(composed.hazards[0].environmentDropRateAdjustment, -15);
+  assert.equal(composed.events[0].dropRate, 25);
+  assert.equal(composed.events[0].baseDropRate, 40);
+  assert.equal(composed.events[0].environmentDropRateAdjustment, -15);
   assert.equal(sourceTask.dropRows[0].dropRate, 40);
-  assert.equal(sourceHazard.dropRate, 40);
+  assert.equal(sourceEvent.dropRate, 40);
 });
 
 test('disabled task drop-rate adjustments remain stored but do not apply to composed task rows', () => {
@@ -250,26 +250,26 @@ test('disabled task drop-rate adjustments remain stored but do not apply to comp
   assert.equal(sourceTask.dropRows[0].dropRate, 40);
 });
 
-test('disabled hazard drop-rate adjustments remain stored but do not apply to composed hazards', () => {
-  const sourceHazard = { id: 'hDisabledAdjust', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 };
-  const service = makeService({ hazards: [sourceHazard] });
+test('disabled event drop-rate adjustments remain stored but do not apply to composed events', () => {
+  const sourceEvent = { id: 'hDisabledAdjust', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 };
+  const service = makeService({ events: [sourceEvent] });
 
   const composed = service.composeEnvironment(environment({
     compositionMode: 'automatic',
-    hazardDropRateAdjustments: { hDisabledAdjust: 20 },
-    hazardDropRateAdjustmentsEnabled: { hDisabledAdjust: false }
+    eventDropRateAdjustments: { hDisabledAdjust: 20 },
+    eventDropRateAdjustmentsEnabled: { hDisabledAdjust: false }
   }), system);
 
-  assert.equal(composed.hazards[0].dropRate, 40);
-  assert.equal(composed.hazards[0].baseDropRate, 40);
-  assert.equal(composed.hazards[0].environmentDropRateAdjustment, 0);
-  assert.equal(sourceHazard.dropRate, 40);
+  assert.equal(composed.events[0].dropRate, 40);
+  assert.equal(composed.events[0].baseDropRate, 40);
+  assert.equal(composed.events[0].environmentDropRateAdjustment, 0);
+  assert.equal(sourceEvent.dropRate, 40);
 });
 
-test('environment drop-rate adjustments affect d100 task and hazard roll thresholds', async () => {
+test('environment drop-rate adjustments affect d100 task and event roll thresholds', async () => {
   const service = makeRollingService({
     tasks: [{ id: 'tRoll', name: 'Pick Ore', biomes: ['cave'], dropRows: [{ id: 'dRoll', componentId: 'ore', quantity: 1, dropRate: 40 }] }],
-    hazards: [{ id: 'hRoll', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 }]
+    events: [{ id: 'hRoll', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 }]
   }, () => 50);
 
   const unadjusted = service.composeEnvironment(environment({ compositionMode: 'automatic' }), system);
@@ -278,12 +278,12 @@ test('environment drop-rate adjustments affect d100 task and hazard roll thresho
     environment: unadjusted
   });
   assert.deepEqual(unadjustedResult.items, []);
-  assert.deepEqual(unadjustedResult.hazards, []);
+  assert.deepEqual(unadjustedResult.events, []);
 
   const adjusted = service.composeEnvironment(environment({
     compositionMode: 'automatic',
     taskDropRateAdjustments: { tRoll: { dRoll: 20 } },
-    hazardDropRateAdjustments: { hRoll: 20 }
+    eventDropRateAdjustments: { hRoll: 20 }
   }), system);
   const adjustedResult = await service.resolveD100Attempt({
     task: adjusted.tasks[0],
@@ -291,5 +291,5 @@ test('environment drop-rate adjustments affect d100 task and hazard roll thresho
   });
 
   assert.deepEqual(adjustedResult.items.map(item => item.id), ['dRoll']);
-  assert.deepEqual(adjustedResult.hazards.map(hazard => hazard.id), ['hRoll']);
+  assert.deepEqual(adjustedResult.events.map(event => event.id), ['hRoll']);
 });

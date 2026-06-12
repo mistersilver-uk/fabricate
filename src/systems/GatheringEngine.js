@@ -41,10 +41,10 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
-// Player-facing hazard visibility tiers. A GM always resolves to 'full'; a
+// Player-facing event visibility tiers. A GM always resolves to 'full'; a
 // non-GM viewer falls back to the more-restrictive 'encounterChance' when the
-// rule is missing, so absent rules never leak the full hazard list.
-const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
+// rule is missing, so absent rules never leak the full event list.
+const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const FAILURE_KEYWORDS = new Set([
   'f',
   'fail',
@@ -103,7 +103,7 @@ export class GatheringEngine {
     resultCreator = null,
     toolBreakage = null,
     failureFeedback = null,
-    hazardSceneTrigger = null,
+    eventSceneTrigger = null,
     getRunViewer = null,
     locationResolver = null,
     random = Math.random,
@@ -128,7 +128,7 @@ export class GatheringEngine {
     this.resultCreator = resultCreator;
     this.toolBreakage = toolBreakage;
     this.failureFeedback = failureFeedback;
-    this.hazardSceneTrigger = hazardSceneTrigger;
+    this.eventSceneTrigger = eventSceneTrigger;
     this.getRunViewer = getRunViewer;
     // Constructor-injected current-region resolver (GatheringLocationService),
     // NOT a module import — keeps the engine system-agnostic and testable.
@@ -599,15 +599,15 @@ export class GatheringEngine {
    *   already revealed (the "Discovered Tasks" list); `[]` for targeted
    *   environments, GM viewers, locked environments, and `never`-policy
    *   environments. See {@link GatheringEngine#_discoveredTaskModels}.
-   * - `hazards` — read-only player-facing models for the environment's composed
-   *   hazards (`id`, `name`, `description`, `img`, `dangerTags`, `risk`, a static
+   * - `events` — read-only player-facing models for the environment's composed
+   *   events (`id`, `name`, `description`, `img`, `dangerTags`, `risk`, a static
    *   `chance`, the matching criteria `weather`/`timeOfDay`/`biomes`,
    *   resolved `biomeTags` display metadata, and an optional `linkedSceneUuid`;
-   *   see {@link GatheringEngine#_hazardModel}).
+   *   see {@link GatheringEngine#_eventModel}).
    *   The full list for targeted environments and GM viewers; `[]` (redacted) for
    *   a non-GM viewer of a blind environment and for locked teasers. The aggregate
-   *   `hazardChance` is still emitted regardless, so the player UI can show the
-   *   chance bar even when individual hazards are redacted.
+   *   `eventChance` is still emitted regardless, so the player UI can show the
+   *   chance bar even when individual events are redacted.
    * - `locked` — `true` for disabled environments surfaced to every viewer
    *   (players and GMs alike) as non-interactive teasers (identity fields only;
    *   empty `tasks`, empty `discoveredTasks`, an `ENVIRONMENT_DISABLED` blocked
@@ -733,7 +733,7 @@ export class GatheringEngine {
    * drops never leak), then delegates the per-drop math to
    * `richState.previewDropBreakdown` and attaches each drop's component image.
    *
-   * Returns `{ resolutionMode, awardMode, awardLimit, hazardPolicy, drops }`;
+   * Returns `{ resolutionMode, awardMode, awardLimit, eventPolicy, drops }`;
    * `drops` is empty when not applicable (no richState, unknown/hidden task,
    * non-d100 task, or no drops).
    *
@@ -745,7 +745,7 @@ export class GatheringEngine {
    * @returns {Promise<object>}
    */
   async getTaskDropBreakdown({ environmentId, taskId, rememberedActorId = null, viewer = null } = {}) {
-    const empty = { resolutionMode: null, awardMode: null, awardLimit: null, hazardPolicy: null, drops: [] };
+    const empty = { resolutionMode: null, awardMode: null, awardLimit: null, eventPolicy: null, drops: [] };
     if (!environmentId || !taskId || typeof this.richState?.previewDropBreakdown !== 'function') return empty;
 
     const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
@@ -784,7 +784,7 @@ export class GatheringEngine {
       successChance: preview?.successChance ?? null,
       awardMode: stringOrNull(preview?.awardMode),
       awardLimit: Number(preview?.awardLimit ?? 1),
-      hazardPolicy: stringOrNull(preview?.hazardPolicy),
+      eventPolicy: stringOrNull(preview?.eventPolicy),
       drops
     };
   }
@@ -925,12 +925,12 @@ export class GatheringEngine {
       ? {
           ...environment,
           conditions: plainObjectOrNull(snapshot?.conditions) || plainObjectOrNull(run?.conditionSnapshot) || plainObjectOrNull(environment?.conditions) || {},
-          hazards: normalizeList(snapshot?.hazards),
+          events: normalizeList(snapshot?.events),
           rules: plainObjectOrNull(snapshot?.rules) || plainObjectOrNull(environment?.rules) || {},
           useLegacyTaskItemSelectionMode: snapshot?.useLegacyTaskItemSelectionMode === true,
-          hazardSelectionMode: stringOrNull(snapshot?.hazardSelectionMode) || stringOrNull(environment?.hazardSelectionMode),
-          hazardLimit: snapshot?.hazardLimit,
-          hazardPolicy: stringOrNull(snapshot?.hazardPolicy) || stringOrNull(environment?.hazardPolicy)
+          eventSelectionMode: stringOrNull(snapshot?.eventSelectionMode) || stringOrNull(environment?.eventSelectionMode),
+          eventLimit: snapshot?.eventLimit,
+          eventPolicy: stringOrNull(snapshot?.eventPolicy) || stringOrNull(environment?.eventPolicy)
         }
       : null;
     if (snapshotEnvironment && environment?.__libraryTools instanceof Map) {
@@ -1097,22 +1097,22 @@ export class GatheringEngine {
       ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools })
       : [];
 
-    // The GM-configured hazard visibility tier further restricts what a non-GM
+    // The GM-configured event visibility tier further restricts what a non-GM
     // viewer sees, independent of the blind/targeted redaction above: only
-    // 'full' exposes individual hazards, and 'dangerLevelOnly' also hides the
-    // environment encounter-chance bar (signalled by a null hazardChance). A GM
+    // 'full' exposes individual events, and 'dangerLevelOnly' also hides the
+    // environment encounter-chance bar (signalled by a null eventChance). A GM
     // always resolves to 'full'.
-    const hazardVisibility = this._resolveHazardVisibility(environment, viewer);
+    const eventVisibility = this._resolveEventVisibility(environment, viewer);
 
-    // Individual hazards are read-only player-facing models. They are redacted
+    // Individual events are read-only player-facing models. They are redacted
     // for a non-GM viewer of a blind environment (mirroring the collapsed task
     // list) or whenever the visibility tier is not 'full', and surfaced in full
     // for targeted environments and GM viewers.
-    const listedHazards = (blindForViewer || hazardVisibility !== 'full')
+    const listedEvents = (blindForViewer || eventVisibility !== 'full')
       ? []
-      : normalizeList(environment.hazards)
-          .filter(hazard => hazard?.enabled !== false)
-          .map(hazard => this._hazardModel(hazard, environment));
+      : normalizeList(environment.events)
+          .filter(event => event?.enabled !== false)
+          .map(event => this._eventModel(event, environment));
 
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
@@ -1143,9 +1143,9 @@ export class GatheringEngine {
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
       attemptable,
-      hazardChance: hazardVisibility === 'dangerLevelOnly' ? null : this._environmentHazardChance(environment),
-      hazards: listedHazards,
-      hazardVisibility,
+      eventChance: eventVisibility === 'dangerLevelOnly' ? null : this._environmentEventChance(environment),
+      events: listedEvents,
+      eventVisibility,
       blockedReasons,
       location,
       tasks: listedTasks,
@@ -1275,7 +1275,7 @@ export class GatheringEngine {
       location: location ?? { gated: false, available: true, source: 'unresolved', currentRegions: [], guidance: null },
       tasks: [],
       discoveredTasks: [],
-      hazards: [],
+      events: [],
       ...this._playerListingFields({ environment, actor, locked: true })
     };
   }
@@ -1351,66 +1351,66 @@ export class GatheringEngine {
   }
 
   /**
-   * Static "chance of encountering a hazard" for an environment: the probability
-   * that at least one eligible hazard triggers on an attempt, derived from the
-   * composed hazards' `dropRate`s as `1 - ∏(1 - dropRate/100)`.
+   * Static "chance of encountering an event" for an environment: the probability
+   * that at least one eligible event triggers on an attempt, derived from the
+   * composed events' `dropRate`s as `1 - ∏(1 - dropRate/100)`.
    *
    * Like `_taskSuccessChance` this ignores actor/condition/character modifiers
-   * and hazard selection-mode/limit (those only affect which triggered hazards
+   * and event selection-mode/limit (those only affect which triggered events
    * are applied, not whether any trigger). Returns `0` when the environment has
-   * no enabled hazards, so the player UI can show the "safe" hint instead of a
+   * no enabled events, so the player UI can show the "safe" hint instead of a
    * bar.
    *
    * @param {object} environment A composed gathering environment.
-   * @returns {number} A 0–1 fraction (0 when there are no hazards).
+   * @returns {number} A 0–1 fraction (0 when there are no events).
    */
-  _environmentHazardChance(environment) {
-    const hazards = normalizeList(environment?.hazards).filter(hazard => hazard?.enabled !== false);
-    if (hazards.length === 0) return 0;
-    const missAll = hazards.reduce((product, hazard) => {
-      const rate = Math.min(100, Math.max(0, Number(hazard?.dropRate) || 0));
+  _environmentEventChance(environment) {
+    const events = normalizeList(environment?.events).filter(event => event?.enabled !== false);
+    if (events.length === 0) return 0;
+    const missAll = events.reduce((product, event) => {
+      const rate = Math.min(100, Math.max(0, Number(event?.dropRate) || 0));
       return product * (1 - rate / 100);
     }, 1);
     return 1 - missAll;
   }
 
   /**
-   * A read-only, player-safe model for a single composed hazard, used to render
-   * the center column's hazards list and the right-column hazard inspector.
-   * Carries identity (`id`/`name`/`description`/`img`), the hazard's danger tags
+   * A read-only, player-safe model for a single composed event, used to render
+   * the center column's events list and the right-column event inspector.
+   * Carries identity (`id`/`name`/`description`/`img`), the event's danger tags
    * + a derived `risk` tier (the first tag, or `safe`), a static `chance`
-   * (`dropRate/100`, clamped to 0–1) so the UI can reuse the hazard-chance bar,
-   * and the hazard's matching criteria (`weather`/`timeOfDay`/`biomes`, each an
+   * (`dropRate/100`, clamped to 0–1) so the UI can reuse the event-chance bar,
+   * and the event's matching criteria (`weather`/`timeOfDay`/`biomes`, each an
    * empty array meaning "any"; region is no longer a composition axis) plus an
    * optional `linkedSceneUuid` for the
-   * details view. Modifier internals (hazardModifier/conditionModifiers/
+   * details view. Modifier internals (eventModifier/conditionModifiers/
    * characterModifiers) are intentionally NOT surfaced. Like
-   * `_environmentHazardChance`, `chance` ignores actor/condition/character
-   * modifiers — it is the static per-hazard trigger rate, not a resolved roll.
+   * `_environmentEventChance`, `chance` ignores actor/condition/character
+   * modifiers — it is the static per-event trigger rate, not a resolved roll.
    *
-   * @param {object} hazard A composed/normalized gathering hazard.
+   * @param {object} event A composed/normalized gathering event.
    * @param {object} [environment] The owning environment (for biome-tag resolution).
-   * @returns {object} The player-facing hazard model.
+   * @returns {object} The player-facing event model.
    */
-  _hazardModel(hazard, environment = null) {
-    const dangerTags = normalizeStringList(hazard?.dangerTags);
-    const biomes = normalizeStringList(hazard?.biomes);
+  _eventModel(event, environment = null) {
+    const dangerTags = normalizeStringList(event?.dangerTags);
+    const biomes = normalizeStringList(event?.biomes);
     return {
-      id: stringOrNull(hazard?.id),
-      name: stringOrEmpty(hazard?.name),
-      description: stringOrEmpty(hazard?.description),
-      img: stringOrNull(hazard?.img),
+      id: stringOrNull(event?.id),
+      name: stringOrEmpty(event?.name),
+      description: stringOrEmpty(event?.description),
+      img: stringOrNull(event?.img),
       dangerTags,
       risk: dangerTags[0] || 'safe',
-      chance: Math.min(1, Math.max(0, (Number(hazard?.dropRate) || 0) / 100)),
-      weather: normalizeStringList(hazard?.weather),
-      timeOfDay: normalizeStringList(hazard?.timeOfDay),
+      chance: Math.min(1, Math.max(0, (Number(event?.dropRate) || 0) / 100)),
+      weather: normalizeStringList(event?.weather),
+      timeOfDay: normalizeStringList(event?.timeOfDay),
       biomes,
       // Resolved biome display metadata ({ id, label, icon, colorToken,
-      // customColor }) so hazard biome chips render with icons/colours like the
+      // customColor }) so event biome chips render with icons/colours like the
       // environment's biome pips. Empty when richState can't resolve them.
       biomeTags: this._resolveBiomeTagList(biomes, environment),
-      linkedSceneUuid: stringOrNull(hazard?.linkedSceneUuid)
+      linkedSceneUuid: stringOrNull(event?.linkedSceneUuid)
     };
   }
 
@@ -1425,7 +1425,7 @@ export class GatheringEngine {
    * Null-safe resolution of a biome-id list to display metadata via
    * {@link GatheringRichStateService#resolveBiomeTags}, scoped to the
    * environment's crafting system. Returns `[]` when the service is absent or
-   * throws. Shared by environment and hazard biome-tag resolution.
+   * throws. Shared by environment and event biome-tag resolution.
    */
   _resolveBiomeTagList(biomes, environment) {
     if (typeof this.richState?.resolveBiomeTags !== 'function') return [];
@@ -2405,12 +2405,12 @@ export class GatheringEngine {
   _runtimeSnapshot({ environment, task }) {
     return {
       task: cloneJson(task),
-      hazards: normalizeList(environment?.hazards).map(hazard => cloneJson(hazard)),
+      events: normalizeList(environment?.events).map(event => cloneJson(event)),
       rules: plainObjectOrNull(environment?.rules) || {},
       useLegacyTaskItemSelectionMode: environment?.useLegacyTaskItemSelectionMode === true,
-      hazardSelectionMode: stringOrNull(environment?.hazardSelectionMode),
-      hazardLimit: environment?.hazardLimit,
-      hazardPolicy: stringOrNull(environment?.hazardPolicy),
+      eventSelectionMode: stringOrNull(environment?.eventSelectionMode),
+      eventLimit: environment?.eventLimit,
+      eventPolicy: stringOrNull(environment?.eventPolicy),
       conditions: plainObjectOrNull(environment?.conditions) || {}
     };
   }
@@ -2436,7 +2436,7 @@ export class GatheringEngine {
     if (outcome.status === 'failed') {
       await this._applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult });
     }
-    await this.hazardSceneTrigger?.apply?.({ hazards: checkResult?.hazards, viewer, actor, system, environment, task });
+    await this.eventSceneTrigger?.apply?.({ events: checkResult?.events, viewer, actor, system, environment, task });
   }
 
   async _resolveRoutedOutcome({ viewer, actor, system, environment, task }) {
@@ -2469,7 +2469,7 @@ export class GatheringEngine {
       });
     }
     const gatheringModifier = Number(task?.gatheringModifier?.value ?? task?.gatheringModifier ?? 0);
-    const hazardModifier = Number(environment?.hazardModifier?.value ?? environment?.hazardModifier ?? 0);
+    const eventModifier = Number(environment?.eventModifier?.value ?? environment?.eventModifier ?? 0);
     const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
@@ -2477,7 +2477,7 @@ export class GatheringEngine {
       viewer,
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
-      hazardModifier: Number.isFinite(hazardModifier) ? hazardModifier : 0
+      eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
@@ -2502,8 +2502,8 @@ export class GatheringEngine {
       checkResult: {
         provider: 'd100',
         items: normalizeList(resolved?.items),
-        hazards: normalizeList(resolved?.hazards),
-        hazardPolicy: stringOrNull(resolved?.hazardPolicy),
+        events: normalizeList(resolved?.events),
+        eventPolicy: stringOrNull(resolved?.eventPolicy),
         characterModifierSnapshot: resolved?.characterModifierSnapshot || null
       }
     };
@@ -2733,8 +2733,8 @@ export class GatheringEngine {
 
   /**
    * Post an automatic gathering result chat card summarizing the attempt:
-   * gathered components, hazards encountered, broken tools, stamina spent, and
-   * remaining nodes — each with its component/hazard image.
+   * gathered components, events encountered, broken tools, stamina spent, and
+   * remaining nodes — each with its component/event image.
    *
    * Gated by the crafting system's `features.chatOutput` toggle (default true);
    * returns silently when off or when the system cannot be resolved. Never
@@ -2748,7 +2748,7 @@ export class GatheringEngine {
    * @param {string}  params.status         - 'succeeded' | 'failed'.
    * @param {Array}   params.createdResults - Gathered item refs `{actorUuid,itemUuid,quantity}`.
    * @param {Array}   params.usedTools      - Tool breakage plan entries.
-   * @param {object}  [params.checkResult]  - Outcome detail (hazards, items).
+   * @param {object}  [params.checkResult]  - Outcome detail (events, items).
    * @param {object}  params.run            - Terminal run (carries economyEvidence).
    * @private
    */
@@ -2775,9 +2775,9 @@ export class GatheringEngine {
         };
       });
 
-      const hazards = normalizeList(checkResult?.hazards).map(hazard => ({
-        name: stringOrEmpty(hazard?.name),
-        img: stringOrNull(hazard?.img) || 'icons/svg/hazard.svg'
+      const events = normalizeList(checkResult?.events).map(event => ({
+        name: stringOrEmpty(event?.name),
+        img: stringOrNull(event?.img) || 'icons/svg/hazard.svg'
       }));
 
       const brokenTools = normalizeList(usedTools)
@@ -2796,7 +2796,7 @@ export class GatheringEngine {
         actorName: stringOrEmpty(actor?.name),
         taskName: stringOrEmpty(task?.name),
         components,
-        hazards,
+        events,
         brokenTools,
         staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
         nodesRemaining: run?.economyEvidence?.node?.remaining ?? null
@@ -2845,20 +2845,20 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve the effective player-facing hazard visibility tier for a viewer.
-   * GMs always see the full hazard information. For a non-GM viewer the tier is
+   * Resolve the effective player-facing event visibility tier for a viewer.
+   * GMs always see the full event information. For a non-GM viewer the tier is
    * read from the environment's gathering rules, defaulting to the more
    * restrictive `encounterChance` when absent or invalid so missing rules never
-   * leak the full hazard list.
+   * leak the full event list.
    *
    * @param {object} environment Composed gathering environment (carries `rules`).
    * @param {object} [viewer] Foundry user requesting the listing.
    * @returns {'dangerLevelOnly'|'encounterChance'|'full'} The effective tier.
    */
-  _resolveHazardVisibility(environment, viewer) {
+  _resolveEventVisibility(environment, viewer) {
     if (viewer?.isGM === true) return 'full';
-    const visibility = environment?.rules?.hazardVisibility;
-    return GATHERING_HAZARD_VISIBILITIES.has(visibility) ? visibility : 'encounterChance';
+    const visibility = environment?.rules?.eventVisibility;
+    return GATHERING_EVENT_VISIBILITIES.has(visibility) ? visibility : 'encounterChance';
   }
 
   async _clearMisconfiguredWaitingRun({ viewer, actor, run, environment, task, errors = null, outcome = null }) {
@@ -3544,7 +3544,7 @@ function resolveToolBreakagePolicy(environment) {
 
 function redactCharacterModifierSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return snapshot;
-  if (!snapshot?.rows && !snapshot?.hazards) return snapshot;
+  if (!snapshot?.rows && !snapshot?.events) return snapshot;
   return {
     rows: normalizeList(snapshot.rows).map(row => ({
       rowId: null,
@@ -3552,9 +3552,9 @@ function redactCharacterModifierSnapshot(snapshot) {
         contribution: Number(entry?.contribution ?? 0)
       }))
     })),
-    hazards: normalizeList(snapshot.hazards).map(hazard => ({
-      hazardId: null,
-      contributions: normalizeList(hazard?.contributions).map(entry => ({
+    events: normalizeList(snapshot.events).map(event => ({
+      eventId: null,
+      contributions: normalizeList(event?.contributions).map(entry => ({
         contribution: Number(entry?.contribution ?? 0)
       }))
     }))
@@ -3566,8 +3566,8 @@ function redactRichEvidence(evidence = {}, _options = {}) {
   if (redacted.node) {
     redacted.node = { available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0 };
   }
-  if (Array.isArray(redacted.hazards)) {
-    redacted.hazards = redacted.hazards.map(() => ({ matched: true }));
+  if (Array.isArray(redacted.events)) {
+    redacted.events = redacted.events.map(() => ({ matched: true }));
   }
   if (redacted.characterModifierSnapshot && typeof redacted.characterModifierSnapshot === 'object') {
     redacted.characterModifierSnapshot = {
@@ -3577,9 +3577,9 @@ function redactRichEvidence(evidence = {}, _options = {}) {
           contribution: Number(entry?.contribution ?? 0)
         }))
       })),
-      hazards: normalizeList(redacted.characterModifierSnapshot.hazards).map(hazard => ({
-        hazardId: null,
-        contributions: normalizeList(hazard?.contributions).map(entry => ({
+      events: normalizeList(redacted.characterModifierSnapshot.events).map(event => ({
+        eventId: null,
+        contributions: normalizeList(event?.contributions).map(entry => ({
           contribution: Number(entry?.contribution ?? 0)
         }))
       }))
@@ -3589,7 +3589,7 @@ function redactRichEvidence(evidence = {}, _options = {}) {
   delete redacted.rolls;
   delete redacted.dropRows;
   delete redacted.selectedItems;
-  delete redacted.selectedHazards;
+  delete redacted.selectedEvents;
   delete redacted.runtimeSnapshot;
   delete redacted.encounterOutcome;
   delete redacted.revealEvents;

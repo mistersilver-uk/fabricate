@@ -20,7 +20,7 @@ function baseData() {
         'sys-a': {
           vocabularies: { regions: { values: [{ id: 'north', label: 'North' }] } },
           tasks: [{ id: 't1', name: 'Forage', region: 'north', biomes: ['forest'] }],
-          hazards: [{ id: 'h1', name: 'Bears', regions: ['north'], biomes: ['forest'], dangerTags: ['hazardous'] }]
+          events: [{ id: 'h1', name: 'Bears', regions: ['north'], biomes: ['forest'], dangerTags: ['hazardous'] }]
         }
       }
     },
@@ -61,14 +61,14 @@ test('maps environment.region onto includedRegionIds when a derived region exist
   assert.equal(result.environments[0].region, 'north');
 });
 
-test('strips region/regions tags from gathering-config tasks and hazards', () => {
+test('strips region/regions tags from gathering-config tasks and events', () => {
   const result = migrateUnifyGatheringRegions(baseData());
   const sysConfig = result.gatheringConfig.systems['sys-a'];
   assert.equal('region' in sysConfig.tasks[0], false);
-  assert.equal('regions' in sysConfig.hazards[0], false);
+  assert.equal('regions' in sysConfig.events[0], false);
   // Other composition fields are untouched.
   assert.deepEqual(sysConfig.tasks[0].biomes, ['forest']);
-  assert.deepEqual(sysConfig.hazards[0].biomes, ['forest']);
+  assert.deepEqual(sysConfig.events[0].biomes, ['forest']);
 });
 
 test('clears the per-system region vocabulary after deriving', () => {
@@ -220,7 +220,7 @@ function makeSettings(initial = {}) {
 test('runner: surfaces the GM-notice system names and never persists the transient field', async () => {
   const data = baseData();
   const settings = makeSettings({
-    migrationVersion: '0.8.0', // only the 0.9.0 migration is pending
+    migrationVersion: '0.8.0', // the 0.9.0 and 1.0.0 migrations are pending
     craftingSystems: clone(data.systems),
     gatheringConfig: clone(data.gatheringConfig),
     gatheringEnvironments: clone(data.environments)
@@ -230,7 +230,7 @@ test('runner: surfaces the GM-notice system names and never persists the transie
   const summary = await runner.run();
 
   assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'system names surfaced for the GM notice');
-  assert.equal(settings.store.get('migrationVersion'), '0.9.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.0.0');
 
   // The transient field is never written into any persisted setting payload.
   for (const { value } of settings.calls.set) {
@@ -296,5 +296,5 @@ test('runner: no GM notice and no gatheringConfig rewrite when there is no legac
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringConfig'), false, 'no rewrite when nothing to unify');
   assert.equal(setKeys.includes('craftingSystems'), false, 'systems untouched when no regions derived');
-  assert.equal(settings.store.get('migrationVersion'), '0.9.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.0.0');
 });

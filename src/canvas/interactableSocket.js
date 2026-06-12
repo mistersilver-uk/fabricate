@@ -8,7 +8,7 @@
  * applies the `behavior.update(...)` / linked-visual write. A GM client applies
  * its OWN write locally without round-tripping the socket (socket emits never
  * reach the emitter), so the GM-on-GM case must branch on `isActiveGM` exactly
- * like `hazardSceneCoordinator`.
+ * like `eventSceneCoordinator`.
  *
  * NOTE: a gathering-task interactable carries NO per-interactable node pool —
  * depletion/respawn is owned by the environment's `nodeRuntime[taskId]`, so these

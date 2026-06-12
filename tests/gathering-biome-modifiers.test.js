@@ -6,7 +6,7 @@ import { makeRichState } from './helpers/gathering.js';
 // Compose an environment whose biomes drive biome-modifier matching, with a
 // chosen aggregation mode. composeEnvironment pulls conditions from system
 // defaults; we override rules so each test can pick the aggregation strategy.
-function composedEnvironment(service, { biomes = [], aggregation = 'strongestOfEach', hazards = [] } = {}) {
+function composedEnvironment(service, { biomes = [], aggregation = 'strongestOfEach', events = [] } = {}) {
   const composed = service.composeEnvironment({
     id: 'env',
     craftingSystemId: 'system-a',
@@ -15,18 +15,18 @@ function composedEnvironment(service, { biomes = [], aggregation = 'strongestOfE
   }, { id: 'system-a' });
   composed.rules = {
     rewardSelectionMode: 'allDrops',
-    hazardSelectionMode: 'allDrops',
+    eventSelectionMode: 'allDrops',
     rewardLimit: 99,
-    hazardLimit: 99,
-    hazardPolicy: 'successWithHazard',
+    eventLimit: 99,
+    eventPolicy: 'successWithEvent',
     biomeModifierAggregation: aggregation
   };
-  if (hazards.length > 0) composed.hazards = hazards;
+  if (events.length > 0) composed.events = events;
   return composed;
 }
 
 function configFor() {
-  return { systems: { 'system-a': { rules: {}, characterModifiers: [], hazards: [] } } };
+  return { systems: { 'system-a': { rules: {}, characterModifiers: [], events: [] } } };
 }
 
 const WORKED_EXAMPLE_BIOME_MODIFIERS = {
@@ -88,12 +88,12 @@ test('biome modifiers only match biomes present in the gathering environment', a
   assert.equal(result.items[0].finalDropRate, 35);
 });
 
-test('hazard trigger rate is adjusted by its biome modifiers at runtime', async () => {
+test('event trigger rate is adjusted by its biome modifiers at runtime', async () => {
   const { service } = makeRichState({ config: configFor(), rolls: [100, 100] });
   const environment = composedEnvironment(service, {
     biomes: ['cave'],
     aggregation: 'strongestOfEach',
-    hazards: [{
+    events: [{
       id: 'h1',
       name: 'Cave-in',
       dropRate: 25,
@@ -105,7 +105,7 @@ test('hazard trigger rate is adjusted by its biome modifiers at runtime', async 
     environment,
     actor: { uuid: 'Actor.x' }
   });
-  assert.equal(result.hazards.length, 1);
-  assert.equal(result.hazards[0].conditionModifier, 15);
-  assert.equal(result.hazards[0].finalDropRate, 40);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].conditionModifier, 15);
+  assert.equal(result.events[0].finalDropRate, 40);
 });

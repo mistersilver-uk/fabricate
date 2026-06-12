@@ -207,13 +207,13 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
       ' task-library-a ': false,
       'task-library-default': true
     },
-    hazardDropRateAdjustments: {
-      ' hazard-a ': -20,
-      'hazard-zero': 0
+    eventDropRateAdjustments: {
+      ' event-a ': -20,
+      'event-zero': 0
     },
-    hazardDropRateAdjustmentsEnabled: {
-      ' hazard-a ': false,
-      'hazard-default': true
+    eventDropRateAdjustmentsEnabled: {
+      ' event-a ': false,
+      'event-default': true
     }
   }));
 
@@ -223,25 +223,25 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
   assert.deepEqual(created.taskDropRateAdjustmentsEnabled, {
     'task-library-a': false
   });
-  assert.deepEqual(created.hazardDropRateAdjustments, {
-    'hazard-a': -20
+  assert.deepEqual(created.eventDropRateAdjustments, {
+    'event-a': -20
   });
-  assert.deepEqual(created.hazardDropRateAdjustmentsEnabled, {
-    'hazard-a': false
+  assert.deepEqual(created.eventDropRateAdjustmentsEnabled, {
+    'event-a': false
   });
 
   const invalid = store.validate(environment({
     id: 'env-invalid-adjustments',
     taskDropRateAdjustments: { 'task-library-a': { 'drop-a': 101 } },
     taskDropRateAdjustmentsEnabled: { 'task-library-a': 'false' },
-    hazardDropRateAdjustments: { 'hazard-a': -101 },
-    hazardDropRateAdjustmentsEnabled: { 'hazard-a': 'false' }
+    eventDropRateAdjustments: { 'event-a': -101 },
+    eventDropRateAdjustmentsEnabled: { 'event-a': 'false' }
   }));
   assert.equal(invalid.valid, false);
   assert.match(invalid.errors.join('\n'), /taskDropRateAdjustments\.task-library-a\.drop-a must be an integer from -100 to 100/);
   assert.match(invalid.errors.join('\n'), /taskDropRateAdjustmentsEnabled\.task-library-a must be a boolean/);
-  assert.match(invalid.errors.join('\n'), /hazardDropRateAdjustments\.hazard-a must be an integer from -100 to 100/);
-  assert.match(invalid.errors.join('\n'), /hazardDropRateAdjustmentsEnabled\.hazard-a must be a boolean/);
+  assert.match(invalid.errors.join('\n'), /eventDropRateAdjustments\.event-a must be an integer from -100 to 100/);
+  assert.match(invalid.errors.join('\n'), /eventDropRateAdjustmentsEnabled\.event-a must be a boolean/);
 });
 
 test('save rejects an invalid selection mode without writing settings', async () => {
@@ -452,4 +452,38 @@ test('load never throws on a stale includedRegionId (validation is save-time onl
   // load() normalizes without validating; no throw, stale id preserved.
   const loaded = store.load();
   assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRegionIds, ['gone']);
+});
+
+// ---------------------------------------------------------------------------
+// Legacy-acceptance fallback on read (imports bypass the 1.0.0 startup migration)
+// ---------------------------------------------------------------------------
+
+test('_normalizeEnvironment accepts legacy hazard-schema keys and values on read', () => {
+  const { store } = makeMemoryStore();
+  const normalized = store._normalizeEnvironment({
+    id: 'env-legacy',
+    craftingSystemId: 'system-a',
+    enabledHazardIds: ['h1'],
+    disabledHazardIds: ['h2'],
+    forcedHazardIds: ['h3'],
+    hazardOrder: ['h1', 'h3'],
+    hazardSelectionMode: 'highestRankedDrop',
+    hazardPolicy: 'failureWithHazard',
+    hazardDropRateAdjustments: { h1: 20 },
+    hazardDropRateAdjustmentsEnabled: { h1: false }
+  });
+  assert.deepEqual(normalized.enabledEventIds, ['h1']);
+  assert.deepEqual(normalized.disabledEventIds, ['h2']);
+  assert.deepEqual(normalized.forcedEventIds, ['h3']);
+  assert.deepEqual(normalized.eventOrder, ['h1', 'h3']);
+  assert.equal(normalized.eventSelectionMode, 'highestRankedDrop');
+  assert.equal(normalized.eventPolicy, 'failureWithEvent', 'legacy policy value coerced');
+  assert.deepEqual(normalized.eventDropRateAdjustments, { h1: 20 });
+  assert.deepEqual(normalized.eventDropRateAdjustmentsEnabled, { h1: false });
+});
+
+test('_normalizeEnvironment defaults an unknown event policy to successWithEvent', () => {
+  const { store } = makeMemoryStore();
+  const normalized = store._normalizeEnvironment({ craftingSystemId: 'system-a', hazardPolicy: 'nonsense' });
+  assert.equal(normalized.eventPolicy, 'successWithEvent');
 });

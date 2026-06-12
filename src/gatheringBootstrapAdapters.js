@@ -88,7 +88,7 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
  *  - `kind: 'stamina'` / `kind: 'attemptLimit'` — formula-driven economy.
  *  - `kind: 'characterModifier'` — per-row character modifier resolution
  *    (added by the gathering character modifiers feature). The extra
- *    `environment`, `task`, `row`, `hazard`, `viewer`, and `modifier` keys
+ *    `environment`, `task`, `row`, `event`, `viewer`, and `modifier` keys
  *    on the payload give macros enough context to inspect the surrounding
  *    attempt; this implementation forwards them only when the underlying
  *    Roll engine reads them as part of `actor.getRollData()`.

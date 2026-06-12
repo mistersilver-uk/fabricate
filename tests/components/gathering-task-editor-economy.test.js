@@ -167,7 +167,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     // Empty state: a centered fa-image placeholder shown only when no swap image
     // is set; the fa-pen edit affordance is the bottom-right badge over either
     // the placeholder or the <img>. The fix is in the SHARED .manager-task-image-picker
-    // rule so every picker (task identity, hazard, depleted) gets the same treatment.
+    // rule so every picker (task identity, event, depleted) gets the same treatment.
     const pickerIdx = editorSource.indexOf('manager-task-depleted-image-picker');
     const pickerBlock = editorSource.slice(pickerIdx, editorSource.indexOf('</button>', pickerIdx));
     assert.ok(

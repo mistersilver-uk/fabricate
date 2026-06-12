@@ -7,7 +7,7 @@
   let {
     activeTab = 'overview',
     environment = null,
-    composition = { tasks: [], hazards: [], counts: {} },
+    composition = { tasks: [], events: [], counts: {} },
     selectedKind = '',
     selectedId = '',
     onUpdateEnvironment = () => {}
@@ -19,13 +19,13 @@
   }
 
   // The inspector is tab-specific: Overview always shows the environment summary
-  // (never a selected record); Tasks/Hazards show the selected record of their
+  // (never a selected record); Tasks/Events show the selected record of their
   // own kind, so a stale cross-tab selection never leaks between tabs.
-  const recordKind = $derived(activeTab === 'hazards' ? 'hazard' : 'task');
+  const recordKind = $derived(activeTab === 'events' ? 'event' : 'task');
   const recordEntry = $derived((() => {
-    if (activeTab !== 'tasks' && activeTab !== 'hazards') return null;
+    if (activeTab !== 'tasks' && activeTab !== 'events') return null;
     if (selectedKind !== recordKind || !selectedId) return null;
-    const list = recordKind === 'hazard' ? composition?.hazards : composition?.tasks;
+    const list = recordKind === 'event' ? composition?.events : composition?.tasks;
     return (Array.isArray(list) ? list : []).find(entry => entry.id === selectedId) || null;
   })());
 
@@ -43,11 +43,11 @@
     />
   {:else}
     <section class="manager-inspector-card" data-record-inspector-empty={recordKind}>
-      <p class="manager-kicker">{recordKind === 'hazard'
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveHazards', 'No active hazards')
+      <p class="manager-kicker">{recordKind === 'event'
+        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEvents', 'No active events')
         : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasks', 'No active tasks')}</p>
-      <p class="manager-muted">{recordKind === 'hazard'
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveHazardsHint', 'Add or include hazards in this environment so they appear here.')
+      <p class="manager-muted">{recordKind === 'event'
+        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEventsHint', 'Add or include events in this environment so they appear here.')
         : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint', 'Add or include tasks in this environment so they appear here.')}</p>
     </section>
   {/if}

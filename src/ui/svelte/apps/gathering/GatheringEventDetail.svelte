@@ -1,19 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringHazardDetail is the right column when the center column's Hazards tab
-  is active — the "selected hazard" inspector, the hazard analogue of
-  GatheringTaskDetail. It is read-only: hazards carry no Attempt action.
+  GatheringEventDetail is the right column when the center column's Events tab
+  is active — the "selected event" inspector, the event analogue of
+  GatheringTaskDetail. It is read-only: events carry no Attempt action.
 
-   - no hazard selected but hazards exist  -> "Select a hazard" hint
-   - no hazards (or redacted for a blind site) -> "No hazards" hint
-   - a hazard selected -> header (image, name), description, a danger-tag row, the
-     per-hazard hazard-chance bar, and a details card listing the hazard's
+   - no event selected but events exist  -> "Select an event" hint
+   - no events (or redacted for a blind site) -> "No events" hint
+   - an event selected -> header (image, name), description, a danger-tag row, the
+     per-event event-chance bar, and a details card listing the event's
      matching criteria (weather / time of day / biomes / regions) and any linked
      scene (reusing LinkedScene).
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import HazardChanceBar from './HazardChanceBar.svelte';
+  import EventChanceBar from './EventChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
   import {
     getWeatherIcon,
@@ -23,24 +23,24 @@
   } from '../../util/gatheringConditionIcons.js';
 
   let {
-    hazard = null,
-    hasHazards = false,
+    event = null,
+    hasEvents = false,
     services = null
   } = $props();
 
-  const name = $derived(String(hazard?.name ?? ''));
-  const description = $derived(String(hazard?.description ?? ''));
+  const name = $derived(String(event?.name ?? ''));
+  const description = $derived(String(event?.description ?? ''));
   const hasDescription = $derived(description !== '');
   const descriptionText = $derived(
-    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoHazardDescription')
+    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoEventDescription')
   );
-  const img = $derived(String(hazard?.img ?? ''));
-  const chance = $derived(hazard?.chance ?? null);
-  const sceneUuid = $derived(String(hazard?.linkedSceneUuid ?? ''));
+  const img = $derived(String(event?.img ?? ''));
+  const chance = $derived(event?.chance ?? null);
+  const sceneUuid = $derived(String(event?.linkedSceneUuid ?? ''));
 
   // All danger tags, each localized to the GM editor's risk labels when known.
   const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
-  const dangerTags = $derived(Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : []);
+  const dangerTags = $derived(Array.isArray(event?.dangerTags) ? event.dangerTags : []);
   function riskLabel(tag) {
     return KNOWN_RISKS.has(tag) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${tag}`) : tag;
   }
@@ -54,21 +54,21 @@
   // player app; biome chips use the resolved biomeTags (icon + colour + label)
   // like the environment's biome pips; regions are free-form text chips.
   const weatherChips = $derived(
-    (Array.isArray(hazard?.weather) ? hazard.weather : []).map(id => ({
+    (Array.isArray(event?.weather) ? event.weather : []).map(id => ({
       id,
       icon: getWeatherIcon(id),
       label: localize(getWeatherLabelKey(id))
     }))
   );
   const timeOfDayChips = $derived(
-    (Array.isArray(hazard?.timeOfDay) ? hazard.timeOfDay : []).map(id => ({
+    (Array.isArray(event?.timeOfDay) ? event.timeOfDay : []).map(id => ({
       id,
       icon: getTimeOfDayIcon(id),
       label: localize(getTimeOfDayLabelKey(id))
     }))
   );
-  const biomeChips = $derived(Array.isArray(hazard?.biomeTags) ? hazard.biomeTags : []);
-  const regions = $derived(Array.isArray(hazard?.regions) ? hazard.regions : []);
+  const biomeChips = $derived(Array.isArray(event?.biomeTags) ? event.biomeTags : []);
+  const regions = $derived(Array.isArray(event?.regions) ? event.regions : []);
 
   function biomeChipStyle(tag) {
     const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
@@ -81,36 +81,36 @@
     || regions.length > 0 || sceneUuid !== ''
   );
 
-  const titleId = 'gathering-hazard-detail-title';
+  const titleId = 'gathering-event-detail-title';
 </script>
 
-{#if hazard == null}
-  <div class="gathering-hazard-detail-state" data-gathering-hazard-detail-state={hasHazards ? 'empty' : 'none'}>
-    <i class={`fas ${hasHazards ? 'fa-hand-pointer' : 'fa-shield-halved'}`} aria-hidden="true"></i>
+{#if event == null}
+  <div class="gathering-event-detail-state" data-gathering-event-detail-state={hasEvents ? 'empty' : 'none'}>
+    <i class={`fas ${hasEvents ? 'fa-hand-pointer' : 'fa-shield-halved'}`} aria-hidden="true"></i>
     <p>
-      {localize(hasHazards
-        ? 'FABRICATE.App.Gathering.Detail.SelectHazardHint'
-        : 'FABRICATE.App.Gathering.Detail.NoHazards')}
+      {localize(hasEvents
+        ? 'FABRICATE.App.Gathering.Detail.SelectEventHint'
+        : 'FABRICATE.App.Gathering.Detail.NoEvents')}
     </p>
   </div>
 {:else}
   <section
-    class="gathering-hazard-detail"
+    class="gathering-event-detail"
     aria-labelledby={titleId}
-    aria-label={localize('FABRICATE.App.Gathering.Detail.HazardInspectorLabel')}
-    data-gathering-hazard-detail
-    data-detail-hazard-id={String(hazard?.id ?? '')}
+    aria-label={localize('FABRICATE.App.Gathering.Detail.EventInspectorLabel')}
+    data-gathering-event-detail
+    data-detail-event-id={String(event?.id ?? '')}
   >
-    <header class="gathering-hazard-detail-header">
-      <span class="gathering-hazard-detail-thumb-wrap">
-        <img class="gathering-hazard-detail-thumb" class:is-fallback={!img} src={img || 'icons/svg/hazard.svg'} alt="" />
+    <header class="gathering-event-detail-header">
+      <span class="gathering-event-detail-thumb-wrap">
+        <img class="gathering-event-detail-thumb" class:is-fallback={!img} src={img || 'icons/svg/hazard.svg'} alt="" />
       </span>
-      <span class="gathering-hazard-detail-heading">
-        <h2 id={titleId} class="gathering-hazard-detail-title" title={name}>{name}</h2>
+      <span class="gathering-event-detail-heading">
+        <h2 id={titleId} class="gathering-event-detail-title" title={name}>{name}</h2>
         {#if dangerTags.length > 0}
-          <ul class="gathering-hazard-detail-tags" data-gathering-hazard-tags>
+          <ul class="gathering-event-detail-tags" data-gathering-event-tags>
             {#each dangerTags as tag (tag)}
-              <li class={`gathering-hazard-detail-tag is-danger ${riskClass(tag)}`}>
+              <li class={`gathering-event-detail-tag is-danger ${riskClass(tag)}`}>
                 <i class="fas fa-skull" aria-hidden="true"></i>
                 <span>{riskLabel(tag)}</span>
               </li>
@@ -120,25 +120,25 @@
       </span>
     </header>
 
-    <p class="gathering-hazard-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
+    <p class="gathering-event-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
 
     {#if chance != null}
-      <HazardChanceBar value={chance} />
+      <EventChanceBar value={chance} />
     {/if}
 
     {#if hasDetails}
-      <div class="gathering-hazard-detail-card" data-gathering-hazard-details>
-        <p class="gathering-hazard-detail-card-heading">{localize('FABRICATE.App.Gathering.Detail.HazardConditionsHeading')}</p>
+      <div class="gathering-event-detail-card" data-gathering-event-details>
+        <p class="gathering-event-detail-card-heading">{localize('FABRICATE.App.Gathering.Detail.EventConditionsHeading')}</p>
 
         {#if weatherChips.length > 0}
-          <div class="gathering-hazard-detail-group" data-gathering-hazard-match="weather">
-            <span class="gathering-hazard-detail-group-label">
+          <div class="gathering-event-detail-group" data-gathering-event-match="weather">
+            <span class="gathering-event-detail-group-label">
               <i class="fas fa-cloud-sun" aria-hidden="true"></i>
-              {localize('FABRICATE.App.Gathering.Detail.HazardWeather')}
+              {localize('FABRICATE.App.Gathering.Detail.EventWeather')}
             </span>
-            <span class="gathering-hazard-detail-group-values">
+            <span class="gathering-event-detail-group-values">
               {#each weatherChips as chip (chip.id)}
-                <span class="gathering-hazard-detail-chip">
+                <span class="gathering-event-detail-chip">
                   <i class={chip.icon} aria-hidden="true"></i>
                   <span>{chip.label}</span>
                 </span>
@@ -148,14 +148,14 @@
         {/if}
 
         {#if timeOfDayChips.length > 0}
-          <div class="gathering-hazard-detail-group" data-gathering-hazard-match="timeOfDay">
-            <span class="gathering-hazard-detail-group-label">
+          <div class="gathering-event-detail-group" data-gathering-event-match="timeOfDay">
+            <span class="gathering-event-detail-group-label">
               <i class="fas fa-clock" aria-hidden="true"></i>
-              {localize('FABRICATE.App.Gathering.Detail.HazardTimeOfDay')}
+              {localize('FABRICATE.App.Gathering.Detail.EventTimeOfDay')}
             </span>
-            <span class="gathering-hazard-detail-group-values">
+            <span class="gathering-event-detail-group-values">
               {#each timeOfDayChips as chip (chip.id)}
-                <span class="gathering-hazard-detail-chip">
+                <span class="gathering-event-detail-chip">
                   <i class={chip.icon} aria-hidden="true"></i>
                   <span>{chip.label}</span>
                 </span>
@@ -165,14 +165,14 @@
         {/if}
 
         {#if biomeChips.length > 0}
-          <div class="gathering-hazard-detail-group" data-gathering-hazard-match="biomes">
-            <span class="gathering-hazard-detail-group-label">
+          <div class="gathering-event-detail-group" data-gathering-event-match="biomes">
+            <span class="gathering-event-detail-group-label">
               <i class="fas fa-tree" aria-hidden="true"></i>
-              {localize('FABRICATE.App.Gathering.Detail.HazardBiomes')}
+              {localize('FABRICATE.App.Gathering.Detail.EventBiomes')}
             </span>
-            <span class="gathering-hazard-detail-group-values">
+            <span class="gathering-event-detail-group-values">
               {#each biomeChips as tag (tag.id)}
-                <span class="gathering-hazard-detail-chip is-biome" style={biomeChipStyle(tag)}>
+                <span class="gathering-event-detail-chip is-biome" style={biomeChipStyle(tag)}>
                   <i class={tag.icon} aria-hidden="true"></i>
                   <span>{tag.label}</span>
                 </span>
@@ -182,21 +182,21 @@
         {/if}
 
         {#if regions.length > 0}
-          <div class="gathering-hazard-detail-group" data-gathering-hazard-match="regions">
-            <span class="gathering-hazard-detail-group-label">
+          <div class="gathering-event-detail-group" data-gathering-event-match="regions">
+            <span class="gathering-event-detail-group-label">
               <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-              {localize('FABRICATE.App.Gathering.Detail.HazardRegions')}
+              {localize('FABRICATE.App.Gathering.Detail.EventRegions')}
             </span>
-            <span class="gathering-hazard-detail-group-values">
+            <span class="gathering-event-detail-group-values">
               {#each regions as region (region)}
-                <span class="gathering-hazard-detail-chip is-region"><span>{region}</span></span>
+                <span class="gathering-event-detail-chip is-region"><span>{region}</span></span>
               {/each}
             </span>
           </div>
         {/if}
 
         {#if sceneUuid !== ''}
-          <div class="gathering-hazard-detail-scene" data-gathering-hazard-scene>
+          <div class="gathering-event-detail-scene" data-gathering-event-scene>
             <LinkedScene {sceneUuid} {services} />
           </div>
         {/if}
@@ -206,7 +206,7 @@
 {/if}
 
 <style>
-  .gathering-hazard-detail-state {
+  .gathering-event-detail-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -219,16 +219,16 @@
     color: var(--fab-text-muted);
   }
 
-  .gathering-hazard-detail-state i {
+  .gathering-event-detail-state i {
     font-size: 32px;
   }
 
-  .gathering-hazard-detail-state p {
+  .gathering-event-detail-state p {
     margin: 0;
     font-size: 14px;
   }
 
-  .gathering-hazard-detail {
+  .gathering-event-detail {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
@@ -240,20 +240,20 @@
     color: var(--fab-text);
   }
 
-  .gathering-hazard-detail-header {
+  .gathering-event-detail-header {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
   }
 
-  .gathering-hazard-detail-thumb-wrap {
+  .gathering-event-detail-thumb-wrap {
     flex: 0 0 auto;
     width: 64px;
     height: 64px;
   }
 
-  .gathering-hazard-detail-thumb {
+  .gathering-event-detail-thumb {
     display: block;
     width: 64px;
     height: 64px;
@@ -262,13 +262,13 @@
     background: var(--fab-surface-raised);
   }
 
-  .gathering-hazard-detail-thumb.is-fallback {
+  .gathering-event-detail-thumb.is-fallback {
     object-fit: contain;
     padding: 10px;
     box-sizing: border-box;
   }
 
-  .gathering-hazard-detail-heading {
+  .gathering-event-detail-heading {
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
@@ -276,7 +276,7 @@
     gap: 6px;
   }
 
-  .gathering-hazard-detail-title {
+  .gathering-event-detail-title {
     margin: 0;
     font-size: 18px;
     font-weight: 700;
@@ -285,7 +285,7 @@
     white-space: nowrap;
   }
 
-  .gathering-hazard-detail-tags {
+  .gathering-event-detail-tags {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -294,7 +294,7 @@
     gap: 6px;
   }
 
-  .gathering-hazard-detail-tag {
+  .gathering-event-detail-tag {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -307,28 +307,28 @@
   }
 
   /* Danger-tier icon colour, mirroring the center column's danger pip. */
-  .gathering-hazard-detail-tag.is-danger i { color: var(--fab-danger, var(--fab-text-muted)); }
-  .gathering-hazard-detail-tag.is-danger.risk-safe i { color: var(--fab-success); }
-  .gathering-hazard-detail-tag.is-danger.risk-unsafe i { color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%); }
-  .gathering-hazard-detail-tag.is-danger.risk-hazardous i { color: var(--fab-warning); }
-  .gathering-hazard-detail-tag.is-danger.risk-dangerous i { color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%); }
-  .gathering-hazard-detail-tag.is-danger.risk-deadly i,
-  .gathering-hazard-detail-tag.is-danger.risk-extreme i { color: var(--fab-danger); }
+  .gathering-event-detail-tag.is-danger i { color: var(--fab-danger, var(--fab-text-muted)); }
+  .gathering-event-detail-tag.is-danger.risk-safe i { color: var(--fab-success); }
+  .gathering-event-detail-tag.is-danger.risk-unsafe i { color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%); }
+  .gathering-event-detail-tag.is-danger.risk-hazardous i { color: var(--fab-warning); }
+  .gathering-event-detail-tag.is-danger.risk-dangerous i { color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%); }
+  .gathering-event-detail-tag.is-danger.risk-deadly i,
+  .gathering-event-detail-tag.is-danger.risk-extreme i { color: var(--fab-danger); }
 
-  .gathering-hazard-detail-description {
+  .gathering-event-detail-description {
     margin: 0;
     font-size: 13px;
     line-height: 1.5;
     color: var(--fab-text);
   }
 
-  .gathering-hazard-detail-description.is-fallback {
+  .gathering-event-detail-description.is-fallback {
     font-style: italic;
     color: var(--fab-text-muted);
   }
 
   /* Matching-criteria card, styled like the task requirements card. */
-  .gathering-hazard-detail-card {
+  .gathering-event-detail-card {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
@@ -338,7 +338,7 @@
     background: var(--fab-surface);
   }
 
-  .gathering-hazard-detail-card-heading {
+  .gathering-event-detail-card-heading {
     margin: 0;
     font-size: 12px;
     font-weight: 600;
@@ -347,13 +347,13 @@
     letter-spacing: 0.03em;
   }
 
-  .gathering-hazard-detail-group {
+  .gathering-event-detail-group {
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
 
-  .gathering-hazard-detail-group-label {
+  .gathering-event-detail-group-label {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -362,17 +362,17 @@
     color: var(--fab-text);
   }
 
-  .gathering-hazard-detail-group-label i {
+  .gathering-event-detail-group-label i {
     color: var(--fab-text-muted);
   }
 
-  .gathering-hazard-detail-group-values {
+  .gathering-event-detail-group-values {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
   }
 
-  .gathering-hazard-detail-chip {
+  .gathering-event-detail-chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -385,22 +385,22 @@
     text-transform: capitalize;
   }
 
-  .gathering-hazard-detail-chip i {
+  .gathering-event-detail-chip i {
     font-size: 10px;
     color: var(--fab-text-muted);
   }
 
   /* Biome chips mirror the environment biome pips: tinted by the tag colour. */
-  .gathering-hazard-detail-chip.is-biome {
+  .gathering-event-detail-chip.is-biome {
     background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-surface-raised));
     border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
   }
 
-  .gathering-hazard-detail-chip.is-biome i {
+  .gathering-event-detail-chip.is-biome i {
     color: var(--fab-chip-color);
   }
 
-  .gathering-hazard-detail-scene {
+  .gathering-event-detail-scene {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);

@@ -15,13 +15,13 @@
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import GatheringTaskDetail from './GatheringTaskDetail.svelte';
-  import GatheringHazardDetail from './GatheringHazardDetail.svelte';
+  import GatheringEventDetail from './GatheringEventDetail.svelte';
   import {
     resolveDefaultSelection,
     resolveDefaultTaskSelection,
     visibleTasksFor,
-    resolveDefaultHazardSelection,
-    visibleHazardsFor
+    resolveDefaultEventSelection,
+    visibleEventsFor
   } from './selectionDefault.js';
   import { resolveScopedGatheringSelection } from './scopedSelection.js';
 
@@ -48,11 +48,11 @@
   // accordion (the selected row is the expanded one) and the right-column task
   // inspector. Resolved to the first attemptable task by default.
   let selectedTaskId = $state(null);
-  // The center column's active tab ('tasks' | 'hazards') and the selected hazard.
+  // The center column's active tab ('tasks' | 'events') and the selected event.
   // Lifted here (like selectedTaskId) so the right column can swap between the
-  // task inspector and the hazard inspector in step with the tab.
+  // task inspector and the event inspector in step with the tab.
   let activeTab = $state('tasks');
-  let selectedHazardId = $state(null);
+  let selectedEventId = $state(null);
   // Shared "an attempt is in flight" guard for both the blind attempt button
   // (center) and the right-column task inspector's Attempt button.
   let busy = $state(false);
@@ -85,12 +85,12 @@
   const selectedTask = $derived(
     visibleTasks.find(task => String(task?.id) === String(selectedTaskId)) ?? null
   );
-  // The hazards the player can inspect for the selected environment, and the
-  // currently selected hazard object (drives the right-column hazard inspector
-  // when the Hazards tab is active).
-  const visibleHazards = $derived(visibleHazardsFor(selectedEnvironment));
-  const selectedHazard = $derived(
-    visibleHazards.find(hazard => String(hazard?.id) === String(selectedHazardId)) ?? null
+  // The events the player can inspect for the selected environment, and the
+  // currently selected event object (drives the right-column event inspector
+  // when the Events tab is active).
+  const visibleEvents = $derived(visibleEventsFor(selectedEnvironment));
+  const selectedEvent = $derived(
+    visibleEvents.find(event => String(event?.id) === String(selectedEventId)) ?? null
   );
 
   // `quiet` refreshes (e.g. on scene change) keep the populated grid on screen
@@ -139,9 +139,9 @@
       const resolvedEnvironment = listingEnvironments
         .find(environment => environment?.id === selectedId) ?? null;
       selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(resolvedEnvironment), scopeDecision.taskPreferenceId);
-      // Resolve the hazard selection the same way (preserve a still-present pick,
-      // else default to the first hazard) so the Hazards tab inspector is seeded.
-      selectedHazardId = resolveDefaultHazardSelection(visibleHazardsFor(resolvedEnvironment), selectedHazardId);
+      // Resolve the event selection the same way (preserve a still-present pick,
+      // else default to the first event) so the Events tab inspector is seeded.
+      selectedEventId = resolveDefaultEventSelection(visibleEventsFor(resolvedEnvironment), selectedEventId);
 
       // First-load backstop: when the shared selection is still empty, adopt the
       // listing's resolved actor AT MOST ONCE and ONLY when it is a player
@@ -176,17 +176,17 @@
     const nextEnvironment = environments.find(environment => environment?.id === id) ?? null;
     selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(nextEnvironment), null);
     // A new environment also resets to the default (Tasks) tab and its own
-    // default hazard selection.
+    // default event selection.
     activeTab = 'tasks';
-    selectedHazardId = resolveDefaultHazardSelection(visibleHazardsFor(nextEnvironment), null);
+    selectedEventId = resolveDefaultEventSelection(visibleEventsFor(nextEnvironment), null);
   }
 
   function onSelectTask(id) {
     selectedTaskId = id;
   }
 
-  function onSelectHazard(id) {
-    selectedHazardId = id;
+  function onSelectEvent(id) {
+    selectedEventId = id;
   }
 
   function onTabChange(tab) {
@@ -315,15 +315,15 @@
         {onSelectTask}
         {activeTab}
         {onTabChange}
-        {selectedHazardId}
-        {onSelectHazard}
+        {selectedEventId}
+        {onSelectEvent}
       />
     </section>
     <section class="gathering-view-column gathering-view-column-right" data-gathering-task-detail-column>
-      {#if activeTab === 'hazards'}
-        <GatheringHazardDetail
-          hazard={selectedHazard}
-          hasHazards={visibleHazards.length > 0}
+      {#if activeTab === 'events'}
+        <GatheringEventDetail
+          event={selectedEvent}
+          hasEvents={visibleEvents.length > 0}
           {services}
         />
       {:else}

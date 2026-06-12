@@ -184,7 +184,7 @@ function makeEngine({
 
 // A timed library task in nodes economy mode. Library tasks resolve as `d100`
 // (composeEnvironment forces it), so the per-attempt outcome status — and thus
-// node depletion under `onSuccess` — is driven by the drop/hazard rolls, not a
+// node depletion under `onSuccess` — is driven by the drop/event rolls, not a
 // routed macro. `dropRate: 100` makes the find deterministic.
 function nodesLibraryTask(overrides = {}) {
   return {
@@ -202,11 +202,11 @@ function nodesLibraryTask(overrides = {}) {
 // supplied environments so its node-state writes mutate the same env objects the
 // engine reads at maturity. The store's `update` merges the patch in place so
 // `env.nodeRuntime` is observable after `commitAcceptedAttempt`. The library
-// `tasks`/`hazards` feed composeEnvironment, which the engine uses to resolve
+// `tasks`/`events` feed composeEnvironment, which the engine uses to resolve
 // the matured run's task (embedded `env.tasks` are ignored under richState).
-function makeNodesRichState(environments, { tasks = [nodesLibraryTask()], hazards = [], rules = null, rollD100 = () => 1 } = {}) {
+function makeNodesRichState(environments, { tasks = [nodesLibraryTask()], events = [], rules = null, rollD100 = () => 1 } = {}) {
   const byId = new Map(environments.map(env => [env.id, env]));
-  const system = { economy: { mode: 'nodes' }, tasks, hazards };
+  const system = { economy: { mode: 'nodes' }, tasks, events };
   if (rules) system.rules = rules;
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { 'system-a': system } }]]);
   return new GatheringRichStateService({
@@ -572,7 +572,7 @@ test('timed nodes-mode maturity decrements the environment node on a successful 
 
   const result = await engine.processWorldTime(worldTime);
 
-  // A d100 gather with no triggered hazard matures as succeeded, so the
+  // A d100 gather with no triggered event matures as succeeded, so the
   // onSuccess node pool depletes by one on the ENVIRONMENT (nodeRuntime[taskId]).
   assert.equal(result.completed.length, 1);
   assert.equal(result.completed[0].state, 'succeeded');
@@ -591,11 +591,11 @@ test('timed nodes-mode maturity does not decrement the environment node on a fai
   const runManager = makeRunManager({ now: () => worldTime });
   const env = environment([], { compositionMode: 'automatic', tasks: [], dangerTags: ['hazardous'] });
   const environments = [env];
-  // A guaranteed hazard under a failureWithHazard policy forces the matured
+  // A guaranteed event under a failureWithEvent policy forces the matured
   // d100 outcome to 'failed', so the onSuccess pool must stay untouched.
   const richState = makeNodesRichState(environments, {
-    hazards: [{ id: 'haz-a', name: 'Cave-in', enabled: true, dangerTags: ['hazardous'], dropRate: 100 }],
-    rules: { hazardSelectionMode: 'all', hazardPolicy: 'failureWithHazard' }
+    events: [{ id: 'haz-a', name: 'Cave-in', enabled: true, dangerTags: ['hazardous'], dropRate: 100 }],
+    rules: { eventSelectionMode: 'all', eventPolicy: 'failureWithEvent' }
   });
   await createWaitingRun(runManager);
   worldTime = 1060;

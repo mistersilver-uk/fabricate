@@ -1997,8 +1997,8 @@ describe('createAdminStore', () => {
         timeOfDay: ['night'],
         dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 2, dropRate: 80 }]
       });
-      const hazard = await store.addGatheringLibraryHazard('sys1');
-      await store.updateGatheringLibraryHazard('sys1', hazard.id, {
+      const event = await store.addGatheringLibraryEvent('sys1');
+      await store.updateGatheringLibraryEvent('sys1', event.id, {
         name: 'Thorns',
         dangerTags: ['hazardous'],
         dropRate: 30
@@ -2043,8 +2043,8 @@ describe('createAdminStore', () => {
         characterModifiers: [],
         enabled: true
       });
-      assert.equal(config.systems.sys1.hazards[0].name, 'Thorns');
-      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
+      assert.equal(config.systems.sys1.events[0].name, 'Thorns');
+      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.events[0].dropRate, 30);
     });
 
     it('auto-populates default task name and image when the first drop row receives a component', async () => {
@@ -2469,11 +2469,11 @@ describe('createAdminStore', () => {
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
     });
 
-    it('duplicates gathering library hazards with a fresh id and Copy suffix', async () => {
+    it('duplicates gathering library events with a fresh id and Copy suffix', async () => {
       const services = createMockServices({
         randomID: (() => {
           let id = 0;
-          return () => `hazard-copy-${++id}`;
+          return () => `event-copy-${++id}`;
         })(),
         localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key
       });
@@ -2482,8 +2482,8 @@ describe('createAdminStore', () => {
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            hazards: [{
-              id: 'hazard-thorns',
+            events: [{
+              id: 'event-thorns',
               name: 'Thornwall',
               description: 'Vicious thicket.',
               enabled: true,
@@ -2493,52 +2493,52 @@ describe('createAdminStore', () => {
               weather: ['rain'],
               timeOfDay: ['night'],
               dropRate: 35,
-              hazardModifier: { provider: 'macro', macroUuid: 'Macro.thorn' },
+              eventModifier: { provider: 'macro', macroUuid: 'Macro.thorn' },
               characterModifiers: []
             }]
           },
           sys2: {
-            hazards: [{ id: 'hazard-other', name: 'Other Hazard', dropRate: 10 }]
+            events: [{ id: 'event-other', name: 'Other Event', dropRate: 10 }]
           }
         }
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const duplicate = await store.duplicateGatheringLibraryHazard('sys1', 'hazard-thorns');
+      const duplicate = await store.duplicateGatheringLibraryEvent('sys1', 'event-thorns');
 
-      const sys1Hazards = services._store.gatheringConfig.systems.sys1.hazards;
-      assert.equal(duplicate.id, 'hazard-copy-1');
+      const sys1Events = services._store.gatheringConfig.systems.sys1.events;
+      assert.equal(duplicate.id, 'event-copy-1');
       assert.equal(duplicate.name, 'Thornwall (Copy)');
-      // Region dropped from hazard composition (legacy `regions` input not carried).
+      // Region dropped from event composition (legacy `regions` input not carried).
       assert.equal('regions' in duplicate, false);
       assert.deepEqual(duplicate.biomes, ['forest']);
       assert.deepEqual(duplicate.weather, ['rain']);
       assert.deepEqual(duplicate.timeOfDay, ['night']);
       assert.deepEqual(duplicate.dangerTags, ['hazardous']);
       assert.equal(duplicate.dropRate, 35);
-      assert.deepEqual(duplicate.hazardModifier, { provider: 'macro', macroUuid: 'Macro.thorn' });
-      assert.equal(sys1Hazards.length, 2);
-      assert.equal(sys1Hazards[0].id, 'hazard-thorns');
-      assert.equal(services._store.gatheringConfig.systems.sys2.hazards.length, 1);
-      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards.length, 2);
+      assert.deepEqual(duplicate.eventModifier, { provider: 'macro', macroUuid: 'Macro.thorn' });
+      assert.equal(sys1Events.length, 2);
+      assert.equal(sys1Events[0].id, 'event-thorns');
+      assert.equal(services._store.gatheringConfig.systems.sys2.events.length, 1);
+      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.events.length, 2);
     });
 
-    it('returns null when duplicating a missing gathering hazard', async () => {
+    it('returns null when duplicating a missing gathering event', async () => {
       const services = createMockServices();
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            hazards: [{ id: 'hazard-thorns', name: 'Thornwall', dropRate: 25 }]
+            events: [{ id: 'event-thorns', name: 'Thornwall', dropRate: 25 }]
           }
         }
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.equal(await store.duplicateGatheringLibraryHazard('sys1', 'missing'), null);
-      assert.equal(await store.duplicateGatheringLibraryHazard('missing-system', 'hazard-thorns'), null);
-      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+      assert.equal(await store.duplicateGatheringLibraryEvent('sys1', 'missing'), null);
+      assert.equal(await store.duplicateGatheringLibraryEvent('missing-system', 'event-thorns'), null);
+      assert.equal(services._store.gatheringConfig.systems.sys1.events.length, 1);
     });
 
     it('manages selected-system gathering weather and time vocabulary without affecting other systems', async () => {
@@ -2553,7 +2553,7 @@ describe('createAdminStore', () => {
               timeOfDay: { enabled: true, current: 'night', values: ['night', 'day'] }
             },
             tasks: [{ id: 'task-rain', name: 'Rain', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
-            hazards: [{ id: 'hazard-rain', name: 'Rain Hazard', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+            events: [{ id: 'event-rain', name: 'Rain Event', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
           },
           sys2: {
             conditions: {
@@ -2561,7 +2561,7 @@ describe('createAdminStore', () => {
               timeOfDay: { enabled: true, current: 'night', values: ['night'] }
             },
             tasks: [{ id: 'task-other', name: 'Other', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
-            hazards: [{ id: 'hazard-other', name: 'Other Hazard', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+            events: [{ id: 'event-other', name: 'Other Event', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
           }
         }
       };
@@ -2584,9 +2584,9 @@ describe('createAdminStore', () => {
         values: [{ id: 'ash-fall', label: 'Ashfall', icon: 'fas fa-volcano' }]
       });
       assert.deepEqual(sys1.tasks[0].weather, []);
-      assert.deepEqual(sys1.hazards[0].weather, []);
+      assert.deepEqual(sys1.events[0].weather, []);
       assert.deepEqual(sys2.tasks[0].weather, ['rain']);
-      assert.deepEqual(sys2.hazards[0].weather, ['rain']);
+      assert.deepEqual(sys2.events[0].weather, ['rain']);
     });
 
     it('edits condition labels without changing ids, icons, selections, or library references', async () => {
@@ -2609,7 +2609,7 @@ describe('createAdminStore', () => {
               }
             },
             tasks: [{ id: 'task-rain', name: 'Rain', weather: ['heavy-rain'], timeOfDay: ['night'], dropRows: [] }],
-            hazards: [{ id: 'hazard-rain', name: 'Rain Hazard', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
+            events: [{ id: 'event-rain', name: 'Rain Event', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
           },
           sys2: {
             conditions: {
@@ -2625,7 +2625,7 @@ describe('createAdminStore', () => {
               }
             },
             tasks: [{ id: 'task-other', name: 'Other', weather: ['heavy-rain'], timeOfDay: ['night'], dropRows: [] }],
-            hazards: [{ id: 'hazard-other', name: 'Other Hazard', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
+            events: [{ id: 'event-other', name: 'Other Event', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
           }
         }
       };
@@ -2642,16 +2642,16 @@ describe('createAdminStore', () => {
         values: [{ id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }]
       });
       assert.deepEqual(sys1.tasks[0].weather, ['heavy-rain']);
-      assert.deepEqual(sys1.hazards[0].weather, ['heavy-rain']);
+      assert.deepEqual(sys1.events[0].weather, ['heavy-rain']);
 
       assert.equal(await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'), false);
       await store.toggleGatheringConditionEnabled('weather', false, 'sys1');
       assert.equal(await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'), true);
 
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].weather, []);
-      assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].weather, []);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.events[0].weather, []);
       assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].weather, ['heavy-rain']);
-      assert.deepEqual(services._store.gatheringConfig.systems.sys2.hazards[0].weather, ['heavy-rain']);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys2.events[0].weather, ['heavy-rain']);
     });
 
     it('normalizes and edits selected-system region and biome vocabularies', async () => {
@@ -2668,7 +2668,7 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [{ id: 'task-forest', name: 'Forest', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', biomes: ['forest'], dropRate: 50 }]
+            events: [{ id: 'event-forest', name: 'Forest Event', biomes: ['forest'], dropRate: 50 }]
           }
         }
       };
@@ -2696,7 +2696,7 @@ describe('createAdminStore', () => {
         customColor: ''
       });
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].biomes, ['forest']);
-      assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].biomes, ['forest']);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.events[0].biomes, ['forest']);
     });
 
     it('normalises top-level vocabularies into objects with capitalised labels and per-biome colour tokens', async () => {
@@ -2781,14 +2781,14 @@ describe('createAdminStore', () => {
               biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
             },
             tasks: [{ id: 'task-forest', name: 'Forest', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', biomes: ['forest'], dropRate: 50 }]
+            events: [{ id: 'event-forest', name: 'Forest Event', biomes: ['forest'], dropRate: 50 }]
           },
           sys2: {
             vocabularies: {
               biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
             },
             tasks: [{ id: 'task-other', name: 'Other', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-other', name: 'Other Hazard', biomes: ['forest'], dropRate: 50 }]
+            events: [{ id: 'event-other', name: 'Other Event', biomes: ['forest'], dropRate: 50 }]
           }
         }
       };
@@ -2804,7 +2804,7 @@ describe('createAdminStore', () => {
       assert.equal('regions' in sys1.vocabularies, false);
       assert.deepEqual(sys1.vocabularies.biomes.values, []);
       assert.deepEqual(sys1.tasks[0].biomes, []);
-      assert.deepEqual(sys1.hazards[0].biomes, []);
+      assert.deepEqual(sys1.events[0].biomes, []);
       assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
       assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1']);
       assert.deepEqual(environments[0].biomes, ['swamp']);
@@ -2822,16 +2822,16 @@ describe('createAdminStore', () => {
             rules: {
               rewardSelectionMode: 'invalid',
               rewardLimit: 0,
-              hazardSelectionMode: 'limitedDrops',
-              hazardLimit: '3.8',
-              hazardPolicy: 'bad-policy',
+              eventSelectionMode: 'limitedDrops',
+              eventLimit: '3.8',
+              eventPolicy: 'bad-policy',
               blindCandidateGate: 'not-a-gate',
               revealPolicy: 'not-a-policy',
               revealScope: 'not-a-scope',
-              hazardVisibility: 'not-a-visibility'
+              eventVisibility: 'not-a-visibility'
             },
             tasks: [],
-            hazards: []
+            events: []
           }
         }
       };
@@ -2842,46 +2842,104 @@ describe('createAdminStore', () => {
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, {
         rewardSelectionMode: 'highestRankedDrop',
         rewardLimit: 1,
-        hazardSelectionMode: 'limitedDrops',
-        hazardLimit: 3,
-        hazardPolicy: 'successWithHazard',
+        eventSelectionMode: 'limitedDrops',
+        eventLimit: 3,
+        eventPolicy: 'successWithEvent',
         toolBreakagePolicy: 'failureOnBreak',
         biomeModifierAggregation: 'strongestOfEach',
         blindCandidateGate: 'attemptableOnly',
         revealPolicy: 'never',
         revealScope: 'actor',
-        hazardVisibility: 'encounterChance'
+        eventVisibility: 'encounterChance'
       });
 
       await store.updateGatheringRules('sys1', {
         rewardSelectionMode: 'limitedDrops',
         rewardLimit: 2,
-        hazardSelectionMode: 'highestRankedDrop',
-        hazardLimit: -4,
-        hazardPolicy: 'failureWithHazard',
+        eventSelectionMode: 'highestRankedDrop',
+        eventLimit: -4,
+        eventPolicy: 'failureWithEvent',
         blindCandidateGate: 'allMatching',
         revealPolicy: 'onAttempt',
         revealScope: 'global',
-        hazardVisibility: 'full'
+        eventVisibility: 'full'
       });
 
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.rules, {
         rewardSelectionMode: 'limitedDrops',
         rewardLimit: 2,
-        hazardSelectionMode: 'highestRankedDrop',
-        hazardLimit: 1,
-        hazardPolicy: 'failureWithHazard',
+        eventSelectionMode: 'highestRankedDrop',
+        eventLimit: 1,
+        eventPolicy: 'failureWithEvent',
         toolBreakagePolicy: 'failureOnBreak',
         biomeModifierAggregation: 'strongestOfEach',
         blindCandidateGate: 'allMatching',
         revealPolicy: 'onAttempt',
         revealScope: 'global',
-        hazardVisibility: 'full'
+        eventVisibility: 'full'
       });
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });
 
-    it('updateEnvironmentDraft accepts compositionMode, taskOrder, and hazardOrder', async () => {
+    it('accepts legacy hazard-schema rule keys/values on read (pre-1.0.0 / imported config)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+
+      // A gathering config saved before the hazard->event rename, never run through
+      // the 1.0.0 startup migration (e.g. imported in the same session).
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            rules: {
+              hazardSelectionMode: 'highestRankedDrop',
+              hazardLimit: 4,
+              hazardPolicy: 'failureWithHazard',
+              hazardVisibility: 'full'
+            },
+            tasks: [],
+            events: []
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const rules = get(store.viewState).gatheringConfig.systems.sys1.rules;
+      assert.equal(rules.eventSelectionMode, 'highestRankedDrop', 'legacy hazardSelectionMode read');
+      assert.equal(rules.eventLimit, 4, 'legacy hazardLimit read');
+      assert.equal(rules.eventPolicy, 'failureWithEvent', 'legacy policy value coerced');
+      assert.equal(rules.eventVisibility, 'full', 'legacy hazardVisibility read');
+    });
+
+    it('reads a legacy hazards collection and hazardModifier field on a pre-rename system config', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            rules: {},
+            tasks: [],
+            hazards: [
+              { id: 'legacy-event', name: 'Wandering Pedlar', dropRate: 25, hazardModifier: { provider: 'macro', macroUuid: 'Macro.m' } }
+            ]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const events = get(store.viewState).gatheringConfig.systems.sys1.events;
+      assert.equal(events.length, 1, 'legacy hazards collection surfaced as events');
+      assert.equal(events[0].id, 'legacy-event');
+      assert.ok(events[0].eventModifier, 'legacy hazardModifier surfaced as eventModifier');
+    });
+
+    it('updateEnvironmentDraft accepts compositionMode, taskOrder, and eventOrder', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2889,11 +2947,11 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       await store.createEnvironmentDraft();
 
-      store.updateEnvironmentDraft({ compositionMode: 'manual', taskOrder: ['t2', 't1', 't1'], hazardOrder: ['h1'] });
+      store.updateEnvironmentDraft({ compositionMode: 'manual', taskOrder: ['t2', 't1', 't1'], eventOrder: ['h1'] });
       const draft = get(store.viewState).environmentDraft;
       assert.equal(draft.compositionMode, 'manual');
       assert.deepEqual(draft.taskOrder, ['t2', 't1']);
-      assert.deepEqual(draft.hazardOrder, ['h1']);
+      assert.deepEqual(draft.eventOrder, ['h1']);
 
       store.updateEnvironmentDraft({ compositionMode: 'not-a-mode' });
       assert.equal(get(store.viewState).environmentDraft.compositionMode, 'automatic');
@@ -2932,7 +2990,7 @@ describe('createAdminStore', () => {
               { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
               { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] }
             ],
-            hazards: []
+            events: []
           }
         }
       };
@@ -2957,7 +3015,7 @@ describe('createAdminStore', () => {
               { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] },
               { id: 't-off', name: 'Disabled', enabled: false, biomes: ['cave'], dropRows: [] }
             ],
-            hazards: []
+            events: []
           }
         }
       };
@@ -2996,7 +3054,7 @@ describe('createAdminStore', () => {
               { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
               { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] }
             ],
-            hazards: []
+            events: []
           }
         }
       };
@@ -3050,7 +3108,7 @@ describe('createAdminStore', () => {
       assert.equal(removedForced.runtimeState, 'unavailable');
     });
 
-    it('manual hazard removal clears include and force state without local exclusion', async () => {
+    it('manual event removal clears include and force state without local exclusion', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3058,9 +3116,9 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [],
-            hazards: [
-              { id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dropRate: 25 },
-              { id: 'h-desert', name: 'Desert Hazard', biomes: ['desert'], dropRate: 25 }
+            events: [
+              { id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dropRate: 25 },
+              { id: 'h-desert', name: 'Desert Event', biomes: ['desert'], dropRate: 25 }
             ]
           }
         }
@@ -3070,31 +3128,31 @@ describe('createAdminStore', () => {
       await store.createEnvironmentDraft();
       store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'manual' });
 
-      store.includeEnvironmentRecord('hazard', 'h-cave');
-      store.excludeEnvironmentRecord('hazard', 'h-cave');
+      store.includeEnvironmentRecord('event', 'h-cave');
+      store.excludeEnvironmentRecord('event', 'h-cave');
 
       const draft = get(store.viewState).environmentDraft;
-      assert.ok(!draft.enabledHazardIds.includes('h-cave'));
-      assert.ok(!draft.disabledHazardIds.includes('h-cave'));
+      assert.ok(!draft.enabledEventIds.includes('h-cave'));
+      assert.ok(!draft.disabledEventIds.includes('h-cave'));
       let composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.hazards.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
-      assert.equal(composition.counts.excludedHazards, 0);
+      assert.equal(composition.events.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
+      assert.equal(composition.counts.excludedEvents, 0);
 
-      store.updateEnvironmentDraft({ disabledHazardIds: ['h-cave'] });
+      store.updateEnvironmentDraft({ disabledEventIds: ['h-cave'] });
       composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.hazards.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
-      assert.equal(composition.counts.excludedHazards, 0);
+      assert.equal(composition.events.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
+      assert.equal(composition.counts.excludedEvents, 0);
 
-      store.forceIncludeEnvironmentRecord('hazard', 'h-desert');
-      store.excludeEnvironmentRecord('hazard', 'h-desert');
+      store.forceIncludeEnvironmentRecord('event', 'h-desert');
+      store.excludeEnvironmentRecord('event', 'h-desert');
       const forcedDraft = get(store.viewState).environmentDraft;
-      assert.ok(!forcedDraft.forcedHazardIds.includes('h-desert'));
-      assert.ok(!forcedDraft.disabledHazardIds.includes('h-desert'));
+      assert.ok(!forcedDraft.forcedEventIds.includes('h-desert'));
+      assert.ok(!forcedDraft.disabledEventIds.includes('h-desert'));
       composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.hazards.find(entry => entry.id === 'h-desert').compositionState, 'notMatching');
+      assert.equal(composition.events.find(entry => entry.id === 'h-desert').compositionState, 'notMatching');
     });
 
-    it('reorders all included hazards including condition-blocked force-added hazards', async () => {
+    it('reorders all included events including condition-blocked force-added events', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3102,10 +3160,10 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [],
-            hazards: [
-              { id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
+            events: [
+              { id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
               { id: 'h-gas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
-              { id: 'h-storm', name: 'Storm Hazard', biomes: ['cave'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 },
+              { id: 'h-storm', name: 'Storm Event', biomes: ['cave'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 },
               { id: 'h-desert', name: 'Desert Storm', biomes: ['desert'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 }
             ]
           }
@@ -3116,43 +3174,43 @@ describe('createAdminStore', () => {
       await store.createEnvironmentDraft();
       store.updateEnvironmentDraft({ biomes: ['cave'], dangerLevel: 'hazardous', compositionMode: 'manual' });
 
-      store.includeEnvironmentRecord('hazard', 'h-cave');
-      store.includeEnvironmentRecord('hazard', 'h-gas');
-      store.includeEnvironmentRecord('hazard', 'h-storm');
-      store.forceIncludeEnvironmentRecord('hazard', 'h-desert');
+      store.includeEnvironmentRecord('event', 'h-cave');
+      store.includeEnvironmentRecord('event', 'h-gas');
+      store.includeEnvironmentRecord('event', 'h-storm');
+      store.forceIncludeEnvironmentRecord('event', 'h-desert');
 
       let composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
-        composition.hazards
+        composition.events
           .filter(entry => ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState))
           .map(entry => entry.id),
         ['h-cave', 'h-gas', 'h-storm', 'h-desert']
       );
-      const conditionBlocked = composition.hazards.find(entry => entry.id === 'h-storm');
+      const conditionBlocked = composition.events.find(entry => entry.id === 'h-storm');
       assert.equal(conditionBlocked.compositionState, 'explicitlyIncluded');
       assert.equal(conditionBlocked.runtimeState, 'unavailable');
-      const forced = composition.hazards.find(entry => entry.id === 'h-desert');
+      const forced = composition.events.find(entry => entry.id === 'h-desert');
       assert.equal(forced.compositionState, 'forceIncluded');
       assert.equal(forced.runtimeState, 'unavailable');
 
-      assert.equal(store.reorderEnvironmentRecord('hazard', 2, 0), true);
+      assert.equal(store.reorderEnvironmentRecord('event', 2, 0), true);
 
       let draft = get(store.viewState).environmentDraft;
-      assert.deepEqual(draft.hazardOrder, ['h-storm', 'h-cave', 'h-gas', 'h-desert']);
+      assert.deepEqual(draft.eventOrder, ['h-storm', 'h-cave', 'h-gas', 'h-desert']);
       composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
-        composition.hazards
+        composition.events
           .filter(entry => ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState))
           .map(entry => entry.id),
         ['h-storm', 'h-cave', 'h-gas', 'h-desert']
       );
 
-      assert.equal(store.reorderEnvironmentRecord('hazard', 3, 1), true);
+      assert.equal(store.reorderEnvironmentRecord('event', 3, 1), true);
       draft = get(store.viewState).environmentDraft;
-      assert.deepEqual(draft.hazardOrder, ['h-storm', 'h-desert', 'h-cave', 'h-gas']);
+      assert.deepEqual(draft.eventOrder, ['h-storm', 'h-desert', 'h-cave', 'h-gas']);
     });
 
-    it('keeps force-added hazards included after environment edits make them match', async () => {
+    it('keeps force-added events included after environment edits make them match', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3160,8 +3218,8 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [],
-            hazards: [
-              { id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
+            events: [
+              { id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
               { id: 'h-desert', name: 'Desert Storm', biomes: ['desert'], dangerTags: ['hazardous'], dropRate: 25 }
             ]
           }
@@ -3172,29 +3230,29 @@ describe('createAdminStore', () => {
       await store.createEnvironmentDraft();
       store.updateEnvironmentDraft({ biomes: ['cave'], dangerLevel: 'hazardous', compositionMode: 'manual' });
 
-      store.includeEnvironmentRecord('hazard', 'h-cave');
-      store.forceIncludeEnvironmentRecord('hazard', 'h-desert');
+      store.includeEnvironmentRecord('event', 'h-cave');
+      store.forceIncludeEnvironmentRecord('event', 'h-desert');
       store.updateEnvironmentDraft({ biomes: ['desert'] });
 
       let composition = get(store.viewState).environmentComposition;
-      const forced = composition.hazards.find(entry => entry.id === 'h-desert');
+      const forced = composition.events.find(entry => entry.id === 'h-desert');
       assert.equal(forced.matches, true);
       assert.equal(forced.compositionState, 'forceIncluded');
       assert.equal(forced.runtimeState, 'available');
 
-      assert.equal(store.reorderEnvironmentRecord('hazard', 0, 1), true);
+      assert.equal(store.reorderEnvironmentRecord('event', 0, 1), true);
       const draft = get(store.viewState).environmentDraft;
-      assert.deepEqual(draft.hazardOrder, ['h-desert', 'h-cave']);
+      assert.deepEqual(draft.eventOrder, ['h-desert', 'h-cave']);
       composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
-        composition.hazards
+        composition.events
           .filter(entry => ['includedByMatch', 'explicitlyIncluded', 'forceIncluded', 'includedButUnavailable'].includes(entry.compositionState))
           .map(entry => entry.id),
         ['h-desert', 'h-cave']
       );
     });
 
-    it('automatic hazard exclusion writes local excluded state', async () => {
+    it('automatic event exclusion writes local excluded state', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3202,7 +3260,7 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [],
-            hazards: [{ id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dropRate: 25 }]
+            events: [{ id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dropRate: 25 }]
           }
         }
       };
@@ -3211,14 +3269,14 @@ describe('createAdminStore', () => {
       await store.createEnvironmentDraft();
       store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'automatic' });
 
-      store.excludeEnvironmentRecord('hazard', 'h-cave');
+      store.excludeEnvironmentRecord('event', 'h-cave');
 
       const draft = get(store.viewState).environmentDraft;
-      assert.ok(!draft.enabledHazardIds.includes('h-cave'));
-      assert.ok(draft.disabledHazardIds.includes('h-cave'));
+      assert.ok(!draft.enabledEventIds.includes('h-cave'));
+      assert.ok(draft.disabledEventIds.includes('h-cave'));
       const composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.hazards.find(entry => entry.id === 'h-cave').compositionState, 'excluded');
-      assert.equal(composition.counts.excludedHazards, 1);
+      assert.equal(composition.events.find(entry => entry.id === 'h-cave').compositionState, 'excluded');
+      assert.equal(composition.counts.excludedEvents, 1);
     });
 
     it('requires confirmation before deleting gathering library records used by environments', async () => {
@@ -3237,7 +3295,7 @@ describe('createAdminStore', () => {
             biomes: ['forest'],
             dangerTags: ['hazardous'],
             enabledTaskIds: ['task-used'],
-            enabledHazardIds: ['hazard-used']
+            enabledEventIds: ['event-used']
           }]
         })
       });
@@ -3253,7 +3311,7 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [{ id: 'task-used', name: 'Used Task', region: 'north', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-used', name: 'Used Hazard', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
+            events: [{ id: 'event-used', name: 'Used Event', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
           }
         }
       };
@@ -3262,14 +3320,14 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-used'), false);
-      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-used'), false);
+      assert.equal(await store.deleteGatheringLibraryEvent('sys1', 'event-used'), false);
       assert.equal(confirmations.length, 2);
       assert.ok(confirmations[0].content.includes('Used Grove'));
       assert.ok(confirmations[1].content.includes('Used Grove'));
       assert.ok(confirmations[0].content.includes('cannot be undone'));
       assert.ok(confirmations[1].content.includes('cannot be undone'));
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
-      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+      assert.equal(services._store.gatheringConfig.systems.sys1.events.length, 1);
     });
 
     it('requires confirmation before deleting unused gathering library records and keeps them on decline', async () => {
@@ -3285,7 +3343,7 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
-            hazards: [{ id: 'hazard-unused', name: 'Lone Hazard', dropRate: 10 }]
+            events: [{ id: 'event-unused', name: 'Lone Event', dropRate: 10 }]
           }
         }
       };
@@ -3294,16 +3352,16 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-unused'), false);
-      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-unused'), false);
+      assert.equal(await store.deleteGatheringLibraryEvent('sys1', 'event-unused'), false);
       assert.equal(confirmations.length, 2);
       assert.ok(confirmations[0].content.includes('Lone Task'));
       assert.ok(confirmations[0].content.includes('cannot be undone'));
       assert.ok(!confirmations[0].content.includes('Used by'));
-      assert.ok(confirmations[1].content.includes('Lone Hazard'));
+      assert.ok(confirmations[1].content.includes('Lone Event'));
       assert.ok(confirmations[1].content.includes('cannot be undone'));
       assert.ok(!confirmations[1].content.includes('Used by'));
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
-      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+      assert.equal(services._store.gatheringConfig.systems.sys1.events.length, 1);
     });
 
     it('deletes unused gathering library records when the confirmation is accepted', async () => {
@@ -3319,7 +3377,7 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
-            hazards: [{ id: 'hazard-unused', name: 'Lone Hazard', dropRate: 10 }]
+            events: [{ id: 'event-unused', name: 'Lone Event', dropRate: 10 }]
           }
         }
       };
@@ -3328,10 +3386,10 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-unused'), true);
-      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-unused'), true);
+      assert.equal(await store.deleteGatheringLibraryEvent('sys1', 'event-unused'), true);
       assert.equal(confirmationCount, 2);
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 0);
-      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 0);
+      assert.equal(services._store.gatheringConfig.systems.sys1.events.length, 0);
     });
 
     it('deletes gathering library records after used-record confirmation is accepted', async () => {
@@ -3350,7 +3408,7 @@ describe('createAdminStore', () => {
             biomes: ['forest'],
             dangerTags: ['hazardous'],
             enabledTaskIds: ['task-used'],
-            enabledHazardIds: ['hazard-used']
+            enabledEventIds: ['event-used']
           }]
         })
       });
@@ -3366,7 +3424,7 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [{ id: 'task-used', name: 'Used Task', region: 'north', biomes: ['forest'], dropRows: [] }],
-            hazards: [{ id: 'hazard-used', name: 'Used Hazard', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
+            events: [{ id: 'event-used', name: 'Used Event', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
           }
         }
       };
@@ -3375,13 +3433,13 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-used'), true);
-      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-used'), true);
+      assert.equal(await store.deleteGatheringLibraryEvent('sys1', 'event-used'), true);
       assert.equal(confirmationCount, 2);
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 0);
-      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 0);
+      assert.equal(services._store.gatheringConfig.systems.sys1.events.length, 0);
     });
 
-    it('adds, updates, and deletes character modifier references on drop rows and hazards', async () => {
+    it('adds, updates, and deletes character modifier references on drop rows and events', async () => {
       const services = createMockServices({
         randomID: (() => {
           let id = 0;
@@ -3404,8 +3462,8 @@ describe('createAdminStore', () => {
                 { id: 'row-iron', componentId: 'iron', quantity: 1, dropRate: 50 }
               ]
             }],
-            hazards: [
-              { id: 'hazard-cave-in', name: 'Cave-in', dropRate: 25 }
+            events: [
+              { id: 'event-cave-in', name: 'Cave-in', dropRate: 25 }
             ]
           }
         }
@@ -3436,33 +3494,33 @@ describe('createAdminStore', () => {
       assert.equal(task.dropRows[0].characterModifiers[0].max, 5);
       assert.equal(task.dropRows[0].characterModifiers[0].expressionOverride, '1d4 + @abilities.dex.mod');
 
-      const hazardRef = await store.addGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', {
+      const eventRef = await store.addGatheringEventCharacterModifier('sys1', 'event-cave-in', {
         modifierId: 'strength',
         operator: '-'
       });
-      assert.ok(hazardRef, 'hazard ref was created');
-      assert.equal(hazardRef.modifierId, 'strength');
-      assert.equal(hazardRef.operator, '-');
-      let hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
-      assert.equal(hazard.characterModifiers.length, 1);
-      assert.equal(hazard.characterModifiers[0].id, hazardRef.id);
+      assert.ok(eventRef, 'event ref was created');
+      assert.equal(eventRef.modifierId, 'strength');
+      assert.equal(eventRef.operator, '-');
+      let event = services._store.gatheringConfig.systems.sys1.events[0];
+      assert.equal(event.characterModifiers.length, 1);
+      assert.equal(event.characterModifiers[0].id, eventRef.id);
 
-      const hazardUpdated = await store.updateGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', hazardRef.id, {
+      const eventUpdated = await store.updateGatheringEventCharacterModifier('sys1', 'event-cave-in', eventRef.id, {
         expressionOverride: '1d6 + @abilities.con.mod'
       });
-      assert.equal(hazardUpdated, true);
-      hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
-      assert.equal(hazard.characterModifiers[0].expressionOverride, '1d6 + @abilities.con.mod');
+      assert.equal(eventUpdated, true);
+      event = services._store.gatheringConfig.systems.sys1.events[0];
+      assert.equal(event.characterModifiers[0].expressionOverride, '1d6 + @abilities.con.mod');
 
       const dropDeleted = await store.deleteGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron', dropRef.id);
       assert.equal(dropDeleted, true);
       task = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(task.dropRows[0].characterModifiers.length, 0);
 
-      const hazardDeleted = await store.deleteGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', hazardRef.id);
-      assert.equal(hazardDeleted, true);
-      hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
-      assert.equal(hazard.characterModifiers.length, 0);
+      const eventDeleted = await store.deleteGatheringEventCharacterModifier('sys1', 'event-cave-in', eventRef.id);
+      assert.equal(eventDeleted, true);
+      event = services._store.gatheringConfig.systems.sys1.events[0];
+      assert.equal(event.characterModifiers.length, 0);
     });
 
     it('returns null when adding a character modifier reference to an unknown row', async () => {
@@ -3474,7 +3532,7 @@ describe('createAdminStore', () => {
           sys1: {
             characterModifiers: [{ id: 'strength', label: 'Strength', icon: '', provider: 'dnd5e', expression: '@abilities.str.mod' }],
             tasks: [{ id: 'task-iron', name: 'Iron', dropRows: [{ id: 'row-iron', dropRate: 50 }] }],
-            hazards: []
+            events: []
           }
         }
       };
@@ -3482,7 +3540,7 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       assert.equal(await store.addGatheringDropRowCharacterModifier('sys1', 'unknown-task', 'row-iron'), null);
       assert.equal(await store.addGatheringDropRowCharacterModifier('sys1', 'task-iron', 'unknown-row'), null);
-      assert.equal(await store.addGatheringHazardCharacterModifier('sys1', 'unknown-hazard'), null);
+      assert.equal(await store.addGatheringEventCharacterModifier('sys1', 'unknown-event'), null);
     });
 
     it('viewState.selectedSystem.craftingCheck.outcomesText is comma-separated string from outcomes array', async () => {
@@ -4089,7 +4147,7 @@ describe('createAdminStore', () => {
         assert.equal(await store.confirmDiscardDirtyComponentDraft(), action);
         assert.equal(await store.confirmDiscardDirtyEssenceDraft(), action);
         assert.equal(await store.confirmDiscardDirtyGatheringTaskDraft(), action);
-        assert.equal(await store.confirmDiscardDirtyGatheringHazardDraft(), action);
+        assert.equal(await store.confirmDiscardDirtyGatheringEventDraft(), action);
       }
     });
 

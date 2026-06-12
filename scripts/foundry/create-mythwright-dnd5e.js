@@ -1253,10 +1253,10 @@ const MythwrightDnd5eBootstrap = (() => {
     ];
   }
 
-  function buildGatheringHazards() {
+  function buildGatheringEvents() {
     return [
       {
-        id: 'mythwright-hazard-cave-in',
+        id: 'mythwright-event-cave-in',
         name: 'Cave-in',
         description: 'Loose ceiling timbers and unstable rock give way without warning, threatening to bury anyone still inside the seam.',
         img: 'icons/svg/explosion.svg',
@@ -1266,7 +1266,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRate: 25
       },
       {
-        id: 'mythwright-hazard-sudden-storm',
+        id: 'mythwright-event-sudden-storm',
         name: 'Sudden Storm',
         description: 'A fast-moving squall lashes the open ground with rain and lightning, soaking supplies and grounding birds.',
         img: 'icons/svg/lightning.svg',
@@ -1277,7 +1277,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRate: 30
       },
       {
-        id: 'mythwright-hazard-collapsing-floor',
+        id: 'mythwright-event-collapsing-floor',
         name: 'Collapsing Floor',
         description: 'Rotten flagstones and warped beams crumble under the slightest pressure, dropping unwary delvers into the level below.',
         img: 'icons/svg/trap.svg',
@@ -1287,7 +1287,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRate: 35
       },
       {
-        id: 'mythwright-hazard-restless-dead',
+        id: 'mythwright-event-restless-dead',
         name: 'Restless Dead',
         description: 'After dusk the battlefield wakes; armoured corpses rise from the mud to reclaim the gear stripped from them.',
         img: 'icons/svg/skull.svg',
@@ -1298,7 +1298,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRate: 30
       },
       {
-        id: 'mythwright-hazard-planar-surge',
+        id: 'mythwright-event-planar-surge',
         name: 'Planar Surge',
         description: 'The veil thins and raw planar energy floods the site, scouring anything not bound by ritual.',
         img: 'icons/svg/aura.svg',
@@ -1307,7 +1307,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRate: 20
       },
       {
-        id: 'mythwright-hazard-dragon-wakes',
+        id: 'mythwright-event-dragon-wakes',
         name: 'The Dragon Wakes',
         description: 'A miscalculated step rouses the lair\'s ancient occupant. Everything that follows is on the dragon\'s terms.',
         img: 'icons/svg/eye.svg',
@@ -1595,10 +1595,10 @@ const MythwrightDnd5eBootstrap = (() => {
     return errors;
   }
 
-  async function seedGatheringConfig({ tools = [], tasks = [], hazards = [], components = [], unresolvedDrops = [] } = {}, summary = null) {
+  async function seedGatheringConfig({ tools = [], tasks = [], events = [], components = [], unresolvedDrops = [] } = {}, summary = null) {
     const settings = globalThis.game?.settings;
     if (typeof settings?.get !== 'function' || typeof settings?.set !== 'function') {
-      return { updated: false, tools: 0, tasks: 0, hazards: 0 };
+      return { updated: false, tools: 0, tasks: 0, events: 0 };
     }
     const validationErrors = await validateGatheringTaskDrops(tasks, components);
     if (validationErrors.length > 0) {
@@ -1611,7 +1611,7 @@ const MythwrightDnd5eBootstrap = (() => {
       : {};
     systemConfig.tools = upsertById(systemConfig.tools || [], tools);
     systemConfig.tasks = upsertById(systemConfig.tasks || [], tasks);
-    systemConfig.hazards = upsertById(systemConfig.hazards || [], hazards);
+    systemConfig.events = upsertById(systemConfig.events || [], events);
     systemConfig.rules = {
       ...(systemConfig.rules || {}),
       toolBreakagePolicy: systemConfig.rules?.toolBreakagePolicy || 'failureOnBreak'
@@ -1631,8 +1631,8 @@ const MythwrightDnd5eBootstrap = (() => {
     ];
     current.systems[SYSTEM_ID] = systemConfig;
     await settings.set('fabricate', 'gatheringConfig', current);
-    if (summary) summary.gatheringConfig = { tools: tools.length, tasks: tasks.length, hazards: hazards.length, unresolvedDrops: clonePlain(unresolvedDrops) };
-    return { updated: true, tools: tools.length, tasks: tasks.length, hazards: hazards.length };
+    if (summary) summary.gatheringConfig = { tools: tools.length, tasks: tasks.length, events: events.length, unresolvedDrops: clonePlain(unresolvedDrops) };
+    return { updated: true, tools: tools.length, tasks: tasks.length, events: events.length };
   }
 
   function clonePlain(value) {
@@ -1803,11 +1803,11 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       componentIds,
       unresolvedDrops: unresolvedGatheringDrops
     });
-    const gatheringHazards = buildGatheringHazards();
+    const gatheringEvents = buildGatheringEvents();
     await seedGatheringConfig({
       tools: gatheringTools,
       tasks: gatheringTasks,
-      hazards: gatheringHazards,
+      events: gatheringEvents,
       components,
       unresolvedDrops: unresolvedGatheringDrops
     }, summary);
@@ -1877,7 +1877,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     buildElementalRecipe,
     buildGatheringTools,
     buildGatheringTasks,
-    buildGatheringHazards,
+    buildGatheringEvents,
     srdComponentIdsFromMap,
     validateGatheringTaskDrops,
     buildToolRepairRecipes,

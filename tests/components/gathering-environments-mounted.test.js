@@ -138,12 +138,12 @@ describe('GatheringView mounted behavior', () => {
     // GatheringView now renders the center-column detail tree; compile it too so
     // the compiled view can resolve its imports at mount time.
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/HazardChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/EventChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardRow.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
@@ -272,7 +272,7 @@ describe('GatheringView mounted behavior', () => {
     // The alert sits in the header alongside the danger pip.
     const header = regionCard.querySelector('.gathering-env-card-header');
     assert.ok(header.contains(alert), 'alert is in the card header');
-    assert.ok(header.querySelector('.gathering-env-card-hazard'), 'danger pip is in the same header');
+    assert.ok(header.querySelector('.gathering-env-card-event'), 'danger pip is in the same header');
 
     // A normal (in-region/open) environment shows no region alert.
     const openCard = target.querySelector('[data-environment-id="env-open"]');
@@ -575,13 +575,13 @@ describe('GatheringView mounted behavior', () => {
     // Always shown, even on a non-blind card.
     const safeCard = target.querySelector('[data-environment-id="env-safe"]');
     const safeHeader = safeCard.querySelector('.gathering-env-card-header');
-    const safeHazard = safeCard.querySelector('.gathering-env-card-hazard');
-    assert.ok(safeHazard, 'danger pill renders on a non-blind card');
-    assert.ok(safeHeader.contains(safeHazard), 'danger pill lives in the header bar');
-    assert.ok(safeHazard.classList.contains('risk-safe'), 'pill carries the risk tier class');
-    assert.ok(safeHazard.querySelector('.fa-skull'), 'pill shows the danger icon');
+    const safeEvent = safeCard.querySelector('.gathering-env-card-event');
+    assert.ok(safeEvent, 'danger pill renders on a non-blind card');
+    assert.ok(safeHeader.contains(safeEvent), 'danger pill lives in the header bar');
+    assert.ok(safeEvent.classList.contains('risk-safe'), 'pill carries the risk tier class');
+    assert.ok(safeEvent.querySelector('.fa-skull'), 'pill shows the danger icon');
     // The chip now shows the level name, not just the icon.
-    const safeLabel = safeHazard.querySelector('.gathering-env-card-hazard-label');
+    const safeLabel = safeEvent.querySelector('.gathering-env-card-event-label');
     assert.ok(safeLabel, 'danger pill renders a level-name label');
     assert.ok((safeLabel.textContent || '').includes('Risk.safe'), 'label shows the localized danger level');
 
@@ -589,10 +589,10 @@ describe('GatheringView mounted behavior', () => {
     const blindCard = target.querySelector('[data-environment-id="env-blind-deadly"]');
     const header = blindCard.querySelector('.gathering-env-card-header');
     const blind = header.querySelector('.gathering-env-card-blind');
-    const hazard = header.querySelector('.gathering-env-card-hazard');
-    assert.ok(blind && hazard, 'both the blind chip and the danger pill render');
-    assert.equal(blind.nextElementSibling, hazard, 'danger pill is to the right of the blind chip');
-    assert.ok(hazard.classList.contains('risk-deadly'), 'deadly tier class applied');
+    const event = header.querySelector('.gathering-env-card-event');
+    assert.ok(blind && event, 'both the blind chip and the danger pill render');
+    assert.equal(blind.nextElementSibling, event, 'danger pill is to the right of the blind chip');
+    assert.ok(event.classList.contains('risk-deadly'), 'deadly tier class applied');
   });
 
   it('uses the linked-scene thumbnail for the card image when the environment links a scene', async () => {

@@ -1,6 +1,6 @@
 # Manager Confirm-Discard Architecture
 
-Every editor in the Crafting System Manager (component, essence, environment, gathering task, gathering hazard, tools) guards an unsaved draft on route exit. The pattern is three layers; new editor kinds MUST mirror it rather than reach for `globalThis.confirm()` or thread callbacks through `services` directly.
+Every editor in the Crafting System Manager (component, essence, environment, gathering task, gathering event, tools) guards an unsaved draft on route exit. The pattern is three layers; new editor kinds MUST mirror it rather than reach for `globalThis.confirm()` or thread callbacks through `services` directly.
 
 ## The three layers
 
@@ -14,7 +14,7 @@ Helpers today:
 - `confirmEssenceRouteExit`
 - `confirmComponentRouteExit`
 - `confirmGatheringTaskRouteExit`
-- `confirmGatheringHazardRouteExit`
+- `confirmGatheringEventRouteExit`
 - `confirmToolsRouteExit`
 
 Each pairs with a `finish{Kind}RouteExit` that calls `store.cancel{Kind}Draft?.()` to actually clear the draft *after* the user confirms.
@@ -23,7 +23,7 @@ Each pairs with a `finish{Kind}RouteExit` that calls `store.cancel{Kind}Draft?.(
 
 Each kind has a `confirmDiscardDirty{Kind}Draft()` async helper exported on the store. It calls `services.confirmDialog?.({ title, content, yes, no })` and returns the boolean. Shared title + button labels live under `FABRICATE.Admin.Manager.DiscardDirty*` in `lang/en.json`; kind-specific body strings live under each kind's namespace.
 
-A shared inner factory `_confirmDiscardDirtyDraft(contentKey, contentFallback)` produces the dialog options for the four kinds whose dirty state lives in Svelte (component, essence, gathering-task, gathering-hazard). The two kinds whose dirty state lives in the store (environment, tools) wrap the same factory with their own dirty-check + dedup lock.
+A shared inner factory `_confirmDiscardDirtyDraft(contentKey, contentFallback)` produces the dialog options for the four kinds whose dirty state lives in Svelte (component, essence, gathering-task, gathering-event). The two kinds whose dirty state lives in the store (environment, tools) wrap the same factory with their own dirty-check + dedup lock.
 
 **3. Foundry layer — `src/ui/svelte/util/foundryBridge.js`**
 
