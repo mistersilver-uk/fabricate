@@ -62,15 +62,17 @@ SonarCloud quality gate (which scores duplication, reliability, and security on 
 code* — so a path is widened in its own focused PR, not bundled into an unrelated change). The
 gate (`npm run lint` / `npm run format:check`) currently covers the low-coupling leaf modules:
 
-- `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`, and
-  `src/toolBreakageRuntime.js`
+- `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`,
+  `src/canvas/`, and `src/toolBreakageRuntime.js`
 
 Not yet gated (tracked for follow-up — run `npm run lint:all` / `npm run lint:svelte` to see them):
 
-- `src/systems/`, `src/canvas/` — lint-clean after autofix, but reformatting them surfaces
-  pre-existing SonarCloud findings (regex/complexity) that must be addressed in their own PRs.
-  `src/systems/` is large (~31 files) so it is split across more than one follow-up PR
-- the `tests/` suite — same reason (sort comparators, fixture duplication)
+- `src/systems/` — large (~31 files, ~6.8k reformat delta) with ~13 helper families duplicated
+  across files, so folding it in needs a shared-helper extraction refactor to keep SonarCloud's
+  new-code duplication under 3%. Planned as its own PR(s): the 28 non-engine files first (deduping
+  the shared helpers), then the three large engines (`GatheringEngine`, `GatheringRichStateService`,
+  `CraftingEngine`) one per focused PR
+- the `tests/` suite — sort comparators, fixture duplication
 - `src/ui/**` and all `*.svelte` components (Svelte parsing is wired up; findings triaged later)
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by
   source-text assertions in `tests/gathering-bootstrap-api.test.js`, so they change with that test)
