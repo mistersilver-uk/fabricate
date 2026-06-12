@@ -106,11 +106,11 @@ GatheringEnvironment = {
   selectionMode: "targeted" | "blind",
   compositionMode?: "automatic" | "manual",
   sceneUuid?: string | null,
-  region?: string, // INERT legacy single-region string: not a composition input, not editor-surfaced; migrated to includedRegionIds
+  region?: string, // INERT legacy single-region free-text string: not a composition input, not editor-surfaced; migrated to includedRealmIds. NOT a GatheringRealm id — kept verbatim.
   biomes?: string[],
-  includedRegionIds?: string[], // opt-in location availability (Gathering Region ids)
+  includedRealmIds?: string[], // opt-in location availability (Gathering Realm ids); was includedRegionIds
   includedBiomeIds?: string[],
-  excludedRegionIds?: string[],
+  excludedRealmIds?: string[], // was excludedRegionIds
   excludedBiomeIds?: string[],
   dangerLevel?: string,
   dangerTags?: string[], // legacy compatibility-read fallback for dangerLevel
@@ -146,10 +146,10 @@ GatheringEnvironment = {
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 7. Scene linkage is optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
 8. Disabled environments are never attemptable by non-GM users and surface no task content to them. Disabled environments are surfaced as **locked identity-only listings to all viewers** in the player listing (players and GMs alike): a **locked identity-only teaser** (`locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, and no `tasks` or composition internals); it must never expose task identity, weights, drop data, or other composition internals. See *Player Environment Listing*.
-9. `dangerLevel` is a single-select tag value; `biomes` is a multi-select tag list. The legacy single `region` string is **inert**: it is no longer a composition input, is not surfaced in the editor, and is superseded by `includedRegionIds` (multiple `GatheringRegion` ids). The region-as-composition-axis vocabulary has been removed.
+9. `dangerLevel` is a single-select tag value; `biomes` is a multi-select tag list. The legacy single `region` string is **inert**: it is no longer a composition input, is not surfaced in the editor, and is superseded by `includedRealmIds` (multiple `GatheringRealm` ids). The region-as-composition-axis vocabulary has been removed.
 10. `dangerLevel` is the canonical environment danger ceiling used for reusable event matching. Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs when `dangerLevel` is absent; canonical writes should use `dangerLevel`.
 10a. `risk` may remain as optional player-facing risk evidence for older data, but new matching behavior must not depend on `risk` when `dangerLevel` is present.
-11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or event whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and events are skipped during d100 event selection. Matching itself is decided by biome (and, for events, danger) only — region is geography (`GatheringRegion`), not a composition axis.
+11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or event whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and events are skipped during d100 event selection. Matching itself is decided by biome (and, for events, danger) only — geography (`GatheringRealm`) is not a composition axis.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledEventIds`, and `disabledEventIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `compositionMode` controls reusable task/event composition. In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledEventIds`; stale `enabled*Ids` and `forced*Ids` are ignored. In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledEventIds` are ignored.
 12b. `forcedTaskIds` / `forcedEventIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's biome/danger context (composition state `forceIncluded`). A forced record remains force-included until removed even if later environment edits make it match normally. Weather and time-of-day remain runtime gates for force-included records, so a force-included record can still be condition-blocked and inactive at runtime. Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode. Removing a forced task or event in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
@@ -164,22 +164,22 @@ GatheringEnvironment = {
 15. `eventSelectionMode` and `eventPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 16. `blindSelection` (optional) stores the per-task `weights` map used when a blind environment resolves its generic gather. Selection is always a weighted random draw over the gated candidate pool: `weights[taskId]` defaults to `1`, and a non-positive weight excludes the task. There are no other strategies and no per-environment configuration of the selection algorithm. GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
 17. Reveal behaviour is set at the system level only — the system Gathering Rules `revealPolicy` / `revealScope` apply to every environment. Environments do not override them.
-18. `includedRegionIds`, `includedBiomeIds`, `excludedRegionIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current regions (see *Location-Aware Gathering*). `includedRegionIds` is the region membership (multiple `GatheringRegion` ids) authored from the Travel tab / environment editor. They are distinct from the inert legacy `region` string: `region` is a free-text tag string, is NOT a `GatheringRegion` id, no longer participates in composition matching, and is not editor-surfaced. The legacy `biomes` tag list remains a composition match dimension. An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior. The entire location-availability evaluation is additionally gated by `gatheringRegionSettings.enabled`: when the subsystem is disabled (the default), every environment is treated as ungated regardless of these fields. `includedRegionIds`/`excludedRegionIds` are validated against the owning system's `gatheringRegions` only at save boundaries where the system context resolves; load paths never throw on stale ids.
+18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from the Travel tab / environment editor. They are distinct from the inert legacy `region` string: `region` is a free-text tag string, is NOT a `GatheringRealm` id, no longer participates in composition matching, and is not editor-surfaced. The legacy `biomes` tag list remains a composition match dimension. An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior. The entire location-availability evaluation is additionally gated by `gatheringRealmSettings.enabled`: when the subsystem is disabled (the default), every environment is treated as ungated regardless of these fields. `includedRealmIds`/`excludedRealmIds` are validated against the owning system's `gatheringRealms` only at save boundaries where the system context resolves; load paths never throw on stale ids.
 
 ## Location-Aware Gathering
 
 ### Purpose
 
-Make **Gathering Region** a first-class per-crafting-system geography concept and add Fabricate-managed world-level **Gathering Parties** whose current region can gate gathering availability. Region authoring stays lightweight geography — a Region owns no tasks, events, or drops — so the same environment can be reused across many named places.
+Make **Gathering Realm** a first-class per-crafting-system geography concept and add Fabricate-managed world-level **Gathering Parties** whose current realm can gate gathering availability. Realm authoring stays lightweight geography — a Realm owns no tasks, events, or drops — so the same environment can be reused across many named places. A **Gathering Realm** is the Fabricate geography concept; it is distinct from a Foundry **Scene Region** (`RegionDocument` / Region Behaviour), the canvas object that a realm maps to many-to-one through `sceneMappings[].sceneRegionUuid`. This distinction is the reason the Fabricate concept was renamed from **Region** to **Realm**.
 
-This section specifies the **shipped Phase 1** behavior (manual current-region MVP). Scene Region automation, region modifier application, and the full player travel/discovery UI are later-phase follow-ups; the reserved fields and source tokens below leave room for them without changing the contract.
+This section specifies the **shipped Phase 1** behavior (manual current-realm MVP). Scene Region automation, realm modifier application, and the full player travel/discovery UI are later-phase follow-ups; the reserved fields and source tokens below leave room for them without changing the contract.
 
-The entire region/travel/availability subsystem is gated by a per-system `gatheringRegionSettings.enabled` toggle that defaults to `false` (see *Gathering Region Settings*). When disabled, every gate point — the engine location-block choke point, the current-region resolver, the location-aware public API, and the Manager Travel tab and environment region selectors — behaves as if no environment is location-gated and no travel surfaces exist. Region is geography only and is NOT a composition axis (composition uses biome + danger); the legacy region vocabulary that previously conflated geography with composition tagging has been removed.
+The entire realm/travel/availability subsystem is gated by a per-system `gatheringRealmSettings.enabled` toggle that defaults to `false` (see *Gathering Realm Settings*). When disabled, every gate point — the engine location-block choke point, the current-realm resolver, the location-aware public API, and the Manager Travel tab and environment realm selectors — behaves as if no environment is location-gated and no travel surfaces exist. Realm is geography only and is NOT a composition axis (composition uses biome + danger); the legacy region vocabulary that previously conflated geography with composition tagging has been removed.
 
-### Gathering Region
+### Gathering Realm
 
 ```js
-GatheringRegion = {
+GatheringRealm = {
   id: string,
   craftingSystemId: string,
   name: string,
@@ -189,27 +189,27 @@ GatheringRegion = {
   secret: boolean,    // default false
   biomes: string[],   // terrain/ecology traits from the system biome vocabulary
   sort?: number,
-  sceneMappings?: GatheringRegionSceneMapping[], // reserved for Phase 3 Scene Region automation
-  modifiers?: GatheringRegionModifier[],         // reserved for Phase 4 region modifiers
+  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; reserved for Phase 3 Scene Region automation
+  modifiers?: GatheringRealmModifier[],         // reserved for Phase 4 realm modifiers
 }
 ```
 
 #### Requirements
 
-1. `id` must be unique within the owning crafting system's region list; duplicate region ids are rejected at save boundaries (and keep the first occurrence on read).
-2. `craftingSystemId` is forced to the owning system on normalization so a stored or imported region can never claim a foreign owner.
-3. Regions are geography; they must not own environment, task, event, or drop records.
+1. `id` must be unique within the owning crafting system's realm list; duplicate realm ids are rejected at save boundaries (and keep the first occurrence on read).
+2. `craftingSystemId` is forced to the owning system on normalization so a stored or imported realm can never claim a foreign owner.
+3. Realms are geography; they must not own environment, task, event, or drop records.
 4. `biomes` are terrain/ecology traits resolved through the system's biome vocabulary and normalize to a de-duplicated, lower-cased list.
-5. Secret regions may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the region or `GatheringRegionSettings.revealMode === "alwaysVisible"`.
-6. Disabled regions must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled region for diagnostic/preview purposes.
-7. Stale region ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
-8. `sceneMappings` and `modifiers` normalize, validate (unique ids, known enums, finite values), and round-trip, but are **not yet applied at runtime** — Scene Region resolution (Phase 3) and modifier application (Phase 4) are not shipped.
+5. Secret realms may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the realm or `GatheringRealmSettings.revealMode === "alwaysVisible"`.
+6. Disabled realms must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled realm for diagnostic/preview purposes.
+7. Stale realm ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
+8. `sceneMappings` and `modifiers` normalize, validate (unique ids, known enums, finite values), and round-trip, but are **not yet applied at runtime** — Scene Region resolution (Phase 3) and modifier application (Phase 4) are not shipped. The `sceneMappings[].sceneRegionUuid`/`sceneUuid` fields name Foundry `RegionDocument` objects and are **not** renamed.
 
-### Gathering Region Settings
+### Gathering Realm Settings
 
 ```js
-GatheringRegionSettings = {
-  enabled: boolean,                                             // default false; gates the whole region/travel/availability subsystem
+GatheringRealmSettings = {
+  enabled: boolean,                                             // default false; gates the whole realm/travel/availability subsystem
   revealMode: "manual" | "onPartyTokenEntry" | "alwaysVisible", // default "manual"
   modifierVisibility: "visible" | "gmOnly",                     // default "visible"
 }
@@ -217,11 +217,11 @@ GatheringRegionSettings = {
 
 #### Requirements
 
-1. Settings are scoped to one crafting system (`CraftingSystem.gatheringRegionSettings`) because regions are per system.
+1. Settings are scoped to one crafting system (`CraftingSystem.gatheringRealmSettings`) because realms are per system.
 2. Missing settings normalize to `enabled: false`, `revealMode: "manual"`, and `modifierVisibility: "visible"`.
 3. Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data. `enabled` must be a real boolean when present; only an explicit `true` enables the subsystem, and any non-boolean coerces to `false` on read.
-4. `enabled` gates the entire region/travel/availability subsystem. When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-region resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides the Travel tab and the environment region selectors. A shared `isGatheringRegionsEnabled(system)` helper is the single source of truth every gate reads.
-5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret regions. `alwaysVisible` discloses region identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
+4. `enabled` gates the entire realm/travel/availability subsystem. When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides the Travel tab and the environment realm selectors. A shared `isGatheringRealmsEnabled(system)` helper is the single source of truth every gate reads.
+5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
 
 ### Gathering Party
 
@@ -232,10 +232,10 @@ GatheringParty = {
   enabled: boolean,              // default false; enabling requires a travel actor
   memberActorUuids: string[],
   travelActorUuid: string | null,
-  currentRegionOverrides?: {
+  currentRealmOverrides?: {                                    // was currentRegionOverrides
     [systemId: string]: {
       mode: "none" | "manual",
-      regionIds: string[],
+      realmIds: string[],                                      // was regionIds
       updatedAt: number,
       updatedByUserId: string,
     },
@@ -245,74 +245,75 @@ GatheringParty = {
 
 #### Requirements
 
-1. Parties are world-level Fabricate records (world setting `fabricate.gatheringParties`) because the same party can interact with multiple crafting systems; `currentRegionOverrides` is keyed by `systemId`.
-2. Parties are excluded from crafting-system import/export. Overrides referencing missing systems or regions persist as stale repair evidence.
-3. `travelActorUuid` identifies the single Actor that represents the party on a campaign map — the **Travel Actor**. It is an Actor document UUID, not a placed Token UUID or prototype-token reference; Phase 3 region presence sensing will resolve the travel actor's placed token(s).
+1. Parties are world-level Fabricate records (world setting `fabricate.gatheringParties`) because the same party can interact with multiple crafting systems; `currentRealmOverrides` is keyed by `systemId`.
+2. Parties are excluded from crafting-system import/export. Overrides referencing missing systems or realms persist as stale repair evidence.
+3. `travelActorUuid` identifies the single Actor that represents the party on a campaign map — the **Travel Actor**. It is an Actor document UUID, not a placed Token UUID or prototype-token reference; Phase 3 realm presence sensing will resolve the travel actor's placed token(s).
 4. An enabled party must have exactly one travel actor; a newly created party defaults to `enabled: false`, and setting `enabled: true` without a travel actor is rejected at save.
-5. **Composite uniqueness invariant:** an actor may be associated with at most one *enabled* party in total — as a member, as the travel actor, or both (when both, it must be the same party). The travel actor may also be a member of its own party. Membership in disabled parties does not count toward the invariant. This keeps a selected actor's current-region resolution unambiguous.
-6. A selected actor resolves to the unique enabled party that references the actor's UUID in `memberActorUuids` or as `travelActorUuid`; if the actor is in no enabled party, region-aware gathering falls back to no current region.
+5. **Composite uniqueness invariant:** an actor may be associated with at most one *enabled* party in total — as a member, as the travel actor, or both (when both, it must be the same party). The travel actor may also be a member of its own party. Membership in disabled parties does not count toward the invariant. This keeps a selected actor's current-realm resolution unambiguous.
+6. A selected actor resolves to the unique enabled party that references the actor's UUID in `memberActorUuids` or as `travelActorUuid`; if the actor is in no enabled party, realm-aware gathering falls back to no current realm.
 7. Party membership is actor-based, not user-based, and must not depend on a game-system-supplied party/group actor type.
 8. Existing blind-task `revealScope: "party"` is not redefined by this change.
 
-### Current Region Resolution
+### Current Realm Resolution
 
-Current regions are resolved per `partyId` and `systemId`. Canonical source tokens: `manualOverride`, `travelActor`, `unresolved` (player-facing labels `GM override`, `Travel actor`, `No current region`).
+Current realms are resolved per `partyId` and `systemId`. Canonical source tokens: `manualOverride`, `travelActor`, `unresolved` (player-facing labels `GM override`, `Travel actor`, `No current realm`).
 
 #### Requirements
 
-1. A GM manual override (`currentRegionOverrides[systemId].mode === "manual"`) is authoritative and resolves to `manualOverride`. A manual override that explicitly includes a *disabled* region id still resolves that region (GM diagnostic/preview inclusion). Region ids referencing *missing* regions become `staleRegionIds` and do not resolve.
-2. `mode: "none"`, an absent override, or a disabled / travel-actor-less party resolves to `unresolved` (no current region). There is no token-derived fallback in Phase 1.
+1. A GM manual override (`currentRealmOverrides[systemId].mode === "manual"`) is authoritative and resolves to `manualOverride`. A manual override that explicitly includes a *disabled* realm id still resolves that realm (GM diagnostic/preview inclusion). Realm ids referencing *missing* realms become `staleRealmIds` and do not resolve.
+2. `mode: "none"`, an absent override, or a disabled / travel-actor-less party resolves to `unresolved` (no current realm). There is no token-derived fallback in Phase 1.
 3. The `travelActor` source token is reserved for Phase 3 token-derived Scene Region sensing, which slots between the override and unresolved branches without changing the resolver contract. Until then it is surfaced to the GM as "automation not yet available".
-4. Clearing an override is a stamped mutation: it sets `mode: "none"`, empties `regionIds`, and updates `updatedAt`/`updatedByUserId`.
-5. Changing current region refreshes gathering listings but must not retroactively rewrite completed gathering history.
+4. Clearing an override is a stamped mutation: it sets `mode: "none"`, empties `realmIds`, and updates `updatedAt`/`updatedByUserId`.
+5. Changing current realm refreshes gathering listings but must not retroactively rewrite completed gathering history.
 
 ### Environment Location Availability
 
 ```js
 GatheringEnvironmentAvailability = {
-  includedRegionIds?: string[],
+  includedRealmIds?: string[],   // was includedRegionIds
   includedBiomeIds?: string[],
-  excludedRegionIds?: string[],
+  excludedRealmIds?: string[],   // was excludedRegionIds
   excludedBiomeIds?: string[],
 }
 ```
 
 #### Requirements
 
-1. Explicit region exclusions win: any current region in `excludedRegionIds` blocks the environment.
-2. Biome exclusions win when any current region carries a biome in `excludedBiomeIds`.
-3. Explicit region inclusions match when at least one current region id appears in `includedRegionIds`.
-4. Biome inclusions match when at least one current region carries a biome in `includedBiomeIds`.
-5. An environment with exclusions but no inclusions is globally available except in matching excluded current regions/biomes.
+1. Explicit realm exclusions win: any current realm in `excludedRealmIds` blocks the environment.
+2. Biome exclusions win when any current realm carries a biome in `excludedBiomeIds`.
+3. Explicit realm inclusions match when at least one current realm id appears in `includedRealmIds`.
+4. Biome inclusions match when at least one current realm carries a biome in `includedBiomeIds`.
+5. An environment with exclusions but no inclusions is globally available except in matching excluded current realms/biomes.
 6. An environment with no inclusion or exclusion fields (or only empty-after-normalization arrays) is not location-gated and is never location-blocked, preserving existing worlds.
-7. When inclusion-gated and no current region resolves, the environment is blocked with `NO_CURRENT_REGION`; an inclusion-gated environment whose current regions resolve but do not match, or any environment matched by an exclusion, is blocked with `LOCATION_BLOCKED`. Exclusion-only and ungated environments are not blocked by missing current-region context.
+7. When inclusion-gated and no current realm resolves, the environment is blocked with `NO_CURRENT_REALM`; an inclusion-gated environment whose current realms resolve but do not match, or any environment matched by an exclusion, is blocked with `LOCATION_BLOCKED`. Exclusion-only and ungated environments are not blocked by missing current-realm context.
 8. Location availability is re-evaluated freshly in the **start-attempt guard** (not only in listing), so a stale listing — e.g. an override cleared between list and start — cannot start a location-gated attempt.
-9. Availability evaluation must not leak hidden blind task identity, hidden results, hidden events, GM-only notes, or secret undiscovered region names.
-10. All of the above is short-circuited when `gatheringRegionSettings.enabled` is `false` (the default): the engine location choke point (`_locationBlockedReasons`) early-returns the ungated shape before any location-rule check, so every environment is available and the listing `location` field reports `{ gated: false, available: true, source: "unresolved", currentRegions: [], guidance: null }`. The same gate disables the start-attempt location guard.
+9. Availability evaluation must not leak hidden blind task identity, hidden results, hidden events, GM-only notes, or secret undiscovered realm names.
+10. All of the above is short-circuited when `gatheringRealmSettings.enabled` is `false` (the default): the engine location choke point (`_locationBlockedReasons`) early-returns the ungated shape before any location-rule check, so every environment is available and the listing `location` field reports `{ gated: false, available: true, source: "unresolved", currentRealms: [], guidance: null }`. The same gate disables the start-attempt location guard.
 
-### Region Disclosure and Travel Guidance
-
-#### Requirements
-
-1. Player-facing region labels are produced through a disclosure-safe model `{ id, label | labelKey, discovered, secret, placeholder }`. For a non-GM viewer, a secret undiscovered region resolves to `{ id: null, labelKey: <undiscovered placeholder>, placeholder: true }` and must not expose its id or name in visible text, `title`, `aria-label`, filter options, or DOM `data-*` attributes.
-2. Travel guidance for a blocked environment resolves to one of: `noCurrentRegion` (no current region resolved — ask the GM to set the party's current region), `excluded` (an explicit exclusion applies), or `travel` (inclusion-gated, not matched). Known destinations are disclosed safely; secret/undiscovered destinations are summarized as a count, never named.
-3. The viewer-facing current-region summary returns raw `regionIds`/`staleRegionIds` only to GM viewers.
-
-### Actor Region Discovery
-
-Region discovery is tracked on actor flags under the module flag namespace via the bare key `discoveredGatheringRegions`, with logical shape `{ [systemId]: { [regionId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } }` where `source` is one of `manual` | `partyToken` | `import` | `api`.
+### Realm Disclosure and Travel Guidance
 
 #### Requirements
 
-1. Discovery is actor-scoped so region knowledge follows the character across party changes.
-2. Discovery writes must validate that the region belongs to the referenced crafting system; reads never throw on stale `partyId` references.
+1. Player-facing realm labels are produced through a disclosure-safe model `{ id, label | labelKey, discovered, secret, placeholder }`. For a non-GM viewer, a secret undiscovered realm resolves to `{ id: null, labelKey: <undiscovered placeholder>, placeholder: true }` and must not expose its id or name in visible text, `title`, `aria-label`, filter options, or DOM `data-*` attributes.
+2. Travel guidance for a blocked environment resolves to one of: `noCurrentRealm` (no current realm resolved — ask the GM to set the party's current realm), `excluded` (an explicit exclusion applies), or `travel` (inclusion-gated, not matched). Known destinations are disclosed safely; secret/undiscovered destinations are summarized as a count, never named.
+3. The viewer-facing current-realm summary returns raw `realmIds`/`staleRealmIds` only to GM viewers.
+
+### Actor Realm Discovery
+
+Realm discovery is tracked on actor flags under the module flag namespace via the bare key `discoveredGatheringRealms`, with logical shape `{ [systemId]: { [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } }` where `source` is one of `manual` | `partyToken` | `import` | `api`. The `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are not renamed.
+
+#### Requirements
+
+1. Discovery is actor-scoped so realm knowledge follows the character across party changes.
+2. Discovery writes must validate that the realm belongs to the referenced crafting system; reads never throw on stale `partyId` references.
 3. GM reveal/hide mutators add or remove discovery entries. `partyToken` auto-discovery and player-facing discovery controls are later-phase follow-ups.
+4. Because this is an actor flag (not a world setting), it is not rewritten by the `1.1.0` migration runner: reads accept the legacy `discoveredGatheringRegions` flag as a fallback and writes persist only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
 
 ### Reserved Records (Not Yet Applied)
 
 ```js
-GatheringRegionSceneMapping = { id: string, sceneUuid: string, sceneRegionUuid: string } // Phase 3
-GatheringRegionModifier = {
+GatheringRealmSceneMapping = { id: string, sceneUuid: string, sceneRegionUuid: string } // Foundry bridge — member field names NOT renamed; Phase 3
+GatheringRealmModifier = {
   id: string, enabled: boolean,
   kind: "eventChance" | "dropRate" | "yield" | "difficulty" | "staminaCost" | "attemptLimit" | "custom",
   operation: "add" | "multiply" | "set" | "min" | "max",
@@ -320,7 +321,7 @@ GatheringRegionModifier = {
 } // Phase 4
 ```
 
-These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through region persistence and import/export, but Fabricate does not yet resolve Scene Region mappings (Phase 3) or apply region modifiers to listing/attempt calculations (Phase 4). When implemented, modifiers must adjust gathering behavior only and must not rewrite source environment, task, event, drop, or component records.
+These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export, but Fabricate does not yet resolve Scene Region mappings (Phase 3) or apply realm modifiers to listing/attempt calculations (Phase 4). When implemented, modifiers must adjust gathering behavior only and must not rewrite source environment, task, event, drop, or component records.
 
 ## System Gathering Rules
 
@@ -373,8 +374,8 @@ GatheringConditionConfig = {
     timeOfDay: string,
   },
   vocabularies: {
-    // NOTE: the legacy `regions` vocabulary dimension was removed — region is no
-    // longer a composition axis. Geography is the first-class `GatheringRegion`.
+    // NOTE: the legacy `regions` vocabulary dimension was removed — it is no
+    // longer a composition axis. Geography is the first-class `GatheringRealm`.
     biomes: string[],
     danger: string[],
     weather: string[],
@@ -400,7 +401,7 @@ ConditionOption = {
 ### Requirements
 
 1. Default weather is `"clear"` and default time of day is `"day"`.
-2. There is no region vocabulary (removed: region is not a composition axis). Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`, `desert`, `urban`, `ruins`, and `wasteland`.
+2. There is no region vocabulary (removed: geography is not a composition axis — it is the first-class `GatheringRealm`). Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`, `desert`, `urban`, `ruins`, and `wasteland`.
 3. Default danger levels are `safe`, `unsafe`, `hazardous`, `dangerous`, `deadly`, and `extreme`.
 4. Default weather tags are `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind`.
 5. Default time-of-day tags are `dawn`, `day`, `dusk`, and `night`.
@@ -474,7 +475,7 @@ GatheringTaskDefinition = {
 
 1. Gathering Tasks are scoped to one crafting system.
 2. Disabled Gathering Tasks never match for player gathering.
-3. Empty match tags mean "matches any" for that dimension. Region is NOT a match dimension — geography (`GatheringRegion`) is not a composition axis. A task no longer carries a `region`/`regions` match tag; any legacy value is stripped by migration and ignored on read.
+3. Empty match tags mean "matches any" for that dimension. Geography is NOT a match dimension — geography (`GatheringRealm`) is not a composition axis. A task no longer carries a `region`/`regions` match tag (the inert legacy tag name is kept verbatim); any legacy value is stripped by migration and ignored on read.
 4. Biomes match when omitted or at least one task biome is present on the environment.
 5. Weather and time of day are runtime availability gates, not environment composition match criteria. A task whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions remains composed by biome, but is not attemptable until the condition gate passes.
 6. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document. Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
@@ -605,7 +606,7 @@ GatheringEventDefinition = {
 
 1. Definitions are scoped to one crafting system.
 2. Disabled definitions never match for player gathering.
-3. Empty match tags mean "matches any" for that dimension. Region is NOT a match dimension (geography is not a composition axis); an event no longer carries a `region`/`regions` match tag and any legacy value is stripped by migration and ignored on read.
+3. Empty match tags mean "matches any" for that dimension. Geography is NOT a match dimension (geography — `GatheringRealm` — is not a composition axis); an event no longer carries a `region`/`regions` match tag (inert legacy tag name kept verbatim) and any legacy value is stripped by migration and ignored on read.
 4. Danger matches when omitted or when the event's danger tags are within the environment's canonical `dangerLevel` ceiling.
 5. Biome matching uses the same rules as Gathering Tasks.
 5a. Event `dangerTags` match against the environment's canonical `dangerLevel` ceiling, with environment `dangerTags` / `risk` used only as legacy fallback when `dangerLevel` is absent.
@@ -1073,7 +1074,7 @@ If Foundry is paused, Fabricate must reject new gathering attempts before run-st
 
 If `environment.sceneUuid` is set:
 
-1. Any user — **including GMs** — may only attempt gathering while viewing that scene. This presence gate is additive with the region/travel and stamina/node gates (which also apply to GMs); it is NOT one of the visibility/inspection restrictions GMs bypass.
+1. Any user — **including GMs** — may only attempt gathering while viewing that scene. This presence gate is additive with the realm/travel and stamina/node gates (which also apply to GMs); it is NOT one of the visibility/inspection restrictions GMs bypass.
 2. For a non-GM user the selected actor must be player-owned by the acting user.
 3. The selected actor must have at least one token present on the associated scene.
 4. If any of the above checks fail, the environment is not attemptable by that user.
@@ -1083,8 +1084,8 @@ If `environment.sceneUuid` is absent, the environment is not scene-gated by this
 ### GM Permissions
 
 - GMs may view and configure all environments and tasks.
-- GMs may bypass player-facing **visibility** restrictions (hidden tasks, secret region names, event tiers) for inspection, testing, and administration.
-- GMs are NOT exempt from **attemptability** gates: the scene/token presence requirement, region/travel availability, and stamina/node limits all apply to a GM attempting to gather, the same as for any player.
+- GMs may bypass player-facing **visibility** restrictions (hidden tasks, secret realm names, event tiers) for inspection, testing, and administration.
+- GMs are NOT exempt from **attemptability** gates: the scene/token presence requirement, realm/travel availability, and stamina/node limits all apply to a GM attempting to gather, the same as for any player.
 - Non-GM users may gather only with actors they own and only when all scene and visibility guards pass.
 - Gathering actor selectability is based on actor resolution and Foundry ownership/permission, not actor document type. Fabricate must not exclude Actor types such as `npc`, `group`, or `character` by type.
 
@@ -1114,7 +1115,7 @@ Define the redaction-safe per-environment fields the player listing API surfaces
 
 ### Requirements
 
-1. Each environment entry in a non-GM listing carries identity and player-facing metadata (name, description, image, biome(s), danger/risk, selection mode, scene linkage) plus `visible`, `attemptable`, and localized `blockedReasons`, in addition to the fields below. The inert legacy `region` string is NOT echoed to the player listing (the player-facing region pip and the actor-bar region surface were removed); player geography surfaces, when built, read resolved current regions, not `environment.region`.
+1. Each environment entry in a non-GM listing carries identity and player-facing metadata (name, description, image, biome(s), danger/risk, selection mode, scene linkage) plus `visible`, `attemptable`, and localized `blockedReasons`, in addition to the fields below. The inert legacy `region` free-text string is NOT echoed to the player listing (the player-facing geography pip was removed); player geography surfaces read resolved current realms, not the inert `environment.region`.
 2. `locked` (boolean) marks an entry that is a disabled-environment teaser. Disabled environments are surfaced as locked identity-only listings to all viewers in the player listing (players and GMs alike). A locked entry is `attemptable: false`, carries an `ENVIRONMENT_DISABLED` blocked reason, exposes no `tasks` and no composition internals (weights, drop data, hidden task identity), and is non-interactive for the player.
 3. `revealPolicy` is the **effective system-level** reveal policy (`never` | `onSuccess` | `onAttempt`) resolved from the system Gathering Rules. It is system-level only; environments never override it (see *System Gathering Rules* requirement 10).
 4. `composedTaskCount` is the size of the environment's total composed task pool — the denominator (`y`) for a blind `(x/y)` discovery display. It is a pool size and is distinct from any GM-runtime "available right now" count, which additionally excludes condition-blocked records. A locked entry reports `0`.
@@ -1395,7 +1396,7 @@ When world time advances to or past a run's `timeGate.availableAt`, the backend 
 1. Fabricate exposes documented APIs for listing rich gathering environments for an actor, starting a gathering attempt, inspecting GM-only environment state, manually restocking nodes, manually recharging attempt limits, manually setting stamina, and revealing or clearing blind-task discovery where permissions allow.
 2. Fabricate exposes `game.fabricate.gathering.getConditions()` for current global conditions and tag vocabularies.
 3. Fabricate exposes `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` for authorized GM/API callers.
-3a. Fabricate exposes location-aware gathering APIs: `getPartyStore()`, `getRegionStore()`, and `getLocationService()` (support seams); the player-callable `getLocationForActor({ actorId | actor, systemId })` returning a redaction-safe current-region summary; and the GM-only mutators `setPartyRegionOverride({ partyId, systemId, regionIds })`, `clearPartyRegionOverride({ partyId, systemId })`, `revealRegionForActor({ actor | actorId, systemId, regionId, source?, partyId? })`, and `hideRegionForActor({ actor | actorId, systemId, regionId })`. `getLocationForActor` returns raw region ids only to GM viewers and routes every region label through the disclosure-safe model. The GM mutators reject non-GM callers, and `revealRegionForActor` validates the region belongs to the referenced crafting system before writing.
+3a. Fabricate exposes location-aware gathering APIs: `getPartyStore()`, `getRealmStore()`, and `getLocationService()` (support seams); the player-callable `getLocationForActor({ actorId | actor, systemId })` returning a redaction-safe current-realm summary; and the GM-only mutators `setPartyRealmOverride({ partyId, systemId, realmIds })`, `clearPartyRealmOverride({ partyId, systemId })`, `revealRealmForActor({ actor | actorId, systemId, realmId, source?, partyId? })`, and `hideRealmForActor({ actor | actorId, systemId, realmId })`. The old `*Region*` helper names (`getRegionStore`, `setPartyRegionOverride`, `clearPartyRegionOverride`, `revealRegionForActor`, `hideRegionForActor`) are retained as deprecated delegates that warn once and forward. `getLocationForActor` returns raw realm ids only to GM viewers and routes every realm label through the disclosure-safe model. The GM mutators reject non-GM callers, and `revealRealmForActor` validates the realm belongs to the referenced crafting system before writing.
 4. Condition mutation APIs reject unauthorized player callers and invalid tags before persistence.
 5. Public player APIs enforce the same visibility, scene/access, blind redaction, stamina, node, attempt-limit, and provider-diagnostic secrecy rules as the UI.
 6. GM APIs may expose full diagnostic and hidden task state when called by an authorized GM context.
@@ -1549,7 +1550,7 @@ If a linked scene is deleted:
   - `targeted` requires an explicit task source unless automatic library composition can provide matching Gathering Tasks
   - `blind` allows multiple tasks and validates blind-selection/redaction configuration
 - Unit tests for default tag seeding and preservation of GM-customized tags
-- Unit tests for task/event composition matching by biome and danger (region is not a composition axis), plus runtime condition gating by global weather and global time of day
+- Unit tests for task/event composition matching by biome and danger (geography — `GatheringRealm` — is not a composition axis), plus runtime condition gating by global weather and global time of day
 - Unit tests proving weather/time do not appear as player environment browse filters
 - API tests for `getConditions`, `setWeather`, `setTimeOfDay`, `setConditions`, permission checks, validation, persistence, and hook dispatch
 - Unit tests for visibility-gate evaluation using `dnd5e`, `pf2e`, and macro providers

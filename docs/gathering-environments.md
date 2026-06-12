@@ -52,7 +52,7 @@ Each environment belongs to one crafting system and stores:
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
 {: .note }
-> **Biomes** and **Danger Level** above are the composition match tags — they decide which reusable tasks and events belong to the environment, not where players can gather. **Region is no longer a composition tag**: geography is the first-class `GatheringRegion`, and an environment declares membership in one or more regions through the editor's multi-region selector when the per-system **Enable Travel & Regions** toggle is on. Region membership and the optional location-availability rule fields (`includedRegionIds`, `excludedRegionIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only; see [Gathering Regions & Travel]({% link gathering-regions.md %}).
+> **Biomes** and **Danger Level** above are the composition match tags — they decide which reusable tasks and events belong to the environment, not where players can gather. **Geography is no longer a composition tag**: it is the first-class `GatheringRealm`, and an environment declares membership in one or more realms through the editor's multi-realm selector when the per-system **Enable Travel & Realms** toggle is on. Realm membership and the optional location-availability rule fields (`includedRealmIds`, `excludedRealmIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only; see [Gathering Realms & Travel]({% link gathering-realms.md %}).
 
 Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
 
@@ -73,7 +73,7 @@ game.fabricate.gathering.setConditions({ weather: "fog", timeOfDay: "dawn" });
 
 Mutation methods require a GM user, validate values against the configured weather and time-of-day vocabularies, persist the gathering config setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings. Player-facing code may call `getConditions()` but cannot mutate conditions.
 
-When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRegion` authored in the Travel tab (see [Gathering Regions & Travel]({% link gathering-regions.md %})). Empty task or event match tags mean "matches any" for that dimension.
+When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRealm` authored in the Travel tab (see [Gathering Realms & Travel]({% link gathering-realms.md %})). Empty task or event match tags mean "matches any" for that dimension.
 
 ## Gathering Rules
 
@@ -137,7 +137,7 @@ Library tools are **system-owned** — they persist as `system.tools[]` on the c
 
 Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
 
-Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only — region is not a composition axis. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or event belongs to the environment. GMs can toggle matched task and event records on or off per environment. Reusable event authoring is not part of this slice.
+Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only — geography (the `GatheringRealm`) is not a composition axis. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or event belongs to the environment. GMs can toggle matched task and event records on or off per environment. Reusable event authoring is not part of this slice.
 
 Gathering Task records support:
 

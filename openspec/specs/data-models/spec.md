@@ -133,8 +133,11 @@ CraftingSystem = {
   },
 
   // Present only when features.gathering is true. Per-system gathering geography.
-  gatheringRegions?: GatheringRegion[],          // default []
-  gatheringRegionSettings?: GatheringRegionSettings, // defaults: enabled false, revealMode "manual", modifierVisibility "visible"
+  // NOTE: a Gathering Realm is the Fabricate geography concept; it is distinct from a
+  // Foundry Scene Region (RegionDocument / Region Behaviour), which a realm maps to
+  // many-to-one through sceneMappings[].sceneRegionUuid.
+  gatheringRealms?: GatheringRealm[],          // default []; was gatheringRegions
+  gatheringRealmSettings?: GatheringRealmSettings, // defaults: enabled false, revealMode "manual", modifierVisibility "visible"
 }
 ```
 
@@ -155,7 +158,7 @@ CraftingSystem = {
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
 13. **`consumption.consumeCatalystsOnFail` is a legacy-named flag.** Following the Catalyst retirement, the persisted config key `consumption.consumeCatalystsOnFail` (on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`) was **retained by name** but now governs **Tool usage/breakage on a failed craft or salvage** (read it as "consume/break tools on fail"). It defaults to `false` (tools are not consumed/broken on failure unless enabled). The persisted key was deliberately **not** renamed because renaming a persisted setting key would require its own migration; the in-code semantics are tool-oriented while the wire key stays `consumeCatalystsOnFail`.
-14. When `features.gathering` is true, a crafting system may own a `gatheringRegions` library (default `[]`) and `gatheringRegionSettings`. `gatheringRegionSettings.enabled` (default `false`) gates the whole region/travel/availability subsystem; the records and behavior are inert until a GM opts in. Region is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed. The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; region membership is expressed through `includedRegionIds` (multiple `GatheringRegion` ids). A startup migration derives `GatheringRegion` records from the legacy per-system region vocabulary and maps `environment.region` → `includedRegionIds` (orphan free-text region strings are left inert). Region records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import). Record shapes and behavior are defined in `gathering-and-harvesting` (*Location-Aware Gathering*). Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (see *World Settings* below) and are excluded from system import/export.
+14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in. A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour). Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed. The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids). A startup migration derives `GatheringRealm` records from the legacy per-system region vocabulary and maps `environment.region` → `includedRealmIds` (orphan free-text region strings are left inert). Realm records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import). A Realm maps to Foundry Scene Regions many-to-one through `sceneMappings[].sceneRegionUuid`; those Foundry-bridge fields keep their `sceneRegionUuid`/`sceneUuid` names. Record shapes and behavior are defined in `gathering-and-harvesting` (*Location-Aware Gathering*). Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (see *World Settings* below) and are excluded from system import/export.
 
 ### Recipe Visibility Requirements
 
@@ -819,17 +822,17 @@ Requirements:
 2. `learnedAt` must be a valid timestamp.
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
 
-### Discovered Gathering Regions Flag
+### Discovered Gathering Realms Flag
 
 ```js
-Actor.flags.fabricate.discoveredGatheringRegions = {
+Actor.flags.fabricate.discoveredGatheringRealms = {        // was discoveredGatheringRegions
   [systemId: string]: {
-    [regionId: string]: {
+    [realmId: string]: {                                   // was regionId
       discoveredAt: number,
       source: "manual" | "partyToken" | "import" | "api",
       partyId?: string,
-      sceneUuid?: string,
-      sceneRegionUuid?: string,
+      sceneUuid?: string,        // Foundry bridge — NOT renamed
+      sceneRegionUuid?: string,  // Foundry bridge — NOT renamed
     },
   },
 }
@@ -837,11 +840,12 @@ Actor.flags.fabricate.discoveredGatheringRegions = {
 
 Requirements:
 
-1. The flag is actor-scoped and world-local so region knowledge follows the character across party changes.
-2. `systemId` must refer to the crafting system that owns the region; `regionId` must refer to a `GatheringRegion` in that system. Discovery writes validate this before persisting.
+1. The flag is actor-scoped and world-local so realm knowledge follows the character across party changes.
+2. `systemId` must refer to the crafting system that owns the realm; `realmId` must refer to a `GatheringRealm` in that system. Discovery writes validate this before persisting.
 3. `discoveredAt` must be a timestamp and `source` must be one of the listed values.
-4. Reads never throw on a stale `partyId`; missing or stale region ids must not disclose secret region names to non-GM users.
-5. Discovery semantics are defined in `gathering-and-harvesting` (*Actor Region Discovery*).
+4. Reads never throw on a stale `partyId`; missing or stale realm ids must not disclose secret realm names to non-GM users.
+5. Because this is an actor flag (not a world setting), it is **not** rewritten by the `1.1.0` migration runner. Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and every write persists only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
+6. Discovery semantics are defined in `gathering-and-harvesting` (*Actor Realm Discovery*).
 
 ## Item Flags
 

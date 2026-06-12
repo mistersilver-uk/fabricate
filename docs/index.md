@@ -68,7 +68,7 @@ Recipes, gathering tasks, and salvage all require reusable, breakable equipment 
 
 GMs can define material-gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the `gathering` feature.
 
-Gathering can also be location-aware: GMs describe campaign geography as regions, group actors into Fabricate-managed parties, and gate environments by the party's current region. See [Gathering Regions & Travel]({% link gathering-regions.md %}).
+Gathering can also be location-aware: GMs describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm. See [Gathering Realms & Travel]({% link gathering-realms.md %}).
 
 ## Canvas Interactables
 

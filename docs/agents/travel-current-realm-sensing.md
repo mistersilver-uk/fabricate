@@ -1,22 +1,32 @@
-# Travel: live current-region sensing
+# Travel: live current-realm sensing
 
-How a gathering **party's current Fabricate region** is determined, and the
+How a gathering **party's current Fabricate realm** is determined, and the
 Foundry V13 token-movement timing trap that makes the naive implementation report
-the region the marker *just left* (an off-by-one that cost three round-trips to
+the realm the marker *just left* (an off-by-one that cost three round-trips to
 diagnose). Touch any of the files below and re-read this first.
+
+> **Realm vs Foundry Scene Region.** A **Gathering Realm** is the Fabricate
+> geography concept. A **Foundry Scene Region** (`RegionDocument`) is the canvas
+> object the travel marker physically sits inside. The sensing layer below reads
+> Foundry Scene Regions (their `sceneRegionUuid`s) and maps them **many-to-one**
+> onto Fabricate realms via each realm's `sceneMappings[].sceneRegionUuid`. The
+> Foundry-named identifiers (`sceneRegionUuid`, `TokenDocument#regions`,
+> `senseSceneRegions`, `sceneRegionUuidsContainingToken`) are kept verbatim — only
+> the Fabricate-side "region" naming was renamed to "realm".
 
 ## Resolution model
 
-`GatheringLocationService.resolveCurrentRegions({ partyId, systemId })`
+`GatheringLocationService.resolveCurrentRealms({ partyId, systemId })`
 (`src/systems/GatheringLocationService.js`) resolves in this order:
 
-1. **Manual override** — `party.currentRegionOverrides[systemId].mode === 'manual'`
-   wins; the GM has pinned regions explicitly (`source: 'manualOverride'`).
-2. **Auto (travel-actor) sensing** — otherwise the current region is derived
+1. **Manual override** — `party.currentRealmOverrides[systemId].mode === 'manual'`
+   wins; the GM has pinned realms explicitly (`source: 'manualOverride'`).
+2. **Auto (travel-actor) sensing** — otherwise the current realm is derived
    **live** from where the party's travel-marker token (`party.travelActorUuid`)
-   currently sits: scene-region UUIDs the marker is inside → mapped to Fabricate
-   regions by each region's `sceneMappings[].sceneRegionUuid` (`source: 'travelActor'`).
-   No state is stored; it always reflects the marker's live position.
+   currently sits: the Foundry Scene-Region UUIDs the marker is inside → mapped to
+   Fabricate realms by each realm's `sceneMappings[].sceneRegionUuid`
+   (`source: 'travelActor'`). No state is stored; it always reflects the marker's
+   live position.
 
 The service stays Foundry-free and unit-testable: the `senseSceneRegions`
 collaborator (a `(travelActorUuid) => Iterable<sceneRegionUuid>`) is injected, and
@@ -24,13 +34,13 @@ defaults to `() => []`. The real implementation is wired in `src/main.js` where 
 service is constructed.
 
 Consumers need **no change** when the auto branch is involved — the engine's
-location gating (`GatheringEngine._resolveRegionContext` → `buildCurrentRegionContext`
+location gating (`GatheringEngine._resolveRealmContext` → `buildCurrentRealmContext`
 → `evaluateLocationAvailability` in `src/systems/gatheringLocation.js`) and the
-manager view-model already consume `{ resolved, regions, regionIds }` generically.
+manager view-model already consume `{ resolved, realms, realmIds }` generically.
 The manager's `adminStore` travel `buildState` resolves each party once via
-`resolveCurrentRegions` and buckets by region, so **auto-resolved** parties appear
-in region→party lists — do not read `currentRegionOverrides` directly for "parties
-in region", or auto parties vanish.
+`resolveCurrentRealms` and buckets by realm, so **auto-resolved** parties appear
+in realm→party lists — do not read `currentRealmOverrides` directly for "parties
+in realm", or auto parties vanish.
 
 ## The V13 token-movement off-by-one (read this twice)
 
@@ -43,13 +53,14 @@ Foundry V13 **animates** token movement. When a token moves:
   animation settles.
 
 So any containment test that reads the placeable centre *at the hook* resolves the
-**previous** region. Symptom: the first entry shows "no region", and each later move
-shows the region from the move before. This is deterministic, not flaky.
+**previous** Scene Region (and therefore the previous realm). Symptom: the first
+entry shows "no realm", and each later move shows the realm from the move before.
+This is deterministic, not flaky.
 
 Three independent mitigations are in place (use all of them; they reinforce):
 
 1. **Read Foundry's authoritative membership.** `senseSceneRegions` prefers
-   `TokenDocument#regions` (the set of regions Foundry itself tracks the token
+   `TokenDocument#regions` (the set of Scene Regions Foundry itself tracks the token
    inside — the same core system that drives interactable `tokenEnter`/`tokenExit`),
    falling back to position hit-testing only when it is unavailable.
 2. **Compute the centre from the DOCUMENT, not the placeable.**

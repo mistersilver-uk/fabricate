@@ -11,7 +11,7 @@ Library references — the environment composes content from `gatheringConfig.sy
 - `environment.forcedTaskIds[]` — task ids force-added in manual mode
 - `environment.enabledEventIds[]` / `disabledEventIds[]` / `forcedEventIds[]` — same shape for events
 
-The actual composed-task set is `enabled ∪ forced − disabled`, then filtered by environment matching rules (biome / region / danger / library-enabled).
+The actual composed-task set is `enabled ∪ forced − disabled`, then filtered by environment matching rules (biome / danger / library-enabled). Geography is NOT a composition axis — the first-class `GatheringRealm` only gates location availability, never composition.
 
 **Canonical GM-admin composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape: `{ availableTaskCount, availableEventCount }`), computed inside `adminStore.js` via `_buildEnvironmentCompositionViewModel(environment)?.counts` (`src/ui/svelte/stores/adminStore.js:2692`). `availableTaskCount` counts only records whose `runtimeState === 'available'` — i.e. composed **and** with current conditions met (`adminStore.js:2145`, `:2239`). It is the authoritative GM-runtime "ready right now" count for the manager surface; it is **not** what a player blind-reveal `(x/y)` suffix divides by.
 
