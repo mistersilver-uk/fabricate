@@ -70,9 +70,12 @@ describe('GatheringEventsBrowserView source contract', () => {
   });
 
   it('uses a four-column grid for the event table and a scrollable tags cell', () => {
-    const gridMatch = css.match(/--fab-mv2-gathering-event-grid:\s*([^;]+);/);
+    const gridMatch = css.match(/--fab-mv2-gathering-event-grid:([^;]+);/);
     assert.ok(gridMatch, 'event grid CSS variable should be defined');
-    const columns = gridMatch[1].split(/\s+(?![^()]*\))/).filter(Boolean);
+    // Mask parenthesized groups (e.g. minmax(0, 1fr)) before splitting on
+    // whitespace so each top-level column counts once. Bounded negated classes
+    // keep both regexes linear (no catastrophic backtracking).
+    const columns = gridMatch[1].replace(/\([^)]*\)/g, 'X').split(/\s+/).filter(Boolean);
     assert.equal(columns.length, 4, 'expected four grid columns (identity, tags, status, actions)');
 
     const tagsBlock = css.match(/\.manager-gathering-event-tags-cell\s*\{[^}]*\}/);
@@ -146,9 +149,9 @@ describe('GatheringEventsBrowserView source contract', () => {
   });
 
   it('shows usage tiles as squares in a three-column grid (shared with the task card)', () => {
-    const gridBlock = css.match(/\.manager-task-environment-usage-grid,[\s\S]*?\{[^}]*\}/);
+    const gridBlock = css.match(/\.manager-task-environment-usage-grid,[^{]*\{[^}]*\}/);
     assert.ok(gridBlock && /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/.test(gridBlock[0]), 'usage grid should be three equal columns');
-    const thumbBlock = css.match(/\.manager-task-environment-usage-thumb,[\s\S]*?\{[^}]*\}/);
+    const thumbBlock = css.match(/\.manager-task-environment-usage-thumb,[^{]*\{[^}]*\}/);
     assert.ok(thumbBlock && /aspect-ratio:\s*1\s*\/\s*1/.test(thumbBlock[0]), 'usage thumbnails should be square');
   });
 });

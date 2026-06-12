@@ -191,39 +191,29 @@ test('does not mutate its inputs (deep-clones)', () => {
 // Through the runner
 // ---------------------------------------------------------------------------
 
-function makeSettings(initial = {}) {
-  const store = new Map(Object.entries({
-    recipes: [],
-    craftingSystems: [],
-    gatheringConfig: {},
-    gatheringEnvironments: [],
-    migrationVersion: '0.0.0',
-    ...initial
-  }));
-  const calls = { set: [] };
-  const getSetting = key => store.get(key) ?? null;
-  const setSetting = async (key, value) => { calls.set.push({ key, value }); store.set(key, value); return value; };
-  return { store, calls, getSetting, setSetting };
-}
-
 test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at 1.0.0', async () => {
   const data = legacyData();
-  const settings = makeSettings({
-    migrationVersion: '0.9.0', // only the 1.0.0 migration is pending
-    craftingSystems: clone(data.systems),
-    gatheringConfig: clone(data.gatheringConfig),
-    gatheringEnvironments: clone(data.environments)
+  // Minimal in-memory settings backing the runner; migrationVersion 0.9.0 leaves
+  // only the 1.0.0 migration pending.
+  const store = new Map([
+    ['migrationVersion', '0.9.0'],
+    ['craftingSystems', clone(data.systems)],
+    ['gatheringConfig', clone(data.gatheringConfig)],
+    ['gatheringEnvironments', clone(data.environments)]
+  ]);
+  const runner = new MigrationRunner({
+    getSetting: key => store.get(key) ?? null,
+    setSetting: async (key, value) => { store.set(key, value); }
   });
-  const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.0.0', 'advances to the new highest version');
-  const sys = settings.store.get('gatheringConfig').systems['sys-a'];
+  assert.equal(store.get('migrationVersion'), '1.0.0', 'advances to the new highest version');
+  const sys = store.get('gatheringConfig').systems['sys-a'];
   assert.ok(Array.isArray(sys.events), 'persisted gatheringConfig was rewritten to events');
   assert.equal(sys.rules.eventPolicy, 'failureWithEvent');
-  assert.deepEqual(settings.store.get('gatheringEnvironments')[0].enabledEventIds, ['h1']);
-  assert.equal(settings.store.get('craftingSystems')[0].gatheringRegions[0].modifiers[0].kind, 'eventChance');
+  assert.deepEqual(store.get('gatheringEnvironments')[0].enabledEventIds, ['h1']);
+  assert.equal(store.get('craftingSystems')[0].gatheringRegions[0].modifiers[0].kind, 'eventChance');
 });
 
 // ---------------------------------------------------------------------------
