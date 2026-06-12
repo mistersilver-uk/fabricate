@@ -52,7 +52,7 @@ export function createEventSceneTrigger({ isGM, emitPrompt, showPrompt } = {}) {
           emitPrompt?.(entry);
         }
       }
-    }
+    },
   };
 }
 
@@ -66,7 +66,10 @@ export function createEventSceneTrigger({ isGM, emitPrompt, showPrompt } = {}) {
  * @param {(entry: { sceneUuid: string, eventName: string }) => void} deps.showPrompt
  * @param {(sceneUuid: string) => void} deps.viewSceneForSelf
  */
-export function routeEventSceneSocketMessage(payload, { currentUserId, isActiveGM, showPrompt, viewSceneForSelf } = {}) {
+export function routeEventSceneSocketMessage(
+  payload,
+  { currentUserId, isActiveGM, showPrompt, viewSceneForSelf } = {}
+) {
   if (!payload || typeof payload !== 'object') return;
   if (payload.action === 'eventScenePrompt') {
     if (typeof isActiveGM === 'function' && !isActiveGM()) return;
@@ -74,7 +77,7 @@ export function routeEventSceneSocketMessage(payload, { currentUserId, isActiveG
     return;
   }
   if (payload.action === 'pullToScene') {
-    const userIds = Array.isArray(payload.userIds) ? payload.userIds.map(id => String(id)) : [];
+    const userIds = Array.isArray(payload.userIds) ? payload.userIds.map(String) : [];
     const me = typeof currentUserId === 'function' ? String(currentUserId() || '') : '';
     if (me && userIds.includes(me)) {
       viewSceneForSelf?.(payload.sceneUuid);

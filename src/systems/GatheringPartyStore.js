@@ -1,4 +1,8 @@
-import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
+import {
+  getSetting as defaultGetSetting,
+  setSetting as defaultSetSetting,
+  SETTING_KEYS,
+} from '../config/settings.js';
 
 const OVERRIDE_MODES = new Set(['none', 'manual']);
 
@@ -34,7 +38,7 @@ export class GatheringPartyStore {
     setSetting = defaultSetSetting,
     randomID = null,
     getUserId = null,
-    now = null
+    now = null,
   } = {}) {
     this.getSetting = getSetting;
     this.setSetting = setSetting;
@@ -63,7 +67,7 @@ export class GatheringPartyStore {
 
   get(partyId) {
     this._ensureLoaded();
-    const party = this.parties.find(p => p.id === partyId);
+    const party = this.parties.find((p) => p.id === partyId);
     return party ? cloneJson(party) : null;
   }
 
@@ -78,8 +82,9 @@ export class GatheringPartyStore {
     this._ensureLoaded();
     const uuid = stringOrEmpty(actorUuid);
     if (!uuid) return null;
-    const party = this.parties.find(p => p.enabled === true
-      && (p.travelActorUuid === uuid || p.memberActorUuids.includes(uuid)));
+    const party = this.parties.find(
+      (p) => p.enabled === true && (p.travelActorUuid === uuid || p.memberActorUuids.includes(uuid))
+    );
     return party ? cloneJson(party) : null;
   }
 
@@ -91,30 +96,30 @@ export class GatheringPartyStore {
   }
 
   async update(partyId, patch = {}) {
-    return this._mutateParty(partyId, party => ({ ...party, ...cloneJson(patch), id: partyId }));
+    return this._mutateParty(partyId, (party) => ({ ...party, ...cloneJson(patch), id: partyId }));
   }
 
   async delete(partyId) {
     this._ensureLoaded();
-    const exists = this.parties.some(p => p.id === partyId);
+    const exists = this.parties.some((p) => p.id === partyId);
     if (!exists) return false;
-    await this._persist(this.parties.filter(p => p.id !== partyId));
+    await this._persist(this.parties.filter((p) => p.id !== partyId));
     return true;
   }
 
   async addMember(partyId, actorUuid) {
     const uuid = stringOrEmpty(actorUuid);
-    return this._mutateParty(partyId, party => ({
+    return this._mutateParty(partyId, (party) => ({
       ...party,
-      memberActorUuids: Array.from(new Set([...party.memberActorUuids, uuid].filter(Boolean)))
+      memberActorUuids: [...new Set([...party.memberActorUuids, uuid].filter(Boolean))],
     }));
   }
 
   async removeMember(partyId, actorUuid) {
     const uuid = stringOrEmpty(actorUuid);
-    return this._mutateParty(partyId, party => ({
+    return this._mutateParty(partyId, (party) => ({
       ...party,
-      memberActorUuids: party.memberActorUuids.filter(member => member !== uuid)
+      memberActorUuids: party.memberActorUuids.filter((member) => member !== uuid),
     }));
   }
 
@@ -130,12 +135,18 @@ export class GatheringPartyStore {
   async moveMember(fromPartyId, toPartyId, actorUuid) {
     this._ensureLoaded();
     const uuid = stringOrEmpty(actorUuid);
-    const next = this.parties.map(party => {
+    const next = this.parties.map((party) => {
       if (party.id === fromPartyId) {
-        return { ...party, memberActorUuids: party.memberActorUuids.filter(member => member !== uuid) };
+        return {
+          ...party,
+          memberActorUuids: party.memberActorUuids.filter((member) => member !== uuid),
+        };
       }
       if (party.id === toPartyId) {
-        return { ...party, memberActorUuids: Array.from(new Set([...party.memberActorUuids, uuid].filter(Boolean))) };
+        return {
+          ...party,
+          memberActorUuids: [...new Set([...party.memberActorUuids, uuid].filter(Boolean))],
+        };
       }
       return party;
     });
@@ -145,17 +156,17 @@ export class GatheringPartyStore {
 
   async setTravelActor(partyId, actorUuid) {
     const uuid = optionalString(actorUuid);
-    return this._mutateParty(partyId, party => ({ ...party, travelActorUuid: uuid }));
+    return this._mutateParty(partyId, (party) => ({ ...party, travelActorUuid: uuid }));
   }
 
   async setEnabled(partyId, enabled) {
-    return this._mutateParty(partyId, party => ({ ...party, enabled: enabled === true }));
+    return this._mutateParty(partyId, (party) => ({ ...party, enabled: enabled === true }));
   }
 
   async setCurrentRealmOverride(partyId, systemId, realmIds = []) {
     const sysId = stringOrEmpty(systemId);
     const ids = normalizeIdList(realmIds);
-    return this._mutateParty(partyId, party => ({
+    return this._mutateParty(partyId, (party) => ({
       ...party,
       currentRealmOverrides: {
         ...party.currentRealmOverrides,
@@ -163,15 +174,15 @@ export class GatheringPartyStore {
           mode: 'manual',
           realmIds: ids,
           updatedAt: this.now(),
-          updatedByUserId: stringOrEmpty(this.getUserId())
-        }
-      }
+          updatedByUserId: stringOrEmpty(this.getUserId()),
+        },
+      },
     }));
   }
 
   async clearCurrentRealmOverride(partyId, systemId) {
     const sysId = stringOrEmpty(systemId);
-    return this._mutateParty(partyId, party => ({
+    return this._mutateParty(partyId, (party) => ({
       ...party,
       currentRealmOverrides: {
         ...party.currentRealmOverrides,
@@ -179,16 +190,16 @@ export class GatheringPartyStore {
           mode: 'none',
           realmIds: [],
           updatedAt: this.now(),
-          updatedByUserId: stringOrEmpty(this.getUserId())
-        }
-      }
+          updatedByUserId: stringOrEmpty(this.getUserId()),
+        },
+      },
     }));
   }
 
   async _mutateParty(partyId, transform) {
     this._ensureLoaded();
-    const index = this.parties.findIndex(p => p.id === partyId);
-    if (index < 0) return null;
+    const index = this.parties.findIndex((p) => p.id === partyId);
+    if (index === -1) return null;
     const nextParty = this._normalizeParty(transform(cloneJson(this.parties[index])));
     await this._persist(replaceAt(this.parties, index, nextParty));
     return this.get(partyId);
@@ -234,7 +245,9 @@ export class GatheringPartyStore {
       enabled: data?.enabled === true,
       memberActorUuids: normalizeIdList(data?.memberActorUuids),
       travelActorUuid: optionalString(data?.travelActorUuid),
-      currentRealmOverrides: normalizeOverrides(data?.currentRealmOverrides ?? data?.currentRegionOverrides)
+      currentRealmOverrides: normalizeOverrides(
+        data?.currentRealmOverrides ?? data?.currentRegionOverrides
+      ),
     };
   }
 
@@ -282,12 +295,14 @@ export class GatheringPartyStore {
     for (const party of parties) {
       for (const [systemId, override] of Object.entries(party.currentRealmOverrides)) {
         if (!OVERRIDE_MODES.has(override.mode)) {
-          errors.push(`Party "${party.name}" override for system "${systemId}" has invalid mode "${override.mode}"`);
+          errors.push(
+            `Party "${party.name}" override for system "${systemId}" has invalid mode "${override.mode}"`
+          );
         }
       }
     }
 
-    return Array.from(new Set(errors));
+    return [...new Set(errors)];
   }
 }
 
@@ -301,7 +316,7 @@ function normalizeOverrides(value) {
       mode: OVERRIDE_MODES.has(override.mode) ? override.mode : 'none',
       realmIds: normalizeIdList(override.realmIds ?? override.regionIds),
       updatedAt: Number.isFinite(Number(override.updatedAt)) ? Number(override.updatedAt) : 0,
-      updatedByUserId: stringOrEmpty(override.updatedByUserId)
+      updatedByUserId: stringOrEmpty(override.updatedByUserId),
     };
   }
   return result;
@@ -333,6 +348,6 @@ function trimmedOrDefault(value, fallback) {
 }
 
 function normalizeIdList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(entry => stringOrEmpty(entry)).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
 }

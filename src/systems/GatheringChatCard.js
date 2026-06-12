@@ -21,22 +21,22 @@ const CHAT_KEYS = Object.freeze({
   events: 'FABRICATE.Chat.GatherEvents',
   toolsBroken: 'FABRICATE.Chat.GatherToolsBroken',
   stamina: 'FABRICATE.Chat.GatherStamina',
-  nodes: 'FABRICATE.Chat.GatherNodes'
+  nodes: 'FABRICATE.Chat.GatherNodes',
 });
 
 // FontAwesome glyphs (Foundry bundles FA6) for the footer stat pills.
 const STAT_ICONS = Object.freeze({
   stamina: 'fas fa-bolt',
-  nodes: 'fas fa-mountain'
+  nodes: 'fas fa-mountain',
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */
 function esc(value) {
   return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
 /**
@@ -44,14 +44,12 @@ function esc(value) {
  * item. `quantity` is rendered as a `N×` prefix when present and > 1.
  */
 function renderItem({ name, img, quantity }, fallbackImg) {
-  const label = Number(quantity) > 1
-    ? `${Number(quantity)}× ${esc(name)}`
-    : esc(name);
+  const label = Number(quantity) > 1 ? `${Number(quantity)}× ${esc(name)}` : esc(name);
   return [
     '<li class="fabricate-gather-chat__item">',
     `<img class="fabricate-gather-chat__icon" src="${esc(img || fallbackImg)}" alt="" />`,
     `<span class="fabricate-gather-chat__label">${label}</span>`,
-    '</li>'
+    '</li>',
   ].join('');
 }
 
@@ -65,9 +63,9 @@ function renderSection({ heading, entries, fallbackImg, modifier }) {
     `<section class="${sectionClass}">`,
     `<div class="fabricate-gather-chat__heading">${esc(heading)}</div>`,
     '<ul class="fabricate-gather-chat__grid">',
-    ...entries.map(entry => renderItem(entry, fallbackImg)),
+    ...entries.map((entry) => renderItem(entry, fallbackImg)),
     '</ul>',
-    '</section>'
+    '</section>',
   ].join('');
 }
 
@@ -81,7 +79,7 @@ function renderStat(icon, label, value) {
     '<span class="fabricate-gather-chat__stat">',
     `<i class="fabricate-gather-chat__stat-icon ${esc(icon)}" aria-hidden="true"></i>`,
     `<span class="fabricate-gather-chat__stat-text">${esc(label)}: <span class="fabricate-gather-chat__stat-value">${esc(value)}</span></span>`,
-    '</span>'
+    '</span>',
   ].join('');
 }
 
@@ -115,30 +113,31 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
     renderSection({
       heading: loc(CHAT_KEYS.components),
       entries: model.components,
-      fallbackImg: COMPONENT_FALLBACK_IMG
+      fallbackImg: COMPONENT_FALLBACK_IMG,
     }),
     renderSection({
       heading: loc(CHAT_KEYS.events),
       entries: model.events,
       fallbackImg: EVENT_FALLBACK_IMG,
-      modifier: 'event'
+      modifier: 'event',
     }),
     renderSection({
       heading: loc(CHAT_KEYS.toolsBroken),
       entries: model.brokenTools,
       fallbackImg: COMPONENT_FALLBACK_IMG,
-      modifier: 'tools'
-    })
+      modifier: 'tools',
+    }),
   ].filter(Boolean);
 
   const stats = [
     renderStat(STAT_ICONS.stamina, loc(CHAT_KEYS.stamina), model.staminaSpent),
-    renderStat(STAT_ICONS.nodes, loc(CHAT_KEYS.nodes), model.nodesRemaining)
+    renderStat(STAT_ICONS.nodes, loc(CHAT_KEYS.nodes), model.nodesRemaining),
   ].filter(Boolean);
 
-  const footer = stats.length > 0
-    ? `<footer class="fabricate-gather-chat__footer">${stats.join('')}</footer>`
-    : '';
+  const footer =
+    stats.length > 0
+      ? `<footer class="fabricate-gather-chat__footer">${stats.join('')}</footer>`
+      : '';
 
   return [
     `<div class="fabricate-gather-chat fabricate-gather-chat--${stateModifier}">`,
@@ -148,6 +147,8 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
     '</header>',
     ...sections,
     footer,
-    '</div>'
-  ].filter(Boolean).join('');
+    '</div>',
+  ]
+    .filter(Boolean)
+    .join('');
 }

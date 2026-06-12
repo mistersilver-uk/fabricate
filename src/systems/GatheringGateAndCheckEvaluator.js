@@ -9,19 +9,22 @@ const SUCCESS_STATUSES = new Set(['success', 'succeeded', 'pass', 'passed']);
  * so this seam can stay independent from Foundry globals.
  */
 export class GatheringGateAndCheckEvaluator {
-  constructor({
-    runMacro = null,
-    evaluateExpression = null
-  } = {}) {
+  constructor({ runMacro = null, evaluateExpression = null } = {}) {
     this.runMacro = runMacro;
     this.evaluateExpression = evaluateExpression;
   }
 
-  async evaluateVisibility({ gate = null, actor = null, viewer = null, environment = null, task = null } = {}) {
+  async evaluateVisibility({
+    gate = null,
+    actor = null,
+    viewer = null,
+    environment = null,
+    task = null,
+  } = {}) {
     if (!gate) {
       return visibilityResult({
         visible: true,
-        reasonCode: 'NO_VISIBILITY_GATE'
+        reasonCode: 'NO_VISIBILITY_GATE',
       });
     }
 
@@ -38,7 +41,12 @@ export class GatheringGateAndCheckEvaluator {
     return this._evaluateSystemVisibility({ gate, actor, viewer, environment, task, provider });
   }
 
-  async evaluateRequirement({ requirement = null, actor = null, environment = null, task = null } = {}) {
+  async evaluateRequirement({
+    requirement = null,
+    actor = null,
+    environment = null,
+    task = null,
+  } = {}) {
     if (!requirement) {
       return requirementResult({ allowed: true, reasonCode: 'NO_REQUIREMENT' });
     }
@@ -76,10 +84,18 @@ export class GatheringGateAndCheckEvaluator {
 
   async _evaluateMacroVisibility({ gate, actor, viewer, environment, task }) {
     if (!gate?.macroUuid) {
-      return visibilityDiagnostic('Macro visibility gate requires macroUuid', 'macro', 'MISCONFIGURED_PROVIDER');
+      return visibilityDiagnostic(
+        'Macro visibility gate requires macroUuid',
+        'macro',
+        'MISCONFIGURED_PROVIDER'
+      );
     }
     if (typeof this.runMacro !== 'function') {
-      return visibilityDiagnostic('Macro execution dependency is not configured', 'macro', 'MISCONFIGURED_PROVIDER');
+      return visibilityDiagnostic(
+        'Macro execution dependency is not configured',
+        'macro',
+        'MISCONFIGURED_PROVIDER'
+      );
     }
 
     try {
@@ -89,32 +105,44 @@ export class GatheringGateAndCheckEvaluator {
         actor,
         viewer,
         environment,
-        task
+        task,
       });
       return normalizeMacroVisibility(raw, 'macro');
-    } catch (err) {
-      return visibilityDiagnostic(errorMessage(err, 'Macro visibility gate failed'), 'macro', 'PROVIDER_ERROR');
+    } catch (error) {
+      return visibilityDiagnostic(
+        errorMessage(error, 'Macro visibility gate failed'),
+        'macro',
+        'PROVIDER_ERROR'
+      );
     }
   }
 
   async _evaluateSystemVisibility({ gate, actor, viewer, environment, task, provider }) {
     if (!gate?.formula || !gate?.threshold) {
-      return visibilityDiagnostic(`${provider} visibility gate requires formula and threshold`, provider, 'MISCONFIGURED_PROVIDER');
+      return visibilityDiagnostic(
+        `${provider} visibility gate requires formula and threshold`,
+        provider,
+        'MISCONFIGURED_PROVIDER'
+      );
     }
     if (typeof this.evaluateExpression !== 'function') {
-      return visibilityDiagnostic('Expression evaluation dependency is not configured', provider, 'MISCONFIGURED_PROVIDER');
+      return visibilityDiagnostic(
+        'Expression evaluation dependency is not configured',
+        provider,
+        'MISCONFIGURED_PROVIDER'
+      );
     }
 
     try {
       const context = { provider, actor, viewer, environment, task };
       const value = await this._resolveExpression(gate.formula, {
         ...context,
-        kind: 'visibilityFormula'
+        kind: 'visibilityFormula',
       });
       const threshold = await this._resolveExpression(gate.threshold, {
         ...context,
         kind: 'visibilityThreshold',
-        formulaValue: value
+        formulaValue: value,
       });
       const comparison = compareVisibility(value, threshold);
       if (!comparison.valid) {
@@ -123,19 +151,31 @@ export class GatheringGateAndCheckEvaluator {
 
       return visibilityResult({
         visible: comparison.visible,
-        reasonCode: comparison.visible ? 'VISIBLE' : 'HIDDEN'
+        reasonCode: comparison.visible ? 'VISIBLE' : 'HIDDEN',
       });
-    } catch (err) {
-      return visibilityDiagnostic(errorMessage(err, `${provider} visibility gate failed`), provider, 'PROVIDER_ERROR');
+    } catch (error) {
+      return visibilityDiagnostic(
+        errorMessage(error, `${provider} visibility gate failed`),
+        provider,
+        'PROVIDER_ERROR'
+      );
     }
   }
 
   async _evaluateMacroRequirement({ requirement, actor, environment, task }) {
     if (!requirement?.macroUuid) {
-      return requirementDiagnostic('Macro tool requirement requires macroUuid', 'macro', 'MISCONFIGURED_PROVIDER');
+      return requirementDiagnostic(
+        'Macro tool requirement requires macroUuid',
+        'macro',
+        'MISCONFIGURED_PROVIDER'
+      );
     }
     if (typeof this.runMacro !== 'function') {
-      return requirementDiagnostic('Macro execution dependency is not configured', 'macro', 'MISCONFIGURED_PROVIDER');
+      return requirementDiagnostic(
+        'Macro execution dependency is not configured',
+        'macro',
+        'MISCONFIGURED_PROVIDER'
+      );
     }
 
     try {
@@ -144,20 +184,32 @@ export class GatheringGateAndCheckEvaluator {
         requirement,
         actor,
         environment,
-        task
+        task,
       });
       return normalizeMacroRequirement(raw, 'macro');
-    } catch (err) {
-      return requirementDiagnostic(errorMessage(err, 'Macro tool requirement failed'), 'macro', 'PROVIDER_ERROR');
+    } catch (error) {
+      return requirementDiagnostic(
+        errorMessage(error, 'Macro tool requirement failed'),
+        'macro',
+        'PROVIDER_ERROR'
+      );
     }
   }
 
   async _evaluateSystemRequirement({ requirement, actor, environment, task, provider }) {
     if (!requirement?.formula) {
-      return requirementDiagnostic(`${provider} tool requirement requires formula`, provider, 'MISCONFIGURED_PROVIDER');
+      return requirementDiagnostic(
+        `${provider} tool requirement requires formula`,
+        provider,
+        'MISCONFIGURED_PROVIDER'
+      );
     }
     if (typeof this.evaluateExpression !== 'function') {
-      return requirementDiagnostic('Expression evaluation dependency is not configured', provider, 'MISCONFIGURED_PROVIDER');
+      return requirementDiagnostic(
+        'Expression evaluation dependency is not configured',
+        provider,
+        'MISCONFIGURED_PROVIDER'
+      );
     }
 
     try {
@@ -166,21 +218,36 @@ export class GatheringGateAndCheckEvaluator {
         actor,
         environment,
         task,
-        kind: 'toolRequirement'
+        kind: 'toolRequirement',
       });
       const allowed = coerceTruthy(value);
-      return requirementResult({ allowed, reasonCode: allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED' });
-    } catch (err) {
-      return requirementDiagnostic(errorMessage(err, `${provider} tool requirement failed`), provider, 'PROVIDER_ERROR');
+      return requirementResult({
+        allowed,
+        reasonCode: allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED',
+      });
+    } catch (error) {
+      return requirementDiagnostic(
+        errorMessage(error, `${provider} tool requirement failed`),
+        provider,
+        'PROVIDER_ERROR'
+      );
     }
   }
 
   async _evaluateMacroCheck({ check, actor, environment, task }) {
     if (!check?.macroUuid) {
-      return checkDiagnostic('Macro gathering check requires macroUuid', 'MISCONFIGURED_PROVIDER', 'macro');
+      return checkDiagnostic(
+        'Macro gathering check requires macroUuid',
+        'MISCONFIGURED_PROVIDER',
+        'macro'
+      );
     }
     if (typeof this.runMacro !== 'function') {
-      return checkDiagnostic('Macro execution dependency is not configured', 'MISCONFIGURED_PROVIDER', 'macro');
+      return checkDiagnostic(
+        'Macro execution dependency is not configured',
+        'MISCONFIGURED_PROVIDER',
+        'macro'
+      );
     }
 
     try {
@@ -189,31 +256,47 @@ export class GatheringGateAndCheckEvaluator {
         check,
         actor,
         environment,
-        task
+        task,
       });
       return normalizeMacroCheck(raw, 'macro');
-    } catch (err) {
-      return checkDiagnostic(errorMessage(err, 'Macro gathering check failed'), 'PROVIDER_ERROR', 'macro');
+    } catch (error) {
+      return checkDiagnostic(
+        errorMessage(error, 'Macro gathering check failed'),
+        'PROVIDER_ERROR',
+        'macro'
+      );
     }
   }
 
   async _evaluateSystemCheck({ check, actor, environment, task, provider }) {
     if (!check?.formula) {
-      return checkDiagnostic(`${provider} gathering check requires formula`, 'MISCONFIGURED_PROVIDER', provider);
+      return checkDiagnostic(
+        `${provider} gathering check requires formula`,
+        'MISCONFIGURED_PROVIDER',
+        provider
+      );
     }
     if (typeof this.evaluateExpression !== 'function') {
-      return checkDiagnostic('Expression evaluation dependency is not configured', 'MISCONFIGURED_PROVIDER', provider);
+      return checkDiagnostic(
+        'Expression evaluation dependency is not configured',
+        'MISCONFIGURED_PROVIDER',
+        provider
+      );
     }
 
     try {
       const context = { provider, actor, environment, task };
       const value = await this._resolveExpression(check.formula, {
         ...context,
-        kind: 'checkFormula'
+        kind: 'checkFormula',
       });
       const numericValue = numericValueOf(value);
       if (numericValue === null) {
-        return checkDiagnostic(`${provider} gathering check formula must resolve to a number`, 'MALFORMED_RESULT', provider);
+        return checkDiagnostic(
+          `${provider} gathering check formula must resolve to a number`,
+          'MALFORMED_RESULT',
+          provider
+        );
       }
 
       if (!check.threshold) {
@@ -221,35 +304,41 @@ export class GatheringGateAndCheckEvaluator {
           success: null,
           status: null,
           value: numericValue,
-          reasonCode: 'CHECK_VALUE'
+          reasonCode: 'CHECK_VALUE',
         });
       }
 
       const threshold = await this._resolveExpression(check.threshold, {
         ...context,
         kind: 'checkThreshold',
-        formulaValue: numericValue
+        formulaValue: numericValue,
       });
       const comparison = compareCheck(numericValue, threshold);
       if (!comparison.valid) {
-        return checkDiagnostic(comparison.message, 'MALFORMED_RESULT', provider, { value: numericValue });
+        return checkDiagnostic(comparison.message, 'MALFORMED_RESULT', provider, {
+          value: numericValue,
+        });
       }
 
       return checkResult({
         success: comparison.success,
         status: comparison.success ? 'success' : 'failure',
         value: numericValue,
-        reasonCode: comparison.success ? 'CHECK_SUCCESS' : 'CHECK_FAILURE'
+        reasonCode: comparison.success ? 'CHECK_SUCCESS' : 'CHECK_FAILURE',
       });
-    } catch (err) {
-      return checkDiagnostic(errorMessage(err, `${provider} gathering check failed`), 'PROVIDER_ERROR', provider);
+    } catch (error) {
+      return checkDiagnostic(
+        errorMessage(error, `${provider} gathering check failed`),
+        'PROVIDER_ERROR',
+        provider
+      );
     }
   }
 
   async _resolveExpression(expression, context) {
     return this.evaluateExpression({
       expression,
-      ...context
+      ...context,
     });
   }
 
@@ -265,7 +354,7 @@ function normalizeMacroRequirement(raw, provider) {
   if (typeof raw === 'boolean') {
     return requirementResult({
       allowed: raw,
-      reasonCode: raw ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED'
+      reasonCode: raw ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED',
     });
   }
 
@@ -273,16 +362,20 @@ function normalizeMacroRequirement(raw, provider) {
     return requirementResult({
       allowed: raw.allowed,
       description: stringOrEmpty(raw.description),
-      reasonCode: raw.allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED'
+      reasonCode: raw.allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED',
     });
   }
 
-  return requirementDiagnostic('Macro tool requirement must return a boolean or { allowed, description }', provider, 'MALFORMED_RESULT');
+  return requirementDiagnostic(
+    'Macro tool requirement must return a boolean or { allowed, description }',
+    provider,
+    'MALFORMED_RESULT'
+  );
 }
 
 function coerceTruthy(value) {
   if (typeof value === 'boolean') return value;
-  if (value === null || value === undefined || value === '') return false;
+  if (value == null || value === '') return false;
   if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -298,7 +391,7 @@ function normalizeMacroVisibility(raw, provider) {
   if (typeof raw === 'boolean') {
     return visibilityResult({
       visible: raw,
-      reasonCode: raw ? 'VISIBLE' : 'HIDDEN'
+      reasonCode: raw ? 'VISIBLE' : 'HIDDEN',
     });
   }
 
@@ -306,39 +399,67 @@ function normalizeMacroVisibility(raw, provider) {
     return visibilityResult({
       visible: raw.visible,
       description: stringOrEmpty(raw.description),
-      reasonCode: raw.visible ? 'VISIBLE' : 'HIDDEN'
+      reasonCode: raw.visible ? 'VISIBLE' : 'HIDDEN',
     });
   }
 
-  return visibilityDiagnostic('Macro visibility gate must return a boolean or { visible, description }', provider, 'MALFORMED_RESULT');
+  return visibilityDiagnostic(
+    'Macro visibility gate must return a boolean or { visible, description }',
+    provider,
+    'MALFORMED_RESULT'
+  );
 }
 
 function normalizeMacroCheck(raw, provider) {
   if (typeof raw === 'number') {
-    return checkDiagnostic('Macro gathering check must return an object with numeric value', 'MALFORMED_RESULT', provider, {
-      value: Number.isFinite(raw) ? raw : null
-    });
+    return checkDiagnostic(
+      'Macro gathering check must return an object with numeric value',
+      'MALFORMED_RESULT',
+      provider,
+      {
+        value: Number.isFinite(raw) ? raw : null,
+      }
+    );
   }
 
   if (!raw || typeof raw !== 'object') {
-    return checkDiagnostic('Macro gathering check must return an object with numeric value', 'MALFORMED_RESULT', provider);
+    return checkDiagnostic(
+      'Macro gathering check must return an object with numeric value',
+      'MALFORMED_RESULT',
+      provider
+    );
   }
 
   const value = numericValueOf(raw.value);
   if (value === null) {
-    return checkDiagnostic('Macro gathering check object requires numeric value', 'MALFORMED_RESULT', provider);
+    return checkDiagnostic(
+      'Macro gathering check object requires numeric value',
+      'MALFORMED_RESULT',
+      provider
+    );
   }
 
   const status = normalizeCheckStatus(raw.status);
   const successHint = normalizeSuccessHint(raw.success);
   if (status === undefined || successHint === undefined) {
-    return checkDiagnostic('Macro gathering check status must be success or failure when provided', 'MALFORMED_RESULT', provider, { value });
+    return checkDiagnostic(
+      'Macro gathering check status must be success or failure when provided',
+      'MALFORMED_RESULT',
+      provider,
+      { value }
+    );
   }
   if (status !== null && successHint !== null && (status === 'success') !== successHint) {
-    return checkDiagnostic('Macro gathering check status conflicts with success hint', 'MALFORMED_RESULT', provider, { value });
+    return checkDiagnostic(
+      'Macro gathering check status conflicts with success hint',
+      'MALFORMED_RESULT',
+      provider,
+      { value }
+    );
   }
 
-  const resolvedStatus = status ?? (successHint === null ? null : (successHint ? 'success' : 'failure'));
+  const resolvedStatus =
+    status ?? (successHint === null ? null : successHint ? 'success' : 'failure');
   if (!resolvedStatus) {
     return checkResult({
       success: null,
@@ -346,7 +467,7 @@ function normalizeMacroCheck(raw, provider) {
       value,
       description: stringOrEmpty(raw.description),
       data: plainObject(raw.data),
-      reasonCode: 'CHECK_VALUE'
+      reasonCode: 'CHECK_VALUE',
     });
   }
 
@@ -356,7 +477,7 @@ function normalizeMacroCheck(raw, provider) {
     value,
     description: stringOrEmpty(raw.description),
     data: plainObject(raw.data),
-    reasonCode: resolvedStatus === 'failure' ? 'CHECK_FAILURE' : 'CHECK_SUCCESS'
+    reasonCode: resolvedStatus === 'failure' ? 'CHECK_FAILURE' : 'CHECK_SUCCESS',
   });
 }
 
@@ -370,13 +491,14 @@ function compareVisibility(value, threshold) {
   if (numericValue === null || numericThreshold === null) {
     return {
       valid: false,
-      message: 'Visibility formula and numeric threshold must resolve to numbers, or threshold must resolve to boolean'
+      message:
+        'Visibility formula and numeric threshold must resolve to numbers, or threshold must resolve to boolean',
     };
   }
 
   return {
     valid: true,
-    visible: numericValue >= numericThreshold
+    visible: numericValue >= numericThreshold,
   };
 }
 
@@ -389,44 +511,39 @@ function compareCheck(value, threshold) {
   if (numericThreshold === null) {
     return {
       valid: false,
-      message: 'Gathering check threshold must resolve to a number or boolean'
+      message: 'Gathering check threshold must resolve to a number or boolean',
     };
   }
 
   return {
     valid: true,
-    success: value >= numericThreshold
+    success: value >= numericThreshold,
   };
 }
 
 function normalizeCheckStatus(status) {
-  if (status === undefined || status === null || status === '') {
+  if (status == null || status === '') {
     return null;
   }
 
   const normalized = String(status).trim().toLowerCase();
   if (SUCCESS_STATUSES.has(normalized)) return 'success';
   if (FAILURE_STATUSES.has(normalized)) return 'failure';
-  return undefined;
+  return;
 }
 
 function normalizeSuccessHint(success) {
-  if (success === undefined || success === null || success === '') return null;
+  if (success == null || success === '') return null;
   if (typeof success === 'boolean') return success;
-  return undefined;
+  return;
 }
 
-function visibilityResult({
-  visible,
-  description = '',
-  reasonCode,
-  diagnostic = null
-}) {
+function visibilityResult({ visible, description = '', reasonCode, diagnostic = null }) {
   return {
     visible: visible === true,
     description: stringOrEmpty(description),
     reasonCode,
-    diagnostic
+    diagnostic,
   };
 }
 
@@ -437,7 +554,7 @@ function checkResult({
   description = '',
   data = {},
   reasonCode,
-  diagnostic = null
+  diagnostic = null,
 }) {
   return {
     success: success === null ? null : success === true,
@@ -446,7 +563,7 @@ function checkResult({
     description: stringOrEmpty(description),
     data: plainObject(data),
     reasonCode,
-    diagnostic
+    diagnostic,
   };
 }
 
@@ -455,7 +572,7 @@ function requirementResult({ allowed, description = '', reasonCode, diagnostic =
     allowed: allowed === true,
     description: stringOrEmpty(description),
     reasonCode,
-    diagnostic
+    diagnostic,
   };
 }
 
@@ -463,7 +580,7 @@ function requirementDiagnostic(message, provider, reasonCode = 'MISCONFIGURED_PR
   return requirementResult({
     allowed: false,
     reasonCode,
-    diagnostic: diagnostic(provider, message)
+    diagnostic: diagnostic(provider, message),
   });
 }
 
@@ -471,7 +588,7 @@ function visibilityDiagnostic(message, provider, reasonCode = 'MISCONFIGURED_PRO
   return visibilityResult({
     visible: false,
     reasonCode,
-    diagnostic: diagnostic(provider, message)
+    diagnostic: diagnostic(provider, message),
   });
 }
 
@@ -481,14 +598,14 @@ function checkDiagnostic(message, reasonCode, provider, extra = {}) {
     status: null,
     value: Object.hasOwn(extra, 'value') ? extra.value : null,
     reasonCode,
-    diagnostic: diagnostic(provider, message)
+    diagnostic: diagnostic(provider, message),
   });
 }
 
 function diagnostic(provider, message) {
   return {
     provider: provider || null,
-    message
+    message,
   };
 }
 

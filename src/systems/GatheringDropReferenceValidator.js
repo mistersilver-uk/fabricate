@@ -6,9 +6,11 @@ function componentList(systemOrComponents = null) {
 }
 
 function componentIds(systemOrComponents = null) {
-  return new Set(componentList(systemOrComponents)
-    .map(component => String(component?.id || '').trim())
-    .filter(Boolean));
+  return new Set(
+    componentList(systemOrComponents)
+      .map((component) => String(component?.id || '').trim())
+      .filter(Boolean)
+  );
 }
 
 function taskLabel(task = {}, index = 0) {
@@ -36,17 +38,17 @@ async function defaultAsyncUuidResolver(uuid) {
     if (typeof globalThis.fromUuidSync === 'function') {
       return globalThis.fromUuidSync(uuid) || null;
     }
-  } catch (_) {
+  } catch {
     return null;
   }
   return null;
 }
 
 function defaultSyncUuidResolver(uuid) {
-  if (!uuid || typeof globalThis.fromUuidSync !== 'function') return undefined;
+  if (!uuid || typeof globalThis.fromUuidSync !== 'function') return;
   try {
     return globalThis.fromUuidSync(uuid) || null;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -95,7 +97,7 @@ export async function validateGatheringDropReferences({
   resolveUuid = defaultAsyncUuidResolver,
   requireAtLeastOneEnabled = true,
   validateDisabledRows = true,
-  validateBasics = true
+  validateBasics = true,
 } = {}) {
   const ids = componentIds(system);
   const hasComponentContext = system !== null && system !== undefined;
@@ -105,7 +107,7 @@ export async function validateGatheringDropReferences({
   for (const [taskIndex, task] of normalizeTasks(tasks).entries()) {
     const rows = normalizeRows(task);
     const label = `${prefix}Task "${taskLabel(task, taskIndex)}"`;
-    if (requireAtLeastOneEnabled && !rows.some(row => row?.enabled !== false)) {
+    if (requireAtLeastOneEnabled && !rows.some((row) => row?.enabled !== false)) {
       errors.push(`${label} requires at least one drop row`);
     }
     for (const [rowIndex, row] of rows.entries()) {
@@ -148,7 +150,7 @@ export function validateGatheringDropReferencesSync({
   resolveUuid = defaultSyncUuidResolver,
   requireAtLeastOneEnabled = true,
   validateDisabledRows = true,
-  validateBasics = true
+  validateBasics = true,
 } = {}) {
   const ids = componentIds(system);
   const hasComponentContext = system !== null && system !== undefined;
@@ -158,7 +160,7 @@ export function validateGatheringDropReferencesSync({
   for (const [taskIndex, task] of normalizeTasks(tasks).entries()) {
     const rows = normalizeRows(task);
     const label = `${prefix}Task "${taskLabel(task, taskIndex)}"`;
-    if (requireAtLeastOneEnabled && !rows.some(row => row?.enabled !== false)) {
+    if (requireAtLeastOneEnabled && !rows.some((row) => row?.enabled !== false)) {
       errors.push(`${label} requires at least one drop row`);
     }
     for (const [rowIndex, row] of rows.entries()) {

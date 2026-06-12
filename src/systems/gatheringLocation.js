@@ -16,13 +16,23 @@
 export const UNDISCOVERED_PLACEHOLDER_KEY = 'FABRICATE.Gathering.Realm.UndiscoveredPlaceholder';
 
 function asIdList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(v => String(v ?? '').trim()).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map((v) => String(v ?? '').trim()).filter(Boolean))];
 }
 
 function asBiomeList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [
+    ...new Set(
+      values
+        .map((v) =>
+          String(v ?? '')
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    ),
+  ];
 }
 
 /**
@@ -34,10 +44,12 @@ function asBiomeList(value) {
  * @returns {boolean}
  */
 export function environmentHasLocationRules(env = {}) {
-  return asIdList(env?.includedRealmIds ?? env?.includedRegionIds).length > 0
-    || asIdList(env?.excludedRealmIds ?? env?.excludedRegionIds).length > 0
-    || asBiomeList(env?.includedBiomeIds).length > 0
-    || asBiomeList(env?.excludedBiomeIds).length > 0;
+  return (
+    asIdList(env?.includedRealmIds ?? env?.includedRegionIds).length > 0 ||
+    asIdList(env?.excludedRealmIds ?? env?.excludedRegionIds).length > 0 ||
+    asBiomeList(env?.includedBiomeIds).length > 0 ||
+    asBiomeList(env?.excludedBiomeIds).length > 0
+  );
 }
 
 /**
@@ -55,14 +67,21 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
   const includedBiomes = asBiomeList(env?.includedBiomeIds);
   const excludedBiomes = asBiomeList(env?.excludedBiomeIds);
 
-  const gated = includedRealms.length > 0
-    || excludedRealms.length > 0
-    || includedBiomes.length > 0
-    || excludedBiomes.length > 0;
+  const gated =
+    includedRealms.length > 0 ||
+    excludedRealms.length > 0 ||
+    includedBiomes.length > 0 ||
+    excludedBiomes.length > 0;
 
   // Rule 6: ungated environments are never location-blocked.
   if (!gated) {
-    return { available: true, gated: false, reasons: [], matchedRealmIds: [], excludedRealmIds: [] };
+    return {
+      available: true,
+      gated: false,
+      reasons: [],
+      matchedRealmIds: [],
+      excludedRealmIds: [],
+    };
   }
 
   const hasInclusions = includedRealms.length > 0 || includedBiomes.length > 0;
@@ -77,7 +96,7 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
         gated: true,
         reasons: ['NO_CURRENT_REALM'],
         matchedRealmIds: [],
-        excludedRealmIds: []
+        excludedRealmIds: [],
       };
     }
     // Exclusion-only or biome-exclusion-only with no current realm: available.
@@ -93,7 +112,7 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
       excludedHits.push(realm.id);
       continue;
     }
-    if (realmBiomes.some(biome => excludedBiomes.includes(biome))) {
+    if (realmBiomes.some((biome) => excludedBiomes.includes(biome))) {
       excludedHits.push(realm?.id);
     }
   }
@@ -103,7 +122,7 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
       gated: true,
       reasons: ['LOCATION_BLOCKED'],
       matchedRealmIds: [],
-      excludedRealmIds: Array.from(new Set(excludedHits.filter(Boolean)))
+      excludedRealmIds: [...new Set(excludedHits.filter(Boolean))],
     };
   }
 
@@ -117,7 +136,10 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
   const matched = [];
   for (const realm of realms) {
     const realmBiomes = asBiomeList(realm?.biomes);
-    if (includedRealms.includes(realm?.id) || realmBiomes.some(biome => includedBiomes.includes(biome))) {
+    if (
+      includedRealms.includes(realm?.id) ||
+      realmBiomes.some((biome) => includedBiomes.includes(biome))
+    ) {
       matched.push(realm.id);
     }
   }
@@ -126,8 +148,8 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
       available: true,
       gated: true,
       reasons: [],
-      matchedRealmIds: Array.from(new Set(matched)),
-      excludedRealmIds: []
+      matchedRealmIds: [...new Set(matched)],
+      excludedRealmIds: [],
     };
   }
 
@@ -137,7 +159,7 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
     gated: true,
     reasons: ['LOCATION_BLOCKED'],
     matchedRealmIds: [],
-    excludedRealmIds: []
+    excludedRealmIds: [],
   };
 }
 
@@ -153,21 +175,25 @@ export function evaluateLocationAvailability(env = {}, currentRealmContext = {})
  * @param {string} [options.revealMode] System reveal mode ('alwaysVisible' shows names).
  * @returns {GatheringRealmDisclosure}
  */
-export function buildRealmDisclosure(realm = {}, { isGM = false, discovered = false, revealMode = 'manual' } = {}) {
+export function buildRealmDisclosure(
+  realm = {},
+  { isGM = false, discovered = false, revealMode = 'manual' } = {}
+) {
   const id = realm?.id ? String(realm.id) : null;
   const secret = realm?.secret === true;
   const name = String(realm?.name ?? '');
 
   // GMs, non-secret realms, discovered realms, and alwaysVisible reveal mode
   // all disclose the real name/id.
-  const disclosed = isGM === true || !secret || discovered === true || revealMode === 'alwaysVisible';
+  const disclosed =
+    isGM === true || !secret || discovered === true || revealMode === 'alwaysVisible';
   if (disclosed) {
     return {
       id,
       label: name,
       discovered: discovered === true,
       secret,
-      placeholder: false
+      placeholder: false,
     };
   }
 
@@ -177,7 +203,7 @@ export function buildRealmDisclosure(realm = {}, { isGM = false, discovered = fa
     labelKey: UNDISCOVERED_PLACEHOLDER_KEY,
     discovered: false,
     secret: true,
-    placeholder: true
+    placeholder: true,
   };
 }
 
@@ -201,23 +227,25 @@ export function buildLocationSummaryForViewer({
   context = {},
   isGM = false,
   revealMode = 'manual',
-  discoveredRealmIds = new Set()
+  discoveredRealmIds = new Set(),
 } = {}) {
-  const discovered = discoveredRealmIds instanceof Set
-    ? discoveredRealmIds
-    : new Set(Array.isArray(discoveredRealmIds) ? discoveredRealmIds : []);
-  const realms = (Array.isArray(context?.realms) ? context.realms : [])
-    .map(realm => buildRealmDisclosure(realm, {
+  const discovered =
+    discoveredRealmIds instanceof Set
+      ? discoveredRealmIds
+      : new Set(Array.isArray(discoveredRealmIds) ? discoveredRealmIds : []);
+  const realms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
+    buildRealmDisclosure(realm, {
       isGM,
       discovered: discovered.has(realm?.id),
-      revealMode
-    }));
+      revealMode,
+    })
+  );
   return {
     resolved: context?.resolved === true,
     source: context?.source || 'unresolved',
     realms,
-    realmIds: isGM ? (Array.isArray(context?.realmIds) ? context.realmIds : []) : [],
-    staleRealmIds: isGM ? (Array.isArray(context?.staleRealmIds) ? context.staleRealmIds : []) : []
+    realmIds: isGM && Array.isArray(context?.realmIds) ? context.realmIds : [],
+    staleRealmIds: isGM && Array.isArray(context?.staleRealmIds) ? context.staleRealmIds : [],
   };
 }
 
@@ -241,15 +269,14 @@ export function buildTravelGuidance({
   availability = null,
   discoveredRealmIds = new Set(),
   isGM = false,
-  revealMode = 'manual'
+  revealMode = 'manual',
 } = {}) {
   const result = availability || evaluateLocationAvailability(environment, currentRealmContext);
-  const lookup = realmsById instanceof Map
-    ? realmsById
-    : new Map(Object.entries(realmsById || {}));
-  const discovered = discoveredRealmIds instanceof Set
-    ? discoveredRealmIds
-    : new Set(Array.isArray(discoveredRealmIds) ? discoveredRealmIds : []);
+  const lookup = realmsById instanceof Map ? realmsById : new Map(Object.entries(realmsById || {}));
+  const discovered =
+    discoveredRealmIds instanceof Set
+      ? discoveredRealmIds
+      : new Set(Array.isArray(discoveredRealmIds) ? discoveredRealmIds : []);
 
   // No current realm resolved (and the env is inclusion-gated) ⇒ ask the GM to
   // set the party's current realm. Distinct from an explicit exclusion.

@@ -1,10 +1,11 @@
-import { Recipe } from '../models/Recipe.js';
-import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
-import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
-import { accumulateItemEssences } from '../utils/essenceResolver.js';
-import { SignatureValidator } from './SignatureValidator.js';
+import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools } from '../gatheringToolRuntime.js';
+import { Recipe } from '../models/Recipe.js';
+import { accumulateItemEssences } from '../utils/essenceResolver.js';
+import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
+
+import { SignatureValidator } from './SignatureValidator.js';
 
 const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
@@ -51,7 +52,7 @@ export class RecipeManager {
    * Save all recipes to game settings
    */
   async save() {
-    const recipesArray = Array.from(this.recipes.values()).map(r => r.toJSON());
+    const recipesArray = [...this.recipes.values()].map((r) => r.toJSON());
     await setSetting(SETTING_KEYS.RECIPES, recipesArray);
   }
 
@@ -59,7 +60,7 @@ export class RecipeManager {
     globalThis.Hooks?.callAll?.('fabricate.recipesChanged', {
       action,
       recipes: this.getRecipes(),
-      ...details
+      ...details,
     });
   }
 
@@ -114,7 +115,7 @@ export class RecipeManager {
     const merged = {
       ...recipe.toJSON(),
       ...updates,
-      id: recipeId
+      id: recipeId,
     };
     const updatedRecipe = Recipe.fromJSON(merged);
     const validation = this._validateRecipeForCreateOrUpdate(updatedRecipe);
@@ -174,41 +175,40 @@ export class RecipeManager {
    * @returns {Recipe[]}
    */
   getRecipes(filters = {}) {
-    let recipes = Array.from(this.recipes.values());
+    let recipes = [...this.recipes.values()];
 
     // Filter by category
     if (filters.category) {
-      recipes = recipes.filter(r => r.category === filters.category);
+      recipes = recipes.filter((r) => r.category === filters.category);
     }
 
     // Filter by crafting system
     if (filters.craftingSystemId !== undefined) {
-      recipes = recipes.filter(r => r.craftingSystemId === filters.craftingSystemId);
+      recipes = recipes.filter((r) => r.craftingSystemId === filters.craftingSystemId);
     }
 
     // Filter by system
     if (filters.system) {
-      recipes = recipes.filter(r => (r.system || 'all') === 'all' || r.system === filters.system);
+      recipes = recipes.filter((r) => (r.system || 'all') === 'all' || r.system === filters.system);
     }
 
     // Filter by enabled status
     if (filters.enabled !== undefined) {
-      recipes = recipes.filter(r => r.enabled === filters.enabled);
+      recipes = recipes.filter((r) => r.enabled === filters.enabled);
     }
 
     // Filter by tags
     if (filters.tags && filters.tags.length > 0) {
-      recipes = recipes.filter(r =>
-        filters.tags.some(tag => (r.tags || []).includes(tag))
-      );
+      recipes = recipes.filter((r) => filters.tags.some((tag) => (r.tags || []).includes(tag)));
     }
 
     // Search by name
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      recipes = recipes.filter(r =>
-        r.name.toLowerCase().includes(searchLower) ||
-        r.description.toLowerCase().includes(searchLower)
+      recipes = recipes.filter(
+        (r) =>
+          r.name.toLowerCase().includes(searchLower) ||
+          r.description.toLowerCase().includes(searchLower)
       );
     }
 
@@ -221,15 +221,17 @@ export class RecipeManager {
    * @returns {Recipe[]}
    */
   getAvailableRecipes(componentSourceActors) {
-    if (!Array.isArray(componentSourceActors)) {
-      componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
-    }
+    const sourceActors = Array.isArray(componentSourceActors)
+      ? componentSourceActors
+      : componentSourceActors
+        ? [componentSourceActors]
+        : [];
 
     const recipes = this.getRecipes({ enabled: true });
     const available = [];
 
     for (const recipe of recipes) {
-      if (this.canCraft(componentSourceActors, recipe).canCraft) {
+      if (this.canCraft(sourceActors, recipe).canCraft) {
         available.push(recipe);
       }
     }
@@ -267,9 +269,11 @@ export class RecipeManager {
    * }}
    */
   evaluateCraftability(componentSourceActors, recipe, { presentTools = null } = {}) {
-    if (!Array.isArray(componentSourceActors)) {
-      componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
-    }
+    const sourceActors = Array.isArray(componentSourceActors)
+      ? componentSourceActors
+      : componentSourceActors
+        ? [componentSourceActors]
+        : [];
 
     const emptyResult = {
       canCraft: false,
@@ -277,10 +281,10 @@ export class RecipeManager {
       missing: { ingredients: [], essences: [], tools: [] },
       ingredientStates: [],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     };
 
-    if (componentSourceActors.length === 0) {
+    if (sourceActors.length === 0) {
       return emptyResult;
     }
 
@@ -290,9 +294,7 @@ export class RecipeManager {
     }
 
     // Aggregate all items from component source actors once.
-    const availableItems = componentSourceActors.flatMap(actor =>
-      Array.from(actor.items)
-    );
+    const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
 
     const features = this._getSystemFeatures(recipe);
 
@@ -304,15 +306,15 @@ export class RecipeManager {
 
     // Also keep the first-set selection for the "unsatisfied" display fallback.
     let firstSetSelection = null;
-    let firstSet = recipe.ingredientSets[0];
+    const firstSet = recipe.ingredientSets[0];
 
     for (const ingredientSet of recipe.ingredientSets) {
-      const selection = typeof ingredientSet.resolveIngredientSelection === 'function'
-        ? ingredientSet.resolveIngredientSelection(
-          availableItems,
-          (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item)
-        )
-        : { success: true, missingGroups: [], selectedIngredients: [], plan: [] };
+      const selection =
+        typeof ingredientSet.resolveIngredientSelection === 'function'
+          ? ingredientSet.resolveIngredientSelection(availableItems, (ingredient, item) =>
+              this.ingredientMatchesItem(recipe, ingredient, item)
+            )
+          : { success: true, missingGroups: [], selectedIngredients: [], plan: [] };
 
       // Track the first set's selection for the unsatisfied fallback display.
       if (firstSetSelection === null) {
@@ -359,28 +361,38 @@ export class RecipeManager {
     const displayIngredientSet = canCraft ? satisfiableSet : firstSet;
 
     const ingredientStates = this._buildIngredientStates(
-      recipe, displayIngredientSet, displaySelection, availableItems
+      recipe,
+      displayIngredientSet,
+      displaySelection,
+      availableItems
     );
 
     // Build essence states from the display set.
-    const essenceStates = this._buildEssenceStates(recipe, displayIngredientSet, availableItems, features);
+    const essenceStates = this._buildEssenceStates(
+      recipe,
+      displayIngredientSet,
+      availableItems,
+      features
+    );
 
     // Build the missing object (for backward compatibility with canCraft() callers).
     const missingIngredients = [];
-    for (const groupMissing of (displaySelection?.missingGroups || [])) {
+    for (const groupMissing of displaySelection?.missingGroups || []) {
       const ingredient = groupMissing?.ingredient || groupMissing?.group?.options?.[0] || null;
       if (!ingredient) continue;
       missingIngredients.push({
         ingredient,
         have: Number(groupMissing.have || 0),
-        need: Number(groupMissing.need || ingredient.quantity || 1)
+        need: Number(groupMissing.need || ingredient.quantity || 1),
       });
     }
-    const missingEssences = essenceStates.filter(s => !s.satisfied).map(s => ({
-      type: s.type,
-      have: s.have,
-      need: s.need
-    }));
+    const missingEssences = essenceStates
+      .filter((s) => !s.satisfied)
+      .map((s) => ({
+        type: s.type,
+        have: s.have,
+        need: s.need,
+      }));
 
     return {
       canCraft,
@@ -388,11 +400,11 @@ export class RecipeManager {
       missing: {
         ingredients: canCraft ? [] : missingIngredients,
         essences: canCraft ? [] : missingEssences,
-        tools: missingTools
+        tools: missingTools,
       },
       ingredientStates,
       essenceStates,
-      toolStates
+      toolStates,
     };
   }
 
@@ -420,17 +432,17 @@ export class RecipeManager {
       task: { id: recipe?.id ?? null, craftingSystemId: recipe?.craftingSystemId ?? null },
       tools,
       craftingSystemManager: { recipeManager: this },
-      presentTools
+      presentTools,
     });
     // Index by tool so the per-tool state can carry the virtual flag (a
     // virtual-present match has no owned item and must be excluded from
     // breakage/usage by the caller).
-    const matchedByTool = new Map(matched.items.map(entry => [entry.tool, entry]));
-    return tools.map(tool => {
+    const matchedByTool = new Map(matched.items.map((entry) => [entry.tool, entry]));
+    return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
       const state = {
         name: this.resolveComponentName(recipe, tool?.componentId || tool?.systemItemId),
-        available: entry !== null
+        available: entry !== null,
       };
       if (entry?.virtual === true) state.virtual = true;
       return state;
@@ -452,16 +464,17 @@ export class RecipeManager {
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
     if (!ingredientSet) return [];
 
-    const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
-      ? ingredientSet.ingredientGroups
-      : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+    const groups =
+      Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+        ? ingredientSet.ingredientGroups
+        : (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
 
     // Build a set of missing group IDs for O(1) lookup.
     const missingGroupIds = new Set(
-      (selection?.missingGroups || []).map(mg => mg?.group?.id).filter(Boolean)
+      (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
-    return groups.map(group => {
+    return groups.map((group) => {
       const options = group.options || [];
 
       // Check whether any option in this group is satisfied.
@@ -473,15 +486,18 @@ export class RecipeManager {
 
       if (isMissing) {
         // Find this group's missing data.
-        const missingEntry = (selection?.missingGroups || []).find(mg => mg?.group?.id === group.id);
+        const missingEntry = (selection?.missingGroups || []).find(
+          (mg) => mg?.group?.id === group.id
+        );
         const ingredient = missingEntry?.ingredient || options[0] || null;
-        const description = this._resolveIngredientDescription(recipe, ingredient)
-          || options.map(o => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
+        const description =
+          this._resolveIngredientDescription(recipe, ingredient) ||
+          options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
         return {
           description,
           need: Number(missingEntry?.need || ingredient?.quantity || 1),
           have: Number(missingEntry?.have || 0),
-          satisfied: false
+          satisfied: false,
         };
       }
 
@@ -493,8 +509,8 @@ export class RecipeManager {
       // To avoid positional assumptions we instead compute have/need for each option
       // using the availableItems (no remaining-quantity deduction here — we only need
       // display values, and the group is already known to be satisfied).
-      const optionStates = options.map(ing => {
-        const matchingItems = availableItems.filter(item =>
+      const optionStates = options.map((ing) => {
+        const matchingItems = availableItems.filter((item) =>
           this.ingredientMatchesItem(recipe, ing, item)
         );
         const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
@@ -502,16 +518,16 @@ export class RecipeManager {
           description: this._resolveIngredientDescription(recipe, ing) || '',
           need: ing.quantity,
           have: totalQty,
-          satisfied: totalQty >= ing.quantity
+          satisfied: totalQty >= ing.quantity,
         };
       });
 
-      const satisfiedOption = optionStates.find(s => s.satisfied) || optionStates[0];
+      const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
       return {
-        description: optionStates.map(s => s.description).join(' OR '),
+        description: optionStates.map((s) => s.description).join(' OR '),
         need: satisfiedOption?.need || 1,
         have: satisfiedOption?.have || 0,
-        satisfied: true
+        satisfied: true,
       };
     });
   }
@@ -570,19 +586,23 @@ export class RecipeManager {
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
   canCraft(componentSourceActors, recipe, { presentTools = null } = {}) {
-    if (!Array.isArray(componentSourceActors)) {
-      componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
-    }
+    const sourceActors = Array.isArray(componentSourceActors)
+      ? componentSourceActors
+      : componentSourceActors
+        ? [componentSourceActors]
+        : [];
 
-    if (componentSourceActors.length === 0) {
+    if (sourceActors.length === 0) {
       return {
         canCraft: false,
         satisfiableSet: null,
-        missing: { ingredients: [], essences: [], tools: [] }
+        missing: { ingredients: [], essences: [], tools: [] },
       };
     }
 
-    const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(componentSourceActors, recipe, { presentTools });
+    const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(sourceActors, recipe, {
+      presentTools,
+    });
     return { canCraft, satisfiableSet, missing };
   }
 
@@ -596,15 +616,15 @@ export class RecipeManager {
   _checkIngredientSet(recipe, ingredientSet, availableItems) {
     const missing = {
       ingredients: [],
-      essences: []
+      essences: [],
     };
     const features = this._getSystemFeatures(recipe);
-    const selection = typeof ingredientSet.resolveIngredientSelection === 'function'
-      ? ingredientSet.resolveIngredientSelection(
-        availableItems,
-        (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item)
-      )
-      : { success: true, missingGroups: [] };
+    const selection =
+      typeof ingredientSet.resolveIngredientSelection === 'function'
+        ? ingredientSet.resolveIngredientSelection(availableItems, (ingredient, item) =>
+            this.ingredientMatchesItem(recipe, ingredient, item)
+          )
+        : { success: true, missingGroups: [] };
 
     if (!selection.success) {
       for (const groupMissing of selection.missingGroups || []) {
@@ -613,7 +633,7 @@ export class RecipeManager {
         missing.ingredients.push({
           ingredient,
           have: Number(groupMissing.have || 0),
-          need: Number(groupMissing.need || ingredient.quantity || 1)
+          need: Number(groupMissing.need || ingredient.quantity || 1),
         });
       }
     }
@@ -628,7 +648,7 @@ export class RecipeManager {
           missing.essences.push({
             type: essenceType,
             have: availableQty,
-            need: requiredQty
+            need: requiredQty,
           });
         }
       }
@@ -651,7 +671,7 @@ export class RecipeManager {
   getToolsForSet(recipe, ingredientSet) {
     const ids = [
       ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
-      ...(Array.isArray(ingredientSet?.toolIds) ? ingredientSet.toolIds : [])
+      ...(Array.isArray(ingredientSet?.toolIds) ? ingredientSet.toolIds : []),
     ];
     const seen = new Set();
     const tools = [];
@@ -675,7 +695,7 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return (system.tools || []).find(tool => tool?.id === toolId) || null;
+    return (system.tools || []).find((tool) => tool?.id === toolId) || null;
   }
 
   /**
@@ -688,9 +708,10 @@ export class RecipeManager {
   ingredientMatchesItem(recipe, ingredient, item) {
     const features = this._getSystemFeatures(recipe);
     const match = ingredient.match || null;
-    const componentId = (match?.type === 'component' || match?.type === 'systemItem')
-      ? (match.componentId || match.systemItemId || null)
-      : (ingredient.componentId || ingredient.systemItemId || null);
+    const componentId =
+      match?.type === 'component' || match?.type === 'systemItem'
+        ? match.componentId || match.systemItemId || null
+        : ingredient.componentId || ingredient.systemItemId || null;
 
     if (componentId) {
       const managedItem = this._getComponent(recipe, componentId);
@@ -698,9 +719,10 @@ export class RecipeManager {
 
       if (itemMatchesComponentSource(item, managedItem)) return true;
 
-      const byName = !managedItem.sourceUuid && managedItem.name
-        ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
-        : false;
+      const byName =
+        !managedItem.sourceUuid && managedItem.name
+          ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
+          : false;
       if (!byName) return false;
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
@@ -726,7 +748,11 @@ export class RecipeManager {
     if (tool.componentId || tool.systemItemId) {
       const managedItem = this._getComponent(recipe, tool.componentId || tool.systemItemId);
       if (!managedItem) return false;
-      if (managedItem.sourceUuid || managedItem.sourceItemUuid || managedItem.fallbackItemIds?.length) {
+      if (
+        managedItem.sourceUuid ||
+        managedItem.sourceItemUuid ||
+        managedItem.fallbackItemIds?.length
+      ) {
         if (itemMatchesComponentSource(item, managedItem)) return true;
         return false;
       }
@@ -743,9 +769,10 @@ export class RecipeManager {
       if (!features.enableTags) return false;
       const requiredTags = Array.isArray(ingredient.match.tags) ? ingredient.match.tags : [];
       const itemTags = getFabricateFlag(item, 'tags', []);
-      const matched = ingredient.match.tagMatch === 'all'
-        ? requiredTags.every(tag => itemTags.includes(tag))
-        : requiredTags.some(tag => itemTags.includes(tag));
+      const matched =
+        ingredient.match.tagMatch === 'all'
+          ? requiredTags.every((tag) => itemTags.includes(tag))
+          : requiredTags.some((tag) => itemTags.includes(tag));
       if (!matched) return false;
       return true;
     }
@@ -758,7 +785,7 @@ export class RecipeManager {
     }
 
     if (Array.isArray(ingredient.alternatives) && ingredient.alternatives.length > 0) {
-      return ingredient.alternatives.some(alt => this._matchesIngredient(alt, item, features));
+      return ingredient.alternatives.some((alt) => this._matchesIngredient(alt, item, features));
     }
 
     return false;
@@ -774,7 +801,7 @@ export class RecipeManager {
     const features = system?.features || {};
     return {
       enableTags: !!system,
-      enableEssences: system?.advancedOptionsEnabled !== false && features.essences === true
+      enableEssences: system?.advancedOptionsEnabled !== false && features.essences === true,
     };
   }
 
@@ -788,7 +815,7 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return (system.components || []).find(item => item.id === componentId) || null;
+    return (system.components || []).find((item) => item.id === componentId) || null;
   }
 
   /**
@@ -801,10 +828,16 @@ export class RecipeManager {
    * @returns {string}
    */
   resolveComponentName(recipe, componentId) {
-    if (!componentId) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    if (!componentId)
+      return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
     const component = this._getComponent(recipe, componentId);
-    if (!component) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
-    return component.name || game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    if (!component)
+      return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    return (
+      component.name ||
+      game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') ||
+      'Unknown Component'
+    );
   }
 
   /**
@@ -816,9 +849,11 @@ export class RecipeManager {
    * @returns {Promise<string>}
    */
   async resolveComponentNameAsync(recipe, componentId) {
-    if (!componentId) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    if (!componentId)
+      return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
     const component = this._getComponent(recipe, componentId);
-    if (!component) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    if (!component)
+      return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
     if (component.sourceUuid && typeof fromUuid === 'function') {
       try {
         const item = await fromUuid(component.sourceUuid);
@@ -827,7 +862,11 @@ export class RecipeManager {
         // Broken reference — fall through to component.name
       }
     }
-    return component.name || game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    return (
+      component.name ||
+      game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') ||
+      'Unknown Component'
+    );
   }
 
   /**
@@ -892,7 +931,8 @@ export class RecipeManager {
 
     const systemManager = game?.fabricate?.getCraftingSystemManager?.();
     const recipeItemUuid = recipe?.recipeItemId
-      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)?.sourceItemUuid
+      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
+          ?.sourceItemUuid
       : null;
     const fallbackUuid = recipeItemUuid || recipe?.linkedRecipeItemUuid;
 
@@ -917,7 +957,7 @@ export class RecipeManager {
   _accumulateEssences(items, recipe = null) {
     return accumulateItemEssences(items, {
       components: this._getSystemComponents(recipe),
-      multiplyByQuantity: true
+      multiplyByQuantity: true,
     });
   }
 
@@ -974,15 +1014,11 @@ export class RecipeManager {
   exportRecipes(recipeIds = null) {
     this._assertGM('export recipes');
 
-    let recipes;
+    const recipes = recipeIds
+      ? recipeIds.map((id) => this.recipes.get(id)).filter(Boolean)
+      : [...this.recipes.values()];
 
-    if (recipeIds) {
-      recipes = recipeIds.map(id => this.recipes.get(id)).filter(r => r);
-    } else {
-      recipes = Array.from(this.recipes.values());
-    }
-
-    return recipes.map(r => r.toJSON());
+    return recipes.map((r) => r.toJSON());
   }
 
   /**
@@ -1006,7 +1042,7 @@ export class RecipeManager {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -1031,12 +1067,12 @@ export class RecipeManager {
         const system = systemManager.getSystem(id);
         if (!system) return [];
         return system.components || [];
-      }
+      },
     };
 
     const validator = new SignatureValidator(csm);
     const result = validator.validateRecipe(recipe, systemId);
-    const errors = result.conflicts.map(c => c.message);
+    const errors = result.conflicts.map((c) => c.message);
     return { valid: errors.length === 0, errors };
   }
 
@@ -1061,29 +1097,34 @@ export class RecipeManager {
 
     const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
-    const essencesEnabled = advancedEnabled && (features.essences === true || system.enableEssences === true);
+    const essencesEnabled =
+      advancedEnabled && (features.essences === true || system.enableEssences === true);
     if (!essencesEnabled) {
       return { valid: true, errors };
     }
 
     const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const validEssenceIds = new Set(definitions.map(def => def.id));
+    const validEssenceIds = new Set(definitions.map((def) => def.id));
 
     for (const set of recipe.ingredientSets || []) {
       for (const [essenceId, qty] of Object.entries(set.essences || {})) {
         if (!validEssenceIds.has(essenceId)) {
-          errors.push(`Ingredient set "${set.name || set.id}" references unknown essence "${essenceId}"`);
+          errors.push(
+            `Ingredient set "${set.name || set.id}" references unknown essence "${essenceId}"`
+          );
         }
         const num = Number(qty);
         if (!Number.isFinite(num) || num <= 0) {
-          errors.push(`Ingredient set "${set.name || set.id}" has invalid quantity for essence "${essenceId}"`);
+          errors.push(
+            `Ingredient set "${set.name || set.id}" has invalid quantity for essence "${essenceId}"`
+          );
         }
       }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -1108,19 +1149,23 @@ export class RecipeManager {
       return { valid: true, errors };
     }
 
-    const validTags = new Set([
-      ...((system.itemTags || []).map(tag => String(tag || '').trim())),
-      ...((system.tags || []).map(tag => String(tag || '').trim()))
-    ].filter(Boolean));
+    const validTags = new Set(
+      [
+        ...(system.itemTags || []).map((tag) => String(tag || '').trim()),
+        ...(system.tags || []).map((tag) => String(tag || '').trim()),
+      ].filter(Boolean)
+    );
 
-    const steps = typeof recipe.getExecutionSteps === 'function'
-      ? recipe.getExecutionSteps()
-      : [{ id: 'implicit', ingredientSets: recipe.ingredientSets || [] }];
+    const steps =
+      typeof recipe.getExecutionSteps === 'function'
+        ? recipe.getExecutionSteps()
+        : [{ id: 'implicit', ingredientSets: recipe.ingredientSets || [] }];
     for (const step of steps) {
       for (const ingredientSet of step.ingredientSets || []) {
-        const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
-          ? ingredientSet.ingredientGroups
-          : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+        const groups =
+          Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+            ? ingredientSet.ingredientGroups
+            : (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
 
         for (const group of groups) {
           for (const option of group.options || []) {
@@ -1144,7 +1189,7 @@ export class RecipeManager {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -1154,8 +1199,8 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     if (!runManager && !visibilityService) return;
 
-    const validRecipes = new Set(this.getRecipes({}).map(r => r.id));
-    const validSystems = new Set((systemManager?.getSystems?.() || []).map(s => s.id));
+    const validRecipes = new Set(this.getRecipes({}).map((r) => r.id));
+    const validSystems = new Set((systemManager?.getSystems?.() || []).map((s) => s.id));
     if (runManager) {
       await runManager.cleanupInvalidRuns(validRecipes, validSystems);
     }

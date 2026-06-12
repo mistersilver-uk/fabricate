@@ -23,7 +23,7 @@ export class CraftingCheckAdapter {
    * @param {object} config - The builtIn check config { ability, skill, dc, advantage }
    * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object}>}
    */
-  async executeCheck(actor, config) {
+  async executeCheck(_actor, _config) {
     throw new Error('Not implemented');
   }
 }
@@ -44,7 +44,7 @@ export class Dnd5eCraftingCheckAdapter extends CraftingCheckAdapter {
       { key: 'con', label: 'Constitution' },
       { key: 'int', label: 'Intelligence' },
       { key: 'wis', label: 'Wisdom' },
-      { key: 'cha', label: 'Charisma' }
+      { key: 'cha', label: 'Charisma' },
     ];
   }
 
@@ -67,7 +67,7 @@ export class Dnd5eCraftingCheckAdapter extends CraftingCheckAdapter {
       { key: 'rel', label: 'Religion' },
       { key: 'slt', label: 'Sleight of Hand' },
       { key: 'ste', label: 'Stealth' },
-      { key: 'sur', label: 'Survival' }
+      { key: 'sur', label: 'Survival' },
     ];
   }
 
@@ -79,13 +79,11 @@ export class Dnd5eCraftingCheckAdapter extends CraftingCheckAdapter {
 
     let roll;
     try {
-      if (skill) {
-        roll = await actor.rollSkill(skill, rollOptions);
-      } else {
-        roll = await actor.rollAbilityCheck(ability, rollOptions);
-      }
-    } catch (err) {
-      throw new Error(`dnd5e check failed: ${err.message}`);
+      roll = await (skill
+        ? actor.rollSkill(skill, rollOptions)
+        : actor.rollAbilityCheck(ability, rollOptions));
+    } catch (error) {
+      throw new Error(`dnd5e check failed: ${error.message}`, { cause: error });
     }
 
     if (!roll) {
@@ -98,7 +96,7 @@ export class Dnd5eCraftingCheckAdapter extends CraftingCheckAdapter {
       success,
       outcome: success ? 'pass' : 'fail',
       value: total,
-      data: { roll }
+      data: { roll },
     };
   }
 }
@@ -107,46 +105,46 @@ export class Dnd5eCraftingCheckAdapter extends CraftingCheckAdapter {
  * Registry for CraftingCheckAdapter implementations.
  * Allows game systems to register custom adapters and the engine to retrieve them.
  */
-export class CraftingCheckAdapterRegistry {
-  static _adapters = new Map();
+export const CraftingCheckAdapterRegistry = {
+  _adapters: new Map(),
 
   /**
    * Register an adapter class for a game system ID.
    * @param {string} systemId
    * @param {typeof CraftingCheckAdapter} adapterClass
    */
-  static register(systemId, adapterClass) {
+  register(systemId, adapterClass) {
     this._adapters.set(systemId, adapterClass);
-  }
+  },
 
   /**
    * Get an instantiated adapter for the given system ID, or null if not registered.
    * @param {string} systemId
    * @returns {CraftingCheckAdapter|null}
    */
-  static get(systemId) {
+  get(systemId) {
     const AdapterClass = this._adapters.get(systemId);
     if (!AdapterClass) return null;
     return new AdapterClass();
-  }
+  },
 
   /**
    * Returns true if an adapter is registered for the given system ID.
    * @param {string} systemId
    * @returns {boolean}
    */
-  static has(systemId) {
+  has(systemId) {
     return this._adapters.has(systemId);
-  }
+  },
 
   /**
    * Auto-register known adapters based on the current game system.
    * Called during module initialization.
    */
-  static initialize() {
-    const gameSystemId = typeof game !== 'undefined' ? game.system?.id : null;
+  initialize() {
+    const gameSystemId = typeof game === 'undefined' ? null : game.system?.id;
     if (gameSystemId === 'dnd5e') {
       this.register('dnd5e', Dnd5eCraftingCheckAdapter);
     }
-  }
-}
+  },
+};

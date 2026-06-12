@@ -10,7 +10,7 @@ const LEARN_RECIPE_MESSAGES = {
   learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
   learnedRecipes: 'FABRICATE.Knowledge.LearnedRecipes',
   learnedRecipesPartial: 'FABRICATE.Knowledge.LearnedRecipesPartial',
-  noNewRecipesLearned: 'FABRICATE.Knowledge.NoNewRecipesLearned'
+  noNewRecipesLearned: 'FABRICATE.Knowledge.NoNewRecipesLearned',
 };
 
 /**
@@ -31,21 +31,25 @@ export class RecipeVisibilityService {
     if (viewer?.isGM) return true;
     const visibility = recipe?.visibility || {};
     if (visibility.restricted !== true) return true;
-    return Array.isArray(visibility.allowedUserIds) && visibility.allowedUserIds.includes(viewer?.id);
+    return (
+      Array.isArray(visibility.allowedUserIds) && visibility.allowedUserIds.includes(viewer?.id)
+    );
   }
 
   _getRecipeItemDefinition(recipe) {
     const system = this._getCraftingSystem(recipe);
     if (!system || !recipe?.recipeItemId) return null;
-    return this.craftingSystemManager?.getRecipeItemDefinition?.(system.id, recipe.recipeItemId)
-      || (system.recipeItemDefinitions || []).find(def => def.id === recipe.recipeItemId)
-      || null;
+    return (
+      this.craftingSystemManager?.getRecipeItemDefinition?.(system.id, recipe.recipeItemId) ||
+      (system.recipeItemDefinitions || []).find((def) => def.id === recipe.recipeItemId) ||
+      null
+    );
   }
 
   _getRecipeItemSourceUuid(recipe) {
-    return this._getRecipeItemDefinition(recipe)?.sourceItemUuid
-      || recipe?.linkedRecipeItemUuid
-      || null;
+    return (
+      this._getRecipeItemDefinition(recipe)?.sourceItemUuid || recipe?.linkedRecipeItemUuid || null
+    );
   }
 
   _hasRecipeItemReference(recipe) {
@@ -61,10 +65,12 @@ export class RecipeVisibilityService {
 
   _isActorOwnedItem(ownedItem, actor) {
     if (!ownedItem || !actor) return false;
-    return ownedItem.parent === actor ||
+    return (
+      ownedItem.parent === actor ||
       ownedItem.actor === actor ||
       actor.items?.has?.(ownedItem.id) ||
-      (Array.isArray(actor.items) && actor.items.includes(ownedItem));
+      (Array.isArray(actor.items) && actor.items.includes(ownedItem))
+    );
   }
 
   _getLearnedMap(actor) {
@@ -82,15 +88,19 @@ export class RecipeVisibilityService {
   }
 
   async _setRecipeItemUsage(item, timesUsed) {
-    await setFabricateFlag(item, 'recipeItemUsage', { timesUsed: Math.max(0, Math.floor(timesUsed)) });
+    await setFabricateFlag(item, 'recipeItemUsage', {
+      timesUsed: Math.max(0, Math.floor(timesUsed)),
+    });
   }
 
   _getKnowledgeConfig(system) {
-    return system?.recipeVisibility?.knowledge || {
-      mode: 'itemOrLearned',
-      item: { limitUses: false },
-      learn: { consumeOnLearn: true }
-    };
+    return (
+      system?.recipeVisibility?.knowledge || {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true },
+      }
+    );
   }
 
   _collectCandidateItems(recipe, craftingActor, componentSourceActors = []) {
@@ -98,23 +108,21 @@ export class RecipeVisibilityService {
     if (craftingActor) actors.push(craftingActor);
     for (const actor of componentSourceActors || []) {
       if (!actor) continue;
-      if (actors.some(a => a.id === actor.id)) continue;
+      if (actors.some((a) => a.id === actor.id)) continue;
       actors.push(actor);
     }
 
     const matched = [];
-    for (let actorIdx = 0; actorIdx < actors.length; actorIdx++) {
-      const actor = actors[actorIdx];
-      const items = Array.from(actor.items || []);
-      for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
-        const item = items[itemIdx];
+    for (const [actorIdx, actor] of actors.entries()) {
+      const items = [...(actor.items || [])];
+      for (const [itemIdx, item] of items.entries()) {
         if (!this._isMatchingRecipeItem(recipe, item)) continue;
         matched.push({
           actor,
           item,
           actorOrder: actorIdx,
           itemOrder: itemIdx,
-          timesUsed: this._getRecipeItemUsage(item)
+          timesUsed: this._getRecipeItemUsage(item),
         });
       }
     }
@@ -125,7 +133,7 @@ export class RecipeVisibilityService {
     if (!knowledgeItemCfg?.limitUses) return matches;
     const maxUses = Number(knowledgeItemCfg?.maxUses);
     if (!Number.isFinite(maxUses) || maxUses <= 0) return matches;
-    return matches.filter(entry => Number(entry.timesUsed || 0) < maxUses);
+    return matches.filter((entry) => Number(entry.timesUsed || 0) < maxUses);
   }
 
   _selectDeterministic(matches) {
@@ -148,7 +156,7 @@ export class RecipeVisibilityService {
         reason: 'gm',
         hasLearned: true,
         hasMatchedItem: true,
-        matchedItems: []
+        matchedItems: [],
       };
     }
 
@@ -169,10 +177,9 @@ export class RecipeVisibilityService {
       reason: granted ? 'ok' : 'knowledge',
       hasLearned,
       hasMatchedItem,
-      matchedItems
+      matchedItems,
     };
   }
-
 
   _getDiscoveryProgress(actor, recipeId) {
     const all = getFabricateFlag(actor, 'discoveryProgress', {});
@@ -184,7 +191,7 @@ export class RecipeVisibilityService {
       progress: Number(entry.progress || 0),
       fragments: Array.isArray(entry.fragments) ? entry.fragments : [],
       discoveredAt: entry.discoveredAt || null,
-      manuallySet: entry.manuallySet === true
+      manuallySet: entry.manuallySet === true,
     };
   }
 
@@ -224,7 +231,7 @@ export class RecipeVisibilityService {
       return {
         visible: true,
         craftable: true,
-        reason: 'teaser-discovered'
+        reason: 'teaser-discovered',
       };
     }
 
@@ -236,21 +243,26 @@ export class RecipeVisibilityService {
         isTeaser: true,
         progress,
         hiddenFields,
-        teaserDescription
-      }
+        teaserDescription,
+      },
     };
   }
 
   async discoverFragment(actor, fragmentId, system) {
     const fragments = system?.teaserConfig?.fragments || [];
-    const fragment = fragments.find(f => f.id === fragmentId);
+    const fragment = fragments.find((f) => f.id === fragmentId);
     if (!fragment) return;
 
     const all = getFabricateFlag(actor, 'discoveryProgress', {});
     const updated = { ...all };
 
-    for (const recipeId of (fragment.recipeIds || [])) {
-      const entry = updated[recipeId] || { progress: 0, fragments: [], discoveredAt: null, manuallySet: false };
+    for (const recipeId of fragment.recipeIds || []) {
+      const entry = updated[recipeId] || {
+        progress: 0,
+        fragments: [],
+        discoveredAt: null,
+        manuallySet: false,
+      };
 
       // Idempotent — skip if already discovered this fragment
       if (entry.fragments.includes(fragmentId)) continue;
@@ -281,7 +293,7 @@ export class RecipeVisibilityService {
       updated[recipeId] = {
         ...entry,
         fragments: newFragments,
-        discoveredAt
+        discoveredAt,
       };
     }
 
@@ -290,7 +302,12 @@ export class RecipeVisibilityService {
 
   async setDiscoveryProgress(actor, recipeId, progress) {
     const all = getFabricateFlag(actor, 'discoveryProgress', {});
-    const entry = all?.[recipeId] || { progress: 0, fragments: [], discoveredAt: null, manuallySet: false };
+    const entry = all?.[recipeId] || {
+      progress: 0,
+      fragments: [],
+      discoveredAt: null,
+      manuallySet: false,
+    };
     const clampedProgress = Math.min(100, Math.max(0, Number(progress) || 0));
 
     const updated = {
@@ -298,14 +315,14 @@ export class RecipeVisibilityService {
       [recipeId]: {
         ...entry,
         progress: clampedProgress,
-        manuallySet: true
-      }
+        manuallySet: true,
+      },
     };
 
     await setFabricateFlag(actor, 'discoveryProgress', updated);
   }
 
-  getDiscoveryProgressForActor(actor, systemId) {
+  getDiscoveryProgressForActor(actor, _systemId) {
     return getFabricateFlag(actor, 'discoveryProgress', {}) || {};
   }
 
@@ -332,7 +349,12 @@ export class RecipeVisibilityService {
       }
       // Check if the player has a formula item that could teach this recipe
       if (this._hasRecipeItemReference(recipe)) {
-        const knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
+        const knowledge = this.evaluateKnowledgeAccess({
+          recipe,
+          viewer,
+          craftingActor,
+          componentSourceActors,
+        });
         if (knowledge.hasMatchedItem) {
           return { visible: true, craftable: false, reason: 'knowledge', knowledge };
         }
@@ -341,7 +363,7 @@ export class RecipeVisibilityService {
     }
 
     const listMode = system?.recipeVisibility?.listMode || 'global';
-    let visible = false;
+    let visible;
     let knowledge = null;
 
     // Teaser mode: handled separately
@@ -352,7 +374,12 @@ export class RecipeVisibilityService {
     if (viewer?.isGM) {
       visible = true;
     } else if (listMode === 'knowledge') {
-      knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
+      knowledge = this.evaluateKnowledgeAccess({
+        recipe,
+        viewer,
+        craftingActor,
+        componentSourceActors,
+      });
       visible = knowledge.granted || knowledge.hasMatchedItem;
     } else if (listMode === 'player') {
       visible = this._isRecipeVisibleByPlayerListMode(recipe, viewer);
@@ -366,7 +393,7 @@ export class RecipeVisibilityService {
         visible: false,
         craftable: false,
         reason: knowledge ? 'knowledge' : 'visibility',
-        knowledge
+        knowledge,
       };
     }
 
@@ -384,15 +411,15 @@ export class RecipeVisibilityService {
   getVisibleRecipes({ viewer, craftingSystemId, craftingActor, componentSourceActors = [] }) {
     const recipes = this.recipeManager.getRecipes({
       enabled: true,
-      craftingSystemId
+      craftingSystemId,
     });
 
     return recipes
-      .map(recipe => ({
+      .map((recipe) => ({
         recipe,
-        access: this.evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors })
+        access: this.evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors }),
       }))
-      .filter(entry => entry.access.visible);
+      .filter((entry) => entry.access.visible);
   }
 
   guardCraftStart({ viewer, recipe, craftingActor, componentSourceActors = [] }) {
@@ -417,7 +444,12 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
-    const access = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
+    const access = this.evaluateKnowledgeAccess({
+      recipe,
+      viewer,
+      craftingActor,
+      componentSourceActors,
+    });
     const selected = this._selectDeterministic(access.matchedItems || []);
     if (!selected) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
@@ -427,8 +459,8 @@ export class RecipeVisibilityService {
       ...learnedMap,
       [recipe.id]: {
         learnedAt: Date.now(),
-        sourceItemUuid: selected.item.uuid
-      }
+        sourceItemUuid: selected.item.uuid,
+      },
     };
     await this._setLearnedMap(craftingActor, next);
 
@@ -439,7 +471,7 @@ export class RecipeVisibilityService {
     return {
       success: true,
       message: LEARN_RECIPE_MESSAGES.learnedRecipe,
-      messageData: { name: recipe.name }
+      messageData: { name: recipe.name },
     };
   }
 
@@ -461,10 +493,11 @@ export class RecipeVisibilityService {
   _getOwnedItemLearningCandidates({ ownedItem, mode = 'auto' } = {}) {
     if (!ownedItem) return [];
     const recipes = this.recipeManager?.getRecipes?.({ enabled: true }) || [];
-    return recipes.filter(recipe =>
-      this._isRecipeEligibleForOwnedItemLearning(recipe, mode) &&
-      this._hasRecipeItemReference(recipe) &&
-      this._isMatchingRecipeItem(recipe, ownedItem)
+    return recipes.filter(
+      (recipe) =>
+        this._isRecipeEligibleForOwnedItemLearning(recipe, mode) &&
+        this._hasRecipeItemReference(recipe) &&
+        this._isMatchingRecipeItem(recipe, ownedItem)
     );
   }
 
@@ -476,7 +509,7 @@ export class RecipeVisibilityService {
     learnedRecipes = [],
     alreadyLearnedRecipes = [],
     consumedItem = false,
-    silent = false
+    silent = false,
   }) {
     let notificationKind = 'silent';
     let message = null;
@@ -495,8 +528,8 @@ export class RecipeVisibilityService {
       }
     }
 
-    const recipeNames = learnedRecipes.map(recipe => recipe.name).filter(Boolean);
-    const matchedRecipeNames = matchedRecipes.map(recipe => recipe.name).filter(Boolean);
+    const recipeNames = learnedRecipes.map((recipe) => recipe.name).filter(Boolean);
+    const matchedRecipeNames = matchedRecipes.map((recipe) => recipe.name).filter(Boolean);
     return {
       actor,
       ownedItem,
@@ -516,12 +549,16 @@ export class RecipeVisibilityService {
         recipes: recipeNames.join(', '),
         matchedRecipes: matchedRecipeNames.join(', '),
         count: learnedRecipes.length,
-        matchedCount: matchedRecipes.length
-      }
+        matchedCount: matchedRecipes.length,
+      },
     };
   }
 
-  previewOwnedItemLearning({ ownedItem, actor = ownedItem?.parent || ownedItem?.actor || null, mode = 'auto' } = {}) {
+  previewOwnedItemLearning({
+    ownedItem,
+    actor = ownedItem?.parent || ownedItem?.actor || null,
+    mode = 'auto',
+  } = {}) {
     if (!this._isActorOwnedItem(ownedItem, actor)) {
       return this._buildOwnedItemLearningResult({ actor, ownedItem, mode, silent: true });
     }
@@ -539,7 +576,7 @@ export class RecipeVisibilityService {
       }
     }
 
-    const consumedItem = learnableRecipes.some(recipe => {
+    const consumedItem = learnableRecipes.some((recipe) => {
       const system = this._getCraftingSystem(recipe);
       const knowledge = this._getKnowledgeConfig(system);
       return knowledge?.learn?.consumeOnLearn === true;
@@ -552,11 +589,16 @@ export class RecipeVisibilityService {
       matchedRecipes,
       learnedRecipes: learnableRecipes,
       alreadyLearnedRecipes,
-      consumedItem
+      consumedItem,
     });
   }
 
-  async learnRecipesFromOwnedItem({ ownedItem, actor = ownedItem?.parent || ownedItem?.actor || null, viewer = null, mode = 'auto' } = {}) {
+  async learnRecipesFromOwnedItem({
+    ownedItem,
+    actor = ownedItem?.parent || ownedItem?.actor || null,
+    viewer = null,
+    mode = 'auto',
+  } = {}) {
     const preview = this.previewOwnedItemLearning({ ownedItem, actor, viewer, mode });
     if (preview.matchedRecipes.length === 0 || preview.learnedRecipes.length === 0) {
       return {
@@ -567,8 +609,8 @@ export class RecipeVisibilityService {
         messageData: {
           ...preview.messageData,
           count: 0,
-          recipes: ''
-        }
+          recipes: '',
+        },
       };
     }
 
@@ -579,15 +621,15 @@ export class RecipeVisibilityService {
     for (const recipe of preview.learnedRecipes) {
       next[recipe.id] = {
         learnedAt,
-        sourceItemUuid: ownedItem.uuid
+        sourceItemUuid: ownedItem.uuid,
       };
     }
 
     await this._setLearnedMap(actor, next);
 
     const confirmedLearnedMap = this._getLearnedMap(actor);
-    const writeSucceeded = preview.learnedRecipes.every(recipe =>
-      confirmedLearnedMap?.[recipe.id]?.sourceItemUuid === ownedItem.uuid
+    const writeSucceeded = preview.learnedRecipes.every(
+      (recipe) => confirmedLearnedMap?.[recipe.id]?.sourceItemUuid === ownedItem.uuid
     );
     if (!writeSucceeded) {
       return this._buildOwnedItemLearningResult({
@@ -598,7 +640,7 @@ export class RecipeVisibilityService {
         learnedRecipes: [],
         alreadyLearnedRecipes: preview.alreadyLearnedRecipes,
         consumedItem: false,
-        silent: true
+        silent: true,
       });
     }
 
@@ -613,7 +655,7 @@ export class RecipeVisibilityService {
       matchedRecipes: preview.matchedRecipes,
       learnedRecipes: preview.learnedRecipes,
       alreadyLearnedRecipes: preview.alreadyLearnedRecipes,
-      consumedItem: preview.consumedItem === true
+      consumedItem: preview.consumedItem === true,
     });
   }
 
@@ -653,8 +695,8 @@ export class RecipeVisibilityService {
       ...learnedMap,
       [recipe.id]: {
         learnedAt: Date.now(),
-        sourceItemUuid: null
-      }
+        sourceItemUuid: null,
+      },
     };
     await this._setLearnedMap(craftingActor, next);
   }

@@ -6,14 +6,34 @@ const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
-  biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
+  biomes: [
+    'forest',
+    'grassland',
+    'mountain',
+    'cave',
+    'coastal',
+    'swamp',
+    'desert',
+    'urban',
+    'ruins',
+    'wasteland',
+  ],
   danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
-  timeOfDay: ['dawn', 'day', 'dusk', 'night']
+  timeOfDay: ['dawn', 'day', 'dusk', 'night'],
 });
 const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
 const VOCABULARY_DIMENSIONS = ['biomes'];
-const BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
+const BIOME_COLOR_TOKENS = new Set([
+  'sage',
+  'mist',
+  'lavender',
+  'rose',
+  'peach',
+  'butter',
+  'aqua',
+  'mauve',
+]);
 const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_BIOME_METADATA = Object.freeze({
   forest: Object.freeze({ label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }),
@@ -25,7 +45,7 @@ const DEFAULT_BIOME_METADATA = Object.freeze({
   desert: Object.freeze({ label: 'Desert', icon: 'fas fa-sun', colorToken: 'peach' }),
   urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
   ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
-  wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' })
+  wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' }),
 });
 const DEFAULT_CONDITION_ICONS = Object.freeze({
   weather: Object.freeze({
@@ -35,18 +55,18 @@ const DEFAULT_CONDITION_ICONS = Object.freeze({
     storm: 'fas fa-bolt',
     snow: 'fas fa-snowflake',
     fog: 'fas fa-smog',
-    wind: 'fas fa-wind'
+    wind: 'fas fa-wind',
   }),
   timeOfDay: Object.freeze({
     dawn: 'fas fa-cloud-sun',
     day: 'fas fa-sun',
     dusk: 'fas fa-cloud-moon',
-    night: 'fas fa-moon'
-  })
+    night: 'fas fa-moon',
+  }),
 });
 const FALLBACK_CONDITION_ICONS = Object.freeze({
   weather: 'fas fa-cloud-sun',
-  timeOfDay: 'fas fa-clock'
+  timeOfDay: 'fas fa-clock',
 });
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
@@ -73,7 +93,7 @@ const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
 // different enum at a different path (see gatheringNodeConfig.js).
 const LEGACY_STAMINA_REGEN_POLICY_MAP = Object.freeze({ elapsedTime: 'overTime' });
 const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
-const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86400, weeks: 604800 });
+const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86_400, weeks: 604_800 });
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
@@ -86,12 +106,12 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   blindCandidateGate: 'attemptableOnly',
   revealPolicy: 'never',
   revealScope: 'actor',
-  eventVisibility: 'encounterChance'
+  eventVisibility: 'encounterChance',
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
-  STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked'
+  STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
 });
 
 /**
@@ -135,7 +155,7 @@ export class GatheringRichStateService {
     hooks = globalThis.Hooks ?? null,
     evaluateExpression = null,
     runMacro = null,
-    secondsPerUnit = null
+    secondsPerUnit = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.getSetting = getSetting;
@@ -151,9 +171,10 @@ export class GatheringRichStateService {
     // hardcoded Earth-calendar table; main.js injects a calendar-aware provider
     // so `days`/`weeks` track the active Foundry world calendar (minutes/hours
     // are universal and always 60/3600).
-    this.secondsPerUnit = typeof secondsPerUnit === 'function'
-      ? secondsPerUnit
-      : (unit) => SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
+    this.secondsPerUnit =
+      typeof secondsPerUnit === 'function'
+        ? secondsPerUnit
+        : (unit) => SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
   }
 
   /**
@@ -177,7 +198,7 @@ export class GatheringRichStateService {
     return {
       weather: config.conditions.weather,
       timeOfDay: config.conditions.timeOfDay,
-      vocabularies: cloneJson(config.vocabularies)
+      vocabularies: cloneJson(config.vocabularies),
     };
   }
 
@@ -189,7 +210,7 @@ export class GatheringRichStateService {
     return this.setConditions({ timeOfDay });
   }
 
-  async setConditions({ weather = undefined, timeOfDay = undefined } = {}) {
+  async setConditions({ weather, timeOfDay } = {}) {
     const config = this._config();
     const nextConditions = { ...config.conditions };
     if (weather !== undefined) {
@@ -211,7 +232,7 @@ export class GatheringRichStateService {
     await this._saveConfig(next);
     this._callHook('fabricate.gathering.conditionsUpdated', {
       conditions: cloneJson(nextConditions),
-      vocabularies: cloneJson(next.vocabularies)
+      vocabularies: cloneJson(next.vocabularies),
     });
     return this.getConditions();
   }
@@ -225,31 +246,48 @@ export class GatheringRichStateService {
     const systemConditions = resolveSystemConditionSettings(config, systemId);
     const currentConditions = conditionSettingsToCurrent(systemConditions);
     const rawSystemConfig = rawConfig?.systems?.[systemId] || {};
-    const hasSystemRules = rawSystemConfig?.rules && typeof rawSystemConfig.rules === 'object' && !Array.isArray(rawSystemConfig.rules);
+    const hasSystemRules =
+      rawSystemConfig?.rules &&
+      typeof rawSystemConfig.rules === 'object' &&
+      !Array.isArray(rawSystemConfig.rules);
     const rules = hasSystemRules
       ? normalizeGatheringRules(libraries.rules)
       : normalizeGatheringRules({
           eventSelectionMode: environment.eventSelectionMode,
           eventLimit: environment.eventLimit,
-          eventPolicy: environment.eventPolicy
+          eventPolicy: environment.eventPolicy,
         });
     const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
     const tasks = sortRecordsByOrder(
       normalizeList(libraries.tasks)
-        .filter(task => task?.enabled !== false)
-        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
-          || this._recordIsForced(environment, task.id, 'task', compositionMode))
-        .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
+        .filter((task) => task?.enabled !== false)
+        .filter(
+          (task) =>
+            this._recordMatchesEnvironment(task, environment, currentConditions, {
+              includeDanger: false,
+              conditionSettings: systemConditions,
+            }) || this._recordIsForced(environment, task.id, 'task', compositionMode)
+        )
+        .filter((task) =>
+          this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)
+        ),
       environment?.taskOrder
-    ).map(task => this._libraryTaskToRuntimeTask(task, environment));
+    ).map((task) => this._libraryTaskToRuntimeTask(task, environment));
     const events = sortRecordsByOrder(
       normalizeList(libraries.events)
-        .filter(event => event?.enabled !== false)
-        .filter(event => this._recordMatchesEnvironment(event, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions })
-          || this._recordIsForced(environment, event.id, 'event', compositionMode))
-        .filter(event => this._environmentIncludesLibraryRecord(environment, event.id, 'event', compositionMode)),
+        .filter((event) => event?.enabled !== false)
+        .filter(
+          (event) =>
+            this._recordMatchesEnvironment(event, environment, currentConditions, {
+              includeDanger: true,
+              conditionSettings: systemConditions,
+            }) || this._recordIsForced(environment, event.id, 'event', compositionMode)
+        )
+        .filter((event) =>
+          this._environmentIncludesLibraryRecord(environment, event.id, 'event', compositionMode)
+        ),
       environment?.eventOrder
-    ).map(event => applyEventDropRateAdjustment(normalizeEvent(event), environment));
+    ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
     const libraryCharacterModifiers = new Map();
     for (const entry of normalizeList(libraries.characterModifiers)) {
@@ -263,9 +301,10 @@ export class GatheringRichStateService {
     // live lookup via the global registry when a caller did not pass one. The
     // gathering-config `tools` copy is no longer the source (a reconciliation
     // migration moves any UI-authored tools onto the system).
-    const toolSource = (Array.isArray(system?.tools) && system.tools)
-      || globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.tools
-      || [];
+    const toolSource =
+      (Array.isArray(system?.tools) && system.tools) ||
+      globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.tools ||
+      [];
     const libraryTools = new Map();
     for (const tool of normalizeList(toolSource)) {
       if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));
@@ -282,25 +321,25 @@ export class GatheringRichStateService {
       useLegacyTaskItemSelectionMode: !hasSystemRules,
       eventSelectionMode: rules.eventSelectionMode,
       eventLimit: rules.eventLimit,
-      eventPolicy: rules.eventPolicy
+      eventPolicy: rules.eventPolicy,
     };
     Object.defineProperty(composed, '__libraryCharacterModifiers', {
       value: libraryCharacterModifiers,
       enumerable: false,
       configurable: true,
-      writable: true
+      writable: true,
     });
     Object.defineProperty(composed, '__libraryTools', {
       value: libraryTools,
       enumerable: false,
       configurable: true,
-      writable: true
+      writable: true,
     });
     Object.defineProperty(composed, '__systemId', {
       value: systemId,
       enumerable: false,
       configurable: true,
-      writable: true
+      writable: true,
     });
     return composed;
   }
@@ -325,17 +364,30 @@ export class GatheringRichStateService {
    * @returns {Promise<object>} Resolution payload (status, items, events,
    *   eventPolicy, characterModifierSnapshot, [diagnostics]).
    */
-  async resolveD100Attempt({ task, environment, actor = null, viewer = null, system = null, gatheringModifier = 0, eventModifier = 0 } = {}) {
+  async resolveD100Attempt({
+    task,
+    environment,
+    actor = null,
+    viewer = null,
+    system = null,
+    gatheringModifier = 0,
+    eventModifier = 0,
+  } = {}) {
     const itemRows = normalizeList(task?.dropRows ?? task?.itemDrops);
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
     const conditions = environment?.conditions || {};
-    const library = environment?.__libraryCharacterModifiers instanceof Map
-      ? environment.__libraryCharacterModifiers
-      : new Map();
+    const library =
+      environment?.__libraryCharacterModifiers instanceof Map
+        ? environment.__libraryCharacterModifiers
+        : new Map();
 
     const diagnostics = [];
-    const enabledRows = itemRows.filter(row => row?.enabled !== false).map(row => normalizeItemDrop(row));
-    const enabledEvents = normalizeList(environment?.events).filter(event => event?.enabled !== false).map(event => normalizeEvent(event));
+    const enabledRows = itemRows
+      .filter((row) => row?.enabled !== false)
+      .map((row) => normalizeItemDrop(row));
+    const enabledEvents = normalizeList(environment?.events)
+      .filter((event) => event?.enabled !== false)
+      .map((event) => normalizeEvent(event));
 
     const rowSnapshots = [];
     const rowContributions = [];
@@ -353,7 +405,7 @@ export class GatheringRichStateService {
           row,
           event: null,
           viewer,
-          system
+          system,
         });
         if (!resolved.ok) {
           diagnostics.push(resolved.diagnostic);
@@ -363,7 +415,11 @@ export class GatheringRichStateService {
         rowEvidence.push(resolved.evidence);
       }
       rowSnapshots.push({ rowId: row.id, contributions: rowEvidence });
-      rowContributions.push({ row, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
+      rowContributions.push({
+        row,
+        contributions,
+        characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0),
+      });
     }
 
     const eventSnapshots = [];
@@ -372,7 +428,10 @@ export class GatheringRichStateService {
       // Weather/time are runtime gates: an event that does not currently meet its
       // required weather/timeOfDay never triggers, even if it matched the
       // environment (region/biome/danger) at composition time.
-      if (evaluateEnvironmentMatch(event, environment, conditions, { includeDanger: true }).conditionsMet === false) {
+      if (
+        evaluateEnvironmentMatch(event, environment, conditions, { includeDanger: true })
+          .conditionsMet === false
+      ) {
         continue;
       }
       const contributions = [];
@@ -388,7 +447,7 @@ export class GatheringRichStateService {
           row: null,
           event,
           viewer,
-          system
+          system,
         });
         if (!resolved.ok) {
           diagnostics.push(resolved.diagnostic);
@@ -398,7 +457,11 @@ export class GatheringRichStateService {
         eventEvidence.push(resolved.evidence);
       }
       eventSnapshots.push({ eventId: event.id, contributions: eventEvidence });
-      eventContributions.push({ event, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
+      eventContributions.push({
+        event,
+        contributions,
+        characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0),
+      });
     }
 
     if (diagnostics.length > 0) {
@@ -408,7 +471,7 @@ export class GatheringRichStateService {
         events: [],
         eventPolicy: null,
         characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
-        diagnostics
+        diagnostics,
       };
     }
 
@@ -417,40 +480,45 @@ export class GatheringRichStateService {
     const biomeAggregation = rules.biomeModifierAggregation;
 
     const droppedItems = rowContributions
-      .map((entry, index) => rollDropRow({
-        row: entry.row,
-        index,
-        roll: this.rollD100(),
-        modifier: taskModifier,
-        conditions,
-        biomes,
-        biomeAggregation,
-        characterModifierContributions: entry.contributions
-      }))
-      .filter(result => result.dropped);
+      .map((entry, index) =>
+        rollDropRow({
+          row: entry.row,
+          index,
+          roll: this.rollD100(),
+          modifier: taskModifier,
+          conditions,
+          biomes,
+          biomeAggregation,
+          characterModifierContributions: entry.contributions,
+        })
+      )
+      .filter((result) => result.dropped);
     const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
 
     const droppedEvents = eventContributions
-      .map((entry, index) => rollDropRow({
-        row: entry.event,
-        index,
-        roll: this.rollD100(),
-        modifier: numericModifier(entry.event?.eventModifier, eventModifier),
-        conditions,
-        biomes,
-        biomeAggregation,
-        characterModifierContributions: entry.contributions
-      }))
-      .filter(result => result.dropped);
+      .map((entry, index) =>
+        rollDropRow({
+          row: entry.event,
+          index,
+          roll: this.rollD100(),
+          modifier: numericModifier(entry.event?.eventModifier, eventModifier),
+          conditions,
+          biomes,
+          biomeAggregation,
+          characterModifierContributions: entry.contributions,
+        })
+      )
+      .filter((result) => result.dropped);
     const selectedEvents = selectDrops(droppedEvents, rules.eventSelectionMode, rules.eventLimit);
     const eventPolicy = rules.eventPolicy;
 
     return {
-      status: selectedEvents.length > 0 && eventPolicy === 'failureWithEvent' ? 'failed' : 'succeeded',
+      status:
+        selectedEvents.length > 0 && eventPolicy === 'failureWithEvent' ? 'failed' : 'succeeded',
       items: selectedItems,
       events: selectedEvents,
       eventPolicy,
-      characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots }
+      characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
     };
   }
 
@@ -474,27 +542,34 @@ export class GatheringRichStateService {
    * @param {object} [options.system] Crafting system.
    * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, eventPolicy: string}>}
    */
-  async previewDropBreakdown({ environment, task, actor = null, viewer = null, system = null } = {}) {
+  async previewDropBreakdown({
+    environment,
+    task,
+    actor = null,
+    viewer = null,
+    system = null,
+  } = {}) {
     const rules = resolveRulesForAttempt(task, environment);
     const empty = {
       drops: [],
       successChance: null,
       awardMode: rules.rewardSelectionMode,
       awardLimit: rules.rewardLimit,
-      eventPolicy: rules.eventPolicy
+      eventPolicy: rules.eventPolicy,
     };
     if (task?.resolutionMode !== 'd100') return empty;
     const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
-      .filter(row => row?.enabled !== false)
-      .map(row => normalizeItemDrop(row));
+      .filter((row) => row?.enabled !== false)
+      .map((row) => normalizeItemDrop(row));
     if (rows.length === 0) return empty;
 
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
     const biomeAggregation = rules.biomeModifierAggregation;
-    const library = environment?.__libraryCharacterModifiers instanceof Map
-      ? environment.__libraryCharacterModifiers
-      : new Map();
+    const library =
+      environment?.__libraryCharacterModifiers instanceof Map
+        ? environment.__libraryCharacterModifiers
+        : new Map();
 
     const drops = [];
     for (const row of rows) {
@@ -502,22 +577,36 @@ export class GatheringRichStateService {
       for (const reference of normalizeList(row.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
-          reference, libraryEntry: entry, actor, environment, task, row, event: null, viewer, system
+          reference,
+          libraryEntry: entry,
+          actor,
+          environment,
+          task,
+          row,
+          event: null,
+          viewer,
+          system,
         });
         if (resolved.ok) {
           character.push({
             label: resolved.evidence.label,
             icon: resolved.evidence.icon,
-            contribution: resolved.evidence.contribution
+            contribution: resolved.evidence.contribution,
           });
         }
       }
-      const characterTotal = character.reduce((sum, entry) => sum + Number(entry.contribution || 0), 0);
+      const characterTotal = character.reduce(
+        (sum, entry) => sum + Number(entry.contribution || 0),
+        0
+      );
       const weather = conditionModifierForKind(row.conditionModifiers, 'weather', conditions);
       const timeOfDay = conditionModifierForKind(row.conditionModifiers, 'timeOfDay', conditions);
       const biome = matchingBiomeModifier(row.conditionModifiers?.biome, biomes, biomeAggregation);
       const base = clampDropRate(row.dropRate);
-      const finalRate = Math.min(100, Math.max(0, base + weather + timeOfDay + biome + characterTotal));
+      const finalRate = Math.min(
+        100,
+        Math.max(0, base + weather + timeOfDay + biome + characterTotal)
+      );
       drops.push({
         id: row.id,
         name: row.name,
@@ -530,13 +619,16 @@ export class GatheringRichStateService {
           weather: { conditionId: normalizeConditionId(conditions?.weather), value: weather },
           timeOfDay: { conditionId: normalizeConditionId(conditions?.timeOfDay), value: timeOfDay },
           biome: { value: biome },
-          character
-        }
+          character,
+        },
       });
     }
     // Aggregate "at least one find" chance from the modifier-adjusted per-drop
     // chances (NOT the base rates), so the success bar matches the drop rows.
-    const missAll = drops.reduce((product, drop) => product * (1 - Math.max(0, Math.min(1, Number(drop.finalChance) || 0))), 1);
+    const missAll = drops.reduce(
+      (product, drop) => product * (1 - Math.max(0, Math.min(1, Number(drop.finalChance) || 0))),
+      1
+    );
     return { ...empty, drops, successChance: 1 - missAll };
   }
 
@@ -555,8 +647,8 @@ export class GatheringRichStateService {
   taskSuccessChance(task, environment) {
     if (task?.resolutionMode !== 'd100') return null;
     const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
-      .filter(row => row?.enabled !== false)
-      .map(row => normalizeItemDrop(row));
+      .filter((row) => row?.enabled !== false)
+      .map((row) => normalizeItemDrop(row));
     if (rows.length === 0) return null;
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
@@ -593,10 +685,22 @@ export class GatheringRichStateService {
    * @param {object} [payload.system]
    * @returns {Promise<{ok: boolean, contribution: number, evidence: object, diagnostic?: object}>}
    */
-  async _resolveCharacterModifierContribution({ reference, libraryEntry, actor, environment, task, row, event, viewer, system }) {
+  async _resolveCharacterModifierContribution({
+    reference,
+    libraryEntry,
+    actor,
+    environment,
+    task,
+    row,
+    event,
+    viewer,
+    system,
+  }) {
     const referenceId = stringOrFallback(reference?.id, '');
     const modifierId = stringOrFallback(reference?.modifierId, '');
-    const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator) ? reference.operator : '+';
+    const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator)
+      ? reference.operator
+      : '+';
     const min = numberOrNullStrict(reference?.min);
     const max = numberOrNullStrict(reference?.max);
 
@@ -611,8 +715,8 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          eventId: event?.id || null
-        }
+          eventId: event?.id || null,
+        },
       };
     }
 
@@ -629,8 +733,8 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          eventId: event?.id || null
-        }
+          eventId: event?.id || null,
+        },
       };
     }
 
@@ -649,7 +753,7 @@ export class GatheringRichStateService {
             conditions,
             modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
             viewer,
-            system
+            system,
           });
         }
       } else if (typeof this.evaluateExpression === 'function') {
@@ -664,14 +768,14 @@ export class GatheringRichStateService {
           event,
           viewer,
           system,
-          modifier: { id: modifierId, label: libraryEntry?.label || modifierId }
+          modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
         });
       }
-    } catch (_err) {
+    } catch {
       rawValue = null;
     }
 
-    if (rawValue === null || rawValue === undefined || rawValue === '') {
+    if (rawValue == null || rawValue === '') {
       return {
         ok: false,
         diagnostic: {
@@ -680,8 +784,8 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          eventId: event?.id || null
-        }
+          eventId: event?.id || null,
+        },
       };
     }
     const numeric = Number(rawValue);
@@ -694,8 +798,8 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          eventId: event?.id || null
-        }
+          eventId: event?.id || null,
+        },
       };
     }
 
@@ -718,7 +822,7 @@ export class GatheringRichStateService {
       clampedValue: clamped,
       operator,
       contribution,
-      bounds: { min, max }
+      bounds: { min, max },
     };
 
     return { ok: true, contribution, evidence };
@@ -734,30 +838,39 @@ export class GatheringRichStateService {
     const staminaEnabled = this.staminaEnabled(environment?.craftingSystemId);
     const nodesEnabled = this.nodesEnabled(environment?.craftingSystemId);
     const displayNode = task?.nodes ?? null;
-    const showNodeCounts = displayNode?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
-    const nodes = nodesEnabled && displayNode ? {
-      enabled: true,
-      available: Number(displayNode.current || 0) > 0,
-      depleted: Number(displayNode.current || 0) <= 0,
-      current: showNodeCounts ? Number(displayNode.current || 0) : null,
-      max: showNodeCounts ? Number(displayNode.max || 0) : null
-    } : null;
-    const stamina = staminaEnabled && Number(task?.staminaCost || 0) > 0 ? {
-      cost: Number(task.staminaCost || 0),
-      state: this.getActorStamina(actor, environment?.craftingSystemId)
-    } : null;
+    const showNodeCounts =
+      displayNode?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
+    const nodes =
+      nodesEnabled && displayNode
+        ? {
+            enabled: true,
+            available: Number(displayNode.current || 0) > 0,
+            depleted: Number(displayNode.current || 0) <= 0,
+            current: showNodeCounts ? Number(displayNode.current || 0) : null,
+            max: showNodeCounts ? Number(displayNode.max || 0) : null,
+          }
+        : null;
+    const stamina =
+      staminaEnabled && Number(task?.staminaCost || 0) > 0
+        ? {
+            cost: Number(task.staminaCost || 0),
+            state: this.getActorStamina(actor, environment?.craftingSystemId),
+          }
+        : null;
     return {
       nodes,
       stamina,
       risk: task?.riskOverride || environment?.risk || 'safe',
-      conditions: this.getConditions().weather ? cloneJson(this._config().conditions) : cloneJson(environment?.conditions || {}),
+      conditions: this.getConditions().weather
+        ? cloneJson(this._config().conditions)
+        : cloneJson(environment?.conditions || {}),
       events: opaqueBlind
         ? normalizeList(environment?.events).map(() => ({ matched: true }))
-        : normalizeList(environment?.events).map(event => ({
+        : normalizeList(environment?.events).map((event) => ({
             id: event.id,
             name: event.name,
-            dropRate: event.dropRate
-          }))
+            dropRate: event.dropRate,
+          })),
     };
   }
 
@@ -771,16 +884,16 @@ export class GatheringRichStateService {
     // `max` is the rolled value; an optional GM `maxOverride` layers over it.
     const rolledMax = numberOrNullStrict(stamina.max);
     const maxOverride = numberOrNullStrict(stamina.maxOverride);
-    const max = maxOverride != null ? maxOverride : rolledMax; // effective cap
+    const max = maxOverride == null ? rolledMax : maxOverride; // effective cap
     const storedCurrent = numberOrNullStrict(stamina.current);
-    const current = storedCurrent != null ? storedCurrent : (max != null ? max : null);
+    const current = storedCurrent == null ? (max == null ? null : max) : storedCurrent;
     return {
       current,
       max,
       rolledMax,
       maxOverride,
       provider: stamina.provider || 'fabricate',
-      regenerationMode: stamina.regenerationMode || 'manual'
+      regenerationMode: stamina.regenerationMode || 'manual',
     };
   }
 
@@ -794,7 +907,13 @@ export class GatheringRichStateService {
    * @param {object} payload
    * @returns {Promise<object|null>} The materialized pool, or null on no-op.
    */
-  async seedActorStaminaIfNeeded({ actor, systemId, system = null, environment = null, force = false } = {}) {
+  async seedActorStaminaIfNeeded({
+    actor,
+    systemId,
+    system = null,
+    environment = null,
+    force = false,
+  } = {}) {
     const key = systemId || 'default';
     const econ = this._systemEconomy(key);
     if (econ.stamina?.enabled !== true) return null;
@@ -805,11 +924,23 @@ export class GatheringRichStateService {
       return cloneJson(existing);
     }
 
-    const maxValue = await this._evaluateStaminaExpression({ expression: econ.stamina?.max, actor, system, environment, kind: 'staminaMax' });
+    const maxValue = await this._evaluateStaminaExpression({
+      expression: econ.stamina?.max,
+      actor,
+      system,
+      environment,
+      kind: 'staminaMax',
+    });
     if (maxValue == null) return null; // no max configured ⇒ leave unseeded (stamina unenforced)
     const max = Math.max(0, Math.round(maxValue));
 
-    const startRaw = await this._evaluateStaminaExpression({ expression: econ.stamina?.start, actor, system, environment, kind: 'staminaStart' });
+    const startRaw = await this._evaluateStaminaExpression({
+      expression: econ.stamina?.start,
+      actor,
+      system,
+      environment,
+      kind: 'staminaStart',
+    });
     const start = startRaw == null ? max : Math.max(0, Math.round(startRaw)); // blank start ⇒ full
 
     const entry = {
@@ -817,15 +948,19 @@ export class GatheringRichStateService {
       regenerationMode: econ.stamina?.regen?.policy === 'overTime' ? 'auto' : 'manual',
       current: Math.min(start, max),
       max,
-      lastRegenWorldTime: this._now()
+      lastRegenWorldTime: this._now(),
     };
-    state.stamina = { ...(state.stamina || {}), [key]: entry };
+    state.stamina = { ...state.stamina, [key]: entry };
     state.history = [
       this._historyEvent('stamina.seed', { systemId: key, current: entry.current, max }),
-      ...normalizeList(state.history)
+      ...normalizeList(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaSeeded', { actor, systemId: key, stamina: cloneJson(entry) });
+    this._callHook('fabricate.gathering.staminaSeeded', {
+      actor,
+      systemId: key,
+      stamina: cloneJson(entry),
+    });
     return cloneJson(entry);
   }
 
@@ -834,19 +969,40 @@ export class GatheringRichStateService {
    * number or null when the template is blank/unresolvable. Reuses the same
    * Roll-backed `evaluateExpression` seam regen uses.
    */
-  async _evaluateStaminaExpression({ expression, actor, system = null, environment = null, kind = 'stamina' } = {}) {
-    if (expression === null || expression === undefined || expression === '') return null;
-    let value;
-    if (typeof this.evaluateExpression === 'function') {
-      value = await this.evaluateExpression({ expression: String(expression), provider: null, actor, kind, system, environment });
-    } else {
-      value = Number(expression);
-    }
+  async _evaluateStaminaExpression({
+    expression,
+    actor,
+    system = null,
+    environment = null,
+    kind = 'stamina',
+  } = {}) {
+    if (expression == null || expression === '') return null;
+    const value =
+      typeof this.evaluateExpression === 'function'
+        ? await this.evaluateExpression({
+            expression: String(expression),
+            provider: null,
+            actor,
+            kind,
+            system,
+            environment,
+          })
+        : Number(expression);
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : null;
   }
 
-  async setActorStamina(actor, { systemId = 'default', current = null, max = null, maxOverride = undefined, provider = 'fabricate', regenerationMode = 'manual' } = {}) {
+  async setActorStamina(
+    actor,
+    {
+      systemId = 'default',
+      current = null,
+      max = null,
+      maxOverride,
+      provider = 'fabricate',
+      regenerationMode = 'manual',
+    } = {}
+  ) {
     const state = readState(actor);
     const key = systemId || 'default';
     const previous = state.stamina?.[key] || {};
@@ -857,33 +1013,49 @@ export class GatheringRichStateService {
     // (the panel only edits current + override). When provided: Fabricate-owned
     // pools accept it freely; an external provider's maximum is read-only once
     // established, but an as-yet unset external pool may still be initialized.
-    const rolledMax = providedMax != null
-      ? ((effectiveProvider === 'fabricate' || priorMax == null) ? providedMax : priorMax)
-      : priorMax;
+    const rolledMax =
+      providedMax != null && (effectiveProvider === 'fabricate' || priorMax == null)
+        ? providedMax
+        : priorMax;
     // `maxOverride`: undefined preserves the prior override; a finite number
     // sets it; null/'' clears it. The effective cap is the override, else rolled.
-    const override = maxOverride === undefined
-      ? numberOrNullStrict(previous.maxOverride)
-      : (maxOverride === null || maxOverride === '' ? null : nonNegativeNumber(maxOverride, 0));
-    const effectiveMax = override != null ? override : rolledMax;
+    const override =
+      maxOverride === undefined
+        ? numberOrNullStrict(previous.maxOverride)
+        : maxOverride === null || maxOverride === ''
+          ? null
+          : nonNegativeNumber(maxOverride, 0);
+    const effectiveMax = override == null ? rolledMax : override;
     let currentValue = nonNegativeNumber(current, previous.current ?? 0);
-    if (Number.isFinite(Number(effectiveMax))) currentValue = Math.min(currentValue, Number(effectiveMax));
+    if (Number.isFinite(Number(effectiveMax)))
+      currentValue = Math.min(currentValue, Number(effectiveMax));
     const next = {
       provider: effectiveProvider,
       regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
       current: currentValue,
       max: rolledMax,
-      ...(override != null ? { maxOverride: override } : {}),
+      ...(override == null ? {} : { maxOverride: override }),
       // Preserve the regen anchor so a manual GM set does not reset the clock.
-      ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
+      ...(previous.lastRegenWorldTime === undefined
+        ? {}
+        : { lastRegenWorldTime: previous.lastRegenWorldTime }),
     };
-    state.stamina = { ...(state.stamina || {}), [key]: next };
+    state.stamina = { ...state.stamina, [key]: next };
     state.history = [
-      this._historyEvent('stamina.set', { systemId: key, current: next.current, max: next.max, maxOverride: override }),
-      ...normalizeList(state.history)
+      this._historyEvent('stamina.set', {
+        systemId: key,
+        current: next.current,
+        max: next.max,
+        maxOverride: override,
+      }),
+      ...normalizeList(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaAdjusted', { actor, systemId: key, stamina: cloneJson(next) });
+    this._callHook('fabricate.gathering.staminaAdjusted', {
+      actor,
+      systemId: key,
+      stamina: cloneJson(next),
+    });
     return cloneJson(next);
   }
 
@@ -891,7 +1063,7 @@ export class GatheringRichStateService {
     const key = systemId || 'default';
     const effective = this.getActorStamina(actor, key);
     const next = Math.max(0, Number(effective.current || 0) + Number(delta || 0));
-    const clamped = effective.max !== null ? Math.min(next, effective.max) : next;
+    const clamped = effective.max === null ? next : Math.min(next, effective.max);
     const state = readState(actor);
     const previous = state.stamina?.[key] || {};
     // Preserve the stored max verbatim (null stays null) so the system default
@@ -902,16 +1074,26 @@ export class GatheringRichStateService {
       regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
       current: clamped,
       max: numberOrNullStrict(previous.max),
-      ...(previousOverride != null ? { maxOverride: previousOverride } : {}),
-      ...(previous.lastRegenWorldTime !== undefined ? { lastRegenWorldTime: previous.lastRegenWorldTime } : {})
+      ...(previousOverride == null ? {} : { maxOverride: previousOverride }),
+      ...(previous.lastRegenWorldTime === undefined
+        ? {}
+        : { lastRegenWorldTime: previous.lastRegenWorldTime }),
     };
-    state.stamina = { ...(state.stamina || {}), [key]: entry };
+    state.stamina = { ...state.stamina, [key]: entry };
     state.history = [
-      this._historyEvent('stamina.adjust', { systemId: key, delta: Number(delta || 0), current: clamped }),
-      ...normalizeList(state.history)
+      this._historyEvent('stamina.adjust', {
+        systemId: key,
+        delta: Number(delta || 0),
+        current: clamped,
+      }),
+      ...normalizeList(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaAdjusted', { actor, systemId: key, stamina: cloneJson(entry) });
+    this._callHook('fabricate.gathering.staminaAdjusted', {
+      actor,
+      systemId: key,
+      stamina: cloneJson(entry),
+    });
     return cloneJson(entry);
   }
 
@@ -921,12 +1103,15 @@ export class GatheringRichStateService {
     const existing = this._currentNodeState(environment, taskId);
     if (!existing) return null;
     // A null/undefined max keeps the existing cap (don't let Number(null)→0 wipe it).
-    const nextMax = (max === null || max === undefined) ? Number(existing.max || 0) : nonNegativeInteger(max, existing.max);
+    const nextMax =
+      max === null || max === undefined
+        ? Number(existing.max || 0)
+        : nonNegativeInteger(max, existing.max);
     const node = {
       ...existing,
       enabled: true,
       max: nextMax,
-      current: Math.min(nonNegativeInteger(current, nextMax), nextMax)
+      current: Math.min(nonNegativeInteger(current, nextMax), nextMax),
     };
     const updated = await this._writeNodeState({ environmentId, taskId, node });
     this._callHook('fabricate.gathering.nodeRestocked', { environmentId, taskId, current, max });
@@ -941,8 +1126,11 @@ export class GatheringRichStateService {
   _currentNodeState(environment, taskId) {
     const runtime = environment?.nodeRuntime?.[taskId];
     if (runtime) return runtime;
-    const libraryTasks = this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
-    const config = normalizeNodeConfig(normalizeList(libraryTasks).find(task => task?.id === taskId)?.nodes);
+    const libraryTasks =
+      this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
+    const config = normalizeNodeConfig(
+      normalizeList(libraryTasks).find((task) => task?.id === taskId)?.nodes
+    );
     return config ? { ...config, current: config.max } : null;
   }
 
@@ -955,7 +1143,7 @@ export class GatheringRichStateService {
     const stored = this.environmentStore?.get?.(environmentId);
     if (!stored) return null;
     return this.environmentStore.update(environmentId, {
-      nodeRuntime: { ...(stored.nodeRuntime || {}), [taskId]: node }
+      nodeRuntime: { ...stored.nodeRuntime, [taskId]: node },
     });
   }
 
@@ -971,7 +1159,13 @@ export class GatheringRichStateService {
    * @param {object} payload
    * @returns {Promise<object|null>} The updated stamina entry, or null on no-op.
    */
-  async regenerateActorStamina({ actor, systemId, system = null, environment = null, worldTime } = {}) {
+  async regenerateActorStamina({
+    actor,
+    systemId,
+    system = null,
+    environment = null,
+    worldTime,
+  } = {}) {
     const key = systemId || 'default';
     const econ = this._systemEconomy(key);
     if (econ.stamina?.enabled !== true) return null;
@@ -988,7 +1182,9 @@ export class GatheringRichStateService {
     if (max == null) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
-    const last = Number.isFinite(Number(entry.lastRegenWorldTime)) ? Number(entry.lastRegenWorldTime) : now;
+    const last = Number.isFinite(Number(entry.lastRegenWorldTime))
+      ? Number(entry.lastRegenWorldTime)
+      : now;
 
     // World time stood still or ran backwards: re-anchor, never regenerate.
     if (now <= last) {
@@ -1010,16 +1206,32 @@ export class GatheringRichStateService {
       return null;
     }
 
-    const perInterval = await this._regenAmountPerInterval({ actor, systemId: key, system, environment, regen });
+    const perInterval = await this._regenAmountPerInterval({
+      actor,
+      systemId: key,
+      system,
+      environment,
+      regen,
+    });
     const nextCurrent = perInterval > 0 ? Math.min(max, before + perInterval * intervals) : before;
     const next = { ...entry, current: nextCurrent, lastRegenWorldTime: advancedAnchor };
-    state.stamina = { ...(state.stamina || {}), [key]: next };
+    state.stamina = { ...state.stamina, [key]: next };
     state.history = [
-      this._historyEvent('stamina.regen', { systemId: key, amount: nextCurrent - before, current: nextCurrent, max }),
-      ...normalizeList(state.history)
+      this._historyEvent('stamina.regen', {
+        systemId: key,
+        amount: nextCurrent - before,
+        current: nextCurrent,
+        max,
+      }),
+      ...normalizeList(state.history),
     ].slice(0, 50);
     await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaRegenerated', { actor, systemId: key, amount: nextCurrent - before, stamina: cloneJson(next) });
+    this._callHook('fabricate.gathering.staminaRegenerated', {
+      actor,
+      systemId: key,
+      amount: nextCurrent - before,
+      stamina: cloneJson(next),
+    });
     return cloneJson(next);
   }
 
@@ -1050,14 +1262,22 @@ export class GatheringRichStateService {
     // re-depletes to pick up the new config. A sequential loop (not `.map`) so the
     // `expression` gain mode can await.
     let runtimeChanged = false;
-    const nodeRuntime = { ...(environment.nodeRuntime || {}) };
+    const nodeRuntime = { ...environment.nodeRuntime };
     // Resolve the library node configs once for this environment (not per node).
     const libNodes = this._libraryNodeConfigs(environment.craftingSystemId);
     for (const [taskId, node] of Object.entries(nodeRuntime)) {
       const effective = this._mergeNodeConfigState(libNodes.get(String(taskId)) || null, node);
-      // eslint-disable-next-line no-await-in-loop
-      const result = await this._respawnNode(effective, { now, environment, environmentId: environment.id, taskId });
-      if (result.changed) { runtimeChanged = true; nodeRuntime[taskId] = result.node; }
+
+      const result = await this._respawnNode(effective, {
+        now,
+        environment,
+        environmentId: environment.id,
+        taskId,
+      });
+      if (result.changed) {
+        runtimeChanged = true;
+        nodeRuntime[taskId] = result.node;
+      }
     }
 
     if (!runtimeChanged) return null;
@@ -1111,14 +1331,19 @@ export class GatheringRichStateService {
       // STATE stays per-environment: the live count, clamped to the library cap so
       // a lowered cap can't leave `current` above `max`.
       current: Number.isFinite(storedCurrent)
-        ? (Number.isFinite(max) ? Math.min(storedCurrent, max) : storedCurrent)
+        ? Number.isFinite(max)
+          ? Math.min(storedCurrent, max)
+          : storedCurrent
         : libNode.current,
       respawn: {
         ...cloneJson(libNode.respawn || { policy: 'manual' }),
         lastEvaluatedWorldTime: numberOrNullStrict(storedRespawn.lastEvaluatedWorldTime),
         nextEvaluationWorldTime: numberOrNullStrict(storedRespawn.nextEvaluationWorldTime),
-        lastRoll: storedRespawn.lastRoll && typeof storedRespawn.lastRoll === 'object' ? cloneJson(storedRespawn.lastRoll) : null
-      }
+        lastRoll:
+          storedRespawn.lastRoll && typeof storedRespawn.lastRoll === 'object'
+            ? cloneJson(storedRespawn.lastRoll)
+            : null,
+      },
     };
     if (stored?.showCountsToPlayers === true) merged.showCountsToPlayers = true;
     return merged;
@@ -1161,15 +1386,21 @@ export class GatheringRichStateService {
       const interval = respawn.intervalUnit
         ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
         : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : now;
+      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
+        ? Number(respawn.lastEvaluatedWorldTime)
+        : now;
       if (interval > 0 && now > last) {
         const elapsedIntervals = Math.floor((now - last) / interval);
         const room = Math.max(0, Number(nodes.max || 0) - Number(nodes.current || 0));
         const needed = Math.min(Math.max(0, elapsedIntervals), room);
         expressionRolls = [];
         for (let i = 0; i < needed; i++) {
-          // eslint-disable-next-line no-await-in-loop
-          expressionRolls.push(await this._respawnExpressionAmount({ expression: respawn.amountExpression, environment }));
+          expressionRolls.push(
+            await this._respawnExpressionAmount({
+              expression: respawn.amountExpression,
+              environment,
+            })
+          );
         }
       }
     }
@@ -1181,7 +1412,8 @@ export class GatheringRichStateService {
       // Raw 1..100 roll seam (the math hits on `roll <= chance*100` and persists
       // the raw roll in `lastRoll.rolls`, identical to the prior env path).
       rollChance: () => Number(this.rollD100()),
-      rollExpression: () => (expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0)
+      rollExpression: () =>
+        expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0,
     });
 
     if (changed) {
@@ -1190,7 +1422,13 @@ export class GatheringRichStateService {
       // Only emit the respawn hook when the count actually moved (a pure
       // re-anchor changes the node but gains nothing).
       if (nextCurrent !== before) {
-        this._callHook('fabricate.gathering.nodeRespawned', { environmentId, taskId, amount: nextCurrent - before, current: nextCurrent, max });
+        this._callHook('fabricate.gathering.nodeRespawned', {
+          environmentId,
+          taskId,
+          amount: nextCurrent - before,
+          current: nextCurrent,
+          max,
+        });
       }
     }
     return { changed, node };
@@ -1222,23 +1460,23 @@ export class GatheringRichStateService {
    * @returns {Promise<number>} Non-negative integer node gain for one interval.
    */
   async _respawnExpressionAmount({ expression, environment = null } = {}) {
-    if (expression === null || expression === undefined || String(expression).trim() === '') return 0;
+    if (expression === null || expression === undefined || String(expression).trim() === '')
+      return 0;
     let value;
     try {
-      if (typeof this.evaluateExpression === 'function') {
-        value = await this.evaluateExpression({
-          expression: String(expression),
-          provider: null,
-          actor: null,
-          kind: 'nodeRespawn',
-          system: null,
-          environment
-        });
-      } else {
-        // No Roll available (e.g. headless): a plain number still resolves.
-        value = Number(expression);
-      }
-    } catch (_err) {
+      value =
+        typeof this.evaluateExpression === 'function'
+          ? await this.evaluateExpression({
+              expression: String(expression),
+              provider: null,
+              actor: null,
+              kind: 'nodeRespawn',
+              system: null,
+              environment,
+            })
+          : // No Roll available (e.g. headless): a plain number still resolves.
+            Number(expression);
+    } catch {
       // A malformed dice string (e.g. `1d`, `(`) or an `@actor.*` reference with
       // no actor must not abort respawn for the rest of the environment — treat
       // this interval as no gain.
@@ -1256,18 +1494,24 @@ export class GatheringRichStateService {
     if (!environment) return null;
     const updated = await this.environmentStore.update(environmentId, {
       conditions: {
-        ...(environment.conditions || {}),
-        ...conditions
-      }
+        ...environment.conditions,
+        ...conditions,
+      },
     });
-    this._callHook('fabricate.gathering.conditionsUpdated', { environmentId, conditions: updated?.conditions || {} });
+    this._callHook('fabricate.gathering.conditionsUpdated', {
+      environmentId,
+      conditions: updated?.conditions || {},
+    });
     return updated;
   }
 
   async revealTask(actor, { environmentId, taskId, scope = 'actor' } = {}) {
     const state = readState(actor);
     const key = revealKey({ environmentId, taskId, scope, actor, userId: this.getUserId() });
-    state.reveals = { ...(state.reveals || {}), [key]: this._historyEvent('blind.reveal', { environmentId, taskId, scope }) };
+    state.reveals = {
+      ...state.reveals,
+      [key]: this._historyEvent('blind.reveal', { environmentId, taskId, scope }),
+    };
     await writeState(actor, state);
     this._callHook('fabricate.gathering.blindRevealed', { actor, environmentId, taskId, scope });
     return cloneJson(state.reveals[key]);
@@ -1321,7 +1565,7 @@ export class GatheringRichStateService {
     let reveals;
     try {
       reveals = readState(actor)?.reveals;
-    } catch (_err) {
+    } catch {
       return [];
     }
     if (!reveals || typeof reveals !== 'object') return [];
@@ -1333,7 +1577,7 @@ export class GatheringRichStateService {
       taskId: sentinel,
       scope,
       actor,
-      userId: this.getUserId()
+      userId: this.getUserId(),
     });
     const prefix = sampleKey.slice(0, sampleKey.length - sentinel.length);
     const taskIds = new Set();
@@ -1342,7 +1586,7 @@ export class GatheringRichStateService {
       const taskId = key.slice(prefix.length);
       if (taskId) taskIds.add(taskId);
     }
-    return Array.from(taskIds);
+    return [...taskIds];
   }
 
   /**
@@ -1362,13 +1606,16 @@ export class GatheringRichStateService {
     const config = this._config();
     const optionsById = new Map();
     const systemBiomes = config.systems?.[String(systemId)]?.vocabularies?.biomes;
-    for (const option of normalizeVocabularyOptions('biomes', systemBiomes?.values ?? systemBiomes)) {
+    for (const option of normalizeVocabularyOptions(
+      'biomes',
+      systemBiomes?.values ?? systemBiomes
+    )) {
       optionsById.set(option.id, option);
     }
     for (const option of normalizeVocabularyOptions('biomes', config.vocabularies?.biomes)) {
       if (!optionsById.has(option.id)) optionsById.set(option.id, option);
     }
-    return ids.map(id => optionsById.get(id) ?? normalizeVocabularyOption('biomes', id));
+    return ids.map((id) => optionsById.get(id) ?? normalizeVocabularyOption('biomes', id));
   }
 
   async evaluateStart({ actor, system, environment, task, viewer } = {}) {
@@ -1390,28 +1637,37 @@ export class GatheringRichStateService {
       evidence.stamina = { cost, base: Number(task.staminaCost || 0), state: stamina };
       // Only enforce when a pool exists (max configured); no max ⇒ no stamina limit.
       if (cost > 0 && stamina.max != null && Number(stamina.current ?? 0) < cost) {
-        blockedReasons.push(this._blockedReason('STAMINA_BLOCKED', {
-          taskId: task.id,
-          required: cost,
-          current: stamina.current ?? 0
-        }));
+        blockedReasons.push(
+          this._blockedReason('STAMINA_BLOCKED', {
+            taskId: task.id,
+            required: cost,
+            current: stamina.current ?? 0,
+          })
+        );
       }
     }
 
     return { blockedReasons, evidence };
   }
 
-  async commitAcceptedAttempt({ actor, system, environment, task, outcome = null, viewer = null } = {}) {
+  async commitAcceptedAttempt({
+    actor,
+    system,
+    environment,
+    task,
+    outcome = null,
+    viewer = null,
+  } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
       risk: task?.riskOverride || environment?.risk || 'safe',
       node: null,
       stamina: null,
       characterModifierSnapshot: cloneJson(
-        outcome?.characterModifierSnapshot
-          ?? outcome?.checkResult?.characterModifierSnapshot
-          ?? null
-      )
+        outcome?.characterModifierSnapshot ??
+          outcome?.checkResult?.characterModifierSnapshot ??
+          null
+      ),
     };
 
     const systemId = system?.id || environment?.craftingSystemId;
@@ -1431,7 +1687,10 @@ export class GatheringRichStateService {
       // this, a freshly-seeded pool carries lastEvaluatedWorldTime: null and the
       // first tick is wasted on anchoring (mirrors stamina pool anchor seeding).
       if (node.respawn?.policy === 'overTime' && node.respawn.lastEvaluatedWorldTime == null) {
-        node.respawn = { ...node.respawn, lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0) };
+        node.respawn = {
+          ...node.respawn,
+          lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0),
+        };
       }
       await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
       evidence.node = { taskId: task.id, consumed: 1, remaining: current };
@@ -1449,12 +1708,27 @@ export class GatheringRichStateService {
       }
     }
 
-    this._callHook('fabricate.gathering.richAttemptCommitted', { actor, system, environment, task, outcome, evidence });
+    this._callHook('fabricate.gathering.richAttemptCommitted', {
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      evidence,
+    });
     return evidence;
   }
 
-  _recordMatchesEnvironment(record, environment, conditions, { includeDanger, conditionSettings = null }) {
-    return evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings }).matches;
+  _recordMatchesEnvironment(
+    record,
+    environment,
+    conditions,
+    { includeDanger, conditionSettings = null }
+  ) {
+    return evaluateEnvironmentMatch(record, environment, conditions, {
+      includeDanger,
+      conditionSettings,
+    }).matches;
   }
 
   _environmentAllowsLibraryRecord(environment, id, kind) {
@@ -1495,7 +1769,9 @@ export class GatheringRichStateService {
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
     if (compositionMode !== 'manual' && disabled.includes(String(id))) return false;
     if (compositionMode === 'manual') {
-      const forced = normalizeList(environment?.[kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds']).map(String);
+      const forced = normalizeList(
+        environment?.[kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds']
+      ).map(String);
       return enabled.includes(String(id)) || forced.includes(String(id));
     }
     return true;
@@ -1512,16 +1788,21 @@ export class GatheringRichStateService {
       enabled: normalized.enabled,
       resolutionMode: 'd100',
       itemSelectionMode: normalized.itemSelectionMode,
-      dropRows: normalized.dropRows.map(row => applyDropRateAdjustment(row, rowAdjustments[row.id])),
+      dropRows: normalized.dropRows.map((row) =>
+        applyDropRateAdjustment(row, rowAdjustments[row.id])
+      ),
       staminaCost: normalized.staminaCost,
-      staminaCostModifiers: Array.isArray(normalized.staminaCostModifiers) ? cloneJson(normalized.staminaCostModifiers) : [],
+      staminaCostModifiers: Array.isArray(normalized.staminaCostModifiers)
+        ? cloneJson(normalized.staminaCostModifiers)
+        : [],
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
       resultSelection: { provider: 'd100Rows' },
       catalysts: [],
-      toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : []
+      toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : [],
     };
-    if (normalized.timeRequirement) runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
+    if (normalized.timeRequirement)
+      runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
     // Resource nodes are per-environment: use this environment's stored runtime
     // pool if present, else seed a fresh full pool from the library config. The
     // seed is read-only here; it persists on first depletion.
@@ -1546,14 +1827,15 @@ export class GatheringRichStateService {
    */
   async removeSystem(systemId) {
     if (!systemId) return false;
-    if (typeof this.getSetting !== 'function' || typeof this.setSetting !== 'function') return false;
+    if (typeof this.getSetting !== 'function' || typeof this.setSetting !== 'function')
+      return false;
     const target = String(systemId);
     const raw = this.getSetting(this.settingKey);
     const systems = raw?.systems;
     if (!systems || typeof systems !== 'object' || !(target in systems)) return false;
     const nextSystems = { ...systems };
     delete nextSystems[target];
-    const next = { ...(raw || {}), systems: nextSystems };
+    const next = { ...raw, systems: nextSystems };
     await this.setSetting(this.settingKey, next);
     return true;
   }
@@ -1579,12 +1861,16 @@ export class GatheringRichStateService {
   async setSystemEconomy({ systemId, economy } = {}) {
     if (!systemId || typeof this.setSetting !== 'function') return null;
     const target = String(systemId);
-    const raw = (typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : null) || {};
-    const systems = { ...(raw.systems || {}) };
+    const raw =
+      (typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : null) || {};
+    const systems = { ...raw.systems };
     const normalized = normalizeGatheringEconomy(economy);
-    systems[target] = { ...(systems[target] || {}), economy: cloneJson(normalized) };
+    systems[target] = { ...systems[target], economy: cloneJson(normalized) };
     await this.setSetting(this.settingKey, { ...raw, systems });
-    this._callHook('fabricate.gathering.economyUpdated', { systemId: target, economy: cloneJson(normalized) });
+    this._callHook('fabricate.gathering.economyUpdated', {
+      systemId: target,
+      economy: cloneJson(normalized),
+    });
     return normalized;
   }
 
@@ -1685,11 +1971,16 @@ export class GatheringRichStateService {
    * @returns {Map<string, object>}
    */
   _modifierLibrary({ environment = null, systemId = null } = {}) {
-    if (environment?.__libraryCharacterModifiers instanceof Map && environment.__libraryCharacterModifiers.size > 0) {
+    if (
+      environment?.__libraryCharacterModifiers instanceof Map &&
+      environment.__libraryCharacterModifiers.size > 0
+    ) {
       return environment.__libraryCharacterModifiers;
     }
-    const entries = this._config().systems?.[String(systemId || environment?.craftingSystemId || '')]?.characterModifiers || [];
-    return new Map(entries.map(entry => [String(entry.id), entry]));
+    const entries =
+      this._config().systems?.[String(systemId || environment?.craftingSystemId || '')]
+        ?.characterModifiers || [];
+    return new Map(entries.map((entry) => [String(entry.id), entry]));
   }
 
   /**
@@ -1707,12 +1998,23 @@ export class GatheringRichStateService {
     if (base <= 0) return 0;
     const references = normalizeList(task?.staminaCostModifiers);
     if (references.length === 0) return Math.max(0, Math.round(base));
-    const library = this._modifierLibrary({ environment, systemId: system?.id || environment?.craftingSystemId });
+    const library = this._modifierLibrary({
+      environment,
+      systemId: system?.id || environment?.craftingSystemId,
+    });
     let total = base;
     for (const reference of references) {
       const entry = library.get(String(reference.modifierId)) || null;
       const resolved = await this._resolveCharacterModifierContribution({
-        reference, libraryEntry: entry, actor, environment, task, row: null, event: null, viewer, system
+        reference,
+        libraryEntry: entry,
+        actor,
+        environment,
+        task,
+        row: null,
+        event: null,
+        viewer,
+        system,
       });
       if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
     }
@@ -1744,23 +2046,27 @@ export class GatheringRichStateService {
    * @param {object} payload
    * @returns {Promise<number>} Non-negative integer amount per interval.
    */
-  async _regenAmountPerInterval({ actor, systemId, system = null, environment = null, regen } = {}) {
+  async _regenAmountPerInterval({
+    actor,
+    systemId: _systemId,
+    system = null,
+    environment = null,
+    regen,
+  } = {}) {
     const expression = regen?.amount;
-    if (expression === null || expression === undefined || expression === '') return 0;
-    let value;
-    if (typeof this.evaluateExpression === 'function') {
-      value = await this.evaluateExpression({
-        expression: String(expression),
-        provider: null,
-        actor,
-        kind: 'staminaRegen',
-        system,
-        environment
-      });
-    } else {
-      // No Roll available (e.g. headless): a plain number still resolves.
-      value = Number(expression);
-    }
+    if (expression == null || expression === '') return 0;
+    const value =
+      typeof this.evaluateExpression === 'function'
+        ? await this.evaluateExpression({
+            expression: String(expression),
+            provider: null,
+            actor,
+            kind: 'staminaRegen',
+            system,
+            environment,
+          })
+        : // No Roll available (e.g. headless): a plain number still resolves.
+          Number(expression);
     const numeric = Number(value);
     return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
   }
@@ -1769,7 +2075,7 @@ export class GatheringRichStateService {
     return {
       code,
       messageKey: BLOCKED_REASON_KEYS[code] || `FABRICATE.Gathering.Blocked.${code}`,
-      data
+      data,
     };
   }
 
@@ -1778,7 +2084,7 @@ export class GatheringRichStateService {
       id: `${type}-${this._now()}-${Math.random().toString(36).slice(2)}`,
       type,
       worldTime: this._now(),
-      ...cloneJson(data)
+      ...cloneJson(data),
     };
   }
 
@@ -1790,8 +2096,8 @@ export class GatheringRichStateService {
   _callHook(name, payload) {
     try {
       this.hooks?.callAll?.(name, payload);
-    } catch (err) {
-      console.warn(`Fabricate | Gathering hook failed: ${name}`, err);
+    } catch (error) {
+      console.warn(`Fabricate | Gathering hook failed: ${name}`, error);
     }
   }
 }
@@ -1801,7 +2107,6 @@ function shouldDepleteNode(task, outcome) {
   if (task.nodes.depletionTiming === 'onSuccess') return outcome?.status === 'succeeded';
   return true;
 }
-
 
 /**
  * Normalize a per-system gathering economy block. Two independent boolean
@@ -1824,8 +2129,10 @@ function normalizeGatheringEconomy(raw = {}) {
   const regen = raw?.stamina?.regen || {};
   // "New flags present" means the KEY exists (not merely truthy). Only when
   // neither key exists do we fall back to mapping a legacy `mode`.
-  const hasStaminaFlag = raw?.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
-  const hasNodesFlag = raw?.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
+  const hasStaminaFlag =
+    raw?.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
+  const hasNodesFlag =
+    raw?.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
   const legacyMode = ECONOMY_MODES.has(raw?.mode) ? raw.mode : 'none';
   const staminaEnabled = hasStaminaFlag ? raw.stamina.enabled === true : legacyMode === 'stamina';
   const nodesEnabled = hasNodesFlag ? raw.nodes.enabled === true : legacyMode === 'nodes';
@@ -1837,15 +2144,18 @@ function normalizeGatheringEconomy(raw = {}) {
       max: stringOrFallback(raw?.stamina?.max, ''),
       start: stringOrFallback(raw?.stamina?.start, ''),
       regen: {
-        policy: STAMINA_REGEN_POLICIES.has(regen.policy) ? regen.policy : (LEGACY_STAMINA_REGEN_POLICY_MAP[regen.policy] ?? 'none'),
+        policy: STAMINA_REGEN_POLICIES.has(regen.policy)
+          ? regen.policy
+          : (LEGACY_STAMINA_REGEN_POLICY_MAP[regen.policy] ?? 'none'),
         unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
         // A single expression: a plain number ("1") or a formula with character
         // references ("1 + @abilities.con.mod"), evaluated per actor in-game.
         amount: stringOrFallback(regen.amount, ''),
-        lastRoll: regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null
-      }
+        lastRoll:
+          regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null,
+      },
     },
-    nodes: { enabled: nodesEnabled }
+    nodes: { enabled: nodesEnabled },
   };
 }
 
@@ -1854,32 +2164,36 @@ function normalizeGatheringConfig(raw = {}) {
     biomes: seedVocabulary(raw?.vocabularies?.biomes, DEFAULT_VOCABULARIES.biomes),
     danger: seedVocabulary(raw?.vocabularies?.danger, DEFAULT_VOCABULARIES.danger),
     weather: seedVocabulary(raw?.vocabularies?.weather, DEFAULT_VOCABULARIES.weather),
-    timeOfDay: seedVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_VOCABULARIES.timeOfDay)
+    timeOfDay: seedVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_VOCABULARIES.timeOfDay),
   };
   const weather = normalizeConditionId(raw?.conditions?.weather) || DEFAULT_CONDITIONS.weather;
-  const timeOfDay = normalizeConditionId(raw?.conditions?.timeOfDay) || DEFAULT_CONDITIONS.timeOfDay;
+  const timeOfDay =
+    normalizeConditionId(raw?.conditions?.timeOfDay) || DEFAULT_CONDITIONS.timeOfDay;
   const systems = {};
   for (const [systemId, config] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
       rules: normalizeGatheringRules(config?.rules),
-      conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
+      conditions: normalizeSystemConditions(config?.conditions, {
+        vocabularies,
+        conditions: { weather, timeOfDay },
+      }),
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
       events: normalizeList(config?.events).map(normalizeEvent),
       characterModifiers: normalizeList(config?.characterModifiers)
-        .map(entry => normalizeCharacterModifierLibraryEntry(entry))
+        .map((entry) => normalizeCharacterModifierLibraryEntry(entry))
         .filter(Boolean),
-      economy: normalizeGatheringEconomy(config?.economy)
+      economy: normalizeGatheringEconomy(config?.economy),
     };
   }
   return {
     vocabularies,
     conditions: {
       weather: weather || DEFAULT_CONDITIONS.weather,
-      timeOfDay: timeOfDay || DEFAULT_CONDITIONS.timeOfDay
+      timeOfDay: timeOfDay || DEFAULT_CONDITIONS.timeOfDay,
     },
-    systems
+    systems,
   };
 }
 
@@ -1889,23 +2203,36 @@ function normalizeSystemConditions(raw = {}, fallback = {}) {
     const fallbackValues = fallback?.vocabularies?.[kind] || DEFAULT_VOCABULARIES[kind];
     const enabled = raw?.[kind]?.enabled !== false;
     const explicitValues = Array.isArray(raw?.[kind]?.values);
-    const normalizedValues = explicitValues ? normalizeConditionOptions(kind, raw?.[kind]?.values) : seedConditionOptions(kind, raw?.[kind]?.values, fallbackValues);
-    const values = normalizedValues.length > 0 || !enabled ? normalizedValues : normalizeConditionOptions(kind, fallbackValues);
-    const fallbackCurrent = normalizeConditionId(fallback?.conditions?.[kind]) || DEFAULT_CONDITIONS[kind];
+    const normalizedValues = explicitValues
+      ? normalizeConditionOptions(kind, raw?.[kind]?.values)
+      : seedConditionOptions(kind, raw?.[kind]?.values, fallbackValues);
+    const values =
+      normalizedValues.length > 0 || !enabled
+        ? normalizedValues
+        : normalizeConditionOptions(kind, fallbackValues);
+    const fallbackCurrent =
+      normalizeConditionId(fallback?.conditions?.[kind]) || DEFAULT_CONDITIONS[kind];
     const requestedCurrent = normalizeConditionId(raw?.[kind]?.current) || fallbackCurrent;
-    const valueIds = values.map(option => option.id);
+    const valueIds = values.map((option) => option.id);
     normalized[kind] = {
       enabled,
-      current: valueIds.includes(requestedCurrent) ? requestedCurrent : values[0]?.id || DEFAULT_CONDITIONS[kind],
-      values
+      current: valueIds.includes(requestedCurrent)
+        ? requestedCurrent
+        : values[0]?.id || DEFAULT_CONDITIONS[kind],
+      values,
     };
   }
   return normalized;
 }
 
 function resolveSystemConditionSettings(config, systemId) {
-  return config?.systems?.[systemId]?.conditions
-    || normalizeSystemConditions(null, { vocabularies: config?.vocabularies, conditions: config?.conditions });
+  return (
+    config?.systems?.[systemId]?.conditions ||
+    normalizeSystemConditions(null, {
+      vocabularies: config?.vocabularies,
+      conditions: config?.conditions,
+    })
+  );
 }
 
 function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
@@ -1913,9 +2240,11 @@ function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
   for (const kind of VOCABULARY_DIMENSIONS) {
     const rawValues = Array.isArray(raw?.[kind]?.values)
       ? raw[kind].values
-      : (Array.isArray(raw?.[kind]) ? raw[kind] : fallbackVocabularies?.[kind]);
+      : Array.isArray(raw?.[kind])
+        ? raw[kind]
+        : fallbackVocabularies?.[kind];
     normalized[kind] = {
-      values: normalizeVocabularyOptions(kind, rawValues)
+      values: normalizeVocabularyOptions(kind, rawValues),
     };
   }
   return normalized;
@@ -1924,7 +2253,7 @@ function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
 function conditionSettingsToCurrent(settings) {
   return {
     weather: settings?.weather?.current || DEFAULT_CONDITIONS.weather,
-    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay
+    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay,
   };
 }
 
@@ -1938,22 +2267,27 @@ function normalizeLibraryTask(task = {}) {
     biomes: normalizeTagList(task.biomes),
     weather: normalizeConditionIdList(task.weather),
     timeOfDay: normalizeConditionIdList(task.timeOfDay),
-    itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
+    itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode)
+      ? task.itemSelectionMode
+      : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     staminaCostModifiers: normalizeCharacterModifierReferenceList(task.staminaCostModifiers),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
     timeRequirement: plainObjectOrNull(task.timeRequirement),
     toolIds: Array.isArray(task.toolIds)
-      ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
+      ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
-    nodes: normalizeNodeConfig(task.nodes)
+    nodes: normalizeNodeConfig(task.nodes),
   };
 }
 
 function normalizeItemDrop(row = {}) {
   return {
-    id: stringOrFallback(row.id, `drop-${normalizeTag(row.componentId ?? row.itemUuid ?? row.name) || 'row'}`),
+    id: stringOrFallback(
+      row.id,
+      `drop-${normalizeTag(row.componentId ?? row.itemUuid ?? row.name) || 'row'}`
+    ),
     name: stringOrFallback(row.name, ''),
     componentId: stringOrFallback(row.componentId ?? row.systemItemId, ''),
     itemUuid: stringOrFallback(row.itemUuid, ''),
@@ -1961,7 +2295,7 @@ function normalizeItemDrop(row = {}) {
     dropRate: clampDropRate(row.dropRate),
     conditionModifiers: normalizeDropConditionModifiers(row.conditionModifiers),
     characterModifiers: normalizeDropCharacterModifiers(row.characterModifiers),
-    enabled: row.enabled !== false
+    enabled: row.enabled !== false,
   };
 }
 
@@ -1976,7 +2310,7 @@ function normalizeToolRequirement(input) {
   return {
     provider,
     formula: typeof input.formula === 'string' ? input.formula : '',
-    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : '',
   };
 }
 
@@ -1996,7 +2330,7 @@ function normalizeToolBreakage(input) {
   return {
     mode,
     formula: typeof input?.formula === 'string' ? input.formula : '',
-    threshold: Number.isFinite(threshold) ? threshold : 0
+    threshold: Number.isFinite(threshold) ? threshold : 0,
   };
 }
 
@@ -2005,9 +2339,8 @@ function normalizeToolOnBreak(input) {
   if (mode === 'replaceWith') {
     return {
       mode,
-      replacementComponentId: typeof input?.replacementComponentId === 'string'
-        ? input.replacementComponentId
-        : null
+      replacementComponentId:
+        typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null,
     };
   }
   return { mode };
@@ -2026,7 +2359,7 @@ function normalizeLibraryTool(tool = {}) {
     componentId,
     requirement: normalizeToolRequirement(tool.requirement),
     breakage: normalizeToolBreakage(tool.breakage),
-    onBreak: normalizeToolOnBreak(tool.onBreak)
+    onBreak: normalizeToolOnBreak(tool.onBreak),
   };
 }
 
@@ -2045,7 +2378,7 @@ function normalizeEvent(event = {}) {
     linkedSceneUuid: stringOrFallback(event.linkedSceneUuid, ''),
     eventModifier: normalizeModifierProvider(event.eventModifier ?? event.modifier),
     conditionModifiers: normalizeDropConditionModifiers(event.conditionModifiers),
-    characterModifiers: normalizeEventCharacterModifiers(event.characterModifiers)
+    characterModifiers: normalizeEventCharacterModifiers(event.characterModifiers),
   };
 }
 
@@ -2057,15 +2390,26 @@ function normalizeDropRateAdjustmentValue(value) {
 
 function dropRateAdjustmentMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value)
-    .map(([id, adjustment]) => [String(id || '').trim(), normalizeDropRateAdjustmentValue(adjustment)])
-    .filter(([id, adjustment]) => id && adjustment !== 0));
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([id, adjustment]) => [
+        String(id || '').trim(),
+        normalizeDropRateAdjustmentValue(adjustment),
+      ])
+      .filter(([id, adjustment]) => id && adjustment !== 0)
+  );
 }
 
 function taskDropRateAdjustmentMap(environment, taskId) {
   const id = String(taskId || '');
   const enabledMap = environment?.taskDropRateAdjustmentsEnabled;
-  if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) return {};
+  if (
+    enabledMap &&
+    typeof enabledMap === 'object' &&
+    !Array.isArray(enabledMap) &&
+    enabledMap[id] === false
+  )
+    return {};
   const taskMaps = environment?.taskDropRateAdjustments;
   if (!taskMaps || typeof taskMaps !== 'object' || Array.isArray(taskMaps)) return {};
   return dropRateAdjustmentMap(taskMaps[id]);
@@ -2078,14 +2422,19 @@ function applyDropRateAdjustment(row, adjustment = 0) {
     ...cloneJson(row),
     dropRate: clampDropRate(baseDropRate + normalizedAdjustment),
     baseDropRate,
-    environmentDropRateAdjustment: normalizedAdjustment
+    environmentDropRateAdjustment: normalizedAdjustment,
   };
 }
 
 function applyEventDropRateAdjustment(event, environment) {
   const id = String(event?.id || '');
   const enabledMap = environment?.eventDropRateAdjustmentsEnabled;
-  if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) {
+  if (
+    enabledMap &&
+    typeof enabledMap === 'object' &&
+    !Array.isArray(enabledMap) &&
+    enabledMap[id] === false
+  ) {
     return applyDropRateAdjustment(event, 0);
   }
   const adjustments = dropRateAdjustmentMap(environment?.eventDropRateAdjustments);
@@ -2116,7 +2465,7 @@ function normalizeCharacterModifierLibraryEntry(entry = {}) {
     provider,
     expression,
     macroUuid,
-    isRollExpression: ROLL_EXPRESSION_PATTERN.test(expression || '')
+    isRollExpression: ROLL_EXPRESSION_PATTERN.test(expression || ''),
   };
 }
 
@@ -2156,12 +2505,12 @@ function normalizeCharacterModifierReference(ref, index) {
     operator: CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
     min: numberOrNullStrict(ref.min),
     max: numberOrNullStrict(ref.max),
-    expressionOverride: stringOrFallback(ref.expressionOverride, '')
+    expressionOverride: stringOrFallback(ref.expressionOverride, ''),
   };
 }
 
 function numberOrNullStrict(value) {
-  if (value === null || value === undefined || value === '') return null;
+  if (value == null || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -2172,7 +2521,7 @@ function normalizeModifierProvider(provider = null) {
     provider: stringOrFallback(provider.provider, ''),
     value: numberOrNull(provider.value),
     formula: stringOrFallback(provider.formula, ''),
-    macroUuid: stringOrFallback(provider.macroUuid, '')
+    macroUuid: stringOrFallback(provider.macroUuid, ''),
   };
 }
 
@@ -2189,12 +2538,30 @@ function numericModifier(provider = null, fallback = 0) {
   return Number.isFinite(fallbackNumber) ? fallbackNumber : 0;
 }
 
-function rollDropRow({ row, index, roll, modifier, conditions = {}, biomes = [], biomeAggregation = 'strongestOfEach', characterModifierContributions = [] }) {
+function rollDropRow({
+  row,
+  index,
+  roll,
+  modifier,
+  conditions = {},
+  biomes = [],
+  biomeAggregation = 'strongestOfEach',
+  characterModifierContributions = [],
+}) {
   const effectiveRoll = Number(roll) + Number(modifier || 0);
-  const conditionModifier = matchingConditionModifier(row.conditionModifiers, conditions, biomes, biomeAggregation);
-  const characterModifierTotal = (Array.isArray(characterModifierContributions) ? characterModifierContributions : [])
-    .reduce((sum, value) => sum + Number(value || 0), 0);
-  const finalDropRate = Math.min(100, Math.max(0, Number(row.dropRate) + conditionModifier + characterModifierTotal));
+  const conditionModifier = matchingConditionModifier(
+    row.conditionModifiers,
+    conditions,
+    biomes,
+    biomeAggregation
+  );
+  const characterModifierTotal = (
+    Array.isArray(characterModifierContributions) ? characterModifierContributions : []
+  ).reduce((sum, value) => sum + Number(value || 0), 0);
+  const finalDropRate = Math.min(
+    100,
+    Math.max(0, Number(row.dropRate) + conditionModifier + characterModifierTotal)
+  );
   const threshold = 101 - finalDropRate;
   return {
     ...cloneJson(row),
@@ -2206,7 +2573,7 @@ function rollDropRow({ row, index, roll, modifier, conditions = {}, biomes = [],
     finalDropRate,
     effectiveRoll,
     threshold,
-    dropped: effectiveRoll >= threshold
+    dropped: effectiveRoll >= threshold,
   };
 }
 
@@ -2214,7 +2581,7 @@ function normalizeDropConditionModifiers(modifiers = {}) {
   return {
     timeOfDay: normalizeDropConditionModifierList(modifiers?.timeOfDay),
     weather: normalizeDropConditionModifierList(modifiers?.weather),
-    biome: normalizeDropConditionModifierList(modifiers?.biome)
+    biome: normalizeDropConditionModifierList(modifiers?.biome),
   };
 }
 
@@ -2225,27 +2592,37 @@ function normalizeDropConditionModifierList(values = []) {
       const rawValue = Number(modifier?.value);
       if (!conditionId || !Number.isFinite(rawValue)) return null;
       const truncated = Math.trunc(rawValue);
-      const explicitOperator = modifier?.operator === '-' || modifier?.operator === '+'
-        ? modifier.operator
-        : null;
+      const explicitOperator =
+        modifier?.operator === '-' || modifier?.operator === '+' ? modifier.operator : null;
       const operator = explicitOperator ?? (truncated < 0 ? '-' : '+');
       return {
         id: stringOrFallback(modifier?.id, `${conditionId}-${index + 1}`),
         conditionId,
         operator,
-        value: Math.abs(truncated)
+        value: Math.abs(truncated),
       };
     })
     .filter(Boolean);
 }
 
-function matchingConditionModifier(modifiers = {}, conditions = {}, biomes = [], biomeAggregation = 'strongestOfEach') {
+function matchingConditionModifier(
+  modifiers = {},
+  conditions = {},
+  biomes = [],
+  biomeAggregation = 'strongestOfEach'
+) {
   const conditionTotal = ['timeOfDay', 'weather'].reduce((total, kind) => {
     const current = normalizeConditionId(conditions?.[kind]);
     if (!current) return total;
-    return total + normalizeDropConditionModifierList(modifiers?.[kind])
-      .filter(modifier => modifier.conditionId === current)
-      .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
+    return (
+      total +
+      normalizeDropConditionModifierList(modifiers?.[kind])
+        .filter((modifier) => modifier.conditionId === current)
+        .reduce(
+          (sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value),
+          0
+        )
+    );
   }, 0);
   return conditionTotal + matchingBiomeModifier(modifiers?.biome, biomes, biomeAggregation);
 }
@@ -2258,16 +2635,21 @@ function conditionModifierForKind(modifiers = {}, kind, conditions = {}) {
   const current = normalizeConditionId(conditions?.[kind]);
   if (!current) return 0;
   return normalizeDropConditionModifierList(modifiers?.[kind])
-    .filter(modifier => modifier.conditionId === current)
-    .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
+    .filter((modifier) => modifier.conditionId === current)
+    .reduce(
+      (sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value),
+      0
+    );
 }
 
 function matchingBiomeModifier(biomeModifiers = [], biomes = [], aggregation = 'strongestOfEach') {
-  const activeBiomes = new Set((Array.isArray(biomes) ? biomes : []).map(normalizeTag).filter(Boolean));
+  const activeBiomes = new Set(
+    (Array.isArray(biomes) ? biomes : []).map(normalizeTag).filter(Boolean)
+  );
   if (activeBiomes.size === 0) return 0;
   const values = normalizeDropConditionModifierList(biomeModifiers)
-    .filter(modifier => activeBiomes.has(normalizeTag(modifier.conditionId)))
-    .map(modifier => (modifier.operator === '-' ? -modifier.value : modifier.value));
+    .filter((modifier) => activeBiomes.has(normalizeTag(modifier.conditionId)))
+    .map((modifier) => (modifier.operator === '-' ? -modifier.value : modifier.value));
   return aggregateBiomeModifierValues(values, aggregation);
 }
 
@@ -2275,11 +2657,11 @@ function aggregateBiomeModifierValues(values = [], aggregation = 'strongestOfEac
   if (!Array.isArray(values) || values.length === 0) return 0;
   if (aggregation === 'cumulative') return values.reduce((sum, value) => sum + value, 0);
   if (aggregation === 'dominant') {
-    return values.reduce((best, value) => Math.abs(value) > Math.abs(best) ? value : best, 0);
+    return values.reduce((best, value) => (Math.abs(value) > Math.abs(best) ? value : best), 0);
   }
   // strongestOfEach: largest boost plus largest penalty.
-  const positives = values.filter(value => value > 0);
-  const negatives = values.filter(value => value < 0);
+  const positives = values.filter((value) => value > 0);
+  const negatives = values.filter((value) => value < 0);
   const maxPositive = positives.length > 0 ? Math.max(...positives) : 0;
   const minNegative = negatives.length > 0 ? Math.min(...negatives) : 0;
   return maxPositive + minNegative;
@@ -2315,7 +2697,7 @@ function normalizeGatheringRules(rules = {}) {
       : DEFAULT_GATHERING_RULES.revealScope,
     eventVisibility: GATHERING_EVENT_VISIBILITIES.has(rules?.eventVisibility)
       ? rules.eventVisibility
-      : DEFAULT_GATHERING_RULES.eventVisibility
+      : DEFAULT_GATHERING_RULES.eventVisibility,
   };
 }
 
@@ -2335,16 +2717,15 @@ function resolveRulesForAttempt(task = {}, environment = {}) {
     eventLimit: positiveInteger(environment?.eventLimit, normalized.eventLimit),
     eventPolicy: EVENT_POLICIES.has(environment?.eventPolicy)
       ? environment.eventPolicy
-      : normalized.eventPolicy
+      : normalized.eventPolicy,
   };
 }
 
 function selectDrops(drops, mode, limit = 1) {
-  if (mode === 'allDrops') return drops.map(drop => cloneJson(drop));
-  const ranked = drops
-    .slice()
-    .sort((left, right) => Number(left.rank) - Number(right.rank));
-  if (mode === 'limitedDrops') return ranked.slice(0, positiveInteger(limit, 1)).map(drop => cloneJson(drop));
+  if (mode === 'allDrops') return drops.map((drop) => cloneJson(drop));
+  const ranked = [...drops].sort((left, right) => Number(left.rank) - Number(right.rank));
+  if (mode === 'limitedDrops')
+    return ranked.slice(0, positiveInteger(limit, 1)).map((drop) => cloneJson(drop));
   const highest = ranked[0];
   return highest ? [cloneJson(highest)] : [];
 }
@@ -2358,12 +2739,16 @@ function vocabularyLabelFromId(id) {
   return String(id || '')
     .split(/[\s-]+/)
     .filter(Boolean)
-    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .map((token) =>
+      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
+    )
     .join(' ');
 }
 
 function normalizeBiomeColorToken(value) {
-  const token = String(value || '').trim().replace(/^--fab-tag-/, '');
+  const token = String(value || '')
+    .trim()
+    .replace(/^--fab-tag-/, '');
   return BIOME_COLOR_TOKENS.has(token) ? token : DEFAULT_BIOME_COLOR_TOKEN;
 }
 
@@ -2382,22 +2767,31 @@ function normalizeVocabularyOption(kind, value) {
   // the label would render an unwanted lowercase chip. Records keep their
   // explicit label when present.
   const label = isRecord
-    ? (rawLabel || defaultBiome?.label || vocabularyLabelFromId(id))
-    : (defaultBiome?.label || vocabularyLabelFromId(id));
+    ? rawLabel || defaultBiome?.label || vocabularyLabelFromId(id)
+    : defaultBiome?.label || vocabularyLabelFromId(id);
   if (kind === 'biomes') {
     return {
       id,
       label,
-      icon: normalizeConditionIcon(isRecord ? (value.icon || defaultBiome?.icon || 'fas fa-tree') : (defaultBiome?.icon || 'fas fa-tree'), 'fas fa-tree'),
-      colorToken: normalizeBiomeColorToken(isRecord ? (value.colorToken || defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN) : (defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN)),
-      customColor: normalizeCustomHex(isRecord ? value.customColor : '')
+      icon: normalizeConditionIcon(
+        isRecord
+          ? value.icon || defaultBiome?.icon || 'fas fa-tree'
+          : defaultBiome?.icon || 'fas fa-tree',
+        'fas fa-tree'
+      ),
+      colorToken: normalizeBiomeColorToken(
+        isRecord
+          ? value.colorToken || defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN
+          : defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN
+      ),
+      customColor: normalizeCustomHex(isRecord ? value.customColor : ''),
     };
   }
   return { id, label };
 }
 
 function normalizeVocabularyOptions(kind, value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  const values = Array.isArray(value) ? value : value ? [value] : [];
   const options = [];
   const seen = new Set();
   for (const raw of values) {
@@ -2410,17 +2804,19 @@ function normalizeVocabularyOptions(kind, value) {
 }
 
 function normalizeTagList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map(normalizeTag).filter(Boolean))];
 }
 
 function normalizeTag(value) {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeConditionIdList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(normalizeConditionId).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map(normalizeConditionId).filter(Boolean))];
 }
 
 function normalizeConditionId(value) {
@@ -2430,14 +2826,26 @@ function normalizeConditionId(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '');
 }
 
 function normalizeConditionIcon(icon, fallback) {
-  const tokens = String(icon || '').trim().split(/\s+/).filter(Boolean);
-  const prefix = tokens.find(token => /^(?:fa[bsrltd]?|fa-solid|fa-regular|fa-light|fa-thin|fa-duotone|fa-brands)$/.test(token)) || 'fas';
-  const iconToken = tokens.findLast(token => token.startsWith('fa-') && !['fa', 'fa-solid', 'fa-regular', 'fa-light', 'fa-thin', 'fa-duotone', 'fa-brands'].includes(token));
+  const tokens = String(icon || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const prefix =
+    tokens.find((token) =>
+      /^(?:fa[bsrltd]?|fa-solid|fa-regular|fa-light|fa-thin|fa-duotone|fa-brands)$/.test(token)
+    ) || 'fas';
+  const iconToken = tokens.findLast(
+    (token) =>
+      token.startsWith('fa-') &&
+      !['fa', 'fa-solid', 'fa-regular', 'fa-light', 'fa-thin', 'fa-duotone', 'fa-brands'].includes(
+        token
+      )
+  );
   return iconToken ? `${prefix} ${iconToken}` : fallback;
 }
 
@@ -2445,7 +2853,9 @@ function conditionLabelFromId(id) {
   return String(id || '')
     .split('-')
     .filter(Boolean)
-    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .map((token) =>
+      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
+    )
     .join(' ');
 }
 
@@ -2461,13 +2871,17 @@ function normalizeConditionOption(kind, value) {
   const fallbackIcon = defaultConditionIcon(kind, id);
   return {
     id,
-    label: isRecord ? (rawLabel || conditionLabelFromId(id)) : (/[A-Z]/.test(rawLabel) ? rawLabel : conditionLabelFromId(id)),
-    icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon)
+    label: isRecord
+      ? rawLabel || conditionLabelFromId(id)
+      : /[A-Z]/.test(rawLabel)
+        ? rawLabel
+        : conditionLabelFromId(id),
+    icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon),
   };
 }
 
 function normalizeConditionOptions(kind, value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  const values = Array.isArray(value) ? value : value ? [value] : [];
   const options = [];
   const seen = new Set();
   for (const raw of values) {
@@ -2482,11 +2896,6 @@ function normalizeConditionOptions(kind, value) {
 function seedConditionOptions(kind, raw, defaults) {
   const values = normalizeConditionOptions(kind, raw);
   return values.length > 0 ? values : normalizeConditionOptions(kind, defaults);
-}
-
-function hasAny(left, right) {
-  const rightSet = new Set(right);
-  return left.some(value => rightSet.has(value));
 }
 
 function clampDropRate(value) {
@@ -2520,7 +2929,7 @@ function readState(actor) {
   try {
     const state = actor?.getFlag?.(FLAG_NAMESPACE, STATE_FLAG_KEY);
     return state && typeof state === 'object' ? cloneJson(state) : {};
-  } catch (_err) {
+  } catch {
     return {};
   }
 }
@@ -2544,11 +2953,15 @@ function sortRecordsByOrder(records, order) {
   return list
     .map((record, index) => ({ record, index }))
     .sort((a, b) => {
-      const ai = orderIndex.has(String(a.record?.id)) ? orderIndex.get(String(a.record?.id)) : Number.MAX_SAFE_INTEGER;
-      const bi = orderIndex.has(String(b.record?.id)) ? orderIndex.get(String(b.record?.id)) : Number.MAX_SAFE_INTEGER;
+      const ai = orderIndex.has(String(a.record?.id))
+        ? orderIndex.get(String(a.record?.id))
+        : Number.MAX_SAFE_INTEGER;
+      const bi = orderIndex.has(String(b.record?.id))
+        ? orderIndex.get(String(b.record?.id))
+        : Number.MAX_SAFE_INTEGER;
       return ai === bi ? a.index - b.index : ai - bi;
     })
-    .map(entry => entry.record);
+    .map((entry) => entry.record);
 }
 
 function nonNegativeNumber(value, fallback = 0) {

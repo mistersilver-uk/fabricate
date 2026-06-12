@@ -38,13 +38,13 @@ export class SignatureValidator {
 
       return new Set(
         (systemComponents || [])
-          .filter(c => {
+          .filter((c) => {
             const compTags = Array.isArray(c.tags) ? c.tags : [];
             return tagMatch === 'all'
-              ? tags.every(t => compTags.includes(t))
-              : tags.some(t => compTags.includes(t));
+              ? tags.every((t) => compTags.includes(t))
+              : tags.some((t) => compTags.includes(t));
           })
-          .map(c => c.id)
+          .map((c) => c.id)
       );
     }
 
@@ -61,7 +61,7 @@ export class SignatureValidator {
    */
   expandGroupToComponentIds(group, systemComponents) {
     const expanded = new Set();
-    for (const option of (group.options || [])) {
+    for (const option of group.options || []) {
       for (const id of this.expandIngredientToComponentIds(option, systemComponents)) {
         expanded.add(id);
       }
@@ -79,8 +79,9 @@ export class SignatureValidator {
    * @returns {Set<string>[]}
    */
   computeSignature(ingredientSet, systemComponents) {
-    return (ingredientSet.ingredientGroups || [])
-      .map(g => this.expandGroupToComponentIds(g, systemComponents));
+    return (ingredientSet.ingredientGroups || []).map((g) =>
+      this.expandGroupToComponentIds(g, systemComponents)
+    );
   }
 
   /**
@@ -137,12 +138,12 @@ export class SignatureValidator {
     // Collect all (recipe, ingredientSet, signature) entries
     const entries = [];
     for (const recipe of recipes) {
-      for (const set of (recipe.ingredientSets || [])) {
+      for (const set of recipe.ingredientSets || []) {
         entries.push({
           recipe: { id: recipe.id, name: recipe.name },
           setId: set.id,
           setName: set.name || set.id,
-          signature: this.computeSignature(set, components)
+          signature: this.computeSignature(set, components),
         });
       }
     }
@@ -162,7 +163,7 @@ export class SignatureValidator {
             ingredientSetA: a.setId,
             recipeB: b.recipe,
             ingredientSetB: b.setId,
-            message: `Overlapping signatures between "${a.recipe.name}" (set ${a.setName}) and "${b.recipe.name}" (set ${b.setName})`
+            message: `Overlapping signatures between "${a.recipe.name}" (set ${a.setName}) and "${b.recipe.name}" (set ${b.setName})`,
           });
         }
       }
@@ -170,7 +171,7 @@ export class SignatureValidator {
 
     return {
       valid: conflicts.length === 0,
-      conflicts
+      conflicts,
     };
   }
 
@@ -184,11 +185,11 @@ export class SignatureValidator {
   validateRecipe(recipe, systemId) {
     const result = this.validateSystem(systemId);
     const recipeConflicts = result.conflicts.filter(
-      c => c.recipeA.id === recipe.id || c.recipeB.id === recipe.id
+      (c) => c.recipeA.id === recipe.id || c.recipeB.id === recipe.id
     );
     return {
       valid: recipeConflicts.length === 0,
-      conflicts: recipeConflicts
+      conflicts: recipeConflicts,
     };
   }
 }

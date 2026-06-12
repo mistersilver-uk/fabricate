@@ -25,17 +25,18 @@ export function registerFragmentDiscoveryHook(craftingSystemManager, visibilityS
       if (!system.teaserConfig?.enabled) continue;
       if (!['fragments', 'both'].includes(system.teaserConfig.discoveryMode)) continue;
 
-      for (const fragment of (system.teaserConfig.fragments || [])) {
+      for (const fragment of system.teaserConfig.fragments || []) {
         if (!fragment.linkedItemUuid) continue;
 
-        let sourceUuid = null;
+        let sourceUuid;
         try {
           sourceUuid = getSourceUuid(item);
         } catch {
           sourceUuid = null;
         }
 
-        if (item.uuid !== fragment.linkedItemUuid && sourceUuid !== fragment.linkedItemUuid) continue;
+        if (item.uuid !== fragment.linkedItemUuid && sourceUuid !== fragment.linkedItemUuid)
+          continue;
 
         await visibilityService.discoverFragment(actor, fragment.id, system);
       }

@@ -18,12 +18,14 @@
  */
 
 function normalizeTag(value) {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeTagList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map(normalizeTag).filter(Boolean))];
 }
 
 function normalizeConditionId(value) {
@@ -33,17 +35,17 @@ function normalizeConditionId(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '');
 }
 
 function normalizeConditionIdList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(normalizeConditionId).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map(normalizeConditionId).filter(Boolean))];
 }
 
 function hasAny(left, right) {
-  return left.some(entry => right.includes(entry));
+  return left.some((entry) => right.includes(entry));
 }
 
 /**
@@ -64,8 +66,11 @@ export function dangerRank(level) {
 export function resolveEnvironmentDangerLevel(environment = {}) {
   const explicit = normalizeTag(environment?.dangerLevel);
   if (DANGER_LEVELS.includes(explicit)) return explicit;
-  const tags = normalizeTagList(environment?.dangerTags).filter(tag => DANGER_LEVELS.includes(tag));
-  if (tags.length > 0) return tags.reduce((best, tag) => (dangerRank(tag) > dangerRank(best) ? tag : best), tags[0]);
+  const tags = normalizeTagList(environment?.dangerTags).filter((tag) =>
+    DANGER_LEVELS.includes(tag)
+  );
+  if (tags.length > 0)
+    return tags.reduce((best, tag) => (dangerRank(tag) > dangerRank(best) ? tag : best), tags[0]);
   const risk = normalizeTag(environment?.risk);
   if (DANGER_LEVELS.includes(risk)) return risk;
   return 'safe';
@@ -90,25 +95,47 @@ export function resolveEnvironmentDangerLevel(environment = {}) {
  * @param {object} [options.conditionSettings] Per-system condition enablement.
  * @returns {{ matches: boolean, conditionsMet: boolean, evidence: MatchEvidence }}
  */
-export function evaluateEnvironmentMatch(record = {}, environment = {}, conditions = {}, options = {}) {
+export function evaluateEnvironmentMatch(
+  record = {},
+  environment = {},
+  conditions = {},
+  options = {}
+) {
   const { includeDanger = false, conditionSettings = null } = options;
 
   const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
   const envDangerLevel = resolveEnvironmentDangerLevel(environment);
 
-  const biome = evaluateTagField(normalizeTagList(record?.biomes), envBiomes, { requireAll: false });
+  const biome = evaluateTagField(normalizeTagList(record?.biomes), envBiomes, {
+    requireAll: false,
+  });
 
   const weatherEnabled = conditionSettings?.weather?.enabled !== false;
   const timeEnabled = conditionSettings?.timeOfDay?.enabled !== false;
   const currentWeather = normalizeConditionId(conditions?.weather);
   const currentTime = normalizeConditionId(conditions?.timeOfDay);
 
-  const weather = evaluateConditionField(normalizeConditionIdList(record?.weather), currentWeather, weatherEnabled);
-  const time = evaluateConditionField(normalizeConditionIdList(record?.timeOfDay), currentTime, timeEnabled);
-  const recordDanger = normalizeTagList(record?.dangerTags).filter(tag => DANGER_LEVELS.includes(tag));
+  const weather = evaluateConditionField(
+    normalizeConditionIdList(record?.weather),
+    currentWeather,
+    weatherEnabled
+  );
+  const time = evaluateConditionField(
+    normalizeConditionIdList(record?.timeOfDay),
+    currentTime,
+    timeEnabled
+  );
+  const recordDanger = normalizeTagList(record?.dangerTags).filter((tag) =>
+    DANGER_LEVELS.includes(tag)
+  );
   const danger = includeDanger
     ? evaluateDangerField(recordDanger, envDangerLevel)
-    : { state: 'any', recordValues: recordDanger, envValues: envDangerLevel ? [envDangerLevel] : [], applicable: false };
+    : {
+        state: 'any',
+        recordValues: recordDanger,
+        envValues: envDangerLevel ? [envDangerLevel] : [],
+        applicable: false,
+      };
 
   const evidence = { biome, weather, time, danger };
   // Matching ignores weather/time — those become runtime gates surfaced via conditionsMet.
@@ -137,7 +164,12 @@ function evaluateDangerField(recordTags, envLevel) {
 
 function evaluateConditionField(recordValues, currentValue, enabled) {
   if (!enabled) {
-    return { state: 'any', recordValues, envValues: currentValue ? [currentValue] : [], applicable: false };
+    return {
+      state: 'any',
+      recordValues,
+      envValues: currentValue ? [currentValue] : [],
+      applicable: false,
+    };
   }
   const envValues = currentValue ? [currentValue] : [];
   if (recordValues.length === 0) {

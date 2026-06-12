@@ -63,7 +63,7 @@ export class GatheringLocationService {
       realmIds: [],
       staleRealmIds: [],
       partyId: partyId || null,
-      systemId: systemId || ''
+      systemId: systemId || '',
     };
     if (!partyId || !systemId) return empty;
     // Realm/travel disabled ⇒ never resolve a current realm (no location gating).
@@ -72,15 +72,18 @@ export class GatheringLocationService {
     const party = this.partyStore?.get?.(partyId);
     if (!party) return empty;
 
-    const override = party.currentRealmOverrides?.[systemId] ?? party.currentRegionOverrides?.[systemId];
+    const override =
+      party.currentRealmOverrides?.[systemId] ?? party.currentRegionOverrides?.[systemId];
     if (override && override.mode === 'manual') {
-      const realmsById = new Map(this._getRealms(systemId).map(realm => [realm.id, realm]));
+      const realmsById = new Map(this._getRealms(systemId).map((realm) => [realm.id, realm]));
       const realms = [];
       const realmIds = [];
       const staleRealmIds = [];
       const overrideRealmIds = Array.isArray(override.realmIds)
         ? override.realmIds
-        : (Array.isArray(override.regionIds) ? override.regionIds : []);
+        : Array.isArray(override.regionIds)
+          ? override.regionIds
+          : [];
       for (const realmId of overrideRealmIds) {
         const realm = realmsById.get(realmId);
         if (!realm) {
@@ -99,7 +102,7 @@ export class GatheringLocationService {
         realmIds,
         staleRealmIds,
         partyId,
-        systemId
+        systemId,
       };
     }
 
@@ -111,14 +114,15 @@ export class GatheringLocationService {
     if (!travelActorUuid) return { ...empty, partyId, systemId };
 
     const sensed = this.senseSceneRegions(travelActorUuid);
-    const sceneRegionUuids = sensed instanceof Set ? sensed : new Set(Array.isArray(sensed) ? sensed : []);
+    const sceneRegionUuids =
+      sensed instanceof Set ? sensed : new Set(Array.isArray(sensed) ? sensed : []);
     if (sceneRegionUuids.size === 0) return { ...empty, partyId, systemId };
 
     const realms = [];
     const realmIds = [];
     for (const realm of this._getRealms(systemId)) {
       const mappings = Array.isArray(realm?.sceneMappings) ? realm.sceneMappings : [];
-      if (mappings.some(mapping => sceneRegionUuids.has(mapping?.sceneRegionUuid))) {
+      if (mappings.some((mapping) => sceneRegionUuids.has(mapping?.sceneRegionUuid))) {
         realms.push(realm);
         realmIds.push(realm.id);
       }
@@ -130,7 +134,7 @@ export class GatheringLocationService {
       realmIds,
       staleRealmIds: [],
       partyId,
-      systemId
+      systemId,
     };
   }
 
@@ -148,7 +152,7 @@ export class GatheringLocationService {
       realmIds: [],
       staleRealmIds: [],
       partyId: null,
-      systemId: systemId || ''
+      systemId: systemId || '',
     };
     // Realm/travel disabled ⇒ fast-exit to unresolved-empty (no party lookup).
     if (!this._realmsEnabled(systemId)) return unresolved;

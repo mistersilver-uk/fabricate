@@ -1,12 +1,16 @@
-import { evaluateEnvironmentMatch } from './gatheringMatch.js';
-import { classifyGatheringToolStates, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
+import {
+  classifyGatheringToolStates,
+  resolvePresentComponentIds,
+} from '../gatheringToolRuntime.js';
+
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
   buildRealmDisclosure,
   buildTravelGuidance,
   environmentHasLocationRules,
-  evaluateLocationAvailability
+  evaluateLocationAvailability,
 } from './gatheringLocation.js';
+import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
 import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 
@@ -28,14 +32,13 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   TASK_DISABLED: 'FABRICATE.Gathering.Blocked.TaskDisabled',
   TASK_HIDDEN: 'FABRICATE.Gathering.Blocked.TaskHidden',
   TASK_MISCONFIGURED: 'FABRICATE.Gathering.Blocked.TaskMisconfigured',
-  RUN_CREATION_FAILED: 'FABRICATE.Gathering.Blocked.RunCreationFailed'
-  ,
+  RUN_CREATION_FAILED: 'FABRICATE.Gathering.Blocked.RunCreationFailed',
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
   BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate',
   CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked',
   LOCATION_BLOCKED: 'FABRICATE.Gathering.Blocked.LocationBlocked',
-  NO_CURRENT_REALM: 'FABRICATE.Gathering.Blocked.NoCurrentRealm'
+  NO_CURRENT_REALM: 'FABRICATE.Gathering.Blocked.NoCurrentRealm',
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -61,7 +64,7 @@ const FAILURE_KEYWORDS = new Set([
   'danger',
   'complication',
   'trap',
-  'oops'
+  'oops',
 ]);
 
 /**
@@ -110,8 +113,12 @@ export class GatheringEngine {
     localize = defaultLocalize,
     // Stamina regen / node respawn run on world-time advance and write shared
     // state, so they must run exactly once — only on the primary GM client.
-    isPrimaryGM = () => Boolean(globalThis.game?.user?.isGM && globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id),
-    getActors = () => Array.from(globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [])
+    isPrimaryGM = () =>
+      Boolean(
+        globalThis.game?.user?.isGM &&
+        globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id
+      ),
+    getActors = () => [...(globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [])],
   } = {}) {
     this.environmentStore = environmentStore;
     this.runManager = runManager;
@@ -173,7 +180,7 @@ export class GatheringEngine {
           actorId: idOf(actor),
           runId: stringOrNull(run?.id),
           code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'TIMED_COMPLETION_FAILED',
-          message: stringOrNull(error?.message)
+          message: stringOrNull(error?.message),
         });
       }
     }
@@ -196,7 +203,7 @@ export class GatheringEngine {
       cleared,
       errors,
       staminaRegen,
-      nodeRespawn
+      nodeRespawn,
     };
   }
 
@@ -207,20 +214,29 @@ export class GatheringEngine {
    */
   async _processStaminaRegen(worldTime) {
     if (typeof this.richState?.regenerateActorStamina !== 'function') return [];
-    const staminaSystems = Array.from(this._enabledGatheringSystems().values())
-      .filter(system => this.richState.staminaEnabled?.(system.id) === true);
+    const staminaSystems = [...this._enabledGatheringSystems().values()].filter(
+      (system) => this.richState.staminaEnabled?.(system.id) === true
+    );
     if (staminaSystems.length === 0) return [];
     const actors = normalizeList(this.getActors?.());
     const changed = [];
     for (const system of staminaSystems) {
       for (const actor of actors) {
         try {
-          const updated = await this.richState.regenerateActorStamina({ actor, systemId: system.id, system, worldTime });
+          const updated = await this.richState.regenerateActorStamina({
+            actor,
+            systemId: system.id,
+            system,
+            worldTime,
+          });
           if (updated) changed.push({ actorId: idOf(actor), systemId: String(system.id) });
         } catch (error) {
           // Surface (don't silently swallow) so a broken regen is diagnosable.
-          console.warn(`Fabricate | stamina regen failed for actor ${idOf(actor)} in system ${system.id}:`, error);
-          // eslint-disable-next-line no-continue
+          console.warn(
+            `Fabricate | stamina regen failed for actor ${idOf(actor)} in system ${system.id}:`,
+            error
+          );
+
           continue;
         }
       }
@@ -245,7 +261,7 @@ export class GatheringEngine {
       } catch (error) {
         // Surface (don't silently swallow) so a broken respawn is diagnosable.
         console.warn(`Fabricate | node respawn failed for environment ${environment?.id}:`, error);
-        // eslint-disable-next-line no-continue
+
         continue;
       }
     }
@@ -262,14 +278,14 @@ export class GatheringEngine {
     // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
     // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
     // ONLY for tasks in the matching crafting system — componentId is per-system.
-    presentTools = null
+    presentTools = null,
   } = {}) {
     const resolved = await this._resolveStartContext({
       viewer,
       actor,
       rememberedActorId,
       environmentId,
-      taskId
+      taskId,
     });
     if (resolved.blockedReason) {
       return this._blockedStart({
@@ -277,7 +293,7 @@ export class GatheringEngine {
         actor: resolved.actor ?? null,
         environment: resolved.environment ?? null,
         task: resolved.task ?? null,
-        reason: resolved.blockedReason
+        reason: resolved.blockedReason,
       });
     }
 
@@ -288,7 +304,7 @@ export class GatheringEngine {
         actor: selectedActor,
         environment,
         task,
-        reason: this._blockedReason('GAME_PAUSED')
+        reason: this._blockedReason('GAME_PAUSED'),
       });
     }
 
@@ -298,7 +314,7 @@ export class GatheringEngine {
         actor: selectedActor,
         environment,
         task,
-        reason: this._blockedReason('SYSTEM_DISABLED')
+        reason: this._blockedReason('SYSTEM_DISABLED'),
       });
     }
 
@@ -308,21 +324,26 @@ export class GatheringEngine {
         actor: selectedActor,
         environment,
         task,
-        reason: this._blockedReason('ENVIRONMENT_DISABLED')
+        reason: this._blockedReason('ENVIRONMENT_DISABLED'),
       });
     }
 
     // Fresh location re-resolution at attempt time (no listing cache) so a stale
     // listing state — e.g. an override cleared between list and start — cannot
     // start a location-gated attempt.
-    const locationGuard = this._locationBlockedReasons({ environment, system, viewer, actor: selectedActor });
+    const locationGuard = this._locationBlockedReasons({
+      environment,
+      system,
+      viewer,
+      actor: selectedActor,
+    });
     if (locationGuard.blockedReasons.length > 0) {
       return this._blockedStart({
         viewer,
         actor: selectedActor,
         environment,
         task,
-        reason: locationGuard.blockedReasons[0]
+        reason: locationGuard.blockedReasons[0],
       });
     }
 
@@ -333,8 +354,8 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('TASK_DISABLED', {
-          data: this._blindTaskData({ environment, task, viewer })
-        })
+          data: this._blindTaskData({ environment, task, viewer }),
+        }),
       });
     }
 
@@ -349,21 +370,23 @@ export class GatheringEngine {
           reason: this._blockedReason(access.code || 'SCENE_TOKEN_BLOCKED', {
             messageKey: access.messageKey,
             message: access.message,
-            data: access.data
-          })
+            data: access.data,
+          }),
         });
       }
     }
 
     const visibility = viewer?.isGM
       ? { visible: true, reasonCode: 'GM_VISIBLE', diagnostic: null }
-      : normalizeVisibilityResult(await this._evaluateTaskVisibility({
-        environment,
-        system,
-        task,
-        viewer,
-        actor: selectedActor
-      }));
+      : normalizeVisibilityResult(
+          await this._evaluateTaskVisibility({
+            environment,
+            system,
+            task,
+            viewer,
+            actor: selectedActor,
+          })
+        );
     if (visibility.visible !== true) {
       return this._blockedStart({
         viewer,
@@ -371,8 +394,8 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('TASK_HIDDEN', {
-          data: this._blindTaskData({ environment, task, viewer })
-        })
+          data: this._blindTaskData({ environment, task, viewer }),
+        }),
       });
     }
 
@@ -383,8 +406,8 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('DUPLICATE_ACTIVE_RUN', {
-          data: this._blindTaskData({ environment, task, viewer })
-        })
+          data: this._blindTaskData({ environment, task, viewer }),
+        }),
       });
     }
 
@@ -398,8 +421,8 @@ export class GatheringEngine {
         reason: this._blockedReason('TOOL_BLOCKED', {
           data: this._isOpaqueBlindTask({ environment, viewer })
             ? null
-            : this._toolBlockedData({ task, resolvedTools: taskTools })
-        })
+            : this._toolBlockedData({ task, resolvedTools: taskTools }),
+        }),
       });
     }
     if (taskTools.tools.length > 0) {
@@ -410,7 +433,7 @@ export class GatheringEngine {
         environment,
         task,
         tools: taskTools.tools,
-        presentTools
+        presentTools,
       });
       if (toolResult.available !== true) {
         return this._blockedStart({
@@ -421,8 +444,8 @@ export class GatheringEngine {
           reason: this._blockedReason('TOOL_BLOCKED', {
             data: this._isOpaqueBlindTask({ environment, viewer })
               ? null
-              : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult })
-          })
+              : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult }),
+          }),
         });
       }
     }
@@ -432,7 +455,7 @@ export class GatheringEngine {
       viewer,
       system,
       environment,
-      task
+      task,
     });
     if (richAttempt.blockedReasons.length > 0) {
       return this._blockedStart({
@@ -440,7 +463,7 @@ export class GatheringEngine {
         actor: selectedActor,
         environment,
         task,
-        reason: richAttempt.blockedReasons[0]
+        reason: richAttempt.blockedReasons[0],
       });
     }
 
@@ -454,8 +477,8 @@ export class GatheringEngine {
         reason: this._blockedReason('TASK_MISCONFIGURED', {
           data: this._isOpaqueBlindTask({ environment, viewer })
             ? null
-            : { taskId: task.id, errors: configuration.errors }
-        })
+            : { taskId: task.id, errors: configuration.errors },
+        }),
       });
     }
 
@@ -463,10 +486,25 @@ export class GatheringEngine {
       // Waiting runs mature later (no open session / canvas tool), so terminal
       // tool side-effects use no virtual-present set; the gate above already
       // passed for this attempt.
-      return this._startWaitingAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt });
+      return this._startWaitingAttempt({
+        viewer,
+        actor: selectedActor,
+        system,
+        environment,
+        task,
+        richAttempt,
+      });
     }
 
-    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt, presentTools });
+    return this._resolveImmediateAttempt({
+      viewer,
+      actor: selectedActor,
+      system,
+      environment,
+      task,
+      richAttempt,
+      presentTools,
+    });
   }
 
   async _processMaturedWaitingRun({ actor, run }) {
@@ -485,15 +523,16 @@ export class GatheringEngine {
         run,
         environment,
         task,
-        errors: configuration.errors
+        errors: configuration.errors,
       });
     }
 
-    const outcome = task.resolutionMode === 'd100'
-      ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
-      : (task.resolutionMode === 'progressive'
-        ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-        : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task }));
+    const outcome =
+      task.resolutionMode === 'd100'
+        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+        : task.resolutionMode === 'progressive'
+          ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
+          : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
     if (outcome.status === 'misconfigured') {
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -501,12 +540,20 @@ export class GatheringEngine {
         run,
         environment,
         task,
-        outcome
+        outcome,
       });
     }
 
     const checkResult = plainObjectOrNull(outcome.checkResult) ?? undefined;
-    const plan = await this._terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult });
+    const plan = await this._terminalSideEffectPlan({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+    });
     if (plan.status === 'misconfigured') {
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -514,7 +561,7 @@ export class GatheringEngine {
         run,
         environment,
         task,
-        outcome: plan
+        outcome: plan,
       });
     }
 
@@ -526,27 +573,35 @@ export class GatheringEngine {
       task,
       outcome,
       checkResult,
-      plan
+      plan,
     });
     const completedRun = await this.runManager.completeRun(actor, run, outcome.status, payload, {
-      terminalRunData: runData
+      terminalRunData: runData,
     });
     if (!completedRun) {
       throw Object.assign(new Error('Timed gathering terminal history was not written'), {
-        code: 'TERMINAL_HISTORY_NOT_WRITTEN'
+        code: 'TERMINAL_HISTORY_NOT_WRITTEN',
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer });
-    const completedRunWithRichEvidence = richEvidence && typeof richEvidence === 'object'
-      ? {
-          ...completedRun,
-          economyEvidence: {
-            ...(completedRun.economyEvidence || {}),
-            ...richEvidence
+    const richEvidence = await this._commitRichAttempt({
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      viewer,
+    });
+    const completedRunWithRichEvidence =
+      richEvidence && typeof richEvidence === 'object'
+        ? {
+            ...completedRun,
+            economyEvidence: {
+              ...completedRun.economyEvidence,
+              ...richEvidence,
+            },
           }
-        }
-      : completedRun;
+        : completedRun;
 
     await this._commitTerminalSideEffects({
       viewer,
@@ -555,7 +610,7 @@ export class GatheringEngine {
       environment,
       task,
       outcome,
-      checkResult
+      checkResult,
     });
 
     return await this._terminalStart({
@@ -568,7 +623,7 @@ export class GatheringEngine {
       run: completedRunWithRichEvidence,
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
-      checkResult
+      checkResult,
     });
   }
 
@@ -632,13 +687,20 @@ export class GatheringEngine {
    * @param {string|null} [args.rememberedActorId] Previously selected actor id.
    * @returns {Promise<object>} The gathering listing model.
    */
-  async listForActor({ viewer = null, actor = null, rememberedActorId = null, presentTools = null } = {}) {
-    const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
+  async listForActor({
+    viewer = null,
+    actor = null,
+    rememberedActorId = null,
+    presentTools = null,
+  } = {}) {
+    const selectableActors = normalizeActorList(
+      await callMaybe(this.getSelectableActors, { viewer })
+    );
     if (selectableActors.length === 0) {
       return this._emptyListing({
         viewer,
         selectableActors,
-        reason: this._blockedReason('NO_SELECTABLE_ACTORS')
+        reason: this._blockedReason('NO_SELECTABLE_ACTORS'),
       });
     }
 
@@ -646,13 +708,13 @@ export class GatheringEngine {
       actor,
       rememberedActorId,
       selectableActors,
-      viewer
+      viewer,
     });
     if (selected.blockedReason) {
       return this._emptyListing({
         viewer,
         selectableActors,
-        reason: selected.blockedReason
+        reason: selected.blockedReason,
       });
     }
 
@@ -664,7 +726,7 @@ export class GatheringEngine {
         viewer,
         actor: selectedActor,
         selectableActors,
-        reason: this._blockedReason('NO_ENVIRONMENTS_CONFIGURED')
+        reason: this._blockedReason('NO_ENVIRONMENTS_CONFIGURED'),
       });
     }
 
@@ -679,7 +741,7 @@ export class GatheringEngine {
         viewer,
         actor: selectedActor,
         presentTools,
-        realmContextCache
+        realmContextCache,
       });
       if (model.visible) {
         environmentModels.push(model);
@@ -694,20 +756,20 @@ export class GatheringEngine {
         viewer,
         actor: selectedActor,
         selectableActors,
-        reason: this._emptyVisibilityReason(hidden)
+        reason: this._emptyVisibilityReason(hidden),
       });
     }
 
-    const attemptable = environmentModels.some(environment => environment.attemptable);
+    const attemptable = environmentModels.some((environment) => environment.attemptable);
     const blockedReasons = attemptable
       ? []
-      : uniqueReasons(environmentModels.flatMap(environment => environment.blockedReasons));
+      : uniqueReasons(environmentModels.flatMap((environment) => environment.blockedReasons));
     const activeRuns = this._activeRunModels({ actor: selectedActor, viewer });
     const history = this._historyModels({ actor: selectedActor, viewer });
     const gatheringSystems = this._gatheringSystemOptions([
       ...environmentModels,
       ...activeRuns,
-      ...history
+      ...history,
     ]);
 
     return {
@@ -721,7 +783,7 @@ export class GatheringEngine {
       environments: environmentModels,
       activeRuns,
       history,
-      gatheringSystems
+      gatheringSystems,
     };
   }
 
@@ -744,19 +806,39 @@ export class GatheringEngine {
    * @param {object|null} [options.viewer]
    * @returns {Promise<object>}
    */
-  async getTaskDropBreakdown({ environmentId, taskId, rememberedActorId = null, viewer = null } = {}) {
-    const empty = { resolutionMode: null, awardMode: null, awardLimit: null, eventPolicy: null, drops: [] };
-    if (!environmentId || !taskId || typeof this.richState?.previewDropBreakdown !== 'function') return empty;
+  async getTaskDropBreakdown({
+    environmentId,
+    taskId,
+    rememberedActorId = null,
+    viewer = null,
+  } = {}) {
+    const empty = {
+      resolutionMode: null,
+      awardMode: null,
+      awardLimit: null,
+      eventPolicy: null,
+      drops: [],
+    };
+    if (!environmentId || !taskId || typeof this.richState?.previewDropBreakdown !== 'function')
+      return empty;
 
-    const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
+    const selectableActors = normalizeActorList(
+      await callMaybe(this.getSelectableActors, { viewer })
+    );
     if (selectableActors.length === 0) return empty;
-    const selected = this._resolveSelectedActor({ actor: null, rememberedActorId, selectableActors, viewer });
+    const selected = this._resolveSelectedActor({
+      actor: null,
+      rememberedActorId,
+      selectableActors,
+      viewer,
+    });
     if (selected.blockedReason) return empty;
     const actor = selected.actor;
 
     const systems = this._enabledGatheringSystems();
-    const environment = this._playerCandidateEnvironments(systems, viewer)
-      .find(candidate => stringOrNull(candidate?.id) === String(environmentId));
+    const environment = this._playerCandidateEnvironments(systems, viewer).find(
+      (candidate) => stringOrNull(candidate?.id) === String(environmentId)
+    );
     if (!environment || environment.enabled === false) return empty;
     const system = systems.get(environment.craftingSystemId);
 
@@ -764,20 +846,33 @@ export class GatheringEngine {
     // would render (targeted tasks, or revealed blind "discovered" tasks).
     const model = await this._buildEnvironmentListing({ environment, system, viewer, actor });
     if (model.visible !== true) return empty;
-    const visibleIds = new Set([
-      ...normalizeList(model.tasks),
-      ...normalizeList(model.discoveredTasks)
-    ].map(taskModel => stringOrNull(taskModel?.id)).filter(Boolean));
+    const visibleIds = new Set(
+      [...normalizeList(model.tasks), ...normalizeList(model.discoveredTasks)]
+        .map((taskModel) => stringOrNull(taskModel?.id))
+        .filter(Boolean)
+    );
     if (!visibleIds.has(String(taskId))) return empty;
 
-    const task = normalizeList(environment.tasks).find(entry => stringOrNull(entry?.id) === String(taskId)) ?? null;
-    if (!task || task.resolutionMode !== 'd100') return { ...empty, resolutionMode: stringOrNull(task?.resolutionMode) };
+    const task =
+      normalizeList(environment.tasks).find(
+        (entry) => stringOrNull(entry?.id) === String(taskId)
+      ) ?? null;
+    if (!task || task.resolutionMode !== 'd100')
+      return { ...empty, resolutionMode: stringOrNull(task?.resolutionMode) };
 
-    const preview = await this.richState.previewDropBreakdown({ environment, task, actor, viewer, system });
+    const preview = await this.richState.previewDropBreakdown({
+      environment,
+      task,
+      actor,
+      viewer,
+      system,
+    });
     const componentsById = this._componentsById(system);
-    const drops = normalizeList(preview?.drops).map(drop => ({
+    const drops = normalizeList(preview?.drops).map((drop) => ({
       ...drop,
-      img: stringOrNull(componentsById.get(stringOrNull(drop?.componentId))?.img) || 'icons/svg/item-bag.svg'
+      img:
+        stringOrNull(componentsById.get(stringOrNull(drop?.componentId))?.img) ||
+        'icons/svg/item-bag.svg',
     }));
     return {
       resolutionMode: 'd100',
@@ -785,20 +880,20 @@ export class GatheringEngine {
       awardMode: stringOrNull(preview?.awardMode),
       awardLimit: Number(preview?.awardLimit ?? 1),
       eventPolicy: stringOrNull(preview?.eventPolicy),
-      drops
+      drops,
     };
   }
 
   _activeRunModels({ actor, viewer }) {
     return normalizeList(this.runManager?.getActiveRuns?.(actor))
-      .filter(run => run?.status === 'waitingTime')
-      .map(run => this._runModel({ run, viewer, terminal: false }))
+      .filter((run) => run?.status === 'waitingTime')
+      .map((run) => this._runModel({ run, viewer, terminal: false }))
       .filter(Boolean);
   }
 
   _historyModels({ actor, viewer }) {
     return normalizeList(this.runManager?.getRunHistory?.(actor, 10))
-      .map(run => this._runModel({ run, viewer, terminal: true }))
+      .map((run) => this._runModel({ run, viewer, terminal: true }))
       .filter(Boolean);
   }
 
@@ -807,7 +902,7 @@ export class GatheringEngine {
     const environment = this._findEnvironment(run.environmentId);
     const system = this._allSystems().get(String(run.craftingSystemId));
     const task = environment
-      ? normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null
+      ? (normalizeList(environment.tasks).find((task) => task?.id === run.taskId) ?? null)
       : null;
     const opaqueBlind = this._isOpaqueBlindRun({ environment, run, viewer });
     const status = stringOrNull(run.status);
@@ -825,7 +920,7 @@ export class GatheringEngine {
         : stringOrEmpty(task?.name) || stringOrEmpty(environment?.name) || status,
       taskId: opaqueBlind ? null : stringOrNull(run.taskId),
       startedAtWorldTime: numberOrNull(run.startedAtWorldTime),
-      updatedAtWorldTime: numberOrNull(run.updatedAtWorldTime)
+      updatedAtWorldTime: numberOrNull(run.updatedAtWorldTime),
     };
 
     const timeGate = plainObjectOrNull(run.timeGate);
@@ -875,18 +970,20 @@ export class GatheringEngine {
       }
       return {
         actor: null,
-        blockedReason: this._blockedReason('ACTOR_NOT_SELECTABLE')
+        blockedReason: this._blockedReason('ACTOR_NOT_SELECTABLE'),
       };
     }
 
     if (rememberedActorId) {
-      const remembered = selectableActors.find(candidate => actorMatchesId(candidate, rememberedActorId));
+      const remembered = selectableActors.find((candidate) =>
+        actorMatchesId(candidate, rememberedActorId)
+      );
       if (remembered) return { actor: remembered };
       return {
         actor: null,
         blockedReason: this._blockedReason('INVALID_REMEMBERED_ACTOR', {
-          data: { actorId: String(rememberedActorId) }
-        })
+          data: { actorId: String(rememberedActorId) },
+        }),
       };
     }
 
@@ -900,7 +997,7 @@ export class GatheringEngine {
     }
     return {
       id: stringOrNull(run?.userId),
-      isGM: false
+      isGM: false,
     };
   }
 
@@ -915,7 +1012,10 @@ export class GatheringEngine {
     }
 
     const environment = this._findEnvironment(run.environmentId);
-    if (!environment || stringOrNull(environment.craftingSystemId) !== stringOrNull(run.craftingSystemId)) {
+    if (
+      !environment ||
+      stringOrNull(environment.craftingSystemId) !== stringOrNull(run.craftingSystemId)
+    ) {
       return { missingReference: 'environment', system };
     }
 
@@ -924,13 +1024,20 @@ export class GatheringEngine {
     const snapshotEnvironment = snapshotTask
       ? {
           ...environment,
-          conditions: plainObjectOrNull(snapshot?.conditions) || plainObjectOrNull(run?.conditionSnapshot) || plainObjectOrNull(environment?.conditions) || {},
+          conditions:
+            plainObjectOrNull(snapshot?.conditions) ||
+            plainObjectOrNull(run?.conditionSnapshot) ||
+            plainObjectOrNull(environment?.conditions) ||
+            {},
           events: normalizeList(snapshot?.events),
           rules: plainObjectOrNull(snapshot?.rules) || plainObjectOrNull(environment?.rules) || {},
           useLegacyTaskItemSelectionMode: snapshot?.useLegacyTaskItemSelectionMode === true,
-          eventSelectionMode: stringOrNull(snapshot?.eventSelectionMode) || stringOrNull(environment?.eventSelectionMode),
+          eventSelectionMode:
+            stringOrNull(snapshot?.eventSelectionMode) ||
+            stringOrNull(environment?.eventSelectionMode),
           eventLimit: snapshot?.eventLimit,
-          eventPolicy: stringOrNull(snapshot?.eventPolicy) || stringOrNull(environment?.eventPolicy)
+          eventPolicy:
+            stringOrNull(snapshot?.eventPolicy) || stringOrNull(environment?.eventPolicy),
         }
       : null;
     if (snapshotEnvironment && environment?.__libraryTools instanceof Map) {
@@ -938,10 +1045,11 @@ export class GatheringEngine {
         value: environment.__libraryTools,
         enumerable: false,
         configurable: true,
-        writable: true
+        writable: true,
       });
     }
-    const currentTask = normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null;
+    const currentTask =
+      normalizeList(environment.tasks).find((task) => task?.id === run.taskId) ?? null;
     const task = snapshotTask || currentTask;
     if (!task) {
       return { missingReference: 'task', system, environment };
@@ -954,33 +1062,37 @@ export class GatheringEngine {
     if (typeof this.isActorSelectable === 'function') {
       return this.isActorSelectable({ actor, viewer }) === true;
     }
-    return selectableActors.some(candidate => sameActor(candidate, actor));
+    return selectableActors.some((candidate) => sameActor(candidate, actor));
   }
 
   _enabledGatheringSystems() {
     return new Map(
-      Array.from(this._allSystems().values())
-        .filter(system => system.enabled !== false && system.features?.gathering === true)
-        .map(system => [String(system.id), system])
+      [...this._allSystems().values()]
+        .filter((system) => system.enabled !== false && system.features?.gathering === true)
+        .map((system) => [String(system.id), system])
     );
   }
 
   _allSystems() {
     const systems = normalizeList(
-      typeof this.getSystems === 'function'
-        ? this.getSystems()
-        : this.systemManager?.getSystems?.()
+      typeof this.getSystems === 'function' ? this.getSystems() : this.systemManager?.getSystems?.()
     );
 
-    return new Map(systems.filter(system => system?.id).map(system => [String(system.id), system]));
+    return new Map(
+      systems.filter((system) => system?.id).map((system) => [String(system.id), system])
+    );
   }
 
-  _playerCandidateEnvironments(systems, viewer) {
+  _playerCandidateEnvironments(systems, _viewer) {
     const environments = normalizeList(this.environmentStore?.list?.());
-    return environments.filter(environment => {
-      if (!systems.has(environment?.craftingSystemId)) return false;
-      return true;
-    }).map(environment => this._composeEnvironment(environment, systems.get(environment.craftingSystemId)));
+    return environments
+      .filter((environment) => {
+        if (!systems.has(environment?.craftingSystemId)) return false;
+        return true;
+      })
+      .map((environment) =>
+        this._composeEnvironment(environment, systems.get(environment.craftingSystemId))
+      );
   }
 
   _composeEnvironment(environment, system = null) {
@@ -990,7 +1102,14 @@ export class GatheringEngine {
     return environment;
   }
 
-  async _buildEnvironmentListing({ environment, system, viewer, actor, presentTools = null, realmContextCache = null }) {
+  async _buildEnvironmentListing({
+    environment,
+    system,
+    viewer,
+    actor,
+    presentTools = null,
+    realmContextCache = null,
+  }) {
     // Disabled environments surface to every viewer (players and GMs alike) as
     // non-interactive "locked" teasers. Build them before any task-visibility
     // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
@@ -1005,14 +1124,20 @@ export class GatheringEngine {
     // the location reason + travel guidance, rather than a selectable environment
     // whose every task carries the realm block. Evaluated before task-visibility
     // gating so it is never dropped, mirroring the disabled-teaser path above.
-    const locationGate = this._locationBlockedReasons({ environment, system, viewer, actor, realmContextCache });
+    const locationGate = this._locationBlockedReasons({
+      environment,
+      system,
+      viewer,
+      actor,
+      realmContextCache,
+    });
     if (locationGate.location?.gated === true && locationGate.location?.available === false) {
       return this._lockedEnvironmentListing({
         environment,
         system,
         actor,
         blockedReasons: locationGate.blockedReasons,
-        location: locationGate.location
+        location: locationGate.location,
       });
     }
 
@@ -1021,28 +1146,47 @@ export class GatheringEngine {
     // rolled max/start. Idempotent — the dice roll persists once.
     if (actor && this.richState?.staminaEnabled?.(environment.craftingSystemId) === true) {
       try {
-        await this.richState?.seedActorStaminaIfNeeded?.({ actor, systemId: environment.craftingSystemId, system });
-      } catch (error) { /* display-only: never block the listing on a seed failure */ }
+        await this.richState?.seedActorStaminaIfNeeded?.({
+          actor,
+          systemId: environment.craftingSystemId,
+          system,
+        });
+      } catch {
+        /* display-only: never block the listing on a seed failure */
+      }
     }
 
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
     if (visibleTasks.length === 0) {
       return {
         visible: false,
-        hiddenReason: environment.selectionMode === 'blind'
-          ? 'BLIND_SOLE_TASK_HIDDEN'
-          : 'NO_VISIBLE_TARGETED_TASKS'
+        hiddenReason:
+          environment.selectionMode === 'blind'
+            ? 'BLIND_SOLE_TASK_HIDDEN'
+            : 'NO_VISIBLE_TARGETED_TASKS',
       };
     }
 
-    const environmentBlockedReasons = await this._environmentBlockedReasons({ environment, system, viewer, actor, realmContextCache });
+    const environmentBlockedReasons = await this._environmentBlockedReasons({
+      environment,
+      system,
+      viewer,
+      actor,
+      realmContextCache,
+    });
     // Redaction-safe location field — reuse the gate computed above (here the
     // environment is realm-available, so this is the ungated/available shape).
     const location = locationGate.location;
     // Party current-realm summary for the header bar (regardless of this
     // environment's gating), so the player app can show the current realm or
     // "no realm selected" when the realm/travel subsystem is enabled.
-    const realmSummary = this._currentRealmSummary({ environment, system, viewer, actor, realmContextCache });
+    const realmSummary = this._currentRealmSummary({
+      environment,
+      system,
+      viewer,
+      actor,
+      realmContextCache,
+    });
     // Stash each visible task's blocked reasons so both the player task models
     // and the blind "discovered tasks" list draw from one computation — no
     // extra visibility pass that could surface unrevealed tasks.
@@ -1050,40 +1194,57 @@ export class GatheringEngine {
     for (const visibleTask of visibleTasks) {
       const taskBlockedReasons = [
         ...environmentBlockedReasons,
-        ...await this._taskBlockedReasons({
+        ...(await this._taskBlockedReasons({
           environment,
           system,
           task: visibleTask.task,
           actor,
           viewer,
-          presentTools
-        })
+          presentTools,
+        })),
       ];
       taskEntries.push({
         task: visibleTask.task,
         visibility: visibleTask.visibility,
-        blockedReasons: taskBlockedReasons
+        blockedReasons: taskBlockedReasons,
       });
     }
-    const taskModels = taskEntries.map(entry => this._taskModel({
-      task: entry.task,
-      environment,
-      actor,
-      viewer,
-      visibility: entry.visibility,
-      blockedReasons: entry.blockedReasons,
-      tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools })
-    }));
+    const taskModels = taskEntries.map((entry) =>
+      this._taskModel({
+        task: entry.task,
+        environment,
+        actor,
+        viewer,
+        visibility: entry.visibility,
+        blockedReasons: entry.blockedReasons,
+        tools: this._resolveTaskToolStates({
+          actor,
+          system,
+          environment,
+          task: entry.task,
+          presentTools,
+        }),
+      })
+    );
     // Refine the displayed stamina cost to the viewing character's effective
     // cost (base + per-actor modifiers); the sync model carries the base.
-    for (let i = 0; i < taskModels.length; i++) {
-      await this._applyListingStaminaCost(taskModels[i], { system, environment, actor, viewer, task: taskEntries[i].task });
+    for (const [i, taskModel] of taskModels.entries()) {
+      await this._applyListingStaminaCost(taskModel, {
+        system,
+        environment,
+        actor,
+        viewer,
+        task: taskEntries[i].task,
+      });
     }
 
-    const attemptable = taskModels.some(task => task.attemptable);
-    const blockedReasons = environmentBlockedReasons.length > 0
-      ? environmentBlockedReasons
-      : (attemptable ? [] : uniqueReasons(taskModels.flatMap(task => task.blockedReasons)));
+    const attemptable = taskModels.some((task) => task.attemptable);
+    const blockedReasons =
+      environmentBlockedReasons.length > 0
+        ? environmentBlockedReasons
+        : attemptable
+          ? []
+          : uniqueReasons(taskModels.flatMap((task) => task.blockedReasons));
 
     // A non-GM viewer of a blind environment sees one opaque "Attempt gathering"
     // action (the collapsed task list) plus the transparent rows for tasks they
@@ -1091,10 +1252,20 @@ export class GatheringEngine {
     // full task list and no separate discovered list.
     const blindForViewer = environment.selectionMode === 'blind' && viewer?.isGM !== true;
     const listedTasks = blindForViewer
-      ? (taskModels.length > 0 ? [taskModels[0]] : [])
+      ? taskModels.length > 0
+        ? [taskModels[0]]
+        : []
       : taskModels;
     const discoveredTasks = blindForViewer
-      ? await this._discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools })
+      ? await this._discoveredTaskModels({
+          environment,
+          system,
+          viewer,
+          actor,
+          taskEntries,
+          environmentBlockedReasons,
+          presentTools,
+        })
       : [];
 
     // The GM-configured event visibility tier further restricts what a non-GM
@@ -1108,11 +1279,12 @@ export class GatheringEngine {
     // for a non-GM viewer of a blind environment (mirroring the collapsed task
     // list) or whenever the visibility tier is not 'full', and surfaced in full
     // for targeted environments and GM viewers.
-    const listedEvents = (blindForViewer || eventVisibility !== 'full')
-      ? []
-      : normalizeList(environment.events)
-          .filter(event => event?.enabled !== false)
-          .map(event => this._eventModel(event, environment));
+    const listedEvents =
+      blindForViewer || eventVisibility !== 'full'
+        ? []
+        : normalizeList(environment.events)
+            .filter((event) => event?.enabled !== false)
+            .map((event) => this._eventModel(event, environment));
 
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
@@ -1133,9 +1305,11 @@ export class GatheringEngine {
       nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
       weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
       timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
-      staminaPool: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true && actor
-        ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) || null
-        : null,
+      staminaPool:
+        this.richState?.staminaEnabled?.(environment.craftingSystemId) === true && actor
+          ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) ||
+            null
+          : null,
       conditions: plainObjectOrNull(environment.conditions) || {},
       realmsEnabled: realmSummary.realmsEnabled,
       currentRealms: realmSummary.currentRealms,
@@ -1143,14 +1317,15 @@ export class GatheringEngine {
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
       attemptable,
-      eventChance: eventVisibility === 'dangerLevelOnly' ? null : this._environmentEventChance(environment),
+      eventChance:
+        eventVisibility === 'dangerLevelOnly' ? null : this._environmentEventChance(environment),
       events: listedEvents,
       eventVisibility,
       blockedReasons,
       location,
       tasks: listedTasks,
       discoveredTasks,
-      ...this._playerListingFields({ environment, actor, locked: false })
+      ...this._playerListingFields({ environment, actor, locked: false }),
     };
   }
 
@@ -1176,10 +1351,20 @@ export class GatheringEngine {
    * @param {object[]} args.environmentBlockedReasons Shared environment-level reasons.
    * @returns {Promise<object[]>} Transparent discovered task models (each with `discovered: true`).
    */
-  async _discoveredTaskModels({ environment, system, viewer, actor, taskEntries, environmentBlockedReasons, presentTools = null }) {
+  async _discoveredTaskModels({
+    environment,
+    system,
+    viewer,
+    actor,
+    taskEntries,
+    environmentBlockedReasons,
+    presentTools = null,
+  }) {
     const { policy, scope } = this._resolveRevealPolicy(environment);
     if (policy === 'never') return [];
-    const revealedIds = new Set(this._listRevealedTaskIds({ actor, environmentId: environment.id, scope }));
+    const revealedIds = new Set(
+      this._listRevealedTaskIds({ actor, environmentId: environment.id, scope })
+    );
     if (revealedIds.size === 0) return [];
 
     const discovered = [];
@@ -1187,15 +1372,15 @@ export class GatheringEngine {
       if (!revealedIds.has(stringOrNull(entry.task.id))) continue;
       const blockedReasons = [
         ...environmentBlockedReasons,
-        ...await this._taskBlockedReasons({
+        ...(await this._taskBlockedReasons({
           environment,
           system,
           task: entry.task,
           actor,
           viewer,
           transparent: true,
-          presentTools
-        })
+          presentTools,
+        })),
       ];
       const model = this._taskModel({
         task: entry.task,
@@ -1205,9 +1390,21 @@ export class GatheringEngine {
         visibility: entry.visibility,
         blockedReasons,
         forceVisible: true,
-        tools: this._resolveTaskToolStates({ actor, system, environment, task: entry.task, presentTools })
+        tools: this._resolveTaskToolStates({
+          actor,
+          system,
+          environment,
+          task: entry.task,
+          presentTools,
+        }),
       });
-      await this._applyListingStaminaCost(model, { system, environment, actor, viewer, task: entry.task });
+      await this._applyListingStaminaCost(model, {
+        system,
+        environment,
+        actor,
+        viewer,
+        task: entry.task,
+      });
       discovered.push({ ...model, discovered: true });
     }
     return discovered;
@@ -1224,8 +1421,15 @@ export class GatheringEngine {
    * @returns {Promise<void>}
    */
   async _applyListingStaminaCost(model, { system, environment, actor, viewer, task }) {
-    if (!actor || !model?.rich?.stamina || typeof this.richState?.listingStaminaCost !== 'function') return;
-    const cost = await this.richState.listingStaminaCost({ actor, system, environment, task, viewer });
+    if (!actor || !model?.rich?.stamina || typeof this.richState?.listingStaminaCost !== 'function')
+      return;
+    const cost = await this.richState.listingStaminaCost({
+      actor,
+      system,
+      environment,
+      task,
+      viewer,
+    });
     if (cost != null) model.rich.stamina.cost = cost;
   }
 
@@ -1235,7 +1439,13 @@ export class GatheringEngine {
    * identity fields only — no tasks, weights, or composition internals — plus
    * the existing ENVIRONMENT_DISABLED reason.
    */
-  _lockedEnvironmentListing({ environment, system, actor = null, blockedReasons = null, location = null }) {
+  _lockedEnvironmentListing({
+    environment,
+    system,
+    actor = null,
+    blockedReasons = null,
+    location = null,
+  }) {
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
     return {
@@ -1272,11 +1482,17 @@ export class GatheringEngine {
       blockedReasons: blockedReasons ?? [this._blockedReason('ENVIRONMENT_DISABLED')],
       // The redaction-safe location field is surfaced on the teaser so the card
       // can show the "Not in current realm" alert and its guidance tooltip.
-      location: location ?? { gated: false, available: true, source: 'unresolved', currentRealms: [], guidance: null },
+      location: location ?? {
+        gated: false,
+        available: true,
+        source: 'unresolved',
+        currentRealms: [],
+        guidance: null,
+      },
       tasks: [],
       discoveredTasks: [],
       events: [],
-      ...this._playerListingFields({ environment, actor, locked: true })
+      ...this._playerListingFields({ environment, actor, locked: true }),
     };
   }
 
@@ -1290,15 +1506,16 @@ export class GatheringEngine {
   _playerListingFields({ environment, actor, locked }) {
     const { policy: revealPolicy, scope } = this._resolveRevealPolicy(environment);
     const composedTaskCount = locked ? 0 : normalizeList(environment.tasks).length;
-    const discoveredTaskCount = (locked || revealPolicy === 'never')
-      ? 0
-      : this._countRevealedTasks({ actor, environmentId: environment.id, scope });
+    const discoveredTaskCount =
+      locked || revealPolicy === 'never'
+        ? 0
+        : this._countRevealedTasks({ actor, environmentId: environment.id, scope });
     return {
       locked: locked === true,
       revealPolicy,
       composedTaskCount,
       discoveredTaskCount,
-      biomeTags: this._resolveBiomeTags(environment)
+      biomeTags: this._resolveBiomeTags(environment),
     };
   }
 
@@ -1306,7 +1523,7 @@ export class GatheringEngine {
     if (typeof this.richState?.countRevealedTasks !== 'function') return 0;
     try {
       return this.richState.countRevealedTasks({ actor, environmentId, scope }) || 0;
-    } catch (_err) {
+    } catch {
       return 0;
     }
   }
@@ -1321,7 +1538,7 @@ export class GatheringEngine {
     if (typeof this.richState?.listRevealedTaskIds !== 'function') return [];
     try {
       return normalizeList(this.richState.listRevealedTaskIds({ actor, environmentId, scope }));
-    } catch (_err) {
+    } catch {
       return [];
     }
   }
@@ -1341,7 +1558,7 @@ export class GatheringEngine {
    */
   _taskSuccessChance(task) {
     if (task?.resolutionMode !== 'd100') return null;
-    const rows = normalizeList(task.dropRows).filter(row => row?.enabled !== false);
+    const rows = normalizeList(task.dropRows).filter((row) => row?.enabled !== false);
     if (rows.length === 0) return null;
     const missAll = rows.reduce((product, row) => {
       const rate = Math.min(100, Math.max(0, Number(row?.dropRate) || 0));
@@ -1365,7 +1582,7 @@ export class GatheringEngine {
    * @returns {number} A 0–1 fraction (0 when there are no events).
    */
   _environmentEventChance(environment) {
-    const events = normalizeList(environment?.events).filter(event => event?.enabled !== false);
+    const events = normalizeList(environment?.events).filter((event) => event?.enabled !== false);
     if (events.length === 0) return 0;
     const missAll = events.reduce((product, event) => {
       const rate = Math.min(100, Math.max(0, Number(event?.dropRate) || 0));
@@ -1410,7 +1627,7 @@ export class GatheringEngine {
       // customColor }) so event biome chips render with icons/colours like the
       // environment's biome pips. Empty when richState can't resolve them.
       biomeTags: this._resolveBiomeTagList(biomes, environment),
-      linkedSceneUuid: stringOrNull(event?.linkedSceneUuid)
+      linkedSceneUuid: stringOrNull(event?.linkedSceneUuid),
     };
   }
 
@@ -1431,13 +1648,13 @@ export class GatheringEngine {
     if (typeof this.richState?.resolveBiomeTags !== 'function') return [];
     try {
       return this.richState.resolveBiomeTags(biomes, environment?.craftingSystemId) || [];
-    } catch (_err) {
+    } catch {
       return [];
     }
   }
 
   async _visibleTaskListings({ environment, system, viewer, actor }) {
-    const enabledTasks = normalizeList(environment.tasks).filter(task => task?.enabled !== false);
+    const enabledTasks = normalizeList(environment.tasks).filter((task) => task?.enabled !== false);
     const visibleTasks = [];
     for (const task of enabledTasks) {
       const visibility = viewer?.isGM
@@ -1460,11 +1677,17 @@ export class GatheringEngine {
       viewer,
       environment,
       system,
-      task
+      task,
     });
   }
 
-  async _environmentBlockedReasons({ environment, system = null, viewer, actor, realmContextCache = null }) {
+  async _environmentBlockedReasons({
+    environment,
+    system = null,
+    viewer,
+    actor,
+    realmContextCache = null,
+  }) {
     const blockedReasons = [];
     if (environment.enabled === false) {
       blockedReasons.push(this._blockedReason('ENVIRONMENT_DISABLED'));
@@ -1473,15 +1696,23 @@ export class GatheringEngine {
     if (environment.sceneUuid) {
       const access = await this._checkSceneAccess({ environment, viewer, actor });
       if (access.allowed !== true) {
-        blockedReasons.push(this._blockedReason(access.code || 'SCENE_TOKEN_BLOCKED', {
-          messageKey: access.messageKey,
-          message: access.message,
-          data: access.data
-        }));
+        blockedReasons.push(
+          this._blockedReason(access.code || 'SCENE_TOKEN_BLOCKED', {
+            messageKey: access.messageKey,
+            message: access.message,
+            data: access.data,
+          })
+        );
       }
     }
 
-    const location = this._locationBlockedReasons({ environment, system, viewer, actor, realmContextCache });
+    const location = this._locationBlockedReasons({
+      environment,
+      system,
+      viewer,
+      actor,
+      realmContextCache,
+    });
     blockedReasons.push(...location.blockedReasons);
 
     return blockedReasons;
@@ -1500,9 +1731,10 @@ export class GatheringEngine {
    */
   _resolveRealmContext({ actor, systemId, cache = null }) {
     if (cache && cache.has(systemId)) return cache.get(systemId);
-    const context = typeof this.locationResolver?.buildCurrentRealmContext === 'function'
-      ? this.locationResolver.buildCurrentRealmContext({ actor, systemId })
-      : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
+    const context =
+      typeof this.locationResolver?.buildCurrentRealmContext === 'function'
+        ? this.locationResolver.buildCurrentRealmContext({ actor, systemId })
+        : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
     if (cache) cache.set(systemId, context);
     return context;
   }
@@ -1530,14 +1762,26 @@ export class GatheringEngine {
     if (!isGatheringRealmsEnabled(system)) {
       return {
         blockedReasons: [],
-        location: { gated: false, available: true, source: 'unresolved', currentRealms: [], guidance: null }
+        location: {
+          gated: false,
+          available: true,
+          source: 'unresolved',
+          currentRealms: [],
+          guidance: null,
+        },
       };
     }
     const gated = environmentHasLocationRules(environment);
     if (!this.locationResolver || !gated) {
       return {
         blockedReasons: [],
-        location: { gated: false, available: true, source: 'unresolved', currentRealms: [], guidance: null }
+        location: {
+          gated: false,
+          available: true,
+          source: 'unresolved',
+          currentRealms: [],
+          guidance: null,
+        },
       };
     }
 
@@ -1546,21 +1790,28 @@ export class GatheringEngine {
     const availability = evaluateLocationAvailability(environment, context);
     const isGM = viewer?.isGM === true;
     const revealMode = this._realmRevealMode(system);
-    const realmsById = new Map((Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : []).map(realm => [realm.id, realm]));
+    const realmsById = new Map(
+      (Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : []).map((realm) => [
+        realm.id,
+        realm,
+      ])
+    );
     const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
 
-    const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map(realm => buildRealmDisclosure(realm, {
-      isGM,
-      discovered: discoveredRealmIds.has(realm?.id),
-      revealMode
-    }));
+    const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
+      buildRealmDisclosure(realm, {
+        isGM,
+        discovered: discoveredRealmIds.has(realm?.id),
+        revealMode,
+      })
+    );
 
     const location = {
       gated: true,
       available: availability.available === true,
       source: stringOrNull(context?.source) || 'unresolved',
       currentRealms,
-      guidance: null
+      guidance: null,
     };
 
     if (availability.available === true) {
@@ -1574,14 +1825,16 @@ export class GatheringEngine {
       availability,
       discoveredRealmIds,
       isGM,
-      revealMode
+      revealMode,
     });
     location.guidance = guidance;
 
-    const code = availability.reasons.includes('NO_CURRENT_REALM') ? 'NO_CURRENT_REALM' : 'LOCATION_BLOCKED';
+    const code = availability.reasons.includes('NO_CURRENT_REALM')
+      ? 'NO_CURRENT_REALM'
+      : 'LOCATION_BLOCKED';
     return {
       blockedReasons: [this._blockedReason(code, { data: guidance })],
-      location
+      location,
     };
   }
 
@@ -1606,11 +1859,13 @@ export class GatheringEngine {
     const isGM = viewer?.isGM === true;
     const revealMode = this._realmRevealMode(system);
     const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
-    const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map(realm => buildRealmDisclosure(realm, {
-      isGM,
-      discovered: discoveredRealmIds.has(realm?.id),
-      revealMode
-    }));
+    const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
+      buildRealmDisclosure(realm, {
+        isGM,
+        discovered: discoveredRealmIds.has(realm?.id),
+        revealMode,
+      })
+    );
     return { realmsEnabled: true, currentRealms };
   }
 
@@ -1643,7 +1898,15 @@ export class GatheringEngine {
    *   transparent regardless of this flag.
    * @returns {Promise<object[]>} The task's blocked reasons.
    */
-  async _taskBlockedReasons({ environment, system, task, actor, viewer, transparent = false, presentTools = null }) {
+  async _taskBlockedReasons({
+    environment,
+    system,
+    task,
+    actor,
+    viewer,
+    transparent = false,
+    presentTools = null,
+  }) {
     const blockedReasons = [];
     // For a revealed/discovered blind task (`transparent`), keep the real
     // blocked-reason data — the row needs the actual required weather/time and
@@ -1654,18 +1917,20 @@ export class GatheringEngine {
     }
 
     if (this.runManager?.findActiveRunForTask?.(actor, task.id)) {
-      blockedReasons.push(this._blockedReason('DUPLICATE_ACTIVE_RUN', {
-        data: redact ? null : { taskId: task.id }
-      }));
+      blockedReasons.push(
+        this._blockedReason('DUPLICATE_ACTIVE_RUN', {
+          data: redact ? null : { taskId: task.id },
+        })
+      );
     }
 
     const taskTools = this._resolveTaskTools({ environment, task });
     if (this._hasBlockedToolReferences(taskTools)) {
-      blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
-        data: redact
-          ? null
-          : this._toolBlockedData({ task, resolvedTools: taskTools })
-      }));
+      blockedReasons.push(
+        this._blockedReason('TOOL_BLOCKED', {
+          data: redact ? null : this._toolBlockedData({ task, resolvedTools: taskTools }),
+        })
+      );
     } else if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor,
@@ -1674,34 +1939,50 @@ export class GatheringEngine {
         environment,
         task,
         tools: taskTools.tools,
-        presentTools
+        presentTools,
       });
       if (toolResult.available !== true) {
-        blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
-          data: redact
-            ? null
-            : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult })
-        }));
+        blockedReasons.push(
+          this._blockedReason('TOOL_BLOCKED', {
+            data: redact
+              ? null
+              : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult }),
+          })
+        );
       }
     }
 
     // Weather/time-of-day are runtime gates: a task may match the environment
     // (biome/danger) but be inactive when current conditions don't satisfy its
     // required `weather` / `timeOfDay` values.
-    const conditionsResult = evaluateEnvironmentMatch(task, environment, environment?.conditions || {}, { includeDanger: false });
+    const conditionsResult = evaluateEnvironmentMatch(
+      task,
+      environment,
+      environment?.conditions || {},
+      { includeDanger: false }
+    );
     if (conditionsResult.conditionsMet === false) {
-      blockedReasons.push(this._blockedReason('CONDITIONS_BLOCKED', {
-        data: redact
-          ? null
-          : {
-              taskId: task.id,
-              requiredWeather: conditionsResult.evidence?.weather?.recordValues ?? [],
-              requiredTimeOfDay: conditionsResult.evidence?.time?.recordValues ?? []
-            }
-      }));
+      blockedReasons.push(
+        this._blockedReason('CONDITIONS_BLOCKED', {
+          data: redact
+            ? null
+            : {
+                taskId: task.id,
+                requiredWeather: conditionsResult.evidence?.weather?.recordValues ?? [],
+                requiredTimeOfDay: conditionsResult.evidence?.time?.recordValues ?? [],
+              },
+        })
+      );
     }
 
-    const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task, transparent });
+    const richAttempt = await this._evaluateRichAttempt({
+      actor,
+      viewer,
+      system,
+      environment,
+      task,
+      transparent,
+    });
     blockedReasons.push(...richAttempt.blockedReasons);
 
     return blockedReasons;
@@ -1711,7 +1992,8 @@ export class GatheringEngine {
     const tools = [];
     const missingToolIds = [];
     const disabledToolIds = [];
-    const library = environment?.__libraryTools instanceof Map ? environment.__libraryTools : new Map();
+    const library =
+      environment?.__libraryTools instanceof Map ? environment.__libraryTools : new Map();
 
     for (const toolId of normalizeStringList(task?.toolIds)) {
       const tool = library.get(toolId) ?? null;
@@ -1746,7 +2028,10 @@ export class GatheringEngine {
    *                  state: 'present'|'damaged'|'missing', required: boolean}>}
    */
   _resolveTaskToolStates({ actor, system, environment, task, presentTools = null }) {
-    const { tools, missingToolIds, disabledToolIds } = this._resolveTaskTools({ environment, task });
+    const { tools, missingToolIds, disabledToolIds } = this._resolveTaskTools({
+      environment,
+      task,
+    });
     const componentsById = this._componentsById(system);
     const states = classifyGatheringToolStates({
       actor,
@@ -1754,21 +2039,22 @@ export class GatheringEngine {
       task,
       tools,
       craftingSystemManager: this.systemManager,
-      presentTools
+      presentTools,
     });
 
     const resolved = states.map(({ tool, state }) => {
       const component = componentsById.get(stringOrNull(tool?.componentId)) ?? null;
-      const name = stringOrNull(tool?.label)
-        || stringOrEmpty(component?.name)
-        || this.localize(UNKNOWN_TOOL_LABEL_KEY);
+      const name =
+        stringOrNull(tool?.label) ||
+        stringOrEmpty(component?.name) ||
+        this.localize(UNKNOWN_TOOL_LABEL_KEY);
       const img = stringOrNull(component?.img) || DEFAULT_TOOL_IMG;
       return {
         id: stringOrNull(tool?.id) || stringOrNull(tool?.componentId),
         name,
         img,
         state,
-        required: true
+        required: true,
       };
     });
 
@@ -1783,7 +2069,7 @@ export class GatheringEngine {
         name: id,
         img: DEFAULT_TOOL_IMG,
         state: 'missing',
-        required: true
+        required: true,
       });
     }
 
@@ -1793,10 +2079,10 @@ export class GatheringEngine {
   _componentsById(system) {
     const map = new Map();
     if (!system?.id || typeof this.systemManager?.getItems !== 'function') return map;
-    let components = [];
+    let components;
     try {
       components = normalizeList(this.systemManager.getItems(system.id));
-    } catch (_err) {
+    } catch {
       return map;
     }
     for (const component of components) {
@@ -1807,8 +2093,10 @@ export class GatheringEngine {
   }
 
   _hasBlockedToolReferences(resolvedTools) {
-    return normalizeList(resolvedTools?.missingToolIds).length > 0
-      || normalizeList(resolvedTools?.disabledToolIds).length > 0;
+    return (
+      normalizeList(resolvedTools?.missingToolIds).length > 0 ||
+      normalizeList(resolvedTools?.disabledToolIds).length > 0
+    );
   }
 
   _toolBlockedData({ task, resolvedTools, toolResult = null }) {
@@ -1817,30 +2105,32 @@ export class GatheringEngine {
       missingToolIds: normalizeList(resolvedTools?.missingToolIds),
       disabledToolIds: normalizeList(resolvedTools?.disabledToolIds),
       missing: normalizeList(toolResult?.missing),
-      failedRequirements: normalizeList(toolResult?.failedRequirements)
+      failedRequirements: normalizeList(toolResult?.failedRequirements),
     };
   }
 
   async _checkTools({ actor, viewer, system, environment, task, tools, presentTools = null }) {
     if (typeof this.toolAvailability?.check === 'function') {
-      return normalizeToolResult(await this.toolAvailability.check({
-        actor,
-        viewer,
-        system,
-        environment,
-        task,
-        tools,
-        presentTools
-      }));
+      return normalizeToolResult(
+        await this.toolAvailability.check({
+          actor,
+          viewer,
+          system,
+          environment,
+          task,
+          tools,
+          presentTools,
+        })
+      );
     }
     // Fallback: treat a tool as satisfied when virtually present (canvas Tool).
     // System-scoped: a present tool only counts when the active tool's systemId
     // matches this task's crafting system (componentId is a per-system id).
     const presentSet = resolvePresentComponentIds({
       presentTools,
-      systemId: system?.id ?? task?.craftingSystemId ?? null
+      systemId: system?.id ?? task?.craftingSystemId ?? null,
     });
-    const missing = tools.filter(tool => !presentSet.has(tool?.componentId));
+    const missing = tools.filter((tool) => !presentSet.has(tool?.componentId));
     return missing.length === 0
       ? { available: true, missing: [], failedRequirements: [] }
       : { available: false, missing, failedRequirements: [] };
@@ -1868,7 +2158,16 @@ export class GatheringEngine {
    *   key is safe.
    * @returns {object} The task model.
    */
-  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons, forceVisible = false, tools = null }) {
+  _taskModel({
+    task,
+    environment,
+    actor = null,
+    viewer,
+    visibility,
+    blockedReasons,
+    forceVisible = false,
+    tools = null,
+  }) {
     const blind = environment.selectionMode === 'blind';
     // `forceVisible` builds a transparent model for an already-revealed blind
     // task (the "Discovered Tasks" list) — it bypasses the opaque collapse that
@@ -1890,8 +2189,8 @@ export class GatheringEngine {
         visibility: {
           reasonCode: null,
           description: '',
-          diagnostic: null
-        }
+          diagnostic: null,
+        },
       };
     }
 
@@ -1908,15 +2207,16 @@ export class GatheringEngine {
       visibility: {
         reasonCode: stringOrNull(visibility.reasonCode),
         description: stringOrEmpty(visibility.description),
-        diagnostic: visibility.diagnostic ?? null
+        diagnostic: visibility.diagnostic ?? null,
       },
       resolutionMode: stringOrNull(task.resolutionMode),
       hasTimeRequirement: Boolean(task.timeRequirement),
-      successChance: typeof this.richState?.taskSuccessChance === 'function'
-        ? this.richState.taskSuccessChance(task, environment)
-        : this._taskSuccessChance(task),
+      successChance:
+        typeof this.richState?.taskSuccessChance === 'function'
+          ? this.richState.taskSuccessChance(task, environment)
+          : this._taskSuccessChance(task),
       tools: Array.isArray(tools) ? tools : [],
-      rich
+      rich,
     };
   }
 
@@ -1925,15 +2225,17 @@ export class GatheringEngine {
       return this.richState.buildListingMetadata({ environment, task, actor, viewer });
     }
     return {
-      nodes: task?.nodes ? {
-        enabled: true,
-        available: Number(task.nodes.current || 0) > 0,
-        current: Number(task.nodes.current || 0),
-        max: Number(task.nodes.max || 0)
-      } : null,
+      nodes: task?.nodes
+        ? {
+            enabled: true,
+            available: Number(task.nodes.current || 0) > 0,
+            current: Number(task.nodes.current || 0),
+            max: Number(task.nodes.max || 0),
+          }
+        : null,
       stamina: Number(task?.staminaCost || 0) > 0 ? { cost: Number(task.staminaCost) } : null,
       risk: task?.riskOverride || environment?.risk || 'safe',
-      conditions: plainObjectOrNull(environment?.conditions) || {}
+      conditions: plainObjectOrNull(environment?.conditions) || {},
     };
   }
 
@@ -1955,17 +2257,22 @@ export class GatheringEngine {
    */
   async _evaluateRichAttempt({ actor, viewer, system, environment, task, transparent = false }) {
     if (typeof this.richState?.evaluateStart !== 'function') {
-      return { blockedReasons: [], evidence: this._richListingMetadata({ environment, task, actor, viewer }) };
+      return {
+        blockedReasons: [],
+        evidence: this._richListingMetadata({ environment, task, actor, viewer }),
+      };
     }
     const result = await this.richState.evaluateStart({ actor, viewer, system, environment, task });
     const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     return {
-      blockedReasons: normalizeList(result?.blockedReasons).map(reason => this._blockedReason(reason.code || 'BLOCKED', {
-        messageKey: reason.messageKey,
-        message: reason.message,
-        data: redact ? null : reason.data
-      })),
-      evidence: plainObjectOrNull(result?.evidence) || {}
+      blockedReasons: normalizeList(result?.blockedReasons).map((reason) =>
+        this._blockedReason(reason.code || 'BLOCKED', {
+          messageKey: reason.messageKey,
+          message: reason.message,
+          data: redact ? null : reason.data,
+        })
+      ),
+      evidence: plainObjectOrNull(result?.evidence) || {},
     };
   }
 
@@ -1978,12 +2285,19 @@ export class GatheringEngine {
   }
 
   async _resolveStartContext({ viewer, actor, rememberedActorId, environmentId, taskId }) {
-    const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
+    const selectableActors = normalizeActorList(
+      await callMaybe(this.getSelectableActors, { viewer })
+    );
     if (selectableActors.length === 0) {
       return { blockedReason: this._blockedReason('NO_SELECTABLE_ACTORS') };
     }
 
-    const selected = this._resolveSelectedActor({ actor, rememberedActorId, selectableActors, viewer });
+    const selected = this._resolveSelectedActor({
+      actor,
+      rememberedActorId,
+      selectableActors,
+      viewer,
+    });
     if (selected.blockedReason) {
       return { actor: null, blockedReason: selected.blockedReason };
     }
@@ -1993,8 +2307,8 @@ export class GatheringEngine {
       return {
         actor: selected.actor,
         blockedReason: this._blockedReason('MISSING_REFERENCE', {
-          data: { environmentId: stringOrNull(environmentId) }
-        })
+          data: { environmentId: stringOrNull(environmentId) },
+        }),
       };
     }
 
@@ -2006,9 +2320,9 @@ export class GatheringEngine {
         blockedReason: this._blockedReason('MISSING_REFERENCE', {
           data: {
             environmentId: environment.id,
-            craftingSystemId: stringOrNull(environment.craftingSystemId)
-          }
-        })
+            craftingSystemId: stringOrNull(environment.craftingSystemId),
+          },
+        }),
       };
     }
 
@@ -2025,9 +2339,9 @@ export class GatheringEngine {
           : this._blockedReason('MISSING_REFERENCE', {
               data: {
                 environmentId: environment.id,
-                taskId: stringOrNull(taskId)
-              }
-            })
+                taskId: stringOrNull(taskId),
+              },
+            }),
       };
     }
 
@@ -2044,7 +2358,10 @@ export class GatheringEngine {
         return this._composeEnvironment(environment, system);
       }
     }
-    const environment = normalizeList(this.environmentStore?.list?.()).find(environment => environment?.id === id) ?? null;
+    const environment =
+      normalizeList(this.environmentStore?.list?.()).find(
+        (environment) => environment?.id === id
+      ) ?? null;
     if (!environment) return null;
     const system = this._allSystems().get(String(environment.craftingSystemId));
     return this._composeEnvironment(environment, system);
@@ -2054,7 +2371,7 @@ export class GatheringEngine {
     const tasks = normalizeList(environment?.tasks);
     const id = stringOrNull(taskId);
     if (!id) return null;
-    return tasks.find(task => task?.id === id) ?? null;
+    return tasks.find((task) => task?.id === id) ?? null;
   }
 
   /**
@@ -2066,13 +2383,20 @@ export class GatheringEngine {
    */
   async _selectBlindStartTask({ environment, system, actor, viewer }) {
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
-    let pool = visibleTasks.map(entry => entry.task);
+    let pool = visibleTasks.map((entry) => entry.task);
 
-    const gate = environment?.rules?.blindCandidateGate === 'allMatching' ? 'allMatching' : 'attemptableOnly';
+    const gate =
+      environment?.rules?.blindCandidateGate === 'allMatching' ? 'allMatching' : 'attemptableOnly';
     if (gate === 'attemptableOnly') {
       const attemptable = [];
       for (const task of pool) {
-        const reasons = await this._taskBlockedReasons({ environment, system, task, actor, viewer });
+        const reasons = await this._taskBlockedReasons({
+          environment,
+          system,
+          task,
+          actor,
+          viewer,
+        });
         if (reasons.length === 0) attemptable.push(task);
       }
       pool = attemptable;
@@ -2089,13 +2413,13 @@ export class GatheringEngine {
   _weightedPickTask(pool, weights) {
     const map = weights && typeof weights === 'object' ? weights : {};
     const weighted = pool
-      .map(task => {
+      .map((task) => {
         const raw = Number(map[task.id]);
         const hasEntry = Object.prototype.hasOwnProperty.call(map, task.id);
-        const weight = Number.isFinite(raw) ? raw : (hasEntry ? 0 : 1);
-        return { task, weight: weight > 0 ? weight : 0 };
+        const weight = Number.isFinite(raw) ? raw : hasEntry ? 0 : 1;
+        return { task, weight: Math.max(weight, 0) };
       })
-      .filter(entry => entry.weight > 0);
+      .filter((entry) => entry.weight > 0);
     if (weighted.length === 0) return null;
     const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
     let roll = this.random() * total;
@@ -2103,14 +2427,14 @@ export class GatheringEngine {
       roll -= entry.weight;
       if (roll < 0) return entry.task;
     }
-    return weighted[weighted.length - 1].task;
+    return weighted.at(-1).task;
   }
 
   _validateStartTask(task) {
     const errors = validateTaskConfiguration(task);
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -2122,21 +2446,26 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('RUN_CREATION_FAILED', {
-          data: this._waitingRunFailureData({ environment, task, viewer, code: 'MISSING_RUN_MANAGER' })
-        })
+          data: this._waitingRunFailureData({
+            environment,
+            task,
+            viewer,
+            code: 'MISSING_RUN_MANAGER',
+          }),
+        }),
       });
     }
 
     const runData = {
       craftingSystemId: stringOrNull(system.id),
       environmentId: stringOrNull(environment.id),
-      taskId: stringOrNull(task.id)
+      taskId: stringOrNull(task.id),
     };
     if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
       const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
       richPayload.economyEvidence = {
-        ...(richPayload.economyEvidence || {}),
-        runtimeSnapshot: this._runtimeSnapshot({ environment, task })
+        ...richPayload.economyEvidence,
+        runtimeSnapshot: this._runtimeSnapshot({ environment, task }),
       };
       Object.assign(runData, richPayload);
     }
@@ -2156,23 +2485,38 @@ export class GatheringEngine {
               task,
               viewer,
               code: 'RUN_MANAGER_DIAGNOSTIC',
-              diagnostics: run?.diagnostics ?? run?.diagnostic
-            })
-          })
+              diagnostics: run?.diagnostics ?? run?.diagnostic,
+            }),
+          }),
         });
       }
 
-      const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome: { status: 'waitingTime' }, viewer });
-      const waitingRun = richEvidence && typeof richEvidence === 'object'
-        ? {
-            ...run,
-            economyEvidence: {
-              ...(run.economyEvidence || {}),
-              ...richEvidence
+      const richEvidence = await this._commitRichAttempt({
+        actor,
+        system,
+        environment,
+        task,
+        outcome: { status: 'waitingTime' },
+        viewer,
+      });
+      const waitingRun =
+        richEvidence && typeof richEvidence === 'object'
+          ? {
+              ...run,
+              economyEvidence: {
+                ...run.economyEvidence,
+                ...richEvidence,
+              },
             }
-          }
-        : run;
-      return this._startedWaitingStart({ viewer, actor, system, environment, task, run: waitingRun });
+          : run;
+      return this._startedWaitingStart({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        run: waitingRun,
+      });
     } catch (error) {
       return this._blockedStart({
         viewer,
@@ -2184,19 +2528,28 @@ export class GatheringEngine {
             environment,
             task,
             viewer,
-            code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR'
-          })
-        })
+            code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR',
+          }),
+        }),
       });
     }
   }
 
-  async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null, presentTools = null }) {
-    const outcome = task.resolutionMode === 'd100'
-      ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
-      : (task.resolutionMode === 'progressive'
-        ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-        : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task }));
+  async _resolveImmediateAttempt({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    richAttempt = null,
+    presentTools = null,
+  }) {
+    const outcome =
+      task.resolutionMode === 'd100'
+        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+        : task.resolutionMode === 'progressive'
+          ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
+          : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
 
     if (outcome.status === 'misconfigured') {
       return this._blockedStart({
@@ -2205,8 +2558,8 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('TASK_MISCONFIGURED', {
-          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome })
-        })
+          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome }),
+        }),
       });
     }
 
@@ -2217,13 +2570,27 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('RUN_CREATION_FAILED', {
-          data: this._waitingRunFailureData({ environment, task, viewer, code: 'MISSING_RUN_MANAGER' })
-        })
+          data: this._waitingRunFailureData({
+            environment,
+            task,
+            viewer,
+            code: 'MISSING_RUN_MANAGER',
+          }),
+        }),
       });
     }
 
     const checkResult = plainObjectOrNull(outcome.checkResult) ?? undefined;
-    const plan = await this._terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult, presentTools });
+    const plan = await this._terminalSideEffectPlan({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+      presentTools,
+    });
     if (plan.status === 'misconfigured') {
       return this._blockedStart({
         viewer,
@@ -2231,8 +2598,8 @@ export class GatheringEngine {
         environment,
         task,
         reason: this._blockedReason('TASK_MISCONFIGURED', {
-          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome: plan })
-        })
+          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome: plan }),
+        }),
       });
     }
 
@@ -2244,9 +2611,15 @@ export class GatheringEngine {
       task,
       outcome,
       checkResult,
-      plan
+      plan,
     });
-    const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer, characterModifierSnapshot: outcome?.characterModifierSnapshot ?? null });
+    const richPayload = this._richHistoryPayload({
+      environment,
+      task,
+      richAttempt,
+      viewer,
+      characterModifierSnapshot: outcome?.characterModifierSnapshot ?? null,
+    });
     Object.assign(runData, richPayload);
     Object.assign(payload, richPayload);
     let run;
@@ -2263,20 +2636,27 @@ export class GatheringEngine {
             environment,
             task,
             viewer,
-            code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR'
-          })
-        })
+            code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR',
+          }),
+        }),
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome, viewer });
+    const richEvidence = await this._commitRichAttempt({
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      viewer,
+    });
     if (richEvidence && typeof richEvidence === 'object') {
       run = {
         ...run,
         economyEvidence: {
-          ...(run.economyEvidence || {}),
-          ...richEvidence
-        }
+          ...run.economyEvidence,
+          ...richEvidence,
+        },
       };
     }
 
@@ -2288,7 +2668,7 @@ export class GatheringEngine {
       task,
       outcome,
       checkResult,
-      presentTools
+      presentTools,
     });
 
     return await this._terminalStart({
@@ -2301,11 +2681,20 @@ export class GatheringEngine {
       run,
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
-      checkResult
+      checkResult,
     });
   }
 
-  async _terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {
+  async _terminalSideEffectPlan({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    checkResult,
+    presentTools = null,
+  }) {
     try {
       const usedTools = await this._planTerminalTools({
         viewer,
@@ -2315,30 +2704,32 @@ export class GatheringEngine {
         task,
         outcome,
         checkResult,
-        presentTools
+        presentTools,
       });
       if (usedTools?.status === 'misconfigured') return usedTools;
 
-      const toolBroke = Array.isArray(usedTools) && usedTools.some(entry => entry?.broken === true);
+      const toolBroke =
+        Array.isArray(usedTools) && usedTools.some((entry) => entry?.broken === true);
       if (toolBroke && resolveToolBreakagePolicy(environment) === 'failureOnBreak') {
         outcome.status = 'failed';
         outcome.resultGroups = [];
       }
 
-      const createdResults = outcome.status === 'succeeded'
-        ? await this._planGatheredResults({ viewer, actor, system, environment, task, outcome })
-        : [];
+      const createdResults =
+        outcome.status === 'succeeded'
+          ? await this._planGatheredResults({ viewer, actor, system, environment, task, outcome })
+          : [];
       if (createdResults?.status === 'misconfigured') return createdResults;
 
       return {
         status: 'ready',
         createdResults,
-        usedTools: Array.isArray(usedTools) ? usedTools : []
+        usedTools: Array.isArray(usedTools) ? usedTools : [],
       };
     } catch (error) {
       return misconfiguredOutcome({
         code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'TERMINAL_PLAN_FAILED',
-        message: stringOrNull(error?.message) || 'Terminal side-effect planning failed'
+        message: stringOrNull(error?.message) || 'Terminal side-effect planning failed',
       });
     }
   }
@@ -2351,45 +2742,56 @@ export class GatheringEngine {
         runData: {
           craftingSystemId: stringOrNull(system.id),
           environmentId: stringOrNull(environment.id),
-          taskId: 'blind'
+          taskId: 'blind',
         },
         payload: {
           createdResults: [],
           usedTools: [],
           checkResult: { blind: true, status: outcome.status },
-          ...this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot })
-        }
+          ...this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot }),
+        },
       };
     }
 
     const payload = {
       createdResults: plan.createdResults,
-      usedTools: plan.usedTools ?? []
+      usedTools: plan.usedTools ?? [],
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
-    Object.assign(payload, this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot }));
+    Object.assign(
+      payload,
+      this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot })
+    );
 
     return {
       runData: {
         craftingSystemId: stringOrNull(system.id),
         environmentId: stringOrNull(environment.id),
-        taskId: stringOrNull(task.id)
+        taskId: stringOrNull(task.id),
       },
-      payload
+      payload,
     };
   }
 
-  _richHistoryPayload({ environment, task, richAttempt = null, viewer = null, characterModifierSnapshot = null }) {
+  _richHistoryPayload({
+    environment,
+    task,
+    richAttempt = null,
+    viewer = null,
+    characterModifierSnapshot = null,
+  }) {
     if (!hasRichGatheringData(environment, task)) return {};
     const opaqueBlind = viewer ? this._isOpaqueBlindTask({ environment, viewer }) : false;
-    const evidence = plainObjectOrNull(richAttempt?.evidence) || this._richListingMetadata({ environment, task, viewer });
+    const evidence =
+      plainObjectOrNull(richAttempt?.evidence) ||
+      this._richListingMetadata({ environment, task, viewer });
     if (characterModifierSnapshot && typeof characterModifierSnapshot === 'object') {
       evidence.characterModifierSnapshot = cloneJson(characterModifierSnapshot);
     }
     const payload = {
       economyEvidence: opaqueBlind ? redactRichEvidence(evidence, { viewer }) : evidence,
       conditionSnapshot: plainObjectOrNull(environment?.conditions) || {},
-      riskLevel: stringOrNull(task?.riskOverride) || stringOrNull(environment?.risk) || 'safe'
+      riskLevel: stringOrNull(task?.riskOverride) || stringOrNull(environment?.risk) || 'safe',
     };
     if (characterModifierSnapshot && typeof characterModifierSnapshot === 'object') {
       const cloned = cloneJson(characterModifierSnapshot);
@@ -2405,22 +2807,38 @@ export class GatheringEngine {
   _runtimeSnapshot({ environment, task }) {
     return {
       task: cloneJson(task),
-      events: normalizeList(environment?.events).map(event => cloneJson(event)),
+      events: normalizeList(environment?.events).map((event) => cloneJson(event)),
       rules: plainObjectOrNull(environment?.rules) || {},
       useLegacyTaskItemSelectionMode: environment?.useLegacyTaskItemSelectionMode === true,
       eventSelectionMode: stringOrNull(environment?.eventSelectionMode),
       eventLimit: environment?.eventLimit,
       eventPolicy: stringOrNull(environment?.eventPolicy),
-      conditions: plainObjectOrNull(environment?.conditions) || {}
+      conditions: plainObjectOrNull(environment?.conditions) || {},
     };
   }
 
   async _commitRichAttempt({ actor, system, environment, task, outcome, viewer = null }) {
     if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
-    return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome, viewer });
+    return this.richState.commitAcceptedAttempt({
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      viewer,
+    });
   }
 
-  async _commitTerminalSideEffects({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {
+  async _commitTerminalSideEffects({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    checkResult,
+    presentTools = null,
+  }) {
     if (outcome.status === 'succeeded') {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
     }
@@ -2431,19 +2849,34 @@ export class GatheringEngine {
       environment,
       task,
       outcome,
-      presentTools
+      presentTools,
     });
     if (outcome.status === 'failed') {
-      await this._applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult });
+      await this._applyFailureFeedback({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        outcome,
+        checkResult,
+      });
     }
-    await this.eventSceneTrigger?.apply?.({ events: checkResult?.events, viewer, actor, system, environment, task });
+    await this.eventSceneTrigger?.apply?.({
+      events: checkResult?.events,
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+    });
   }
 
   async _resolveRoutedOutcome({ viewer, actor, system, environment, task }) {
     if (typeof this.resultResolver?.resolveRouted !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_RESULT_RESOLVER',
-        message: 'Routed gathering resolution requires a result resolver'
+        message: 'Routed gathering resolution requires a result resolver',
       });
     }
 
@@ -2456,7 +2889,7 @@ export class GatheringEngine {
       viewer,
       system,
       environment,
-      task
+      task,
     });
     return normalizeTerminalOutcome(raw);
   }
@@ -2465,11 +2898,15 @@ export class GatheringEngine {
     if (typeof this.richState?.resolveD100Attempt !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_D100_RESOLVER',
-        message: 'D100 gathering resolution requires a rich gathering resolver'
+        message: 'D100 gathering resolution requires a rich gathering resolver',
       });
     }
-    const gatheringModifier = Number(task?.gatheringModifier?.value ?? task?.gatheringModifier ?? 0);
-    const eventModifier = Number(environment?.eventModifier?.value ?? environment?.eventModifier ?? 0);
+    const gatheringModifier = Number(
+      task?.gatheringModifier?.value ?? task?.gatheringModifier ?? 0
+    );
+    const eventModifier = Number(
+      environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
+    );
     const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
@@ -2477,24 +2914,26 @@ export class GatheringEngine {
       viewer,
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
-      eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0
+      eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
         code: 'CHARACTER_MODIFIER_MISCONFIGURED',
-        diagnostics: normalizeList(resolved.diagnostics)
+        diagnostics: normalizeList(resolved.diagnostics),
       });
     }
-    const resultGroups = [{
-      id: `${task.id}-d100-results`,
-      name: task.name || 'Gathered',
-      results: normalizeList(resolved?.items).map(item => ({
-        id: item.id,
-        componentId: stringOrNull(item.componentId),
-        itemUuid: stringOrNull(item.itemUuid),
-        quantity: Number(item.quantity || 1)
-      }))
-    }];
+    const resultGroups = [
+      {
+        id: `${task.id}-d100-results`,
+        name: task.name || 'Gathered',
+        results: normalizeList(resolved?.items).map((item) => ({
+          id: item.id,
+          componentId: stringOrNull(item.componentId),
+          itemUuid: stringOrNull(item.itemUuid),
+          quantity: Number(item.quantity || 1),
+        })),
+      },
+    ];
     return {
       status: resolved?.status === 'failed' ? 'failed' : 'succeeded',
       resultGroups,
@@ -2504,19 +2943,25 @@ export class GatheringEngine {
         items: normalizeList(resolved?.items),
         events: normalizeList(resolved?.events),
         eventPolicy: stringOrNull(resolved?.eventPolicy),
-        characterModifierSnapshot: resolved?.characterModifierSnapshot || null
-      }
+        characterModifierSnapshot: resolved?.characterModifierSnapshot || null,
+      },
     };
   }
 
   async _resolveProgressiveOutcome({ viewer, actor, system, environment, task }) {
-    const checkResult = await this._evaluateGatheringCheck({ actor, viewer, system, environment, task });
+    const checkResult = await this._evaluateGatheringCheck({
+      actor,
+      viewer,
+      system,
+      environment,
+      task,
+    });
     const normalizedCheck = normalizeCheckResult(checkResult);
     if (normalizedCheck.diagnostic) {
       return misconfiguredOutcome({
         code: normalizedCheck.reasonCode || 'CHECK_DIAGNOSTIC',
         message: normalizedCheck.diagnostic.message,
-        checkResult: normalizedCheck
+        checkResult: normalizedCheck,
       });
     }
 
@@ -2524,32 +2969,37 @@ export class GatheringEngine {
       return {
         status: 'failed',
         resultGroups: [],
-        checkResult: normalizedCheck
+        checkResult: normalizedCheck,
       };
     }
 
-    const raw = typeof this.resultResolver?.resolveProgressive === 'function'
-      ? await this.resultResolver.resolveProgressive({
-        actor,
-        viewer,
-        system,
-        environment,
-        task,
-        checkResult: normalizedCheck
-      })
-      : resolveProgressiveAward({ system, task, checkResult: normalizedCheck });
+    const raw =
+      typeof this.resultResolver?.resolveProgressive === 'function'
+        ? await this.resultResolver.resolveProgressive({
+            actor,
+            viewer,
+            system,
+            environment,
+            task,
+            checkResult: normalizedCheck,
+          })
+        : resolveProgressiveAward({ system, task, checkResult: normalizedCheck });
     const outcome = normalizeTerminalOutcome({
       checkResult: normalizedCheck,
-      ...raw
+      ...raw,
     });
     if (outcome.status === 'misconfigured') return outcome;
 
-    if (outcome.status === 'succeeded' && !hasAwardedResults(outcome.resultGroups) && normalizedCheck.status !== 'success') {
+    if (
+      outcome.status === 'succeeded' &&
+      !hasAwardedResults(outcome.resultGroups) &&
+      normalizedCheck.status !== 'success'
+    ) {
       return {
         ...outcome,
         status: 'failed',
         resultGroups: [],
-        checkResult: outcome.checkResult ?? normalizedCheck
+        checkResult: outcome.checkResult ?? normalizedCheck,
       };
     }
 
@@ -2565,8 +3015,8 @@ export class GatheringEngine {
         reasonCode: 'MISCONFIGURED_PROVIDER',
         diagnostic: {
           code: 'MISSING_CHECK_EVALUATOR',
-          message: 'Progressive gathering resolution requires a check evaluator'
-        }
+          message: 'Progressive gathering resolution requires a check evaluator',
+        },
       };
     }
 
@@ -2576,7 +3026,7 @@ export class GatheringEngine {
       viewer,
       system,
       environment,
-      task
+      task,
     });
   }
 
@@ -2593,7 +3043,7 @@ export class GatheringEngine {
       task,
       resultGroups: outcome.resultGroups,
       checkResult: outcome.checkResult ?? null,
-      outcome
+      outcome,
     });
   }
 
@@ -2608,27 +3058,38 @@ export class GatheringEngine {
       task,
       resultGroups: outcome.resultGroups,
       checkResult: outcome.checkResult ?? null,
-      outcome
+      outcome,
     });
     if (runHasDiagnostics(planned)) {
       return misconfiguredOutcome({
         code: 'RESULT_PLAN_DIAGNOSTIC',
-        diagnostics: planned.diagnostics ?? planned.diagnostic
+        diagnostics: planned.diagnostics ?? planned.diagnostic,
       });
     }
     return normalizeRunItems(planned, { actor });
   }
 
-  async _planTerminalTools({ viewer, actor, system, environment, task, outcome, checkResult, presentTools = null }) {
+  async _planTerminalTools({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    checkResult,
+    presentTools = null,
+  }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
     if (this._hasBlockedToolReferences(resolvedTools)) {
       return misconfiguredOutcome({
         code: 'TOOL_REFERENCE_UNRESOLVED',
-        diagnostics: [{
-          code: 'TOOL_REFERENCE_UNRESOLVED',
-          missingToolIds: normalizeList(resolvedTools.missingToolIds),
-          disabledToolIds: normalizeList(resolvedTools.disabledToolIds)
-        }]
+        diagnostics: [
+          {
+            code: 'TOOL_REFERENCE_UNRESOLVED',
+            missingToolIds: normalizeList(resolvedTools.missingToolIds),
+            disabledToolIds: normalizeList(resolvedTools.disabledToolIds),
+          },
+        ],
       });
     }
     const tools = resolvedTools.tools;
@@ -2645,18 +3106,26 @@ export class GatheringEngine {
         tools,
         presentTools,
         outcomeStatus: outcome.status,
-        checkResult: checkResult ?? outcome.checkResult ?? null
+        checkResult: checkResult ?? outcome.checkResult ?? null,
       });
       return Array.isArray(planned) ? planned : [];
     } catch (error) {
       return misconfiguredOutcome({
         code: stringOrNull(error?.code) || 'TOOL_PLAN_FAILED',
-        message: stringOrNull(error?.message) || 'Tool breakage planning failed'
+        message: stringOrNull(error?.message) || 'Tool breakage planning failed',
       });
     }
   }
 
-  async _applyTerminalTools({ viewer, actor, system, environment, task, outcome, presentTools = null }) {
+  async _applyTerminalTools({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    presentTools = null,
+  }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
     const tools = resolvedTools.tools;
     if (tools.length === 0 || typeof this.toolBreakage?.apply !== 'function') {
@@ -2671,7 +3140,7 @@ export class GatheringEngine {
       tools,
       presentTools,
       outcomeStatus: outcome.status,
-      checkResult: outcome.checkResult ?? null
+      checkResult: outcome.checkResult ?? null,
     });
   }
 
@@ -2685,16 +3154,31 @@ export class GatheringEngine {
       task,
       failureOutcome: task.failureOutcome ?? null,
       outcome,
-      checkResult: checkResult ?? null
+      checkResult: checkResult ?? null,
     });
   }
 
-  async _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedTools = [], checkResult }) {
+  async _terminalStart({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    status,
+    run,
+    createdResults,
+    usedTools = [],
+    checkResult,
+  }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
-      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), { createdResults, usedTools, checkResult });
+      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), {
+          createdResults,
+          usedTools,
+          checkResult,
+        });
     const response = {
       accepted: true,
       started: true,
@@ -2707,7 +3191,7 @@ export class GatheringEngine {
       runId: stringOrNull(run?.id),
       runStatus: stringOrNull(run?.status) || status,
       run: publicRun,
-      blockedReasons: []
+      blockedReasons: [],
     };
 
     if (!opaqueBlind) {
@@ -2724,7 +3208,7 @@ export class GatheringEngine {
         createdResults,
         usedTools,
         checkResult,
-        run
+        run,
       });
     }
 
@@ -2752,7 +3236,16 @@ export class GatheringEngine {
    * @param {object}  params.run            - Terminal run (carries economyEvidence).
    * @private
    */
-  async _postGatheringChatMessage({ actor, system, task, status, createdResults, usedTools, checkResult, run }) {
+  async _postGatheringChatMessage({
+    actor,
+    system,
+    task,
+    status,
+    createdResults,
+    usedTools,
+    checkResult,
+    run,
+  }) {
     if (!system || system.features?.chatOutput !== true) return;
 
     try {
@@ -2763,52 +3256,64 @@ export class GatheringEngine {
         if (uuid) itemsByUuid.set(uuid, item);
       }
 
-      const components = normalizeList(createdResults).map(entry => {
+      const components = normalizeList(createdResults).map((entry) => {
         const itemUuid = stringOrNull(entry?.itemUuid);
         const componentId = stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
         const component = componentId ? componentsById.get(componentId) : null;
         const resolvedDoc = component ? null : resolveItemDoc(itemUuid);
         return {
-          name: stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || itemUuid || '',
-          img: stringOrNull(component?.img) || stringOrNull(resolvedDoc?.img) || 'icons/svg/item-bag.svg',
-          quantity: Number(entry?.quantity) || 1
+          name:
+            stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || itemUuid || '',
+          img:
+            stringOrNull(component?.img) ||
+            stringOrNull(resolvedDoc?.img) ||
+            'icons/svg/item-bag.svg',
+          quantity: Number(entry?.quantity) || 1,
         };
       });
 
-      const events = normalizeList(checkResult?.events).map(event => ({
+      const events = normalizeList(checkResult?.events).map((event) => ({
         name: stringOrEmpty(event?.name),
-        img: stringOrNull(event?.img) || 'icons/svg/mystery-man.svg'
+        img: stringOrNull(event?.img) || 'icons/svg/mystery-man.svg',
       }));
 
       const brokenTools = normalizeList(usedTools)
-        .filter(entry => entry?.broken === true)
-        .map(entry => {
+        .filter((entry) => entry?.broken === true)
+        .map((entry) => {
           const component = componentsById.get(stringOrNull(entry?.componentId));
-          const resolvedDoc = component ? null : resolveItemDoc(stringOrNull(entry?.itemRef?.itemUuid));
+          const resolvedDoc = component
+            ? null
+            : resolveItemDoc(stringOrNull(entry?.itemRef?.itemUuid));
           return {
-            name: stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || this.localize(UNKNOWN_TOOL_LABEL_KEY),
-            img: stringOrNull(component?.img) || stringOrNull(resolvedDoc?.img) || DEFAULT_TOOL_IMG
+            name:
+              stringOrEmpty(component?.name) ||
+              stringOrEmpty(resolvedDoc?.name) ||
+              this.localize(UNKNOWN_TOOL_LABEL_KEY),
+            img: stringOrNull(component?.img) || stringOrNull(resolvedDoc?.img) || DEFAULT_TOOL_IMG,
           };
         });
 
-      const content = buildGatheringChatContent({
-        status,
-        actorName: stringOrEmpty(actor?.name),
-        taskName: stringOrEmpty(task?.name),
-        components,
-        events,
-        brokenTools,
-        staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
-        nodesRemaining: run?.economyEvidence?.node?.remaining ?? null
-      }, this.localize);
+      const content = buildGatheringChatContent(
+        {
+          status,
+          actorName: stringOrEmpty(actor?.name),
+          taskName: stringOrEmpty(task?.name),
+          components,
+          events,
+          brokenTools,
+          staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
+          nodesRemaining: run?.economyEvidence?.node?.remaining ?? null,
+        },
+        this.localize
+      );
 
       await ChatMessage.create({
         user: game.user?.id,
         speaker: ChatMessage.getSpeaker({ actor }),
-        content
+        content,
       });
-    } catch (err) {
-      console.error('Fabricate | Failed to post gathering chat message:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to post gathering chat message:', error);
     }
   }
 
@@ -2829,7 +3334,7 @@ export class GatheringEngine {
       await this.richState.revealTask(actor, {
         environmentId: stringOrNull(environment.id),
         taskId: stringOrNull(task?.id),
-        scope
+        scope,
       });
     } catch {
       // Reveal is advisory; never fail the attempt because of it.
@@ -2840,7 +3345,7 @@ export class GatheringEngine {
     const rules = environment?.rules || {};
     return {
       policy: rules.revealPolicy ?? 'never',
-      scope: rules.revealScope ?? 'actor'
+      scope: rules.revealScope ?? 'actor',
     };
   }
 
@@ -2861,11 +3366,22 @@ export class GatheringEngine {
     return GATHERING_EVENT_VISIBILITIES.has(visibility) ? visibility : 'encounterChance';
   }
 
-  async _clearMisconfiguredWaitingRun({ viewer, actor, run, environment, task, errors = null, outcome = null }) {
+  async _clearMisconfiguredWaitingRun({
+    viewer,
+    actor,
+    run,
+    environment,
+    task,
+    errors = null,
+    outcome = null,
+  }) {
     if (typeof this.runManager?.clearActiveRun !== 'function') {
-      throw Object.assign(new Error('Gathering timed misconfiguration requires active-run cleanup'), {
-        code: 'MISSING_CLEAR_ACTIVE_RUN'
-      });
+      throw Object.assign(
+        new Error('Gathering timed misconfiguration requires active-run cleanup'),
+        {
+          code: 'MISSING_CLEAR_ACTIVE_RUN',
+        }
+      );
     }
 
     await this.runManager.clearActiveRun(actor, run.id);
@@ -2876,9 +3392,12 @@ export class GatheringEngine {
         viewer,
         outcome: outcome ?? {
           code: 'TASK_MISCONFIGURED',
-          diagnostics: normalizeList(errors).map(error => ({ code: 'TASK_MISCONFIGURED', message: error }))
-        }
-      })
+          diagnostics: normalizeList(errors).map((error) => ({
+            code: 'TASK_MISCONFIGURED',
+            message: error,
+          })),
+        },
+      }),
     });
 
     return {
@@ -2891,35 +3410,42 @@ export class GatheringEngine {
       taskId: this._isOpaqueBlindTask({ environment, viewer }) ? null : stringOrNull(run?.taskId),
       runId: stringOrNull(run?.id),
       runStatus: 'cleared',
-      blockedReasons: [reason]
+      blockedReasons: [reason],
     };
   }
 
   async _cancelMissingReferenceRun({ viewer, actor, run, resolved }) {
-    const opaqueBlind = resolved.environment && this._isOpaqueBlindTask({ environment: resolved.environment, viewer });
+    const opaqueBlind =
+      resolved.environment &&
+      this._isOpaqueBlindTask({ environment: resolved.environment, viewer });
     const cancellationPayload = {
       economyEvidence: opaqueBlind
         ? redactRichEvidence(run?.economyEvidence || {})
-        : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} }).economyEvidence
+        : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} })
+            .economyEvidence,
     };
-    const cancelledRun = await this.runManager.cancelRun(actor, run.id, opaqueBlind
-      ? {
-          terminalRunData: {
-            craftingSystemId: stringOrNull(run?.craftingSystemId),
-            environmentId: stringOrNull(run?.environmentId),
-            taskId: 'blind'
-          },
-          payload: {
-            ...cancellationPayload,
-            createdResults: [],
-            usedTools: [],
-            checkResult: { blind: true, status: 'cancelled' }
+    const cancelledRun = await this.runManager.cancelRun(
+      actor,
+      run.id,
+      opaqueBlind
+        ? {
+            terminalRunData: {
+              craftingSystemId: stringOrNull(run?.craftingSystemId),
+              environmentId: stringOrNull(run?.environmentId),
+              taskId: 'blind',
+            },
+            payload: {
+              ...cancellationPayload,
+              createdResults: [],
+              usedTools: [],
+              checkResult: { blind: true, status: 'cancelled' },
+            },
           }
-        }
-      : { payload: cancellationPayload });
+        : { payload: cancellationPayload }
+    );
     if (!cancelledRun) {
       throw Object.assign(new Error('Timed gathering cancellation history was not written'), {
-        code: 'TERMINAL_HISTORY_NOT_WRITTEN'
+        code: 'TERMINAL_HISTORY_NOT_WRITTEN',
       });
     }
 
@@ -2929,7 +3455,7 @@ export class GatheringEngine {
       run,
       cancelledRun,
       reason: resolved.missingReference,
-      environment: resolved.environment ?? null
+      environment: resolved.environment ?? null,
     });
   }
 
@@ -2946,12 +3472,14 @@ export class GatheringEngine {
       taskId: opaqueBlind ? null : stringOrNull(run?.taskId),
       runId: stringOrNull(run?.id),
       runStatus: 'cancelled',
-      run: opaqueBlind ? redactBlindTerminalRun(cancelledRun) : stripRuntimeSnapshotFromRun(cancelledRun),
+      run: opaqueBlind
+        ? redactBlindTerminalRun(cancelledRun)
+        : stripRuntimeSnapshotFromRun(cancelledRun),
       blockedReasons: [
         this._blockedReason('MISSING_REFERENCE', {
-          data: { reference: reason }
-        })
-      ]
+          data: { reference: reason },
+        }),
+      ],
     };
   }
 
@@ -2959,7 +3487,7 @@ export class GatheringEngine {
     if (this._isOpaqueBlindTask({ environment, viewer })) return null;
     const data = {
       taskId: stringOrNull(task?.id),
-      code: stringOrNull(outcome?.code)
+      code: stringOrNull(outcome?.code),
     };
     const safeDiagnostics = sanitizeDiagnostics(outcome?.diagnostics ?? outcome?.diagnostic);
     if (safeDiagnostics.length > 0) data.diagnostics = safeDiagnostics;
@@ -2976,7 +3504,7 @@ export class GatheringEngine {
       craftingSystemId: stringOrNull(system.id),
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id),
-      blockedReasons: []
+      blockedReasons: [],
     };
   }
 
@@ -2996,7 +3524,7 @@ export class GatheringEngine {
       runStatus: stringOrNull(run?.status) || 'waitingTime',
       timeGate: plainObjectOrNull(run?.timeGate),
       run: publicRun,
-      blockedReasons: []
+      blockedReasons: [],
     };
   }
 
@@ -3009,8 +3537,8 @@ export class GatheringEngine {
       viewerId: idOf(viewer),
       actorId: actor ? idOf(actor) : null,
       environmentId: environment ? stringOrNull(environment.id) : null,
-      taskId: opaqueBlind ? null : (task ? stringOrNull(task.id) : null),
-      blockedReasons: [reason]
+      taskId: opaqueBlind ? null : task ? stringOrNull(task.id) : null,
+      blockedReasons: [reason],
     };
   }
 
@@ -3022,7 +3550,7 @@ export class GatheringEngine {
     if (this._isOpaqueBlindTask({ environment, viewer })) return null;
     const data = {
       taskId: stringOrNull(task?.id),
-      code: stringOrNull(code)
+      code: stringOrNull(code),
     };
     const safeDiagnostics = sanitizeDiagnostics(diagnostics);
     if (safeDiagnostics.length > 0) data.diagnostics = safeDiagnostics;
@@ -3043,21 +3571,30 @@ export class GatheringEngine {
       environments: [],
       activeRuns,
       history,
-      gatheringSystems: this._gatheringSystemOptions([...activeRuns, ...history])
+      gatheringSystems: this._gatheringSystemOptions([...activeRuns, ...history]),
     };
   }
 
   _gatheringSystemOptions(models = []) {
     const systems = this._allSystems();
-    const ids = Array.from(new Set(normalizeList(models)
-      .map(model => stringOrNull(model?.craftingSystemId))
-      .filter(Boolean)));
+    const ids = [
+      ...new Set(
+        normalizeList(models)
+          .map((model) => stringOrNull(model?.craftingSystemId))
+          .filter(Boolean)
+      ),
+    ];
     return ids
-      .map(id => {
+      .map((id) => {
         const system = systems.get(id);
         return {
           id,
-          name: stringOrEmpty(system?.name) || stringOrEmpty(models.find(model => model?.craftingSystemId === id)?.craftingSystemName) || id
+          name:
+            stringOrEmpty(system?.name) ||
+            stringOrEmpty(
+              models.find((model) => model?.craftingSystemId === id)?.craftingSystemName
+            ) ||
+            id,
         };
       })
       .sort((left, right) => left.name.localeCompare(right.name));
@@ -3075,12 +3612,15 @@ export class GatheringEngine {
 
   _blockedReason(code, { messageKey = null, message = null, data = null } = {}) {
     const normalizedCode = stringOrEmpty(code) || 'BLOCKED';
-    const key = messageKey || DEFAULT_BLOCKED_REASON_KEYS[normalizedCode] || `FABRICATE.Gathering.Blocked.${normalizedCode}`;
+    const key =
+      messageKey ||
+      DEFAULT_BLOCKED_REASON_KEYS[normalizedCode] ||
+      `FABRICATE.Gathering.Blocked.${normalizedCode}`;
     return {
       code: normalizedCode,
       messageKey: key,
       message: message || this.localize(key, data ?? undefined),
-      data: data ?? null
+      data: data ?? null,
     };
   }
 }
@@ -3095,7 +3635,7 @@ function normalizeGateResult(result) {
     code: stringOrNull(result.code || result.reasonCode) || 'SCENE_TOKEN_BLOCKED',
     messageKey: stringOrNull(result.messageKey),
     message: stringOrNull(result.message),
-    data: plainObjectOrNull(result.data)
+    data: plainObjectOrNull(result.data),
   };
 }
 
@@ -3107,7 +3647,7 @@ function normalizeToolResult(result) {
   return {
     available: result.available === true,
     missing: normalizeList(result.missing),
-    failedRequirements: normalizeList(result.failedRequirements)
+    failedRequirements: normalizeList(result.failedRequirements),
   };
 }
 
@@ -3115,7 +3655,7 @@ function normalizeTerminalOutcome(raw) {
   if (!raw || typeof raw !== 'object') {
     return misconfiguredOutcome({
       code: 'MALFORMED_OUTCOME',
-      message: 'Gathering resolution returned no outcome'
+      message: 'Gathering resolution returned no outcome',
     });
   }
 
@@ -3125,7 +3665,7 @@ function normalizeTerminalOutcome(raw) {
       message: stringOrNull(raw.message),
       diagnostic: raw.diagnostic,
       diagnostics: raw.diagnostics,
-      checkResult: raw.checkResult
+      checkResult: raw.checkResult,
     });
   }
 
@@ -3134,12 +3674,13 @@ function normalizeTerminalOutcome(raw) {
     return misconfiguredOutcome({
       code: stringOrNull(raw.code || raw.reasonCode) || 'RESOLUTION_MISCONFIGURED',
       message: stringOrNull(raw.message || raw.error),
-      checkResult: raw.checkResult
+      checkResult: raw.checkResult,
     });
   }
 
   const outcomeText = normalizeOutcomeText(raw.outcome ?? raw.outcomeName ?? raw.drawnName);
-  const failed = raw.success === false ||
+  const failed =
+    raw.success === false ||
     raw.failure === true ||
     ['failed', 'failure', 'fail', 'miss'].includes(disposition) ||
     FAILURE_KEYWORDS.has(outcomeText);
@@ -3147,26 +3688,27 @@ function normalizeTerminalOutcome(raw) {
     return {
       status: 'failed',
       resultGroups: [],
-      checkResult: normalizeOutcomeCheckResult(raw)
+      checkResult: normalizeOutcomeCheckResult(raw),
     };
   }
 
   const resultGroups = normalizeOutcomeGroups(raw);
-  const succeeded = raw.success === true ||
+  const succeeded =
+    raw.success === true ||
     ['succeeded', 'success', 'passed', 'pass'].includes(disposition) ||
     resultGroups.length > 0;
   if (succeeded) {
     return {
       status: 'succeeded',
       resultGroups,
-      checkResult: normalizeOutcomeCheckResult(raw)
+      checkResult: normalizeOutcomeCheckResult(raw),
     };
   }
 
   return misconfiguredOutcome({
     code: 'MALFORMED_OUTCOME',
     message: 'Gathering resolution did not return a terminal status',
-    checkResult: raw.checkResult
+    checkResult: raw.checkResult,
   });
 }
 
@@ -3198,7 +3740,7 @@ function normalizeCheckResult(raw) {
       status: null,
       value: null,
       reasonCode: 'MALFORMED_RESULT',
-      diagnostic: { code: 'MALFORMED_RESULT' }
+      diagnostic: { code: 'MALFORMED_RESULT' },
     };
   }
 
@@ -3211,12 +3753,12 @@ function normalizeCheckResult(raw) {
     description: stringOrEmpty(raw.description),
     data: plainObjectOrNull(raw.data) ?? {},
     reasonCode: stringOrNull(raw.reasonCode),
-    diagnostic: raw.diagnostic ?? null
+    diagnostic: raw.diagnostic ?? null,
   };
 }
 
 function normalizeCheckStatus(status) {
-  if (status === undefined || status === null || status === '') return null;
+  if (status == null || status === '') return null;
   const normalized = normalizeOutcomeText(status);
   if (['success', 'succeeded', 'pass', 'passed'].includes(normalized)) return 'success';
   if (['failure', 'failed', 'fail'].includes(normalized)) return 'failure';
@@ -3227,19 +3769,26 @@ function hasOutcomeDiagnostics(raw) {
   return Boolean(raw.diagnostic) || normalizeList(raw.diagnostics).length > 0;
 }
 
-function misconfiguredOutcome({ code = null, message = null, diagnostic = null, diagnostics = null, checkResult = null } = {}) {
+function misconfiguredOutcome({
+  code = null,
+  message = null,
+  diagnostic = null,
+  diagnostics = null,
+  checkResult = null,
+} = {}) {
   const outcome = {
     status: 'misconfigured',
     resultGroups: [],
     code: stringOrNull(code) || 'TASK_MISCONFIGURED',
-    checkResult: checkResult && typeof checkResult === 'object' ? cloneJson(checkResult) : undefined
+    checkResult:
+      checkResult && typeof checkResult === 'object' ? cloneJson(checkResult) : undefined,
   };
   const normalizedDiagnostics = normalizeList(diagnostics);
   if (diagnostic) normalizedDiagnostics.push(diagnostic);
   if (message || normalizedDiagnostics.length > 0) {
     outcome.diagnostics = [
       ...normalizedDiagnostics,
-      ...(message ? [{ code: outcome.code, message }] : [])
+      ...(message ? [{ code: outcome.code, message }] : []),
     ];
   }
   return outcome;
@@ -3250,7 +3799,7 @@ function resolveProgressiveAward({ system, task, checkResult }) {
   if (!group) {
     return misconfiguredOutcome({
       code: 'MISSING_RESULT_GROUP',
-      message: 'Progressive gathering requires one result group'
+      message: 'Progressive gathering requires one result group',
     });
   }
 
@@ -3259,7 +3808,7 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     return misconfiguredOutcome({
       code: 'MALFORMED_CHECK_RESULT',
       message: 'Progressive gathering check must return a numeric value',
-      checkResult
+      checkResult,
     });
   }
 
@@ -3275,7 +3824,7 @@ function resolveProgressiveAward({ system, task, checkResult }) {
       return misconfiguredOutcome({
         code: 'INVALID_PROGRESSIVE_DIFFICULTY',
         message: 'Progressive gathering result references a component without valid difficulty',
-        checkResult
+        checkResult,
       });
     }
 
@@ -3316,23 +3865,23 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     checkResult: {
       ...checkResult,
       resolutionMeta: {
-        awardedResultIds: awarded.map(result => result.id),
-        remaining
-      }
-    }
+        awardedResultIds: awarded.map((result) => result.id),
+        remaining,
+      },
+    },
   };
 }
 
 function difficultyForResult(system, result) {
   const componentId = stringOrNull(result?.componentId ?? result?.systemItemId);
   if (!componentId) return null;
-  const component = normalizeList(system?.components).find(entry => entry?.id === componentId);
+  const component = normalizeList(system?.components).find((entry) => entry?.id === componentId);
   const difficulty = Number(component?.difficulty);
   return Number.isFinite(difficulty) ? difficulty : null;
 }
 
 function hasAwardedResults(resultGroups) {
-  return normalizeList(resultGroups).some(group => normalizeList(group?.results).length > 0);
+  return normalizeList(resultGroups).some((group) => normalizeList(group?.results).length > 0);
 }
 
 function normalizeVisibilityResult(result) {
@@ -3344,7 +3893,7 @@ function normalizeVisibilityResult(result) {
     visible: result.visible === true,
     reasonCode: stringOrNull(result.reasonCode),
     description: stringOrEmpty(result.description),
-    diagnostic: result.diagnostic ?? null
+    diagnostic: result.diagnostic ?? null,
   };
 }
 
@@ -3353,7 +3902,11 @@ function validateTaskConfiguration(task) {
   const resolutionMode = stringOrNull(task?.resolutionMode);
   const resultGroups = normalizeList(task?.resultGroups);
 
-  if (resolutionMode !== 'routed' && resolutionMode !== 'progressive' && resolutionMode !== 'd100') {
+  if (
+    resolutionMode !== 'routed' &&
+    resolutionMode !== 'progressive' &&
+    resolutionMode !== 'd100'
+  ) {
     errors.push('Gathering task requires a routed, progressive, or d100 resolution mode');
     return errors;
   }
@@ -3366,7 +3919,9 @@ function validateTaskConfiguration(task) {
   }
 
   if (resolutionMode === 'd100') {
-    const rows = normalizeList(task?.dropRows ?? task?.itemDrops).filter(row => row?.enabled !== false);
+    const rows = normalizeList(task?.dropRows ?? task?.itemDrops).filter(
+      (row) => row?.enabled !== false
+    );
     if (rows.length === 0) {
       errors.push('D100 gathering task requires at least one item drop row');
     }
@@ -3453,7 +4008,9 @@ function validateResultGroupNames(resultGroups) {
       errors.push(`Gathering result group "${group.name}" collides with reserved failure keyword`);
     }
     if (seen.has(normalizedName)) {
-      errors.push(`Gathering result group "${group.name}" duplicates "${seen.get(normalizedName)}"`);
+      errors.push(
+        `Gathering result group "${group.name}" duplicates "${seen.get(normalizedName)}"`
+      );
     } else {
       seen.set(normalizedName, group.name);
     }
@@ -3486,20 +4043,19 @@ function runHasDiagnostics(run) {
 
 function sanitizeDiagnostics(diagnostics) {
   return normalizeList(diagnostics)
-    .map(diagnostic => {
+    .map((diagnostic) => {
       if (!diagnostic || typeof diagnostic !== 'object') return null;
       return {
         code: stringOrNull(diagnostic.code || diagnostic.reasonCode),
-        messageKey: stringOrNull(diagnostic.messageKey)
+        messageKey: stringOrNull(diagnostic.messageKey),
       };
     })
-    .filter(diagnostic => diagnostic?.code || diagnostic?.messageKey);
+    .filter((diagnostic) => diagnostic?.code || diagnostic?.messageKey);
 }
 
 function redactBlindRun(run) {
   if (!run || typeof run !== 'object') return run;
-  const redacted = { ...run };
-  redacted.taskId = null;
+  const redacted = { ...run, taskId: null };
   if (redacted.economyEvidence && typeof redacted.economyEvidence === 'object') {
     redacted.economyEvidence = redactRichEvidence(redacted.economyEvidence);
   }
@@ -3531,7 +4087,7 @@ function enrichPublicTerminalRun(run, { createdResults, usedTools = [], checkRes
   const enriched = {
     ...run,
     createdResults,
-    usedTools
+    usedTools,
   };
   if (checkResult !== undefined) enriched.checkResult = checkResult;
   return enriched;
@@ -3546,43 +4102,48 @@ function redactCharacterModifierSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return snapshot;
   if (!snapshot?.rows && !snapshot?.events) return snapshot;
   return {
-    rows: normalizeList(snapshot.rows).map(row => ({
+    rows: normalizeList(snapshot.rows).map((row) => ({
       rowId: null,
-      contributions: normalizeList(row?.contributions).map(entry => ({
-        contribution: Number(entry?.contribution ?? 0)
-      }))
+      contributions: normalizeList(row?.contributions).map((entry) => ({
+        contribution: Number(entry?.contribution ?? 0),
+      })),
     })),
-    events: normalizeList(snapshot.events).map(event => ({
+    events: normalizeList(snapshot.events).map((event) => ({
       eventId: null,
-      contributions: normalizeList(event?.contributions).map(entry => ({
-        contribution: Number(entry?.contribution ?? 0)
-      }))
-    }))
+      contributions: normalizeList(event?.contributions).map((entry) => ({
+        contribution: Number(entry?.contribution ?? 0),
+      })),
+    })),
   };
 }
 
 function redactRichEvidence(evidence = {}, _options = {}) {
   const redacted = cloneJson(evidence) || {};
   if (redacted.node) {
-    redacted.node = { available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0 };
+    redacted.node = {
+      available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0,
+    };
   }
   if (Array.isArray(redacted.events)) {
     redacted.events = redacted.events.map(() => ({ matched: true }));
   }
-  if (redacted.characterModifierSnapshot && typeof redacted.characterModifierSnapshot === 'object') {
+  if (
+    redacted.characterModifierSnapshot &&
+    typeof redacted.characterModifierSnapshot === 'object'
+  ) {
     redacted.characterModifierSnapshot = {
-      rows: normalizeList(redacted.characterModifierSnapshot.rows).map(row => ({
+      rows: normalizeList(redacted.characterModifierSnapshot.rows).map((row) => ({
         rowId: null,
-        contributions: normalizeList(row?.contributions).map(entry => ({
-          contribution: Number(entry?.contribution ?? 0)
-        }))
+        contributions: normalizeList(row?.contributions).map((entry) => ({
+          contribution: Number(entry?.contribution ?? 0),
+        })),
       })),
-      events: normalizeList(redacted.characterModifierSnapshot.events).map(event => ({
+      events: normalizeList(redacted.characterModifierSnapshot.events).map((event) => ({
         eventId: null,
-        contributions: normalizeList(event?.contributions).map(entry => ({
-          contribution: Number(entry?.contribution ?? 0)
-        }))
-      }))
+        contributions: normalizeList(event?.contributions).map((entry) => ({
+          contribution: Number(entry?.contribution ?? 0),
+        })),
+      })),
     };
   }
   delete redacted.items;
@@ -3602,7 +4163,9 @@ function hasRichGatheringData(environment, task) {
     stringOrNull(environment?.region) ||
     stringOrNull(environment?.biome) ||
     (stringOrNull(environment?.risk) && environment.risk !== 'safe') ||
-    Object.values(plainObjectOrNull(environment?.conditions) || {}).some(value => stringOrNull(value)) ||
+    Object.values(plainObjectOrNull(environment?.conditions) || {}).some((value) =>
+      stringOrNull(value)
+    ) ||
     task?.nodes ||
     Number(task?.staminaCost || 0) > 0 ||
     stringOrNull(task?.riskOverride) ||
@@ -3623,16 +4186,20 @@ function normalizeActorList(value) {
 function normalizeList(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
-  if (value instanceof Map) return Array.from(value.values());
-  if (typeof value.values === 'function') return Array.from(value.values());
-  if (typeof value[Symbol.iterator] === 'function') return Array.from(value);
+  if (value instanceof Map) return [...value.values()];
+  if (typeof value.values === 'function') return [...value.values()];
+  if (typeof value[Symbol.iterator] === 'function') return [...value];
   return [];
 }
 
 function normalizeStringList(value) {
-  return Array.from(new Set(normalizeList(Array.isArray(value) ? value : (value ? [value] : []))
-    .map(entry => stringOrEmpty(entry))
-    .filter(Boolean)));
+  return [
+    ...new Set(
+      normalizeList(Array.isArray(value) ? value : value ? [value] : [])
+        .map((entry) => stringOrEmpty(entry))
+        .filter(Boolean)
+    ),
+  ];
 }
 
 function actorToOption(actor) {
@@ -3640,7 +4207,7 @@ function actorToOption(actor) {
     id: idOf(actor),
     uuid: stringOrNull(actor?.uuid),
     name: stringOrEmpty(actor?.name),
-    img: stringOrNull(actor?.img)
+    img: stringOrNull(actor?.img),
   };
 }
 
@@ -3654,7 +4221,9 @@ function actorMatchesId(actor, actorId) {
 }
 
 function sameActor(left, right) {
-  return Boolean(left && right && (left === right || left.id === right.id || left.uuid === right.uuid));
+  return Boolean(
+    left && right && (left === right || left.id === right.id || left.uuid === right.uuid)
+  );
 }
 
 function sameActorUuid(actor, actorUuid) {
@@ -3669,28 +4238,31 @@ function uniqueReasons(reasons) {
     if (!reason?.code || byCode.has(reason.code)) continue;
     byCode.set(reason.code, reason);
   }
-  return Array.from(byCode.values());
+  return [...byCode.values()];
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
   return normalizeList(items)
-    .filter(item => item && typeof item === 'object')
-    .map(item => {
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
       const source = item.item && typeof item.item === 'object' ? item.item : item;
-      const actorUuid = stringOrNull(item.actorUuid) || stringOrNull(item.actor?.uuid) || stringOrNull(actor?.uuid);
+      const actorUuid =
+        stringOrNull(item.actorUuid) || stringOrNull(item.actor?.uuid) || stringOrNull(actor?.uuid);
       const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
       const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
       return {
         actorUuid,
         itemUuid,
-        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       };
     })
-    .filter(item => item.actorUuid && item.itemUuid);
+    .filter((item) => item.actorUuid && item.itemUuid);
 }
 
 function normalizeOutcomeText(value) {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function cloneJson(value) {
@@ -3731,7 +4303,7 @@ function resolveItemDoc(uuid) {
   if (!uuid || typeof globalThis.fromUuidSync !== 'function') return null;
   try {
     return globalThis.fromUuidSync(uuid) ?? null;
-  } catch (_err) {
+  } catch {
     return null;
   }
 }
