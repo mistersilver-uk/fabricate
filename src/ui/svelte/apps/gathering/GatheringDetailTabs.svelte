@@ -16,7 +16,7 @@
 
   const TABS = [
     { id: 'tasks', icon: 'fas fa-clipboard-list', key: 'FABRICATE.App.Gathering.Detail.Tabs.Tasks' },
-    { id: 'events', icon: 'fas fa-triangle-exclamation', key: 'FABRICATE.App.Gathering.Detail.Tabs.Events' }
+    { id: 'events', icon: 'fas fa-masks-theater', key: 'FABRICATE.App.Gathering.Detail.Tabs.Events' }
   ];
 
   function onKeydown(event, index) {

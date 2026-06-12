@@ -10,7 +10,7 @@
  */
 
 const COMPONENT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
-const EVENT_FALLBACK_IMG = 'icons/svg/hazard.svg';
+const EVENT_FALLBACK_IMG = 'icons/svg/mystery-man.svg';
 
 const CHAT_KEYS = Object.freeze({
   success: 'FABRICATE.Chat.GatherSuccess',

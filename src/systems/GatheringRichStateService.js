@@ -2028,7 +2028,7 @@ function normalizeEvent(event = {}) {
     id: stringOrFallback(event.id, `event-${normalizeTag(event.name) || 'row'}`),
     name: stringOrFallback(event.name, 'Event'),
     description: stringOrFallback(event.description, ''),
-    img: stringOrFallback(event.img, 'icons/svg/hazard.svg'),
+    img: stringOrFallback(event.img, 'icons/svg/mystery-man.svg'),
     enabled: event.enabled !== false,
     dangerTags: normalizeTagList(event.dangerTags),
     biomes: normalizeTagList(event.biomes),

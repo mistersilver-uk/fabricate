@@ -43,7 +43,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const defaultImg = $derived(kind === 'event' ? 'icons/svg/hazard.svg' : 'icons/svg/item-bag.svg');
+  const defaultImg = $derived(kind === 'event' ? 'icons/svg/mystery-man.svg' : 'icons/svg/item-bag.svg');
 
   function recordImage(entry) { return entry?.record?.img || defaultImg; }
   function recordName(entry) { return entry?.record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'); }

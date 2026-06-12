@@ -69,7 +69,7 @@
   >
     <div class="gathering-event-main">
       <span class="gathering-event-thumb-wrap">
-        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || 'icons/svg/hazard.svg'} alt="" />
+        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || 'icons/svg/mystery-man.svg'} alt="" />
       </span>
 
       <span class="gathering-event-copy">

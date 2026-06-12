@@ -481,7 +481,7 @@
     },
     {
       id: 'encounters',
-      icon: 'fas fa-exclamation-triangle',
+      icon: 'fas fa-masks-theater',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
       labelFallback: 'Events',
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
@@ -4027,7 +4027,7 @@
           {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
             <section class="manager-inspector-card" data-gathering-event-inspector>
               <div class="manager-inspector-title-row is-hero-large">
-                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || 'icons/svg/hazard.svg'} alt="" />
+                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || 'icons/svg/mystery-man.svg'} alt="" />
                 <div class="manager-inspector-copy">
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
                   <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>

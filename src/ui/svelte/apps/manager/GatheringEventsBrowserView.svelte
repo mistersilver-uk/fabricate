@@ -210,7 +210,7 @@
   }
 
   function eventImage(event) {
-    return event?.img || 'icons/svg/hazard.svg';
+    return event?.img || 'icons/svg/mystery-man.svg';
   }
 
   function clearFilters() {

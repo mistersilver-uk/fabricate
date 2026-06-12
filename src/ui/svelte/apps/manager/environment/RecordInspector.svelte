@@ -17,7 +17,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const defaultImg = $derived(kind === 'event' ? 'icons/svg/hazard.svg' : 'icons/svg/item-bag.svg');
+  const defaultImg = $derived(kind === 'event' ? 'icons/svg/mystery-man.svg' : 'icons/svg/item-bag.svg');
   const record = $derived(entry?.record || null);
   const name = $derived(record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'));
 

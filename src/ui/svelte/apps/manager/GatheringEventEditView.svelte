@@ -75,7 +75,7 @@
   }
 
   function eventImage() {
-    return event?.img || 'icons/svg/hazard.svg';
+    return event?.img || 'icons/svg/mystery-man.svg';
   }
 
   function dangerLabel(tag) {

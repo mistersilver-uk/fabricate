@@ -2777,7 +2777,7 @@ export class GatheringEngine {
 
       const events = normalizeList(checkResult?.events).map(event => ({
         name: stringOrEmpty(event?.name),
-        img: stringOrNull(event?.img) || 'icons/svg/hazard.svg'
+        img: stringOrNull(event?.img) || 'icons/svg/mystery-man.svg'
       }));
 
       const brokenTools = normalizeList(usedTools)

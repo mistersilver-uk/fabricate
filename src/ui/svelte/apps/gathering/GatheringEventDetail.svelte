@@ -86,7 +86,7 @@
 
 {#if event == null}
   <div class="gathering-event-detail-state" data-gathering-event-detail-state={hasEvents ? 'empty' : 'none'}>
-    <i class={`fas ${hasEvents ? 'fa-hand-pointer' : 'fa-shield-halved'}`} aria-hidden="true"></i>
+    <i class={`fas ${hasEvents ? 'fa-hand-pointer' : 'fa-masks-theater'}`} aria-hidden="true"></i>
     <p>
       {localize(hasEvents
         ? 'FABRICATE.App.Gathering.Detail.SelectEventHint'
@@ -103,7 +103,7 @@
   >
     <header class="gathering-event-detail-header">
       <span class="gathering-event-detail-thumb-wrap">
-        <img class="gathering-event-detail-thumb" class:is-fallback={!img} src={img || 'icons/svg/hazard.svg'} alt="" />
+        <img class="gathering-event-detail-thumb" class:is-fallback={!img} src={img || 'icons/svg/mystery-man.svg'} alt="" />
       </span>
       <span class="gathering-event-detail-heading">
         <h2 id={titleId} class="gathering-event-detail-title" title={name}>{name}</h2>

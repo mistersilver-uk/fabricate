@@ -647,7 +647,7 @@ function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toS
     id: event.id ? String(event.id) : randomID(),
     name: String(event.name || 'Event'),
     description: String(event.description || ''),
-    img: String(event.img || 'icons/svg/hazard.svg'),
+    img: String(event.img || 'icons/svg/mystery-man.svg'),
     enabled: event.enabled !== false,
     dangerTags: _normalizeGatheringTagList(event.dangerTags),
     biomes: _normalizeGatheringTagList(event.biomes),
