@@ -7,7 +7,7 @@ export class IngredientGroup {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();
     this.name = data.name || '';
-    this.options = (data.options || []).map(option =>
+    this.options = (data.options || []).map((option) =>
       option instanceof Ingredient ? option : Ingredient.fromJSON(option)
     );
   }
@@ -22,13 +22,13 @@ export class IngredientGroup {
     for (const option of this.options) {
       const validation = option.validate();
       if (!validation.valid) {
-        errors.push(...validation.errors.map(err => `Option: ${err}`));
+        errors.push(...validation.errors.map((err) => `Option: ${err}`));
       }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -36,7 +36,7 @@ export class IngredientGroup {
     return {
       id: this.id,
       name: this.name,
-      options: this.options.map(option => option.toJSON())
+      options: this.options.map((option) => option.toJSON()),
     };
   }
 
@@ -44,4 +44,3 @@ export class IngredientGroup {
     return new IngredientGroup(data);
   }
 }
-

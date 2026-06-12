@@ -47,6 +47,30 @@ jobs:
       - name: Build module
         run: npm run build
 
+  lint:
+    # Skip on `edited` PR events for the same reason as unit-tests: editing the
+    # title/body doesn't change the head commit, so the existing result stands.
+    if: github.event_name != 'pull_request' || github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Check formatting (Prettier)
+        run: npm run format:check
+
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
     # <-> Claude <-> AGENTS.md table). No install needed — the script has no deps.

@@ -1,4 +1,5 @@
 import { getFabricateFlag } from '../config/flags.js';
+
 import { itemMatchesComponentSource } from './sourceUuid.js';
 
 function normalizeEssences(essences = {}) {
@@ -27,14 +28,17 @@ function findMatchingComponent(item, components = []) {
 
   // Deterministic precedence: source references are authoritative; name is a
   // compatibility fallback for components created before source refs existed.
-  const sourceMatch = components.find(component => itemMatchesComponentSource(item, component));
+  const sourceMatch = components.find((component) => itemMatchesComponentSource(item, component));
   if (sourceMatch) return sourceMatch;
 
-  return components.find(component =>
-    component?.name &&
-    item?.name &&
-    String(item.name).toLowerCase() === String(component.name).toLowerCase()
-  ) || null;
+  return (
+    components.find(
+      (component) =>
+        component?.name &&
+        item?.name &&
+        String(item.name).toLowerCase() === String(component.name).toLowerCase()
+    ) || null
+  );
 }
 
 export function resolveItemEssences(item, components = []) {
@@ -45,17 +49,18 @@ export function resolveItemEssences(item, components = []) {
   return normalizeEssences(component?.essences || {});
 }
 
-export function accumulateItemEssences(items = [], { components = [], multiplyByQuantity = false } = {}) {
+export function accumulateItemEssences(
+  items = [],
+  { components = [], multiplyByQuantity = false } = {}
+) {
   const accumulated = {};
 
   for (const item of items || []) {
     const essences = resolveItemEssences(item, components);
-    const multiplier = multiplyByQuantity
-      ? Math.max(1, Number(item?.system?.quantity) || 1)
-      : 1;
+    const multiplier = multiplyByQuantity ? Math.max(1, Number(item?.system?.quantity) || 1) : 1;
 
     for (const [type, quantity] of Object.entries(essences)) {
-      accumulated[type] = (accumulated[type] || 0) + (quantity * multiplier);
+      accumulated[type] = (accumulated[type] || 0) + quantity * multiplier;
     }
   }
 

@@ -41,6 +41,45 @@ Header lines must be 100 characters or fewer.
 
 ---
 
+## Linting & formatting
+
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for static
+analysis and [Prettier](https://prettier.io/) for formatting. Both run as a **required CI check**
+(`lint` job in `.github/workflows/ci.yml`).
+
+```bash
+npm run lint           # ESLint over the gated scope (fails on any warning)
+npm run lint:fix       # …and auto-fix what can be fixed
+npm run format         # Prettier-format the gated scope
+npm run format:check   # verify formatting (what CI runs)
+```
+
+### Staged rollout
+
+Linting is being introduced **path by path** so each step lands green rather than in one
+unreviewable sweep. Each path is added only once it is clean for **both** ESLint and the
+SonarCloud quality gate (which scores duplication, reliability, and security on the PR's *new
+code* — so a path is widened in its own focused PR, not bundled into an unrelated change). The
+gate (`npm run lint` / `npm run format:check`) currently covers the low-coupling leaf modules:
+
+- `src/models/`, `src/utils/`, `src/integrations/`, and `src/toolBreakageRuntime.js`
+
+Not yet gated (tracked for follow-up — run `npm run lint:all` / `npm run lint:svelte` to see them):
+
+- `src/systems/`, `src/canvas/`, `src/migration/`, `src/config/` — lint-clean, but reformatting
+  them surfaces pre-existing SonarCloud findings (regex/complexity, and `config/`'s preset-data
+  duplication) that must be addressed in their own PRs
+- the `tests/` suite — same reason (sort comparators, fixture duplication)
+- `src/ui/**` and all `*.svelte` components (Svelte parsing is wired up; findings triaged later)
+- `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by
+  source-text assertions in `tests/gathering-bootstrap-api.test.js`, so they change with that test)
+- `scripts/**` build/release tooling
+
+When you bring a new path to green (ESLint **and** SonarCloud), add it to the `lint`/`format`
+globs in `package.json` so the gate keeps it green.
+
+---
+
 ## Foundry integration tests
 
 Fabricate ships a Docker-based smoke test that starts a real Foundry VTT instance, loads the built module, and verifies the Crafting and Gathering surfaces work without runtime errors.

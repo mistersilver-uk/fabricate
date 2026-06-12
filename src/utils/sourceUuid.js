@@ -11,9 +11,8 @@
 export function getSourceUuid(item) {
   if (!item) return null;
   // Foundry v12+ canonical field
-  const compendiumSource = item._stats?.compendiumSource
-    || item.system?._stats?.compendiumSource
-    || null;
+  const compendiumSource =
+    item._stats?.compendiumSource || item.system?._stats?.compendiumSource || null;
   if (compendiumSource) return compendiumSource;
   // Legacy fallback
   if (typeof foundry !== 'undefined' && foundry?.utils?.getProperty) {
@@ -37,9 +36,7 @@ export function getSourceUuid(item) {
  */
 export function getDuplicateSourceUuid(item) {
   if (!item) return null;
-  return item._stats?.duplicateSource
-    || item.system?._stats?.duplicateSource
-    || null;
+  return item._stats?.duplicateSource || item.system?._stats?.duplicateSource || null;
 }
 
 function pushUnique(target, value) {
@@ -97,7 +94,7 @@ export function getComponentSourceReferences(component) {
 export function itemMatchesComponentSource(item, component) {
   const itemRefs = new Set(getItemSourceReferences(item));
   if (itemRefs.size === 0) return false;
-  return getComponentSourceReferences(component).some(ref => itemRefs.has(ref));
+  return getComponentSourceReferences(component).some((ref) => itemRefs.has(ref));
 }
 
 /**
@@ -112,15 +109,14 @@ export function itemMatchesComponentSource(item, component) {
  * @returns {object|null} The stackable match, or null.
  */
 export function findStackableMatch(items, source) {
-  const sourceRefs = new Set([
-    ...getItemSourceReferences(source),
-    ...getComponentSourceReferences(source)
-  ].filter(Boolean));
+  const sourceRefs = new Set(
+    [...getItemSourceReferences(source), ...getComponentSourceReferences(source)].filter(Boolean)
+  );
   if (sourceRefs.size === 0) return null;
   for (const item of Array.isArray(items) ? items : []) {
     const quantity = item?.system?.quantity;
     if (quantity === undefined || quantity === null) continue;
-    if (getItemSourceReferences(item).some(ref => sourceRefs.has(ref))) return item;
+    if (getItemSourceReferences(item).some((ref) => sourceRefs.has(ref))) return item;
   }
   return null;
 }

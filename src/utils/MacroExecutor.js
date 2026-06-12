@@ -2,20 +2,20 @@
  * Executes Foundry script macros as return-value functions.
  * Macros are expected to return a plain object.
  */
-export class MacroExecutor {
+export const MacroExecutor = {
   /**
    * Run a script macro by UUID and return its result.
    * @param {string|null} macroUuid
    * @param {Object} context
    * @returns {Promise<any>}
    */
-  static async run(macroUuid, context = {}) {
+  async run(macroUuid, context = {}) {
     if (!macroUuid) return null;
 
-    let macro = null;
+    let macro;
     try {
       macro = await fromUuid(macroUuid);
-    } catch (err) {
+    } catch {
       macro = null;
     }
     if (!macro || typeof macro.command !== 'string') {
@@ -34,6 +34,5 @@ export class MacroExecutor {
     );
 
     return await fn(context, context, game, foundry, ui, fromUuid);
-  }
-}
-
+  },
+};

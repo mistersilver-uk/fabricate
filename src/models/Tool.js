@@ -28,7 +28,7 @@ const ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
 const REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 
 function coerceMaxUses(value) {
-  if (value === null || value === undefined || value === '') return null;
+  if ([null, undefined, ''].includes(value)) return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 }
@@ -54,13 +54,24 @@ function normalizeRequirement(input) {
 function normalizeBreakage(input) {
   const mode = BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
   const out = { mode };
-  if (mode === 'limitedUses') {
-    out.maxUses = coerceMaxUses(input?.maxUses);
-  } else if (mode === 'breakageChance') {
-    out.breakageChance = coerceBreakageChance(input?.breakageChance);
-  } else if (mode === 'diceExpression') {
-    out.formula = typeof input?.formula === 'string' ? input.formula : '';
-    out.threshold = coerceThreshold(input?.threshold);
+  switch (mode) {
+    case 'limitedUses': {
+      out.maxUses = coerceMaxUses(input?.maxUses);
+
+      break;
+    }
+    case 'breakageChance': {
+      out.breakageChance = coerceBreakageChance(input?.breakageChance);
+
+      break;
+    }
+    case 'diceExpression': {
+      out.formula = typeof input?.formula === 'string' ? input.formula : '';
+      out.threshold = coerceThreshold(input?.threshold);
+
+      break;
+    }
+    // No default
   }
   return out;
 }
@@ -69,9 +80,8 @@ function normalizeOnBreak(input) {
   const mode = ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
   const out = { mode };
   if (mode === 'replaceWith') {
-    out.replacementComponentId = typeof input?.replacementComponentId === 'string'
-      ? input.replacementComponentId
-      : null;
+    out.replacementComponentId =
+      typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null;
   }
   return out;
 }
@@ -79,14 +89,14 @@ function normalizeOnBreak(input) {
 export class Tool {
   constructor(data = {}) {
     /** @type {string|null} Managed item reference inside a crafting system */
-    this.componentId = typeof data.componentId === 'string' && data.componentId
-      ? data.componentId
-      : null;
+    this.componentId =
+      typeof data.componentId === 'string' && data.componentId ? data.componentId : null;
 
     /** @type {{provider: string, formula: string, macroUuid: string}|null} Optional truthy-expression gate */
-    this.requirement = data.requirement === null
-      ? null
-      : (data.requirement === undefined ? null : normalizeRequirement(data.requirement));
+    this.requirement =
+      data.requirement === null || data.requirement === undefined
+        ? null
+        : normalizeRequirement(data.requirement);
 
     /** @type {{mode: string, [key: string]: any}} Breakage mechanic configuration */
     this.breakage = normalizeBreakage(data.breakage);
@@ -118,25 +128,40 @@ export class Tool {
       }
     }
 
-    if (!BREAKAGE_MODES.has(this.breakage.mode)) {
+    if (BREAKAGE_MODES.has(this.breakage.mode)) {
+      switch (this.breakage.mode) {
+        case 'limitedUses': {
+          if (
+            this.breakage.maxUses !== null &&
+            (!Number.isInteger(this.breakage.maxUses) || this.breakage.maxUses < 1)
+          ) {
+            errors.push('breakage.maxUses must be null or a positive integer');
+          }
+
+          break;
+        }
+        case 'breakageChance': {
+          const value = this.breakage.breakageChance;
+          if (!Number.isInteger(value) || value < 0 || value > 100) {
+            errors.push('breakage.breakageChance must be an integer between 0 and 100');
+          }
+
+          break;
+        }
+        case 'diceExpression': {
+          if (!this.breakage.formula) {
+            errors.push('breakage.formula is required for diceExpression mode');
+          }
+          if (!Number.isFinite(this.breakage.threshold)) {
+            errors.push('breakage.threshold must be a finite number');
+          }
+
+          break;
+        }
+        // No default
+      }
+    } else {
       errors.push('breakage.mode must be one of limitedUses, breakageChance, or diceExpression');
-    } else if (this.breakage.mode === 'limitedUses') {
-      if (this.breakage.maxUses !== null
-        && (!Number.isInteger(this.breakage.maxUses) || this.breakage.maxUses < 1)) {
-        errors.push('breakage.maxUses must be null or a positive integer');
-      }
-    } else if (this.breakage.mode === 'breakageChance') {
-      const value = this.breakage.breakageChance;
-      if (!Number.isInteger(value) || value < 0 || value > 100) {
-        errors.push('breakage.breakageChance must be an integer between 0 and 100');
-      }
-    } else if (this.breakage.mode === 'diceExpression') {
-      if (!this.breakage.formula) {
-        errors.push('breakage.formula is required for diceExpression mode');
-      }
-      if (!Number.isFinite(this.breakage.threshold)) {
-        errors.push('breakage.threshold must be a finite number');
-      }
     }
 
     if (!ON_BREAK_MODES.has(this.onBreak.mode)) {
@@ -196,9 +221,8 @@ export class Tool {
       // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage
       // flag (`catalystItemUsage`) so items already degraded as catalysts keep their used
       // count after the 0.6.0 Catalyst→Tool migration. Writes always go to `toolUsage`.
-      const usage = getFabricateFlag(item, 'toolUsage', null)
-        || getFabricateFlag(item, 'catalystItemUsage', null)
-        || { timesUsed: 0 };
+      const usage = getFabricateFlag(item, 'toolUsage', null) ||
+        getFabricateFlag(item, 'catalystItemUsage', null) || { timesUsed: 0 };
       const timesUsed = Number(usage?.timesUsed || 0);
       const maxUses = this.breakage.maxUses;
       const broken = maxUses !== null && Number.isFinite(maxUses) && timesUsed >= maxUses;
@@ -252,9 +276,8 @@ export class Tool {
     // first post-migration write continues the catalyst-era count rather than resetting it.
     // The result is always written to `toolUsage` (authoritative); the legacy flag is left
     // in place (idempotent — once `toolUsage` exists, the fallback is never re-entered).
-    const current = getFabricateFlag(item, 'toolUsage', null)
-      || getFabricateFlag(item, 'catalystItemUsage', null)
-      || { timesUsed: 0 };
+    const current = getFabricateFlag(item, 'toolUsage', null) ||
+      getFabricateFlag(item, 'catalystItemUsage', null) || { timesUsed: 0 };
     const timesUsed = Number(current?.timesUsed || 0) + 1;
     await setFabricateFlag(item, 'toolUsage', { timesUsed });
   }
@@ -297,6 +320,6 @@ export class Tool {
   }
 }
 
-export const TOOL_BREAKAGE_MODES = Array.from(BREAKAGE_MODES);
-export const TOOL_ON_BREAK_MODES = Array.from(ON_BREAK_MODES);
-export const TOOL_REQUIREMENT_PROVIDERS = Array.from(REQUIREMENT_PROVIDERS);
+export const TOOL_BREAKAGE_MODES = [...BREAKAGE_MODES];
+export const TOOL_ON_BREAK_MODES = [...ON_BREAK_MODES];
+export const TOOL_REQUIREMENT_PROVIDERS = [...REQUIREMENT_PROVIDERS];
