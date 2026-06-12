@@ -138,7 +138,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('persists config edits and reveals regen + actor controls when stamina is enabled', async () => {
     const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }];
-    const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'elapsedTime', unit: 'hours', amount: '2' } }, nodes: { enabled: false } }, actors);
+    const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
     // Stamina mode reveals the regen card and the actor list.

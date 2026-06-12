@@ -157,7 +157,7 @@ function makeSettings(initial = {}) {
   return { store, calls, getSetting, setSetting };
 }
 
-test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at 1.1.0', async () => {
+test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at the highest version', async () => {
   const data = legacyData();
   const settings = makeSettings({
     migrationVersion: '1.0.0', // only the 1.1.0 rename migration is pending
@@ -169,7 +169,7 @@ test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at 1
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.1.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.2.0', 'advances to the new highest version');
 
   const savedSystems = settings.store.get('craftingSystems');
   assert.ok(Array.isArray(savedSystems[0].gatheringRealms), 'systems persisted under gatheringRealms');
@@ -197,5 +197,5 @@ test('runner: gatheringParties is left untouched (no write) when it carries no l
 
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringParties'), false, 'no rewrite when nothing to rename');
-  assert.equal(settings.store.get('migrationVersion'), '1.1.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.2.0');
 });

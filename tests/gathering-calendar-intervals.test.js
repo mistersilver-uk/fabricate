@@ -13,7 +13,7 @@ const CUSTOM_SECONDS_PER_UNIT = (unit) => ({ minutes: 60, hours: 3600, days: 300
 function staminaDaysConfig() {
   return {
     systems: {
-      [SYSTEM]: { economy: { mode: 'stamina', stamina: { regen: { policy: 'elapsedTime', unit: 'days', amount: 5 } } } }
+      [SYSTEM]: { economy: { mode: 'stamina', stamina: { regen: { policy: 'overTime', unit: 'days', amount: 5 } } } }
     }
   };
 }
@@ -87,7 +87,7 @@ describe('gathering — calendar-aware interval lengths', () => {
     assert.equal(oneDay.current, 5);
 
     // Weeks: 604800s is exactly one Earth week.
-    const weeksConfig = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { regen: { policy: 'elapsedTime', unit: 'weeks', amount: 3 } } } } } };
+    const weeksConfig = { systems: { [SYSTEM]: { economy: { mode: 'stamina', stamina: { regen: { policy: 'overTime', unit: 'weeks', amount: 3 } } } } } };
     const weeks = makeRichState({ config: weeksConfig });
     const a2 = makeFakeActor();
     await weeks.service.setActorStamina(a2, { systemId: SYSTEM, current: 0, max: 100 });

@@ -18,6 +18,7 @@ import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationT
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
+import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -136,10 +137,17 @@ const MIGRATIONS = [
     label: 'Rename gathering Region concept to Realm (system/environment/party keys)',
     // Must run strictly after 1.0.0, which still reads the pre-rename
     // `gatheringRegions` key for its per-region modifier rewrite. Semver-sorted
-    // application keeps 1.1.0 last, so the rename only fires once the earlier
-    // migrations have consumed the old schema.
+    // application keeps 1.1.0 after 1.0.0, so the rename only fires once the
+    // earlier migrations have consumed the old schema.
     migrate(data) {
       return migrateRenameGatheringRegionsToRealms(data);
+    }
+  },
+  {
+    version: '1.2.0',
+    label: 'Unify stamina-regen policy name elapsedTime → overTime (matches node respawn)',
+    migrate(data) {
+      return migrateStaminaRegenPolicy(data.gatheringConfig);
     }
   }
   // Future migrations added here in version order
