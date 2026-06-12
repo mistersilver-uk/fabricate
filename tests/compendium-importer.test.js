@@ -178,7 +178,9 @@ test('exact match snapshots live img/description onto an SRD-backed component th
     ...makeMockSystemManager({ createdSystems }),
     _extractSourceDescription: (source) => {
       extractCalls.push(source);
-      return source?.system?.description?.value?.replace(/<[^>]+>/g, '') || '';
+      // Plain string strip (no regex) keeps this mock free of the ReDoS hotspot
+      // the analyzer flags on `<[^>]+>`; the fixture only carries <p> tags.
+      return source?.system?.description?.value?.replaceAll('<p>', '').replaceAll('</p>', '') || '';
     }
   };
   const recipeManager = makeMockRecipeManager();
