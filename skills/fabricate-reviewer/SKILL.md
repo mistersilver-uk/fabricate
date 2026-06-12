@@ -9,7 +9,7 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 
 ## Required context
 
-- the active change folder under `openspec/changes/`
+- the issue's `openspec-delta` block, including its `### Spec Deltas` (provided by the driver; this read-only role does not run git or `gh` itself)
 - the current diff or changed-file list (provided by the driver; this read-only role does not run git or other commands itself)
 - relevant canonical spec files for the changed area
 - `skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
@@ -26,9 +26,10 @@ This skill is the canonical definition of the Fabricate Reviewer persona. Both p
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.
 9. For UI changes, verify generated screenshots are present for the changed views as embedded screenshot images in the PR `Screenshots (if applicable)` section (S3-hosted, produced by `npm run screenshots:ui:publish`), and evaluated against acceptance criteria rather than merely attached.
-10. Check durable product behavior is documented in canonical specs or active design docs, not only in tests, agent prompts, or conversation history.
-11. If validation is missing, stale, or suspicious, flag it as a finding for the driver or implementer to run `npm test` / `npm run build`; do not run validation or other commands from this read-only role.
-12. Return one gate status on the first line:
+10. Reconcile the canonical-spec changes against the plan: compare the `openspec/specs/` portion of the diff against the issue delta's `### Spec Deltas`. The implementation must faithfully realize the proposed delta; when it justifiably deviated, the issue delta must have been updated (with a `### Deviations` note) so it accurately describes what shipped. An unexplained mismatch between the shipped canonical spec and the delta is a finding.
+11. Check durable product behavior is documented in canonical specs or the issue delta, not only in tests, agent prompts, or conversation history.
+12. If validation is missing, stale, or suspicious, flag it as a finding for the driver or implementer to run `npm test` / `npm run build`; do not run validation or other commands from this read-only role.
+13. Return one gate status on the first line:
    - `APPROVED`
    - `NEEDS_CHANGES`
    - `BLOCKED`

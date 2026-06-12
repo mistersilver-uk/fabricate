@@ -3,7 +3,7 @@
  * Interactable (Phase 6).
  *
  * When a gathering task is dropped on the canvas, its environment is resolved by
- * this precedence chain (design.md §6):
+ * this precedence chain:
  *
  *   1. Scene Region auto-detect — the drop point falls inside a Foundry V13 Scene
  *      Region flagged `flags.fabricate.environmentId`. No dialog; the caller emits

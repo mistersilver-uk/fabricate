@@ -7,23 +7,23 @@
 **All non-trivial code changes must follow this OpenSpec workflow:**
 
 1. **Read the Canonical Spec** – Start with the relevant file(s) in `openspec/specs/*/spec.md`
-2. **Create Or Update A Change Folder** – Put the task under `openspec/changes/<change>/`
-3. **Write The Change Docs** – Maintain `proposal.md`, `design.md`, and `tasks.md` before implementation
-4. **Await Approval** – Wait for a maintainer to accept the change spec when the work needs review
-5. **Implement** – Write code following the accepted change and canonical specs
-6. **Reference Canonical Specs** – Link to canonical spec paths during implementation (for example `openspec/specs/data-models/spec.md`)
+2. **Capture the Change Delta in the Issue** – Author the OpenSpec delta in the work's GitHub issue, inside the managed `openspec-delta` block (append it to an existing issue and preserve the reporter's text, or create one from the `OpenSpec Change Delta` issue template for prompt-driven work). It is not versioned under `openspec/changes/`.
+3. **Fill the Delta Sections** – Proposal, Design, Tasks, optional Spec Deltas, Resolved Roster, and Verification & Acceptance before implementation
+4. **Await Approval** – Plan-review agents (and any maintainer) accept the delta via plan-review verdicts on the issue before implementation begins
+5. **Implement** – Write code and make the canonical spec changes the delta requires under `openspec/specs/`
+6. **Reconcile** – Post-implementation and docs review compare the actual `openspec/specs/` diff against the issue delta, confirming a faithful realization or updating the delta (with a `Deviations` note) when implementation justifiably diverged
 
 ### OpenSpec Layout
 
-Canonical technical specifications live under `openspec/specs/`.
-Each non-trivial task gets its own per-change folder under `openspec/changes/`.
+Canonical technical specifications live under `openspec/specs/` — the only versioned spec source of truth.
+Per-change deltas are **not** versioned in git; they live in the work's GitHub issue (managed `openspec-delta` block).
 The legacy `spec/` directory is retained only as compatibility links and should not be edited directly.
 
 See `openspec/README.md` and `openspec/specs/README.md` for:
 
 - OpenSpec structure
 - The canonical spec index
-- How to create and maintain per-change specs
+- The issue-based change-delta format and its rules
 
 ### Specification-Driven Development
 
@@ -31,7 +31,7 @@ We follow a **spec-driven approach** for development with agents:
 
 - **Specifications define behaviour** – Features are specified before implementation
 - **Code implements specs** – Implementation follows the specification
-- **Per-change specs capture intent** – Each change folder records scope, design, and execution steps
+- **Per-change deltas capture intent** – Each change's issue delta records scope, design, and execution steps
 - **Specs are living documents** - Updated as features evolve
 - **Specs guide testing** – Test scenarios are derived from specifications
 

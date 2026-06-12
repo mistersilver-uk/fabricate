@@ -10,7 +10,8 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 - Use the orchestrator flow first for any non-trivial task.
 - Use OpenSpec as the planning system of record for non-trivial work.
 - Plans touching shared scripts (smoke test, build, lint, anything in `scripts/` invoked from `package.json`) must spell out the behavior in both CI and local dev explicitly — don't bury one as a parenthetical.
-- Create or update `openspec/changes/<change>/proposal.md`, `design.md`, and `tasks.md` before implementation starts.
+- Capture the change delta in the work's GitHub issue (a managed `openspec-delta` block — proposal, design, tasks, spec deltas, roster, acceptance) before implementation starts; do not version planning files under `openspec/changes/` (that directory is gone). See `openspec/README.md` for the block format and rules.
+- When the work originates from an existing issue, append the delta block and preserve the reporter's original text; when it originates from a prompt with no issue, create one from the `OpenSpec Change Delta` issue template.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth. The legacy `spec/` directory is compatibility-only.
@@ -22,7 +23,7 @@ Non-trivial work runs as a `plan → plan-review → implement → review → do
 
 The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers. Each resolves to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)) — so the auto-spawn workflow behaves the same regardless of which assistant is driving. The one exception is the read-only `fabricate_pr_explorer` mapping role: Claude uses its built-in `Explore` agent rather than a dedicated binding (see the table below).
 
-**Workflow driver.** The top-level loop — Codex's depth-0 prompt agent or Claude's main loop — is the *workflow driver*. It enacts the orchestrator role: it owns routing and the iteration loops and performs **all** agent spawning. The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec change docs; it returns its plan to the driver. Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
+**Workflow driver.** The top-level loop — Codex's depth-0 prompt agent or Claude's main loop — is the *workflow driver*. It enacts the orchestrator role: it owns routing and the iteration loops and performs **all** agent spawning. The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec delta in the issue; it returns its plan to the driver. Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
 
 ### Auto-spawn routing
 
@@ -42,9 +43,9 @@ Match the change against every signal that applies. All matching agents run in p
 
 Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
 
-1. **Plan review loop.** The driver drafts the OpenSpec change docs (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the plan. The driver revises the change docs until every plan reviewer approves.
-2. **Implementation review loop.** The driver spawns the implementer to ship changes, then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts. The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
-3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site). Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
+1. **Plan review loop.** The driver drafts the OpenSpec delta in the issue's `openspec-delta` block (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the delta (verdicts posted as issue comments). The driver rewrites the delta block in place until every plan reviewer approves.
+2. **Implementation review loop.** The driver spawns the implementer to ship changes — including the canonical spec changes under `openspec/specs/` that the delta requires — then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts. Reviewers compare the actual `openspec/specs/` diff against the proposed delta in the issue and confirm a faithful realization (or flag a justified deviation to reconcile). The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating it and its `Deviations` note when implementation justifiably diverged) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site to match the shipped canonical spec). Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
 
 ### Stop conditions
 

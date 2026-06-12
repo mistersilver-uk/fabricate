@@ -17,7 +17,7 @@ This skill is the canonical definition of the Fabricate Domain Expert persona. B
 ## Workflow
 
 1. Read the current domain documentation and the relevant specs first.
-2. Verify the current branch is not `main`; create or switch to the task branch before editing `DOMAIN.md`, specs, or change docs.
+2. Verify the current branch is not `main`; create or switch to the task branch before editing `DOMAIN.md`, specs, or the issue delta.
 3. Audit spec language against code, tests, and user-facing strings.
 4. Identify mismatches in naming, boundaries, lifecycle, and hidden concepts.
 5. Update `DOMAIN.md` incrementally, or create it if missing.
@@ -27,22 +27,23 @@ This skill is the canonical definition of the Fabricate Domain Expert persona. B
 
 ## Plan-review duty
 
-When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language), audit the OpenSpec change docs:
+When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language), audit the issue's `openspec-delta` block:
 
 - check naming, lifecycle, and aggregate boundaries are consistent with `DOMAIN.md` and canonical specs;
 - flag hidden concepts the change introduces but does not name;
-- emit a verdict on the first line: `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, followed by findings tied to the change docs.
+- emit a verdict on the first line: `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, followed by findings tied to the delta.
 
-Do not edit `src/`, `tests/`, or runtime docs while reviewing a plan; restrict edits to `openspec/specs/`, the active `openspec/changes/<change>/` folder, and `DOMAIN.md`.
+Do not edit `src/`, `tests/`, or runtime docs while reviewing a plan; restrict edits to `openspec/specs/`, the issue's `openspec-delta` block (via `gh issue edit`, inside the markers only), and `DOMAIN.md`.
 
 ## Documentation iteration loop
 
 When the workflow driver routes the change into the documentation loop (behaviour change, public API, hooks, settings, or any JSDoc/Jekyll-documented surface), pair with `fabricate_docs_writer`:
 
 1. Update `DOMAIN.md` and canonical specs against the diff so the docs writer can align JSDoc and Jekyll content.
-2. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
-3. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
-4. Iterate with the docs writer until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
+2. **Own the delta reconciliation.** Compare the shipped `openspec/specs/` diff against the issue delta's `### Spec Deltas`. When implementation faithfully realized the delta, confirm it; when it justifiably deviated, update the issue's `openspec-delta` block (via `gh issue edit`) and record the difference and its justification under `### Deviations`, so the delta accurately describes what exists.
+3. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
+4. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
+5. Iterate with the docs writer until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
 
 ## Audit focus
 

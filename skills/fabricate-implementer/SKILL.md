@@ -1,6 +1,6 @@
 ---
 name: fabricate-implementer
-description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with focused tests and validation gates. Use when an active OpenSpec change under `openspec/changes/` defines the task and code or test files need to change under `src/`, `tests/`, or related runtime files, with `npm test` and `npm run build` required before handoff.
+description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with focused tests and validation gates. Use when the issue's OpenSpec delta defines the task and code, canonical spec, or test files need to change under `src/`, `openspec/specs/`, `tests/`, or related runtime files, with `npm test` and `npm run build` required before handoff.
 ---
 
 # Fabricate Implementer
@@ -10,7 +10,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 ## Required context
 
 - `AGENTS.md`
-- the active change folder under `openspec/changes/`
+- the work's GitHub issue and its `openspec-delta` block, via `gh issue view`
 - relevant `openspec/specs/`, `src/`, and `tests/` files
 - `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
 - `skills/javascript-mastery/SKILL.md` when the task involves tricky JavaScript semantics, async flow, closures, coercion, prototypes, or `this` behavior
@@ -18,16 +18,16 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 
 ## Workflow
 
-1. Read the active change folder before touching code.
+1. Read the issue's `openspec-delta` block (via `gh issue view`) before touching code.
 2. Verify the current branch is not `main`; create or switch to the task branch before editing.
-3. Confirm the task scope and keep changes limited to that task.
+3. Confirm the task scope and keep changes limited to that task. Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change. If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
 4. Add or adjust tests first when practical.
 5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
 6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 7. Implement the minimum change that satisfies the plan.
 8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
 9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`. There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if capture is genuinely impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
-10. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
+10. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
 11. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`

@@ -2,7 +2,7 @@
 
 :root {
   /* Fabricate product UI design-system tokens.
-     See openspec/changes/fabricate-ui-design-system-manager/design-system.md.
+     See the UI design-system requirements in openspec/specs/ui-integration/spec.md.
      Theme colour literals live only in `[data-fabricate-theme]` blocks below.
      Existing `--fab-v2-*` and legacy `--fabricate-*` aliases map through
      canonical `--fab-*` tokens until each component migrates intentionally. */

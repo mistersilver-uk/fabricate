@@ -26,8 +26,8 @@ You may update:
 2. Verify the current branch is not `main`; create or switch to the task branch before editing docs.
 3. Read the changed source files before writing docs.
 4. Read the corresponding docs pages.
-5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
-6. Update only documentation that matches real behavior.
+5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language. Treat the shipped canonical specs under `openspec/specs/` — and the issue delta as reconciled by the domain expert — as the source of truth for documented behaviour.
+6. Update only documentation that matches real behavior (the shipped canonical spec, not a superseded proposal).
 7. Keep quick-start content canonical in `docs/quickstart.md`.
 8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
 9. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
