@@ -388,7 +388,7 @@ test('manager inspector count labels wrap without truncation', () => {
   assert.ok(css.includes('grid-column: 1 / -1;'), 'disabled count facts should have enough width for label-first text');
   assert.ok(css.includes('.fabricate-manager .manager-fact strong.is-disabled'), 'disabled count values should preserve emphasis');
   assert.ok(featureListBlock.includes('align-items: flex-start;'), 'feature pills should align to the top of the card');
-  assert.ok(featureListBlock.includes('justify-content: flex-start;'), 'feature pills should align to the left of the card');
+  assert.ok(featureListBlock.includes('place-content: flex-start flex-start;'), 'feature pills should align to the top-left of the card');
   assert.ok(conditionShortcutListBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'condition shortcut card should keep compact one-column inspector controls');
   assert.ok(conditionShortcutListBlock.includes('gap: 10px;'), 'condition shortcut controls should have stable spacing');
   assert.ok(conditionShortcutLabelBlock.includes('display: inline-flex;'), 'condition shortcut labels should align icons and text');
@@ -805,7 +805,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(componentPillsBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser selected tags should occupy a distinct pill row');
   assert.ok(selectedTagPillBlock.includes('background: var(--fab-success-soft);'), 'selected component tag filters should use removable selected-tag pill styling');
   assert.ok(componentBrowserControlsBlock.includes('grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr);'), 'component browser should keep name and tag search in a compact control grid');
-  assert.ok(componentBrowserScrollBlock.includes('overflow-x: hidden;') && componentBrowserScrollBlock.includes('overflow-y: auto;'), 'component browser card area should scroll internally without horizontal overflow');
+  assert.ok(componentBrowserScrollBlock.includes('overflow: hidden auto;'), 'component browser card area should scroll internally without horizontal overflow');
   assert.ok(componentGridBlock.includes('grid-template-columns: repeat(3, minmax(0, 1fr));'), 'component browser should use a three-column card grid');
   assert.ok(componentCardBlock.includes('grid-template-columns: 38px minmax(0, 1fr) 18px;') && componentCardBlock.includes('min-height: 72px;'), 'component browser cards should reserve image, copy, and grip columns');
   assert.ok(componentCardCopySharedBlock.includes('text-overflow: ellipsis;'), 'component card shared copy should truncate within the card');
@@ -843,7 +843,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tools component browser search should anchor its icon inside a full-width input box without inheriting the global 260px flex basis as height'
   );
   assert.ok(toolsComponentBrowserSearchInputBlock.includes('padding-left: 36px;'), 'tools component browser search input should reserve text inset for the leading search icon');
-  assert.ok(toolsComponentBrowserScrollBlock.includes('padding: 10px 0 12px;') && toolsComponentBrowserScrollBlock.includes('overflow-x: hidden;') && toolsComponentBrowserScrollBlock.includes('overflow-y: auto;'), 'tools component browser results should show complete cards before scrolling without horizontal overflow');
+  assert.ok(toolsComponentBrowserScrollBlock.includes('padding: 10px 0 12px;') && toolsComponentBrowserScrollBlock.includes('overflow: hidden auto;'), 'tools component browser results should show complete cards before scrolling without horizontal overflow');
   assert.ok(toolsComponentBrowserGridBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'tools component browser should keep a one-column card grid in the narrow inspector');
   assert.ok(toolsComponentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);') && toolsComponentBrowserFooterBlock.includes('background: transparent;'), 'tools component browser footer should separate pagination without adding nested card chrome');
   assert.ok(
@@ -877,7 +877,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(dropFooterPaginationBlock.includes('background: transparent;'), 'drop rules footer should not nest pagination chrome');
   assert.ok(dropScrollBlock.includes('height: var(--fab-mv2-task-drop-table-visible-height);') && dropScrollBlock.includes('max-height: var(--fab-mv2-task-drop-table-visible-height);'), 'drop rules table scroll region should show exactly three complete rows before scrolling');
   assert.ok(dropScrollBlock.includes('padding: 10px 0 0;'), 'drop rules table scroll region should not add horizontal inset');
-  assert.ok(dropScrollBlock.includes('overflow-x: hidden;') && dropScrollBlock.includes('overflow-y: auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
+  assert.ok(dropScrollBlock.includes('overflow: hidden auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
   assert.ok(dropTableBlock.includes('minmax(0, 1.05fr)') && dropTableBlock.includes('minmax(220px, 1.35fr)') && dropTableBlock.includes('56px') && dropTableBlock.includes('minmax(180px, 1.65fr)'), 'drop row desktop grid should keep component/chance/quantity geometry while widening modifiers');
   assert.equal(dropTableBlock.includes('88px'), false, 'drop row desktop grid should not reserve a row actions column');
@@ -1020,7 +1020,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(dropInspectorRouteBlock.includes('overflow: hidden;'), 'gathering task edit inspector should delegate selected-drop scrolling to the lower viewport');
   assert.ok(dropInspectorDividerBlock.includes('width: calc(100% + 24px);') && dropInspectorDividerBlock.includes('margin: 10px -12px 0;'), 'selected drop inspector divider should bleed through the right inspector padding');
   assert.ok(dropInspectorDividerBlock.includes('height: 1px;') && dropInspectorDividerBlock.includes('background: var(--fab-mv2-border);'), 'selected drop inspector should render a visible divider below the header');
-  assert.ok(dropInspectorScrollBlock.includes('overflow-y: auto;') && dropInspectorScrollBlock.includes('overflow-x: hidden;'), 'selected drop lower editor content should own vertical scrolling without horizontal overflow');
+  assert.ok(dropInspectorScrollBlock.includes('overflow: hidden auto;'), 'selected drop lower editor content should own vertical scrolling without horizontal overflow');
   assert.ok(dropInspectorScrollBlock.includes('padding-top: 12px;') && dropInspectorScrollBlock.includes('gap: 12px;'), 'selected drop scroll viewport should visually separate lower cards from the divider');
   assert.equal(css.includes('.fabricate-manager .manager-drop-actions'), false, 'drop row actions should not reserve row layout or styling');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
@@ -1322,7 +1322,7 @@ test('manager environments browser and edit route define compact responsive geom
   );
   assert.ok(
     compMenuButtonBlock.includes('justify-content: start;')
-      && compMenuButtonBlock.includes('justify-items: start;')
+      && compMenuButtonBlock.includes('place-items: center start;')
       && compMenuButtonBlock.includes('text-align: left;'),
     'composition overflow menu item content should be left-aligned'
   );

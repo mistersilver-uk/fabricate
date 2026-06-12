@@ -43,16 +43,44 @@ Header lines must be 100 characters or fewer.
 
 ## Linting & formatting
 
-Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for static
-analysis and [Prettier](https://prettier.io/) for formatting. Both run as a **required CI check**
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript
+static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS,
+and [Prettier](https://prettier.io/) for formatting. All three run as a **required CI check**
 (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
-npm run lint           # ESLint over the gated scope (fails on any warning)
+npm run lint           # ESLint over the gated JS scope (fails on any warning)
 npm run lint:fix       # …and auto-fix what can be fixed
+npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
+npm run lint:css:fix   # …and auto-fix what can be fixed
 npm run format         # Prettier-format the gated scope
 npm run format:check   # verify formatting (what CI runs)
 ```
+
+### CSS linting (Stylelint)
+
+`npm run lint:css` gates `styles/**/*.{css,scss}` (today: the global `styles/fabricate.css`).
+The config extends `stylelint-config-standard` and is tuned to enforce the dimensions a linter
+can actually check — each is mapped to its rule(s) in the header comment of `stylelint.config.js`:
+
+- **Quality** — invalid/unknown syntax, modern value notation, malformed selectors.
+- **Reliability** — duplicate/contradictory declarations, shorthand-property overrides,
+  deprecated properties/values.
+- **Duplication** — duplicate selectors, duplicate properties / custom properties, duplicate
+  `@import`s and font-family names.
+- **Reuse / DRY** — collapses redundant longhands into shorthands
+  (`declaration-block-no-redundant-longhand-properties`) and strips redundant shorthand values.
+- **Cross-browser** — `stylelint-no-unsupported-browser-features` checks every property/value
+  against the `browserslist` matrix in `package.json` (Foundry's supported browsers).
+
+Stylelint has **no** robust rule for detecting two near-identical rule blocks that *could be
+merged* (structural similarity); the duplicate/shorthand rules above are the closest proxy, and
+SonarCloud also scores CSS duplication on a PR's new code. A handful of standard rules are
+deliberately turned off with justification in `stylelint.config.js` (e.g. `no-descending-specificity`
+— reordering the single large global sheet is regression-prone and unreviewable; the cosmetic
+`selector-not-notation` / `media-feature-range-notation` modernizers — pure churn for no
+enforcement value). The Svelte components' scoped `<style>` blocks are not linted here (they
+compile to hashed classes and are owned by the Svelte toolchain).
 
 ### Staged rollout
 

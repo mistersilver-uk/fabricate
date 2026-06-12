@@ -1,0 +1,15 @@
+# Build output & dependencies
+dist/
+node_modules/
+coverage/
+
+# Local Foundry e2e fixtures & vendored third-party styles (not ours to lint)
+.foundry-e2e/
+
+# Generated docs site & vendored assets
+docs/_site/
+docs/vendor/
+docs/.jekyll-cache/
+
+# Minified / generated assets
+**/*.min.css

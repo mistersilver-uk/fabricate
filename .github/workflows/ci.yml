@@ -68,6 +68,9 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
 
+      - name: Lint styles (Stylelint)
+        run: npm run lint:css
+
       - name: Check formatting (Prettier)
         run: npm run format:check
 
