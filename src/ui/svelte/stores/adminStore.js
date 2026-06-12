@@ -115,13 +115,13 @@ const FALLBACK_GATHERING_CONDITION_ICONS = Object.freeze({
   timeOfDay: 'fas fa-clock'
 });
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
-const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const GATHERING_EVENT_POLICIES = new Set(['successWithEvent', 'failureWithEvent']);
 const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
 const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
-const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
+const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
   'includedByMatch',
   'explicitlyIncluded',
@@ -131,15 +131,15 @@ const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
-  hazardSelectionMode: 'allDrops',
-  hazardLimit: 1,
-  hazardPolicy: 'successWithHazard',
+  eventSelectionMode: 'allDrops',
+  eventLimit: 1,
+  eventPolicy: 'successWithEvent',
   toolBreakagePolicy: 'failureOnBreak',
   biomeModifierAggregation: 'strongestOfEach',
   blindCandidateGate: 'attemptableOnly',
   revealPolicy: 'never',
   revealScope: 'actor',
-  hazardVisibility: 'encounterChance'
+  eventVisibility: 'encounterChance'
 });
 
 // ---------------------------------------------------------------------------
@@ -642,22 +642,26 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
   };
 }
 
-function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
   return {
-    id: hazard.id ? String(hazard.id) : randomID(),
-    name: String(hazard.name || 'Hazard'),
-    description: String(hazard.description || ''),
-    img: String(hazard.img || 'icons/svg/hazard.svg'),
-    enabled: hazard.enabled !== false,
-    dangerTags: _normalizeGatheringTagList(hazard.dangerTags),
-    biomes: _normalizeGatheringTagList(hazard.biomes),
-    weather: _normalizeGatheringConditionIdList(hazard.weather),
-    timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),
-    dropRate: Number.isFinite(Number(hazard.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(hazard.dropRate)))) : 1,
-    linkedSceneUuid: String(hazard.linkedSceneUuid || ''),
-    hazardModifier: hazard.hazardModifier && typeof hazard.hazardModifier === 'object' ? _clonePlain(hazard.hazardModifier) : null,
-    conditionModifiers: _normalizeGatheringDropConditionModifiers(hazard.conditionModifiers),
-    characterModifiers: _normalizeGatheringCharacterModifierReferences(hazard.characterModifiers, randomID)
+    id: event.id ? String(event.id) : randomID(),
+    name: String(event.name || 'Event'),
+    description: String(event.description || ''),
+    img: String(event.img || 'icons/svg/mystery-man.svg'),
+    enabled: event.enabled !== false,
+    dangerTags: _normalizeGatheringTagList(event.dangerTags),
+    biomes: _normalizeGatheringTagList(event.biomes),
+    weather: _normalizeGatheringConditionIdList(event.weather),
+    timeOfDay: _normalizeGatheringConditionIdList(event.timeOfDay),
+    dropRate: Number.isFinite(Number(event.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(event.dropRate)))) : 1,
+    linkedSceneUuid: String(event.linkedSceneUuid || ''),
+    // Accept the legacy `hazardModifier` field on read (imported or pre-1.0.0 data).
+    eventModifier: (() => {
+      const modifier = event.eventModifier ?? event.hazardModifier;
+      return modifier && typeof modifier === 'object' ? _clonePlain(modifier) : null;
+    })(),
+    conditionModifiers: _normalizeGatheringDropConditionModifiers(event.conditionModifiers),
+    characterModifiers: _normalizeGatheringCharacterModifierReferences(event.characterModifiers, randomID)
   };
 }
 
@@ -671,12 +675,22 @@ function _normalizeGatheringRules(rules = {}) {
   const rewardSelectionMode = GATHERING_DROP_SELECTION_MODES.has(rules?.rewardSelectionMode)
     ? rules.rewardSelectionMode
     : DEFAULT_GATHERING_RULES.rewardSelectionMode;
-  const hazardSelectionMode = GATHERING_DROP_SELECTION_MODES.has(rules?.hazardSelectionMode)
-    ? rules.hazardSelectionMode
-    : DEFAULT_GATHERING_RULES.hazardSelectionMode;
-  const hazardPolicy = GATHERING_HAZARD_POLICIES.has(rules?.hazardPolicy)
-    ? rules.hazardPolicy
-    : DEFAULT_GATHERING_RULES.hazardPolicy;
+  // Accept the legacy hazard-schema rule keys/values on read (imported or
+  // pre-1.0.0-migration gathering config) so the intended rules survive until the
+  // startup migration rewrites them.
+  const rawEventSelectionMode = rules?.eventSelectionMode ?? rules?.hazardSelectionMode;
+  const eventSelectionMode = GATHERING_DROP_SELECTION_MODES.has(rawEventSelectionMode)
+    ? rawEventSelectionMode
+    : DEFAULT_GATHERING_RULES.eventSelectionMode;
+  const rawEventPolicy = (() => {
+    const value = rules?.eventPolicy ?? rules?.hazardPolicy;
+    if (value === 'successWithHazard') return 'successWithEvent';
+    if (value === 'failureWithHazard') return 'failureWithEvent';
+    return value;
+  })();
+  const eventPolicy = GATHERING_EVENT_POLICIES.has(rawEventPolicy)
+    ? rawEventPolicy
+    : DEFAULT_GATHERING_RULES.eventPolicy;
   const toolBreakagePolicy = GATHERING_TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
     ? rules.toolBreakagePolicy
     : DEFAULT_GATHERING_RULES.toolBreakagePolicy;
@@ -692,21 +706,22 @@ function _normalizeGatheringRules(rules = {}) {
   const revealScope = GATHERING_REVEAL_SCOPES.has(rules?.revealScope)
     ? rules.revealScope
     : DEFAULT_GATHERING_RULES.revealScope;
-  const hazardVisibility = GATHERING_HAZARD_VISIBILITIES.has(rules?.hazardVisibility)
-    ? rules.hazardVisibility
-    : DEFAULT_GATHERING_RULES.hazardVisibility;
+  const rawEventVisibility = rules?.eventVisibility ?? rules?.hazardVisibility;
+  const eventVisibility = GATHERING_EVENT_VISIBILITIES.has(rawEventVisibility)
+    ? rawEventVisibility
+    : DEFAULT_GATHERING_RULES.eventVisibility;
   return {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
-    hazardSelectionMode,
-    hazardLimit: _normalizePositiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
-    hazardPolicy,
+    eventSelectionMode,
+    eventLimit: _normalizePositiveInteger(rules?.eventLimit ?? rules?.hazardLimit, DEFAULT_GATHERING_RULES.eventLimit),
+    eventPolicy,
     toolBreakagePolicy,
     biomeModifierAggregation,
     blindCandidateGate,
     revealPolicy,
     revealScope,
-    hazardVisibility
+    eventVisibility
   };
 }
 
@@ -735,7 +750,8 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
       vocabularies: _normalizeGatheringSystemVocabularies(systemConfig?.vocabularies, vocabularies),
       tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
       tools: (Array.isArray(systemConfig?.tools) ? systemConfig.tools : []).map(tool => _normalizeGatheringLibraryTool(tool, randomID)),
-      hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID)),
+      // Accept the legacy `hazards` collection on read (imported or pre-1.0.0 config).
+      events: (Array.isArray(systemConfig?.events) ? systemConfig.events : (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : [])).map(event => _normalizeGatheringEvent(event, randomID)),
       characterModifiers: (Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [])
         .map(entry => _normalizeGatheringCharacterModifier(entry, randomID))
         .filter(Boolean),
@@ -1913,10 +1929,10 @@ export function createAdminStore(services) {
     );
   }
 
-  function confirmDiscardDirtyGatheringHazardDraft() {
+  function confirmDiscardDirtyGatheringEventDraft() {
     return _confirmDiscardDirtyDraft(
-      'FABRICATE.Admin.Manager.Environment.Hazards.DiscardChangesPrompt',
-      'The current hazard has unsaved changes. Discard them and continue?'
+      'FABRICATE.Admin.Manager.Environment.Events.DiscardChangesPrompt',
+      'The current event has unsaved changes. Discard them and continue?'
     );
   }
 
@@ -2471,13 +2487,13 @@ export function createAdminStore(services) {
       conditions: _normalizeGatheringSystemConditions(null, config),
       vocabularies: _normalizeGatheringSystemVocabularies(null, config.vocabularies),
       tasks: [],
-      hazards: []
+      events: []
     };
     config.systems[id].rules = _normalizeGatheringRules(config.systems[id].rules);
     config.systems[id].conditions = _normalizeGatheringSystemConditions(config.systems[id].conditions, config);
     config.systems[id].vocabularies = _normalizeGatheringSystemVocabularies(config.systems[id].vocabularies, config.vocabularies);
     config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
-    config.systems[id].hazards = Array.isArray(config.systems[id].hazards) ? config.systems[id].hazards : [];
+    config.systems[id].events = Array.isArray(config.systems[id].events) ? config.systems[id].events : [];
     return config.systems[id];
   }
 
@@ -2530,8 +2546,8 @@ export function createAdminStore(services) {
   }
 
   function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
     const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
     if (disabled.includes(String(recordId))) return false;
@@ -2539,13 +2555,13 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Classify every library task/hazard for the given environment into a
+   * Classify every library task/event for the given environment into a
    * `CompositionState` + `RuntimeState` plus match evidence, honoring
    * `compositionMode`. This is the single view-model the environment editor
-   * (Overview / Tasks / Hazards / Validation / inspector) renders from.
+   * (Overview / Tasks / Events / Validation / inspector) renders from.
    */
   function _buildEnvironmentCompositionViewModel(environment) {
-    const empty = { compositionMode: 'automatic', conditions: { ...DEFAULT_GATHERING_CONDITIONS }, tasks: [], hazards: [], counts: _emptyCompositionCounts() };
+    const empty = { compositionMode: 'automatic', conditions: { ...DEFAULT_GATHERING_CONDITIONS }, tasks: [], events: [], counts: _emptyCompositionCounts() };
     if (!environment || typeof environment !== 'object') return empty;
     const systemId = String(environment.craftingSystemId || get(selectedSystemId) || '');
     if (!systemId) return empty;
@@ -2564,19 +2580,19 @@ export function createAdminStore(services) {
       order: environment.taskOrder,
       managedItemById
     });
-    const hazards = _classifyCompositionRecords({
-      records: Array.isArray(system.hazards) ? system.hazards : [],
-      environment, conditions, conditionSettings, compositionMode, kind: 'hazard', includeDanger: true,
-      order: environment.hazardOrder
+    const events = _classifyCompositionRecords({
+      records: Array.isArray(system.events) ? system.events : [],
+      environment, conditions, conditionSettings, compositionMode, kind: 'event', includeDanger: true,
+      order: environment.eventOrder
     });
 
-    return { compositionMode, conditions, tasks, hazards, counts: _compositionCounts(tasks, hazards) };
+    return { compositionMode, conditions, tasks, events, counts: _compositionCounts(tasks, events) };
   }
 
   function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order, managedItemById = new Map() }) {
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
-    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
+    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
     const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
     const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
     const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
@@ -2638,11 +2654,11 @@ export function createAdminStore(services) {
   function _dropRateAdjustmentSummary({ kind, record, environment, managedItemById = new Map() }) {
     const id = String(record?.id || '');
     if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentsEnabled: true, dropRateAdjustmentRows: [] };
-    if (kind === 'hazard') {
-      const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
+    if (kind === 'event') {
+      const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.eventDropRateAdjustments);
       const adjustment = adjustments[id] || 0;
-      const hazardEnabledMap = _normalizeDraftHazardDropRateAdjustmentsEnabled(environment?.hazardDropRateAdjustmentsEnabled);
-      const dropRateAdjustmentsEnabled = hazardEnabledMap[id] !== false;
+      const eventEnabledMap = _normalizeDraftEventDropRateAdjustmentsEnabled(environment?.eventDropRateAdjustmentsEnabled);
+      const dropRateAdjustmentsEnabled = eventEnabledMap[id] !== false;
       const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
       const baseDropRate = Number.isFinite(Number(record?.dropRate)) ? Math.floor(Number(record.dropRate)) : 1;
       return {
@@ -2694,12 +2710,12 @@ export function createAdminStore(services) {
   function _emptyCompositionCounts() {
     return {
       availableTasks: 0, excludedTasks: 0, candidateTasks: 0, unavailableTasks: 0,
-      availableHazards: 0, excludedHazards: 0, candidateHazards: 0, unavailableHazards: 0,
-      diagnosticTasks: 0, diagnosticHazards: 0
+      availableEvents: 0, excludedEvents: 0, candidateEvents: 0, unavailableEvents: 0,
+      diagnosticTasks: 0, diagnosticEvents: 0
     };
   }
 
-  function _compositionCounts(tasks, hazards) {
+  function _compositionCounts(tasks, events) {
     const tally = records => {
       const available = records.filter(r => r.runtimeState === 'available').length;
       const excluded = records.filter(r => r.compositionState === 'excluded').length;
@@ -2709,15 +2725,15 @@ export function createAdminStore(services) {
       return { available, excluded, candidate, unavailable, diagnostic };
     };
     const t = tally(tasks);
-    const h = tally(hazards);
+    const h = tally(events);
     return {
       availableTasks: t.available, excludedTasks: t.excluded, candidateTasks: t.candidate, unavailableTasks: t.unavailable, diagnosticTasks: t.diagnostic,
-      availableHazards: h.available, excludedHazards: h.excluded, candidateHazards: h.candidate, unavailableHazards: h.unavailable, diagnosticHazards: h.diagnostic
+      availableEvents: h.available, excludedEvents: h.excluded, candidateEvents: h.candidate, unavailableEvents: h.unavailable, diagnosticEvents: h.diagnostic
     };
   }
 
   /**
-   * Whether `environment` currently composes the library task/hazard `record`, mirroring the
+   * Whether `environment` currently composes the library task/event `record`, mirroring the
    * runtime `GatheringRichStateService.composeEnvironment` filter chain exactly:
    *   library-enabled  AND  (matches OR force-included)  AND  the composition-mode include gate.
    * In manual mode a record is composed only when force-added, or when it both matches and is on
@@ -2726,11 +2742,11 @@ export function createAdminStore(services) {
   function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
     if (!record?.id || record.enabled === false) return false;
     const recordId = String(record.id);
-    const includeDanger = kind === 'hazard';
+    const includeDanger = kind === 'event';
     const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
-    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
+    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
     const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
     const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
     const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
@@ -2744,7 +2760,7 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Environments in `systemId` that currently compose (surface) the task/hazard `record`. Mirrors
+   * Environments in `systemId` that currently compose (surface) the task/event `record`. Mirrors
    * runtime composition so callers see exactly the environments a record actually appears in today.
    */
   function _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind) {
@@ -2764,10 +2780,10 @@ export function createAdminStore(services) {
 
   function _gatheringLibraryRecordUsages(systemId, record, kind) {
     if (!record?.id) return [];
-    // Only tasks and hazards are surfaced into environments. Tools are referenced by tasks via
+    // Only tasks and events are surfaced into environments. Tools are referenced by tasks via
     // their `toolIds`, not by environments, so an environment-level usage scan does not apply to
     // them (the previous `enabledTaskIds` lookup could only ever match on an id collision).
-    if (kind !== 'task' && kind !== 'hazard') return [];
+    if (kind !== 'task' && kind !== 'event') return [];
     return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
   }
 
@@ -2780,7 +2796,7 @@ export function createAdminStore(services) {
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
-    const label = kind === 'hazard' ? 'hazard' : (kind === 'tool' ? 'tool' : 'task');
+    const label = kind === 'event' ? 'event' : (kind === 'tool' ? 'tool' : 'task');
     const recordLabel = record?.label || record?.name || record?.id || label;
     const name = _escapeHtml(recordLabel);
     let content = `<p>Delete ${label} <strong>${name}</strong>? This cannot be undone.</p>`;
@@ -2828,10 +2844,10 @@ export function createAdminStore(services) {
     const affected = _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind);
     if (affected.length === 0) return true;
     const localizeFn = services.localize;
-    const base = kind === 'hazard'
-      ? 'FABRICATE.Admin.Manager.Environment.Hazards.CompositionLossWarning'
+    const base = kind === 'event'
+      ? 'FABRICATE.Admin.Manager.Environment.Events.CompositionLossWarning'
       : 'FABRICATE.Admin.Manager.Environment.Tasks.CompositionLossWarning';
-    const recordWord = kind === 'hazard' ? 'hazard' : 'task';
+    const recordWord = kind === 'event' ? 'event' : 'task';
     const title = localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
     const body = localizeFn?.(`${base}.Body`) || `Saving removes this ${recordWord} from these environments:`;
     const names = affected.slice(0, 6).map(usage => _escapeHtml(usage.name));
@@ -2852,7 +2868,7 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Announce (non-blocking) that disabling a library task/hazard removed it from the environments
+   * Announce (non-blocking) that disabling a library task/event removed it from the environments
    * that composed it. Fires only on a true enable→disable transition with at least one affected
    * environment; covers both the library-list toggle and the editor save, since both flow through
    * the `updateGatheringLibrary*` store methods.
@@ -2863,12 +2879,12 @@ export function createAdminStore(services) {
     if (affected.length === 0) return;
     const names = affected.slice(0, 6).map(usage => usage.name);
     if (affected.length > 6) names.push(`and ${affected.length - 6} more`);
-    const name = oldRecord?.label || oldRecord?.name || oldRecord?.id || (kind === 'hazard' ? 'hazard' : 'task');
-    const key = kind === 'hazard'
-      ? 'FABRICATE.Admin.Manager.Environment.Hazards.DisabledNotice'
+    const name = oldRecord?.label || oldRecord?.name || oldRecord?.id || (kind === 'event' ? 'event' : 'task');
+    const key = kind === 'event'
+      ? 'FABRICATE.Admin.Manager.Environment.Events.DisabledNotice'
       : 'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice';
     const data = { name, count: affected.length, environments: names.join(', ') };
-    const fallback = `Disabled ${kind === 'hazard' ? 'hazard' : 'task'} “${name}” — no longer available in ${affected.length} environment(s): ${data.environments}.`;
+    const fallback = `Disabled ${kind === 'event' ? 'event' : 'task'} “${name}” — no longer available in ${affected.length} environment(s): ${data.environments}.`;
     const message = services.localize?.(key, data) || fallback;
     services.notify?.warn?.(message);
   }
@@ -2883,14 +2899,14 @@ export function createAdminStore(services) {
     return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
   }
 
-  async function confirmGatheringLibraryHazardCompositionLoss(systemId = get(selectedSystemId), hazardId, draft = {}) {
+  async function confirmGatheringLibraryEventCompositionLoss(systemId = get(selectedSystemId), eventId, draft = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    const existing = systemConfig?.hazards?.find(hazard => hazard.id === hazardId);
+    const existing = systemConfig?.events?.find(event => event.id === eventId);
     if (!existing) return true;
-    const newRecord = _normalizeGatheringHazard({ ...existing, ...draft }, _randomID);
+    const newRecord = _normalizeGatheringEvent({ ...existing, ...draft }, _randomID);
     if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
-    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
+    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'event' });
   }
 
   function _selectedManagedItemOptions() {
@@ -3117,7 +3133,7 @@ export function createAdminStore(services) {
         const counts = _buildEnvironmentCompositionViewModel(environment)?.counts || {};
         environmentTaskCounts[String(environment.id)] = {
           availableTaskCount: counts.availableTasks || 0,
-          availableHazardCount: counts.availableHazards || 0
+          availableEventCount: counts.availableEvents || 0
         };
       }
       let environmentId = get(selectedEnvironmentId);
@@ -3517,11 +3533,11 @@ export function createAdminStore(services) {
       .filter(([taskId, enabled]) => taskId && enabled === false));
   }
 
-  function _normalizeDraftHazardDropRateAdjustmentsEnabled(value) {
+  function _normalizeDraftEventDropRateAdjustmentsEnabled(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return Object.fromEntries(Object.entries(value)
-      .map(([hazardId, enabled]) => [String(hazardId || '').trim(), enabled])
-      .filter(([hazardId, enabled]) => hazardId && enabled === false));
+      .map(([eventId, enabled]) => [String(eventId || '').trim(), enabled])
+      .filter(([eventId, enabled]) => eventId && enabled === false));
   }
 
   function updateEnvironmentDraft(updates = {}) {
@@ -3540,20 +3556,20 @@ export function createAdminStore(services) {
       'biomes',
       'dangerTags',
       'dangerLevel',
-      'hazardSelectionMode',
-      'hazardPolicy',
+      'eventSelectionMode',
+      'eventPolicy',
       'enabledTaskIds',
       'disabledTaskIds',
-      'enabledHazardIds',
-      'disabledHazardIds',
+      'enabledEventIds',
+      'disabledEventIds',
       'forcedTaskIds',
-      'forcedHazardIds',
+      'forcedEventIds',
       'taskOrder',
-      'hazardOrder',
+      'eventOrder',
       'taskDropRateAdjustments',
       'taskDropRateAdjustmentsEnabled',
-      'hazardDropRateAdjustments',
-      'hazardDropRateAdjustmentsEnabled',
+      'eventDropRateAdjustments',
+      'eventDropRateAdjustmentsEnabled',
       'blindSelection',
       'nodeRuntime'
     ]);
@@ -3572,14 +3588,14 @@ export function createAdminStore(services) {
         next.img = normalized || null;
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['includedRegionIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
+      } else if (['includedRegionIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledEventIds', 'disabledEventIds', 'forcedTaskIds', 'forcedEventIds', 'taskOrder', 'eventOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
-      } else if (field === 'hazardDropRateAdjustments') {
-        next.hazardDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
-      } else if (field === 'hazardDropRateAdjustmentsEnabled') {
-        next.hazardDropRateAdjustmentsEnabled = _normalizeDraftHazardDropRateAdjustmentsEnabled(value);
+      } else if (field === 'eventDropRateAdjustments') {
+        next.eventDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
+      } else if (field === 'eventDropRateAdjustmentsEnabled') {
+        next.eventDropRateAdjustmentsEnabled = _normalizeDraftEventDropRateAdjustmentsEnabled(value);
       } else if (field === 'taskDropRateAdjustments') {
         next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
       } else if (field === 'taskDropRateAdjustmentsEnabled') {
@@ -3602,8 +3618,8 @@ export function createAdminStore(services) {
   }
 
   function _compositionFieldKeys(kind) {
-    return kind === 'hazard'
-      ? { enabledKey: 'enabledHazardIds', disabledKey: 'disabledHazardIds', orderKey: 'hazardOrder', forcedKey: 'forcedHazardIds' }
+    return kind === 'event'
+      ? { enabledKey: 'enabledEventIds', disabledKey: 'disabledEventIds', orderKey: 'eventOrder', forcedKey: 'forcedEventIds' }
       : { enabledKey: 'enabledTaskIds', disabledKey: 'disabledTaskIds', orderKey: 'taskOrder', forcedKey: 'forcedTaskIds' };
   }
 
@@ -3670,9 +3686,9 @@ export function createAdminStore(services) {
     const current = get(environmentDraft);
     if (!current) return false;
     const viewModel = _buildEnvironmentCompositionViewModel(current);
-    const records = kind === 'hazard' ? viewModel.hazards : viewModel.tasks;
+    const records = kind === 'event' ? viewModel.events : viewModel.tasks;
     const ids = records
-      .filter(entry => kind === 'hazard'
+      .filter(entry => kind === 'event'
         ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
         : entry.runtimeState === 'available' || entry.compositionState === 'includedButUnavailable')
       .map(entry => entry.id);
@@ -4327,9 +4343,9 @@ export function createAdminStore(services) {
       ...task,
       [kind]: _normalizeGatheringConditionIdList(task?.[kind]).filter(existing => existing !== tag)
     }));
-    systemConfig.hazards = systemConfig.hazards.map(hazard => ({
-      ...hazard,
-      [kind]: _normalizeGatheringConditionIdList(hazard?.[kind]).filter(existing => existing !== tag)
+    systemConfig.events = systemConfig.events.map(event => ({
+      ...event,
+      [kind]: _normalizeGatheringConditionIdList(event?.[kind]).filter(existing => existing !== tag)
     }));
     config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
     await _saveGatheringConfig(config);
@@ -4418,9 +4434,9 @@ export function createAdminStore(services) {
         ...task,
         biomes: _normalizeGatheringTagList(task.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
       }));
-      systemConfig.hazards = systemConfig.hazards.map(hazard => ({
-        ...hazard,
-        biomes: _normalizeGatheringTagList(hazard.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
+      systemConfig.events = systemConfig.events.map(event => ({
+        ...event,
+        biomes: _normalizeGatheringTagList(event.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
       }));
     }
     await _pruneGatheringVocabularyFromEnvironments(systemId, kind, id);
@@ -4626,61 +4642,61 @@ export function createAdminStore(services) {
     return duplicate;
   }
 
-  async function addGatheringLibraryHazard(systemId = get(selectedSystemId)) {
+  async function addGatheringLibraryEvent(systemId = get(selectedSystemId)) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return null;
-    const hazard = _normalizeGatheringHazard({
+    const event = _normalizeGatheringEvent({
       id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryHazard') || 'Reusable hazard',
+      name: services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryEvent') || 'Reusable event',
       dangerTags: ['hazardous'],
       dropRate: 25
     }, _randomID);
-    systemConfig.hazards = [...systemConfig.hazards, hazard];
+    systemConfig.events = [...systemConfig.events, event];
     await _saveGatheringConfig(config);
     await refresh();
-    return hazard;
+    return event;
   }
 
-  async function updateGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId, updates = {}) {
+  async function updateGatheringLibraryEvent(systemId = get(selectedSystemId), eventId, updates = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !hazardId) return false;
-    const existing = systemConfig.hazards.find(hazard => hazard.id === hazardId);
-    systemConfig.hazards = systemConfig.hazards.map(hazard => hazard.id === hazardId
-      ? _normalizeGatheringHazard({ ...hazard, ...updates }, _randomID)
-      : hazard);
+    if (!systemConfig || !eventId) return false;
+    const existing = systemConfig.events.find(event => event.id === eventId);
+    systemConfig.events = systemConfig.events.map(event => event.id === eventId
+      ? _normalizeGatheringEvent({ ...event, ...updates }, _randomID)
+      : event);
     await _saveGatheringConfig(config);
-    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.hazards.find(hazard => hazard.id === hazardId), kind: 'hazard' });
-    await refresh();
-    return true;
-  }
-
-  async function deleteGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !hazardId) return false;
-    const hazard = systemConfig.hazards.find(hazard => hazard.id === hazardId);
-    if (hazard && !await _confirmGatheringLibraryRecordDelete({ systemId, record: hazard, kind: 'hazard' })) return false;
-    systemConfig.hazards = systemConfig.hazards.filter(hazard => hazard.id !== hazardId);
-    await _saveGatheringConfig(config);
+    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.events.find(event => event.id === eventId), kind: 'event' });
     await refresh();
     return true;
   }
 
-  async function duplicateGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId) {
+  async function deleteGatheringLibraryEvent(systemId = get(selectedSystemId), eventId) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !hazardId) return null;
-    const hazard = systemConfig.hazards.find(hazard => hazard.id === hazardId);
-    if (!hazard) return null;
+    if (!systemConfig || !eventId) return false;
+    const event = systemConfig.events.find(event => event.id === eventId);
+    if (event && !await _confirmGatheringLibraryRecordDelete({ systemId, record: event, kind: 'event' })) return false;
+    systemConfig.events = systemConfig.events.filter(event => event.id !== eventId);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function duplicateGatheringLibraryEvent(systemId = get(selectedSystemId), eventId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !eventId) return null;
+    const event = systemConfig.events.find(event => event.id === eventId);
+    if (!event) return null;
     const copySuffix = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
-    const duplicate = _normalizeGatheringHazard({
-      ..._clonePlain(hazard),
+    const duplicate = _normalizeGatheringEvent({
+      ..._clonePlain(event),
       id: _randomID(),
-      name: `${hazard.name || 'Hazard'} (${copySuffix})`
+      name: `${event.name || 'Event'} (${copySuffix})`
     }, _randomID);
-    systemConfig.hazards = [...systemConfig.hazards, duplicate];
+    systemConfig.events = [...systemConfig.events, duplicate];
     await _saveGatheringConfig(config);
     await refresh();
     return duplicate;
@@ -4915,26 +4931,26 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Add a character modifier reference to one library hazard. Mirrors the
+   * Add a character modifier reference to one library event. Mirrors the
    * drop-row equivalent: defaults `modifierId` to the system's first library
    * entry when not supplied. Returns the normalized reference or null on
    * lookup failure.
    *
    * @param {string} [systemId] Target crafting system id.
-   * @param {string} hazardId Library hazard id.
+   * @param {string} eventId Library event id.
    * @param {object} [partial] Reference fields.
    * @returns {Promise<object|null>}
    */
-  async function addGatheringHazardCharacterModifier(systemId = get(selectedSystemId), hazardId, partial = {}) {
+  async function addGatheringEventCharacterModifier(systemId = get(selectedSystemId), eventId, partial = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !hazardId) return null;
+    if (!systemConfig || !eventId) return null;
     const modifierId = String(partial?.modifierId || _firstCharacterModifierId(systemConfig) || '').trim();
     if (!modifierId) return null;
-    const hazardIndex = systemConfig.hazards.findIndex(hazard => hazard.id === hazardId);
-    if (hazardIndex < 0) return null;
-    const hazard = systemConfig.hazards[hazardIndex];
-    const refs = Array.isArray(hazard.characterModifiers) ? hazard.characterModifiers : [];
+    const eventIndex = systemConfig.events.findIndex(event => event.id === eventId);
+    if (eventIndex < 0) return null;
+    const event = systemConfig.events[eventIndex];
+    const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const id = String(partial?.id || _randomID());
     const ref = _normalizeGatheringCharacterModifierReference({
       id,
@@ -4945,63 +4961,63 @@ export function createAdminStore(services) {
       expressionOverride: partial?.expressionOverride || ''
     }, refs.length, _randomID);
     if (!ref) return null;
-    const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: [...refs, ref] }, _randomID);
-    systemConfig.hazards = systemConfig.hazards.map((existing, index) => index === hazardIndex ? nextHazard : existing);
+    const nextEvent = _normalizeGatheringEvent({ ...event, characterModifiers: [...refs, ref] }, _randomID);
+    systemConfig.events = systemConfig.events.map((existing, index) => index === eventIndex ? nextEvent : existing);
     await _saveGatheringConfig(config);
     await refresh();
     return ref;
   }
 
   /**
-   * Patch one hazard character modifier reference in place.
+   * Patch one event character modifier reference in place.
    *
    * @param {string} [systemId] Target crafting system id.
-   * @param {string} hazardId Library hazard id.
-   * @param {string} refId Reference id on the hazard.
+   * @param {string} eventId Library event id.
+   * @param {string} refId Reference id on the event.
    * @param {object} [patch] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateGatheringHazardCharacterModifier(systemId = get(selectedSystemId), hazardId, refId, patch = {}) {
+  async function updateGatheringEventCharacterModifier(systemId = get(selectedSystemId), eventId, refId, patch = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !hazardId || !refId) return false;
-    const hazardIndex = systemConfig.hazards.findIndex(hazard => hazard.id === hazardId);
-    if (hazardIndex < 0) return false;
-    const hazard = systemConfig.hazards[hazardIndex];
-    const refs = Array.isArray(hazard.characterModifiers) ? hazard.characterModifiers : [];
+    if (!systemConfig || !eventId || !refId) return false;
+    const eventIndex = systemConfig.events.findIndex(event => event.id === eventId);
+    if (eventIndex < 0) return false;
+    const event = systemConfig.events[eventIndex];
+    const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const index = refs.findIndex(ref => ref.id === refId);
     if (index < 0) return false;
     const merged = { ...refs[index], ...patch };
     const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
     if (!normalized) return false;
     const nextRefs = refs.map((ref, refIndex) => refIndex === index ? normalized : ref);
-    const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: nextRefs }, _randomID);
-    systemConfig.hazards = systemConfig.hazards.map((existing, hIndex) => hIndex === hazardIndex ? nextHazard : existing);
+    const nextEvent = _normalizeGatheringEvent({ ...event, characterModifiers: nextRefs }, _randomID);
+    systemConfig.events = systemConfig.events.map((existing, hIndex) => hIndex === eventIndex ? nextEvent : existing);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
   }
 
   /**
-   * Remove one hazard character modifier reference by id.
+   * Remove one event character modifier reference by id.
    *
    * @param {string} [systemId] Target crafting system id.
-   * @param {string} hazardId Library hazard id.
+   * @param {string} eventId Library event id.
    * @param {string} refId Reference id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteGatheringHazardCharacterModifier(systemId = get(selectedSystemId), hazardId, refId) {
+  async function deleteGatheringEventCharacterModifier(systemId = get(selectedSystemId), eventId, refId) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !hazardId || !refId) return false;
-    const hazardIndex = systemConfig.hazards.findIndex(hazard => hazard.id === hazardId);
-    if (hazardIndex < 0) return false;
-    const hazard = systemConfig.hazards[hazardIndex];
-    const refs = Array.isArray(hazard.characterModifiers) ? hazard.characterModifiers : [];
+    if (!systemConfig || !eventId || !refId) return false;
+    const eventIndex = systemConfig.events.findIndex(event => event.id === eventId);
+    if (eventIndex < 0) return false;
+    const event = systemConfig.events[eventIndex];
+    const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const nextRefs = refs.filter(ref => ref.id !== refId);
     if (nextRefs.length === refs.length) return false;
-    const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: nextRefs }, _randomID);
-    systemConfig.hazards = systemConfig.hazards.map((existing, hIndex) => hIndex === hazardIndex ? nextHazard : existing);
+    const nextEvent = _normalizeGatheringEvent({ ...event, characterModifiers: nextRefs }, _randomID);
+    systemConfig.events = systemConfig.events.map((existing, hIndex) => hIndex === eventIndex ? nextEvent : existing);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -5361,9 +5377,9 @@ export function createAdminStore(services) {
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtyGatheringTaskDraft,
-    confirmDiscardDirtyGatheringHazardDraft,
+    confirmDiscardDirtyGatheringEventDraft,
     confirmGatheringLibraryTaskCompositionLoss,
-    confirmGatheringLibraryHazardCompositionLoss,
+    confirmGatheringLibraryEventCompositionLoss,
     cancelEnvironmentDraft,
     saveEnvironmentDraft,
     duplicateEnvironmentDraft,
@@ -5419,10 +5435,10 @@ export function createAdminStore(services) {
     isToolsDraftDirty,
     confirmDiscardDirtyToolsDraft,
     gatheringTaskAutopopulateFromComponent,
-    addGatheringLibraryHazard,
-    updateGatheringLibraryHazard,
-    deleteGatheringLibraryHazard,
-    duplicateGatheringLibraryHazard,
+    addGatheringLibraryEvent,
+    updateGatheringLibraryEvent,
+    deleteGatheringLibraryEvent,
+    duplicateGatheringLibraryEvent,
     addGatheringCharacterModifier,
     updateGatheringCharacterModifier,
     deleteGatheringCharacterModifier,
@@ -5430,9 +5446,9 @@ export function createAdminStore(services) {
     addGatheringDropRowCharacterModifier,
     updateGatheringDropRowCharacterModifier,
     deleteGatheringDropRowCharacterModifier,
-    addGatheringHazardCharacterModifier,
-    updateGatheringHazardCharacterModifier,
-    deleteGatheringHazardCharacterModifier,
+    addGatheringEventCharacterModifier,
+    updateGatheringEventCharacterModifier,
+    deleteGatheringEventCharacterModifier,
     saveCraftingCheckConfig,
     saveCurrencyConfig,
     saveAlchemyConfig,

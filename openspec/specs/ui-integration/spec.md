@@ -86,7 +86,7 @@ Selected-system navigation:
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`. When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route. When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
-- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Hazards, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The `Travel` submenu item shows the total party count as its badge. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
+- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The `Travel` submenu item shows the total party count as its badge. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`. It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
@@ -274,23 +274,23 @@ Current GM editor behavior:
 - The selected draft can edit gathering composition tags: multiple `biomes` and multiple `dangerTags`. Region is no longer a composition tag and the legacy single-`region` selector has been removed; geography is authored as region membership (see the region multi-select below).
 - When `gatheringRegionSettings.enabled` is `true`, the environment editor surfaces a multi-select **region** chip control (`includedRegionIds`) mirroring the biome selector, sourced from the system's `GatheringRegion` records. When the toggle is off the region control is hidden entirely. When the toggle is on but the system has no regions yet, the control shows a muted empty line pointing the GM to create regions in the Travel tab first.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
-- The selected system's Gathering Settings tab configures d100 reward selection, hazard selection, limits, and hazard outcome through `gatheringConfig.systems[systemId].rules`.
+- The selected system's Gathering Settings tab configures d100 reward selection, event selection, limits, and event outcome through `gatheringConfig.systems[systemId].rules`.
 - The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
-- The Environments editor exposes Gathering Task and hazard library rows for the selected crafting system, including per-environment automatic/manual composition controls.
-- In automatic composition, task and hazard tabs show Included, Excluded, and Non-matching record sections; excluding a record writes the matching `disabled*Ids` list and Restore clears it.
-- In manual composition, task and hazard tabs show only Included in this environment and Available to add. Removing an included manual task or hazard clears `enabled*Ids` and `forced*Ids`, ignores stale `disabled*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
+- The Environments editor exposes Gathering Task and event library rows for the selected crafting system, including per-environment automatic/manual composition controls.
+- In automatic composition, task and event tabs show Included, Excluded, and Non-matching record sections; excluding a record writes the matching `disabled*Ids` list and Restore clears it.
+- In manual composition, task and event tabs show only Included in this environment and Available to add. Removing an included manual task or event clears `enabled*Ids` and `forced*Ids`, ignores stale `disabled*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
 - Manual Available to add rows present Add for matching records, Force add for enabled non-matching records, and a disabled library note for library-disabled records.
-- When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/hazard options before composing environments.
-- Gathering Task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
+- When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/event options before composing environments.
+- Gathering Task and event row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview. D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
-- Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
+- Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The selected-system inspector exposes a per-system character modifier library for gathering, with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
-- D100 drop row and hazard editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
+- D100 drop row and event editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
 - The settings/tag area can edit gathering vocabularies for biomes and danger. The legacy `regions` vocabulary dimension has been removed (region is geography, not a composition tag); geography is authored as `GatheringRegion` records in the Travel tab. Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
 - The editor keeps core environment identity separate from task/node authoring.
 - The editor allows environments to exist without a linked scene. Scene link controls are optional access/evidence controls, not the identity of the environment.
@@ -373,17 +373,17 @@ Shipped capabilities:
 
 Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): region discovery controls, and the player-facing travel/current-region view. (Region authoring — name/description/img/secret/biomes — and the environment region-membership control now ship inside the Travel route and environment editor; the legacy region ordering/sceneMappings/modifiers authoring remains reserved.)
 
-### Gathering Hazard Library
+### Gathering Event Library
 
-When `features.gathering === true`, Manager must expose reusable hazard library authoring as a dedicated route or as a nested reusable library surface inside gathering tasks or gathering settings.
+When `features.gathering === true`, Manager must expose reusable event library authoring as a dedicated route or as a nested reusable library surface inside gathering tasks or gathering settings.
 
-Hazard library authoring must support:
+Event library authoring must support:
 
 - create, edit, duplicate, delete, enable/disable, search/filter, and usage evidence
-- deletion confirmation when hazards are used by environments or tasks
-- rows showing name, image, description summary, enabled state, danger tags, biome/weather/time matching tags, drop rate, and modifier provider evidence (region is no longer a matching tag — the region picker, filter, and per-row region chips were removed from the task and hazard editors and browsers)
+- deletion confirmation when events are used by environments or tasks
+- rows showing name, image, description summary, enabled state, danger tags, biome/weather/time matching tags, drop rate, and modifier provider evidence (region is no longer a matching tag — the region picker, filter, and per-row region chips were removed from the task and event editors and browsers)
 - validation for drop rate, tag vocabulary values, provider configuration, and unsafe deletion
-- composition surfaces that attach or toggle matched reusable hazards without editing reusable hazard definitions inline
+- composition surfaces that attach or toggle matched reusable events without editing reusable event definitions inline
 
 ## Recipe Editor
 
@@ -475,7 +475,7 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 - `rollTableOutcome` provider UI:
   - Roll table picker (`rollTableUuid`).
   - Helper text states drawn result name routes by normalized match to `ResultGroup.name`.
-- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/hazard terms, and forbid them as result-group names.
+- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
 ### Alchemy Recipe UI (GM Editor)
 

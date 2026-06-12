@@ -20,7 +20,7 @@
 export const GATHERING_REGION_REVEAL_MODES = Object.freeze(['manual', 'onPartyTokenEntry', 'alwaysVisible']);
 export const GATHERING_REGION_MODIFIER_VISIBILITIES = Object.freeze(['visible', 'gmOnly']);
 export const GATHERING_REGION_MODIFIER_KINDS = Object.freeze([
-  'hazardChance',
+  'eventChance',
   'dropRate',
   'yield',
   'difficulty',
@@ -108,10 +108,14 @@ function normalizeSceneMappingList(value, collaborators) {
  */
 export function normalizeGatheringRegionModifier(data = {}, { randomID = defaultRandomID } = {}) {
   const numericValue = Number(data?.value);
+  // Accept the legacy `hazardChance` kind on read (imported or pre-1.0.0-migration
+  // region data) and coerce it to `eventChance` so it is not silently dropped to
+  // `custom` before the startup migration rewrites it.
+  const kind = data?.kind === 'hazardChance' ? 'eventChance' : data?.kind;
   const modifier = {
     id: data?.id ? String(data.id) : randomID(),
     enabled: data?.enabled !== false,
-    kind: MODIFIER_KIND_SET.has(data?.kind) ? data.kind : 'custom',
+    kind: MODIFIER_KIND_SET.has(kind) ? kind : 'custom',
     operation: MODIFIER_OPERATION_SET.has(data?.operation) ? data.operation : 'add',
     value: Number.isFinite(numericValue) ? numericValue : 0,
     visibility: MODIFIER_VISIBILITY_SET.has(data?.visibility) ? data.visibility : 'visible'

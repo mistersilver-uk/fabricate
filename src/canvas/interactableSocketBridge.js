@@ -198,7 +198,7 @@ export function emitInteractableBehaviorWrite(behavior) {
  * Interactable actions: only the active GM applies the behaviour/visual write;
  * activation requests route to validate+grant; grants route to the targeted local
  * user. Called from main.js's shared `module.fabricate` socket handler (the same
- * channel the hazard coordinator uses), so this module owns these branches without
+ * channel the event coordinator uses), so this module owns these branches without
  * registering a second listener. No-ops for other actions.
  *
  * @param {object} payload

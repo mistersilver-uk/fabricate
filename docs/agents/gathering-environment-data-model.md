@@ -1,19 +1,19 @@
 # Gathering Environment Data Model
 
-Gathering environment objects carry **two parallel sets** of task/hazard fields. Knowing which one to read for which question saves a lot of stale-zero confusion.
+Gathering environment objects carry **two parallel sets** of task/event fields. Knowing which one to read for which question saves a lot of stale-zero confusion.
 
 ## Modern (canonical for new envs)
 
-Library references — the environment composes content from `gatheringConfig.systems[].tasks` / `.hazards` by id:
+Library references — the environment composes content from `gatheringConfig.systems[].tasks` / `.events` by id:
 
 - `environment.enabledTaskIds[]` — task ids included automatically
 - `environment.disabledTaskIds[]` — task ids the GM explicitly excluded
 - `environment.forcedTaskIds[]` — task ids force-added in manual mode
-- `environment.enabledHazardIds[]` / `disabledHazardIds[]` / `forcedHazardIds[]` — same shape for hazards
+- `environment.enabledEventIds[]` / `disabledEventIds[]` / `forcedEventIds[]` — same shape for events
 
 The actual composed-task set is `enabled ∪ forced − disabled`, then filtered by environment matching rules (biome / region / danger / library-enabled).
 
-**Canonical GM-admin composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape: `{ availableTaskCount, availableHazardCount }`), computed inside `adminStore.js` via `_buildEnvironmentCompositionViewModel(environment)?.counts` (`src/ui/svelte/stores/adminStore.js:2692`). `availableTaskCount` counts only records whose `runtimeState === 'available'` — i.e. composed **and** with current conditions met (`adminStore.js:2145`, `:2239`). It is the authoritative GM-runtime "ready right now" count for the manager surface; it is **not** what a player blind-reveal `(x/y)` suffix divides by.
+**Canonical GM-admin composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape: `{ availableTaskCount, availableEventCount }`), computed inside `adminStore.js` via `_buildEnvironmentCompositionViewModel(environment)?.counts` (`src/ui/svelte/stores/adminStore.js:2692`). `availableTaskCount` counts only records whose `runtimeState === 'available'` — i.e. composed **and** with current conditions met (`adminStore.js:2145`, `:2239`). It is the authoritative GM-runtime "ready right now" count for the manager surface; it is **not** what a player blind-reveal `(x/y)` suffix divides by.
 
 ### Player listing counts are a separate, engine-owned surface
 
@@ -84,7 +84,7 @@ Distinguish two environment-id uses: a Scene Region `flags.fabricate.environment
 | Question | Read from |
 | --- | --- |
 | GM manager: how many tasks are available *right now* (composed + conditions met)? | `$viewState.environmentTaskCounts[id]?.availableTaskCount` |
-| GM manager: how many hazards? | `$viewState.environmentTaskCounts[id]?.availableHazardCount` |
+| GM manager: how many events? | `$viewState.environmentTaskCounts[id]?.availableEventCount` |
 | Player listing: total composed task pool (blind-reveal denominator `y`) | `listing.composedTaskCount` (from `GatheringEngine.listForActor`) |
 | Player listing: tasks this actor has discovered (`x`) | `listing.discoveredTaskCount` |
 | Player listing: the discovered blind-task rows (non-GM blind only) | `listing.discoveredTasks[]` (`[]` for targeted, GM, locked, or `never`-policy) |

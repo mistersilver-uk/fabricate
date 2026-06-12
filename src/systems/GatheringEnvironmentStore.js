@@ -26,6 +26,23 @@ export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
   'oops'
 ]);
 
+/**
+ * Normalize an event-outcome policy, accepting the legacy hazard-schema values
+ * (`successWithHazard` / `failureWithHazard`) on read and coercing them to the
+ * event equivalents. Imported or pre-1.0.0-migration payloads still load with the
+ * intended policy before the startup migration rewrites them. Unknown values
+ * default to `successWithEvent`.
+ *
+ * @param {*} value
+ * @returns {'successWithEvent' | 'failureWithEvent'}
+ */
+function normalizeEventPolicy(value) {
+  const coerced = value === 'successWithHazard' ? 'successWithEvent'
+    : value === 'failureWithHazard' ? 'failureWithEvent'
+      : value;
+  return ['successWithEvent', 'failureWithEvent'].includes(coerced) ? coerced : 'successWithEvent';
+}
+
 export class GatheringEnvironmentValidationError extends Error {
   constructor(errors = []) {
     super(`Gathering environment validation failed: ${errors.join('; ')}`);
@@ -40,7 +57,7 @@ export class GatheringEnvironmentValidationError extends Error {
  * The store owns canonical normalization for environment-level fields
  * (selection/composition mode, conditions, danger, drop-rate adjustments,
  * reveal/chat config, and the per-environment `nodeRuntime` map). Tasks and
- * hazards are NOT authored on the environment — they live in the system library
+ * events are NOT authored on the environment — they live in the system library
  * and are matched in by region/biome/danger (or via the enabled/forced id
  * lists), so a targeted/blind environment is only valid when it has at least one
  * such library task source. Validation failures throw before persistence,
@@ -241,7 +258,9 @@ export class GatheringEnvironmentStore {
     const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
     const blindSelection = normalizeBlindSelection(data?.blindSelection);
     const forcedTaskIds = normalizeIdList(data?.forcedTaskIds);
-    const forcedHazardIds = normalizeIdList(data?.forcedHazardIds);
+    // Accept the legacy hazard-schema keys on read (imported or pre-1.0.0-migration
+    // payloads) so an old export still loads before the startup migration runs.
+    const forcedEventIds = normalizeIdList(data?.forcedEventIds ?? data?.forcedHazardIds);
     return {
       id: freshEnvironmentId || !data?.id ? this.randomID() : String(data.id),
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
@@ -268,19 +287,19 @@ export class GatheringEnvironmentStore {
       sceneUuid: normalizeOptionalString(data?.sceneUuid),
       enabledTaskIds: normalizeIdList(data?.enabledTaskIds),
       disabledTaskIds: normalizeIdList(data?.disabledTaskIds),
-      enabledHazardIds: normalizeIdList(data?.enabledHazardIds),
-      disabledHazardIds: normalizeIdList(data?.disabledHazardIds),
+      enabledEventIds: normalizeIdList(data?.enabledEventIds ?? data?.enabledHazardIds),
+      disabledEventIds: normalizeIdList(data?.disabledEventIds ?? data?.disabledHazardIds),
       taskOrder: normalizeIdList(data?.taskOrder),
-      hazardOrder: normalizeIdList(data?.hazardOrder),
+      eventOrder: normalizeIdList(data?.eventOrder ?? data?.hazardOrder),
       taskDropRateAdjustments: normalizeTaskDropRateAdjustments(data?.taskDropRateAdjustments),
       taskDropRateAdjustmentsEnabled: normalizeTaskDropRateAdjustmentsEnabled(data?.taskDropRateAdjustmentsEnabled),
-      hazardDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.hazardDropRateAdjustments),
-      hazardDropRateAdjustmentsEnabled: normalizeHazardDropRateAdjustmentsEnabled(data?.hazardDropRateAdjustmentsEnabled),
-      hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
-      hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
+      eventDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.eventDropRateAdjustments ?? data?.hazardDropRateAdjustments),
+      eventDropRateAdjustmentsEnabled: normalizeEventDropRateAdjustmentsEnabled(data?.eventDropRateAdjustmentsEnabled ?? data?.hazardDropRateAdjustmentsEnabled),
+      eventSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.eventSelectionMode ?? data?.hazardSelectionMode) ? (data.eventSelectionMode ?? data.hazardSelectionMode) : 'allDrops',
+      eventPolicy: normalizeEventPolicy(data?.eventPolicy ?? data?.hazardPolicy),
       ...(blindSelection ? { blindSelection } : {}),
       ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
-      ...(forcedHazardIds.length > 0 ? { forcedHazardIds } : {}),
+      ...(forcedEventIds.length > 0 ? { forcedEventIds } : {}),
       // Per-environment node runtime state (taskId → node object), so a library
       // task's resource nodes deplete/respawn independently in each environment.
       nodeRuntime: normalizeNodeRuntime(data?.nodeRuntime)
@@ -340,8 +359,8 @@ export class GatheringEnvironmentStore {
 
     errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
     errors.push(...validateTaskDropRateAdjustmentsEnabled(original?.taskDropRateAdjustmentsEnabled, `Environment "${label}" taskDropRateAdjustmentsEnabled`));
-    errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
-    errors.push(...validateHazardDropRateAdjustmentsEnabled(original?.hazardDropRateAdjustmentsEnabled, `Environment "${label}" hazardDropRateAdjustmentsEnabled`));
+    errors.push(...validateDropRateAdjustmentMap(original?.eventDropRateAdjustments, `Environment "${label}" eventDropRateAdjustments`));
+    errors.push(...validateEventDropRateAdjustmentsEnabled(original?.eventDropRateAdjustmentsEnabled, `Environment "${label}" eventDropRateAdjustmentsEnabled`));
 
     const hasTaskSource = this._environmentHasTaskSource(normalized);
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
@@ -556,11 +575,11 @@ function normalizeTaskDropRateAdjustmentsEnabled(value) {
     .filter(([taskId, enabled]) => taskId && enabled === false));
 }
 
-function normalizeHazardDropRateAdjustmentsEnabled(value) {
+function normalizeEventDropRateAdjustmentsEnabled(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return Object.fromEntries(Object.entries(value)
-    .map(([hazardId, enabled]) => [stringOrEmpty(hazardId), enabled])
-    .filter(([hazardId, enabled]) => hazardId && enabled === false));
+    .map(([eventId, enabled]) => [stringOrEmpty(eventId), enabled])
+    .filter(([eventId, enabled]) => eventId && enabled === false));
 }
 
 function validateDropRateAdjustmentMap(value, label) {
@@ -608,14 +627,14 @@ function validateTaskDropRateAdjustmentsEnabled(value, label) {
   return errors;
 }
 
-function validateHazardDropRateAdjustmentsEnabled(value, label) {
+function validateEventDropRateAdjustmentsEnabled(value, label) {
   if (value === undefined || value === null) return [];
   if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
   const errors = [];
-  for (const [hazardId, enabled] of Object.entries(value)) {
-    const key = stringOrEmpty(hazardId);
+  for (const [eventId, enabled] of Object.entries(value)) {
+    const key = stringOrEmpty(eventId);
     if (!key) {
-      errors.push(`${label} keys must be non-empty hazard ids`);
+      errors.push(`${label} keys must be non-empty event ids`);
       continue;
     }
     if (typeof enabled !== 'boolean') {

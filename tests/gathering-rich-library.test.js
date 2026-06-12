@@ -218,7 +218,7 @@ test('rich gathering service preserves explicit biome record labels icons and co
   ]);
 });
 
-test('task and hazard libraries match environments by tags and global conditions', async () => {
+test('task and event libraries match environments by tags and global conditions', async () => {
   const { service } = makeRichState({
     config: {
       conditions: { weather: 'rain', timeOfDay: 'night' },
@@ -241,9 +241,9 @@ test('task and hazard libraries match environments by tags and global conditions
               dropRows: [{ id: 'drop-sand', componentId: 'sand', quantity: 1, dropRate: 60 }]
             }
           ],
-          hazards: [
-            { id: 'hazard-thorns', name: 'Thorns', dangerTags: ['hazardous'], weather: ['rain'], dropRate: 25 },
-            { id: 'hazard-sun', name: 'Sunstroke', dangerTags: ['deadly'], weather: ['clear'], dropRate: 25 }
+          events: [
+            { id: 'event-thorns', name: 'Thorns', dangerTags: ['hazardous'], weather: ['rain'], dropRate: 25 },
+            { id: 'event-sun', name: 'Sunstroke', dangerTags: ['deadly'], weather: ['clear'], dropRate: 25 }
           ]
         }
       }
@@ -255,15 +255,15 @@ test('task and hazard libraries match environments by tags and global conditions
   assert.deepEqual(composed.conditions, { weather: 'rain', timeOfDay: 'night' });
   assert.deepEqual(composed.tasks.map(task => task.id), ['task-forest-rain']);
   assert.equal(composed.tasks[0].resolutionMode, 'd100');
-  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-thorns']);
+  assert.deepEqual(composed.events.map(event => event.id), ['event-thorns']);
 });
 
-test('composeEnvironment carries the system hazardVisibility rule onto composed.rules', () => {
+test('composeEnvironment carries the system eventVisibility rule onto composed.rules', () => {
   const { service } = makeRichState({
     config: {
       systems: {
         'system-a': {
-          rules: { hazardVisibility: 'dangerLevelOnly' },
+          rules: { eventVisibility: 'dangerLevelOnly' },
           tasks: [{ id: 'task-a', name: 'Forage', dropRows: [{ id: 'drop-a', componentId: 'herb', quantity: 1, dropRate: 50 }] }]
         }
       }
@@ -271,11 +271,11 @@ test('composeEnvironment carries the system hazardVisibility rule onto composed.
   });
 
   const composed = service.composeEnvironment(environment(), system);
-  assert.equal(composed.rules.hazardVisibility, 'dangerLevelOnly',
-    'the GM-configured hazard visibility tier reaches the engine via composed.rules');
+  assert.equal(composed.rules.eventVisibility, 'dangerLevelOnly',
+    'the GM-configured event visibility tier reaches the engine via composed.rules');
 });
 
-test('composeEnvironment defaults hazardVisibility to encounterChance when the system rule is absent', () => {
+test('composeEnvironment defaults eventVisibility to encounterChance when the system rule is absent', () => {
   const { service } = makeRichState({
     config: {
       systems: {
@@ -288,11 +288,11 @@ test('composeEnvironment defaults hazardVisibility to encounterChance when the s
   });
 
   const composed = service.composeEnvironment(environment(), system);
-  assert.equal(composed.rules.hazardVisibility, 'encounterChance',
+  assert.equal(composed.rules.eventVisibility, 'encounterChance',
     'an absent rule falls back to the restrictive default');
 });
 
-test('disabled per-system weather and time matching ignores task and hazard condition tags', async () => {
+test('disabled per-system weather and time matching ignores task and event condition tags', async () => {
   const { service } = makeRichState({
     config: {
       conditions: { weather: 'clear', timeOfDay: 'day' },
@@ -309,9 +309,9 @@ test('disabled per-system weather and time matching ignores task and hazard cond
             timeOfDay: ['night'],
             dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate: 60 }]
           }],
-          hazards: [{
-            id: 'hazard-rain-night',
-            name: 'Rain Night Hazard',
+          events: [{
+            id: 'event-rain-night',
+            name: 'Rain Night Event',
             dangerTags: ['hazardous'],
             weather: ['rain'],
             timeOfDay: ['night'],
@@ -326,17 +326,17 @@ test('disabled per-system weather and time matching ignores task and hazard cond
 
   assert.deepEqual(composed.conditions, { weather: 'clear', timeOfDay: 'day' });
   assert.deepEqual(composed.tasks.map(task => task.id), ['task-rain-night']);
-  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-rain-night']);
+  assert.deepEqual(composed.events.map(event => event.id), ['event-rain-night']);
 });
 
-test('environment task and hazard toggles preserve mixed-case library IDs', async () => {
+test('environment task and event toggles preserve mixed-case library IDs', async () => {
   const store = makeEnvironmentStore();
   const saved = await store.create(environment({
     enabledTaskIds: ['Task-Mixed'],
-    disabledHazardIds: ['Hazard-Mixed']
+    disabledEventIds: ['Event-Mixed']
   }));
   assert.deepEqual(saved.enabledTaskIds, ['Task-Mixed']);
-  assert.deepEqual(saved.disabledHazardIds, ['Hazard-Mixed']);
+  assert.deepEqual(saved.disabledEventIds, ['Event-Mixed']);
 
   const { service } = makeRichState({
     config: {
@@ -346,9 +346,9 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
             { id: 'Task-Mixed', name: 'Enabled Mixed', dropRows: [{ id: 'drop-a', componentId: 'herb', quantity: 1, dropRate: 100 }] },
             { id: 'task-other', name: 'Other', dropRows: [{ id: 'drop-b', componentId: 'herb', quantity: 1, dropRate: 100 }] }
           ],
-          hazards: [
-            { id: 'Hazard-Mixed', name: 'Disabled Mixed', dangerTags: ['hazardous'], dropRate: 100 },
-            { id: 'hazard-other', name: 'Other Hazard', dangerTags: ['hazardous'], dropRate: 100 }
+          events: [
+            { id: 'Event-Mixed', name: 'Disabled Mixed', dangerTags: ['hazardous'], dropRate: 100 },
+            { id: 'event-other', name: 'Other Event', dangerTags: ['hazardous'], dropRate: 100 }
           ]
         }
       }
@@ -357,9 +357,9 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
   const composed = service.composeEnvironment(saved, system);
 
   // Automatic mode ignores the enabled allow-list, so every matching library task
-  // composes; the disabled list still excludes Hazard-Mixed (mixed-case preserved).
+  // composes; the disabled list still excludes Event-Mixed (mixed-case preserved).
   assert.deepEqual(composed.tasks.map(task => task.id), ['Task-Mixed', 'task-other']);
-  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-other']);
+  assert.deepEqual(composed.events.map(event => event.id), ['event-other']);
 });
 
 test('environment dangerLevel migrates from dangerTags, preserves explicit values, and validates', async () => {
@@ -438,7 +438,7 @@ test('player listing exposes current conditions as context without weather/time 
   assert.equal('timeOfDayFilters' in listing, false);
 });
 
-test('blind player listing redacts matched hazard identity and drop rates', async () => {
+test('blind player listing redacts matched event identity and drop rates', async () => {
   const { service } = makeRichState({
     config: {
       systems: {
@@ -448,7 +448,7 @@ test('blind player listing redacts matched hazard identity and drop rates', asyn
             name: 'Secret Forage',
             dropRows: [{ id: 'drop-secret', componentId: 'herb', quantity: 1, dropRate: 100 }]
           }],
-          hazards: [{ id: 'hazard-secret-snake', name: 'Secret Snakebite', dangerTags: ['hazardous'], dropRate: 75 }]
+          events: [{ id: 'event-secret-snake', name: 'Secret Snakebite', dangerTags: ['hazardous'], dropRate: 75 }]
         }
       }
     }
@@ -462,13 +462,13 @@ test('blind player listing redacts matched hazard identity and drop rates', asyn
   const blindTask = listing.environments[0].tasks[0];
   const serialized = JSON.stringify(blindTask.rich);
 
-  assert.deepEqual(blindTask.rich.hazards, [{ matched: true }]);
-  assert.equal(serialized.includes('hazard-secret-snake'), false);
+  assert.deepEqual(blindTask.rich.events, [{ matched: true }]);
+  assert.equal(serialized.includes('event-secret-snake'), false);
   assert.equal(serialized.includes('Secret Snakebite'), false);
   assert.equal(serialized.includes('75'), false);
 });
 
-test('blind player d100 terminal history redacts rich item and hazard evidence', async () => {
+test('blind player d100 terminal history redacts rich item and event evidence', async () => {
   const { service } = makeRichState({
     rolls: [100, 100],
     config: {
@@ -479,7 +479,7 @@ test('blind player d100 terminal history redacts rich item and hazard evidence',
             name: 'Secret D100 Forage',
             dropRows: [{ id: 'drop-secret-herb', componentId: 'herb', quantity: 1, dropRate: 100 }]
           }],
-          hazards: [{ id: 'hazard-secret-thorns', name: 'Secret Thorns', dangerTags: ['hazardous'], dropRate: 100 }]
+          events: [{ id: 'event-secret-thorns', name: 'Secret Thorns', dangerTags: ['hazardous'], dropRate: 100 }]
         }
       }
     }
@@ -497,9 +497,9 @@ test('blind player d100 terminal history redacts rich item and hazard evidence',
   assert.equal(result.accepted, true);
   assert.equal(result.taskId, null);
   assert.equal(serializedRun.includes('drop-secret-herb'), false);
-  assert.equal(serializedRun.includes('hazard-secret-thorns'), false);
+  assert.equal(serializedRun.includes('event-secret-thorns'), false);
   assert.equal(serializedRun.includes('Secret Thorns'), false);
-  assert.deepEqual(calls.terminal[0].payload.economyEvidence.hazards, [{ matched: true }]);
+  assert.deepEqual(calls.terminal[0].payload.economyEvidence.events, [{ matched: true }]);
 });
 
 test('paused gathering rejects before d100 rolls, history, item awards, or rich commits', async () => {
@@ -558,7 +558,7 @@ test('paused gathering stays listable but marks tasks non-attemptable', async ()
   assert.deepEqual(listing.environments[0].tasks[0].blockedReasons.map(reason => reason.code), ['GAME_PAUSED']);
 });
 
-test('d100 resolution supports all-drops items and failure-with-hazard policy', async () => {
+test('d100 resolution supports all-drops items and failure-with-event policy', async () => {
   const { service } = makeRichState({
     rolls: [95, 25, 95],
     config: {
@@ -566,8 +566,8 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
         'system-a': {
           rules: {
             rewardSelectionMode: 'allDrops',
-            hazardSelectionMode: 'allDrops',
-            hazardPolicy: 'failureWithHazard'
+            eventSelectionMode: 'allDrops',
+            eventPolicy: 'failureWithEvent'
           },
           tasks: [{
             id: 'task-d100',
@@ -577,7 +577,7 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
               { id: 'drop-rare', itemUuid: 'Item.rare', quantity: 1, dropRate: 80 }
             ]
           }],
-          hazards: [{ id: 'hazard-snake', name: 'Snakebite', dangerTags: ['hazardous'], dropRate: 10 }]
+          events: [{ id: 'event-snake', name: 'Snakebite', dangerTags: ['hazardous'], dropRate: 10 }]
         }
       }
     }
@@ -595,7 +595,7 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
   assert.equal(result.state, 'failed');
   assert.equal(calls.terminal.length, 1);
   assert.equal(calls.created.length, 0);
-  assert.deepEqual(calls.terminal[0].payload.checkResult.hazards.map(row => row.id), ['hazard-snake']);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.events.map(row => row.id), ['event-snake']);
   assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-common', 'drop-rare']);
 });
 
@@ -608,9 +608,9 @@ test('d100 resolution applies system gathering rules over legacy task and enviro
           rules: {
             rewardSelectionMode: 'limitedDrops',
             rewardLimit: 2,
-            hazardSelectionMode: 'limitedDrops',
-            hazardLimit: 1,
-            hazardPolicy: 'successWithHazard'
+            eventSelectionMode: 'limitedDrops',
+            eventLimit: 1,
+            eventPolicy: 'successWithEvent'
           },
           tasks: [{
             id: 'task-limited',
@@ -622,9 +622,9 @@ test('d100 resolution applies system gathering rules over legacy task and enviro
               { id: 'drop-third', componentId: 'herb', quantity: 1, dropRate: 100 }
             ]
           }],
-          hazards: [
-            { id: 'hazard-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 },
-            { id: 'hazard-second', name: 'Second', dangerTags: ['hazardous'], dropRate: 100 }
+          events: [
+            { id: 'event-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 },
+            { id: 'event-second', name: 'Second', dangerTags: ['hazardous'], dropRate: 100 }
           ]
         }
       }
@@ -633,7 +633,7 @@ test('d100 resolution applies system gathering rules over legacy task and enviro
   const calls = {};
   const engine = makeEngine({
     richState: service,
-    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'failureWithHazard' }),
+    env: environment({ eventSelectionMode: 'allDrops', eventPolicy: 'failureWithEvent' }),
     calls
   });
 
@@ -642,7 +642,7 @@ test('d100 resolution applies system gathering rules over legacy task and enviro
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-first', 'drop-second']);
-  assert.deepEqual(calls.terminal[0].payload.checkResult.hazards.map(row => row.id), ['hazard-first']);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.events.map(row => row.id), ['event-first']);
 });
 
 test('d100 resolution preserves legacy selection fields when system rules are missing', async () => {
@@ -660,7 +660,7 @@ test('d100 resolution preserves legacy selection fields when system rules are mi
               { id: 'drop-second', componentId: 'herb', quantity: 1, dropRate: 100 }
             ]
           }],
-          hazards: [{ id: 'hazard-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 }]
+          events: [{ id: 'event-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 }]
         }
       }
     }
@@ -668,7 +668,7 @@ test('d100 resolution preserves legacy selection fields when system rules are mi
   const calls = {};
   const engine = makeEngine({
     richState: service,
-    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'failureWithHazard' }),
+    env: environment({ eventSelectionMode: 'allDrops', eventPolicy: 'failureWithEvent' }),
     calls
   });
 
@@ -677,11 +677,11 @@ test('d100 resolution preserves legacy selection fields when system rules are mi
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'failed');
   assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-first', 'drop-second']);
-  assert.deepEqual(calls.terminal[0].payload.checkResult.hazards.map(row => row.id), ['hazard-first']);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.events.map(row => row.id), ['event-first']);
   assert.equal(calls.created.length, 0);
 });
 
-test('d100 resolution applies numeric task and hazard modifier providers', async () => {
+test('d100 resolution applies numeric task and event modifier providers', async () => {
   const { service } = makeRichState({ rolls: [90, 90] });
   const result = await service.resolveD100Attempt({
     task: {
@@ -691,14 +691,14 @@ test('d100 resolution applies numeric task and hazard modifier providers', async
       dropRows: [{ id: 'drop-modified', componentId: 'herb', quantity: 1, dropRate: 10 }]
     },
     environment: {
-      rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
-      hazards: [{ id: 'hazard-modified', name: 'Thorns', dropRate: 10, hazardModifier: { provider: 'static', value: 1 } }]
+      rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
+      events: [{ id: 'event-modified', name: 'Thorns', dropRate: 10, eventModifier: { provider: 'static', value: 1 } }]
     }
   });
 
   assert.equal(result.status, 'succeeded');
   assert.deepEqual(result.items.map(row => [row.id, row.effectiveRoll, row.modifier]), [['drop-modified', 91, 1]]);
-  assert.deepEqual(result.hazards.map(row => [row.id, row.effectiveRoll, row.modifier]), [['hazard-modified', 91, 1]]);
+  assert.deepEqual(result.events.map(row => [row.id, row.effectiveRoll, row.modifier]), [['event-modified', 91, 1]]);
 });
 
 test('drop resolution applies matching weather and time modifiers and ignores non-matches', async () => {
@@ -802,9 +802,9 @@ test('timed d100 runs complete from their start-time library snapshot after cond
           rules: {
             rewardSelectionMode: 'limitedDrops',
             rewardLimit: 1,
-            hazardSelectionMode: 'limitedDrops',
-            hazardLimit: 1,
-            hazardPolicy: 'successWithHazard'
+            eventSelectionMode: 'limitedDrops',
+            eventLimit: 1,
+            eventPolicy: 'successWithEvent'
           },
           tasks: [{
             id: 'task-timed-rain',
@@ -817,9 +817,9 @@ test('timed d100 runs complete from their start-time library snapshot after cond
               { id: 'drop-rain-flower', componentId: 'herb', quantity: 1, dropRate: 100 }
             ]
           }],
-          hazards: [
+          events: [
             {
-              id: 'hazard-rain-thorns',
+              id: 'event-rain-thorns',
               name: 'Rain Thorns',
               dangerTags: ['hazardous'],
               weather: ['rain'],
@@ -827,7 +827,7 @@ test('timed d100 runs complete from their start-time library snapshot after cond
               dropRate: 100
             },
             {
-              id: 'hazard-rain-mud',
+              id: 'event-rain-mud',
               name: 'Rain Mud',
               dangerTags: ['hazardous'],
               weather: ['rain'],
@@ -882,11 +882,11 @@ test('timed d100 runs complete from their start-time library snapshot after cond
       'system-a': {
         rules: {
           rewardSelectionMode: 'allDrops',
-          hazardSelectionMode: 'allDrops',
-          hazardPolicy: 'failureWithHazard'
+          eventSelectionMode: 'allDrops',
+          eventPolicy: 'failureWithEvent'
         },
         tasks: [],
-        hazards: []
+        events: []
       }
     }
   });
@@ -898,11 +898,11 @@ test('timed d100 runs complete from their start-time library snapshot after cond
   assert.equal(processed.completed.length, 1);
   assert.equal(calls.completed.status, 'succeeded');
   assert.deepEqual(calls.created[0].resultGroups[0].results.map(row => row.id), ['drop-rain-herb']);
-  assert.deepEqual(calls.completed.checkResult.hazards.map(row => row.id), ['hazard-rain-thorns']);
+  assert.deepEqual(calls.completed.checkResult.events.map(row => row.id), ['event-rain-thorns']);
   assert.equal(JSON.stringify(start.run.economyEvidence).includes('runtimeSnapshot'), false);
 });
 
-test('timed d100 legacy runs snapshot legacy hazard behavior before rules are authored', async () => {
+test('timed d100 legacy runs snapshot legacy event behavior before rules are authored', async () => {
   const { service, settings } = makeRichState({
     rolls: [100, 100, 100],
     config: {
@@ -915,9 +915,9 @@ test('timed d100 legacy runs snapshot legacy hazard behavior before rules are au
             timeRequirement: { minutes: 1 },
             dropRows: [{ id: 'drop-legacy-herb', componentId: 'herb', quantity: 1, dropRate: 100 }]
           }],
-          hazards: [
-            { id: 'hazard-legacy-thorns', name: 'Thorns', dangerTags: ['hazardous'], dropRate: 100 },
-            { id: 'hazard-legacy-mud', name: 'Mud', dangerTags: ['hazardous'], dropRate: 100 }
+          events: [
+            { id: 'event-legacy-thorns', name: 'Thorns', dangerTags: ['hazardous'], dropRate: 100 },
+            { id: 'event-legacy-mud', name: 'Mud', dangerTags: ['hazardous'], dropRate: 100 }
           ]
         }
       }
@@ -958,7 +958,7 @@ test('timed d100 legacy runs snapshot legacy hazard behavior before rules are au
   };
   const engine = makeEngine({
     richState: service,
-    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'successWithHazard' }),
+    env: environment({ eventSelectionMode: 'allDrops', eventPolicy: 'successWithEvent' }),
     calls,
     runManager
   });
@@ -969,11 +969,11 @@ test('timed d100 legacy runs snapshot legacy hazard behavior before rules are au
       'system-a': {
         rules: {
           rewardSelectionMode: 'highestRankedDrop',
-          hazardSelectionMode: 'highestRankedDrop',
-          hazardPolicy: 'failureWithHazard'
+          eventSelectionMode: 'highestRankedDrop',
+          eventPolicy: 'failureWithEvent'
         },
         tasks: [],
-        hazards: []
+        events: []
       }
     }
   });
@@ -982,7 +982,7 @@ test('timed d100 legacy runs snapshot legacy hazard behavior before rules are au
   assert.equal(start.accepted, true);
   assert.equal(processed.completed.length, 1);
   assert.equal(calls.completed.status, 'succeeded');
-  assert.deepEqual(calls.completed.checkResult.hazards.map(row => row.id), ['hazard-legacy-thorns', 'hazard-legacy-mud']);
+  assert.deepEqual(calls.completed.checkResult.events.map(row => row.id), ['event-legacy-thorns', 'event-legacy-mud']);
 });
 
 test('timed d100 missing-reference cancellation does not expose or persist runtime snapshots', async () => {

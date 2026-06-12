@@ -131,9 +131,9 @@
         <span class="gathering-env-card-region-label">{localize('FABRICATE.App.Gathering.Environments.RegionLockedChip')}</span>
       </span>
     {/if}
-    <span class={`gathering-env-card-hazard ${riskClass}`} aria-label={dangerAria}>
+    <span class={`gathering-env-card-event ${riskClass}`} aria-label={dangerAria}>
       <i class="fas fa-skull" aria-hidden="true"></i>
-      <span class="gathering-env-card-hazard-label">{dangerLabel}</span>
+      <span class="gathering-env-card-event-label">{dangerLabel}</span>
     </span>
   </span>
   <span class="gathering-env-card-main">
@@ -483,7 +483,7 @@
     readable text colour. The base icon rule is the fallback for any unmapped
     risk value.
   */
-  .gathering-env-card-hazard {
+  .gathering-env-card-event {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -495,38 +495,38 @@
     border: 1px solid var(--fab-border);
   }
 
-  .gathering-env-card-hazard-label {
+  .gathering-env-card-event-label {
     color: var(--fab-text);
   }
 
-  .gathering-env-card.is-locked .gathering-env-card-hazard-label {
+  .gathering-env-card.is-locked .gathering-env-card-event-label {
     color: var(--fab-text-muted);
     opacity: 0.85;
   }
 
-  .gathering-env-card-hazard i {
+  .gathering-env-card-event i {
     font-size: 11px;
     color: var(--fab-danger);
   }
 
-  .gathering-env-card-hazard.risk-safe i {
+  .gathering-env-card-event.risk-safe i {
     color: var(--fab-success);
   }
 
-  .gathering-env-card-hazard.risk-unsafe i {
+  .gathering-env-card-event.risk-unsafe i {
     color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
   }
 
-  .gathering-env-card-hazard.risk-hazardous i {
+  .gathering-env-card-event.risk-hazardous i {
     color: var(--fab-warning);
   }
 
-  .gathering-env-card-hazard.risk-dangerous i {
+  .gathering-env-card-event.risk-dangerous i {
     color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
   }
 
-  .gathering-env-card-hazard.risk-deadly i,
-  .gathering-env-card-hazard.risk-extreme i {
+  .gathering-env-card-event.risk-deadly i,
+  .gathering-env-card-event.risk-extreme i {
     color: var(--fab-danger);
   }
 </style>

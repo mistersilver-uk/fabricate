@@ -50,13 +50,13 @@ const FALLBACK_CONDITION_ICONS = Object.freeze({
 });
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
-const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const EVENT_POLICIES = new Set(['successWithEvent', 'failureWithEvent']);
 const TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
 const BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
-const GATHERING_HAZARD_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
+const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // Legacy system-level limitation mode values, retained only for the read-time
@@ -71,15 +71,15 @@ const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
-  hazardSelectionMode: 'allDrops',
-  hazardLimit: 1,
-  hazardPolicy: 'successWithHazard',
+  eventSelectionMode: 'allDrops',
+  eventLimit: 1,
+  eventPolicy: 'successWithEvent',
   toolBreakagePolicy: 'failureOnBreak',
   biomeModifierAggregation: 'strongestOfEach',
   blindCandidateGate: 'attemptableOnly',
   revealPolicy: 'never',
   revealScope: 'actor',
-  hazardVisibility: 'encounterChance'
+  eventVisibility: 'encounterChance'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -222,9 +222,9 @@ export class GatheringRichStateService {
     const rules = hasSystemRules
       ? normalizeGatheringRules(libraries.rules)
       : normalizeGatheringRules({
-          hazardSelectionMode: environment.hazardSelectionMode,
-          hazardLimit: environment.hazardLimit,
-          hazardPolicy: environment.hazardPolicy
+          eventSelectionMode: environment.eventSelectionMode,
+          eventLimit: environment.eventLimit,
+          eventPolicy: environment.eventPolicy
         });
     const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
     const tasks = sortRecordsByOrder(
@@ -235,14 +235,14 @@ export class GatheringRichStateService {
         .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
       environment?.taskOrder
     ).map(task => this._libraryTaskToRuntimeTask(task, environment));
-    const hazards = sortRecordsByOrder(
-      normalizeList(libraries.hazards)
-        .filter(hazard => hazard?.enabled !== false)
-        .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions })
-          || this._recordIsForced(environment, hazard.id, 'hazard', compositionMode))
-        .filter(hazard => this._environmentIncludesLibraryRecord(environment, hazard.id, 'hazard', compositionMode)),
-      environment?.hazardOrder
-    ).map(hazard => applyHazardDropRateAdjustment(normalizeHazard(hazard), environment));
+    const events = sortRecordsByOrder(
+      normalizeList(libraries.events)
+        .filter(event => event?.enabled !== false)
+        .filter(event => this._recordMatchesEnvironment(event, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions })
+          || this._recordIsForced(environment, event.id, 'event', compositionMode))
+        .filter(event => this._environmentIncludesLibraryRecord(environment, event.id, 'event', compositionMode)),
+      environment?.eventOrder
+    ).map(event => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
     const libraryCharacterModifiers = new Map();
     for (const entry of normalizeList(libraries.characterModifiers)) {
@@ -270,12 +270,12 @@ export class GatheringRichStateService {
       biomes: normalizeTagList(environment.biomes ?? environment.biome),
       dangerTags: normalizeTagList(environment.dangerTags ?? environment.risk),
       tasks,
-      hazards,
+      events,
       rules,
       useLegacyTaskItemSelectionMode: !hasSystemRules,
-      hazardSelectionMode: rules.hazardSelectionMode,
-      hazardLimit: rules.hazardLimit,
-      hazardPolicy: rules.hazardPolicy
+      eventSelectionMode: rules.eventSelectionMode,
+      eventLimit: rules.eventLimit,
+      eventPolicy: rules.eventPolicy
     };
     Object.defineProperty(composed, '__libraryCharacterModifiers', {
       value: libraryCharacterModifiers,
@@ -314,11 +314,11 @@ export class GatheringRichStateService {
    * @param {object} [options.viewer] Active viewer payload.
    * @param {object} [options.system] Crafting system.
    * @param {number} [options.gatheringModifier] Fallback gathering modifier value.
-   * @param {number} [options.hazardModifier] Fallback hazard modifier value.
-   * @returns {Promise<object>} Resolution payload (status, items, hazards,
-   *   hazardPolicy, characterModifierSnapshot, [diagnostics]).
+   * @param {number} [options.eventModifier] Fallback event modifier value.
+   * @returns {Promise<object>} Resolution payload (status, items, events,
+   *   eventPolicy, characterModifierSnapshot, [diagnostics]).
    */
-  async resolveD100Attempt({ task, environment, actor = null, viewer = null, system = null, gatheringModifier = 0, hazardModifier = 0 } = {}) {
+  async resolveD100Attempt({ task, environment, actor = null, viewer = null, system = null, gatheringModifier = 0, eventModifier = 0 } = {}) {
     const itemRows = normalizeList(task?.dropRows ?? task?.itemDrops);
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
     const conditions = environment?.conditions || {};
@@ -328,7 +328,7 @@ export class GatheringRichStateService {
 
     const diagnostics = [];
     const enabledRows = itemRows.filter(row => row?.enabled !== false).map(row => normalizeItemDrop(row));
-    const enabledHazards = normalizeList(environment?.hazards).filter(hazard => hazard?.enabled !== false).map(hazard => normalizeHazard(hazard));
+    const enabledEvents = normalizeList(environment?.events).filter(event => event?.enabled !== false).map(event => normalizeEvent(event));
 
     const rowSnapshots = [];
     const rowContributions = [];
@@ -344,7 +344,7 @@ export class GatheringRichStateService {
           environment,
           task,
           row,
-          hazard: null,
+          event: null,
           viewer,
           system
         });
@@ -359,18 +359,18 @@ export class GatheringRichStateService {
       rowContributions.push({ row, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
     }
 
-    const hazardSnapshots = [];
-    const hazardContributions = [];
-    for (const hazard of enabledHazards) {
-      // Weather/time are runtime gates: a hazard that does not currently meet its
+    const eventSnapshots = [];
+    const eventContributions = [];
+    for (const event of enabledEvents) {
+      // Weather/time are runtime gates: an event that does not currently meet its
       // required weather/timeOfDay never triggers, even if it matched the
       // environment (region/biome/danger) at composition time.
-      if (evaluateEnvironmentMatch(hazard, environment, conditions, { includeDanger: true }).conditionsMet === false) {
+      if (evaluateEnvironmentMatch(event, environment, conditions, { includeDanger: true }).conditionsMet === false) {
         continue;
       }
       const contributions = [];
-      const hazardEvidence = [];
-      for (const reference of normalizeList(hazard.characterModifiers)) {
+      const eventEvidence = [];
+      for (const reference of normalizeList(event.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
           reference,
@@ -379,7 +379,7 @@ export class GatheringRichStateService {
           environment,
           task,
           row: null,
-          hazard,
+          event,
           viewer,
           system
         });
@@ -388,19 +388,19 @@ export class GatheringRichStateService {
           continue;
         }
         contributions.push(resolved.contribution);
-        hazardEvidence.push(resolved.evidence);
+        eventEvidence.push(resolved.evidence);
       }
-      hazardSnapshots.push({ hazardId: hazard.id, contributions: hazardEvidence });
-      hazardContributions.push({ hazard, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
+      eventSnapshots.push({ eventId: event.id, contributions: eventEvidence });
+      eventContributions.push({ event, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
     }
 
     if (diagnostics.length > 0) {
       return {
         status: 'misconfigured',
         items: [],
-        hazards: [],
-        hazardPolicy: null,
-        characterModifierSnapshot: { rows: rowSnapshots, hazards: hazardSnapshots },
+        events: [],
+        eventPolicy: null,
+        characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
         diagnostics
       };
     }
@@ -423,27 +423,27 @@ export class GatheringRichStateService {
       .filter(result => result.dropped);
     const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
 
-    const droppedHazards = hazardContributions
+    const droppedEvents = eventContributions
       .map((entry, index) => rollDropRow({
-        row: entry.hazard,
+        row: entry.event,
         index,
         roll: this.rollD100(),
-        modifier: numericModifier(entry.hazard?.hazardModifier, hazardModifier),
+        modifier: numericModifier(entry.event?.eventModifier, eventModifier),
         conditions,
         biomes,
         biomeAggregation,
         characterModifierContributions: entry.contributions
       }))
       .filter(result => result.dropped);
-    const selectedHazards = selectDrops(droppedHazards, rules.hazardSelectionMode, rules.hazardLimit);
-    const hazardPolicy = rules.hazardPolicy;
+    const selectedEvents = selectDrops(droppedEvents, rules.eventSelectionMode, rules.eventLimit);
+    const eventPolicy = rules.eventPolicy;
 
     return {
-      status: selectedHazards.length > 0 && hazardPolicy === 'failureWithHazard' ? 'failed' : 'succeeded',
+      status: selectedEvents.length > 0 && eventPolicy === 'failureWithEvent' ? 'failed' : 'succeeded',
       items: selectedItems,
-      hazards: selectedHazards,
-      hazardPolicy,
-      characterModifierSnapshot: { rows: rowSnapshots, hazards: hazardSnapshots }
+      events: selectedEvents,
+      eventPolicy,
+      characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots }
     };
   }
 
@@ -465,7 +465,7 @@ export class GatheringRichStateService {
    * @param {object} [options.actor] Selected actor for character modifiers.
    * @param {object} [options.viewer] Active viewer payload.
    * @param {object} [options.system] Crafting system.
-   * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, hazardPolicy: string}>}
+   * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, eventPolicy: string}>}
    */
   async previewDropBreakdown({ environment, task, actor = null, viewer = null, system = null } = {}) {
     const rules = resolveRulesForAttempt(task, environment);
@@ -474,7 +474,7 @@ export class GatheringRichStateService {
       successChance: null,
       awardMode: rules.rewardSelectionMode,
       awardLimit: rules.rewardLimit,
-      hazardPolicy: rules.hazardPolicy
+      eventPolicy: rules.eventPolicy
     };
     if (task?.resolutionMode !== 'd100') return empty;
     const rows = normalizeList(task?.dropRows ?? task?.itemDrops)
@@ -495,7 +495,7 @@ export class GatheringRichStateService {
       for (const reference of normalizeList(row.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
-          reference, libraryEntry: entry, actor, environment, task, row, hazard: null, viewer, system
+          reference, libraryEntry: entry, actor, environment, task, row, event: null, viewer, system
         });
         if (resolved.ok) {
           character.push({
@@ -581,12 +581,12 @@ export class GatheringRichStateService {
    * @param {object} [payload.environment]
    * @param {object} [payload.task]
    * @param {object|null} [payload.row]
-   * @param {object|null} [payload.hazard]
+   * @param {object|null} [payload.event]
    * @param {object} [payload.viewer]
    * @param {object} [payload.system]
    * @returns {Promise<{ok: boolean, contribution: number, evidence: object, diagnostic?: object}>}
    */
-  async _resolveCharacterModifierContribution({ reference, libraryEntry, actor, environment, task, row, hazard, viewer, system }) {
+  async _resolveCharacterModifierContribution({ reference, libraryEntry, actor, environment, task, row, event, viewer, system }) {
     const referenceId = stringOrFallback(reference?.id, '');
     const modifierId = stringOrFallback(reference?.modifierId, '');
     const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator) ? reference.operator : '+';
@@ -604,7 +604,7 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          hazardId: hazard?.id || null
+          eventId: event?.id || null
         }
       };
     }
@@ -622,7 +622,7 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          hazardId: hazard?.id || null
+          eventId: event?.id || null
         }
       };
     }
@@ -638,7 +638,7 @@ export class GatheringRichStateService {
             environment,
             task,
             row,
-            hazard,
+            event,
             conditions,
             modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
             viewer,
@@ -654,7 +654,7 @@ export class GatheringRichStateService {
           environment,
           task,
           row,
-          hazard,
+          event,
           viewer,
           system,
           modifier: { id: modifierId, label: libraryEntry?.label || modifierId }
@@ -673,7 +673,7 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          hazardId: hazard?.id || null
+          eventId: event?.id || null
         }
       };
     }
@@ -687,7 +687,7 @@ export class GatheringRichStateService {
           modifierId,
           referenceId,
           rowId: row?.id || null,
-          hazardId: hazard?.id || null
+          eventId: event?.id || null
         }
       };
     }
@@ -699,7 +699,7 @@ export class GatheringRichStateService {
 
     const evidence = {
       rowId: row?.id || null,
-      hazardId: hazard?.id || null,
+      eventId: event?.id || null,
       referenceId,
       modifierId,
       label: libraryEntry?.label || modifierId,
@@ -744,12 +744,12 @@ export class GatheringRichStateService {
       stamina,
       risk: task?.riskOverride || environment?.risk || 'safe',
       conditions: this.getConditions().weather ? cloneJson(this._config().conditions) : cloneJson(environment?.conditions || {}),
-      hazards: opaqueBlind
-        ? normalizeList(environment?.hazards).map(() => ({ matched: true }))
-        : normalizeList(environment?.hazards).map(hazard => ({
-            id: hazard.id,
-            name: hazard.name,
-            dropRate: hazard.dropRate
+      events: opaqueBlind
+        ? normalizeList(environment?.events).map(() => ({ matched: true }))
+        : normalizeList(environment?.events).map(event => ({
+            id: event.id,
+            name: event.name,
+            dropRate: event.dropRate
           }))
     };
   }
@@ -1451,8 +1451,8 @@ export class GatheringRichStateService {
   }
 
   _environmentAllowsLibraryRecord(environment, id, kind) {
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const enabled = normalizeList(environment?.[enabledKey]).map(String);
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
     if (disabled.includes(String(id))) return false;
@@ -1467,7 +1467,7 @@ export class GatheringRichStateService {
    */
   _recordIsForced(environment, id, kind, compositionMode = 'automatic') {
     if (compositionMode !== 'manual') return false;
-    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
     return normalizeList(environment?.[forcedKey]).map(String).includes(String(id));
   }
 
@@ -1482,13 +1482,13 @@ export class GatheringRichStateService {
    *   force-added (`forced*Ids`); stale disabled lists are ignored.
    */
   _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const enabled = normalizeList(environment?.[enabledKey]).map(String);
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
     if (compositionMode !== 'manual' && disabled.includes(String(id))) return false;
     if (compositionMode === 'manual') {
-      const forced = normalizeList(environment?.[kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds']).map(String);
+      const forced = normalizeList(environment?.[kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds']).map(String);
       return enabled.includes(String(id)) || forced.includes(String(id));
     }
     return true;
@@ -1705,7 +1705,7 @@ export class GatheringRichStateService {
     for (const reference of references) {
       const entry = library.get(String(reference.modifierId)) || null;
       const resolved = await this._resolveCharacterModifierContribution({
-        reference, libraryEntry: entry, actor, environment, task, row: null, hazard: null, viewer, system
+        reference, libraryEntry: entry, actor, environment, task, row: null, event: null, viewer, system
       });
       if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
     }
@@ -1859,7 +1859,7 @@ function normalizeGatheringConfig(raw = {}) {
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
-      hazards: normalizeList(config?.hazards).map(normalizeHazard),
+      events: normalizeList(config?.events).map(normalizeEvent),
       characterModifiers: normalizeList(config?.characterModifiers)
         .map(entry => normalizeCharacterModifierLibraryEntry(entry))
         .filter(Boolean),
@@ -2023,22 +2023,22 @@ function normalizeLibraryTool(tool = {}) {
   };
 }
 
-function normalizeHazard(hazard = {}) {
+function normalizeEvent(event = {}) {
   return {
-    id: stringOrFallback(hazard.id, `hazard-${normalizeTag(hazard.name) || 'row'}`),
-    name: stringOrFallback(hazard.name, 'Hazard'),
-    description: stringOrFallback(hazard.description, ''),
-    img: stringOrFallback(hazard.img, 'icons/svg/hazard.svg'),
-    enabled: hazard.enabled !== false,
-    dangerTags: normalizeTagList(hazard.dangerTags),
-    biomes: normalizeTagList(hazard.biomes),
-    weather: normalizeConditionIdList(hazard.weather),
-    timeOfDay: normalizeConditionIdList(hazard.timeOfDay),
-    dropRate: clampDropRate(hazard.dropRate),
-    linkedSceneUuid: stringOrFallback(hazard.linkedSceneUuid, ''),
-    hazardModifier: normalizeModifierProvider(hazard.hazardModifier ?? hazard.modifier),
-    conditionModifiers: normalizeDropConditionModifiers(hazard.conditionModifiers),
-    characterModifiers: normalizeHazardCharacterModifiers(hazard.characterModifiers)
+    id: stringOrFallback(event.id, `event-${normalizeTag(event.name) || 'row'}`),
+    name: stringOrFallback(event.name, 'Event'),
+    description: stringOrFallback(event.description, ''),
+    img: stringOrFallback(event.img, 'icons/svg/mystery-man.svg'),
+    enabled: event.enabled !== false,
+    dangerTags: normalizeTagList(event.dangerTags),
+    biomes: normalizeTagList(event.biomes),
+    weather: normalizeConditionIdList(event.weather),
+    timeOfDay: normalizeConditionIdList(event.timeOfDay),
+    dropRate: clampDropRate(event.dropRate),
+    linkedSceneUuid: stringOrFallback(event.linkedSceneUuid, ''),
+    eventModifier: normalizeModifierProvider(event.eventModifier ?? event.modifier),
+    conditionModifiers: normalizeDropConditionModifiers(event.conditionModifiers),
+    characterModifiers: normalizeEventCharacterModifiers(event.characterModifiers)
   };
 }
 
@@ -2075,15 +2075,15 @@ function applyDropRateAdjustment(row, adjustment = 0) {
   };
 }
 
-function applyHazardDropRateAdjustment(hazard, environment) {
-  const id = String(hazard?.id || '');
-  const enabledMap = environment?.hazardDropRateAdjustmentsEnabled;
+function applyEventDropRateAdjustment(event, environment) {
+  const id = String(event?.id || '');
+  const enabledMap = environment?.eventDropRateAdjustmentsEnabled;
   if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) {
-    return applyDropRateAdjustment(hazard, 0);
+    return applyDropRateAdjustment(event, 0);
   }
-  const adjustments = dropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
+  const adjustments = dropRateAdjustmentMap(environment?.eventDropRateAdjustments);
   const adjustment = adjustments[id] || 0;
-  return applyDropRateAdjustment(hazard, adjustment);
+  return applyDropRateAdjustment(event, adjustment);
 }
 
 /**
@@ -2124,12 +2124,12 @@ export function normalizeDropCharacterModifiers(refs) {
 }
 
 /**
- * Normalize hazard-row character modifier references.
+ * Normalize event-row character modifier references.
  *
  * @param {Array} refs Raw reference list.
  * @returns {Array<object>} Normalized references.
  */
-export function normalizeHazardCharacterModifiers(refs) {
+export function normalizeEventCharacterModifiers(refs) {
   return normalizeCharacterModifierReferenceList(refs);
 }
 
@@ -2284,13 +2284,13 @@ function normalizeGatheringRules(rules = {}) {
       ? rules.rewardSelectionMode
       : DEFAULT_GATHERING_RULES.rewardSelectionMode,
     rewardLimit: positiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
-    hazardSelectionMode: DROP_SELECTION_MODES.has(rules?.hazardSelectionMode)
-      ? rules.hazardSelectionMode
-      : DEFAULT_GATHERING_RULES.hazardSelectionMode,
-    hazardLimit: positiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
-    hazardPolicy: HAZARD_POLICIES.has(rules?.hazardPolicy)
-      ? rules.hazardPolicy
-      : DEFAULT_GATHERING_RULES.hazardPolicy,
+    eventSelectionMode: DROP_SELECTION_MODES.has(rules?.eventSelectionMode)
+      ? rules.eventSelectionMode
+      : DEFAULT_GATHERING_RULES.eventSelectionMode,
+    eventLimit: positiveInteger(rules?.eventLimit, DEFAULT_GATHERING_RULES.eventLimit),
+    eventPolicy: EVENT_POLICIES.has(rules?.eventPolicy)
+      ? rules.eventPolicy
+      : DEFAULT_GATHERING_RULES.eventPolicy,
     toolBreakagePolicy: TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
       ? rules.toolBreakagePolicy
       : DEFAULT_GATHERING_RULES.toolBreakagePolicy,
@@ -2306,9 +2306,9 @@ function normalizeGatheringRules(rules = {}) {
     revealScope: REVEAL_SCOPES.has(rules?.revealScope)
       ? rules.revealScope
       : DEFAULT_GATHERING_RULES.revealScope,
-    hazardVisibility: GATHERING_HAZARD_VISIBILITIES.has(rules?.hazardVisibility)
-      ? rules.hazardVisibility
-      : DEFAULT_GATHERING_RULES.hazardVisibility
+    eventVisibility: GATHERING_EVENT_VISIBILITIES.has(rules?.eventVisibility)
+      ? rules.eventVisibility
+      : DEFAULT_GATHERING_RULES.eventVisibility
   };
 }
 
@@ -2322,13 +2322,13 @@ function resolveRulesForAttempt(task = {}, environment = {}) {
     rewardSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task?.itemSelectionMode)
       ? task.itemSelectionMode
       : normalized.rewardSelectionMode,
-    hazardSelectionMode: LEGACY_DROP_SELECTION_MODES.has(environment?.hazardSelectionMode)
-      ? environment.hazardSelectionMode
-      : normalized.hazardSelectionMode,
-    hazardLimit: positiveInteger(environment?.hazardLimit, normalized.hazardLimit),
-    hazardPolicy: HAZARD_POLICIES.has(environment?.hazardPolicy)
-      ? environment.hazardPolicy
-      : normalized.hazardPolicy
+    eventSelectionMode: LEGACY_DROP_SELECTION_MODES.has(environment?.eventSelectionMode)
+      ? environment.eventSelectionMode
+      : normalized.eventSelectionMode,
+    eventLimit: positiveInteger(environment?.eventLimit, normalized.eventLimit),
+    eventPolicy: EVENT_POLICIES.has(environment?.eventPolicy)
+      ? environment.eventPolicy
+      : normalized.eventPolicy
   };
 }
 

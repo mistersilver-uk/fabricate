@@ -12,7 +12,7 @@ Location-aware gathering lets a GM describe campaign geography as first-class **
 > The whole region and travel subsystem is **off by default** and is enabled per crafting system with the **Enable Travel & Regions** toggle in gathering Settings (see [Enabling Travel & Regions](#enabling-travel--regions)). Only GMs can manage regions and parties and set current-region overrides. Players experience locations through the gathering app's blocked reasons and the redaction-safe location API.
 
 {: .note }
-> A **region** is the single region concept in Fabricate — it is geography only. There is no separate "region vocabulary" or region match tag any more. Region **never** decides which tasks or hazards belong to an environment (that is biome, plus danger for hazards); it only decides location availability. See [Composition](#composition-no-longer-uses-region) below.
+> A **region** is the single region concept in Fabricate — it is geography only. There is no separate "region vocabulary" or region match tag any more. Region **never** decides which tasks or events belong to an environment (that is biome, plus danger for events); it only decides location availability. See [Composition](#composition-no-longer-uses-region) below.
 
 ## Concepts
 
@@ -57,7 +57,7 @@ Each region belongs to one crafting system and stores:
 | **Secret** | A secret region is never disclosed to players — not even its name or id — until the actor discovers it (see [Secret regions and discovery](#secret-regions-and-discovery)) |
 | **Biomes** | Lowercase biome tags (from the system biome vocabulary) used by environment biome availability rules |
 | **Scene mappings** | Foundry Scene / Scene Region UUID pairs reserved for the scene-automation phase; stale UUIDs are preserved for repair |
-| **Modifiers** | Region modifiers (`hazardChance`, `dropRate`, `yield`, `difficulty`, `staminaCost`, `attemptLimit`, `custom` with `add`/`multiply`/`set`/`min`/`max` operations) are stored and validated now, and applied to gathering calculations in a later phase |
+| **Modifiers** | Region modifiers (`eventChance`, `dropRate`, `yield`, `difficulty`, `staminaCost`, `attemptLimit`, `custom` with `add`/`multiply`/`set`/`min`/`max` operations) are stored and validated now, and applied to gathering calculations in a later phase |
 
 ### Authoring regions (Travel tab)
 
@@ -106,7 +106,7 @@ The inspector echoes the resulting evidence: the resolution source (**GM overrid
 
 ## Composition No Longer Uses Region
 
-Region is **not** a composition axis. Which reusable tasks and hazards belong to an environment is decided by **biome** (and, for hazards, **danger**) only — never by region. Tasks and hazards no longer carry a `region` / `regions` match tag; geography lives entirely in `GatheringRegion`. See [Gathering Environments]({% link gathering-environments.md %}#composition) for how composition matching works.
+Region is **not** a composition axis. Which reusable tasks and events belong to an environment is decided by **biome** (and, for events, **danger**) only — never by region. Tasks and events no longer carry a `region` / `regions` match tag; geography lives entirely in `GatheringRegion`. See [Gathering Environments]({% link gathering-environments.md %}#composition) for how composition matching works.
 
 ## Environment Region Membership
 
@@ -199,15 +199,15 @@ Hooks.once('fabricate.ready', async () => {
 
 ## Migrating From The Legacy Region Vocabulary
 
-Earlier versions modeled regions two ways: a per-system **region vocabulary** (a match tag on tasks, hazards, and environments) and the first-class `GatheringRegion`. These are now unified — `GatheringRegion` is the only region concept. A one-time, idempotent startup migration upgrades existing worlds automatically:
+Earlier versions modeled regions two ways: a per-system **region vocabulary** (a match tag on tasks, events, and environments) and the first-class `GatheringRegion`. These are now unified — `GatheringRegion` is the only region concept. A one-time, idempotent startup migration upgrades existing worlds automatically:
 
 - Each legacy region-vocabulary entry becomes a `GatheringRegion` record on its crafting system (keyed by the vocabulary id; distinct ids with duplicate labels stay distinct regions).
 - Each environment's legacy single `region` is mapped to `includedRegionIds` when a matching region exists; a free-text region with no match is left inert (no data loss, no stale reference).
-- The `region` / `regions` match tags are stripped from tasks and hazards.
+- The `region` / `regions` match tags are stripped from tasks and events.
 - The per-system region vocabulary is cleared.
 - `gatheringRegionSettings.enabled` is left off, so migrated systems keep the subsystem **disabled by default** — re-enable it per system with the **Enable Travel & Regions** toggle.
 
-A one-time GM notice names the systems that had regions. Because region is no longer a composition axis, **region-scoped tasks and hazards may now appear in more environments**: a record that was previously narrowed only by a region tag (with no biome) now matches any biome. Review composition on affected environments after upgrading, and add biome (or danger, for hazards) constraints where you want to keep records out of an environment.
+A one-time GM notice names the systems that had regions. Because region is no longer a composition axis, **region-scoped tasks and events may now appear in more environments**: a record that was previously narrowed only by a region tag (with no biome) now matches any biome. Review composition on affected environments after upgrading, and add biome (or danger, for events) constraints where you want to keep records out of an environment.
 
 ## Data Persistence
 

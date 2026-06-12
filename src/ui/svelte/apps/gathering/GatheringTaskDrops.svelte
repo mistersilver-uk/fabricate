@@ -3,13 +3,13 @@
   GatheringTaskDrops renders the right-column "What you might find" section for
   the selected task. It lists each possible drop with its (modifier-adjusted)
   chance as a mini bar with the percent in-line at the end, hint text explaining
-  how finds are awarded and how hazards impact results, and an expandable
+  how finds are awarded and how events impact results, and an expandable
   "Modifiers" body per drop that breaks the chance down into base + weather +
   time-of-day + biome + per-character-ability contributions.
 
   Data comes from `services.getGatheringDropBreakdown` (resolved lazily by the
   parent for the selected task); `breakdown` is
-  `{ drops, awardMode, awardLimit, hazardPolicy }`. The section renders nothing
+  `{ drops, awardMode, awardLimit, eventPolicy }`. The section renders nothing
   when there are no drops and not loading.
 -->
 <script>
@@ -32,10 +32,10 @@
         return '';
     }
   });
-  const hazardHint = $derived(
-    breakdown?.hazardPolicy === 'failureWithHazard'
-      ? localize('FABRICATE.App.Gathering.Detail.HazardImpactFailure')
-      : (breakdown?.hazardPolicy ? localize('FABRICATE.App.Gathering.Detail.HazardImpactSuccess') : '')
+  const eventHint = $derived(
+    breakdown?.eventPolicy === 'failureWithEvent'
+      ? localize('FABRICATE.App.Gathering.Detail.EventImpactFailure')
+      : (breakdown?.eventPolicy ? localize('FABRICATE.App.Gathering.Detail.EventImpactSuccess') : '')
   );
 
   let expandedIds = $state(new Set());
@@ -99,13 +99,13 @@
   <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="ready">
     <p class="gathering-task-drops-heading">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</p>
 
-    {#if awardHint !== '' || hazardHint !== ''}
+    {#if awardHint !== '' || eventHint !== ''}
       <ul class="gathering-task-drops-hints" data-gathering-drops-hints>
         {#if awardHint !== ''}
           <li><i class="fas fa-gift" aria-hidden="true"></i><span>{awardHint}</span></li>
         {/if}
-        {#if hazardHint !== ''}
-          <li><i class="fas fa-skull" aria-hidden="true"></i><span>{hazardHint}</span></li>
+        {#if eventHint !== ''}
+          <li><i class="fas fa-skull" aria-hidden="true"></i><span>{eventHint}</span></li>
         {/if}
       </ul>
     {/if}

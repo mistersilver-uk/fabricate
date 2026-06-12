@@ -9,7 +9,7 @@
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
-  import GatheringHazardEditView from './GatheringHazardEditView.svelte';
+  import GatheringEventEditView from './GatheringEventEditView.svelte';
   import RegionNameField from './RegionNameField.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
@@ -45,16 +45,16 @@
     if (['parties', 'regions', 'map'].includes(tabId)) activeTravelTab = tabId;
   }
   let selectedGatheringTaskId = $state('');
-  let selectedGatheringHazardId = $state('');
+  let selectedGatheringEventId = $state('');
   let selectedGatheringDropId = $state('');
   let gatheringTaskDraft = $state(null);
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
   let gatheringTaskSaveError = $state('');
-  let gatheringHazardDraft = $state(null);
-  let gatheringHazardDraftBaseline = $state(null);
-  let gatheringHazardSaving = $state(false);
-  let gatheringHazardSaveError = $state('');
+  let gatheringEventDraft = $state(null);
+  let gatheringEventDraftBaseline = $state(null);
+  let gatheringEventSaving = $state(false);
+  let gatheringEventSaveError = $state('');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
@@ -202,10 +202,10 @@
     }
   });
 
-  const hazardCharacterModifierSearchSuggestions = $derived.by(() => {
+  const eventCharacterModifierSearchSuggestions = $derived.by(() => {
     const term = characterModifierSearchTerm.trim().toLowerCase();
     if (!term) return [];
-    const attached = new Set((editingGatheringHazard?.characterModifiers || []).map(ref => ref.modifierId).filter(Boolean));
+    const attached = new Set((editingGatheringEvent?.characterModifiers || []).map(ref => ref.modifierId).filter(Boolean));
     return selectedGatheringCharacterModifiers.filter(entry => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
@@ -214,7 +214,7 @@
     });
   });
   $effect(() => {
-    if (editingGatheringHazard?.id) {
+    if (editingGatheringEvent?.id) {
       characterModifierSearchTerm = '';
     }
   });
@@ -294,33 +294,33 @@
     }
   });
 
-  let gatheringHazardTimeOfDayPickerSelection = $state('');
-  let gatheringHazardWeatherPickerSelection = $state('');
-  let gatheringHazardBiomePickerSelection = $state('');
+  let gatheringEventTimeOfDayPickerSelection = $state('');
+  let gatheringEventWeatherPickerSelection = $state('');
+  let gatheringEventBiomePickerSelection = $state('');
   $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'biome');
-    if (!biomeAvailable.some(option => option.id === gatheringHazardBiomePickerSelection)) {
-      gatheringHazardBiomePickerSelection = biomeAvailable[0]?.id || '';
+    const biomeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'biome');
+    if (!biomeAvailable.some(option => option.id === gatheringEventBiomePickerSelection)) {
+      gatheringEventBiomePickerSelection = biomeAvailable[0]?.id || '';
     }
-    const timeAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'timeOfDay');
-    if (!timeAvailable.some(option => option.id === gatheringHazardTimeOfDayPickerSelection)) {
-      gatheringHazardTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
+    const timeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'timeOfDay');
+    if (!timeAvailable.some(option => option.id === gatheringEventTimeOfDayPickerSelection)) {
+      gatheringEventTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
     }
-    const weatherAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'weather');
-    if (!weatherAvailable.some(option => option.id === gatheringHazardWeatherPickerSelection)) {
-      gatheringHazardWeatherPickerSelection = weatherAvailable[0]?.id || '';
+    const weatherAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'weather');
+    if (!weatherAvailable.some(option => option.id === gatheringEventWeatherPickerSelection)) {
+      gatheringEventWeatherPickerSelection = weatherAvailable[0]?.id || '';
     }
   });
 
-  function gatheringHazardModifierPickerSelection(kind) {
-    if (kind === 'biome') return gatheringHazardBiomePickerSelection;
-    return kind === 'weather' ? gatheringHazardWeatherPickerSelection : gatheringHazardTimeOfDayPickerSelection;
+  function gatheringEventModifierPickerSelection(kind) {
+    if (kind === 'biome') return gatheringEventBiomePickerSelection;
+    return kind === 'weather' ? gatheringEventWeatherPickerSelection : gatheringEventTimeOfDayPickerSelection;
   }
 
-  function setGatheringHazardModifierPickerSelection(kind, value) {
-    if (kind === 'biome') gatheringHazardBiomePickerSelection = value;
-    else if (kind === 'weather') gatheringHazardWeatherPickerSelection = value;
-    else gatheringHazardTimeOfDayPickerSelection = value;
+  function setGatheringEventModifierPickerSelection(kind, value) {
+    if (kind === 'biome') gatheringEventBiomePickerSelection = value;
+    else if (kind === 'weather') gatheringEventWeatherPickerSelection = value;
+    else gatheringEventTimeOfDayPickerSelection = value;
   }
 
   function gatheringDropModifierPickerSelection(kind) {
@@ -368,13 +368,13 @@
     updateGatheringDropModifier(rowId, kind, modifier.id, next);
   }
 
-  function onGatheringHazardModifierKeydown(kind, modifier, event) {
+  function onGatheringEventModifierKeydown(kind, modifier, event) {
     event.stopPropagation();
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
     const next = signedToOperatorValue(String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1)));
     event.currentTarget.value = gatheringModifierDisplayValue(next);
-    updateGatheringHazardConditionModifier(kind, modifier.id, next);
+    updateGatheringEventConditionModifier(kind, modifier.id, next);
   }
 
   async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
@@ -481,13 +481,13 @@
     },
     {
       id: 'encounters',
-      icon: 'fas fa-exclamation-triangle',
+      icon: 'fas fa-masks-theater',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
-      labelFallback: 'Hazards',
+      labelFallback: 'Events',
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
-      titleFallback: 'Gathering hazards',
+      titleFallback: 'Gathering events',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
-      hintFallback: 'Browse reusable hazards before attaching them to environments.'
+      hintFallback: 'Browse reusable events before attaching them to environments.'
     },
     {
       id: 'travel',
@@ -519,7 +519,7 @@
     gatheringRegionsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')
   );
   const gatheringInspectorTabs = $derived(visibleGatheringNavItems.filter(tab => tab.id !== 'environments'));
-  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-hazard-edit');
+  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit');
   const isActiveGatheringChildRoute = $derived(
     isGatheringRoute && visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)
   );
@@ -536,12 +536,12 @@
   const selectedGatheringRules = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
     rewardSelectionMode: 'highestRankedDrop',
     rewardLimit: 1,
-    hazardSelectionMode: 'allDrops',
-    hazardLimit: 1,
-    hazardPolicy: 'successWithHazard',
+    eventSelectionMode: 'allDrops',
+    eventLimit: 1,
+    eventPolicy: 'successWithEvent',
     toolBreakagePolicy: 'failureOnBreak',
     biomeModifierAggregation: 'strongestOfEach',
-    hazardVisibility: 'encounterChance'
+    eventVisibility: 'encounterChance'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   // Two independent limitation flags. Honor key-presence precedence: a present
@@ -559,7 +559,7 @@
       : selectedGatheringEconomy.mode === 'nodes'
   );
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
-  const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
+  const gatheringEventDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : []);
   // Tools are system-owned: read the canonical library from the selected
   // crafting system (surfaced on $viewState.selectedSystem.tools by the store)
   // rather than the gathering-config copy.
@@ -612,18 +612,18 @@
   const gatheringNavCounts = $derived({
     environments: environmentList.length,
     tasks: gatheringTaskDefinitions.length,
-    encounters: gatheringHazardDefinitions.length,
+    encounters: gatheringEventDefinitions.length,
     travel: travelParties.length,
-    total: environmentList.length + gatheringTaskDefinitions.length + gatheringHazardDefinitions.length
+    total: environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length
   });
   const selectedGatheringTask = $derived(
     gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
       || gatheringTaskDefinitions[0]
       || null
   );
-  const selectedGatheringHazard = $derived(
-    gatheringHazardDefinitions.find(hazard => hazard.id === selectedGatheringHazardId)
-      || gatheringHazardDefinitions[0]
+  const selectedGatheringEvent = $derived(
+    gatheringEventDefinitions.find(event => event.id === selectedGatheringEventId)
+      || gatheringEventDefinitions[0]
       || null
   );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
@@ -642,22 +642,22 @@
       : { valid: true, errors: [] }
   );
 
-  const editingGatheringHazard = $derived(gatheringHazardDraft || selectedGatheringHazard);
-  const gatheringHazardDraftDirty = $derived(
-    !!(gatheringHazardDraft && gatheringHazardDraftBaseline
-      && JSON.stringify(gatheringHazardDraft) !== JSON.stringify(gatheringHazardDraftBaseline))
+  const editingGatheringEvent = $derived(gatheringEventDraft || selectedGatheringEvent);
+  const gatheringEventDraftDirty = $derived(
+    !!(gatheringEventDraft && gatheringEventDraftBaseline
+      && JSON.stringify(gatheringEventDraft) !== JSON.stringify(gatheringEventDraftBaseline))
   );
-  const gatheringHazardValidation = $derived(validateGatheringHazardDraft(gatheringHazardDraft));
+  const gatheringEventValidation = $derived(validateGatheringEventDraft(gatheringEventDraft));
 
-  function validateGatheringHazardDraft(draft) {
+  function validateGatheringEventDraft(draft) {
     if (!draft) return { valid: true, errors: [] };
     const errors = [];
     if (!String(draft?.name || '').trim()) {
-      errors.push(text('FABRICATE.Admin.Manager.Environment.Hazards.NameRequired', 'Name is required.'));
+      errors.push(text('FABRICATE.Admin.Manager.Environment.Events.NameRequired', 'Name is required.'));
     }
     const rate = Number(draft?.dropRate);
     if (!Number.isFinite(rate) || rate < 1 || rate > 100) {
-      errors.push(text('FABRICATE.Admin.Manager.Environment.Hazards.DropRateInvalid', 'Drop rate must be between 1 and 100.'));
+      errors.push(text('FABRICATE.Admin.Manager.Environment.Events.DropRateInvalid', 'Drop rate must be between 1 and 100.'));
     }
     return { valid: errors.length === 0, errors };
   }
@@ -698,15 +698,15 @@
     if (selectedSystemId === lastGatheringSystemId) return;
     activeGatheringTab = 'environments';
     selectedGatheringTaskId = '';
-    selectedGatheringHazardId = '';
+    selectedGatheringEventId = '';
     gatheringTaskDraft = null;
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaving = false;
     gatheringTaskSaveError = '';
-    gatheringHazardDraft = null;
-    gatheringHazardDraftBaseline = null;
-    gatheringHazardSaving = false;
-    gatheringHazardSaveError = '';
+    gatheringEventDraft = null;
+    gatheringEventDraftBaseline = null;
+    gatheringEventSaving = false;
+    gatheringEventSaveError = '';
     gatheringMenuExpanded = isGatheringRoute;
     store?.cancelToolsDraft?.();
     lastGatheringSystemId = selectedSystemId;
@@ -716,7 +716,7 @@
     if (activeGatheringTab === 'environments') return;
     if (currentView === 'environments' && canShowEnvironments) return;
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
-    if (currentView === 'gathering-hazard-edit' && canShowEnvironments) return;
+    if (currentView === 'gathering-event-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
   });
 
@@ -737,11 +737,11 @@
 
   $effect(() => {
     if (!canShowEnvironments) {
-      selectedGatheringHazardId = '';
+      selectedGatheringEventId = '';
       return;
     }
-    if (selectedGatheringHazardId && gatheringHazardDefinitions.some(hazard => hazard.id === selectedGatheringHazardId)) return;
-    selectedGatheringHazardId = gatheringHazardDefinitions[0]?.id || '';
+    if (selectedGatheringEventId && gatheringEventDefinitions.some(event => event.id === selectedGatheringEventId)) return;
+    selectedGatheringEventId = gatheringEventDefinitions[0]?.id || '';
   });
 
   $effect(() => {
@@ -797,8 +797,8 @@
     return labels[mode] || labels.highestRankedDrop;
   }
 
-  function gatheringHazardPolicyLabel(policy) {
-    return policy === 'failureWithHazard'
+  function gatheringEventPolicyLabel(policy) {
+    return policy === 'failureWithEvent'
       ? text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')
       : text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds');
   }
@@ -945,7 +945,7 @@
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
     if (!system) return 'systems';
     if (view === 'recipes' && !recipesAvailable) return 'system-edit';
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-hazard-edit') && !environmentsAvailable) return 'systems';
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
@@ -989,7 +989,7 @@
       return environmentName ? `${base}: ${environmentName}` : base;
     }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
-    if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditTitle', 'Edit gathering hazard');
+    if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
@@ -1013,7 +1013,7 @@
       return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation in the workspace.');
     }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
-    if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected hazard.');
+    if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected event.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
     return text('FABRICATE.Admin.Manager.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
@@ -1051,7 +1051,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
-    if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
+    if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
   }
@@ -1113,22 +1113,22 @@
     return true;
   }
 
-  async function finishGatheringHazardRouteExit(action) {
+  async function finishGatheringEventRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
-      const saved = await saveGatheringHazardDraft();
+      const saved = await saveGatheringEventDraft();
       if (saved === false) return false;
     }
-    clearGatheringHazardDraft();
+    clearGatheringEventDraft();
     return true;
   }
 
-  function confirmGatheringHazardRouteExit(nextView) {
-    if (activeView !== 'gathering-hazard-edit') return true;
-    if (!gatheringHazardDraftDirty) return finishGatheringHazardRouteExit(true);
-    const confirmed = store.confirmDiscardDirtyGatheringHazardDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishGatheringHazardRouteExit);
-    return finishGatheringHazardRouteExit(confirmed);
+  function confirmGatheringEventRouteExit(nextView) {
+    if (activeView !== 'gathering-event-edit') return true;
+    if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true);
+    const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
+    if (isPromise(confirmed)) return confirmed.then(finishGatheringEventRouteExit);
+    return finishGatheringEventRouteExit(confirmed);
   }
 
   function confirmComponentRouteExit(nextView) {
@@ -1205,11 +1205,11 @@
   }
 
   function continueRouteExitAfterTask(nextView) {
-    const hazardResult = confirmGatheringHazardRouteExit(nextView);
-    if (isPromise(hazardResult)) {
-      return hazardResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+    const eventResult = confirmGatheringEventRouteExit(nextView);
+    if (isPromise(eventResult)) {
+      return eventResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
     }
-    if (hazardResult === false) return false;
+    if (eventResult === false) return false;
     return confirmToolsRouteExit(nextView);
   }
 
@@ -1244,7 +1244,7 @@
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools') && !selectedSystem) return;
     if (view === 'recipes' && !recipesRouteEnabled) return;
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-hazard-edit') && !canShowEnvironments) return;
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
       activeView = view;
@@ -1705,43 +1705,43 @@
     store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
   }
 
-  function selectGatheringHazard(hazardId = selectedGatheringHazard?.id) {
-    selectedGatheringHazardId = hazardId || '';
+  function selectGatheringEvent(eventId = selectedGatheringEvent?.id) {
+    selectedGatheringEventId = eventId || '';
   }
 
-  function createGatheringHazard(systemId = selectedSystemId) {
+  function createGatheringEvent(systemId = selectedSystemId) {
     if (!systemId) return;
-    const created = store.addGatheringLibraryHazard?.(systemId);
+    const created = store.addGatheringLibraryEvent?.(systemId);
     if (isPromise(created)) {
-      created.then(hazard => {
-        if (hazard?.id) selectedGatheringHazardId = hazard.id;
+      created.then(event => {
+        if (event?.id) selectedGatheringEventId = event.id;
       });
       return;
     }
-    if (created?.id) selectedGatheringHazardId = created.id;
+    if (created?.id) selectedGatheringEventId = created.id;
   }
 
-  function editGatheringHazard(hazardId = selectedGatheringHazard?.id) {
-    if (!hazardId || !canShowEnvironments) return;
-    selectedGatheringHazardId = hazardId;
-    const source = gatheringHazardDefinitions.find(hazard => hazard.id === hazardId) || null;
+  function editGatheringEvent(eventId = selectedGatheringEvent?.id) {
+    if (!eventId || !canShowEnvironments) return;
+    selectedGatheringEventId = eventId;
+    const source = gatheringEventDefinitions.find(event => event.id === eventId) || null;
     const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gatheringHazardDraft = snapshot;
-    gatheringHazardDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gatheringHazardSaveError = '';
+    gatheringEventDraft = snapshot;
+    gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+    gatheringEventSaveError = '';
     activeGatheringTab = 'encounters';
     gatheringMenuExpanded = true;
-    activeView = 'gathering-hazard-edit';
+    activeView = 'gathering-event-edit';
   }
 
-  function clearGatheringHazardDraft() {
-    gatheringHazardDraft = null;
-    gatheringHazardDraftBaseline = null;
-    gatheringHazardSaveError = '';
-    gatheringHazardSaving = false;
+  function clearGatheringEventDraft() {
+    gatheringEventDraft = null;
+    gatheringEventDraftBaseline = null;
+    gatheringEventSaveError = '';
+    gatheringEventSaving = false;
   }
 
-  function backToGatheringHazardLibrary() {
+  function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'encounters';
       gatheringMenuExpanded = true;
@@ -1749,82 +1749,82 @@
     });
   }
 
-  async function saveGatheringHazardDraft() {
-    if (!gatheringHazardDraft || !selectedSystemId || !selectedGatheringHazardId) return false;
-    const { valid, errors } = gatheringHazardValidation;
+  async function saveGatheringEventDraft() {
+    if (!gatheringEventDraft || !selectedSystemId || !selectedGatheringEventId) return false;
+    const { valid, errors } = gatheringEventValidation;
     if (!valid) {
-      gatheringHazardSaveError = errors[0] || '';
+      gatheringEventSaveError = errors[0] || '';
       return false;
     }
-    const proceed = await store.confirmGatheringLibraryHazardCompositionLoss?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft) ?? true;
+    const proceed = await store.confirmGatheringLibraryEventCompositionLoss?.(selectedSystemId, selectedGatheringEventId, gatheringEventDraft) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
-    gatheringHazardSaving = true;
+    gatheringEventSaving = true;
     try {
-      const ok = await store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft);
+      const ok = await store.updateGatheringLibraryEvent?.(selectedSystemId, selectedGatheringEventId, gatheringEventDraft);
       if (ok !== false) {
-        gatheringHazardDraftBaseline = JSON.parse(JSON.stringify(gatheringHazardDraft));
-        gatheringHazardSaveError = '';
+        gatheringEventDraftBaseline = JSON.parse(JSON.stringify(gatheringEventDraft));
+        gatheringEventSaveError = '';
         return true;
       }
       return false;
     } finally {
-      gatheringHazardSaving = false;
+      gatheringEventSaving = false;
     }
   }
 
-  async function deleteGatheringHazardDraft() {
-    if (!selectedGatheringHazardId || !selectedSystemId) return;
+  async function deleteGatheringEventDraft() {
+    if (!selectedGatheringEventId || !selectedSystemId) return;
     const message = text(
-      'FABRICATE.Admin.Manager.Environment.Hazards.DeleteConfirm',
-      'Delete this hazard? This cannot be undone.'
+      'FABRICATE.Admin.Manager.Environment.Events.DeleteConfirm',
+      'Delete this event? This cannot be undone.'
     );
     const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
     if (confirmed === false) return;
-    const deletedId = selectedGatheringHazardId;
-    await store.deleteGatheringLibraryHazard?.(selectedSystemId, deletedId);
-    if (selectedGatheringHazardId === deletedId) selectedGatheringHazardId = '';
-    clearGatheringHazardDraft();
+    const deletedId = selectedGatheringEventId;
+    await store.deleteGatheringLibraryEvent?.(selectedSystemId, deletedId);
+    if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
+    clearGatheringEventDraft();
     activeGatheringTab = 'encounters';
     gatheringMenuExpanded = true;
     activeView = 'environments';
   }
 
-  function duplicateGatheringHazard(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id) {
-    if (!systemId || !hazardId) return;
-    const duplicated = store.duplicateGatheringLibraryHazard?.(systemId, hazardId);
+  function duplicateGatheringEvent(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id) {
+    if (!systemId || !eventId) return;
+    const duplicated = store.duplicateGatheringLibraryEvent?.(systemId, eventId);
     if (isPromise(duplicated)) {
-      duplicated.then(hazard => {
-        if (hazard?.id) selectedGatheringHazardId = hazard.id;
+      duplicated.then(event => {
+        if (event?.id) selectedGatheringEventId = event.id;
       });
       return;
     }
-    if (duplicated?.id) selectedGatheringHazardId = duplicated.id;
+    if (duplicated?.id) selectedGatheringEventId = duplicated.id;
   }
 
-  function deleteGatheringHazard(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id) {
-    if (!systemId || !hazardId) return;
-    const deleted = store.deleteGatheringLibraryHazard?.(systemId, hazardId);
+  function deleteGatheringEvent(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id) {
+    if (!systemId || !eventId) return;
+    const deleted = store.deleteGatheringLibraryEvent?.(systemId, eventId);
     if (isPromise(deleted)) {
       deleted.then(value => {
-        if (value !== false && selectedGatheringHazardId === hazardId) selectedGatheringHazardId = '';
+        if (value !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
       });
       return;
     }
-    if (deleted !== false && selectedGatheringHazardId === hazardId) selectedGatheringHazardId = '';
+    if (deleted !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
   }
 
-  function toggleGatheringHazardEnabled(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id, enabled = true) {
-    if (!systemId || !hazardId) return;
-    store.updateGatheringLibraryHazard?.(systemId, hazardId, { enabled });
+  function toggleGatheringEventEnabled(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id, enabled = true) {
+    if (!systemId || !eventId) return;
+    store.updateGatheringLibraryEvent?.(systemId, eventId, { enabled });
   }
 
-  function updateSelectedGatheringHazard(updates = {}) {
-    if (gatheringHazardDraft) {
-      gatheringHazardDraft = { ...gatheringHazardDraft, ...updates };
+  function updateSelectedGatheringEvent(updates = {}) {
+    if (gatheringEventDraft) {
+      gatheringEventDraft = { ...gatheringEventDraft, ...updates };
       return true;
     }
-    if (!selectedSystemId || !selectedGatheringHazard?.id) return false;
-    return store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazard.id, updates);
+    if (!selectedSystemId || !selectedGatheringEvent?.id) return false;
+    return store.updateGatheringLibraryEvent?.(selectedSystemId, selectedGatheringEvent.id, updates);
   }
 
   function updateSelectedGatheringTask(updates = {}) {
@@ -1989,34 +1989,34 @@
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
-  function addGatheringHazardConditionModifier(kind, conditionId) {
-    if (!editingGatheringHazard?.id || !kind || !conditionId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringHazard);
+  function addGatheringEventConditionModifier(kind, conditionId) {
+    if (!editingGatheringEvent?.id || !kind || !conditionId) return;
+    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
     if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
       { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
     ];
-    updateSelectedGatheringHazard({ conditionModifiers });
+    updateSelectedGatheringEvent({ conditionModifiers });
   }
 
-  function updateGatheringHazardConditionModifier(kind, modifierId, updates = {}) {
-    if (!editingGatheringHazard?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringHazard);
+  function updateGatheringEventConditionModifier(kind, modifierId, updates = {}) {
+    if (!editingGatheringEvent?.id || !kind || !modifierId) return;
+    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
     conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
-    updateSelectedGatheringHazard({ conditionModifiers });
+    updateSelectedGatheringEvent({ conditionModifiers });
   }
 
-  function deleteGatheringHazardConditionModifier(kind, modifierId) {
-    if (!editingGatheringHazard?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringHazard);
+  function deleteGatheringEventConditionModifier(kind, modifierId) {
+    if (!editingGatheringEvent?.id || !kind || !modifierId) return;
+    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
     conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
-    updateSelectedGatheringHazard({ conditionModifiers });
+    updateSelectedGatheringEvent({ conditionModifiers });
   }
 
-  function pickCharacterModifierForHazard(modifierId) {
-    if (!editingGatheringHazard?.id || !modifierId) return;
-    const refs = Array.isArray(editingGatheringHazard.characterModifiers) ? editingGatheringHazard.characterModifiers : [];
+  function pickCharacterModifierForEvent(modifierId) {
+    if (!editingGatheringEvent?.id || !modifierId) return;
+    const refs = Array.isArray(editingGatheringEvent.characterModifiers) ? editingGatheringEvent.characterModifiers : [];
     if (refs.some(ref => ref.modifierId === modifierId)) return;
     characterModifierSearchTerm = '';
     const newRef = {
@@ -2027,25 +2027,25 @@
       max: null,
       expressionOverride: ''
     };
-    updateSelectedGatheringHazard({ characterModifiers: [...refs, newRef] });
+    updateSelectedGatheringEvent({ characterModifiers: [...refs, newRef] });
   }
 
-  function onUpdateHazardCharacterModifier(refId, patch) {
-    if (!editingGatheringHazard?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringHazard.characterModifiers) ? editingGatheringHazard.characterModifiers : [];
+  function onUpdateEventCharacterModifier(refId, patch) {
+    if (!editingGatheringEvent?.id || !refId) return;
+    const refs = Array.isArray(editingGatheringEvent.characterModifiers) ? editingGatheringEvent.characterModifiers : [];
     const next = refs.map(ref => ref.id === refId ? { ...ref, ...patch } : ref);
-    updateSelectedGatheringHazard({ characterModifiers: next });
+    updateSelectedGatheringEvent({ characterModifiers: next });
   }
 
-  function onDeleteHazardCharacterModifier(refId) {
-    if (!editingGatheringHazard?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringHazard.characterModifiers) ? editingGatheringHazard.characterModifiers : [];
-    updateSelectedGatheringHazard({ characterModifiers: refs.filter(ref => ref.id !== refId) });
+  function onDeleteEventCharacterModifier(refId) {
+    if (!editingGatheringEvent?.id || !refId) return;
+    const refs = Array.isArray(editingGatheringEvent.characterModifiers) ? editingGatheringEvent.characterModifiers : [];
+    updateSelectedGatheringEvent({ characterModifiers: refs.filter(ref => ref.id !== refId) });
   }
 
-  function setHazardCharacterModifierOverrideEnabled(ref, enabled, libraryEntry) {
+  function setEventCharacterModifierOverrideEnabled(ref, enabled, libraryEntry) {
     const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
-    onUpdateHazardCharacterModifier(ref.id, { expressionOverride });
+    onUpdateEventCharacterModifier(ref.id, { expressionOverride });
   }
 
   function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
@@ -2290,9 +2290,9 @@
   }
 
   function environmentComposedIds(environment, kind) {
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
+    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
+    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey] : [];
     const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey] : [];
     const disabled = new Set(Array.isArray(environment?.[disabledKey]) ? environment[disabledKey] : []);
@@ -2304,9 +2304,9 @@
     return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'task').length;
   }
 
-  function environmentComposedHazardCount(environment) {
-    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableHazardCount;
-    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'hazard').length;
+  function environmentComposedEventCount(environment) {
+    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableEventCount;
+    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'event').length;
   }
 
   function environmentRequiredToolCount(environment) {
@@ -2382,8 +2382,8 @@
 
   function gatheringModifierCardTitle(kind, scope = 'task') {
     if (kind === 'biome') {
-      return scope === 'hazard'
-        ? text('FABRICATE.Admin.Manager.Environment.Hazards.BiomeModifiers', 'Biome modifiers')
+      return scope === 'event'
+        ? text('FABRICATE.Admin.Manager.Environment.Events.BiomeModifiers', 'Biome modifiers')
         : text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiers', 'Biome modifiers');
     }
     if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers', 'Weather modifiers');
@@ -2391,10 +2391,10 @@
   }
 
   function gatheringModifierCardHint(kind, scope = 'task') {
-    if (scope === 'hazard') {
-      if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Hazards.BiomeModifiersHint', "Adjust this hazard's chance based on the gathering environment's biomes.");
-      if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Hazards.WeatherModifiersHint', "Adjust this hazard's chance based on the active weather condition.");
-      return text('FABRICATE.Admin.Manager.Environment.Hazards.TimeModifiersHint', "Adjust this hazard's chance based on the active time of day.");
+    if (scope === 'event') {
+      if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Events.BiomeModifiersHint', "Adjust this event's chance based on the gathering environment's biomes.");
+      if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Events.WeatherModifiersHint', "Adjust this event's chance based on the active weather condition.");
+      return text('FABRICATE.Admin.Manager.Environment.Events.TimeModifiersHint', "Adjust this event's chance based on the active time of day.");
     }
     if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiersHint', "Adjust this drop's chance based on the gathering environment's biomes.");
     if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint', "Adjust this drop's chance based on the active weather condition.");
@@ -2541,13 +2541,13 @@
     });
   }
 
-  function gatheringHazardReferencingEnvironments(hazard) {
-    if (!hazard?.id) return [];
-    const hazardId = String(hazard.id);
+  function gatheringEventReferencingEnvironments(event) {
+    if (!event?.id) return [];
+    const eventId = String(event.id);
     return environmentList.filter(environment => {
       if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-      const enabledIds = Array.isArray(environment?.enabledHazardIds) ? environment.enabledHazardIds.map(String) : [];
-      return enabledIds.includes(hazardId);
+      const enabledIds = Array.isArray(environment?.enabledEventIds) ? environment.enabledEventIds.map(String) : [];
+      return enabledIds.includes(eventId);
     });
   }
 
@@ -2581,9 +2581,9 @@
         value: environmentComposedTaskCount(environment)
       },
       {
-        id: 'hazards',
-        label: text('FABRICATE.Admin.Environments.Hazards', 'Hazards'),
-        value: environmentComposedHazardCount(environment)
+        id: 'events',
+        label: text('FABRICATE.Admin.Environments.Events', 'Events'),
+        value: environmentComposedEventCount(environment)
       },
       {
         id: 'required-tools',
@@ -2835,11 +2835,11 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
         {/if}
-        {#if currentView === 'gathering-hazard-edit'}
+        {#if currentView === 'gathering-event-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToGatheringHazardLibrary}>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters', 'Hazards')}</button>
+          <button type="button" onclick={backToGatheringEventLibrary}>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters', 'Events')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.EditBreadcrumb', 'Edit gathering hazard')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb', 'Edit gathering event')}</span>
         {/if}
         {#if currentView === 'tools'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -2916,9 +2916,9 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
         </button>
       {:else if currentView === 'environments' && activeGatheringTab === 'encounters'}
-        <button type="button" class="manager-button is-primary" onclick={() => createGatheringHazard(selectedSystemId)} disabled={!canShowEnvironments}>
+        <button type="button" class="manager-button is-primary" onclick={() => createGatheringEvent(selectedSystemId)} disabled={!canShowEnvironments}>
           <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Create', 'Create gathering hazard')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span>
         </button>
       {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
         <button type="button" class="manager-button is-primary" onclick={() => store.createParty?.()} disabled={!canShowEnvironments || $viewState.travelSaving}>
@@ -2981,33 +2981,33 @@
           <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
         </button>
-      {:else if currentView === 'gathering-hazard-edit'}
-        {#if gatheringHazardDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Hazards.Dirty', 'Unsaved')}</span>
+      {:else if currentView === 'gathering-event-edit'}
+        {#if gatheringEventDraftDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</span>
         {/if}
-        <button type="button" class="manager-button" onclick={backToGatheringHazardLibrary}>
+        <button type="button" class="manager-button" onclick={backToGatheringEventLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.BackToLibrary', 'Back to hazard library')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.BackToLibrary', 'Back to event library')}</span>
         </button>
         <button
           type="button"
           class="manager-button is-danger"
-          onclick={deleteGatheringHazardDraft}
-          disabled={!selectedGatheringHazardId || gatheringHazardSaving}
-          title={text('FABRICATE.Admin.Manager.Environment.Hazards.Delete', 'Delete hazard')}
+          onclick={deleteGatheringEventDraft}
+          disabled={!selectedGatheringEventId || gatheringEventSaving}
+          title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
         >
           <i class="fas fa-trash" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Delete', 'Delete hazard')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span>
         </button>
         <button
           type="button"
           class="manager-button is-primary"
-          onclick={saveGatheringHazardDraft}
-          disabled={!gatheringHazardDraftDirty || !gatheringHazardValidation.valid || gatheringHazardSaving}
-          title={gatheringHazardValidation.valid ? '' : gatheringHazardValidation.errors.join('\n')}
+          onclick={saveGatheringEventDraft}
+          disabled={!gatheringEventDraftDirty || !gatheringEventValidation.valid || gatheringEventSaving}
+          title={gatheringEventValidation.valid ? '' : gatheringEventValidation.errors.join('\n')}
         >
-          <i class={gatheringHazardSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Save', 'Save hazard')}</span>
+          <i class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
         </button>
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
@@ -3167,7 +3167,7 @@
         {activeTravelTab}
         onSelectTravelTab={selectTravelTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
-        selectedHazardId={selectedGatheringHazard?.id || selectedGatheringHazardId}
+        selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         {services}
         onSelectGatheringTab={selectGatheringTab}
@@ -3177,12 +3177,12 @@
         onDuplicateGatheringTask={duplicateGatheringTask}
         onDeleteGatheringTask={deleteGatheringTask}
         onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}
-        onSelectGatheringHazard={selectGatheringHazard}
-        onCreateGatheringHazard={createGatheringHazard}
-        onEditGatheringHazard={editGatheringHazard}
-        onDuplicateGatheringHazard={duplicateGatheringHazard}
-        onDeleteGatheringHazard={deleteGatheringHazard}
-        onToggleGatheringHazardEnabled={toggleGatheringHazardEnabled}
+        onSelectGatheringEvent={selectGatheringEvent}
+        onCreateGatheringEvent={createGatheringEvent}
+        onEditGatheringEvent={editGatheringEvent}
+        onDuplicateGatheringEvent={duplicateGatheringEvent}
+        onDeleteGatheringEvent={deleteGatheringEvent}
+        onToggleGatheringEventEnabled={toggleGatheringEventEnabled}
         onSelectEnvironment={(id) => selectEnvironment(id)}
         onEditEnvironment={(id) => editEnvironment(id)}
         onCreateEnvironment={createEnvironment}
@@ -3243,7 +3243,7 @@
           <EnvironmentEditView
             environmentDraft={$viewState.environmentDraft}
             composition={$viewState.environmentComposition}
-            hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}
+            eventSelectionMode={selectedGatheringRules.eventSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
             linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
             regionRecords={$viewState.selectedSystemRegions || []}
@@ -3259,7 +3259,7 @@
             onRestoreRecord={store.restoreEnvironmentRecord}
             onReorderRecord={store.reorderEnvironmentRecord}
             onOpenSourceTask={(id) => editGatheringTask(id)}
-            onOpenSourceHazard={(id) => editGatheringHazard(id)}
+            onOpenSourceEvent={(id) => editGatheringEvent(id)}
           />
         </section>
       </main>
@@ -3291,14 +3291,14 @@
         onAddToolReference={addToolReferenceToSelectedTask}
         onRemoveToolReference={removeToolReferenceFromSelectedTask}
       />
-    {:else if currentView === 'gathering-hazard-edit' && selectedSystem}
-      <GatheringHazardEditView
-        hazard={editingGatheringHazard}
+    {:else if currentView === 'gathering-event-edit' && selectedSystem}
+      <GatheringEventEditView
+        event={editingGatheringEvent}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
         onPickImagePath={services?.pickImagePath}
-        onUpdateHazard={updateSelectedGatheringHazard}
+        onUpdateEvent={updateSelectedGatheringEvent}
       />
     {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView
@@ -3514,7 +3514,7 @@
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralTitle', 'General category')}</h3>
           <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralInspectorHint', 'General is the built-in category for recipes without a custom category and cannot be removed.')}</p>
         </section>
-      {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-hazard-edit'}
+      {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
           {#if selectedGatheringTask}
             {#if currentView !== 'gathering-task-edit'}
@@ -3837,31 +3837,31 @@
               </div>
             </div>
           {/if}
-        {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-hazard-edit'}
-          {#if currentView === 'gathering-hazard-edit' && editingGatheringHazard}
-            <div class="manager-drop-inspector-stack" data-gathering-hazard-inspector-stack>
+        {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
+          {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
+            <div class="manager-drop-inspector-stack" data-gathering-event-inspector-stack>
               <div class="manager-drop-inspector-scroll">
               {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
-                {@const cardTitle = gatheringModifierCardTitle(kind, 'hazard')}
-                {@const cardHint = gatheringModifierCardHint(kind, 'hazard')}
-                {@const availableConditions = gatheringConditionAvailableOptions(editingGatheringHazard, kind)}
-                {@const pickerSelection = gatheringHazardModifierPickerSelection(kind)}
-                {@const attachedModifiers = gatheringConditionModifierRows(editingGatheringHazard, kind)}
-                <section class="manager-inspector-card manager-drop-editor-condition-modifier-card" data-gathering-hazard-condition-modifiers={kind}>
+                {@const cardTitle = gatheringModifierCardTitle(kind, 'event')}
+                {@const cardHint = gatheringModifierCardHint(kind, 'event')}
+                {@const availableConditions = gatheringConditionAvailableOptions(editingGatheringEvent, kind)}
+                {@const pickerSelection = gatheringEventModifierPickerSelection(kind)}
+                {@const attachedModifiers = gatheringConditionModifierRows(editingGatheringEvent, kind)}
+                <section class="manager-inspector-card manager-drop-editor-condition-modifier-card" data-gathering-event-condition-modifiers={kind}>
                   <header class="manager-character-modifier-row-card-header">
                     <div class="manager-character-modifier-row-card-heading">
                       <h3 class="manager-card-title">{cardTitle}</h3>
                       <p class="manager-muted">{cardHint}</p>
                     </div>
                   </header>
-                  <div class="manager-condition-modifier-add-row" data-gathering-hazard-condition-modifier-picker={kind}>
+                  <div class="manager-condition-modifier-add-row" data-gathering-event-condition-modifier-picker={kind}>
                     <label class="manager-field manager-condition-modifier-picker">
                       <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel', 'Condition')}</span>
                       <select
                         value={pickerSelection}
                         disabled={availableConditions.length === 0}
                         data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
-                        onchange={(event) => setGatheringHazardModifierPickerSelection(kind, event.currentTarget.value)}
+                        onchange={(event) => setGatheringEventModifierPickerSelection(kind, event.currentTarget.value)}
                       >
                         {#each availableConditions as option (option.id)}
                           <option value={option.id}>{option.label || option.id}</option>
@@ -3875,14 +3875,14 @@
                       title={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
                       disabled={availableConditions.length === 0 || !pickerSelection}
                       data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
-                      onclick={() => addGatheringHazardConditionModifier(kind, pickerSelection)}
+                      onclick={() => addGatheringEventConditionModifier(kind, pickerSelection)}
                     >
                       <i class="fas fa-plus" aria-hidden="true"></i>
                     </button>
                   </div>
                   <div class="manager-condition-modifier-row-list">
                     {#each attachedModifiers as modifier (modifier.id)}
-                      <article class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`} data-gathering-hazard-modifier-id={modifier.id}>
+                      <article class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`} data-gathering-event-modifier-id={modifier.id}>
                         <header class="manager-character-modifier-row-reference-header">
                           <span class="manager-character-modifier-icon">
                             <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"></i>
@@ -3895,8 +3895,8 @@
                               inputmode="numeric"
                               value={gatheringModifierDisplayValue(modifier)}
                               aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
-                              oninput={(event) => updateGatheringHazardConditionModifier(kind, modifier.id, signedToOperatorValue(event.currentTarget.value))}
-                              onkeydown={(event) => onGatheringHazardModifierKeydown(kind, modifier, event)}
+                              oninput={(event) => updateGatheringEventConditionModifier(kind, modifier.id, signedToOperatorValue(event.currentTarget.value))}
+                              onkeydown={(event) => onGatheringEventModifierKeydown(kind, modifier, event)}
                             />
                             <span aria-hidden="true">%</span>
                           </label>
@@ -3904,7 +3904,7 @@
                             type="button"
                             class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
                             aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier', 'Delete modifier')}
-                            onclick={() => deleteGatheringHazardConditionModifier(kind, modifier.id)}
+                            onclick={() => deleteGatheringEventConditionModifier(kind, modifier.id)}
                           >
                             <i class="fas fa-trash" aria-hidden="true"></i>
                           </button>
@@ -3915,7 +3915,7 @@
                 </section>
               {/each}
 
-              <section class="manager-inspector-card manager-character-modifier-row-card" data-gathering-hazard-character-modifiers>
+              <section class="manager-inspector-card manager-character-modifier-row-card" data-gathering-event-character-modifiers>
                 <header class="manager-character-modifier-row-card-header">
                   <div class="manager-character-modifier-row-card-heading">
                     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h3>
@@ -3923,7 +3923,7 @@
                   </div>
                 </header>
                 <div class="manager-character-modifier-add-search-row">
-                  <label bind:this={characterModifierSearchAnchor} class="manager-search is-compact manager-character-modifier-add-search" data-gathering-hazard-character-modifier-search>
+                  <label bind:this={characterModifierSearchAnchor} class="manager-search is-compact manager-character-modifier-add-search" data-gathering-event-character-modifier-search>
                     <i class="fas fa-search" aria-hidden="true"></i>
                     <input
                       type="search"
@@ -3934,14 +3934,14 @@
                       disabled={selectedGatheringCharacterModifiers.length === 0}
                       data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null}
                     />
-                    {#if hazardCharacterModifierSearchSuggestions.length > 0}
-                      <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-hazard-character-modifier-suggestions>
-                        {#each hazardCharacterModifierSearchSuggestions as option (option.id)}
+                    {#if eventCharacterModifierSearchSuggestions.length > 0}
+                      <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-event-character-modifier-suggestions>
+                        {#each eventCharacterModifierSearchSuggestions as option (option.id)}
                           <button
                             type="button"
                             class="manager-tag-suggestion manager-character-modifier-add-suggestion"
-                            data-gathering-hazard-character-modifier-suggestion={option.id}
-                            onclick={() => pickCharacterModifierForHazard(option.id)}
+                            data-gathering-event-character-modifier-suggestion={option.id}
+                            onclick={() => pickCharacterModifierForEvent(option.id)}
                           >
                             <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
                             <span>{option.label || option.id}</span>
@@ -3952,11 +3952,11 @@
                   </label>
                 </div>
                 <div class="manager-character-modifier-row-list">
-                  {#each rowCharacterModifiers(editingGatheringHazard) as ref (ref.id)}
+                  {#each rowCharacterModifiers(editingGatheringEvent) as ref (ref.id)}
                     {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
                     {@const hasOverride = characterModifierIsCustomized(ref)}
                     {@const operatorClass = characterModifierOperatorClass(ref.operator)}
-                    <article class="manager-character-modifier-row-reference" data-gathering-hazard-character-modifier-ref={ref.id}>
+                    <article class="manager-character-modifier-row-reference" data-gathering-event-character-modifier-ref={ref.id}>
                       <header class="manager-character-modifier-row-reference-header">
                         <span class="manager-character-modifier-icon"><i class={characterModifierIconForRef(ref)} aria-hidden="true"></i></span>
                         <span class="manager-character-modifier-row-reference-label">{characterModifierLabelForRef(ref)}</span>
@@ -3967,23 +3967,23 @@
                         {/if}
                         <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
                           <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator', 'Operator')}</span>
-                          <select value={ref.operator || '+'} onchange={(event) => onUpdateHazardCharacterModifier(ref.id, { operator: event.currentTarget.value })}>
+                          <select value={ref.operator || '+'} onchange={(event) => onUpdateEventCharacterModifier(ref.id, { operator: event.currentTarget.value })}>
                             <option value="+">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive', 'Positive')}</option>
                             <option value="-">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
                           </select>
                         </label>
-                        <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteHazardCharacterModifier(ref.id)}>
+                        <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteEventCharacterModifier(ref.id)}>
                           <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
                       </header>
                       <div class="manager-character-modifier-row-bounds">
                         <label class="manager-field">
                           <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min', 'Min')}</span>
-                          <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateHazardCharacterModifier(ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                          <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateEventCharacterModifier(ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
                         </label>
                         <label class="manager-field">
                           <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max', 'Max')}</span>
-                          <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateHazardCharacterModifier(ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                          <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateEventCharacterModifier(ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
                         </label>
                       </div>
                       <div class="manager-character-modifier-override-row">
@@ -3992,7 +3992,7 @@
                           class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
                           aria-pressed={hasOverride}
                           aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
-                          onclick={() => setHazardCharacterModifierOverrideEnabled(ref, !hasOverride, libraryEntry)}
+                          onclick={() => setEventCharacterModifierOverrideEnabled(ref, !hasOverride, libraryEntry)}
                         >
                           <span class="manager-status-toggle-track" aria-hidden="true">
                             <span class="manager-status-toggle-knob"></span>
@@ -4006,13 +4006,13 @@
                       </div>
                       {#if hasOverride}
                         <p class="manager-muted manager-character-modifier-override-hint">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint', 'Overrides the library expression for this row.')}</p>
-                        <label class="manager-field" for={`hazard-${editingGatheringHazard.id}-character-modifier-${ref.id}-expression`}>
+                        <label class="manager-field" for={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}>
                           <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
                           <input
-                            id={`hazard-${editingGatheringHazard.id}-character-modifier-${ref.id}-expression`}
+                            id={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
                             type="text"
                             value={ref.expressionOverride || ''}
-                            oninput={(event) => onUpdateHazardCharacterModifier(ref.id, { expressionOverride: event.currentTarget.value })}
+                            oninput={(event) => onUpdateEventCharacterModifier(ref.id, { expressionOverride: event.currentTarget.value })}
                           />
                         </label>
                       {/if}
@@ -4024,77 +4024,77 @@
               </section>
               </div>
             </div>
-          {:else if selectedGatheringHazard && currentView !== 'gathering-hazard-edit'}
-            <section class="manager-inspector-card" data-gathering-hazard-inspector>
+          {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
+            <section class="manager-inspector-card" data-gathering-event-inspector>
               <div class="manager-inspector-title-row is-hero-large">
-                <img class="manager-recipe-preview" src={selectedGatheringHazard.img || 'icons/svg/hazard.svg'} alt="" />
+                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || 'icons/svg/mystery-man.svg'} alt="" />
                 <div class="manager-inspector-copy">
-                  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Hazards.Selected', 'Selected gathering hazard')}</p>
-                  <h2 class="manager-inspector-name" title={selectedGatheringHazard.name || ''}>{selectedGatheringHazard.name || text('FABRICATE.Admin.Manager.Environment.Hazards.UnnamedHazard', 'Unnamed hazard')}</h2>
+                  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
+                  <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>
                   <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringHazard.enabled === false ? 'is-disabled' : 'is-active'}`}>
-                      {selectedGatheringHazard.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
+                    <span class={`manager-chip ${selectedGatheringEvent.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                      {selectedGatheringEvent.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
                     </span>
-                    {#if Array.isArray(selectedGatheringHazard.dangerTags) && selectedGatheringHazard.dangerTags.length > 0}
-                      <span class="manager-chip">{sortedDangerTags(selectedGatheringHazard.dangerTags).join(', ')}</span>
+                    {#if Array.isArray(selectedGatheringEvent.dangerTags) && selectedGatheringEvent.dangerTags.length > 0}
+                      <span class="manager-chip">{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</span>
                     {/if}
                   </div>
                 </div>
               </div>
 
               <p class="manager-muted">
-                {selectedGatheringHazard.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+                {selectedGatheringEvent.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
               </p>
             </section>
 
             <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Hazards.Details', 'Hazard details')}</h3>
+              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}</h3>
               <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-hazard-fact="biomes">
-                  <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0 ? selectedGatheringHazard.biomes.length : text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
+                <div class="manager-fact" data-gathering-event-fact="biomes">
+                  <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0 ? selectedGatheringEvent.biomes.length : text('FABRICATE.Admin.Manager.Environment.Events.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
-                <div class="manager-fact" data-gathering-hazard-fact="drop-rate">
+                <div class="manager-fact" data-gathering-event-fact="drop-rate">
                   <span class="manager-fact-line"><strong>{(() => {
-                    const rate = Number(selectedGatheringHazard.dropRate);
+                    const rate = Number(selectedGatheringEvent.dropRate);
                     if (!Number.isFinite(rate)) return '—';
                     return `${Math.max(1, Math.min(100, Math.floor(rate)))}%`;
-                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Hazards.DropRate', 'Drop rate')}</span></span>
+                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Events.DropRate', 'Drop rate')}</span></span>
                 </div>
-                <div class="manager-fact" data-gathering-hazard-fact="environments">
+                <div class="manager-fact" data-gathering-event-fact="environments">
                   <span class="manager-fact-line"><strong>{(() => {
-                    if (!selectedGatheringHazard?.id) return 0;
-                    const hazardId = String(selectedGatheringHazard.id);
+                    if (!selectedGatheringEvent?.id) return 0;
+                    const eventId = String(selectedGatheringEvent.id);
                     return environmentList.filter(env => {
                       if (String(env?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-                      const ids = Array.isArray(env?.enabledHazardIds) ? env.enabledHazardIds.map(String) : [];
-                      return ids.includes(hazardId);
+                      const ids = Array.isArray(env?.enabledEventIds) ? env.enabledEventIds.map(String) : [];
+                      return ids.includes(eventId);
                     }).length;
-                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Hazards.ActiveEnvironments', 'Active environments')}</span></span>
+                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Events.ActiveEnvironments', 'Active environments')}</span></span>
                 </div>
               </div>
             </section>
 
-            <section class="manager-inspector-card manager-hazard-environment-usage-card" data-hazard-environment-usage>
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Hazards.UsedInEnvironmentsCard', 'Used in environments')}</h3>
-              {#if gatheringHazardReferencingEnvironments(selectedGatheringHazard).length === 0}
-                <p class="manager-muted" data-hazard-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Hazards.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
+            <section class="manager-inspector-card manager-event-environment-usage-card" data-event-environment-usage>
+              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard', 'Used in environments')}</h3>
+              {#if gatheringEventReferencingEnvironments(selectedGatheringEvent).length === 0}
+                <p class="manager-muted" data-event-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Events.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
               {:else}
-                <div class="manager-hazard-environment-usage-grid" data-hazard-environment-usage-chips>
-                  {#each gatheringHazardReferencingEnvironments(selectedGatheringHazard) as environment (environment.id)}
-                    <article class="manager-hazard-environment-usage-card">
-                      <img class="manager-hazard-environment-usage-thumb" src={environmentImage(environment)} alt="" />
-                      <span class="manager-hazard-environment-usage-name" title={environmentName(environment)}>{environmentName(environment)}</span>
+                <div class="manager-event-environment-usage-grid" data-event-environment-usage-chips>
+                  {#each gatheringEventReferencingEnvironments(selectedGatheringEvent) as environment (environment.id)}
+                    <article class="manager-event-environment-usage-card">
+                      <img class="manager-event-environment-usage-thumb" src={environmentImage(environment)} alt="" />
+                      <span class="manager-event-environment-usage-name" title={environmentName(environment)}>{environmentName(environment)}</span>
                     </article>
                   {/each}
                 </div>
               {/if}
             </section>
-          {:else if currentView !== 'gathering-hazard-edit'}
+          {:else if currentView !== 'gathering-event-edit'}
             <div class="manager-empty">
               <div>
                 <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Hazards.SelectHazard', 'Select a gathering hazard')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Hazards.InspectorHint', 'The inspector shows hazard availability, danger tags, drop rate, and active environment usage for the selected row.')}</p>
+                <h3>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select a gathering event')}</h3>
+                <p>{text('FABRICATE.Admin.Manager.Environment.Events.InspectorHint', 'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.')}</p>
               </div>
             </div>
           {/if}
@@ -4135,51 +4135,51 @@
 
               <div class="manager-rule-row">
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-triangle-exclamation"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-hazards">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Hazards', 'Hazards')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardsDescription', 'Choose how matching hazards are applied after a gathering roll.')}</span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-events">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Events', 'Events')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.EventsDescription', 'Choose how matching events are applied after a gathering roll.')}</span>
                 </label>
                 <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-hazards" value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
-                    <option value="highestRankedDrop">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardHighestRankedDrop', 'Highest ranked triggered hazard')}</option>
-                    <option value="allDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardAllDrops', 'All triggered hazards')}</option>
-                    <option value="limitedDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardLimitedDrops', 'Limit triggered hazards')}</option>
+                  <select id="manager-gathering-rule-events" value={selectedGatheringRules.eventSelectionMode} onchange={(event) => updateSelectedGatheringRules({ eventSelectionMode: event.target.value })}>
+                    <option value="highestRankedDrop">{text('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop', 'Highest ranked triggered event')}</option>
+                    <option value="allDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.EventAllDrops', 'All triggered events')}</option>
+                    <option value="limitedDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.EventLimitedDrops', 'Limit triggered events')}</option>
                   </select>
                 </span>
               </div>
-              {#if selectedGatheringRules.hazardSelectionMode === 'limitedDrops'}
-                <div class="manager-rule-stepper" data-gathering-rule-stepper="hazardLimit">
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.DecreaseHazardLimit', 'Decrease hazard limit')} onclick={() => adjustGatheringRuleLimit('hazardLimit', -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <input type="number" min="1" step="1" value={selectedGatheringRules.hazardLimit} aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.HazardLimit', 'Hazard limit')} oninput={(event) => updateSelectedGatheringRules({ hazardLimit: Number(event.target.value || 1) })} />
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.IncreaseHazardLimit', 'Increase hazard limit')} onclick={() => adjustGatheringRuleLimit('hazardLimit', 1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+              {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
+                <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
+                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit', 'Decrease event limit')} onclick={() => adjustGatheringRuleLimit('eventLimit', -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
+                  <input type="number" min="1" step="1" value={selectedGatheringRules.eventLimit} aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.EventLimit', 'Event limit')} oninput={(event) => updateSelectedGatheringRules({ eventLimit: Number(event.target.value || 1) })} />
+                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit', 'Increase event limit')} onclick={() => adjustGatheringRuleLimit('eventLimit', 1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
                 </div>
               {/if}
 
               <div class="manager-rule-row">
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-outcome">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcome', 'Hazard outcome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcomeDescription', 'Decide whether rolling a hazard still allows the gathering attempt to succeed.')}</span>
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.EventOutcome', 'Event outcome')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.EventOutcomeDescription', 'Decide whether rolling an event still allows the gathering attempt to succeed.')}</span>
                 </label>
                 <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-outcome" value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
-                    <option value="successWithHazard">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds')}</option>
-                    <option value="failureWithHazard">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')}</option>
+                  <select id="manager-gathering-rule-outcome" value={selectedGatheringRules.eventPolicy} onchange={(event) => updateSelectedGatheringRules({ eventPolicy: event.target.value })}>
+                    <option value="successWithEvent">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds')}</option>
+                    <option value="failureWithEvent">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')}</option>
                   </select>
                 </span>
               </div>
 
               <div class="manager-rule-row">
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-eye"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-hazard-visibility">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibility', 'Hazard visibility')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityDescription', 'Control how much hazard information players see.')}</span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-event-visibility">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibility', 'Event visibility')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityDescription', 'Control how much event information players see.')}</span>
                 </label>
                 <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-hazard-visibility" value={selectedGatheringRules.hazardVisibility ?? 'encounterChance'} onchange={(event) => updateSelectedGatheringRules({ hazardVisibility: event.target.value })}>
-                    <option value="dangerLevelOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityDangerOnly', 'Danger level only')}</option>
-                    <option value="encounterChance">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityEncounter', 'Encounter chance')}</option>
-                    <option value="full">{text('FABRICATE.Admin.Manager.Environment.Rules.HazardVisibilityFull', 'Full details')}</option>
+                  <select id="manager-gathering-rule-event-visibility" value={selectedGatheringRules.eventVisibility ?? 'encounterChance'} onchange={(event) => updateSelectedGatheringRules({ eventVisibility: event.target.value })}>
+                    <option value="dangerLevelOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityDangerOnly', 'Danger level only')}</option>
+                    <option value="encounterChance">{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityEncounter', 'Encounter chance')}</option>
+                    <option value="full">{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityFull', 'Full details')}</option>
                   </select>
                 </span>
               </div>
@@ -4552,11 +4552,11 @@
                 <h3>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Title', 'Plan gathering content')}</h3>
               </div>
             </div>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Hint', 'Gathering tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Hint', 'Gathering tasks and events give environments consistent activities, risks, and rewards across gathering locations.')}</p>
             <ol class="manager-setup-list">
               <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepTasks', 'Define gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepHazards', 'Prepare encounter and hazard options that can be reused across risky locations.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepCreate', 'Create environments after the gathering task and hazard libraries are ready to attach.')}</li>
+              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepEvents', 'Prepare event options that can be reused across your locations.')}</li>
+              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepCreate', 'Create environments after the gathering task and event libraries are ready to attach.')}</li>
             </ol>
             <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Environment.EmptySetup.Resources', 'Environment resources')}>
               <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/gathering-environments/" target="_blank" rel="noreferrer">

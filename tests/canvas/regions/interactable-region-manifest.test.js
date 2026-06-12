@@ -39,6 +39,6 @@ test('module.json declares the interactable RegionBehavior subtype matching the 
 test('module.json declares socket:true so cross-client emits are relayed', () => {
   // Foundry only relays a module's `game.socket.emit("module.fabricate", …)` to
   // other clients when the manifest opts in with `"socket": true`. Without it the
-  // player→active-GM activation round-trip (and node/hazard routing) silently dies.
+  // player→active-GM activation round-trip (and node/event routing) silently dies.
   assert.equal(manifest.socket, true, 'manifest must set "socket": true for module socket relay');
 });

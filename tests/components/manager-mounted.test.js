@@ -44,8 +44,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardsBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRegionsTab.svelte');
@@ -67,7 +67,7 @@ function compileManagerRoot() {
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
     'EnvironmentTasksTab',
-    'EnvironmentHazardsTab',
+    'EnvironmentEventsTab',
     'EnvironmentValidationTab',
     'EnvironmentRightInspector',
     'EnvironmentSummaryInspector',
@@ -517,10 +517,10 @@ function createStore(calls = [], options = {}) {
     environments,
     environmentsLoading: false,
     environmentsError: null,
-    // Library-derived per-environment composition counts (tasks/hazards matched in).
+    // Library-derived per-environment composition counts (tasks/events matched in).
     environmentTaskCounts: options.environmentTaskCounts || {
-      'env-forest': { availableTaskCount: 1, availableHazardCount: 0 },
-      'env-cavern': { availableTaskCount: 1, availableHazardCount: 0 }
+      'env-forest': { availableTaskCount: 1, availableEventCount: 0 },
+      'env-cavern': { availableTaskCount: 1, availableEventCount: 0 }
     },
     selectedEnvironmentId: options.emptyEnvironments ? '' : 'env-forest',
     environmentDraft: options.emptyEnvironments ? null : environmentDraft,
@@ -587,9 +587,9 @@ function createStore(calls = [], options = {}) {
           rules: {
             rewardSelectionMode: options.rewardSelectionMode || 'highestRankedDrop',
             rewardLimit: 1,
-            hazardSelectionMode: 'allDrops',
-            hazardLimit: 1,
-            hazardPolicy: 'successWithHazard'
+            eventSelectionMode: 'allDrops',
+            eventLimit: 1,
+            eventPolicy: 'successWithEvent'
           },
           tasks: options.emptyGatheringTasks ? [] : [
             {
@@ -648,7 +648,7 @@ function createStore(calls = [], options = {}) {
               dropRows: []
             }
           ],
-          hazards: [],
+          events: [],
           tools: options.gatheringLibraryTools || []
         }
       }
@@ -772,9 +772,9 @@ function createStore(calls = [], options = {}) {
       calls.push(['confirmDiscardDirtyGatheringTaskDraft']);
       return options.confirmDiscardGatheringTaskResult ?? true;
     },
-    confirmDiscardDirtyGatheringHazardDraft: () => {
-      calls.push(['confirmDiscardDirtyGatheringHazardDraft']);
-      return options.confirmDiscardGatheringHazardResult ?? true;
+    confirmDiscardDirtyGatheringEventDraft: () => {
+      calls.push(['confirmDiscardDirtyGatheringEventDraft']);
+      return options.confirmDiscardGatheringEventResult ?? true;
     },
     selectEnvironment: (id) => {
       calls.push(['selectEnvironment', id]);
@@ -2350,14 +2350,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
     assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
-    // The parent count is the sum of records (environments + tasks + hazards), not
+    // The parent count is the sum of records (environments + tasks + events), not
     // the subitem count. Travel is hidden by default (Travel & Regions toggle off).
     assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Settings']
+      ['Environments', 'Tasks', 'Events', 'Settings']
     );
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
@@ -2883,15 +2883,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
 
-    gatheringSubitem('Hazards').click();
+    gatheringSubitem('Events').click();
     await tick();
     flushSync();
-    assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
-    assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Hazards tab should mount the hazard library browser');
+    assert.equal(gatheringSubitem('Events').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-gathering-events-browser]'), 'Events tab should mount the event library browser');
     assert.equal(target.querySelector('.manager-environments-table'), null);
     assert.ok(
-      target.querySelector('.manager-inspector').textContent.includes('Select a gathering hazard'),
-      'inspector should show the select-hazard empty state when no hazard is selected'
+      target.querySelector('.manager-inspector').textContent.includes('Select a gathering event'),
+      'inspector should show the select-event empty state when no event is selected'
     );
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
@@ -2904,7 +2904,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
     assert.equal(target.querySelector('.manager-toolbar'), null);
     assert.equal(target.querySelector('.manager-environments-table'), null);
-    assert.ok(target.textContent.includes('Set system-level drop resolution and hazard rules for gathering.'));
+    assert.ok(target.textContent.includes('Set system-level drop resolution and event rules for gathering.'));
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
     // Region is no longer a vocabulary dimension: only the biome vocabulary panel remains.
     assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 1);
@@ -2919,8 +2919,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.ok(target.textContent.includes('Travel & Regions'));
     assert.ok(target.textContent.includes('Biomes'));
-    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.'));
-    assert.ok(target.textContent.includes('These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.'));
+    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.'));
+    assert.ok(target.textContent.includes('These values control weather matching for gathering tasks and events. Click the name of a condition to edit it.'));
     assert.ok(target.textContent.includes('Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.'));
     assert.equal(target.querySelectorAll('.manager-condition-add input').length, 3);
     assert.equal(target.querySelectorAll('.manager-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
@@ -3061,28 +3061,28 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.manager-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
     assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how rewards are granted.'));
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how matching hazards are applied after a gathering roll.'));
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether rolling a hazard still allows the gathering attempt to succeed.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how matching events are applied after a gathering roll.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether rolling an event still allows the gathering attempt to succeed.'));
     const rewardsSelect = target.querySelector('#manager-gathering-rule-rewards');
-    const hazardsSelect = target.querySelector('#manager-gathering-rule-hazards');
+    const eventsSelect = target.querySelector('#manager-gathering-rule-events');
     assert.deepEqual(
       Array.from(rewardsSelect.options).map(option => option.textContent.trim()),
       ['Highest ranked successful drop', 'All successful drops', 'Limit successful drops']
     );
     assert.deepEqual(
-      Array.from(hazardsSelect.options).map(option => option.textContent.trim()),
-      ['Highest ranked triggered hazard', 'All triggered hazards', 'Limit triggered hazards']
+      Array.from(eventsSelect.options).map(option => option.textContent.trim()),
+      ['Highest ranked triggered event', 'All triggered events', 'Limit triggered events']
     );
-    assert.equal(hazardsSelect.textContent.includes('Highest ranked successful drop'), false);
-    assert.equal(hazardsSelect.textContent.includes('All successful drops'), false);
+    assert.equal(eventsSelect.textContent.includes('Highest ranked successful drop'), false);
+    assert.equal(eventsSelect.textContent.includes('All successful drops'), false);
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
     assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 9);
-    const hazardVisibilitySelect = target.querySelector('#manager-gathering-rule-hazard-visibility');
-    assert.ok(hazardVisibilitySelect, 'hazard visibility select renders in the rules inspector');
+    const eventVisibilitySelect = target.querySelector('#manager-gathering-rule-event-visibility');
+    assert.ok(eventVisibilitySelect, 'event visibility select renders in the rules inspector');
     assert.deepEqual(
-      Array.from(hazardVisibilitySelect.options).map(option => option.textContent.trim()),
+      Array.from(eventVisibilitySelect.options).map(option => option.textContent.trim()),
       ['Danger level only', 'Encounter chance', 'Full details']
     );
     assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
@@ -4426,7 +4426,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Settings']
+      ['Environments', 'Tasks', 'Events', 'Settings']
     );
     assert.deepEqual(
       gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
@@ -4434,13 +4434,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
-    assert.ok(target.textContent.includes('Define gathering tasks and hazards before creating environments'));
+    assert.ok(target.textContent.includes('Define gathering tasks and events before creating environments'));
     assert.ok(target.textContent.includes('Review tasks'));
-    assert.ok(target.textContent.includes('Review hazards'));
+    assert.ok(target.textContent.includes('Review events'));
     assert.ok(target.textContent.includes('Plan gathering content'));
     assert.ok(target.textContent.includes('Define gathering tasks with their checks'));
-    assert.ok(target.textContent.includes('Prepare encounter and hazard options'));
-    assert.ok(target.textContent.includes('Create environments after the gathering task and hazard libraries are ready to attach.'));
+    assert.ok(target.textContent.includes('Prepare event options'));
+    assert.ok(target.textContent.includes('Create environments after the gathering task and event libraries are ready to attach.'));
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
 
@@ -4461,13 +4461,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
-      .find(button => button.textContent.includes('Review hazards'))
+      .find(button => button.textContent.includes('Review events'))
       .click();
     await tick();
     flushSync();
 
-    assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
-    assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Review hazards button should land on the hazard library');
+    assert.equal(gatheringSubitem('Events').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-gathering-events-browser]'), 'Review events button should land on the event library');
 
     gatheringSubitem('Environments').click();
     await tick();
@@ -4760,7 +4760,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit', 'declining the confirm should keep the editor open');
   });
 
-  it('omits source and action controls from mounted task and hazard record inspectors', async () => {
+  it('omits source and action controls from mounted task and event record inspectors', async () => {
     const updateCalls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -4780,7 +4780,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         composition: {
           compositionMode: 'automatic',
           conditions: {},
-          counts: { availableTasks: 1, availableHazards: 1 },
+          counts: { availableTasks: 1, availableEvents: 1 },
           tasks: [{
             id: 'task-forage',
             record: { name: 'Forage Herbs', img: 'icons/svg/item-bag.svg' },
@@ -4819,8 +4819,8 @@ describe('CraftingSystemManager mounted behavior', () => {
               hasDropRateAdjustment: true
             }]
           }],
-          hazards: [{
-            id: 'hazard-thorns',
+          events: [{
+            id: 'event-thorns',
             record: { name: 'Thorn Snare', img: 'icons/svg/hazard.svg', dropRate: 10 },
             compositionState: 'includedByMatch',
             runtimeState: 'available',
@@ -4904,48 +4904,48 @@ describe('CraftingSystemManager mounted behavior', () => {
     taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]').click();
     assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustmentsEnabled: { 'task-forage': false } }, 'turning the toggle off should preserve stored values and only disable application');
 
-    target.querySelector('[data-environment-tab-button="hazards"]').click();
+    target.querySelector('[data-environment-tab-button="events"]').click();
     await tick();
     flushSync();
-    const hazardInspector = target.querySelector('[data-record-inspector="hazard"]');
-    assert.ok(hazardInspector, 'hazards tab should render the selected hazard inspector');
-    assert.ok(hazardInspector.querySelector('.manager-inspector-title-row'), 'hazard inspector should render the selected-record header');
-    assert.ok(hazardInspector.textContent.includes('Selected hazard'), 'hazard inspector header should identify the selected hazard');
-    assert.ok(hazardInspector.textContent.includes('Thorn Snare'), 'hazard inspector header should include the selected hazard name');
-    assert.equal(hazardInspector.querySelector('[data-composition-state]')?.dataset.compositionState, 'includedByMatch', 'hazard inspector header should keep the composition pill');
-    assert.equal(hazardInspector.querySelector('[data-runtime-state]')?.dataset.runtimeState, 'available', 'hazard inspector header should keep the runtime pill');
-    assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'hazard inspector should not render a Source card');
-    assert.equal(target.querySelector('[data-record-inspector-section="runtime-state"]'), null, 'hazard inspector should not render a Runtime state card');
-    assert.equal(target.querySelector('[data-record-inspector-section="hazard-runtime"]'), null, 'hazard inspector should not render a Hazard runtime card');
-    assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'hazard inspector should not render the selected-record action strip');
-    assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
-    assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Hazard Environment Matching');
-    const hazardEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
-    assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'weather', 'time', 'danger'], 'hazard evidence table should render every composition dimension (region is geography, not composition)');
+    const eventInspector = target.querySelector('[data-record-inspector="event"]');
+    assert.ok(eventInspector, 'events tab should render the selected event inspector');
+    assert.ok(eventInspector.querySelector('.manager-inspector-title-row'), 'event inspector should render the selected-record header');
+    assert.ok(eventInspector.textContent.includes('Selected event'), 'event inspector header should identify the selected event');
+    assert.ok(eventInspector.textContent.includes('Thorn Snare'), 'event inspector header should include the selected event name');
+    assert.equal(eventInspector.querySelector('[data-composition-state]')?.dataset.compositionState, 'includedByMatch', 'event inspector header should keep the composition pill');
+    assert.equal(eventInspector.querySelector('[data-runtime-state]')?.dataset.runtimeState, 'available', 'event inspector header should keep the runtime pill');
+    assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'event inspector should not render a Source card');
+    assert.equal(target.querySelector('[data-record-inspector-section="runtime-state"]'), null, 'event inspector should not render a Runtime state card');
+    assert.equal(target.querySelector('[data-record-inspector-section="event-runtime"]'), null, 'event inspector should not render a Event runtime card');
+    assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'event inspector should not render the selected-record action strip');
+    assert.equal(target.querySelector('.manager-environment-open-source'), null, 'event inspector should not render an open-source CTA');
+    assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Event Environment Matching');
+    const eventEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
+    assert.deepEqual(eventEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'weather', 'time', 'danger'], 'event evidence table should render every composition dimension (region is geography, not composition)');
     assert.equal(target.querySelector('[data-evidence-field="danger"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Deadly');
     assert.equal(target.querySelector('[data-evidence-field="danger"] .manager-environment-evidence-value-pill').classList.contains('is-danger'), true, 'danger mismatch should use danger tone');
-    const hazardOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
-    assert.ok(hazardOverrides, 'hazard inspector should keep the overrides card');
-    assert.ok(hazardOverrides.textContent.includes('Environment overrides'), 'hazard overrides card should keep its title');
-    assert.ok(hazardOverrides.textContent.includes('Base chance modifier'), 'hazard overrides should render the singular base-chance-modifier heading');
-    assert.ok(hazardOverrides.querySelector('[data-hazard-drop-rate-adjustments-toggle]'), 'hazard overrides should render the apply toggle');
-    const hazardAdjustmentRow = hazardOverrides.querySelector('[data-drop-rate-adjustment="hazard-thorns"]');
-    assert.ok(hazardAdjustmentRow, 'hazard override should render a single row card for the selected hazard');
-    assert.equal(hazardAdjustmentRow.classList.contains('is-task-drop'), true, 'hazard override row should reuse the task-drop card layout');
-    assert.equal(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-thumb')?.getAttribute('src'), 'icons/svg/hazard.svg', 'hazard override should render the hazard image');
-    assert.equal(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-drop strong')?.textContent.trim(), 'Thorn Snare', 'hazard override should render the hazard name');
-    assert.equal(hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-base]')?.textContent.trim(), 'Base 10%', 'hazard base rate should be its own one-row item');
-    assert.equal(hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-effective]')?.textContent.trim(), 'Effective 10%', 'hazard effective rate should be its own one-row item');
-    const hazardAdjustmentInput = hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-input]');
-    assert.ok(hazardAdjustmentInput, 'hazard override should render the custom percent input');
-    assert.equal(hazardAdjustmentInput.getAttribute('type'), 'text', 'hazard override input should use the text percentage input formatting');
-    assert.equal(hazardAdjustmentRow.querySelector('input[type="number"]'), null, 'hazard override should no longer use the plain number input');
-    assert.ok(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-clear'), 'hazard override should render the icon-only clear button');
-    hazardAdjustmentInput.value = '-5';
-    hazardAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
-    assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustments: { 'hazard-thorns': -5 } }, 'hazard percent input should update the stored hazard adjustment');
-    hazardOverrides.querySelector('[data-hazard-drop-rate-adjustments-toggle]').click();
-    assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustmentsEnabled: { 'hazard-thorns': false } }, 'turning the hazard toggle off should preserve stored values and only disable application');
+    const eventOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
+    assert.ok(eventOverrides, 'event inspector should keep the overrides card');
+    assert.ok(eventOverrides.textContent.includes('Environment overrides'), 'event overrides card should keep its title');
+    assert.ok(eventOverrides.textContent.includes('Base chance modifier'), 'event overrides should render the singular base-chance-modifier heading');
+    assert.ok(eventOverrides.querySelector('[data-event-drop-rate-adjustments-toggle]'), 'event overrides should render the apply toggle');
+    const eventAdjustmentRow = eventOverrides.querySelector('[data-drop-rate-adjustment="event-thorns"]');
+    assert.ok(eventAdjustmentRow, 'event override should render a single row card for the selected event');
+    assert.equal(eventAdjustmentRow.classList.contains('is-task-drop'), true, 'event override row should reuse the task-drop card layout');
+    assert.equal(eventAdjustmentRow.querySelector('.manager-environment-drop-adjustment-thumb')?.getAttribute('src'), 'icons/svg/hazard.svg', 'event override should render the event image');
+    assert.equal(eventAdjustmentRow.querySelector('.manager-environment-drop-adjustment-drop strong')?.textContent.trim(), 'Thorn Snare', 'event override should render the event name');
+    assert.equal(eventAdjustmentRow.querySelector('[data-drop-rate-adjustment-base]')?.textContent.trim(), 'Base 10%', 'event base rate should be its own one-row item');
+    assert.equal(eventAdjustmentRow.querySelector('[data-drop-rate-adjustment-effective]')?.textContent.trim(), 'Effective 10%', 'event effective rate should be its own one-row item');
+    const eventAdjustmentInput = eventAdjustmentRow.querySelector('[data-drop-rate-adjustment-input]');
+    assert.ok(eventAdjustmentInput, 'event override should render the custom percent input');
+    assert.equal(eventAdjustmentInput.getAttribute('type'), 'text', 'event override input should use the text percentage input formatting');
+    assert.equal(eventAdjustmentRow.querySelector('input[type="number"]'), null, 'event override should no longer use the plain number input');
+    assert.ok(eventAdjustmentRow.querySelector('.manager-environment-drop-adjustment-clear'), 'event override should render the icon-only clear button');
+    eventAdjustmentInput.value = '-5';
+    eventAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.deepEqual(updateCalls.at(-1), { eventDropRateAdjustments: { 'event-thorns': -5 } }, 'event percent input should update the stored event adjustment');
+    eventOverrides.querySelector('[data-event-drop-rate-adjustments-toggle]').click();
+    assert.deepEqual(updateCalls.at(-1), { eventDropRateAdjustmentsEnabled: { 'event-thorns': false } }, 'turning the event toggle off should preserve stored values and only disable application');
   });
 
   it('routes validation issue actions to the matching composition tab and selected record', async () => {
@@ -4968,7 +4968,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         },
         composition: {
           compositionMode: 'automatic',
-          counts: { availableTasks: 1, unavailableHazards: 1, availableHazards: 0 },
+          counts: { availableTasks: 1, unavailableEvents: 1, availableEvents: 0 },
           tasks: [{
             id: 'task-moon-herbs',
             kind: 'task',
@@ -4977,9 +4977,9 @@ describe('CraftingSystemManager mounted behavior', () => {
             runtimeState: 'available',
             evidence: {}
           }],
-          hazards: [{
-            id: 'hazard-thorns',
-            kind: 'hazard',
+          events: [{
+            id: 'event-thorns',
+            kind: 'event',
             record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg', dropRate: 10 },
             compositionState: 'includedButUnavailable',
             runtimeState: 'unavailable',
@@ -4995,14 +4995,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     Array.from(target.querySelectorAll('.manager-environment-issue-action'))
-      .find(button => button.textContent.includes('View hazard'))
+      .find(button => button.textContent.includes('View event'))
       .click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[data-environment-tab-button="hazards"]').getAttribute('aria-selected'), 'true');
-    assert.ok(target.querySelector('[data-environment-tab="hazards"] [data-record-id="hazard-thorns"]').classList.contains('is-selected'));
-    assert.ok(target.querySelector('[data-record-inspector="hazard"]').textContent.includes('Thorn Snare'));
+    assert.equal(target.querySelector('[data-environment-tab-button="events"]').getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-environment-tab="events"] [data-record-id="event-thorns"]').classList.contains('is-selected'));
+    assert.ok(target.querySelector('[data-record-inspector="event"]').textContent.includes('Thorn Snare'));
 
     target.querySelector('[data-environment-tab-button="validation"]').click();
     await tick();
@@ -5039,7 +5039,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         },
         composition: {
           compositionMode: 'automatic',
-          counts: { availableTasks: 0, availableHazards: 0, unavailableHazards: 1 },
+          counts: { availableTasks: 0, availableEvents: 0, unavailableEvents: 1 },
           tasks: [
             {
               id: 'task-rain-herbs',
@@ -5058,27 +5058,27 @@ describe('CraftingSystemManager mounted behavior', () => {
               evidence: {}
             }
           ],
-          hazards: [
+          events: [
             {
-              id: 'hazard-force',
-              kind: 'hazard',
-              record: { name: 'Forced Hazard', description: 'Added despite matching state.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+              id: 'event-force',
+              kind: 'event',
+              record: { name: 'Forced Event', description: 'Added despite matching state.', img: 'icons/svg/hazard.svg', dropRate: 10 },
               compositionState: 'forceIncluded',
               runtimeState: 'available',
               evidence: {}
             },
             {
-              id: 'hazard-stale',
-              kind: 'hazard',
-              record: { name: 'Stale Hazard', description: 'No longer matches.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+              id: 'event-stale',
+              kind: 'event',
+              record: { name: 'Stale Event', description: 'No longer matches.', img: 'icons/svg/hazard.svg', dropRate: 10 },
               compositionState: 'includedButUnavailable',
               runtimeState: 'unavailable',
               evidence: {}
             },
             {
-              id: 'hazard-disabled',
-              kind: 'hazard',
-              record: { name: 'Disabled Hazard', description: 'Disabled globally.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+              id: 'event-disabled',
+              kind: 'event',
+              record: { name: 'Disabled Event', description: 'Disabled globally.', img: 'icons/svg/hazard.svg', dropRate: 10 },
               compositionState: 'libraryDisabled',
               runtimeState: 'unavailable',
               evidence: {}
@@ -5090,11 +5090,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     const taskBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="tasks"] .manager-environment-tab-badge'));
-    const hazardBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="hazards"] .manager-environment-tab-badge'));
+    const eventBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="events"] .manager-environment-tab-badge'));
     const validationBadges = Array.from(target.querySelectorAll('[data-environment-tab-button="validation"] .manager-environment-tab-badge'));
 
     assert.deepEqual(taskBadges.map(node => node.textContent.trim()), ['1'], 'runtime-unavailable included task should count, excluded task should not');
-    assert.deepEqual(hazardBadges.map(node => node.textContent.trim()), ['2'], 'force-included and stale included hazards should count, library-disabled hazard should not');
+    assert.deepEqual(eventBadges.map(node => node.textContent.trim()), ['2'], 'force-included and stale included events should count, library-disabled event should not');
     assert.deepEqual(validationBadges.map(node => node.textContent.trim()), ['3', '2'], 'validation badges should show counts only');
     assert.equal(target.querySelector('[data-environment-tab-button="validation"]').textContent.includes('errors'), false, 'validation badge should not spell out error status');
     assert.equal(target.querySelector('[data-environment-tab-button="validation"]').textContent.includes('warnings'), false, 'validation badge should not spell out warning status');
@@ -5119,7 +5119,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           biomes: ['forest'],
           dangerLevel: 'extreme'
         },
-        composition: { compositionMode: 'automatic', counts: {}, tasks: [], hazards: [] },
+        composition: { compositionMode: 'automatic', counts: {}, tasks: [], events: [] },
         dangerOptions: [
           { id: 'safe', label: 'Camp safe' },
           { id: 'hazardous', label: 'Rough going' }
@@ -5168,7 +5168,7 @@ describe('CraftingSystemManager mounted behavior', () => {
               danger: { state: 'match', recordValues: ['unsafe', 'extreme'], envValues: ['dangerous'], applicable: true }
             }
           }],
-          hazards: []
+          events: []
         }
       }
     });

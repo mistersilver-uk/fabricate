@@ -159,10 +159,10 @@ describe('RecordInspector available-node stepper', () => {
     assert.equal(nodeSection(), null);
   });
 
-  it('hides the section for hazards', async () => {
+  it('hides the section for events', async () => {
     await render({
-      kind: 'hazard',
-      entry: taskEntry({ kind: 'hazard', record: { name: 'Cave-in', img: 'icons/cave.webp', nodes: { enabled: true, max: 5, current: 5 } } })
+      kind: 'event',
+      entry: taskEntry({ kind: 'event', record: { name: 'Cave-in', img: 'icons/cave.webp', nodes: { enabled: true, max: 5, current: 5 } } })
     });
     assert.equal(nodeSection(), null);
   });

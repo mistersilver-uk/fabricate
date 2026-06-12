@@ -1221,11 +1221,11 @@ test('manager environments browser and edit route define compact responsive geom
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-row,') && css.includes('min-height: 76px;'),
-    'environment rows should share the compact 76px row height with the task and hazard browsers'
+    'environment rows should share the compact 76px row height with the task and event browsers'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 64px minmax(0, 1fr);\n  gap: 12px;\n  align-self: center;\n  min-height: 64px;'),
-    'environment identity should reserve a square 64px thumbnail column like the task and hazard browsers'
+    'environment identity should reserve a square 64px thumbnail column like the task and event browsers'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 64px;\n  height: 64px;'),
@@ -1362,7 +1362,7 @@ test('manager environments browser and edit route define compact responsive geom
     compBlock.includes('--fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;')
       && css.includes('.fabricate-manager .manager-environment-comp-head.has-rank-controls')
       && css.includes('.fabricate-manager .manager-environment-comp-row.has-rank-controls'),
-    'ranked hazards opt into a leading 30px handle column ahead of the task/override/runtime cells'
+    'ranked events opt into a leading 30px handle column ahead of the task/override/runtime cells'
   );
   assert.ok(
     !compBlock.includes('minmax(150px'),

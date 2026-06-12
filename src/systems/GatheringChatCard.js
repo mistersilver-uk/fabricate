@@ -10,7 +10,7 @@
  */
 
 const COMPONENT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
-const HAZARD_FALLBACK_IMG = 'icons/svg/hazard.svg';
+const EVENT_FALLBACK_IMG = 'icons/svg/mystery-man.svg';
 
 const CHAT_KEYS = Object.freeze({
   success: 'FABRICATE.Chat.GatherSuccess',
@@ -18,7 +18,7 @@ const CHAT_KEYS = Object.freeze({
   actor: 'FABRICATE.Chat.GatherActor',
   task: 'FABRICATE.Chat.GatherTask',
   components: 'FABRICATE.Chat.GatherComponents',
-  hazards: 'FABRICATE.Chat.GatherHazards',
+  events: 'FABRICATE.Chat.GatherEvents',
   toolsBroken: 'FABRICATE.Chat.GatherToolsBroken',
   stamina: 'FABRICATE.Chat.GatherStamina',
   nodes: 'FABRICATE.Chat.GatherNodes'
@@ -40,7 +40,7 @@ function esc(value) {
 }
 
 /**
- * Render one image-backed entry (component, hazard, or broken tool) as a list
+ * Render one image-backed entry (component, event, or broken tool) as a list
  * item. `quantity` is rendered as a `N×` prefix when present and > 1.
  */
 function renderItem({ name, img, quantity }, fallbackImg) {
@@ -93,7 +93,7 @@ function renderStat(icon, label, value) {
  * @param {string}  model.actorName
  * @param {string}  [model.taskName]
  * @param {Array<{name:string,img:string,quantity:number}>} [model.components]
- * @param {Array<{name:string,img:string}>}                 [model.hazards]
+ * @param {Array<{name:string,img:string}>}                 [model.events]
  * @param {Array<{name:string,img:string}>}                 [model.brokenTools]
  * @param {number|null} [model.staminaSpent]
  * @param {number|null} [model.nodesRemaining]
@@ -118,10 +118,10 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
       fallbackImg: COMPONENT_FALLBACK_IMG
     }),
     renderSection({
-      heading: loc(CHAT_KEYS.hazards),
-      entries: model.hazards,
-      fallbackImg: HAZARD_FALLBACK_IMG,
-      modifier: 'hazard'
+      heading: loc(CHAT_KEYS.events),
+      entries: model.events,
+      fallbackImg: EVENT_FALLBACK_IMG,
+      modifier: 'event'
     }),
     renderSection({
       heading: loc(CHAT_KEYS.toolsBroken),

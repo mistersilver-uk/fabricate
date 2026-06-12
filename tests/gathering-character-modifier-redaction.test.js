@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 
 import { makeRichState, makeEngine, environment, DEFAULT_TEST_ACTOR } from './helpers/gathering.js';
 
-function configFor({ entries = [], tasks = [], hazards = [] } = {}) {
+function configFor({ entries = [], tasks = [], events = [] } = {}) {
   return {
     systems: {
       'system-test': {
-        rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
+        rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
         characterModifiers: entries,
         tasks,
-        hazards
+        events
       }
     }
   };

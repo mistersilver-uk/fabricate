@@ -21,7 +21,7 @@ import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckE
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
 import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
-import { HAZARD_SCENE_SOCKET, createHazardSceneTrigger, routeHazardSceneSocketMessage } from './systems/hazardSceneCoordinator.js';
+import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
 import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
@@ -293,7 +293,7 @@ function fabricateEscapeHtml(value) {
   }[ch]));
 }
 
-function hazardScenePromptText(key, fallback, data) {
+function eventScenePromptText(key, fallback, data) {
   const i18n = game?.i18n;
   if (!i18n) return fallback;
   if (data) return i18n.format?.(key, data) ?? fallback;
@@ -301,36 +301,36 @@ function hazardScenePromptText(key, fallback, data) {
   return out && out !== key ? out : fallback;
 }
 
-// GM-side prompt: choose which active players to pull to a dropped hazard's
+// GM-side prompt: choose which active players to pull to a dropped event's
 // linked scene. The GM also views the scene; selected players are pulled via
 // the module socket. Lives here (not the engine) because it is Foundry glue.
-async function showHazardScenePrompt({ sceneUuid, hazardName } = {}) {
+async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
   const scene = typeof fromUuid === 'function' ? await fromUuid(sceneUuid) : null;
   if (!scene) {
-    ui.notifications?.warn?.(hazardScenePromptText(
-      'FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Missing',
-      'The hazard\'s linked scene could not be found.'
+    ui.notifications?.warn?.(eventScenePromptText(
+      'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Missing',
+      'The event\'s linked scene could not be found.'
     ));
     return;
   }
   const sceneName = scene.name || sceneUuid;
   const players = Array.from(game.users?.contents || []).filter(user => user?.active && !user?.isGM);
-  const intro = hazardScenePromptText(
-    'FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Intro',
-    `${hazardName || 'A hazard'} dropped. Move players to ${sceneName}?`,
-    { hazard: hazardName || 'A hazard', scene: sceneName }
+  const intro = eventScenePromptText(
+    'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Intro',
+    `${eventName || 'An event'} dropped. Move players to ${sceneName}?`,
+    { event: eventName || 'An event', scene: sceneName }
   );
   const rows = players.length === 0
-    ? `<p class="notes">${fabricateEscapeHtml(hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.NoPlayers', 'No active players to move.'))}</p>`
+    ? `<p class="notes">${fabricateEscapeHtml(eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.NoPlayers', 'No active players to move.'))}</p>`
     : players.map(user => `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="fab-pull-player" value="${fabricateEscapeHtml(user.id)}" checked /> ${fabricateEscapeHtml(user.name)}</label>`).join('');
   const content = `<div style="display:flex;flex-direction:column;gap:6px;"><p>${fabricateEscapeHtml(intro)}</p>${rows}</div>`;
   renderDialog({
-    title: hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Title', 'Hazard struck'),
+    title: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Title', 'An event occurred'),
     content,
     default: 'move',
     buttons: {
       move: {
-        label: hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Move', 'Move players'),
+        label: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Move', 'Move players'),
         callback: (html) => {
           const root = html?.[0] ?? html;
           const userIds = root
@@ -338,12 +338,12 @@ async function showHazardScenePrompt({ sceneUuid, hazardName } = {}) {
             : [];
           void viewScene(sceneUuid);
           if (userIds.length > 0) {
-            game.socket?.emit(HAZARD_SCENE_SOCKET, { action: 'pullToScene', sceneUuid, userIds });
+            game.socket?.emit(EVENT_SCENE_SOCKET, { action: 'pullToScene', sceneUuid, userIds });
           }
         }
       },
       cancel: {
-        label: hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Cancel', 'Cancel')
+        label: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Cancel', 'Cancel')
       }
     }
   });
@@ -601,12 +601,12 @@ class Fabricate {
         evaluateExpression: evaluateGatheringExpression
       }),
       failureFeedback: createGatheringFailureFeedback(),
-      hazardSceneTrigger: createHazardSceneTrigger({
+      eventSceneTrigger: createEventSceneTrigger({
         isGM: () => !!game.user?.isGM,
-        emitPrompt: ({ sceneUuid, hazardName }) => game.socket?.emit(HAZARD_SCENE_SOCKET, {
-          action: 'hazardScenePrompt', sceneUuid, hazardName, requestedBy: game.user?.id
+        emitPrompt: ({ sceneUuid, eventName }) => game.socket?.emit(EVENT_SCENE_SOCKET, {
+          action: 'eventScenePrompt', sceneUuid, eventName, requestedBy: game.user?.id
         }),
-        showPrompt: showHazardScenePrompt
+        showPrompt: showEventScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
       locationResolver: this.gatheringLocationService,
@@ -662,7 +662,7 @@ class Fabricate {
     if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
       const systemList = unifiedRegionSystems.join(', ');
       const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
-        || `Fabricate unified gathering regions for: ${systemList}. Travel & Regions is disabled by default — enable it per system. Region-scoped tasks/hazards may now appear in more environments.`;
+        || `Fabricate unified gathering regions for: ${systemList}. Travel & Regions is disabled by default — enable it per system. Region-scoped tasks/events may now appear in more environments.`;
       ui.notifications?.info?.(message);
     }
   }
@@ -1007,7 +1007,7 @@ class Fabricate {
    * enforces the current Foundry user as the viewer.
    *
    * @param {object} options { environmentId, taskId, rememberedActorId? }
-   * @returns {*} Drop-breakdown result ({ resolutionMode, awardMode, awardLimit, hazardPolicy, drops }).
+   * @returns {*} Drop-breakdown result ({ resolutionMode, awardMode, awardLimit, eventPolicy, drops }).
    */
   getGatheringDropBreakdown(options = {}) {
     if (!this.ready) {
@@ -1392,20 +1392,20 @@ Hooks.once('ready', async () => {
   // calls.
   InteractableManager.instance.register();
 
-  game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => {
-    // Defensive: the hazard router shares the `module.fabricate` channel with the
-    // canvas Interactable round-trip. Guard it so a throw on a hazard payload can
-    // never prevent a non-hazard Interactable payload from reaching
+  game.socket?.on(EVENT_SCENE_SOCKET, (payload) => {
+    // Defensive: the event router shares the `module.fabricate` channel with the
+    // canvas Interactable round-trip. Guard it so a throw on an event payload can
+    // never prevent a non-event Interactable payload from reaching
     // handleInteractableSocketMessage below.
     try {
-      routeHazardSceneSocketMessage(payload, {
+      routeEventSceneSocketMessage(payload, {
         currentUserId: () => game.user?.id,
         isActiveGM: () => game.user === game.users?.activeGM,
-        showPrompt: showHazardScenePrompt,
+        showPrompt: showEventScenePrompt,
         viewSceneForSelf: (uuid) => viewScene(uuid)
       });
     } catch (_error) {
-      // Defensive: a hazard-route throw must never block the Interactable payload
+      // Defensive: an event-route throw must never block the Interactable payload
       // from reaching handleInteractableSocketMessage below.
     }
     // Same `module.fabricate` channel also carries the canvas Interactable

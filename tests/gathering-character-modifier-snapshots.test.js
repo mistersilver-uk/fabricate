@@ -4,14 +4,14 @@ import assert from 'node:assert/strict';
 import { makeRichState, makeEngine, makeFakeActor, environment, DEFAULT_TEST_SYSTEM } from './helpers/gathering.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 
-function configFor({ entries = [], tasks = [], hazards = [] } = {}) {
+function configFor({ entries = [], tasks = [], events = [] } = {}) {
   return {
     systems: {
       'system-test': {
-        rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
+        rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
         characterModifiers: entries,
         tasks,
-        hazards
+        events
       }
     }
   };
@@ -19,25 +19,25 @@ function configFor({ entries = [], tasks = [], hazards = [] } = {}) {
 
 const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' }];
 
-function envWithLibrary(service, { hazards = [] } = {}) {
+function envWithLibrary(service, { events = [] } = {}) {
   const composed = service.composeEnvironment({
     id: 'env-test',
     craftingSystemId: 'system-test',
     tasks: []
   }, { id: 'system-test' });
-  if (hazards.length > 0) composed.hazards = hazards;
-  composed.rules = { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops', rewardLimit: 99, hazardLimit: 99, hazardPolicy: 'successWithHazard' };
+  if (events.length > 0) composed.events = events;
+  composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
   return composed;
 }
 
-test('terminal run records characterModifierSnapshot evidence per row and hazard', async () => {
+test('terminal run records characterModifierSnapshot evidence per row and event', async () => {
   const { service } = makeRichState({
     config: configFor({ entries: STR_LIB }),
     rolls: [100, 100],
     evaluateExpression: () => 3
   });
   const env = envWithLibrary(service, {
-    hazards: [{ id: 'h1', name: 'Trap', dropRate: 50, characterModifiers: [{ id: 'rh', modifierId: 'strength', operator: '-' }] }]
+    events: [{ id: 'h1', name: 'Trap', dropRate: 50, characterModifiers: [{ id: 'rh', modifierId: 'strength', operator: '-' }] }]
   });
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'rd', modifierId: 'strength', operator: '+' }] }] },
@@ -46,11 +46,11 @@ test('terminal run records characterModifierSnapshot evidence per row and hazard
   });
   assert.ok(result.characterModifierSnapshot, 'snapshot returned');
   assert.equal(result.characterModifierSnapshot.rows.length, 1);
-  assert.equal(result.characterModifierSnapshot.hazards.length, 1);
+  assert.equal(result.characterModifierSnapshot.events.length, 1);
   const rowEvidence = result.characterModifierSnapshot.rows[0].contributions[0];
   assert.equal(rowEvidence.modifierId, 'strength');
   assert.equal(rowEvidence.contribution, 3);
-  const hazEvidence = result.characterModifierSnapshot.hazards[0].contributions[0];
+  const hazEvidence = result.characterModifierSnapshot.events[0].contributions[0];
   assert.equal(hazEvidence.contribution, -3);
 });
 
@@ -108,7 +108,7 @@ test('GatheringRunManager preserves characterModifierSnapshot on terminal runs',
       createdResults: [],
       characterModifierSnapshot: {
         rows: [{ rowId: 'd1', contributions: [{ contribution: 5, modifierId: 'strength' }] }],
-        hazards: []
+        events: []
       }
     }
   );

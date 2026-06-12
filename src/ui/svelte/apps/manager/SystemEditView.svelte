@@ -197,7 +197,7 @@
                 <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
                 {text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title', 'Character modifiers')}
               </h3>
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Hint', 'Define reusable actor-driven modifiers for this system\'s d100 gathering rows and hazards.')}</p>
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Hint', 'Define reusable actor-driven modifiers for this system\'s d100 gathering rows and events.')}</p>
             </div>
             <div class="manager-character-modifier-card-header-actions">
               <button type="button" class="manager-action" onclick={handleAddCharacterModifier}>

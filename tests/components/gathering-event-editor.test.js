@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
-const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
+const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -16,24 +16,24 @@ const rootSource = readFileSync(rootPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-describe('GatheringHazardEditView source contract', () => {
-  it('exposes hazard identity, availability, dangerTags, and dropRate sections', () => {
-    assert.ok(editorSource.includes('data-gathering-hazard-editor'), 'editor should expose a data attribute hook');
-    assert.ok(editorSource.includes('data-gathering-hazard-core-editor'), 'editor should expose an identity section');
-    assert.ok(editorSource.includes("data-gathering-hazard-field=\"name\""), 'editor should bind the name field');
-    assert.ok(editorSource.includes("data-gathering-hazard-field=\"enabled\""), 'editor should expose an enabled toggle');
-    assert.ok(editorSource.includes('data-gathering-hazard-availability'), 'editor should expose an availability matching section');
-    assert.ok(editorSource.includes('data-gathering-hazard-danger-tags'), 'editor should expose a danger tags section');
-    assert.ok(editorSource.includes('data-gathering-hazard-drop-rate'), 'editor should expose a drop rate section');
+describe('GatheringEventEditView source contract', () => {
+  it('exposes event identity, availability, dangerTags, and dropRate sections', () => {
+    assert.ok(editorSource.includes('data-gathering-event-editor'), 'editor should expose a data attribute hook');
+    assert.ok(editorSource.includes('data-gathering-event-core-editor'), 'editor should expose an identity section');
+    assert.ok(editorSource.includes("data-gathering-event-field=\"name\""), 'editor should bind the name field');
+    assert.ok(editorSource.includes("data-gathering-event-field=\"enabled\""), 'editor should expose an enabled toggle');
+    assert.ok(editorSource.includes('data-gathering-event-availability'), 'editor should expose an availability matching section');
+    assert.ok(editorSource.includes('data-gathering-event-danger-tags'), 'editor should expose a danger tags section');
+    assert.ok(editorSource.includes('data-gathering-event-drop-rate'), 'editor should expose a drop rate section');
     assert.equal(
-      editorSource.includes('data-gathering-hazard-character-modifiers'),
+      editorSource.includes('data-gathering-event-character-modifiers'),
       false,
       'character-modifier section should live in the right inspector, not the main editor'
     );
   });
 
   it('clamps dropRate to 1..100 before dispatching the update', () => {
-    assert.ok(editorSource.includes('Math.min(100, Math.max(1, Math.floor(raw)))'), 'dropRate input should clamp to 1..100 before calling onUpdateHazard');
+    assert.ok(editorSource.includes('Math.min(100, Math.max(1, Math.floor(raw)))'), 'dropRate input should clamp to 1..100 before calling onUpdateEvent');
     assert.ok(editorSource.includes('min="1"'), 'dropRate input element should set min=1');
     assert.ok(editorSource.includes('max="100"'), 'dropRate input element should set max=100');
   });
@@ -73,22 +73,22 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(editorSource.includes('type="range"'), 'editor should render a range input alongside the text input');
   });
 
-  it('drops the redundant Hazard modifier UI', () => {
-    assert.equal(editorSource.includes('data-gathering-hazard-modifier'), false, 'hazard-modifier section should be removed');
+  it('drops the redundant Event modifier UI', () => {
+    assert.equal(editorSource.includes('data-gathering-event-modifier'), false, 'event-modifier section should be removed');
     assert.equal(editorSource.includes('ProviderExpressionInput'), false, 'ProviderExpressionInput import should be removed');
-    assert.equal(/function\s+setHazardModifier\s*\(/.test(editorSource), false, 'setHazardModifier helper should be removed');
-    assert.equal(/function\s+enableHazardModifier\s*\(/.test(editorSource), false, 'enableHazardModifier helper should be removed');
+    assert.equal(/function\s+setEventModifier\s*\(/.test(editorSource), false, 'setEventModifier helper should be removed');
+    assert.equal(/function\s+enableEventModifier\s*\(/.test(editorSource), false, 'enableEventModifier helper should be removed');
   });
 
-  it('renders the hazard modifier inspector (time, weather, character) from the manager root', () => {
-    assert.ok(rootSource.includes('data-gathering-hazard-condition-modifiers={kind}'), 'root should render hazard condition modifier cards');
-    assert.ok(rootSource.includes('data-gathering-hazard-character-modifiers'), 'root should render hazard character modifier card');
-    assert.ok(rootSource.includes('addGatheringHazardConditionModifier'), 'root should expose add condition modifier handler');
-    assert.ok(rootSource.includes('updateGatheringHazardConditionModifier'), 'root should expose update condition modifier handler');
-    assert.ok(rootSource.includes('deleteGatheringHazardConditionModifier'), 'root should expose delete condition modifier handler');
-    assert.ok(rootSource.includes('onUpdateHazardCharacterModifier'), 'root should expose update character modifier handler');
-    assert.ok(rootSource.includes('onDeleteHazardCharacterModifier'), 'root should expose delete character modifier handler');
-    assert.ok(rootSource.includes('pickCharacterModifierForHazard'), 'root should expose a picker for adding character modifiers');
+  it('renders the event modifier inspector (time, weather, character) from the manager root', () => {
+    assert.ok(rootSource.includes('data-gathering-event-condition-modifiers={kind}'), 'root should render event condition modifier cards');
+    assert.ok(rootSource.includes('data-gathering-event-character-modifiers'), 'root should render event character modifier card');
+    assert.ok(rootSource.includes('addGatheringEventConditionModifier'), 'root should expose add condition modifier handler');
+    assert.ok(rootSource.includes('updateGatheringEventConditionModifier'), 'root should expose update condition modifier handler');
+    assert.ok(rootSource.includes('deleteGatheringEventConditionModifier'), 'root should expose delete condition modifier handler');
+    assert.ok(rootSource.includes('onUpdateEventCharacterModifier'), 'root should expose update character modifier handler');
+    assert.ok(rootSource.includes('onDeleteEventCharacterModifier'), 'root should expose delete character modifier handler');
+    assert.ok(rootSource.includes('pickCharacterModifierForEvent'), 'root should expose a picker for adding character modifiers');
   });
 
   it('renders condition modifiers as a single signed number input that colors its box by value', () => {
@@ -113,75 +113,75 @@ describe('GatheringHazardEditView source contract', () => {
 
   it('supports Arrow Up/Down stepping on condition modifier values', () => {
     assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
-    assert.ok(rootSource.includes('function onGatheringHazardModifierKeydown'), 'root should expose a hazard modifier keydown stepper');
+    assert.ok(rootSource.includes('function onGatheringEventModifierKeydown'), 'root should expose an event modifier keydown stepper');
     assert.ok(rootSource.includes('onkeydown={(event) => onGatheringDropModifierKeydown'), 'drop modifier input should wire the keydown stepper');
-    assert.ok(rootSource.includes('onkeydown={(event) => onGatheringHazardModifierKeydown'), 'hazard modifier input should wire the keydown stepper');
+    assert.ok(rootSource.includes('onkeydown={(event) => onGatheringEventModifierKeydown'), 'event modifier input should wire the keydown stepper');
     assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');
   });
 
   it('exposes an optional linked-scene row with drag-drop, unlink, and right-click removal', () => {
-    assert.ok(editorSource.includes('data-gathering-hazard-scene'), 'editor should expose a linked-scene section');
+    assert.ok(editorSource.includes('data-gathering-event-scene'), 'editor should expose a linked-scene section');
     assert.ok(editorSource.includes('use:dragDrop'), 'linked-scene drop zone should use the dragDrop action');
     assert.ok(editorSource.includes('function handleSceneDrop'), 'editor should expose a scene drop handler');
     assert.ok(editorSource.includes("type !== 'Scene'"), 'drop handler should only accept Scene documents');
-    assert.ok(editorSource.includes('onUpdateHazard({ linkedSceneUuid:'), 'linking/unlinking should patch linkedSceneUuid via onUpdateHazard');
+    assert.ok(editorSource.includes('onUpdateEvent({ linkedSceneUuid:'), 'linking/unlinking should patch linkedSceneUuid via onUpdateEvent');
     assert.ok(editorSource.includes('oncontextmenu'), 'linked scene should support right-click removal');
     assert.ok(editorSource.includes('fa-link-slash'), 'linked scene should expose an unlink button');
     assert.ok(editorSource.includes('viewScene(linkedSceneUuid)'), 'clicking the scene name should navigate the GM to the scene');
   });
 
-  it('stages hazard edits in a draft with Save + Dirty toolbar parity with tasks', () => {
-    assert.ok(rootSource.includes('let gatheringHazardDraft = $state(null)'), 'root should declare a hazard draft state');
-    assert.ok(rootSource.includes('let gatheringHazardDraftBaseline = $state(null)'), 'root should declare a hazard draft baseline');
-    assert.ok(rootSource.includes('const editingGatheringHazard = $derived'), 'root should expose an editingGatheringHazard derived');
-    assert.ok(rootSource.includes('const gatheringHazardDraftDirty = $derived'), 'root should expose a hazard dirty derived');
-    assert.ok(rootSource.includes('const gatheringHazardValidation = $derived'), 'root should expose a hazard validation derived');
-    assert.ok(rootSource.includes('function saveGatheringHazardDraft'), 'root should expose saveGatheringHazardDraft');
-    assert.ok(rootSource.includes('function deleteGatheringHazardDraft'), 'root should expose deleteGatheringHazardDraft');
-    assert.ok(rootSource.includes('function confirmGatheringHazardRouteExit'), 'route-exit chain should include hazard confirm');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Hazards.Save'), 'toolbar Save button uses the hazard Save lang key');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Hazards.Dirty'), 'toolbar Dirty chip uses the hazard Dirty lang key');
-    assert.ok(rootSource.includes('hazard={editingGatheringHazard}'), 'editor mount should bind the draft hazard');
+  it('stages event edits in a draft with Save + Dirty toolbar parity with tasks', () => {
+    assert.ok(rootSource.includes('let gatheringEventDraft = $state(null)'), 'root should declare an event draft state');
+    assert.ok(rootSource.includes('let gatheringEventDraftBaseline = $state(null)'), 'root should declare an event draft baseline');
+    assert.ok(rootSource.includes('const editingGatheringEvent = $derived'), 'root should expose an editingGatheringEvent derived');
+    assert.ok(rootSource.includes('const gatheringEventDraftDirty = $derived'), 'root should expose an event dirty derived');
+    assert.ok(rootSource.includes('const gatheringEventValidation = $derived'), 'root should expose an event validation derived');
+    assert.ok(rootSource.includes('function saveGatheringEventDraft'), 'root should expose saveGatheringEventDraft');
+    assert.ok(rootSource.includes('function deleteGatheringEventDraft'), 'root should expose deleteGatheringEventDraft');
+    assert.ok(rootSource.includes('function confirmGatheringEventRouteExit'), 'route-exit chain should include event confirm');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
+    assert.ok(rootSource.includes('event={editingGatheringEvent}'), 'editor mount should bind the draft event');
   });
 
-  it('mounts at the gathering-hazard-edit route and exposes a back-to-library affordance', () => {
+  it('mounts at the gathering-event-edit route and exposes a back-to-library affordance', () => {
     assert.ok(
-      rootSource.includes("currentView === 'gathering-hazard-edit'"),
-      'manager root should branch on gathering-hazard-edit'
+      rootSource.includes("currentView === 'gathering-event-edit'"),
+      'manager root should branch on gathering-event-edit'
     );
     assert.ok(
-      rootSource.includes('<GatheringHazardEditView'),
-      'manager root should mount the hazard editor component'
+      rootSource.includes('<GatheringEventEditView'),
+      'manager root should mount the event editor component'
     );
     assert.ok(
-      rootSource.includes('function backToGatheringHazardLibrary'),
-      'manager root should expose backToGatheringHazardLibrary'
+      rootSource.includes('function backToGatheringEventLibrary'),
+      'manager root should expose backToGatheringEventLibrary'
     );
     assert.ok(
-      rootSource.includes("activeView = 'gathering-hazard-edit'"),
-      'editGatheringHazard should set the view to gathering-hazard-edit'
+      rootSource.includes("activeView = 'gathering-event-edit'"),
+      'editGatheringEvent should set the view to gathering-event-edit'
     );
     assert.equal(
-      environmentsBrowserSource.includes('GatheringHazardEditView'),
+      environmentsBrowserSource.includes('GatheringEventEditView'),
       false,
       'editor should no longer mount inline inside EnvironmentsBrowserView'
     );
   });
 
-  it('localizes the hazard editor labels', () => {
-    const hazardsNamespace = lang.FABRICATE.Admin.Manager.Environment.Hazards;
-    assert.ok(hazardsNamespace, 'lang/en.json should declare the Hazards namespace');
+  it('localizes the event editor labels', () => {
+    const eventsNamespace = lang.FABRICATE.Admin.Manager.Environment.Events;
+    assert.ok(eventsNamespace, 'lang/en.json should declare the Events namespace');
     for (const key of [
-      'HazardIdentity', 'HazardIdentityHint', 'HazardAvailability',
+      'EventIdentity', 'EventIdentityHint', 'EventAvailability',
       'AvailabilityHint', 'DangerTagsHint', 'DropRateHint', 'DropRateInvalid',
       'CharacterModifiers',
       'CharacterModifiersHint', 'CharacterModifierOperator', 'CharacterModifierMin',
       'CharacterModifierMax', 'CharacterModifierOverride'
     ]) {
-      assert.ok(hazardsNamespace[key], `Hazards namespace should declare ${key}`);
+      assert.ok(eventsNamespace[key], `Events namespace should declare ${key}`);
     }
-    const dangerTagLabels = hazardsNamespace.DangerTag;
-    assert.ok(dangerTagLabels, 'Hazards namespace should expose DangerTag labels');
+    const dangerTagLabels = eventsNamespace.DangerTag;
+    assert.ok(dangerTagLabels, 'Events namespace should expose DangerTag labels');
     for (const tag of ['safe', 'hazardous', 'dangerous', 'deadly']) {
       assert.ok(dangerTagLabels[tag], `DangerTag namespace should declare ${tag}`);
     }

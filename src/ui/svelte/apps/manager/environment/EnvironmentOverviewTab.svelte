@@ -29,7 +29,7 @@
   function optId(option) { return String(option?.id ?? option ?? '').trim(); }
   function optLabel(option) { return String(option?.label ?? option?.id ?? option ?? '').trim(); }
   function defaultDangerLabel(id) {
-    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.DangerTag.${id}`, id.charAt(0).toUpperCase() + id.slice(1));
+    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Events.DangerTag.${id}`, id.charAt(0).toUpperCase() + id.slice(1));
   }
   function dangerOption(option) {
     const id = optId(option);
@@ -198,7 +198,7 @@
 
             <label class="manager-field manager-environment-context-field">
               <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger', 'Danger level')}</span>
-              <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint', 'A ceiling — hazards up to and including this level can appear.')}</p>
+              <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint', 'A ceiling — events up to and including this level can appear.')}</p>
               <select data-environment-field="dangerLevel" value={dangerLevel} onchange={(event) => onUpdate({ dangerLevel: event.currentTarget.value })}>
                 {#each renderedDangerOptions as option (option.id)}
                   <option value={option.id}>{dangerLabel(option.id)}</option>
@@ -209,7 +209,7 @@
 
           <div class="manager-field manager-environment-context-field manager-environment-context-biomes">
             <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Biomes', 'Biomes')}</span>
-            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BiomesHint', 'The terrain here. Tasks and hazards match if they share one or more biomes.')}</p>
+            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BiomesHint', 'The terrain here. Tasks and events match if they share one or more biomes.')}</p>
             {#if availableBiomes.length > 0}
               <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome')} onchange={addBiome}>
                 <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome')}</option>

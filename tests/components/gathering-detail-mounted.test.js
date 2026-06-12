@@ -88,7 +88,7 @@ function makeServices(result, dropBreakdown = null) {
     },
     getGatheringDropBreakdown: (opts) => {
       calls.dropBreakdown.push(opts);
-      return Promise.resolve(dropBreakdown ?? { drops: [], awardMode: null, awardLimit: 1, hazardPolicy: null });
+      return Promise.resolve(dropBreakdown ?? { drops: [], awardMode: null, awardLimit: 1, eventPolicy: null });
     }
   };
   return { services, calls };
@@ -111,7 +111,7 @@ async function settle() {
   flushSync();
 }
 
-// Switch the center column to a given tab ('tasks' | 'hazards').
+// Switch the center column to a given tab ('tasks' | 'events').
 function clickTab(tab) {
   target.querySelector(`[data-gathering-detail-tab="${tab}"]`).click();
   flushSync();
@@ -176,12 +176,12 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/HazardChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/EventChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardRow.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringHazardDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
@@ -281,12 +281,12 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(action.querySelector('[data-gathering-attempt]'), 'attempt button sits in the same action row');
   });
 
-  it('renders "What you might find" with per-drop mini bars, award/hazard hints, and expandable modifiers', async () => {
+  it('renders "What you might find" with per-drop mini bars, award/event hints, and expandable modifiers', async () => {
     const dropBreakdown = {
       successChance: 1,
       awardMode: 'allDrops',
       awardLimit: 1,
-      hazardPolicy: 'successWithHazard',
+      eventPolicy: 'successWithEvent',
       drops: [{
         id: 'd-ore',
         name: 'Raw Ore',
@@ -319,7 +319,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(section, '"What you might find" section renders');
     const hints = section.querySelector('[data-gathering-drops-hints]');
     assert.ok(hints.textContent.includes('AwardModeAll'), 'award-mode hint shown');
-    assert.ok(hints.textContent.includes('HazardImpactSuccess'), 'hazard-impact hint shown');
+    assert.ok(hints.textContent.includes('EventImpactSuccess'), 'event-impact hint shown');
 
     const drop = section.querySelector('[data-gathering-drop]');
     assert.ok(drop, 'a drop row renders');
@@ -335,42 +335,42 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(modifiers.textContent.includes('+10%'), 'weather delta shown signed');
   });
 
-  it('shows the hazard-chance bar (with tier) atop the Hazards tab when hazard chance > 0', async () => {
-    const { services } = makeServices(listing([environment({ risk: 'hazardous', hazardChance: 0.5 })]));
+  it('shows the event-chance bar (with tier) atop the Events tab when event chance > 0', async () => {
+    const { services } = makeServices(listing([environment({ risk: 'hazardous', eventChance: 0.5 })]));
     await mountView(services);
-    clickTab('hazards');
+    clickTab('events');
 
-    const section = target.querySelector('[data-gathering-hazard-section]');
-    assert.ok(section, 'hazard summary renders atop the Hazards tab');
+    const section = target.querySelector('[data-gathering-event-section]');
+    assert.ok(section, 'event summary renders atop the Events tab');
     // Highest danger level shown (localized risk key via the i18n stub).
     assert.ok(section.textContent.includes('Risk.hazardous'), 'section shows the highest danger level');
-    // Hazard bar present, with the percent + reversed-scale tier (50% -> amber).
-    const bar = section.querySelector('[data-gathering-hazard-value]');
-    assert.ok(bar, 'hazard-chance bar renders when chance > 0');
-    assert.equal(bar.getAttribute('data-gathering-hazard-value'), '50');
-    assert.equal(bar.getAttribute('data-gathering-hazard-tier'), 'amber');
+    // Event bar present, with the percent + reversed-scale tier (50% -> amber).
+    const bar = section.querySelector('[data-gathering-event-value]');
+    assert.ok(bar, 'event-chance bar renders when chance > 0');
+    assert.equal(bar.getAttribute('data-gathering-event-value'), '50');
+    assert.equal(bar.getAttribute('data-gathering-event-tier'), 'amber');
     // Explanatory hint shown; the "safe" hint is not.
-    assert.ok(section.textContent.includes('HazardChanceHint'), 'explanatory hazard hint shown');
+    assert.ok(section.textContent.includes('EventChanceHint'), 'explanatory event hint shown');
     assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
   });
 
-  it('shows the "safe environment" hint (no bar) when hazard chance is zero', async () => {
-    const { services } = makeServices(listing([environment({ hazardChance: 0 })]));
+  it('shows the "safe environment" hint (no bar) when event chance is zero', async () => {
+    const { services } = makeServices(listing([environment({ eventChance: 0 })]));
     await mountView(services);
-    clickTab('hazards');
+    clickTab('events');
 
-    const section = target.querySelector('[data-gathering-hazard-section]');
-    assert.ok(section, 'hazard summary still renders');
+    const section = target.querySelector('[data-gathering-event-section]');
+    assert.ok(section, 'event summary still renders');
     assert.ok(section.textContent.includes('Risk.safe'), 'danger level still shown for a safe environment');
-    assert.equal(section.querySelector('[data-gathering-hazard-value]'), null, 'no hazard bar when chance is zero');
+    assert.equal(section.querySelector('[data-gathering-event-value]'), null, 'no event bar when chance is zero');
     const safe = section.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'safe hint shown when chance is zero');
-    assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
+    assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
   });
 
-  it('hides the Hazards tab and shows a risk note above the tasks under the dangerLevelOnly tier', async () => {
+  it('hides the Events tab and shows a risk note above the tasks under the dangerLevelOnly tier', async () => {
     const { services } = makeServices(listing([environment({
-      risk: 'hazardous', hazardVisibility: 'dangerLevelOnly', hazardChance: null, hazards: []
+      risk: 'hazardous', eventVisibility: 'dangerLevelOnly', eventChance: null, events: []
     })]));
     await mountView(services);
 
@@ -378,43 +378,43 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
     // The environment still carries its danger tag in the header pips.
     assert.ok(target.querySelector('[data-gathering-pips] .is-danger'), 'danger pip retained in the header');
-    // No chance bar and no hazards summary/list, but a risk note above the tasks.
-    assert.equal(target.querySelector('[data-gathering-hazard-value]'), null, 'no chance bar under dangerLevelOnly');
-    assert.equal(target.querySelector('[data-gathering-hazard-section]'), null, 'no full-tier hazard block');
-    assert.equal(target.querySelector('[data-gathering-hazards-section]'), null, 'no individual hazard list');
-    const note = target.querySelector('[data-gathering-hazard-risk-note]');
+    // No chance bar and no events summary/list, but a risk note above the tasks.
+    assert.equal(target.querySelector('[data-gathering-event-value]'), null, 'no chance bar under dangerLevelOnly');
+    assert.equal(target.querySelector('[data-gathering-event-section]'), null, 'no full-tier event block');
+    assert.equal(target.querySelector('[data-gathering-events-section]'), null, 'no individual event list');
+    const note = target.querySelector('[data-gathering-event-risk-note]');
     assert.ok(note, 'a risk note is shown above the tasks');
-    assert.ok(note.textContent.includes('HazardRiskNote'), 'the risk note uses the localized message');
+    assert.ok(note.textContent.includes('EventRiskNote'), 'the risk note uses the localized message');
     assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
   });
 
-  it('hides the Hazards tab and shows the chance bar above the tasks under the encounterChance tier', async () => {
+  it('hides the Events tab and shows the chance bar above the tasks under the encounterChance tier', async () => {
     const { services } = makeServices(listing([environment({
-      risk: 'hazardous', hazardVisibility: 'encounterChance', hazardChance: 0.5, hazards: []
+      risk: 'hazardous', eventVisibility: 'encounterChance', eventChance: 0.5, events: []
     })]));
     await mountView(services);
 
     assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
-    const summary = target.querySelector('[data-gathering-hazard-summary]');
-    assert.ok(summary, 'a hazard summary renders above the tasks');
-    assert.ok(summary.querySelector('[data-gathering-hazard-value]'), 'the encounter-chance bar is shown');
-    assert.equal(target.querySelector('[data-gathering-hazard-risk-note]'), null, 'no risk note in encounterChance (bar only)');
-    assert.equal(target.querySelector('[data-gathering-hazards-section]'), null, 'no individual hazard list under encounterChance');
+    const summary = target.querySelector('[data-gathering-event-summary]');
+    assert.ok(summary, 'an event summary renders above the tasks');
+    assert.ok(summary.querySelector('[data-gathering-event-value]'), 'the encounter-chance bar is shown');
+    assert.equal(target.querySelector('[data-gathering-event-risk-note]'), null, 'no risk note in encounterChance (bar only)');
+    assert.equal(target.querySelector('[data-gathering-events-section]'), null, 'no individual event list under encounterChance');
     assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
   });
 
   it('shows the safe hint (no bar) above the tasks under encounterChance when the chance is zero', async () => {
     const { services } = makeServices(listing([environment({
-      risk: 'safe', hazardVisibility: 'encounterChance', hazardChance: 0, hazards: []
+      risk: 'safe', eventVisibility: 'encounterChance', eventChance: 0, events: []
     })]));
     await mountView(services);
 
-    const summary = target.querySelector('[data-gathering-hazard-summary]');
-    assert.ok(summary, 'a hazard summary renders');
-    assert.equal(summary.querySelector('[data-gathering-hazard-value]'), null, 'no bar when chance is zero');
+    const summary = target.querySelector('[data-gathering-event-summary]');
+    assert.ok(summary, 'an event summary renders');
+    assert.equal(summary.querySelector('[data-gathering-event-value]'), null, 'no bar when chance is zero');
     const safe = summary.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'the safe hint is shown instead');
-    assert.ok(safe.textContent.includes('HazardSafeHint'), 'safe hint uses the localized message');
+    assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
   });
 
   it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
@@ -739,24 +739,24 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(section.querySelector('[data-gathering-no-task-matches]'), 'a no-matches hint shows when the search excludes everything');
   });
 
-  it('defaults to the Tasks tab and switches to Hazards on click', async () => {
-    const hazards = [{ id: 'h', name: 'Rockslide', description: '', img: 'icons/svg/hazard.svg', dangerTags: ['unsafe'], risk: 'unsafe', chance: 0.4 }];
-    const { services } = makeServices(listing([environment({ hazardChance: 0.4, hazards })]));
+  it('defaults to the Tasks tab and switches to Events on click', async () => {
+    const events = [{ id: 'h', name: 'Rockslide', description: '', img: 'icons/svg/hazard.svg', dangerTags: ['unsafe'], risk: 'unsafe', chance: 0.4 }];
+    const { services } = makeServices(listing([environment({ eventChance: 0.4, events })]));
     await mountView(services);
 
-    // Tasks tab active by default; tasks panel shown, hazard summary not.
+    // Tasks tab active by default; tasks panel shown, event summary not.
     assert.equal(target.querySelector('[data-gathering-detail-tab="tasks"]').getAttribute('aria-selected'), 'true');
     assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'tasks panel shown by default');
-    assert.equal(target.querySelector('[data-gathering-hazard-section]'), null, 'hazard summary not shown on the Tasks tab');
+    assert.equal(target.querySelector('[data-gathering-event-section]'), null, 'event summary not shown on the Tasks tab');
 
-    clickTab('hazards');
-    assert.equal(target.querySelector('[data-gathering-detail-tab="hazards"]').getAttribute('aria-selected'), 'true');
-    assert.ok(target.querySelector('[data-gathering-hazard-section]'), 'hazard summary shown on the Hazards tab');
-    assert.equal(target.querySelector('[data-gathering-tasks-section]'), null, 'tasks panel hidden on the Hazards tab');
+    clickTab('events');
+    assert.equal(target.querySelector('[data-gathering-detail-tab="events"]').getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-gathering-event-section]'), 'event summary shown on the Events tab');
+    assert.equal(target.querySelector('[data-gathering-tasks-section]'), null, 'tasks panel hidden on the Events tab');
   });
 
-  it('renders a selectable, searchable, paginated hazards list on the Hazards tab', async () => {
-    const hazards = Array.from({ length: 7 }, (_, i) => ({
+  it('renders a selectable, searchable, paginated events list on the Events tab', async () => {
+    const events = Array.from({ length: 7 }, (_, i) => ({
       id: `haz-${i}`,
       name: i === 0 ? 'Rockslide' : `Quicksand ${i}`,
       description: 'Watch your step.',
@@ -765,78 +765,78 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       risk: 'hazardous',
       chance: 0.3
     }));
-    const { services } = makeServices(listing([environment({ risk: 'hazardous', hazardChance: 0.6, hazards })]));
+    const { services } = makeServices(listing([environment({ risk: 'hazardous', eventChance: 0.6, events })]));
     await mountView(services);
-    clickTab('hazards');
+    clickTab('events');
 
     // The aggregate summary (danger + chance bar) sits atop the tab.
-    assert.ok(target.querySelector('[data-gathering-hazard-section] [data-gathering-hazard-value]'), 'aggregate hazard-chance bar shown atop the tab');
+    assert.ok(target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'), 'aggregate event-chance bar shown atop the tab');
 
-    const section = target.querySelector('[data-gathering-hazards-section]');
-    assert.ok(section, 'hazards list section renders');
-    // Hazard rows render, paginated to the default page size (6 of 7).
-    assert.equal(section.querySelectorAll('.gathering-hazard-row').length, 6, 'hazards paginate at the default page size');
-    // Hazard rows are now selectable (interactive summary).
-    assert.ok(section.querySelector('.gathering-hazard-row [role="button"]'), 'hazard rows are selectable');
+    const section = target.querySelector('[data-gathering-events-section]');
+    assert.ok(section, 'events list section renders');
+    // Event rows render, paginated to the default page size (6 of 7).
+    assert.equal(section.querySelectorAll('.gathering-event-row').length, 6, 'events paginate at the default page size');
+    // Event rows are now selectable (interactive summary).
+    assert.ok(section.querySelector('.gathering-event-row [role="button"]'), 'event rows are selectable');
 
-    const search = section.querySelector('[data-gathering-hazard-search]');
-    assert.ok(search, 'hazard search input renders');
+    const search = section.querySelector('[data-gathering-event-search]');
+    assert.ok(search, 'event search input renders');
     search.value = 'rockslide';
     search.dispatchEvent(new window.Event('input', { bubbles: true }));
     await settle();
 
-    const rows = section.querySelectorAll('.gathering-hazard-row');
-    assert.equal(rows.length, 1, 'hazard search narrows the list');
-    assert.ok(rows[0].textContent.includes('Rockslide'), 'the matching hazard is shown');
+    const rows = section.querySelectorAll('.gathering-event-row');
+    assert.equal(rows.length, 1, 'event search narrows the list');
+    assert.ok(rows[0].textContent.includes('Rockslide'), 'the matching event is shown');
   });
 
-  it('selecting a hazard shows its full details in the right column', async () => {
-    const hazards = [
+  it('selecting an event shows its full details in the right column', async () => {
+    const events = [
       { id: 'haz-1', name: 'Rockslide', description: 'Falling rocks.', img: 'icons/svg/hazard.svg', dangerTags: ['hazardous'], risk: 'hazardous', chance: 0.3, weather: ['storm'], timeOfDay: [], biomes: [], regions: [], linkedSceneUuid: '' },
       { id: 'haz-2', name: 'Sinkhole', description: 'The ground gives way.', img: 'icons/svg/hazard.svg', dangerTags: ['deadly'], risk: 'deadly', chance: 0.5, weather: [], timeOfDay: ['night'], biomes: [], regions: [], linkedSceneUuid: '' }
     ];
-    const { services } = makeServices(listing([environment({ risk: 'hazardous', hazardChance: 0.6, hazards })]));
+    const { services } = makeServices(listing([environment({ risk: 'hazardous', eventChance: 0.6, events })]));
     await mountView(services);
-    clickTab('hazards');
+    clickTab('events');
 
-    // Right column shows the hazard inspector for the default-selected first hazard.
-    const panel = target.querySelector('[data-gathering-task-detail-column] [data-gathering-hazard-detail]');
-    assert.ok(panel, 'right column shows the hazard inspector');
-    assert.equal(panel.getAttribute('data-detail-hazard-id'), 'haz-1');
-    assert.ok(panel.textContent.includes('Rockslide'), 'inspector shows the first hazard');
-    const weatherGroup = panel.querySelector('[data-gathering-hazard-match="weather"]');
-    assert.ok(weatherGroup, 'matching weather surfaced for the first hazard');
+    // Right column shows the event inspector for the default-selected first event.
+    const panel = target.querySelector('[data-gathering-task-detail-column] [data-gathering-event-detail]');
+    assert.ok(panel, 'right column shows the event inspector');
+    assert.equal(panel.getAttribute('data-detail-event-id'), 'haz-1');
+    assert.ok(panel.textContent.includes('Rockslide'), 'inspector shows the first event');
+    const weatherGroup = panel.querySelector('[data-gathering-event-match="weather"]');
+    assert.ok(weatherGroup, 'matching weather surfaced for the first event');
     // The weather chip renders the shared icon + capitalized i18n label (not the raw id).
-    const weatherChip = weatherGroup.querySelector('.gathering-hazard-detail-chip');
+    const weatherChip = weatherGroup.querySelector('.gathering-event-detail-chip');
     assert.ok(weatherChip.querySelector('i.fa-bolt'), 'weather chip shows the storm icon');
     assert.ok(weatherChip.textContent.includes('Weather.storm'), 'weather chip uses the localized label key');
 
-    // Selecting the second hazard updates the inspector + its matching fields.
-    target.querySelector('[data-hazard-id="haz-2"] .gathering-hazard-summary').click();
+    // Selecting the second event updates the inspector + its matching fields.
+    target.querySelector('[data-event-id="haz-2"] .gathering-event-summary').click();
     flushSync();
-    const updated = target.querySelector('[data-gathering-task-detail-column] [data-gathering-hazard-detail]');
-    assert.equal(updated.getAttribute('data-detail-hazard-id'), 'haz-2');
+    const updated = target.querySelector('[data-gathering-task-detail-column] [data-gathering-event-detail]');
+    assert.equal(updated.getAttribute('data-detail-event-id'), 'haz-2');
     assert.ok(updated.textContent.includes('Sinkhole'), 'inspector follows the selection');
-    assert.ok(updated.querySelector('[data-gathering-hazard-match="timeOfDay"]'), 'time-of-day matching surfaced for the second hazard');
+    assert.ok(updated.querySelector('[data-gathering-event-match="timeOfDay"]'), 'time-of-day matching surfaced for the second event');
   });
 
-  it('hides individual hazards for a blind environment but keeps the chance summary', async () => {
+  it('hides individual events for a blind environment but keeps the chance summary', async () => {
     const blindEnv = environment({
       id: 'env-blind-haz',
       selectionMode: 'blind',
       revealPolicy: 'onAttempt',
       risk: 'dangerous',
-      hazardChance: 0.5,
-      hazards: [],
+      eventChance: 0.5,
+      events: [],
       tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true, blockedReasons: [] }],
       discoveredTasks: []
     });
     const { services } = makeServices(listing([blindEnv]));
     await mountView(services);
-    clickTab('hazards');
+    clickTab('events');
 
-    assert.ok(target.querySelector('[data-gathering-hazard-section] [data-gathering-hazard-value]'), 'aggregate chance bar still shown for a blind env');
-    assert.equal(target.querySelector('.gathering-hazard-row'), null, 'no individual hazard rows for a blind env');
-    assert.ok(target.querySelector('[data-gathering-hazards-hidden]'), 'a "hazards hidden" hint is shown instead');
+    assert.ok(target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'), 'aggregate chance bar still shown for a blind env');
+    assert.equal(target.querySelector('.gathering-event-row'), null, 'no individual event rows for a blind env');
+    assert.ok(target.querySelector('[data-gathering-events-hidden]'), 'a "events hidden" hint is shown instead');
   });
 });

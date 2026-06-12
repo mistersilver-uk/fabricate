@@ -47,12 +47,12 @@ Each environment belongs to one crafting system and stores:
 | **Description** | Optional notes shown by the authoring UI |
 | **Enabled** | Disabled environments are ignored by normal player listing |
 | **Selection Mode** | `targeted` for visible task rows, or `blind` for one generic opaque action resolved from one or more hidden tasks |
-| **Biomes** | Optional biome tags used to match Gathering Tasks and hazards |
-| **Danger Level** | Optional single danger ceiling used to match reusable hazards |
+| **Biomes** | Optional biome tags used to match Gathering Tasks and events |
+| **Danger Level** | Optional single danger ceiling used to match reusable events |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
 {: .note }
-> **Biomes** and **Danger Level** above are the composition match tags — they decide which reusable tasks and hazards belong to the environment, not where players can gather. **Region is no longer a composition tag**: geography is the first-class `GatheringRegion`, and an environment declares membership in one or more regions through the editor's multi-region selector when the per-system **Enable Travel & Regions** toggle is on. Region membership and the optional location-availability rule fields (`includedRegionIds`, `excludedRegionIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only; see [Gathering Regions & Travel]({% link gathering-regions.md %}).
+> **Biomes** and **Danger Level** above are the composition match tags — they decide which reusable tasks and events belong to the environment, not where players can gather. **Region is no longer a composition tag**: geography is the first-class `GatheringRegion`, and an environment declares membership in one or more regions through the editor's multi-region selector when the per-system **Enable Travel & Regions** toggle is on. Region membership and the optional location-availability rule fields (`includedRegionIds`, `excludedRegionIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only; see [Gathering Regions & Travel]({% link gathering-regions.md %}).
 
 Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
 
@@ -73,7 +73,7 @@ game.fabricate.gathering.setConditions({ weather: "fog", timeOfDay: "dawn" });
 
 Mutation methods require a GM user, validate values against the configured weather and time-of-day vocabularies, persist the gathering config setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings. Player-facing code may call `getConditions()` but cannot mutate conditions.
 
-When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRegion` authored in the Travel tab (see [Gathering Regions & Travel]({% link gathering-regions.md %})). Empty task or hazard match tags mean "matches any" for that dimension.
+When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRegion` authored in the Travel tab (see [Gathering Regions & Travel]({% link gathering-regions.md %})). Empty task or event match tags mean "matches any" for that dimension.
 
 ## Gathering Rules
 
@@ -83,14 +83,14 @@ Manager V2 stores d100 gathering rules per selected crafting system under `gathe
 |:-----|:-------|
 | **Rewards** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
 | **Reward limit** | Positive integer used when Rewards is `limitedDrops` |
-| **Hazards** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
-| **Hazard limit** | Positive integer used when Hazards is `limitedDrops` |
-| **Hazard outcome** | `successWithHazard` or `failureWithHazard` |
+| **Events** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
+| **Event limit** | Positive integer used when Events is `limitedDrops` |
+| **Event outcome** | `successWithEvent` or `failureWithEvent` |
 | **Blind candidate gate** | `attemptableOnly` (default) or `allMatching` — see Blind Mode |
 | **Blind reveal** | `never` (default), `onSuccess`, or `onAttempt` — reveal default for blind tasks |
 | **Reveal scope** | `actor`, `user`, `party`, or `global` — who learns a revealed task |
 
-Legacy per-task item selection, per-environment hazard selection, and per-environment hazard policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
+Legacy per-task item selection, per-environment event selection, and per-environment event policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
 
 ## Blind Mode
 
@@ -104,16 +104,16 @@ The per-task **Weight** column only appears while the environment is in `blind` 
 
 ## Composition
 
-Every environment has a **composition mode** (Overview → Composition mode card) that decides which reusable library tasks and hazards apply:
+Every environment has a **composition mode** (Overview → Composition mode card) that decides which reusable library tasks and events apply:
 
 - **Automatic** — every matching, library-enabled record is available unless you explicitly exclude it. Stale `enabled*Ids` / `forced*Ids` lists left over from a previous manual pass are ignored, so automatic always means "all matching available unless excluded".
-- **Manual** — only records you explicitly **include** apply. On both the Tasks and Hazards tabs, manual mode shows **Included in this environment** and **Available to add** only. Available to add lists matching records first, then non-matching and library-disabled records; matching rows use **Add**, non-matching enabled rows use **Force add**, and library-disabled rows show an "enable in library first" note. Removing an included manual record clears its include/force state and returns it to Available to add according to normal candidate, non-matching, or library-disabled state; it does not create a local Excluded state.
+- **Manual** — only records you explicitly **include** apply. On both the Tasks and Events tabs, manual mode shows **Included in this environment** and **Available to add** only. Available to add lists matching records first, then non-matching and library-disabled records; matching rows use **Add**, non-matching enabled rows use **Force add**, and library-disabled rows show an "enable in library first" note. Removing an included manual record clears its include/force state and returns it to Available to add according to normal candidate, non-matching, or library-disabled state; it does not create a local Excluded state.
 
 Automatic composition can be fully library-backed. An automatic environment does not need a legacy inline placeholder Environment Task when matching library Gathering Tasks provide the gatherable records.
 
-In automatic mode, Excluded and Non-matching are separate sections. Non-matching is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records explicitly excluded through `disabledTaskIds` / `disabledHazardIds`.
+In automatic mode, Excluded and Non-matching are separate sections. Non-matching is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records explicitly excluded through `disabledTaskIds` / `disabledEventIds`.
 
-**Weather and time-of-day are runtime gates, not matching criteria.** A task or hazard whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (biome, plus danger for hazards) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked hazard is skipped during the d100 hazard selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
+**Weather and time-of-day are runtime gates, not matching criteria.** A task or event whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (biome, plus danger for events) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked event is skipped during the d100 event selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
 
 ## Gathering Tools Library
 
@@ -133,11 +133,11 @@ Tool authoring rejects entries with no component, with `replaceWith` and the sam
 
 Library tools are **system-owned** — they persist as `system.tools[]` on the crafting system (the `craftingSystems` setting), authored on the Manager's dedicated **Tools** page, and a gathering task only references them by id. (Worlds that authored tools under the gathering config before `0.7.0` are reconciled onto the system by that migration.) Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported. If a task references a missing or disabled library tool, the runtime blocks the attempt with `TOOL_BLOCKED` before actor inventory checks.
 
-## Gathering Task And Hazard Libraries
+## Gathering Task And Event Libraries
 
 Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
 
-Environment authoring composes Gathering Tasks and reusable hazards by matching environment biome (and danger for hazards) only — region is not a composition axis. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or hazard belongs to the environment. GMs can toggle matched task and hazard records on or off per environment. Reusable hazard authoring is not part of this slice.
+Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only — region is not a composition axis. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or event belongs to the environment. GMs can toggle matched task and event records on or off per environment. Reusable event authoring is not part of this slice.
 
 Gathering Task records support:
 
@@ -153,29 +153,29 @@ Gathering Task records support:
 {: .note }
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more). See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use D&D 5e and Pathfinder 2e examples.
 
-Reusable hazard records support:
+Reusable event records support:
 
 | Field | Description |
 |:------|:------------|
-| **Name, description, image, enabled** | GM-authored hazard identity and availability |
+| **Name, description, image, enabled** | GM-authored event identity and availability |
 | **Danger, biomes** | Optional environment composition match tags; empty means any. Environment danger uses the single `dangerLevel` ceiling; legacy `dangerTags` / `risk` values are fallback inputs for older data. |
 | **Weather, time of day** | Optional runtime availability gates; empty means any |
-| **Drop rate** | d100 hazard trigger rate from 1 to 100 |
-| **Modifier** | Optional hazard roll modifier provider |
+| **Drop rate** | d100 event trigger rate from 1 to 100 |
+| **Modifier** | Optional event roll modifier provider |
 
-Disabled Gathering Tasks and hazards never match for player gathering.
+Disabled Gathering Tasks and events never match for player gathering.
 
 ## D100 Resolution
 
-Gathering Tasks use gathering-native d100 rows. Task-level weather and time-of-day availability gates decide whether the task can be attempted. For each enabled item row, Fabricate computes `finalDropRate = clamp(dropRate + environment adjustment + matching drop-level time/weather modifiers, 0, 100)`, rolls `d100 + gatheringModifier`, and drops the row when the effective roll is at least `101 - finalDropRate`. Gathering modifiers affect the d100 roll, not the final drop chance. Matched enabled hazards that pass runtime condition gates roll independently with `d100 + hazardModifier` and their environment-adjusted hazard drop-rate threshold.
+Gathering Tasks use gathering-native d100 rows. Task-level weather and time-of-day availability gates decide whether the task can be attempted. For each enabled item row, Fabricate computes `finalDropRate = clamp(dropRate + environment adjustment + matching drop-level time/weather modifiers, 0, 100)`, rolls `d100 + gatheringModifier`, and drops the row when the effective roll is at least `101 - finalDropRate`. Gathering modifiers affect the d100 roll, not the final drop chance. Matched enabled events that pass runtime condition gates roll independently with `d100 + eventModifier` and their environment-adjusted event drop-rate threshold.
 
-Environment-local task and hazard drop-rate adjustments can be preserved while disabled by their apply toggles. Disabled adjustment toggles leave the saved values on the environment but compose them as zero at runtime.
+Environment-local task and event drop-rate adjustments can be preserved while disabled by their apply toggles. Disabled adjustment toggles leave the saved values on the environment but compose them as zero at runtime.
 
 Drop-level modifiers do not make an unavailable task available. They only adjust individual row chance after the task already matches. Multiple rows can reference the same component with different quantities and chances; each row rolls independently before the selected system's Gathering Rules choose awarded rows.
 
 Saved, imported, or seeded drop rows must point at a real reward target. A `componentId` must exist in the selected crafting system's component library, and an `itemUuid` must resolve to a Foundry Item. Fabricate rejects stale component ids, unresolved item UUIDs, and rows with neither target before writing the gathering task.
 
-The selected crafting system's Gathering Rules choose reward and hazard rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithHazard` records selected hazards while the gathering still succeeds. `failureWithHazard` records selected hazards and makes the attempt fail, so no selected rewards are awarded. If no hazards are enabled or matched, the environment is mechanically safe even when a danger level is present.
+The selected crafting system's Gathering Rules choose reward and event rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithEvent` records selected events while the gathering still succeeds. `failureWithEvent` records selected events and makes the attempt fail, so no selected rewards are awarded. If no events are enabled or matched, the environment is mechanically safe even when a danger level is present.
 
 ## Task Authoring
 

@@ -257,7 +257,7 @@ describe('essenceIcons utility', () => {
       'burger', 'hotdog', 'pizza-slice', 'ice-cream', 'stroopwafel',
       'baby', 'baby-carriage', 'graduation-cap', 'school',
       'fingerprint', 'passport', 'gun', 'handcuffs',
-      'jet-fighter', 'bomb', 'explosion', 'biohazard', 'radiation',
+      'jet-fighter', 'bomb', 'explosion', 'bioevent', 'radiation',
       'cannabis', 'bong', 'joint', 'smoking', 'ban-smoking',
       'bullhorn', 'rectangle-ad', 'newspaper',
       'stopwatch', 'thermometer', 'tachograph-digital',

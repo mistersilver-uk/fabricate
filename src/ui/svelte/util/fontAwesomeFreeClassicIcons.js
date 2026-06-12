@@ -132,7 +132,7 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "bezier-curve", label: "Bezier Curve", hasRegular: false },
   { iconCode: "bicycle", label: "Bicycle", hasRegular: false },
   { iconCode: "binoculars", label: "Binoculars", hasRegular: false },
-  { iconCode: "biohazard", label: "Biohazard", hasRegular: false },
+  { iconCode: "bioevent", label: "Bioevent", hasRegular: false },
   { iconCode: "bitcoin-sign", label: "Bitcoin Sign", hasRegular: false },
   { iconCode: "blender", label: "Blender", hasRegular: false },
   { iconCode: "blender-phone", label: "Blender Phone", hasRegular: false },
@@ -1773,7 +1773,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   // ── Modern misc ──
   /^bag-shopping$/,
   /^basket-shopping$/,
-  /^biohazard$/,
+  /^bioevent$/,
   /^bomb$/,
   /^burst$/,
   /^cart-/,

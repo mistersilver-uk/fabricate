@@ -220,8 +220,8 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, 'Create essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceLinkedFilter, 'Linked');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceNoneShort, 'None');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle, 'Gathering hazards');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint, 'Browse reusable hazards before attaching them to environments.');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle, 'Gathering events');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint, 'Browse reusable events before attaching them to environments.');
     assert.equal(rootSource.includes('EncountersPlaceholderTitle'), false);
     assert.equal(rootSource.includes('EncountersPlaceholderHint'), false);
   });
@@ -332,13 +332,13 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptyTitle, 'Prepare gathering building blocks first');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.EmptyHint,
-      'Define gathering tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
+      'Define gathering tasks and events before creating environments, then attach those building blocks to each location players can gather from.'
     );
     assert.ok(rootSource.includes('manager-nav-submenu'), 'gathering sections should render in the left rail submenu');
     assert.ok(rootSource.includes('manager-nav-toggle'), 'gathering rail should expose an expand/collapse control');
     assert.ok(rootSource.includes("manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"), 'expanded gathering rail should style as one submenu group');
-    assert.ok(rootSource.includes('const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : [])'), 'root should derive reusable gathering hazard counts from selected gathering config');
-    assert.ok(rootSource.includes('total: environmentList.length + gatheringTaskDefinitions.length + gatheringHazardDefinitions.length'), 'gathering parent count should summarize environments, tasks, and hazards');
+    assert.ok(rootSource.includes('const gatheringEventDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : [])'), 'root should derive reusable gathering event counts from selected gathering config');
+    assert.ok(rootSource.includes('total: environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length'), 'gathering parent count should summarize environments, tasks, and events');
     assert.ok(rootSource.includes('<span class="manager-nav-count">{gatheringNavCounts.total}</span>'), 'gathering parent should render a summary count chip');
     assert.ok(rootSource.includes('gatheringNavCounts[gatheringItem.id]'), 'gathering submenu items should render their count chips from gathered section counts');
     assert.equal(rootSource.includes("manager-nav-parent ${isGatheringRoute ? 'is-active' : ''}"), false, 'gathering parent should not use the selected pill class');
@@ -360,7 +360,7 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint'), 'gathering task browser copy should be localized');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
-    assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Hazards tab');
+    assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route events to the Events tab');
     assert.ok(environmentsBrowserSource.includes('manager-environment-action-grid'), 'environment rows should keep quick action wiring');
     assert.ok(environmentsBrowserSource.includes('onEditEnvironment(environment.id)'), 'environment rows should wire edit quick actions');
     assert.ok(environmentsBrowserSource.includes('onDuplicateEnvironment(environment.id)'), 'environment rows should wire duplicate quick actions');
@@ -368,21 +368,21 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments, 'Environments');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks, 'Tasks');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters, 'Hazards');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters, 'Events');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Settings, 'Settings');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandGathering, 'Expand gathering menu');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseGathering, 'Collapse gathering menu');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenTasks, 'Review tasks');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenHazards, 'Review hazards');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents, 'Review events');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint, 'Browse gathering tasks before attaching them to environments.');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint, 'Browse reusable hazards before attaching them to environments.');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level drop resolution and hazard rules for gathering.');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint, 'Browse reusable events before attaching them to environments.');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level drop resolution and event rules for gathering.');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayTitle, 'Times of day');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Conditions.WeatherTitle, 'Weather conditions');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptySetup.Title, 'Plan gathering content');
     assert.equal(
-      lang.FABRICATE.Admin.Manager.Environment.EmptySetup.StepHazards,
-      'Prepare encounter and hazard options that can be reused across risky locations.'
+      lang.FABRICATE.Admin.Manager.Environment.EmptySetup.StepEvents,
+      'Prepare event options that can be reused across your locations.'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
@@ -543,10 +543,10 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!rootSource.includes("import EnvironmentsTab from '../EnvironmentsTab.svelte';"), 'manager root should not import the full legacy environments tab');
     assert.ok(!rootSource.includes('forceEditorOpen'), 'manager edit route should not force-open the legacy environment editor');
     // The v2 environment editor is a composition/wrapper editor: it composes
-    // reusable library tasks/hazards into one environment via include/exclude,
+    // reusable library tasks/events into one environment via include/exclude,
     // ordering, and a shared automatic|manual composition mode. It does NOT
     // author reusable source records (that lives in the standalone
-    // gathering-task-edit / gathering-hazard-edit routes), so it must wire the
+    // gathering-task-edit / gathering-event-edit routes), so it must wire the
     // composition store actions rather than the inline task-authoring handlers.
     for (const snippet of [
       'store.updateEnvironmentDraft',
@@ -577,7 +577,7 @@ describe('CraftingSystemManager source contract', () => {
 
   it('wires Manager gathering libraries, global conditions, and environment composition controls', () => {
     // Global conditions and vocabularies are authored from the gathering
-    // workspace browser (settings tab); library task/hazard authoring and rules
+    // workspace browser (settings tab); library task/event authoring and rules
     // live on their own routes, so those store actions are invoked by root-owned
     // functions rather than passed into the environment composition editor.
     for (const snippet of [
@@ -614,14 +614,14 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
     assert.ok(rootSource.includes('manager-rule-copy'), 'root should render rule descriptions beside inspector icons');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
-    assert.ok(rootSource.includes('data-gathering-rule-stepper="hazardLimit"'), 'root should render the hazard limit stepper');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.HazardHighestRankedDrop'), 'hazard rule select should use hazard-specific drop labels');
+    assert.ok(rootSource.includes('data-gathering-rule-stepper="eventLimit"'), 'root should render the event limit stepper');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'), 'event rule select should use event-specific drop labels');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop, 'Highest ranked successful drop');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.AllDrops, 'All successful drops');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.LimitedDrops, 'Limit successful drops');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.HazardHighestRankedDrop, 'Highest ranked triggered hazard');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.HazardAllDrops, 'All triggered hazards');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.HazardLimitedDrops, 'Limit triggered hazards');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop, 'Highest ranked triggered event');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.EventAllDrops, 'All triggered events');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Rules.EventLimitedDrops, 'Limit triggered events');
     assert.ok(rootSource.includes('selectedGatheringConditionShortcuts'), 'root should derive selected-system condition shortcuts');
     assert.ok(rootSource.includes('buildSelectedGatheringConditionShortcuts'), 'root should keep shortcut visibility gated by selected-system gathering conditions');
     assert.ok(rootSource.includes('data-systems-gathering-conditions'), 'systems inspector should render a global condition shortcut card');

@@ -2,7 +2,7 @@
 <!--
   Reusable input shell for "provider + expression OR macro UUID" tuples used by
   gathering character modifier authoring (library card, drop row override, and
-  hazard override). Renders a provider select followed by either an expression
+  event override). Renders a provider select followed by either an expression
   text input (for non-macro providers) or a macro UUID text input (for macro).
   The hidden alternative stays mounted as aria-hidden so callers can keep
   controlled state on both fields without losing focus across provider swaps.

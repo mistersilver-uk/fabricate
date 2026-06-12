@@ -54,7 +54,7 @@ function buildArgs(overrides = {}) {
     ],
     checkResult: {
       items: [{ id: 'r1', componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 2 }],
-      hazards: [{ name: 'Thornpatch', img: 'icons/thorn.png' }]
+      events: [{ name: 'Thornpatch', img: 'icons/thorn.png' }]
     },
     run: { economyEvidence: { stamina: { spent: 5 }, node: { remaining: 2 } } },
     ...overrides
@@ -63,7 +63,7 @@ function buildArgs(overrides = {}) {
 
 // ---------------------------------------------------------------------------
 
-test('posts exactly one card with resolved component/hazard/tool/economy content', async () => {
+test('posts exactly one card with resolved component/event/tool/economy content', async () => {
   resetChat();
   const engine = buildEngine();
 
@@ -75,8 +75,8 @@ test('posts exactly one card with resolved component/hazard/tool/economy content
   assert.equal(speaker.alias, 'Aria', 'speaker is the gathering actor');
   assert.ok(content.includes('2× Herb'), 'component name + quantity resolved via componentId join');
   assert.ok(content.includes('src="icons/herb.png"'), 'component image resolved');
-  assert.ok(content.includes('Thornpatch'), 'hazard name');
-  assert.ok(content.includes('src="icons/thorn.png"'), 'hazard image');
+  assert.ok(content.includes('Thornpatch'), 'event name');
+  assert.ok(content.includes('src="icons/thorn.png"'), 'event image');
   assert.ok(content.includes('Worn Sickle'), 'broken tool resolved by componentId');
   assert.ok(!content.includes('comp-herb'), 'unbroken tool not listed');
   assert.ok(content.includes('FABRICATE.Chat.GatherStamina'), 'stamina label');
@@ -124,7 +124,7 @@ test('_terminalStart skips chat output for opaque blind tasks', async () => {
     run: { id: 'run-1', status: 'succeeded', economyEvidence: { stamina: { spent: 5 } } },
     createdResults: [],
     usedTools: [],
-    checkResult: { items: [], hazards: [] }
+    checkResult: { items: [], events: [] }
   });
   assert.equal(chatCreated.length, 0, 'blind task posts no chat card');
 });
@@ -142,7 +142,7 @@ test('_terminalStart posts chat output for transparent tasks', async () => {
     run: { id: 'run-1', status: 'succeeded', economyEvidence: { node: { remaining: 1 } } },
     createdResults: [{ actorUuid: 'Actor.aria', itemUuid: 'Item.h1', quantity: 1 }],
     usedTools: [],
-    checkResult: { items: [{ componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 1 }], hazards: [] }
+    checkResult: { items: [{ componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 1 }], events: [] }
   });
   assert.equal(chatCreated.length, 1, 'transparent task posts one chat card');
   assert.ok(chatCreated[0].content.includes('Herb'), 'component resolved');

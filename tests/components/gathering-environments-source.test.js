@@ -262,25 +262,25 @@ describe('EnvironmentCard markup contracts', () => {
     assert.ok(cardSource.includes('min-height: 76px'), 'min-height kept as a growth floor');
   });
 
-  it('puts the blind/hazard pills in a header bar above the main row, divided by a soft line', () => {
+  it('puts the blind/event pills in a header bar above the main row, divided by a soft line', () => {
     // Scope ordering to the markup (the top doc-comment also names these classes).
     const markup = cardSource.slice(cardSource.indexOf('{#snippet identity()}'), cardSource.indexOf('<style>'));
     const headerIdx = markup.indexOf('gathering-env-card-header');
     const mainIdx = markup.indexOf('gathering-env-card-main');
     const blindIdx = markup.indexOf('gathering-env-card-blind"');
-    const hazardIdx = markup.indexOf('gathering-env-card-hazard');
+    const eventIdx = markup.indexOf('gathering-env-card-event');
     assert.ok(headerIdx > -1, 'header bar present');
     // The header is the FIRST child of the card, before the main row.
     assert.ok(headerIdx < mainIdx, 'header markup precedes the main row');
     assert.ok(blindIdx > headerIdx && blindIdx < mainIdx, 'blind chip lives in the header');
-    assert.ok(hazardIdx > headerIdx && hazardIdx < mainIdx, 'hazard chip lives in the header');
-    assert.ok(blindIdx < hazardIdx, 'hazard chip is to the right of the blind chip');
+    assert.ok(eventIdx > headerIdx && eventIdx < mainIdx, 'event chip lives in the header');
+    assert.ok(blindIdx < eventIdx, 'event chip is to the right of the blind chip');
     // The header is a short, full-bleed bar separated from the body by a divider.
     const headerBlock = cardSource.slice(cardSource.indexOf('.gathering-env-card-header {'));
     assert.ok(/border-bottom:\s*1px solid var\(--fab-border\)/.test(headerBlock), 'header has the soft divider line');
     assert.ok(/margin:\s*-10px -10px 0/.test(headerBlock), 'header is full-bleed (negative margins reach the card edges)');
-    // The hazard chip now shows its level name, not just the icon.
-    assert.ok(cardSource.includes('gathering-env-card-hazard-label'), 'hazard chip renders a level-name label');
+    // The event chip now shows its level name, not just the icon.
+    assert.ok(cardSource.includes('gathering-env-card-event-label'), 'event chip renders a level-name label');
   });
 
   it('uses base tokens only (no manager-only --fab-mv2-* tokens)', () => {

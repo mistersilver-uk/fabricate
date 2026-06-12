@@ -60,10 +60,10 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
   },
   {
-    id: 'manager-gathering-hazards',
-    label: 'Manager gathering hazards',
-    smokeLabels: ['manager-gathering-hazards-normal', 'manager-gathering-hazard-editor-normal'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringHazardEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringHazardsBrowserView\.svelte$/],
+    id: 'manager-gathering-events',
+    label: 'Manager gathering events',
+    smokeLabels: ['manager-gathering-events-normal', 'manager-gathering-event-editor-normal'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/],
   },
   {
     id: 'manager-tools',
@@ -112,7 +112,7 @@ export const VIEW_RECIPES = Object.freeze([
       'manager-components-normal',
       'manager-environments-browse-normal',
       'manager-gathering-task-editor-normal',
-      'manager-gathering-hazards-normal',
+      'manager-gathering-events-normal',
       'manager-essences-normal',
     ],
     matches: [/^styles\//, /\.css$/],

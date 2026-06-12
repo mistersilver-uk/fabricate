@@ -7,7 +7,7 @@
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
-  import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
+  import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringTravelTabs from './GatheringTravelTabs.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
@@ -33,7 +33,7 @@
     onSelectTravelTab = () => {},
     services = null,
     selectedTaskId = '',
-    selectedHazardId = '',
+    selectedEventId = '',
     managedItemOptions = [],
     onSelectGatheringTab = () => {},
     onSelectGatheringTask = () => {},
@@ -42,12 +42,12 @@
     onDuplicateGatheringTask = () => {},
     onDeleteGatheringTask = () => {},
     onToggleGatheringTaskEnabled = () => {},
-    onSelectGatheringHazard = () => {},
-    onCreateGatheringHazard = () => {},
-    onEditGatheringHazard = () => {},
-    onDuplicateGatheringHazard = () => {},
-    onDeleteGatheringHazard = () => {},
-    onToggleGatheringHazardEnabled = () => {},
+    onSelectGatheringEvent = () => {},
+    onCreateGatheringEvent = () => {},
+    onEditGatheringEvent = () => {},
+    onDuplicateGatheringEvent = () => {},
+    onDeleteGatheringEvent = () => {},
+    onToggleGatheringEventEnabled = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -144,12 +144,12 @@
     {
       id: 'encounters',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
-      labelFallback: 'Hazards',
+      labelFallback: 'Events',
       icon: 'fas fa-exclamation-triangle',
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
-      titleFallback: 'Gathering hazards',
+      titleFallback: 'Gathering events',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
-      hintFallback: 'Browse reusable hazards before attaching them to environments.'
+      hintFallback: 'Browse reusable events before attaching them to environments.'
     },
     {
       id: 'travel',
@@ -169,7 +169,7 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level drop resolution and hazard rules for gathering.'
+      hintFallback: 'Set system-level drop resolution and event rules for gathering.'
     }
   ];
 
@@ -367,8 +367,8 @@
 
   function conditionHint(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint', 'These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.');
+      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.')
+      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint', 'These values control weather matching for gathering tasks and events. Click the name of a condition to edit it.');
   }
 
   function conditionInputPlaceholder(kind) {
@@ -716,7 +716,7 @@
             <div>
               <i class="fas fa-seedling" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.Manager.Environment.EmptyTitle', 'Prepare gathering building blocks first')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Environment.EmptyHint', 'Define gathering tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.')}</p>
+              <p>{text('FABRICATE.Admin.Manager.Environment.EmptyHint', 'Define gathering tasks and events before creating environments, then attach those building blocks to each location players can gather from.')}</p>
               <div class="manager-action-group">
                 <button type="button" class="manager-button is-primary" onclick={onCreateEnvironment}>
                   <i class="fas fa-plus" aria-hidden="true"></i>
@@ -728,7 +728,7 @@
                 </button>
                 <button type="button" class="manager-button" onclick={() => selectGatheringTab('encounters')}>
                   <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenHazards', 'Review hazards')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents', 'Review events')}</span>
                 </button>
               </div>
             </div>
@@ -841,19 +841,19 @@
     />
   {:else if activeGatheringTab === 'encounters'}
     <div class="manager-gathering-encounters-shell" data-gathering-encounters-shell>
-      <GatheringHazardsBrowserView
-        hazards={selectedGatheringSystemConfig.hazards || []}
+      <GatheringEventsBrowserView
+        events={selectedGatheringSystemConfig.events || []}
         environments={environmentList}
-        {selectedHazardId}
+        {selectedEventId}
         {selectedSystemId}
         {gatheringConfig}
         labelledBy="manager-gathering-nav-encounters"
-        onSelectHazard={onSelectGatheringHazard}
-        onCreateHazard={onCreateGatheringHazard}
-        onEditHazard={onEditGatheringHazard}
-        onDuplicateHazard={onDuplicateGatheringHazard}
-        onDeleteHazard={onDeleteGatheringHazard}
-        onToggleHazardEnabled={onToggleGatheringHazardEnabled}
+        onSelectEvent={onSelectGatheringEvent}
+        onCreateEvent={onCreateGatheringEvent}
+        onEditEvent={onEditGatheringEvent}
+        onDuplicateEvent={onDuplicateGatheringEvent}
+        onDeleteEvent={onDeleteGatheringEvent}
+        onToggleEventEnabled={onToggleGatheringEventEnabled}
       />
     </div>
   {:else if activeGatheringTab === 'travel'}
