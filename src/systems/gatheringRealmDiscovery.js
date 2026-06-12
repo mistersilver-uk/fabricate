@@ -37,7 +37,11 @@ const DISCOVERY_SOURCES = new Set(['manual', 'partyToken', 'import', 'api']);
  * @returns {object} The full `{ [systemId]: { [realmId]: entry } }` map (clone-safe to read).
  */
 export function getDiscoveredGatheringRealms(actor) {
-  const value = getFabricateFlag(actor, DISCOVERY_FLAG_KEY, getFabricateFlag(actor, LEGACY_DISCOVERY_FLAG_KEY, {}));
+  const value = getFabricateFlag(
+    actor,
+    DISCOVERY_FLAG_KEY,
+    getFabricateFlag(actor, LEGACY_DISCOVERY_FLAG_KEY, {})
+  );
   return value && typeof value === 'object' ? value : {};
 }
 
@@ -63,9 +67,11 @@ function resolveRealmBelongsToSystem(systemId, realmId, validation) {
   // Accept a system snapshot ({ id, gatheringRealms }) or a raw realm array.
   const realms = Array.isArray(validation)
     ? validation
-    : (Array.isArray(validation?.gatheringRealms) ? validation.gatheringRealms : null);
+    : Array.isArray(validation?.gatheringRealms)
+      ? validation.gatheringRealms
+      : null;
   if (realms) {
-    return realms.some(realm => realm?.id === realmId);
+    return realms.some((realm) => realm?.id === realmId);
   }
   return false;
 }
@@ -87,16 +93,19 @@ function resolveRealmBelongsToSystem(systemId, realmId, validation) {
  * @param {() => number} [args.now]
  * @returns {Promise<boolean>} `true` when the discovery entry was written.
  */
-export async function revealGatheringRealm(actor, {
-  systemId,
-  realmId,
-  source = 'api',
-  partyId = null,
-  sceneUuid = null,
-  sceneRegionUuid = null,
-  validateRealmInSystem = null,
-  now = () => Date.now()
-} = {}) {
+export async function revealGatheringRealm(
+  actor,
+  {
+    systemId,
+    realmId,
+    source = 'api',
+    partyId = null,
+    sceneUuid = null,
+    sceneRegionUuid = null,
+    validateRealmInSystem = null,
+    now = () => Date.now(),
+  } = {}
+) {
   if (!systemId || !realmId) return false;
   if (!DISCOVERY_SOURCES.has(source)) return false;
   if (!resolveRealmBelongsToSystem(systemId, realmId, validateRealmInSystem)) return false;

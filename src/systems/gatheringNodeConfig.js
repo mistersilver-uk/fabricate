@@ -38,11 +38,11 @@ const LEGACY_RESPAWN_POLICY_MAP = Object.freeze({
   none: { policy: 'manual' },
   elapsedTime: { policy: 'overTime', gainMode: 'guaranteed' },
   probability: { policy: 'overTime', gainMode: 'chance' },
-  manualAndElapsedTime: { policy: 'overTime', gainMode: 'chance' }
+  manualAndElapsedTime: { policy: 'overTime', gainMode: 'chance' },
 });
 
 function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
+  if (value == null || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -74,10 +74,15 @@ export function normalizeRespawn(data = null) {
   // map them to the current schema rather than silently coercing to `manual`
   // (which would disable respawn). An unknown policy still falls back to manual.
   const legacy = LEGACY_RESPAWN_POLICY_MAP[data.policy];
-  const policy = VALID_RESPAWN_POLICIES.has(data.policy) ? data.policy : (legacy?.policy ?? 'manual');
-  const gainMode = VALID_RESPAWN_GAIN_MODES.has(data.gainMode) ? data.gainMode : (legacy?.gainMode ?? 'guaranteed');
+  const policy = VALID_RESPAWN_POLICIES.has(data.policy)
+    ? data.policy
+    : (legacy?.policy ?? 'manual');
+  const gainMode = VALID_RESPAWN_GAIN_MODES.has(data.gainMode)
+    ? data.gainMode
+    : (legacy?.gainMode ?? 'guaranteed');
   const chance = numberOrNull(data.chance);
-  const amountExpression = typeof data.amountExpression === 'string' ? data.amountExpression.trim() : '';
+  const amountExpression =
+    typeof data.amountExpression === 'string' ? data.amountExpression.trim() : '';
   const base = {
     policy,
     gainMode,
@@ -85,7 +90,7 @@ export function normalizeRespawn(data = null) {
     amountExpression,
     lastEvaluatedWorldTime: numberOrNull(data.lastEvaluatedWorldTime),
     nextEvaluationWorldTime: numberOrNull(data.nextEvaluationWorldTime),
-    lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null
+    lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null,
   };
   // Prefer the unit+amount schema; fall back to a legacy raw `intervalSeconds`
   // only when neither unit field is present (so un-migrated nodes keep working).
@@ -100,7 +105,7 @@ export function normalizeRespawn(data = null) {
 function trimmedOrNull(value) {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 /**
@@ -148,8 +153,10 @@ export function normalizeNodeConfig(data = null) {
     enabled: data.enabled === true || max !== null || current !== null,
     max: max ?? 0,
     current: current ?? max ?? 0,
-    depletionTiming: VALID_DEPLETION_TIMINGS.has(data.depletionTiming) ? data.depletionTiming : 'onStart',
-    respawn: normalizeRespawn(data.respawn)
+    depletionTiming: VALID_DEPLETION_TIMINGS.has(data.depletionTiming)
+      ? data.depletionTiming
+      : 'onStart',
+    respawn: normalizeRespawn(data.respawn),
   };
   if (data.showCountsToPlayers === true) config.showCountsToPlayers = true;
   const depletedBehavior = normalizeDepletedBehavior(data.depletedBehavior);

@@ -60,18 +60,13 @@ Linting is being introduced **path by path** so each step lands green rather tha
 unreviewable sweep. Each path is added only once it is clean for **both** ESLint and the
 SonarCloud quality gate (which scores duplication, reliability, and security on the PR's *new
 code* — so a path is widened in its own focused PR, not bundled into an unrelated change). The
-gate (`npm run lint` / `npm run format:check`) currently covers the low-coupling leaf modules:
+gate (`npm run lint` / `npm run format:check`) now covers the **entire `src/` JavaScript surface**:
 
 - `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`,
-  `src/canvas/`, and `src/toolBreakageRuntime.js`
+  `src/canvas/`, `src/systems/`, and `src/toolBreakageRuntime.js`
 
 Not yet gated (tracked for follow-up — run `npm run lint:all` / `npm run lint:svelte` to see them):
 
-- `src/systems/` — large (~31 files, ~6.8k reformat delta) with ~13 helper families duplicated
-  across files, so folding it in needs a shared-helper extraction refactor to keep SonarCloud's
-  new-code duplication under 3%. Planned as its own PR(s): the 28 non-engine files first (deduping
-  the shared helpers), then the three large engines (`GatheringEngine`, `GatheringRichStateService`,
-  `CraftingEngine`) one per focused PR
 - the `tests/` suite — sort comparators, fixture duplication
 - `src/ui/**` and all `*.svelte` components (Svelte parsing is wired up; findings triaged later)
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by

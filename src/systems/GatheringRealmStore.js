@@ -4,7 +4,7 @@ import {
   normalizeGatheringRealmSettings,
   validateGatheringRealm,
   validateGatheringRealmList,
-  validateGatheringRealmSettings
+  validateGatheringRealmSettings,
 } from './gatheringRealms.js';
 
 export class GatheringRealmValidationError extends Error {
@@ -50,7 +50,7 @@ export class GatheringRealmStore {
   }
 
   get(systemId, realmId) {
-    const realm = this._getRealms(systemId).find(r => r.id === realmId);
+    const realm = this._getRealms(systemId).find((r) => r.id === realmId);
     return realm ? cloneJson(realm) : null;
   }
 
@@ -65,7 +65,7 @@ export class GatheringRealmStore {
     const errors = validateGatheringRealmSettings(merged);
     if (errors.length > 0) throw new GatheringRealmValidationError(errors);
     await this.systemManager.updateSystem(systemId, {
-      gatheringRealmSettings: normalizeGatheringRealmSettings(merged)
+      gatheringRealmSettings: normalizeGatheringRealmSettings(merged),
     });
     return this.getRealmSettings(systemId);
   }
@@ -76,17 +76,24 @@ export class GatheringRealmStore {
       { craftingSystemId: systemId, randomID: this.randomID }
     );
     const next = [...this._getRealms(systemId), realm];
-    await this._persist(systemId, next, data ? [...this._getRealms(systemId), { ...data, id: realm.id }] : next);
+    await this._persist(
+      systemId,
+      next,
+      data ? [...this._getRealms(systemId), { ...data, id: realm.id }] : next
+    );
     return this.get(systemId, realm.id);
   }
 
   async update(systemId, realmId, patch = {}) {
     const realms = this._getRealms(systemId);
-    const index = realms.findIndex(r => r.id === realmId);
-    if (index < 0) return null;
+    const index = realms.findIndex((r) => r.id === realmId);
+    if (index === -1) return null;
 
     const mergedRaw = { ...realms[index], ...cloneJson(patch), id: realmId };
-    const realm = normalizeGatheringRealm(mergedRaw, { craftingSystemId: systemId, randomID: this.randomID });
+    const realm = normalizeGatheringRealm(mergedRaw, {
+      craftingSystemId: systemId,
+      randomID: this.randomID,
+    });
     const next = replaceAt(realms, index, realm);
     const rawNext = replaceAt(realms, index, mergedRaw);
     await this._persist(systemId, next, rawNext);
@@ -95,7 +102,7 @@ export class GatheringRealmStore {
 
   async reorder(systemId, orderedRealmIds = []) {
     const realms = this._getRealms(systemId);
-    const byId = new Map(realms.map(r => [r.id, r]));
+    const byId = new Map(realms.map((r) => [r.id, r]));
     const emitted = new Set();
     const reordered = [];
     for (const id of Array.isArray(orderedRealmIds) ? orderedRealmIds : []) {
@@ -124,11 +131,14 @@ export class GatheringRealmStore {
    */
   async delete(systemId, realmId, { environmentStore = null, partyStore = null } = {}) {
     const realms = this._getRealms(systemId);
-    const existing = realms.find(r => r.id === realmId);
+    const existing = realms.find((r) => r.id === realmId);
     if (!existing) return { deleted: null, referencedBy: { environments: [], partyOverrides: [] } };
 
-    const referencedBy = this._collectReferences(systemId, realmId, { environmentStore, partyStore });
-    const next = realms.filter(r => r.id !== realmId);
+    const referencedBy = this._collectReferences(systemId, realmId, {
+      environmentStore,
+      partyStore,
+    });
+    const next = realms.filter((r) => r.id !== realmId);
     await this._persist(systemId, next, next);
     return { deleted: cloneJson(existing), referencedBy };
   }
@@ -137,13 +147,18 @@ export class GatheringRealmStore {
     const environments = [];
     const partyOverrides = [];
 
-    const envList = typeof environmentStore?.listBySystem === 'function'
-      ? environmentStore.listBySystem(systemId)
-      : (typeof environmentStore?.list === 'function' ? environmentStore.list() : []);
+    const envList =
+      typeof environmentStore?.listBySystem === 'function'
+        ? environmentStore.listBySystem(systemId)
+        : typeof environmentStore?.list === 'function'
+          ? environmentStore.list()
+          : [];
     for (const env of Array.isArray(envList) ? envList : []) {
       if (env?.craftingSystemId && env.craftingSystemId !== systemId) continue;
-      const included = Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);
-      const excluded = Array.isArray(env?.excludedRealmIds) && env.excludedRealmIds.includes(realmId);
+      const included =
+        Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);
+      const excluded =
+        Array.isArray(env?.excludedRealmIds) && env.excludedRealmIds.includes(realmId);
       if (included || excluded) {
         environments.push({ id: env.id, name: env.name, included, excluded });
       }
@@ -167,12 +182,12 @@ export class GatheringRealmStore {
     for (const realm of normalizedRealms) {
       errors.push(...validateGatheringRealm(realm));
     }
-    if (errors.length > 0) throw new GatheringRealmValidationError(Array.from(new Set(errors)));
+    if (errors.length > 0) throw new GatheringRealmValidationError([...new Set(errors)]);
     await this.systemManager.updateSystem(systemId, {
       gatheringRealms: normalizeGatheringRealmList(normalizedRealms, {
         craftingSystemId: systemId,
-        randomID: this.randomID
-      })
+        randomID: this.randomID,
+      }),
     });
   }
 }

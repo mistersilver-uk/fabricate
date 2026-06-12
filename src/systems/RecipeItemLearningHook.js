@@ -8,14 +8,12 @@ export function localizeRecipeLearning(key, data = null) {
 }
 
 function capRecipeList(recipes = [], limit = DEFAULT_RECIPE_LIST_LIMIT) {
-  const names = recipes.map(recipe => recipe?.name).filter(Boolean);
+  const names = recipes.map((recipe) => recipe?.name).filter(Boolean);
   const visible = names.slice(0, limit);
   const remaining = Math.max(0, names.length - visible.length);
   return {
     names,
-    list: remaining > 0
-      ? `${visible.join(', ')} (+${remaining})`
-      : visible.join(', ')
+    list: remaining > 0 ? `${visible.join(', ')} (+${remaining})` : visible.join(', '),
   };
 }
 
@@ -23,21 +21,21 @@ export function buildRecipeLearningMessageData(result) {
   const learnedList = capRecipeList(result?.learnedRecipes || []);
   const matchedList = capRecipeList(result?.matchedRecipes || []);
   return {
-    ...(result?.messageData || {}),
+    ...result?.messageData,
     actor: result?.actor?.name || result?.actor?.id || result?.messageData?.actor || '',
     item: result?.ownedItem?.name || result?.ownedItem?.uuid || result?.messageData?.item || '',
     name: learnedList.names[0] || matchedList.names[0] || result?.messageData?.name || '',
     recipes: learnedList.list,
     matchedRecipes: matchedList.list,
     count: learnedList.names.length,
-    matchedCount: matchedList.names.length
+    matchedCount: matchedList.names.length,
   };
 }
 
-export function notifyOwnedItemLearningResult(result, {
-  notify = globalThis.ui?.notifications,
-  localize = localizeRecipeLearning
-} = {}) {
+export function notifyOwnedItemLearningResult(
+  result,
+  { notify = globalThis.ui?.notifications, localize = localizeRecipeLearning } = {}
+) {
   if (!result?.shouldNotify || !result.message || !notify) return false;
 
   const message = localize(result.message, buildRecipeLearningMessageData(result));
@@ -92,7 +90,7 @@ export function registerRecipeItemLearningHook(visibilityService, deps = {}) {
       ownedItem: item,
       actor,
       viewer: game?.user || null,
-      mode: 'auto'
+      mode: 'auto',
     });
 
     notifyOwnedItemLearningResult(result, { notify, localize });

@@ -29,12 +29,13 @@ export class SalvageRunManager {
     const years = Number(timeRequirement.years || 0);
     const daySeconds = 24 * 60 * 60;
 
-    return Math.max(0,
-      (minutes * 60) +
-      (hours * 60 * 60) +
-      (days * daySeconds) +
-      (months * 30 * daySeconds) +
-      (years * 365 * daySeconds)
+    return Math.max(
+      0,
+      minutes * 60 +
+        hours * 60 * 60 +
+        days * daySeconds +
+        months * 30 * daySeconds +
+        years * 365 * daySeconds
     );
   }
 
@@ -79,15 +80,16 @@ export class SalvageRunManager {
     if (!runId) return null;
     const container = this._getContainer(actor);
     if (container.active?.[runId]) return container.active[runId];
-    return (container.history || []).find(run => run?.id === runId) || null;
+    return (container.history || []).find((run) => run?.id === runId) || null;
   }
 
   findActiveRunForComponent(actor, craftingSystemId, componentId) {
     const runs = this.getActiveRuns(actor);
-    return runs.find(run =>
-      run?.craftingSystemId === craftingSystemId &&
-      run?.componentId === componentId
-    ) || null;
+    return (
+      runs.find(
+        (run) => run?.craftingSystemId === craftingSystemId && run?.componentId === componentId
+      ) || null
+    );
   }
 
   async createRun(actor, runData = {}) {
@@ -95,14 +97,12 @@ export class SalvageRunManager {
     const now = this._nowWorldTime();
     const runId = foundry.utils.randomID();
     const run = {
-      id: runId,
-      actorUuid: actor.uuid,
-      userId: game.user?.id || null,
+      // Defaults first; `...runData` lets the caller override; then the
+      // authoritative fields below are re-asserted so they cannot be clobbered.
       craftingSystemId: null,
       componentId: null,
       status: 'inProgress',
       startedAt: now,
-      updatedAt: now,
       finishedAt: undefined,
       timeGate: undefined,
       checkResult: undefined,
@@ -114,7 +114,7 @@ export class SalvageRunManager {
       id: runId,
       actorUuid: runData.actorUuid || actor.uuid,
       userId: runData.userId ?? game.user?.id ?? null,
-      updatedAt: now
+      updatedAt: now,
     };
 
     if (run.status === 'waitingTime' || run.status === 'inProgress') {
@@ -145,13 +145,13 @@ export class SalvageRunManager {
     if (seconds <= 0) return run;
 
     const worldTime = this._nowWorldTime();
-    const nextRun = run || await this.createRun(actor, {});
+    const nextRun = run || (await this.createRun(actor, {}));
     const existingGate = nextRun.timeGate;
     if (!existingGate) {
       nextRun.timeGate = {
         requiredSeconds: seconds,
         initiatedAt: worldTime,
-        availableAt: worldTime + seconds
+        availableAt: worldTime + seconds,
       };
     }
     nextRun.status = 'waitingTime';
@@ -181,7 +181,7 @@ export class SalvageRunManager {
       ...payload,
       status,
       updatedAt: now,
-      finishedAt: payload.finishedAt ?? now
+      finishedAt: payload.finishedAt ?? now,
     };
 
     delete container.active[run.id];
@@ -197,7 +197,7 @@ export class SalvageRunManager {
     const run = this.getActiveRun(actor, runId);
     if (!run) return null;
     return this.completeRun(actor, run, 'cancelled', {
-      failureReason: run.failureReason || reason
+      failureReason: run.failureReason || reason,
     });
   }
 
@@ -239,7 +239,7 @@ export class SalvageRunManager {
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter(run => {
+      const nextHistory = (container.history || []).filter((run) => {
         const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
         const validComponents = validComponentIdsBySystem.get(run?.craftingSystemId) || new Set();
         const componentValid = run?.componentId && validComponents.has(run.componentId);
@@ -260,7 +260,7 @@ export class SalvageRunManager {
     const {
       cancelActive = true,
       removeHistory = true,
-      cancellationReason = 'Salvage system disabled'
+      cancellationReason = 'Salvage system disabled',
     } = options;
 
     for (const actor of game.actors || []) {
@@ -276,14 +276,16 @@ export class SalvageRunManager {
             status: 'cancelled',
             failureReason: run.failureReason || cancellationReason,
             updatedAt: this._nowWorldTime(),
-            finishedAt: this._nowWorldTime()
+            finishedAt: this._nowWorldTime(),
           });
         }
         dirty = true;
       }
 
       if (removeHistory) {
-        const nextHistory = (container.history || []).filter(run => run?.craftingSystemId !== systemId);
+        const nextHistory = (container.history || []).filter(
+          (run) => run?.craftingSystemId !== systemId
+        );
         if (nextHistory.length !== (container.history || []).length) {
           container.history = nextHistory;
           dirty = true;
@@ -305,7 +307,7 @@ export class SalvageRunManager {
       systemId = null,
       cancelActive = true,
       removeHistory = true,
-      cancellationReason = 'Salvage component removed'
+      cancellationReason = 'Salvage component removed',
     } = options;
 
     for (const actor of game.actors || []) {
@@ -323,14 +325,14 @@ export class SalvageRunManager {
             status: 'cancelled',
             failureReason: run.failureReason || cancellationReason,
             updatedAt: this._nowWorldTime(),
-            finishedAt: this._nowWorldTime()
+            finishedAt: this._nowWorldTime(),
           });
         }
         dirty = true;
       }
 
       if (removeHistory) {
-        const nextHistory = (container.history || []).filter(run => {
+        const nextHistory = (container.history || []).filter((run) => {
           const componentMatches = run?.componentId === componentId;
           const systemMatches = !systemId || run?.craftingSystemId === systemId;
           return !(componentMatches && systemMatches);

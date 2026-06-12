@@ -29,12 +29,13 @@ export class CraftingRunManager {
     const years = Number(timeRequirement.years || 0);
     const daySeconds = 24 * 60 * 60;
 
-    return Math.max(0,
-      (minutes * 60) +
-      (hours * 60 * 60) +
-      (days * daySeconds) +
-      (months * 30 * daySeconds) +
-      (years * 365 * daySeconds)
+    return Math.max(
+      0,
+      minutes * 60 +
+        hours * 60 * 60 +
+        days * daySeconds +
+        months * 30 * daySeconds +
+        years * 365 * daySeconds
     );
   }
 
@@ -54,7 +55,7 @@ export class CraftingRunManager {
       consumedIngredients: [],
       usedTools: [],
       createdResults: [],
-      failureReason: undefined
+      failureReason: undefined,
     }));
   }
 
@@ -99,12 +100,12 @@ export class CraftingRunManager {
     if (!runId) return null;
     const container = this._getContainer(actor);
     if (container.active?.[runId]) return container.active[runId];
-    return (container.history || []).find(run => run?.id === runId) || null;
+    return (container.history || []).find((run) => run?.id === runId) || null;
   }
 
   findActiveRunForRecipe(actor, recipeId) {
     const runs = this.getActiveRuns(actor);
-    return runs.find(run => run.recipeId === recipeId) || null;
+    return runs.find((run) => run.recipeId === recipeId) || null;
   }
 
   async createRun(actor, recipe, componentSourceActors = [], userId = null) {
@@ -123,7 +124,7 @@ export class CraftingRunManager {
       finishedAt: undefined,
       currentStepIndex: 0,
       steps: stepStates,
-      componentSourceActorUuids: componentSourceActors.map(a => a.uuid)
+      componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
     };
 
     container.active[runId] = run;
@@ -159,7 +160,7 @@ export class CraftingRunManager {
       step.timeGate = {
         requiredSeconds: seconds,
         initiatedAt: worldTime,
-        availableAt: worldTime + seconds
+        availableAt: worldTime + seconds,
       };
     }
     run.status = 'waitingTime';
@@ -300,7 +301,9 @@ export class CraftingRunManager {
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter(run => run?.craftingSystemId !== target);
+      const nextHistory = (container.history || []).filter(
+        (run) => run?.craftingSystemId !== target
+      );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
         dirty = true;
@@ -325,7 +328,7 @@ export class CraftingRunManager {
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter(run => {
+      const nextHistory = (container.history || []).filter((run) => {
         const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
         const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
         return recipeValid && systemValid;

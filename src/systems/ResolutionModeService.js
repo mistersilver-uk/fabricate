@@ -29,9 +29,7 @@ export class ResolutionModeService {
   }
 
   getExecutionSteps(recipe) {
-    return typeof recipe?.getExecutionSteps === 'function'
-      ? recipe.getExecutionSteps()
-      : [];
+    return typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
   }
 
   // ---------------------------------------------------------------------------
@@ -39,7 +37,9 @@ export class ResolutionModeService {
   // ---------------------------------------------------------------------------
 
   _normalizeName(name) {
-    return String(name || '').trim().toLowerCase();
+    return String(name || '')
+      .trim()
+      .toLowerCase();
   }
 
   _isFailKeyword(name) {
@@ -71,8 +71,8 @@ export class ResolutionModeService {
     let drawResult;
     try {
       drawResult = await table.draw({ displayChat: false });
-    } catch (err) {
-      return { groups: [], meta: { error: `Roll table draw failed: ${err.message}` } };
+    } catch (error) {
+      return { groups: [], meta: { error: `Roll table draw failed: ${error.message}` } };
     }
 
     const results = drawResult?.results || [];
@@ -86,18 +86,18 @@ export class ResolutionModeService {
     if (this._isFailKeyword(normalized)) {
       return {
         groups: [],
-        meta: { drawnName, normalized, disposition: 'fail' }
+        meta: { drawnName, normalized, disposition: 'fail' },
       };
     }
 
     if (this._isMissKeyword(normalized)) {
       return {
         groups: [],
-        meta: { drawnName, normalized, disposition: 'miss' }
+        meta: { drawnName, normalized, disposition: 'miss' },
       };
     }
 
-    const matched = (allGroups || []).filter(g => this._normalizeName(g.name) === normalized);
+    const matched = (allGroups || []).filter((g) => this._normalizeName(g.name) === normalized);
     if (matched.length === 0) {
       return {
         groups: [],
@@ -105,14 +105,14 @@ export class ResolutionModeService {
           drawnName,
           normalized,
           disposition: 'misconfiguration',
-          error: `No result group matches drawn name "${drawnName}"`
-        }
+          error: `No result group matches drawn name "${drawnName}"`,
+        },
       };
     }
 
     return {
       groups: matched.slice(0, 1),
-      meta: { drawnName, normalized, disposition: 'success', matchedGroupId: matched[0].id }
+      meta: { drawnName, normalized, disposition: 'success', matchedGroupId: matched[0].id },
     };
   }
 
@@ -123,49 +123,80 @@ export class ResolutionModeService {
 
     const mode = this.getMode(recipe);
     const steps = this.getExecutionSteps(recipe);
-    const checkEnabled = system?.craftingCheck?.enabled === true || !!system?.craftingCheck?.macroUuid || system?.craftingCheck?.checkSource === 'builtIn';
-    const outcomes = Array.isArray(system?.craftingCheck?.outcomes) ? system.craftingCheck.outcomes : [];
+    const checkEnabled =
+      system?.craftingCheck?.enabled === true ||
+      !!system?.craftingCheck?.macroUuid ||
+      system?.craftingCheck?.checkSource === 'builtIn';
+    const outcomes = Array.isArray(system?.craftingCheck?.outcomes)
+      ? system.craftingCheck.outcomes
+      : [];
 
     for (const step of steps) {
       const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
       const groups = Array.isArray(step?.resultGroups) ? step.resultGroups : [];
 
       if (mode === 'simple') {
-        if (sets.length !== 1) errors.push(`Step "${step.name || step.id}" must have exactly 1 ingredient set in simple mode`);
-        if (groups.length !== 1) errors.push(`Step "${step.name || step.id}" must have exactly 1 result group in simple mode`);
+        if (sets.length !== 1)
+          errors.push(
+            `Step "${step.name || step.id}" must have exactly 1 ingredient set in simple mode`
+          );
+        if (groups.length !== 1)
+          errors.push(
+            `Step "${step.name || step.id}" must have exactly 1 result group in simple mode`
+          );
       }
 
       if (mode === 'mapped') {
-        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in mapped mode`);
-        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in mapped mode`);
-        const groupIds = new Set(groups.map(g => g.id));
+        if (sets.length === 0)
+          errors.push(
+            `Step "${step.name || step.id}" must have at least 1 ingredient set in mapped mode`
+          );
+        if (groups.length === 0)
+          errors.push(
+            `Step "${step.name || step.id}" must have at least 1 result group in mapped mode`
+          );
+        const groupIds = new Set(groups.map((g) => g.id));
         for (const set of sets) {
           const mappedId = set?.resultGroupId || null;
           if (mappedId && !groupIds.has(mappedId)) {
-            errors.push(`Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`);
+            errors.push(
+              `Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`
+            );
           }
         }
       }
 
       if (mode === 'tiered' || mode === 'routed') {
-        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`);
-        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`);
+        if (sets.length === 0)
+          errors.push(
+            `Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`
+          );
+        if (groups.length === 0)
+          errors.push(
+            `Step "${step.name || step.id}" must have at least 1 result group in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`
+          );
 
         if (mode === 'tiered') {
-          if (!checkEnabled) errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
-          if (outcomes.length === 0) errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
-          const groupIds = new Set(groups.map(g => g.id));
+          if (!checkEnabled)
+            errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
+          if (outcomes.length === 0)
+            errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
+          const groupIds = new Set(groups.map((g) => g.id));
           const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
           for (const outcome of outcomes) {
             const target = routing?.[outcome];
             if (!target || !groupIds.has(target)) {
-              errors.push(`Outcome "${outcome}" must map to a valid result group in step "${step.name || step.id}"`);
+              errors.push(
+                `Outcome "${outcome}" must map to a valid result group in step "${step.name || step.id}"`
+              );
             }
           }
         } else {
           const provider = this.getProviderForStep(recipe, step);
           if (!provider) {
-            errors.push(`Step "${step.name || step.id}" in routed mode requires resultSelection.provider`);
+            errors.push(
+              `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
+            );
           } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
             errors.push('Invalid result selection provider: ' + provider);
           }
@@ -184,17 +215,30 @@ export class ResolutionModeService {
         if (!system?.craftingCheck?.progressive) {
           errors.push('Progressive mode requires craftingCheck.progressive configuration');
         }
-        if (sets.length !== 1) errors.push(`Step "${step.name || step.id}" must have exactly 1 ingredient set in progressive mode`);
-        if (groups.length !== 1) errors.push(`Step "${step.name || step.id}" must have exactly 1 result group in progressive mode`);
+        if (sets.length !== 1)
+          errors.push(
+            `Step "${step.name || step.id}" must have exactly 1 ingredient set in progressive mode`
+          );
+        if (groups.length !== 1)
+          errors.push(
+            `Step "${step.name || step.id}" must have exactly 1 result group in progressive mode`
+          );
 
         const results = groups?.[0]?.results || [];
         if (results.length === 0) {
-          errors.push(`Step "${step.name || step.id}" requires ordered results in progressive mode`);
+          errors.push(
+            `Step "${step.name || step.id}" requires ordered results in progressive mode`
+          );
         }
         for (const result of results) {
-          const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
+          const difficulty = this._getDifficulty(
+            system,
+            result?.componentId || result?.systemItemId
+          );
           if (!Number.isFinite(difficulty) || difficulty < 1) {
-            errors.push(`Result "${result?.id || 'unknown'}" references component without valid difficulty`);
+            errors.push(
+              `Result "${result?.id || 'unknown'}" references component without valid difficulty`
+            );
           }
         }
       }
@@ -204,11 +248,14 @@ export class ResolutionModeService {
       // Alchemy recipes cannot have explicit multi-step configuration
       const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
-      if (setsTop.length < 1) errors.push('Alchemy recipe must have at least 1 ingredient set');
-      if (groupsTop.length < 1) errors.push('Alchemy recipe must have at least 1 result group');
+      if (setsTop.length === 0) errors.push('Alchemy recipe must have at least 1 ingredient set');
+      if (groupsTop.length === 0) errors.push('Alchemy recipe must have at least 1 result group');
       // No explicit steps allowed
-      const explicitSteps = typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
-      const hasExplicitSteps = explicitSteps.length > 1 || (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
+      const explicitSteps =
+        typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+      const hasExplicitSteps =
+        explicitSteps.length > 1 ||
+        (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
       if (hasExplicitSteps) errors.push('Alchemy recipe must not have explicit steps');
       const provider = this.getProvider(recipe);
       if (!provider) {
@@ -223,7 +270,7 @@ export class ResolutionModeService {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -248,41 +295,57 @@ export class ResolutionModeService {
       return { valid: false, errors };
     }
 
-    const groups = Array.isArray(component.salvage.resultGroups) ? component.salvage.resultGroups : [];
+    const groups = Array.isArray(component.salvage.resultGroups)
+      ? component.salvage.resultGroups
+      : [];
 
-    if (mode === 'simple') {
-      if (groups.length !== 1) {
-        errors.push(`Salvage for "${componentLabel}" must have exactly 1 result group in simple mode`);
-      }
+    if (mode === 'simple' && groups.length !== 1) {
+      errors.push(
+        `Salvage for "${componentLabel}" must have exactly 1 result group in simple mode`
+      );
     }
 
     if (mode === 'routed') {
-      const checkEnabled = system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
-      const outcomes = Array.isArray(system.salvageCraftingCheck?.outcomes) ? system.salvageCraftingCheck.outcomes : [];
+      const checkEnabled =
+        system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
+      const outcomes = Array.isArray(system.salvageCraftingCheck?.outcomes)
+        ? system.salvageCraftingCheck.outcomes
+        : [];
 
       if (!checkEnabled) errors.push('Routed salvage mode requires crafting checks enabled');
-      if (outcomes.length === 0) errors.push('Routed salvage mode requires at least one declared outcome');
-      if (groups.length < 1) errors.push(`Salvage for "${componentLabel}" must have at least 1 result group in routed mode`);
+      if (outcomes.length === 0)
+        errors.push('Routed salvage mode requires at least one declared outcome');
+      if (groups.length === 0)
+        errors.push(
+          `Salvage for "${componentLabel}" must have at least 1 result group in routed mode`
+        );
 
-      const groupIds = new Set(groups.map(g => g.id));
+      const groupIds = new Set(groups.map((g) => g.id));
       const routing = component.salvage.outcomeRouting || {};
       for (const outcome of outcomes) {
         const target = routing[outcome];
         if (!target || !groupIds.has(target)) {
-          errors.push(`Outcome "${outcome}" must map to a valid salvage result group for "${componentLabel}"`);
+          errors.push(
+            `Outcome "${outcome}" must map to a valid salvage result group for "${componentLabel}"`
+          );
         }
       }
     }
 
     if (mode === 'progressive') {
-      const checkEnabled = system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
+      const checkEnabled =
+        system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
 
       if (!checkEnabled) errors.push('Progressive salvage mode requires crafting checks enabled');
       if (!system.salvageCraftingCheck?.progressive) {
-        errors.push('Progressive salvage mode requires salvageCraftingCheck.progressive configuration');
+        errors.push(
+          'Progressive salvage mode requires salvageCraftingCheck.progressive configuration'
+        );
       }
       if (groups.length !== 1) {
-        errors.push(`Salvage for "${componentLabel}" must have exactly 1 result group in progressive mode`);
+        errors.push(
+          `Salvage for "${componentLabel}" must have exactly 1 result group in progressive mode`
+        );
       }
 
       const results = groups?.[0]?.results || [];
@@ -292,18 +355,27 @@ export class ResolutionModeService {
       for (const result of results) {
         const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
         if (!Number.isFinite(difficulty) || difficulty < 1) {
-          errors.push(`Result "${result?.id || 'unknown'}" references component without valid difficulty for salvage on "${componentLabel}"`);
+          errors.push(
+            `Result "${result?.id || 'unknown'}" references component without valid difficulty for salvage on "${componentLabel}"`
+          );
         }
       }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
-  resolveResultGroups({ recipe, step, ingredientSet, checkResult, selectedResultGroupId = null, rollTableResult = null }) {
+  resolveResultGroups({
+    recipe,
+    step,
+    ingredientSet,
+    checkResult,
+    selectedResultGroupId = null,
+    rollTableResult = null,
+  }) {
     // If a rollTableResult was pre-resolved (for rollTableOutcome provider), use it directly
     if (rollTableResult) {
       return rollTableResult;
@@ -311,14 +383,17 @@ export class ResolutionModeService {
 
     const system = this.getSystem(recipe);
     const mode = this.getMode(recipe);
-    const allGroups = Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
-      ? step.resultGroups
-      : (Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
+    const allGroups =
+      Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
+        ? step.resultGroups
+        : Array.isArray(recipe?.resultGroups)
+          ? recipe.resultGroups
+          : [];
 
     if (mode === 'simple') {
       return {
         groups: allGroups.slice(0, 1),
-        meta: {}
+        meta: {},
       };
     }
 
@@ -326,49 +401,59 @@ export class ResolutionModeService {
       const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
       if (mappedId) {
         return {
-          groups: allGroups.filter(group => group.id === mappedId),
-          meta: {}
+          groups: allGroups.filter((group) => group.id === mappedId),
+          meta: {},
         };
       }
 
       // Legacy fallback to resultMapping support.
       if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
         return {
-          groups: allGroups.filter(group => ingredientSet.resultMapping.includes(group.id)),
-          meta: {}
+          groups: allGroups.filter((group) => ingredientSet.resultMapping.includes(group.id)),
+          meta: {},
         };
       }
 
       return {
         groups: allGroups.slice(0, 1),
-        meta: {}
+        meta: {},
       };
     }
 
     if (mode === 'tiered' || mode === 'routed') {
-      const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
+      const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
       if (mode === 'tiered') {
         const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
         const routedId = outcome ? routing[outcome] : null;
         return {
-          groups: routedId ? allGroups.filter(group => group.id === routedId) : [],
-          meta: { outcome, routedId }
+          groups: routedId ? allGroups.filter((group) => group.id === routedId) : [],
+          meta: { outcome, routedId },
         };
       }
 
       const provider = this.getProviderForStep(recipe, step);
       if (provider === 'ingredientSet') {
         const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
-        if (mappedId) return { groups: allGroups.filter(group => group.id === mappedId), meta: {} };
+        if (mappedId)
+          return { groups: allGroups.filter((group) => group.id === mappedId), meta: {} };
         return { groups: allGroups.slice(0, 1), meta: {} };
       }
       if (provider === 'macroOutcome') {
         const normalized = this._normalizeName(outcome);
-        if (this._isFailKeyword(normalized)) return { groups: [], meta: { outcome, disposition: 'fail' } };
-        if (this._isMissKeyword(normalized)) return { groups: [], meta: { outcome, disposition: 'miss' } };
-        const matched = allGroups.filter(group => this._normalizeName(group.name) === normalized);
+        if (this._isFailKeyword(normalized))
+          return { groups: [], meta: { outcome, disposition: 'fail' } };
+        if (this._isMissKeyword(normalized))
+          return { groups: [], meta: { outcome, disposition: 'miss' } };
+        const matched = allGroups.filter((group) => this._normalizeName(group.name) === normalized);
         if (matched.length === 0) {
-          return { groups: [], meta: { outcome, disposition: 'misconfiguration', error: `No result group matches outcome "${outcome}"` } };
+          return {
+            groups: [],
+            meta: {
+              outcome,
+              disposition: 'misconfiguration',
+              error: `No result group matches outcome "${outcome}"`,
+            },
+          };
         }
         return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
       }
@@ -421,14 +506,16 @@ export class ResolutionModeService {
       }
 
       return {
-        groups: [{
-          ...group,
-          results: awarded
-        }],
+        groups: [
+          {
+            ...group,
+            results: awarded,
+          },
+        ],
         meta: {
-          awardedResultIds: awarded.map(r => r.id),
-          remaining
-        }
+          awardedResultIds: awarded.map((r) => r.id),
+          remaining,
+        },
       };
     }
 
@@ -437,12 +524,12 @@ export class ResolutionModeService {
       if (provider === 'ingredientSet') {
         const mappedId = ingredientSet?.resultGroupId || null;
         if (mappedId) {
-          return { groups: allGroups.filter(g => g.id === mappedId), meta: {} };
+          return { groups: allGroups.filter((g) => g.id === mappedId), meta: {} };
         }
         return { groups: allGroups.slice(0, 1), meta: {} };
       }
       if (provider === 'macroOutcome') {
-        const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
+        const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
         const normalized = this._normalizeName(outcome);
         if (this._isFailKeyword(normalized)) {
           return { groups: [], meta: { outcome, disposition: 'fail' } };
@@ -450,9 +537,16 @@ export class ResolutionModeService {
         if (this._isMissKeyword(normalized)) {
           return { groups: [], meta: { outcome, disposition: 'miss' } };
         }
-        const matched = allGroups.filter(g => this._normalizeName(g.name) === normalized);
+        const matched = allGroups.filter((g) => this._normalizeName(g.name) === normalized);
         if (matched.length === 0) {
-          return { groups: [], meta: { outcome, disposition: 'misconfiguration', error: `No result group matches outcome "${outcome}"` } };
+          return {
+            groups: [],
+            meta: {
+              outcome,
+              disposition: 'misconfiguration',
+              error: `No result group matches outcome "${outcome}"`,
+            },
+          };
         }
         return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
       }
@@ -463,8 +557,8 @@ export class ResolutionModeService {
       groups: [],
       meta: {
         error: 'Unknown resolution mode',
-        disposition: 'error'
-      }
+        disposition: 'error',
+      },
     };
   }
 
@@ -474,8 +568,10 @@ export class ResolutionModeService {
       return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
     }
     if (mode === 'routed') {
-      return this.getProvider(recipe) !== 'macroOutcome'
-        || !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
+      return (
+        this.getProvider(recipe) !== 'macroOutcome' ||
+        !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0)
+      );
     }
     if (mode === 'progressive') {
       return Number.isFinite(Number(checkResult?.value));
@@ -486,7 +582,7 @@ export class ResolutionModeService {
   _getDifficulty(system, componentId) {
     if (!componentId) return null;
     const managedItems = system?.components || [];
-    const item = managedItems.find(entry => entry.id === componentId);
+    const item = managedItems.find((entry) => entry.id === componentId);
     const difficulty = Number(item?.difficulty);
     return Number.isFinite(difficulty) ? difficulty : null;
   }

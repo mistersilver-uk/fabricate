@@ -24,7 +24,7 @@ export function buildExportPayload(system, recipes, fabricateVersion) {
   const exportSystem = stripTransitionalAliases(structuredClone(system));
 
   // Replace craftingSystemId with placeholder so imports can rebind
-  const exportRecipes = recipes.map(recipe => {
+  const exportRecipes = recipes.map((recipe) => {
     const r = structuredClone(recipe);
     if (r.craftingSystemId === systemId) {
       r.craftingSystemId = SYSTEM_ID_PLACEHOLDER;
@@ -38,7 +38,7 @@ export function buildExportPayload(system, recipes, fabricateVersion) {
     fabricateVersion,
     exportedAt: new Date().toISOString(),
     system: exportSystem,
-    recipes: exportRecipes
+    recipes: exportRecipes,
   };
 }
 
@@ -75,14 +75,16 @@ export function validateImportData(data) {
     // key on read (pre-1.1.0-migration exports) so an old export still validates.
     const gatheringRealms = data.system.gatheringRealms ?? data.system.gatheringRegions;
     if (gatheringRealms !== undefined) {
-      if (!Array.isArray(gatheringRealms)) {
-        errors.push('System "gatheringRealms" field must be an array');
-      } else {
-        gatheringRealms.forEach((realm, i) => {
+      if (Array.isArray(gatheringRealms)) {
+        for (const [i, realm] of gatheringRealms.entries()) {
           if (realm && typeof realm === 'object' && !realm.name) {
-            warnings.push(`Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`);
+            warnings.push(
+              `Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`
+            );
           }
-        });
+        }
+      } else {
+        errors.push('System "gatheringRealms" field must be an array');
       }
     }
   }
@@ -141,8 +143,8 @@ export function prepareForImport(data, mode = 'keep') {
 export function makeExportFilename(systemName) {
   const slug = (systemName || 'system')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-|-$/g, '');
   const date = new Date().toISOString().slice(0, 10);
   return `fabricate-${slug}-${date}.json`;
 }

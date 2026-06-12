@@ -1,6 +1,15 @@
-import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
+import {
+  getSetting as defaultGetSetting,
+  setSetting as defaultSetSetting,
+  SETTING_KEYS,
+} from '../config/settings.js';
+
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
-import { DANGER_LEVELS, evaluateEnvironmentMatch, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
+import {
+  DANGER_LEVELS,
+  evaluateEnvironmentMatch,
+  resolveEnvironmentDangerLevel,
+} from './gatheringMatch.js';
 import { normalizeNodeRuntime } from './gatheringNodeConfig.js';
 
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
@@ -23,7 +32,7 @@ export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
   'danger',
   'complication',
   'trap',
-  'oops'
+  'oops',
 ]);
 
 /**
@@ -37,9 +46,12 @@ export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
  * @returns {'successWithEvent' | 'failureWithEvent'}
  */
 function normalizeEventPolicy(value) {
-  const coerced = value === 'successWithHazard' ? 'successWithEvent'
-    : value === 'failureWithHazard' ? 'failureWithEvent'
-      : value;
+  const coerced =
+    value === 'successWithHazard'
+      ? 'successWithEvent'
+      : value === 'failureWithHazard'
+        ? 'failureWithEvent'
+        : value;
   return ['successWithEvent', 'failureWithEvent'].includes(coerced) ? coerced : 'successWithEvent';
 }
 
@@ -71,7 +83,7 @@ export class GatheringEnvironmentStore {
     systemManager = null,
     getSystems = null,
     randomID = null,
-    runCleanup = null
+    runCleanup = null,
   } = {}) {
     this.getSetting = getSetting;
     this.setSetting = setSetting;
@@ -97,7 +109,7 @@ export class GatheringEnvironmentStore {
 
   get(environmentId) {
     this._ensureLoaded();
-    const environment = this.environments.find(env => env.id === environmentId);
+    const environment = this.environments.find((env) => env.id === environmentId);
     return environment ? cloneJson(environment) : null;
   }
 
@@ -107,7 +119,7 @@ export class GatheringEnvironmentStore {
     if (!includeDisabledFeature && system?.features?.gathering !== true) {
       return [];
     }
-    return cloneJson(this.environments.filter(env => env.craftingSystemId === systemId));
+    return cloneJson(this.environments.filter((env) => env.craftingSystemId === systemId));
   }
 
   async save(environments = null) {
@@ -138,7 +150,7 @@ export class GatheringEnvironmentStore {
     const errors = this._validateEnvironment(environment);
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -155,13 +167,13 @@ export class GatheringEnvironmentStore {
 
   async update(environmentId, patch = {}) {
     this._ensureLoaded();
-    const index = this.environments.findIndex(env => env.id === environmentId);
-    if (index < 0) return null;
+    const index = this.environments.findIndex((env) => env.id === environmentId);
+    if (index === -1) return null;
 
     const merged = {
       ...this.environments[index],
       ...cloneJson(patch),
-      id: environmentId
+      id: environmentId,
     };
     const environment = this._normalizeEnvironment(merged);
     const errors = this._validateEnvironment(environment, merged);
@@ -174,14 +186,14 @@ export class GatheringEnvironmentStore {
 
   async duplicate(environmentId, overrides = {}) {
     this._ensureLoaded();
-    const source = this.environments.find(env => env.id === environmentId);
+    const source = this.environments.find((env) => env.id === environmentId);
     if (!source) return null;
 
     const duplicate = this._normalizeEnvironment({
       ...cloneJson(source),
       ...cloneJson(overrides),
       id: this.randomID(),
-      nodeRuntime: {} // a copy starts with full pools
+      nodeRuntime: {}, // a copy starts with full pools
     });
     const errors = this._validateEnvironment(duplicate);
     if (errors.length > 0) {
@@ -194,8 +206,10 @@ export class GatheringEnvironmentStore {
   async reorder(systemId, orderedEnvironmentIds = []) {
     this._ensureLoaded();
     const orderedIds = Array.isArray(orderedEnvironmentIds) ? orderedEnvironmentIds : [];
-    const byId = new Map(this.environments.map(env => [env.id, env]));
-    const systemIds = new Set(this.environments.filter(env => env.craftingSystemId === systemId).map(env => env.id));
+    const byId = new Map(this.environments.map((env) => [env.id, env]));
+    const systemIds = new Set(
+      this.environments.filter((env) => env.craftingSystemId === systemId).map((env) => env.id)
+    );
     const emitted = new Set();
     const reorderedSystemEnvironments = [];
 
@@ -213,7 +227,7 @@ export class GatheringEnvironmentStore {
     }
 
     const queue = [...reorderedSystemEnvironments];
-    const reordered = this.environments.map(env => {
+    const reordered = this.environments.map((env) => {
       if (env.craftingSystemId !== systemId) return env;
       return queue.shift();
     });
@@ -223,20 +237,19 @@ export class GatheringEnvironmentStore {
 
   async delete(environmentId) {
     this._ensureLoaded();
-    const environment = this.environments.find(env => env.id === environmentId);
-    if (!environment) return false;
+    const exists = this.environments.some((env) => env.id === environmentId);
+    if (!exists) return false;
 
-    const candidate = this.environments.filter(env => env.id !== environmentId);
+    const candidate = this.environments.filter((env) => env.id !== environmentId);
     await this._persistEnvironmentList(candidate);
     await this._removeRunsForEnvironment(environmentId);
     return true;
   }
 
-
   async cleanupByCraftingSystem(systemId) {
     this._ensureLoaded();
     const before = this.environments.length;
-    const candidate = this.environments.filter(env => env.craftingSystemId !== systemId);
+    const candidate = this.environments.filter((env) => env.craftingSystemId !== systemId);
     if (candidate.length === before) return false;
 
     await this._persistEnvironmentList(candidate);
@@ -250,12 +263,16 @@ export class GatheringEnvironmentStore {
 
   _normalizeEnvironmentList(raw) {
     const records = Array.isArray(raw) ? raw : [];
-    return records.map(record => this._normalizeEnvironment(record));
+    return records.map((record) => this._normalizeEnvironment(record));
   }
 
   _normalizeEnvironment(data = {}, { freshEnvironmentId = false } = {}) {
-    const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode) ? data.selectionMode : 'targeted';
-    const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
+    const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode)
+      ? data.selectionMode
+      : 'targeted';
+    const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode)
+      ? data.compositionMode
+      : 'automatic';
     const blindSelection = normalizeBlindSelection(data?.blindSelection);
     const forcedTaskIds = normalizeIdList(data?.forcedTaskIds);
     // Accept the legacy hazard-schema keys on read (imported or pre-1.0.0-migration
@@ -294,25 +311,37 @@ export class GatheringEnvironmentStore {
       taskOrder: normalizeIdList(data?.taskOrder),
       eventOrder: normalizeIdList(data?.eventOrder ?? data?.hazardOrder),
       taskDropRateAdjustments: normalizeTaskDropRateAdjustments(data?.taskDropRateAdjustments),
-      taskDropRateAdjustmentsEnabled: normalizeTaskDropRateAdjustmentsEnabled(data?.taskDropRateAdjustmentsEnabled),
-      eventDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.eventDropRateAdjustments ?? data?.hazardDropRateAdjustments),
-      eventDropRateAdjustmentsEnabled: normalizeEventDropRateAdjustmentsEnabled(data?.eventDropRateAdjustmentsEnabled ?? data?.hazardDropRateAdjustmentsEnabled),
-      eventSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.eventSelectionMode ?? data?.hazardSelectionMode) ? (data.eventSelectionMode ?? data.hazardSelectionMode) : 'allDrops',
+      taskDropRateAdjustmentsEnabled: normalizeTaskDropRateAdjustmentsEnabled(
+        data?.taskDropRateAdjustmentsEnabled
+      ),
+      eventDropRateAdjustments: normalizeDropRateAdjustmentMap(
+        data?.eventDropRateAdjustments ?? data?.hazardDropRateAdjustments
+      ),
+      eventDropRateAdjustmentsEnabled: normalizeEventDropRateAdjustmentsEnabled(
+        data?.eventDropRateAdjustmentsEnabled ?? data?.hazardDropRateAdjustmentsEnabled
+      ),
+      eventSelectionMode: ['highestRankedDrop', 'allDrops'].includes(
+        data?.eventSelectionMode ?? data?.hazardSelectionMode
+      )
+        ? (data.eventSelectionMode ?? data.hazardSelectionMode)
+        : 'allDrops',
       eventPolicy: normalizeEventPolicy(data?.eventPolicy ?? data?.hazardPolicy),
       ...(blindSelection ? { blindSelection } : {}),
       ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
       ...(forcedEventIds.length > 0 ? { forcedEventIds } : {}),
       // Per-environment node runtime state (taskId → node object), so a library
       // task's resource nodes deplete/respawn independently in each environment.
-      nodeRuntime: normalizeNodeRuntime(data?.nodeRuntime)
+      nodeRuntime: normalizeNodeRuntime(data?.nodeRuntime),
     };
   }
 
   _validateAll(environments, originals = environments) {
-    return environments.flatMap((environment, index) => this._validateEnvironment(
-      environment,
-      Array.isArray(originals) ? originals[index] : environment
-    ));
+    return environments.flatMap((environment, index) =>
+      this._validateEnvironment(
+        environment,
+        Array.isArray(originals) ? originals[index] : environment
+      )
+    );
   }
 
   _validateEnvironment(environment, original = environment) {
@@ -320,11 +349,15 @@ export class GatheringEnvironmentStore {
     const errors = [];
     const label = normalized.name || normalized.id;
 
-    const system = normalized.craftingSystemId ? this._getSystem(normalized.craftingSystemId) : null;
+    const system = normalized.craftingSystemId
+      ? this._getSystem(normalized.craftingSystemId)
+      : null;
     if (!normalized.craftingSystemId) {
       errors.push(`Environment "${label}" is missing craftingSystemId`);
     } else if (!system) {
-      errors.push(`Environment "${label}" references unresolved craftingSystemId "${normalized.craftingSystemId}"`);
+      errors.push(
+        `Environment "${label}" references unresolved craftingSystemId "${normalized.craftingSystemId}"`
+      );
     }
 
     // Realm-id availability validation runs only at save boundaries where the
@@ -334,15 +367,19 @@ export class GatheringEnvironmentStore {
     // here — they remain compatibility input until a biome vocabulary surface
     // ships.
     if (system && Array.isArray(system.gatheringRealms)) {
-      const realmIds = new Set(system.gatheringRealms.map(realm => realm?.id).filter(Boolean));
+      const realmIds = new Set(system.gatheringRealms.map((realm) => realm?.id).filter(Boolean));
       for (const realmId of normalized.includedRealmIds) {
         if (!realmIds.has(realmId)) {
-          errors.push(`Environment "${label}" includedRealmIds references unknown realm "${realmId}"`);
+          errors.push(
+            `Environment "${label}" includedRealmIds references unknown realm "${realmId}"`
+          );
         }
       }
       for (const realmId of normalized.excludedRealmIds) {
         if (!realmIds.has(realmId)) {
-          errors.push(`Environment "${label}" excludedRealmIds references unknown realm "${realmId}"`);
+          errors.push(
+            `Environment "${label}" excludedRealmIds references unknown realm "${realmId}"`
+          );
         }
       }
     }
@@ -351,7 +388,10 @@ export class GatheringEnvironmentStore {
       errors.push(`Environment "${label}" selectionMode must be targeted or blind`);
     }
 
-    if (original?.compositionMode !== undefined && !VALID_COMPOSITION_MODES.has(original.compositionMode)) {
+    if (
+      original?.compositionMode !== undefined &&
+      !VALID_COMPOSITION_MODES.has(original.compositionMode)
+    ) {
       errors.push(`Environment "${label}" compositionMode must be automatic or manual`);
     }
 
@@ -359,10 +399,24 @@ export class GatheringEnvironmentStore {
       errors.push(`Environment "${label}" dangerLevel must be one of: ${DANGER_LEVELS.join(', ')}`);
     }
 
-    errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
-    errors.push(...validateTaskDropRateAdjustmentsEnabled(original?.taskDropRateAdjustmentsEnabled, `Environment "${label}" taskDropRateAdjustmentsEnabled`));
-    errors.push(...validateDropRateAdjustmentMap(original?.eventDropRateAdjustments, `Environment "${label}" eventDropRateAdjustments`));
-    errors.push(...validateEventDropRateAdjustmentsEnabled(original?.eventDropRateAdjustmentsEnabled, `Environment "${label}" eventDropRateAdjustmentsEnabled`));
+    errors.push(
+      ...validateTaskDropRateAdjustments(
+        original?.taskDropRateAdjustments,
+        `Environment "${label}" taskDropRateAdjustments`
+      ),
+      ...validateTaskDropRateAdjustmentsEnabled(
+        original?.taskDropRateAdjustmentsEnabled,
+        `Environment "${label}" taskDropRateAdjustmentsEnabled`
+      ),
+      ...validateDropRateAdjustmentMap(
+        original?.eventDropRateAdjustments,
+        `Environment "${label}" eventDropRateAdjustments`
+      ),
+      ...validateEventDropRateAdjustmentsEnabled(
+        original?.eventDropRateAdjustmentsEnabled,
+        `Environment "${label}" eventDropRateAdjustmentsEnabled`
+      )
+    );
 
     const hasTaskSource = this._environmentHasTaskSource(normalized);
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
@@ -379,25 +433,30 @@ export class GatheringEnvironmentStore {
     return errors;
   }
 
-
   _getSystem(systemId) {
     if (!systemId) return null;
     if (this.systemManager?.getSystem) return this.systemManager.getSystem(systemId);
     const systems = this._getSystems();
-    return systems.find(system => system?.id === systemId) || null;
+    return systems.find((system) => system?.id === systemId) || null;
   }
 
   _environmentHasTaskSource(environment) {
     if (environment.enabledTaskIds.length > 0) return true;
-    if (environment.compositionMode === 'manual' && normalizeIdList(environment.forcedTaskIds).length > 0) return true;
+    if (
+      environment.compositionMode === 'manual' &&
+      normalizeIdList(environment.forcedTaskIds).length > 0
+    )
+      return true;
     if (environment.compositionMode !== 'automatic') return false;
     return this._hasMatchingLibraryTask(environment);
   }
 
   _hasMatchingLibraryTask(environment) {
-    return this._getGatheringLibraryTasks(environment.craftingSystemId)
-      .some(task => task?.enabled !== false
-        && evaluateEnvironmentMatch(task, environment, {}, { includeDanger: false }).matches);
+    return this._getGatheringLibraryTasks(environment.craftingSystemId).some(
+      (task) =>
+        task?.enabled !== false &&
+        evaluateEnvironmentMatch(task, environment, {}, { includeDanger: false }).matches
+    );
   }
 
   _getGatheringLibraryTasks(systemId) {
@@ -408,21 +467,24 @@ export class GatheringEnvironmentStore {
   }
 
   _getSystems() {
-    const raw = typeof this.getSystems === 'function'
-      ? this.getSystems()
-      : (this.systemManager?.getSystems ? this.systemManager.getSystems() : []);
-    if (raw instanceof Map) return Array.from(raw.values());
+    const raw =
+      typeof this.getSystems === 'function'
+        ? this.getSystems()
+        : this.systemManager?.getSystems
+          ? this.systemManager.getSystems()
+          : [];
+    if (raw instanceof Map) return [...raw.values()];
     return Array.isArray(raw) ? raw : [];
   }
 
   _getSystemItem(systemId, componentId) {
     if (!systemId || !componentId) return null;
     if (this.systemManager?.getItems) {
-      return this.systemManager.getItems(systemId).find(item => item?.id === componentId) || null;
+      return this.systemManager.getItems(systemId).find((item) => item?.id === componentId) || null;
     }
     const system = this._getSystem(systemId);
     const items = Array.isArray(system?.components) ? system.components : [];
-    return items.find(item => item?.id === componentId) || null;
+    return items.find((item) => item?.id === componentId) || null;
   }
 
   async _removeRunsForSystem(systemId) {
@@ -436,26 +498,31 @@ export class GatheringEnvironmentStore {
       await this.runCleanup.removeRunsForEnvironment(environmentId);
     }
   }
-
 }
 
 // Validates a library task's d100 drop rows (the admin task editor imports this).
-export function validateDropRows(rows, label, {
-  system = null,
-  systemId = '',
-  validateDisabledRows = false,
-  requireAtLeastOneEnabled = true,
-  resolveUuid
-} = {}) {
-  const entries = Array.isArray(rows) ? rows.filter(row => row?.enabled !== false) : [];
+export function validateDropRows(
+  rows,
+  label,
+  {
+    system = null,
+    systemId = '',
+    validateDisabledRows = false,
+    requireAtLeastOneEnabled = true,
+    resolveUuid,
+  } = {}
+) {
+  const entries = Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
   const errors = [];
-  if (requireAtLeastOneEnabled && entries.length < 1) {
+  if (requireAtLeastOneEnabled && entries.length === 0) {
     errors.push(`${label} requires at least one drop row`);
   }
   for (const row of entries) {
     const dropRate = Number(row?.dropRate);
     if (!Number.isInteger(dropRate) || dropRate < 0 || dropRate > 100) {
-      errors.push(`${label} drop row "${row?.id || 'row'}" dropRate must be an integer from 0 to 100`);
+      errors.push(
+        `${label} drop row "${row?.id || 'row'}" dropRate must be an integer from 0 to 100`
+      );
     }
     if (!row?.componentId && !row?.itemUuid) {
       errors.push(`${label} drop row "${row?.id || 'row'}" requires componentId or itemUuid`);
@@ -465,15 +532,19 @@ export function validateDropRows(rows, label, {
       errors.push(`${label} drop row "${row?.id || 'row'}" quantity must be positive`);
     }
   }
-  errors.push(...validateGatheringDropReferencesSync({
-    tasks: [{ name: label.replace(/^Task\s+"|"$/g, ''), dropRows: Array.isArray(rows) ? rows : [] }],
-    system,
-    systemId,
-    validateDisabledRows,
-    requireAtLeastOneEnabled: false,
-    validateBasics: false,
-    resolveUuid
-  }));
+  errors.push(
+    ...validateGatheringDropReferencesSync({
+      tasks: [
+        { name: label.replaceAll(/^Task\s+"|"$/g, ''), dropRows: Array.isArray(rows) ? rows : [] },
+      ],
+      system,
+      systemId,
+      validateDisabledRows,
+      requireAtLeastOneEnabled: false,
+      validateBasics: false,
+      resolveUuid,
+    })
+  );
   return errors;
 }
 
@@ -483,11 +554,11 @@ function normalizeConditions(data = null) {
     timeOfDay: stringOrEmpty(data.timeOfDay),
     weather: stringOrEmpty(data.weather),
     visibility: stringOrEmpty(data.visibility),
-    notes: stringOrEmpty(data.notes)
+    notes: stringOrEmpty(data.notes),
   };
 }
 
-function validateConditions(conditions, label) {
+function validateConditions(conditions, _label) {
   if (!conditions || typeof conditions !== 'object') return [];
   return [];
 }
@@ -501,10 +572,9 @@ function normalizeChatMessages(data = null) {
   return {
     enabled: data.enabled === true,
     gmDiagnostics: data.gmDiagnostics === true,
-    events
+    events,
   };
 }
-
 
 function normalizeBlindSelection(data = null) {
   if (!data || typeof data !== 'object') return null;
@@ -534,20 +604,14 @@ function stringOrEmpty(value) {
   return String(value).trim();
 }
 
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
 function normalizeStringList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(entry => stringOrEmpty(entry).toLowerCase()).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map((entry) => stringOrEmpty(entry).toLowerCase()).filter(Boolean))];
 }
 
 function normalizeIdList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(entry => stringOrEmpty(entry)).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
 }
 
 function normalizeDropRateAdjustmentValue(value) {
@@ -558,30 +622,41 @@ function normalizeDropRateAdjustmentValue(value) {
 
 function normalizeDropRateAdjustmentMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value)
-    .map(([id, adjustment]) => [stringOrEmpty(id), normalizeDropRateAdjustmentValue(adjustment)])
-    .filter(([id, adjustment]) => id && adjustment !== null));
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([id, adjustment]) => [stringOrEmpty(id), normalizeDropRateAdjustmentValue(adjustment)])
+      .filter(([id, adjustment]) => id && adjustment !== null)
+  );
 }
 
 function normalizeTaskDropRateAdjustments(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value)
-    .map(([taskId, rowAdjustments]) => [stringOrEmpty(taskId), normalizeDropRateAdjustmentMap(rowAdjustments)])
-    .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([taskId, rowAdjustments]) => [
+        stringOrEmpty(taskId),
+        normalizeDropRateAdjustmentMap(rowAdjustments),
+      ])
+      .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0)
+  );
 }
 
 function normalizeTaskDropRateAdjustmentsEnabled(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value)
-    .map(([taskId, enabled]) => [stringOrEmpty(taskId), enabled])
-    .filter(([taskId, enabled]) => taskId && enabled === false));
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([taskId, enabled]) => [stringOrEmpty(taskId), enabled])
+      .filter(([taskId, enabled]) => taskId && enabled === false)
+  );
 }
 
 function normalizeEventDropRateAdjustmentsEnabled(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value)
-    .map(([eventId, enabled]) => [stringOrEmpty(eventId), enabled])
-    .filter(([eventId, enabled]) => eventId && enabled === false));
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([eventId, enabled]) => [stringOrEmpty(eventId), enabled])
+      .filter(([eventId, enabled]) => eventId && enabled === false)
+  );
 }
 
 function validateDropRateAdjustmentMap(value, label) {
@@ -648,8 +723,4 @@ function validateEventDropRateAdjustmentsEnabled(value, label) {
 
 function trimmedOrDefault(value, fallback) {
   return stringOrEmpty(value) || fallback;
-}
-
-function normalizeGroupName(value) {
-  return stringOrEmpty(value).toLowerCase();
 }

@@ -34,7 +34,7 @@ export class CompendiumImporter {
       overwriteExisting = false,
       retainFallbackIds = true,
       additionalFallbackIds = {},
-      targetPackIds = []
+      targetPackIds = [],
     } = options;
 
     const systemData = packData.system;
@@ -44,7 +44,7 @@ export class CompendiumImporter {
       system: { id: null, name: systemData.name || '', created: false, skipped: false },
       components: { total: 0, remapped: [], retained: [], unresolved: [] },
       recipes: { total: recipesData.length, imported: 0, skipped: 0, errors: [] },
-      collisions: []
+      collisions: [],
     };
 
     // --- Phase 1: Resolve existing system ---
@@ -58,7 +58,7 @@ export class CompendiumImporter {
         type: 'system',
         id: existingSystem.id,
         name: existingSystem.name,
-        resolution: 'skipped'
+        resolution: 'skipped',
       });
       return summary;
     }
@@ -89,7 +89,7 @@ export class CompendiumImporter {
         type: 'system',
         id: system.id,
         name: system.name,
-        resolution: 'overwritten'
+        resolution: 'overwritten',
       });
     } else {
       // Force the pack's system ID if provided so cross-references remain stable
@@ -103,9 +103,10 @@ export class CompendiumImporter {
     for (const recipeData of recipesData) {
       const resolved = {
         ...recipeData,
-        craftingSystemId: recipeData.craftingSystemId === '__SYSTEM_ID__'
-          ? system.id
-          : (recipeData.craftingSystemId || system.id)
+        craftingSystemId:
+          recipeData.craftingSystemId === '__SYSTEM_ID__'
+            ? system.id
+            : recipeData.craftingSystemId || system.id,
       };
 
       const existing = this._recipeManager.getRecipe(resolved.id);
@@ -115,29 +116,32 @@ export class CompendiumImporter {
           type: 'recipe',
           id: resolved.id,
           name: resolved.name || resolved.id,
-          resolution: 'skipped'
+          resolution: 'skipped',
         });
         continue;
       }
 
       try {
         if (existing && overwriteExisting) {
-          await this._recipeManager.updateRecipe(resolved.id, resolved, { notify: false, emitChange: false });
+          await this._recipeManager.updateRecipe(resolved.id, resolved, {
+            notify: false,
+            emitChange: false,
+          });
           summary.collisions.push({
             type: 'recipe',
             id: resolved.id,
             name: resolved.name || resolved.id,
-            resolution: 'overwritten'
+            resolution: 'overwritten',
           });
         } else {
           await this._recipeManager.createRecipe(resolved, { notify: false, emitChange: false });
         }
         summary.recipes.imported++;
-      } catch (err) {
+      } catch (error) {
         summary.recipes.errors.push({
           recipeId: resolved.id,
           recipeName: resolved.name || resolved.id,
-          error: err.message || String(err)
+          error: error.message || String(error),
         });
       }
     }
@@ -147,7 +151,7 @@ export class CompendiumImporter {
       imported: summary.recipes.imported,
       skipped: summary.recipes.skipped,
       errors: summary.recipes.errors.length,
-      systemId: system.id
+      systemId: system.id,
     });
 
     return summary;
@@ -156,16 +160,17 @@ export class CompendiumImporter {
   async _validateGatheringConfig(systemInput) {
     const gatheringConfig = systemInput?.gatheringConfig;
     if (!gatheringConfig || typeof gatheringConfig !== 'object') return;
-    const systems = gatheringConfig.systems && typeof gatheringConfig.systems === 'object'
-      ? gatheringConfig.systems
-      : {};
+    const systems =
+      gatheringConfig.systems && typeof gatheringConfig.systems === 'object'
+        ? gatheringConfig.systems
+        : {};
     const errors = [];
     for (const [systemId, systemConfig] of Object.entries(systems)) {
       if (!Array.isArray(systemConfig?.tasks)) continue;
       const validationErrors = await validateGatheringDropReferences({
         tasks: systemConfig.tasks,
         system: { components: systemInput.components || [] },
-        systemId
+        systemId,
       });
       errors.push(...validationErrors);
     }
@@ -203,7 +208,7 @@ export class CompendiumImporter {
       const { id: compId, name: compName, sourceItemUuid } = component;
 
       // Collect fallback IDs: existing retained IDs + explicit additions + pack-provided fallbacks
-      let mergedFallbacks = [];
+      const mergedFallbacks = [];
 
       if (retainFallbackIds) {
         const existing = existingComponentsById.get(compId);
@@ -240,12 +245,14 @@ export class CompendiumImporter {
           componentName: compName,
           oldUuid: sourceItemUuid,
           newUuid: sourceItemUuid,
-          method: 'exact'
+          method: 'exact',
         });
-        remapped.push(this._withResolvedSourceMetadata(
-          { ...component, fallbackItemIds: mergedFallbacks },
-          exactDoc
-        ));
+        remapped.push(
+          this._withResolvedSourceMetadata(
+            { ...component, fallbackItemIds: mergedFallbacks },
+            exactDoc
+          )
+        );
         continue;
       }
 
@@ -261,13 +268,20 @@ export class CompendiumImporter {
           componentName: compName,
           oldUuid: sourceItemUuid,
           newUuid: foundUuid,
-          method: 'sourceName'
+          method: 'sourceName',
         });
         const foundDoc = await this._resolveUuidDocument(foundUuid);
-        remapped.push(this._withResolvedSourceMetadata(
-          { ...component, sourceItemUuid: foundUuid, sourceUuid: foundUuid, fallbackItemIds: mergedFallbacks },
-          foundDoc
-        ));
+        remapped.push(
+          this._withResolvedSourceMetadata(
+            {
+              ...component,
+              sourceItemUuid: foundUuid,
+              sourceUuid: foundUuid,
+              fallbackItemIds: mergedFallbacks,
+            },
+            foundDoc
+          )
+        );
         continue;
       }
 
@@ -275,14 +289,14 @@ export class CompendiumImporter {
       summary.components.unresolved.push({
         componentId: compId,
         componentName: compName,
-        sourceItemUuid
+        sourceItemUuid,
       });
 
       if (mergedFallbacks.length > 0) {
         summary.components.retained.push({
           componentId: compId,
           componentName: compName,
-          fallbackIds: [...mergedFallbacks]
+          fallbackIds: [...mergedFallbacks],
         });
       }
 
@@ -329,12 +343,12 @@ export class CompendiumImporter {
       enriched.img = sourceDoc.img;
     }
 
-    const storedDescription = typeof component.description === 'string' ? component.description.trim() : '';
+    const storedDescription =
+      typeof component.description === 'string' ? component.description.trim() : '';
     if (!storedDescription) {
       const extract = this._craftingSystemManager?._extractSourceDescription;
-      const description = typeof extract === 'function'
-        ? extract.call(this._craftingSystemManager, sourceDoc)
-        : '';
+      const description =
+        typeof extract === 'function' ? extract.call(this._craftingSystemManager, sourceDoc) : '';
       if (description) enriched.description = description;
     }
 
@@ -355,8 +369,8 @@ export class CompendiumImporter {
     if (!sourceUuid || !name) return null;
     const nameLower = name.trim().toLowerCase();
 
-    const packs = game.packs ? Array.from(game.packs) : [];
-    const filteredPacks = packs.filter(p => {
+    const packs = game.packs ? [...game.packs] : [];
+    const filteredPacks = packs.filter((p) => {
       if (p.documentName !== 'Item') return false;
       if (targetPackIds.length > 0 && !targetPackIds.includes(p.collection)) return false;
       return true;
@@ -365,7 +379,9 @@ export class CompendiumImporter {
     for (const pack of filteredPacks) {
       let index;
       try {
-        index = await pack.getIndex({ fields: ['name', '_stats.compendiumSource', 'flags.core.sourceId'] });
+        index = await pack.getIndex({
+          fields: ['name', '_stats.compendiumSource', 'flags.core.sourceId'],
+        });
       } catch {
         continue;
       }
@@ -392,13 +408,13 @@ export class CompendiumImporter {
     const systems = this._craftingSystemManager.getSystems();
 
     if (systemData.id) {
-      const byId = systems.find(s => s.id === systemData.id);
+      const byId = systems.find((s) => s.id === systemData.id);
       if (byId) return byId;
     }
 
     if (systemData.name) {
       const nameLower = systemData.name.trim().toLowerCase();
-      const byName = systems.find(s => (s.name || '').trim().toLowerCase() === nameLower);
+      const byName = systems.find((s) => (s.name || '').trim().toLowerCase() === nameLower);
       if (byName) return byName;
     }
 

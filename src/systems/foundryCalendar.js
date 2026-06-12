@@ -9,8 +9,8 @@
  * weeks vary across custom calendars.
  */
 
-const EARTH_SECONDS_PER_DAY = 86400;
-const EARTH_SECONDS_PER_WEEK = 604800;
+const EARTH_SECONDS_PER_DAY = 86_400;
+const EARTH_SECONDS_PER_WEEK = 604_800;
 
 /**
  * Measure one calendar day by differencing `componentsToTime` — a fallback for
@@ -23,9 +23,10 @@ const EARTH_SECONDS_PER_WEEK = 604800;
 function measureDaySeconds(calendar) {
   if (typeof calendar?.componentsToTime !== 'function') return 0;
   try {
-    const delta = Number(calendar.componentsToTime({ day: 1 })) - Number(calendar.componentsToTime({ day: 0 }));
+    const delta =
+      Number(calendar.componentsToTime({ day: 1 })) - Number(calendar.componentsToTime({ day: 0 }));
     return Number.isFinite(delta) && delta > 0 ? delta : 0;
-  } catch (_err) {
+  } catch {
     return 0;
   }
 }
@@ -57,7 +58,10 @@ export function secondsPerDayFromCalendar(calendar) {
  * @param {number} [secondsPerDay] Precomputed day length to avoid recomputation.
  * @returns {number}
  */
-export function secondsPerWeekFromCalendar(calendar, secondsPerDay = secondsPerDayFromCalendar(calendar)) {
+export function secondsPerWeekFromCalendar(
+  calendar,
+  secondsPerDay = secondsPerDayFromCalendar(calendar)
+) {
   if (!calendar) return EARTH_SECONDS_PER_WEEK;
   const spd = Number(secondsPerDay) > 0 ? Number(secondsPerDay) : EARTH_SECONDS_PER_DAY;
   const weekdayCount = Number(calendar?.days?.values?.length);

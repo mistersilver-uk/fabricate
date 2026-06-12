@@ -82,12 +82,17 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
   if (!(interval > 0)) return { changed: false, node };
   const nowTime = Number(now);
   if (!Number.isFinite(nowTime)) return { changed: false, node };
-  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : nowTime;
+  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
+    ? Number(respawn.lastEvaluatedWorldTime)
+    : nowTime;
 
   // World time stood still or ran backwards: re-anchor, never regenerate.
   if (nowTime <= last) {
     if (respawn.lastEvaluatedWorldTime !== nowTime) {
-      return { changed: true, node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: nowTime } } };
+      return {
+        changed: true,
+        node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: nowTime } },
+      };
     }
     return { changed: false, node };
   }
@@ -99,7 +104,10 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
   const room = Math.max(0, max - before);
   const advancedAnchor = last + intervals * interval;
   if (room === 0) {
-    return { changed: true, node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } } };
+    return {
+      changed: true,
+      node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor } },
+    };
   }
   intervals = Math.min(intervals, room); // bound stochastic loops to needed restocks
 
@@ -114,7 +122,8 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
     for (let i = 0; i < intervals; i++) {
       // The chance seam returns the RAW 1..100 roll; persist it (matching the
       // authoritative env path's `lastRoll.rolls`) and hit on `roll <= chance*100`.
-      const roll = typeof rollChance === 'function' ? Number(rollChance(chance)) : Number.POSITIVE_INFINITY;
+      const roll =
+        typeof rollChance === 'function' ? Number(rollChance(chance)) : Number.POSITIVE_INFINITY;
       rolls.push(roll);
       if (roll <= chance * 100) gain += 1;
     }
@@ -122,9 +131,10 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
   } else {
     const rolls = [];
     for (let i = 0; i < intervals; i++) {
-      const amount = typeof rollExpression === 'function'
-        ? Math.max(0, Math.round(Number(rollExpression(respawn.amountExpression)) || 0))
-        : 0;
+      const amount =
+        typeof rollExpression === 'function'
+          ? Math.max(0, Math.round(Number(rollExpression(respawn.amountExpression)) || 0))
+          : 0;
       rolls.push(amount);
       gain += amount;
       if (before + gain >= max) break;
@@ -134,7 +144,11 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
   const nextCurrent = Math.min(max, before + gain);
   return {
     changed: true,
-    node: { ...node, current: nextCurrent, respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll } }
+    node: {
+      ...node,
+      current: nextCurrent,
+      respawn: { ...respawn, lastEvaluatedWorldTime: advancedAnchor, lastRoll },
+    },
   };
 }
 
@@ -156,7 +170,9 @@ export function nextRespawnEta(node, secondsPerUnit, now) {
   if (!(interval > 0)) return null;
   const nowTime = Number(now);
   if (!Number.isFinite(nowTime)) return null;
-  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime)) ? Number(respawn.lastEvaluatedWorldTime) : nowTime;
+  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
+    ? Number(respawn.lastEvaluatedWorldTime)
+    : nowTime;
   // Next anchor strictly after `now`.
   const elapsed = Math.max(0, nowTime - last);
   const wholeIntervals = Math.floor(elapsed / interval) + 1;

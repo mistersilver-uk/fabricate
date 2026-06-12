@@ -17,7 +17,11 @@
  * @typedef {'visible' | 'gmOnly'} GatheringRealmModifierVisibility
  */
 
-export const GATHERING_REALM_REVEAL_MODES = Object.freeze(['manual', 'onPartyTokenEntry', 'alwaysVisible']);
+export const GATHERING_REALM_REVEAL_MODES = Object.freeze([
+  'manual',
+  'onPartyTokenEntry',
+  'alwaysVisible',
+]);
 export const GATHERING_REALM_MODIFIER_VISIBILITIES = Object.freeze(['visible', 'gmOnly']);
 export const GATHERING_REALM_MODIFIER_KINDS = Object.freeze([
   'eventChance',
@@ -26,16 +30,26 @@ export const GATHERING_REALM_MODIFIER_KINDS = Object.freeze([
   'difficulty',
   'staminaCost',
   'attemptLimit',
-  'custom'
+  'custom',
 ]);
-export const GATHERING_REALM_MODIFIER_OPERATIONS = Object.freeze(['add', 'multiply', 'set', 'min', 'max']);
+export const GATHERING_REALM_MODIFIER_OPERATIONS = Object.freeze([
+  'add',
+  'multiply',
+  'set',
+  'min',
+  'max',
+]);
 
 const REVEAL_MODE_SET = new Set(GATHERING_REALM_REVEAL_MODES);
 const MODIFIER_VISIBILITY_SET = new Set(GATHERING_REALM_MODIFIER_VISIBILITIES);
 const MODIFIER_KIND_SET = new Set(GATHERING_REALM_MODIFIER_KINDS);
 const MODIFIER_OPERATION_SET = new Set(GATHERING_REALM_MODIFIER_OPERATIONS);
 
-const DEFAULT_REALM_SETTINGS = Object.freeze({ enabled: false, revealMode: 'manual', modifierVisibility: 'visible' });
+const DEFAULT_REALM_SETTINGS = Object.freeze({
+  enabled: false,
+  revealMode: 'manual',
+  modifierVisibility: 'visible',
+});
 
 function stringOrEmpty(value) {
   if (value === null || value === undefined) return '';
@@ -53,8 +67,8 @@ function trimmedOrDefault(value, fallback) {
 }
 
 function normalizeStringList(value) {
-  const values = Array.isArray(value) ? value : (value ? [value] : []);
-  return Array.from(new Set(values.map(entry => stringOrEmpty(entry).toLowerCase()).filter(Boolean)));
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map((entry) => stringOrEmpty(entry).toLowerCase()).filter(Boolean))];
 }
 
 let _realmIdFallbackSeq = 0;
@@ -66,11 +80,11 @@ let _realmIdFallbackSeq = 0;
 function defaultRandomID() {
   if (globalThis.foundry?.utils?.randomID) return globalThis.foundry.utils.randomID();
   const cryptoSource = globalThis.crypto;
-  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID().replace(/-/g, '').slice(0, 16);
+  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID().replaceAll('-', '').slice(0, 16);
   if (cryptoSource?.getRandomValues) {
     const bytes = new Uint8Array(8);
     cryptoSource.getRandomValues(bytes);
-    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
   return `realm-${(_realmIdFallbackSeq++).toString(36)}`;
 }
@@ -83,17 +97,20 @@ function defaultRandomID() {
  * @param {{ randomID?: () => string }} [collaborators]
  * @returns {{ id: string, sceneUuid: string, sceneRegionUuid: string }}
  */
-export function normalizeGatheringRealmSceneMapping(data = {}, { randomID = defaultRandomID } = {}) {
+export function normalizeGatheringRealmSceneMapping(
+  data = {},
+  { randomID = defaultRandomID } = {}
+) {
   return {
     id: data?.id ? String(data.id) : randomID(),
     sceneUuid: stringOrEmpty(data?.sceneUuid),
-    sceneRegionUuid: stringOrEmpty(data?.sceneRegionUuid)
+    sceneRegionUuid: stringOrEmpty(data?.sceneRegionUuid),
   };
 }
 
 function normalizeSceneMappingList(value, collaborators) {
   const records = Array.isArray(value) ? value : [];
-  return records.map(record => normalizeGatheringRealmSceneMapping(record, collaborators));
+  return records.map((record) => normalizeGatheringRealmSceneMapping(record, collaborators));
 }
 
 /**
@@ -118,7 +135,7 @@ export function normalizeGatheringRealmModifier(data = {}, { randomID = defaultR
     kind: MODIFIER_KIND_SET.has(kind) ? kind : 'custom',
     operation: MODIFIER_OPERATION_SET.has(data?.operation) ? data.operation : 'add',
     value: Number.isFinite(numericValue) ? numericValue : 0,
-    visibility: MODIFIER_VISIBILITY_SET.has(data?.visibility) ? data.visibility : 'visible'
+    visibility: MODIFIER_VISIBILITY_SET.has(data?.visibility) ? data.visibility : 'visible',
   };
   const note = optionalString(data?.note);
   if (note !== null) modifier.note = note;
@@ -127,7 +144,7 @@ export function normalizeGatheringRealmModifier(data = {}, { randomID = defaultR
 
 function normalizeModifierList(value, collaborators) {
   const records = Array.isArray(value) ? value : [];
-  return records.map(record => normalizeGatheringRealmModifier(record, collaborators));
+  return records.map((record) => normalizeGatheringRealmModifier(record, collaborators));
 }
 
 /**
@@ -138,7 +155,10 @@ function normalizeModifierList(value, collaborators) {
  * @param {{ craftingSystemId?: string, randomID?: () => string }} [collaborators]
  * @returns {object}
  */
-export function normalizeGatheringRealm(data = {}, { craftingSystemId = '', randomID = defaultRandomID } = {}) {
+export function normalizeGatheringRealm(
+  data = {},
+  { craftingSystemId = '', randomID = defaultRandomID } = {}
+) {
   const ownerId = stringOrEmpty(craftingSystemId) || stringOrEmpty(data?.craftingSystemId);
   const realm = {
     id: data?.id ? String(data.id) : randomID(),
@@ -150,7 +170,7 @@ export function normalizeGatheringRealm(data = {}, { craftingSystemId = '', rand
     secret: data?.secret === true,
     biomes: normalizeStringList(data?.biomes),
     sceneMappings: normalizeSceneMappingList(data?.sceneMappings, { randomID }),
-    modifiers: normalizeModifierList(data?.modifiers, { randomID })
+    modifiers: normalizeModifierList(data?.modifiers, { randomID }),
   };
   const sort = Number(data?.sort);
   if (Number.isFinite(sort)) realm.sort = sort;
@@ -166,7 +186,7 @@ export function normalizeGatheringRealm(data = {}, { craftingSystemId = '', rand
  */
 export function normalizeGatheringRealmList(value, collaborators = {}) {
   const records = Array.isArray(value) ? value : [];
-  return records.map(record => normalizeGatheringRealm(record, collaborators));
+  return records.map((record) => normalizeGatheringRealm(record, collaborators));
 }
 
 /**
@@ -189,13 +209,19 @@ export function validateGatheringRealmModifiers(modifiers, label) {
       seen.add(id);
     }
     if (modifier?.kind !== undefined && !MODIFIER_KIND_SET.has(modifier.kind)) {
-      errors.push(`Realm "${label}" modifier "${id || 'modifier'}" kind must be one of: ${GATHERING_REALM_MODIFIER_KINDS.join(', ')}`);
+      errors.push(
+        `Realm "${label}" modifier "${id || 'modifier'}" kind must be one of: ${GATHERING_REALM_MODIFIER_KINDS.join(', ')}`
+      );
     }
     if (modifier?.operation !== undefined && !MODIFIER_OPERATION_SET.has(modifier.operation)) {
-      errors.push(`Realm "${label}" modifier "${id || 'modifier'}" operation must be one of: ${GATHERING_REALM_MODIFIER_OPERATIONS.join(', ')}`);
+      errors.push(
+        `Realm "${label}" modifier "${id || 'modifier'}" operation must be one of: ${GATHERING_REALM_MODIFIER_OPERATIONS.join(', ')}`
+      );
     }
     if (modifier?.visibility !== undefined && !MODIFIER_VISIBILITY_SET.has(modifier.visibility)) {
-      errors.push(`Realm "${label}" modifier "${id || 'modifier'}" visibility must be visible or gmOnly`);
+      errors.push(
+        `Realm "${label}" modifier "${id || 'modifier'}" visibility must be visible or gmOnly`
+      );
     }
     if (!Number.isFinite(Number(modifier?.value))) {
       errors.push(`Realm "${label}" modifier "${id || 'modifier'}" value must be a finite number`);
@@ -235,9 +261,10 @@ export function validateGatheringRealmSceneMappings(mappings, label) {
  */
 export function validateGatheringRealm(realm) {
   const label = stringOrEmpty(realm?.name) || stringOrEmpty(realm?.id) || 'realm';
-  const errors = [];
-  errors.push(...validateGatheringRealmModifiers(realm?.modifiers, label));
-  errors.push(...validateGatheringRealmSceneMappings(realm?.sceneMappings, label));
+  const errors = [
+    ...validateGatheringRealmModifiers(realm?.modifiers, label),
+    ...validateGatheringRealmSceneMappings(realm?.sceneMappings, label),
+  ];
   return errors;
 }
 
@@ -275,10 +302,12 @@ export function validateGatheringRealmList(realms) {
 export function normalizeGatheringRealmSettings(data = {}) {
   return {
     enabled: data?.enabled === true,
-    revealMode: REVEAL_MODE_SET.has(data?.revealMode) ? data.revealMode : DEFAULT_REALM_SETTINGS.revealMode,
+    revealMode: REVEAL_MODE_SET.has(data?.revealMode)
+      ? data.revealMode
+      : DEFAULT_REALM_SETTINGS.revealMode,
     modifierVisibility: MODIFIER_VISIBILITY_SET.has(data?.modifierVisibility)
       ? data.modifierVisibility
-      : DEFAULT_REALM_SETTINGS.modifierVisibility
+      : DEFAULT_REALM_SETTINGS.modifierVisibility,
   };
 }
 
@@ -292,15 +321,21 @@ export function normalizeGatheringRealmSettings(data = {}) {
  */
 export function validateGatheringRealmSettings(data = {}) {
   if (data === undefined || data === null) return [];
-  if (typeof data !== 'object' || Array.isArray(data)) return ['gatheringRealmSettings must be an object'];
+  if (typeof data !== 'object' || Array.isArray(data))
+    return ['gatheringRealmSettings must be an object'];
   const errors = [];
   if (data.enabled !== undefined && typeof data.enabled !== 'boolean') {
     errors.push('gatheringRealmSettings enabled must be a boolean');
   }
   if (data.revealMode !== undefined && !REVEAL_MODE_SET.has(data.revealMode)) {
-    errors.push(`gatheringRealmSettings revealMode must be one of: ${GATHERING_REALM_REVEAL_MODES.join(', ')}`);
+    errors.push(
+      `gatheringRealmSettings revealMode must be one of: ${GATHERING_REALM_REVEAL_MODES.join(', ')}`
+    );
   }
-  if (data.modifierVisibility !== undefined && !MODIFIER_VISIBILITY_SET.has(data.modifierVisibility)) {
+  if (
+    data.modifierVisibility !== undefined &&
+    !MODIFIER_VISIBILITY_SET.has(data.modifierVisibility)
+  ) {
     errors.push('gatheringRealmSettings modifierVisibility must be visible or gmOnly');
   }
   return errors;

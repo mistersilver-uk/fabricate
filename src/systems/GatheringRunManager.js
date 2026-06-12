@@ -25,7 +25,7 @@ export class GatheringRunManager {
     randomID = defaultRandomID,
     nowWorldTime = defaultNowWorldTime,
     getUserId = defaultGetUserId,
-    getActors = defaultGetActors
+    getActors = defaultGetActors,
   } = {}) {
     this.randomID = randomID;
     this.nowWorldTime = nowWorldTime;
@@ -64,7 +64,7 @@ export class GatheringRunManager {
   findActiveRunForTask(actor, taskId) {
     const normalizedTaskId = stringOrNull(taskId);
     if (!normalizedTaskId) return null;
-    return this.getActiveRuns(actor).find(run => run.taskId === normalizedTaskId) || null;
+    return this.getActiveRuns(actor).find((run) => run.taskId === normalizedTaskId) || null;
   }
 
   async createRun(actor, runData = {}) {
@@ -73,20 +73,26 @@ export class GatheringRunManager {
     this._assertNoActiveTaskRun(actor, runData.taskId);
 
     if (runData.status === 'waitingTime' && !this._normalizeTimeGate(runData.timeGate)) {
-      throw new GatheringRunManagerError('Waiting gathering runs require a positive time gate', 'INVALID_TIME_GATE');
+      throw new GatheringRunManagerError(
+        'Waiting gathering runs require a positive time gate',
+        'INVALID_TIME_GATE'
+      );
     }
 
     const container = cloneContainer(this._getContainer(actor));
     const now = this._now();
-    const run = this._normalizeRun({
-      actorUuid: actor.uuid,
-      userId: this.getUserId(),
-      ...pickRunPayload(runData),
-      id: this.randomID(),
-      status: ACTIVE_STATUSES.has(runData.status) ? runData.status : 'inProgress',
-      startedAtWorldTime: now,
-      updatedAtWorldTime: now
-    }, { actor, terminal: false });
+    const run = this._normalizeRun(
+      {
+        actorUuid: actor.uuid,
+        userId: this.getUserId(),
+        ...pickRunPayload(runData),
+        id: this.randomID(),
+        status: ACTIVE_STATUSES.has(runData.status) ? runData.status : 'inProgress',
+        startedAtWorldTime: now,
+        updatedAtWorldTime: now,
+      },
+      { actor, terminal: false }
+    );
 
     container.active[run.id] = run;
     await this._persist(actor, container);
@@ -94,15 +100,20 @@ export class GatheringRunManager {
   }
 
   async createWaitingRun(actor, runData = {}, timeRequirementOrGate = null) {
-    const gate = this._normalizeTimeGate(timeRequirementOrGate ?? runData.timeGate ?? runData.timeRequirement);
+    const gate = this._normalizeTimeGate(
+      timeRequirementOrGate ?? runData.timeGate ?? runData.timeRequirement
+    );
     if (!gate) {
-      throw new GatheringRunManagerError('Waiting gathering runs require a positive time gate', 'INVALID_TIME_GATE');
+      throw new GatheringRunManagerError(
+        'Waiting gathering runs require a positive time gate',
+        'INVALID_TIME_GATE'
+      );
     }
 
     return this.createRun(actor, {
       ...runData,
       status: 'waitingTime',
-      timeGate: gate
+      timeGate: gate,
     });
   }
 
@@ -111,23 +122,29 @@ export class GatheringRunManager {
     this._assertRunReferences(runData);
     this._assertNoActiveTaskRun(actor, runData.taskId);
     if (!TERMINAL_STATUSES.has(status)) {
-      throw new GatheringRunManagerError(`Invalid terminal gathering run status "${status}"`, 'INVALID_STATUS');
+      throw new GatheringRunManagerError(
+        `Invalid terminal gathering run status "${status}"`,
+        'INVALID_STATUS'
+      );
     }
 
     const container = cloneContainer(this._getContainer(actor));
     const now = this._now();
     const terminalPayload = this._terminalPayload(status, payload);
-    const run = this._normalizeRun({
-      actorUuid: actor.uuid,
-      userId: this.getUserId(),
-      ...pickRunPayload(runData),
-      ...terminalPayload,
-      id: this.randomID(),
-      status,
-      startedAtWorldTime: now,
-      updatedAtWorldTime: now,
-      completedAtWorldTime: now
-    }, { actor, terminal: true });
+    const run = this._normalizeRun(
+      {
+        actorUuid: actor.uuid,
+        userId: this.getUserId(),
+        ...pickRunPayload(runData),
+        ...terminalPayload,
+        id: this.randomID(),
+        status,
+        startedAtWorldTime: now,
+        updatedAtWorldTime: now,
+        completedAtWorldTime: now,
+      },
+      { actor, terminal: true }
+    );
 
     container.history = [run, ...container.history].slice(0, HISTORY_LIMIT);
     await this._persist(actor, container);
@@ -154,7 +171,10 @@ export class GatheringRunManager {
     this._assertActor(actor);
     if (!run?.id) return null;
     if (!TERMINAL_STATUSES.has(status)) {
-      throw new GatheringRunManagerError(`Invalid terminal gathering run status "${status}"`, 'INVALID_STATUS');
+      throw new GatheringRunManagerError(
+        `Invalid terminal gathering run status "${status}"`,
+        'INVALID_STATUS'
+      );
     }
 
     const container = cloneContainer(this._getContainer(actor));
@@ -162,14 +182,17 @@ export class GatheringRunManager {
     if (!activeRun) return null;
 
     const now = this._now();
-    const completed = this._normalizeRun({
-      ...activeRun,
-      ...pickTerminalIdentity(options.terminalRunData),
-      ...this._terminalPayload(status, payload, { preserveMissingTimeGate: true }),
-      status,
-      updatedAtWorldTime: now,
-      completedAtWorldTime: now
-    }, { actor, terminal: true });
+    const completed = this._normalizeRun(
+      {
+        ...activeRun,
+        ...pickTerminalIdentity(options.terminalRunData),
+        ...this._terminalPayload(status, payload, { preserveMissingTimeGate: true }),
+        status,
+        updatedAtWorldTime: now,
+        completedAtWorldTime: now,
+      },
+      { actor, terminal: true }
+    );
 
     delete container.active[completed.id];
     container.history = [completed, ...container.history].slice(0, HISTORY_LIMIT);
@@ -194,23 +217,23 @@ export class GatheringRunManager {
     const run = this.getActiveRun(actor, runId);
     if (!run) return null;
     return this.completeRun(actor, run, 'cancelled', options.payload ?? {}, {
-      terminalRunData: options.terminalRunData
+      terminalRunData: options.terminalRunData,
     });
   }
 
   async removeRunsForSystem(systemId) {
     if (!systemId) return;
-    await this._removeRunsWhere(run => run?.craftingSystemId === String(systemId));
+    await this._removeRunsWhere((run) => run?.craftingSystemId === String(systemId));
   }
 
   async removeRunsForEnvironment(environmentId) {
     if (!environmentId) return;
-    await this._removeRunsWhere(run => run?.environmentId === String(environmentId));
+    await this._removeRunsWhere((run) => run?.environmentId === String(environmentId));
   }
 
   async removeRunsForTask(taskId, { environmentId = null } = {}) {
     if (!taskId) return;
-    await this._removeRunsWhere(run => {
+    await this._removeRunsWhere((run) => {
       const taskMatches = run?.taskId === String(taskId);
       const environmentMatches = !environmentId || run?.environmentId === String(environmentId);
       return taskMatches && environmentMatches;
@@ -237,12 +260,16 @@ export class GatheringRunManager {
   _normalizeContainer(raw = {}, actor = null) {
     const active = {};
     const latestActiveByTask = new Map();
-    const activeEntries = raw?.active && typeof raw.active === 'object' && !Array.isArray(raw.active)
-      ? Object.entries(raw.active)
-      : [];
+    const activeEntries =
+      raw?.active && typeof raw.active === 'object' && !Array.isArray(raw.active)
+        ? Object.entries(raw.active)
+        : [];
 
     for (const [runId, record] of activeEntries) {
-      const run = this._normalizeRun({ ...record, id: record?.id || runId }, { actor, terminal: false });
+      const run = this._normalizeRun(
+        { ...record, id: record?.id || runId },
+        { actor, terminal: false }
+      );
       if (!run) continue;
       const previous = latestActiveByTask.get(run.taskId);
       if (!previous || compareRunFreshness(run, previous) >= 0) {
@@ -255,7 +282,7 @@ export class GatheringRunManager {
     }
 
     const history = (Array.isArray(raw?.history) ? raw.history : [])
-      .map(record => this._normalizeRun(record, { actor, terminal: true }))
+      .map((record) => this._normalizeRun(record, { actor, terminal: true }))
       .filter(Boolean)
       .sort(compareNewestFirst)
       .slice(0, HISTORY_LIMIT);
@@ -286,11 +313,14 @@ export class GatheringRunManager {
       taskId,
       status,
       startedAtWorldTime: numberOrDefault(record.startedAtWorldTime, 0),
-      updatedAtWorldTime: numberOrDefault(record.updatedAtWorldTime, record.startedAtWorldTime, 0)
+      updatedAtWorldTime: numberOrDefault(record.updatedAtWorldTime, record.startedAtWorldTime, 0),
     };
 
     if (terminal) {
-      run.completedAtWorldTime = numberOrDefault(record.completedAtWorldTime, run.updatedAtWorldTime);
+      run.completedAtWorldTime = numberOrDefault(
+        record.completedAtWorldTime,
+        run.updatedAtWorldTime
+      );
     }
 
     const timeGate = this._normalizeTimeGate(record.timeGate);
@@ -323,7 +353,8 @@ export class GatheringRunManager {
     }
 
     run.usedTools = normalizeRunItems(record.usedTools);
-    run.createdResults = terminal && status !== 'succeeded' ? [] : normalizeRunItems(record.createdResults);
+    run.createdResults =
+      terminal && status !== 'succeeded' ? [] : normalizeRunItems(record.createdResults);
 
     return run;
   }
@@ -342,7 +373,7 @@ export class GatheringRunManager {
     return {
       requiredSeconds,
       availableAt,
-      initiatedAt
+      initiatedAt,
     };
   }
 
@@ -357,7 +388,7 @@ export class GatheringRunManager {
         dirty = true;
       }
 
-      const nextHistory = container.history.filter(run => !predicate(run));
+      const nextHistory = container.history.filter((run) => !predicate(run));
       if (nextHistory.length !== container.history.length) {
         container.history = nextHistory;
         dirty = true;
@@ -371,14 +402,20 @@ export class GatheringRunManager {
 
   _assertActor(actor) {
     if (!actor || typeof actor.getFlag !== 'function' || typeof actor.setFlag !== 'function') {
-      throw new GatheringRunManagerError('Gathering runs require an actor with getFlag and setFlag', 'INVALID_ACTOR');
+      throw new GatheringRunManagerError(
+        'Gathering runs require an actor with getFlag and setFlag',
+        'INVALID_ACTOR'
+      );
     }
   }
 
   _assertRunReferences(runData) {
     for (const field of ['craftingSystemId', 'environmentId', 'taskId']) {
       if (!stringOrNull(runData?.[field])) {
-        throw new GatheringRunManagerError(`Gathering run is missing ${field}`, 'MISSING_REFERENCE');
+        throw new GatheringRunManagerError(
+          `Gathering run is missing ${field}`,
+          'MISSING_REFERENCE'
+        );
       }
     }
   }
@@ -398,12 +435,17 @@ export class GatheringRunManager {
       terminalPayload.timeGate = payload.timeGate;
     }
     if (payload.checkResult !== undefined) terminalPayload.checkResult = payload.checkResult;
-    if (payload.economyEvidence !== undefined) terminalPayload.economyEvidence = payload.economyEvidence;
-    if (payload.conditionSnapshot !== undefined) terminalPayload.conditionSnapshot = payload.conditionSnapshot;
-    if (payload.characterModifierSnapshot !== undefined) terminalPayload.characterModifierSnapshot = payload.characterModifierSnapshot;
+    if (payload.economyEvidence !== undefined)
+      terminalPayload.economyEvidence = payload.economyEvidence;
+    if (payload.conditionSnapshot !== undefined)
+      terminalPayload.conditionSnapshot = payload.conditionSnapshot;
+    if (payload.characterModifierSnapshot !== undefined)
+      terminalPayload.characterModifierSnapshot = payload.characterModifierSnapshot;
     if (payload.riskLevel !== undefined) terminalPayload.riskLevel = payload.riskLevel;
-    if (payload.encounterOutcome !== undefined) terminalPayload.encounterOutcome = payload.encounterOutcome;
-    if (payload.chatMessageIds !== undefined) terminalPayload.chatMessageIds = payload.chatMessageIds;
+    if (payload.encounterOutcome !== undefined)
+      terminalPayload.encounterOutcome = payload.encounterOutcome;
+    if (payload.chatMessageIds !== undefined)
+      terminalPayload.chatMessageIds = payload.chatMessageIds;
     if (payload.revealEvents !== undefined) terminalPayload.revealEvents = payload.revealEvents;
     if (payload.usedTools !== undefined) terminalPayload.usedTools = payload.usedTools;
     terminalPayload.createdResults = status === 'succeeded' ? payload.createdResults : [];
@@ -419,21 +461,23 @@ export class GatheringRunManager {
 function readGatheringRunsFlag(actor) {
   try {
     return actor.getFlag(FLAG_NAMESPACE, FLAG_KEY);
-  } catch (_err) {
+  } catch {
     return null;
   }
 }
 
 async function writeGatheringRunsFlag(actor, value) {
   const current = readGatheringRunsFlag(actor);
-  const currentActive = current?.active && typeof current.active === 'object' && !Array.isArray(current.active)
-    ? current.active
-    : {};
-  const nextActive = value?.active && typeof value.active === 'object' && !Array.isArray(value.active)
-    ? value.active
-    : {};
+  const currentActive =
+    current?.active && typeof current.active === 'object' && !Array.isArray(current.active)
+      ? current.active
+      : {};
+  const nextActive =
+    value?.active && typeof value.active === 'object' && !Array.isArray(value.active)
+      ? value.active
+      : {};
   const activeDeletions = Object.keys(currentActive)
-    .filter(runId => !(runId in nextActive))
+    .filter((runId) => !(runId in nextActive))
     .reduce((updates, runId) => {
       updates[`flags.${FLAG_NAMESPACE}.${FLAG_KEY}.active.-=${runId}`] = null;
       return updates;
@@ -462,7 +506,7 @@ function pickRunPayload(data = {}) {
     'chatMessageIds',
     'revealEvents',
     'usedTools',
-    'createdResults'
+    'createdResults',
   ]) {
     if (data[field] !== undefined) payload[field] = data[field];
   }
@@ -481,13 +525,13 @@ function pickTerminalIdentity(data = {}) {
 function normalizeRunItems(items) {
   if (!Array.isArray(items)) return [];
   return items
-    .filter(item => item && typeof item === 'object')
-    .map(item => ({
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
       actorUuid: stringOrNull(item.actorUuid),
       itemUuid: stringOrNull(item.itemUuid),
-      quantity: positiveNumberOrDefault(item.quantity, 1)
+      quantity: positiveNumberOrDefault(item.quantity, 1),
     }))
-    .filter(item => item.actorUuid && item.itemUuid);
+    .filter((item) => item.actorUuid && item.itemUuid);
 }
 
 function normalizeStatus(status, terminal) {
@@ -504,11 +548,12 @@ function durationToSeconds(timeRequirement = {}) {
   const months = Number(timeRequirement.months || 0);
   const years = Number(timeRequirement.years || 0);
   const daySeconds = 24 * 60 * 60;
-  const total = (minutes * 60) +
-    (hours * 60 * 60) +
-    (days * daySeconds) +
-    (months * 30 * daySeconds) +
-    (years * 365 * daySeconds);
+  const total =
+    minutes * 60 +
+    hours * 60 * 60 +
+    days * daySeconds +
+    months * 30 * daySeconds +
+    years * 365 * daySeconds;
 
   return Number.isFinite(total) ? Math.max(0, total) : 0;
 }
@@ -527,8 +572,8 @@ function compareRunFreshness(a, b) {
 function normalizeActorList(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
-  if (typeof raw.values === 'function') return Array.from(raw.values());
-  if (typeof raw[Symbol.iterator] === 'function') return Array.from(raw);
+  if (typeof raw.values === 'function') return [...raw.values()];
+  if (typeof raw[Symbol.iterator] === 'function') return [...raw];
   return [];
 }
 
@@ -544,7 +589,7 @@ function stringOrNull(value) {
 
 function numberOrDefault(...values) {
   for (const value of values) {
-    if (value === null || value === undefined || value === '') continue;
+    if (value == null || value === '') continue;
     const number = Number(value);
     if (Number.isFinite(number)) return number;
   }
@@ -565,7 +610,17 @@ function cloneContainer(container) {
 }
 
 function defaultRandomID() {
-  return globalThis.foundry?.utils?.randomID?.() || `gathering-${Math.random().toString(36).slice(2)}`;
+  if (globalThis.foundry?.utils?.randomID) return globalThis.foundry.utils.randomID();
+  // Non-security id fallback for headless contexts. Prefer the Web Crypto RNG
+  // over Math.random so the id is collision-resistant.
+  const cryptoSource = globalThis.crypto;
+  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID().replaceAll('-', '').slice(0, 16);
+  if (cryptoSource?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    cryptoSource.getRandomValues(bytes);
+    return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return `gathering-${Date.now().toString(36)}`;
 }
 
 function defaultNowWorldTime() {
