@@ -1060,6 +1060,16 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     if (!systemManager) return { valid: true, errors: [] };
 
+    // Signature uniqueness only matters when the engine *infers* which recipe
+    // the player is crafting from the submitted ingredients — i.e. alchemy
+    // mode (see CraftingEngine._matchAlchemySignature). In every selected-recipe
+    // mode (simple/mapped/tiered/routed/progressive) the player picks the recipe
+    // explicitly, so shared base materials — iron+wood → axe OR spear OR shield —
+    // are never ambiguous. Enforcing overlap there is stricter than the runtime
+    // that depends on it and rejects perfectly valid recipes.
+    const system = systemManager.getSystem(systemId);
+    if (system?.resolutionMode !== 'alchemy') return { valid: true, errors: [] };
+
     const csm = {
       getSystem: (id) => systemManager.getSystem(id),
       getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
