@@ -165,6 +165,76 @@ test('T-097: exact UUID match retains UUID, method=exact', async () => {
   assert.equal(comp.sourceItemUuid, 'Compendium.source.items.iron-ore', 'sourceItemUuid unchanged on exact match');
 });
 
+test('exact match snapshots live img/description onto an SRD-backed component that omitted them', async () => {
+  // Mirrors a pre-built premium system: the component references a foreign
+  // (SRD) pack by UUID but ships no img/description; the live item supplies both.
+  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.dnd5e.items.Item.smiths'
+    ? { img: 'icons/tools/smithing/hammer.webp', system: { description: { value: '<p>Smithing tools.</p>' } } }
+    : null;
+
+  const createdSystems = [];
+  const extractCalls = [];
+  const systemManager = {
+    ...makeMockSystemManager({ createdSystems }),
+    _extractSourceDescription: (source) => {
+      extractCalls.push(source);
+      // Plain string strip (no regex) keeps this mock free of the ReDoS hotspot
+      // the analyzer flags on `<[^>]+>`; the fixture only carries <p> tags.
+      return source?.system?.description?.value?.replaceAll('<p>', '').replaceAll('</p>', '') || '';
+    }
+  };
+  const recipeManager = makeMockRecipeManager();
+
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+  const packData = makePackData({
+    recipes: [],
+    system: {
+      id: 'test-system',
+      name: 'Test System',
+      components: [makeComponent({ id: 'smiths', name: "Smith's Tools", sourceItemUuid: 'Compendium.dnd5e.items.Item.smiths' })]
+    }
+  });
+
+  await importer.importFromPackData(packData);
+
+  const comp = createdSystems[0].components[0];
+  assert.equal(comp.img, 'icons/tools/smithing/hammer.webp', 'img snapshotted from the live SRD item');
+  assert.equal(comp.description, 'Smithing tools.', 'description snapshotted from the live SRD item');
+  assert.equal(extractCalls.length, 1, 'description extraction reused the manager helper');
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('exact match preserves baked img and does not overwrite an authored description', async () => {
+  // In-module (contentRef) component: build already baked art; live item must not clobber it.
+  globalThis.fromUuid = async () => ({ img: 'icons/live/other.webp', system: { description: { value: 'live desc' } } });
+
+  const createdSystems = [];
+  const systemManager = {
+    ...makeMockSystemManager({ createdSystems }),
+    _extractSourceDescription: (source) => source?.system?.description?.value || ''
+  };
+  const recipeManager = makeMockRecipeManager();
+
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+  const packData = makePackData({
+    recipes: [],
+    system: {
+      id: 'test-system',
+      name: 'Test System',
+      components: [makeComponent({ img: 'icons/baked/iron-ore.webp', description: 'authored copy' })]
+    }
+  });
+
+  await importer.importFromPackData(packData);
+
+  const comp = createdSystems[0].components[0];
+  assert.equal(comp.img, 'icons/baked/iron-ore.webp', 'baked img preserved');
+  assert.equal(comp.description, 'authored copy', 'authored description preserved');
+
+  globalThis.fromUuid = async () => null;
+});
+
 test('T-097: source+name match remaps UUID, old UUID added to fallbacks', async () => {
   // fromUuid fails for the original UUID (stale)
   globalThis.fromUuid = async () => null;
