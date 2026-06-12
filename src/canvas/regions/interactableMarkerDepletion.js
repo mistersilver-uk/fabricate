@@ -25,8 +25,9 @@
  * idempotent.
  */
 
-import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
+import { numberOrNull } from './coercion.js';
 import { resolveMarkerHidden } from './interactableRegionActivation.js';
+import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
 
 /**
  * Read the depleted state for an environment's node for a task.
@@ -51,12 +52,6 @@ function isNodeDepleted(environment, task, taskId) {
     current = numberOrNull(task?.nodes?.current ?? task?.nodes?.max);
   }
   return (current ?? 0) <= 0;
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 /**
@@ -91,10 +86,12 @@ export function resolveMarkerImage({ behaviorSystem, environment, task, availabl
   const taskId = system.taskId;
   if (!taskId || !environment || !task) return null;
 
-  const available = typeof availableImg === 'string' && availableImg.trim() ? availableImg.trim() : '';
-  const swapImage = typeof task?.nodes?.depletedBehavior?.swapImage === 'string'
-    ? task.nodes.depletedBehavior.swapImage.trim()
-    : '';
+  const available =
+    typeof availableImg === 'string' && availableImg.trim() ? availableImg.trim() : '';
+  const swapImage =
+    typeof task?.nodes?.depletedBehavior?.swapImage === 'string'
+      ? task.nodes.depletedBehavior.swapImage.trim()
+      : '';
 
   // Without a configured swap image there is no depleted look — never swap.
   if (!swapImage) {
@@ -138,7 +135,13 @@ function normalizeSystem(behaviorSystem) {
  *   Write a tile texture/flag update (active-GM routed).
  * @returns {Promise<void>}
  */
-export async function syncInteractableMarkers({ scenes, resolveEnvironment, resolveTask, isActiveGM, applyTileImage } = {}) {
+export async function syncInteractableMarkers({
+  scenes,
+  resolveEnvironment,
+  resolveTask,
+  isActiveGM,
+  applyTileImage,
+} = {}) {
   try {
     if (typeof isActiveGM !== 'function' || isActiveGM() !== true) return;
     if (!scenes || typeof applyTileImage !== 'function') return;
@@ -146,16 +149,24 @@ export async function syncInteractableMarkers({ scenes, resolveEnvironment, reso
     for (const scene of iterate(scenes)) {
       for (const region of iterate(scene?.regions)) {
         for (const behavior of iterate(region?.behaviors)) {
-          await syncOneBehavior(behavior, scene, { resolveEnvironment, resolveTask, applyTileImage });
+          await syncOneBehavior(behavior, scene, {
+            resolveEnvironment,
+            resolveTask,
+            applyTileImage,
+          });
         }
       }
     }
-  } catch (_error) {
+  } catch {
     // Defensive: a marker sync must never throw into the caller's hook body.
   }
 }
 
-async function syncOneBehavior(behavior, scene, { resolveEnvironment, resolveTask, applyTileImage }) {
+async function syncOneBehavior(
+  behavior,
+  scene,
+  { resolveEnvironment, resolveTask, applyTileImage }
+) {
   try {
     const system = readInteractableBehaviorSystem(behavior);
     if (!system) return;
@@ -180,26 +191,43 @@ async function syncOneBehavior(behavior, scene, { resolveEnvironment, resolveTas
     // Image-swap reconcile (gatheringTask only): env-node depletion drives the
     // marker texture between the available and `depletedBehavior.swapImage`.
     if (system.interactableType === 'gatheringTask') {
-      const environment = system.environmentId ? resolveEnvironment?.(system.environmentId) ?? null : null;
-      const task = system.systemId && system.taskId ? resolveTask?.(system.systemId, system.taskId) ?? null : null;
+      const environment = system.environmentId
+        ? (resolveEnvironment?.(system.environmentId) ?? null)
+        : null;
+      const task =
+        system.systemId && system.taskId
+          ? (resolveTask?.(system.systemId, system.taskId) ?? null)
+          : null;
       if (environment && task) {
         // Prefer a previously-stashed available image; else the current tile texture
         // (when available) so a non-depleted tile's restore target is the GM's actual
         // marker; finally the task img.
         const stashed = tile?.flags?.fabricate?.markerAvailableImg;
         const currentSrc = tile?.texture?.src ?? null;
-        const availableImg = (typeof stashed === 'string' && stashed.trim())
-          ? stashed.trim()
-          : (typeof currentSrc === 'string' && currentSrc.trim() ? currentSrc.trim() : (task?.img ?? ''));
+        const availableImg =
+          typeof stashed === 'string' && stashed.trim()
+            ? stashed.trim()
+            : typeof currentSrc === 'string' && currentSrc.trim()
+              ? currentSrc.trim()
+              : (task?.img ?? '');
 
-        const decision = resolveMarkerImage({ behaviorSystem: system, environment, task, availableImg });
+        const decision = resolveMarkerImage({
+          behaviorSystem: system,
+          environment,
+          task,
+          availableImg,
+        });
         if (decision) {
           if (decision.desiredImg && decision.desiredImg !== currentSrc) {
             update.texture = { src: decision.desiredImg };
           }
           // Stash the available image on the FIRST depletion swap so a later restore
           // targets the GM's actual marker texture (only when not already stashed).
-          if (decision.depleted && !(typeof stashed === 'string' && stashed.trim()) && availableImg) {
+          if (
+            decision.depleted &&
+            !(typeof stashed === 'string' && stashed.trim()) &&
+            availableImg
+          ) {
             update.flags = { fabricate: { markerAvailableImg: availableImg } };
           }
         }
@@ -209,23 +237,23 @@ async function syncOneBehavior(behavior, scene, { resolveEnvironment, resolveTas
     if (Object.keys(update).length > 0) {
       await applyTileImage(tile, update);
     }
-  } catch (_error) {
+  } catch {
     // Defensive: one bad behaviour must not abort the whole scan.
   }
 }
 
 function resolveTile(uuid, scene) {
-  let doc = null;
+  let doc;
   try {
     doc = globalThis.fromUuidSync?.(uuid) ?? null;
-  } catch (_error) {
+  } catch {
     doc = null;
   }
   if (!doc && scene) {
     const id = uuid.includes('.') ? uuid.split('.').pop() : uuid;
     try {
       doc = scene.tiles?.get?.(id) ?? null;
-    } catch (_error) {
+    } catch {
       doc = null;
     }
   }

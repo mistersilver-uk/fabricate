@@ -66,7 +66,9 @@ function renameKey(obj, oldKey, newKey) {
 export function migrateRenameGatheringRegionsToRealms(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
   const environments = Array.isArray(data?.environments) ? clone(data.environments) : [];
-  const gatheringParties = Array.isArray(data?.gatheringParties) ? clone(data.gatheringParties) : [];
+  const gatheringParties = Array.isArray(data?.gatheringParties)
+    ? clone(data.gatheringParties)
+    : [];
 
   // 1. Crafting systems: realm library + realm settings. The Foundry-bridge
   // fields (sceneMappings/sceneRegionUuid/sceneUuid) and modifier kind/operation/

@@ -107,8 +107,12 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
         interactableType: 'tool',
         systemId,
         referenceId: toolId,
-        sourceUuid: buildInteractableSourceUuid({ interactableType: 'tool', systemId, referenceId: toolId }),
-        entry
+        sourceUuid: buildInteractableSourceUuid({
+          interactableType: 'tool',
+          systemId,
+          referenceId: toolId,
+        }),
+        entry,
       };
     }
 
@@ -121,8 +125,12 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
         interactableType: 'gatheringTask',
         systemId,
         referenceId: taskId,
-        sourceUuid: buildInteractableSourceUuid({ interactableType: 'gatheringTask', systemId, referenceId: taskId }),
-        entry
+        sourceUuid: buildInteractableSourceUuid({
+          interactableType: 'gatheringTask',
+          systemId,
+          referenceId: taskId,
+        }),
+        entry,
       };
     }
 
@@ -130,7 +138,7 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
   }
 
   // Fallback: a dropped Item uuid that maps to a Fabricate component used by a Tool.
-  const uuid = typeof data === 'string' ? data : (typeof data?.uuid === 'string' ? data.uuid : '');
+  const uuid = typeof data === 'string' ? data : typeof data?.uuid === 'string' ? data.uuid : '';
   if (uuid && typeof resolveItemUuidToTool === 'function') {
     const match = resolveItemUuidToTool(uuid);
     const systemId = typeof match?.systemId === 'string' ? match.systemId : '';
@@ -142,8 +150,12 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
           interactableType: 'tool',
           systemId,
           referenceId: toolId,
-          sourceUuid: buildInteractableSourceUuid({ interactableType: 'tool', systemId, referenceId: toolId }),
-          entry
+          sourceUuid: buildInteractableSourceUuid({
+            interactableType: 'tool',
+            systemId,
+            referenceId: toolId,
+          }),
+          entry,
         };
       }
     }
@@ -180,7 +192,7 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
     componentId,
     systemId: typeof systemId === 'string' ? systemId : '',
     toolId: typeof toolId === 'string' ? toolId : '',
-    label
+    label,
   };
 }
 
@@ -234,11 +246,11 @@ export function buildRegionSpawnRequest({
   gridSize,
   regionGrid = 1,
   visualMode = 'marker',
-  buildBehaviorSystem
+  buildBehaviorSystem,
 } = {}) {
   if (!classification) return null;
   if (typeof buildBehaviorSystem !== 'function') {
-    throw new Error('buildRegionSpawnRequest requires a buildBehaviorSystem builder');
+    throw new TypeError('buildRegionSpawnRequest requires a buildBehaviorSystem builder');
   }
 
   // Region-only: a hidden/abstract interactable with NO visible marker. The
@@ -251,11 +263,14 @@ export function buildRegionSpawnRequest({
 
   // The displayed name: an explicit name wins, else the entry's name/label.
   const entry = classification.entry ?? null;
-  const resolvedName = typeof name === 'string' && name.trim()
-    ? name.trim()
-    : (typeof entry?.name === 'string' && entry.name.trim()
-      ? entry.name.trim()
-      : (typeof entry?.label === 'string' ? entry.label.trim() : ''));
+  const resolvedName =
+    typeof name === 'string' && name.trim()
+      ? name.trim()
+      : typeof entry?.name === 'string' && entry.name.trim()
+        ? entry.name.trim()
+        : typeof entry?.label === 'string'
+          ? entry.label.trim()
+          : '';
 
   const tileWidth = Number.isFinite(Number(width)) && Number(width) > 0 ? Number(width) : grid;
   const tileHeight = Number.isFinite(Number(height)) && Number(height) > 0 ? Number(height) : grid;
@@ -283,10 +298,12 @@ export function buildRegionSpawnRequest({
   const regionX = cx - regionW / 2;
   const regionY = cy - regionH / 2;
 
-  const resolvedEnvironmentId = classification.interactableType === 'gatheringTask'
-    && typeof environmentId === 'string' && environmentId
-    ? environmentId
-    : null;
+  const resolvedEnvironmentId =
+    classification.interactableType === 'gatheringTask' &&
+    typeof environmentId === 'string' &&
+    environmentId
+      ? environmentId
+      : null;
 
   const behaviorSystem = buildBehaviorSystem({
     interactableType: classification.interactableType,
@@ -298,7 +315,7 @@ export function buildRegionSpawnRequest({
     name: resolvedName,
     // Region-only ⇒ hidden + no marker; the builder leaves uuid/documentName null.
     presentation: regionOnly ? { hidden: true } : undefined,
-    linkedVisual: regionOnly ? { mode: 'none' } : undefined
+    linkedVisual: regionOnly ? { mode: 'none' } : undefined,
   });
 
   return {
@@ -313,18 +330,25 @@ export function buildRegionSpawnRequest({
         x: regionX,
         y: regionY,
         width: regionW,
-        height: regionH
-      }
+        height: regionH,
+      },
     },
     behaviorSystem,
     // Region-only ⇒ no Tile: the caller skips Tile creation entirely.
-    tile: regionOnly ? null : {
-      texture: { src: typeof texture === 'string' && texture.trim() ? texture.trim() : DEFAULT_REGION_TILE_IMG },
-      x: tileX,
-      y: tileY,
-      width: tileWidth,
-      height: tileHeight
-    }
+    tile: regionOnly
+      ? null
+      : {
+          texture: {
+            src:
+              typeof texture === 'string' && texture.trim()
+                ? texture.trim()
+                : DEFAULT_REGION_TILE_IMG,
+          },
+          x: tileX,
+          y: tileY,
+          width: tileWidth,
+          height: tileHeight,
+        },
   };
 }
 

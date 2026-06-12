@@ -60,7 +60,7 @@ function renameKey(obj, oldKey, newKey) {
 
 const POLICY_VALUE_REMAP = {
   successWithHazard: 'successWithEvent',
-  failureWithHazard: 'failureWithEvent'
+  failureWithHazard: 'failureWithEvent',
 };
 
 /**
@@ -74,7 +74,10 @@ const POLICY_VALUE_REMAP = {
 function remapPolicyValue(obj, key) {
   if (!isPlainObject(obj)) return;
   const current = obj[key];
-  if (typeof current === 'string' && Object.prototype.hasOwnProperty.call(POLICY_VALUE_REMAP, current)) {
+  if (
+    typeof current === 'string' &&
+    Object.prototype.hasOwnProperty.call(POLICY_VALUE_REMAP, current)
+  ) {
     obj[key] = POLICY_VALUE_REMAP[current];
   }
 }
@@ -101,7 +104,9 @@ function migrateRuleKeys(obj) {
  */
 export function migrateRenameGatheringHazardsToEvents(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
-  const gatheringConfig = isPlainObject(data?.gatheringConfig) ? clone(data.gatheringConfig) : data?.gatheringConfig;
+  const gatheringConfig = isPlainObject(data?.gatheringConfig)
+    ? clone(data.gatheringConfig)
+    : data?.gatheringConfig;
   const environments = Array.isArray(data?.environments) ? clone(data.environments) : [];
 
   // 1 + 3. Gathering-config systems: collection, rules, and event-record fields.

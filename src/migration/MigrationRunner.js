@@ -7,19 +7,20 @@
  * migrations newer than that version, in order.
  */
 
+import { SETTING_KEYS } from '../config/settings.js';
+
+import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
-import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
-import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
-import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
-import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
-import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
+import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
-import { SETTING_KEYS } from '../config/settings.js';
+import { migrateToolsToSystem } from './migrateToolsToSystem.js';
+import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 
 // ---------------------------------------------------------------------------
 // Semver comparison utility (no npm dependency)
@@ -32,8 +33,12 @@ import { SETTING_KEYS } from '../config/settings.js';
  * @returns {-1|0|1}
  */
 function compareSemver(a, b) {
-  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
-  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  const pa = String(a)
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0);
+  const pb = String(b)
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0);
   const len = Math.max(pa.length, pb.length);
   for (let i = 0; i < len; i++) {
     const na = pa[i] ?? 0;
@@ -55,50 +60,53 @@ const MIGRATIONS = [
     migrate(data) {
       return {
         recipes: migrateRecipes(data.recipes),
-        systems: migrateCraftingSystems(data.systems)
+        systems: migrateCraftingSystems(data.systems),
       };
-    }
+    },
   },
   {
     version: '0.2.0',
     label: 'Clear stale top-level gathering regions',
     migrate(data) {
       return {
-        gatheringConfig: migrateGatheringConfig(data.gatheringConfig)
+        gatheringConfig: migrateGatheringConfig(data.gatheringConfig),
       };
-    }
+    },
   },
   {
     version: '0.3.0',
     label: 'System-level gathering economy modes (remove attemptLimit/economyMode)',
     migrate(data) {
       return migrateGatheringEconomy(data.gatheringConfig, data.environments);
-    }
+    },
   },
   {
     version: '0.4.0',
     label: 'Collapse resource-node respawn policies to manual|overTime + gainMode',
     migrate(data) {
       return migrateNodeRespawnModes(data.gatheringConfig, data.environments);
-    }
+    },
   },
   {
     version: '0.5.0',
     label: 'Store node respawn intervals as unit+amount (calendar-aware) instead of raw seconds',
     migrate(data) {
       return migrateNodeRespawnIntervals(data.gatheringConfig, data.environments);
-    }
+    },
   },
   {
     version: '0.6.0',
     label: 'Convert catalysts to shared library Tools',
     migrate(data) {
-      const { recipes, systems, migratedCount } = migrateCatalystsToTools(data.recipes, data.systems);
+      const { recipes, systems, migratedCount } = migrateCatalystsToTools(
+        data.recipes,
+        data.systems
+      );
       // Surface the migrated-catalyst count so the runner can fire a one-time GM notice.
       // (Spread-merged into the accumulated data; `_migratedCatalystCount` is consumed by
       // the runner and never persisted as a setting.)
       return { recipes, systems, _migratedCatalystCount: migratedCount };
-    }
+    },
   },
   {
     version: '0.7.0',
@@ -106,31 +114,32 @@ const MIGRATIONS = [
     migrate(data) {
       const { systems, gatheringConfig } = migrateToolsToSystem(data.systems, data.gatheringConfig);
       return { systems, gatheringConfig };
-    }
+    },
   },
   {
     version: '0.8.0',
     label: 'Replace gathering economy mode enum with independent stamina/nodes toggles',
     migrate(data) {
       return migrateGatheringLimitationToggles(data.gatheringConfig);
-    }
+    },
   },
   {
     version: '0.9.0',
-    label: 'Unify gathering regions (vocabulary → GatheringRegion; drop region as a composition axis)',
+    label:
+      'Unify gathering regions (vocabulary → GatheringRegion; drop region as a composition axis)',
     migrate(data) {
       // Runs after the 0.2.0 migration (which preserves per-system region vocab)
       // so it sees that vocab. Surfaces the names of systems that had regions via
       // a transient `_unifiedRegionSystems` field for the runner's GM notice.
       return migrateUnifyGatheringRegions(data);
-    }
+    },
   },
   {
     version: '1.0.0',
     label: 'Rename gathering Hazard concept to Event (keys, policy values, region-modifier kind)',
     migrate(data) {
       return migrateRenameGatheringHazardsToEvents(data);
-    }
+    },
   },
   {
     version: '1.1.0',
@@ -141,15 +150,15 @@ const MIGRATIONS = [
     // earlier migrations have consumed the old schema.
     migrate(data) {
       return migrateRenameGatheringRegionsToRealms(data);
-    }
+    },
   },
   {
     version: '1.2.0',
     label: 'Unify stamina-regen policy name elapsedTime → overTime (matches node respawn)',
     migrate(data) {
       return migrateStaminaRegenPolicy(data.gatheringConfig);
-    }
-  }
+    },
+  },
   // Future migrations added here in version order
 ];
 
@@ -179,9 +188,9 @@ export class MigrationRunner {
   async run() {
     const lastRunVersion = this._getSetting(SETTING_KEYS.MIGRATION_VERSION) ?? '0.0.0';
 
-    const pending = MIGRATIONS
-      .filter(m => compareSemver(m.version, lastRunVersion) > 0)
-      .sort((a, b) => compareSemver(a.version, b.version));
+    const pending = MIGRATIONS.filter((m) => compareSemver(m.version, lastRunVersion) > 0).sort(
+      (a, b) => compareSemver(a.version, b.version)
+    );
 
     if (pending.length === 0) {
       return { ran: 0, migratedCatalystCount: 0, unifiedRegionSystems: [] };
@@ -204,7 +213,7 @@ export class MigrationRunner {
       systems: rawSystems,
       gatheringConfig: rawGatheringConfig,
       environments: rawEnvironments,
-      gatheringParties: rawGatheringParties
+      gatheringParties: rawGatheringParties,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -220,8 +229,8 @@ export class MigrationRunner {
           data = { ...data, ...result };
         }
         highestVersion = migration.version;
-      } catch (err) {
-        console.warn(`Fabricate | Migration "${migration.label}" failed: ${err.message}`);
+      } catch (error) {
+        console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
       }
     }
 
@@ -237,15 +246,17 @@ export class MigrationRunner {
     // legacy regions via a transient `_unifiedRegionSystems` field. Capture it for
     // the GM notice and strip it so it is never persisted as part of any setting.
     if (Array.isArray(data._unifiedRegionSystems)) {
-      unifiedRegionSystems = data._unifiedRegionSystems.map(name => String(name));
+      unifiedRegionSystems = data._unifiedRegionSystems.map(String);
     }
     delete data._unifiedRegionSystems;
 
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
-    const gatheringConfigChanged = JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
+    const gatheringConfigChanged =
+      JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
     const environmentsChanged = JSON.stringify(data.environments) !== originalEnvironmentsJson;
-    const gatheringPartiesChanged = JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
+    const gatheringPartiesChanged =
+      JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
 
     if (recipesChanged) {
       await this._setSetting(SETTING_KEYS.RECIPES, data.recipes);

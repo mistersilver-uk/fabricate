@@ -27,7 +27,9 @@
  * zero churn.
  */
 
-const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86400, weeks: 604800 });
+import { migrateNodeRespawnConfig } from './respawnTraversal.js';
+
+const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86_400, weeks: 604_800 });
 
 /**
  * Express a seconds count as `{intervalUnit, intervalAmount}`, preferring the
@@ -40,7 +42,8 @@ function secondsToUnitAmount(seconds) {
   const total = Number(seconds) || 0;
   for (const unit of ['weeks', 'days', 'hours', 'minutes']) {
     const size = SECONDS_PER_UNIT[unit];
-    if (total > 0 && total % size === 0) return { intervalUnit: unit, intervalAmount: total / size };
+    if (total > 0 && total % size === 0)
+      return { intervalUnit: unit, intervalAmount: total / size };
   }
   return { intervalUnit: 'hours', intervalAmount: total ? total / SECONDS_PER_UNIT.hours : 0 };
 }
@@ -55,79 +58,11 @@ function migrateRespawn(respawn) {
   return { ...rest, ...secondsToUnitAmount(intervalSeconds) };
 }
 
-function migrateNode(node) {
-  const respawn = node?.respawn;
-  if (!respawn) return node;
-  const migrated = migrateRespawn(respawn);
-  return migrated === respawn ? node : { ...node, respawn: migrated };
-}
-
-function migrateTask(task) {
-  const node = task?.nodes;
-  if (!node) return task;
-  const migratedNode = migrateNode(node);
-  return migratedNode === node ? task : { ...task, nodes: migratedNode };
-}
-
-function migrateTasks(tasks) {
-  if (!Array.isArray(tasks)) return tasks;
-  let changed = false;
-  const next = tasks.map(task => {
-    const migrated = migrateTask(task);
-    if (migrated !== task) changed = true;
-    return migrated;
-  });
-  return changed ? next : tasks;
-}
-
-function migrateNodeRuntime(runtime) {
-  if (!runtime || typeof runtime !== 'object') return runtime;
-  let changed = false;
-  const next = {};
-  for (const [taskId, node] of Object.entries(runtime)) {
-    const migrated = migrateNode(node);
-    if (migrated !== node) changed = true;
-    next[taskId] = migrated;
-  }
-  return changed ? next : runtime;
-}
-
 /**
  * @param {object} gatheringConfig Raw gathering config setting.
  * @param {Array<object>} environments Raw gathering environments setting.
  * @returns {{gatheringConfig: object, environments: Array<object>}}
  */
 export function migrateNodeRespawnIntervals(gatheringConfig = {}, environments = []) {
-  // Library tasks under gatheringConfig.systems[sid].tasks.
-  const systems = gatheringConfig?.systems;
-  let nextConfig = gatheringConfig;
-  if (systems && typeof systems === 'object') {
-    let systemsChanged = false;
-    const nextSystems = {};
-    for (const [sid, system] of Object.entries(systems)) {
-      const tasks = migrateTasks(system?.tasks);
-      if (tasks !== system?.tasks) {
-        systemsChanged = true;
-        nextSystems[sid] = { ...system, tasks };
-      } else {
-        nextSystems[sid] = system;
-      }
-    }
-    if (systemsChanged) nextConfig = { ...gatheringConfig, systems: nextSystems };
-  }
-
-  // Environment inline tasks + per-environment runtime state.
-  const envs = Array.isArray(environments) ? environments : [];
-  const nextEnvironments = envs.map(env => {
-    if (!env || typeof env !== 'object') return env;
-    const tasks = migrateTasks(env.tasks);
-    const nodeRuntime = migrateNodeRuntime(env.nodeRuntime);
-    if (tasks === env.tasks && nodeRuntime === env.nodeRuntime) return env;
-    const nextEnv = { ...env };
-    if (tasks !== env.tasks) nextEnv.tasks = tasks;
-    if (nodeRuntime !== env.nodeRuntime) nextEnv.nodeRuntime = nodeRuntime;
-    return nextEnv;
-  });
-
-  return { gatheringConfig: nextConfig, environments: nextEnvironments };
+  return migrateNodeRespawnConfig(gatheringConfig, environments, migrateRespawn);
 }

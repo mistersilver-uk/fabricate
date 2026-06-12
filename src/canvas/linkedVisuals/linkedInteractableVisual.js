@@ -13,7 +13,10 @@
  * relink/missing-policy DECISIONS stay PURE.
  */
 
-import { buildLinkedVisualFlags, readInteractableBehaviorSystem } from '../regions/interactableRegionFlags.js';
+import {
+  buildLinkedVisualFlags,
+  readInteractableBehaviorSystem,
+} from '../regions/interactableRegionFlags.js';
 
 /**
  * Resolve the live linked-visual document for a behaviour. EDGE: reads
@@ -34,10 +37,10 @@ export function resolveLinkedVisual(behaviorSystem, { scene } = {}) {
   if (!documentName || !uuid) return null;
 
   // Primary path: resolve the live document by UUID.
-  let doc = null;
+  let doc;
   try {
     doc = globalThis.fromUuidSync?.(uuid) ?? null;
-  } catch (_error) {
+  } catch {
     doc = null;
   }
 
@@ -58,7 +61,7 @@ function lookupEmbedded(scene, documentName, docId) {
     if (documentName === 'Tile') return scene.tiles?.get?.(docId) ?? null;
     if (documentName === 'Drawing') return scene.drawings?.get?.(docId) ?? null;
     if (documentName === 'Token') return scene.tokens?.get?.(docId) ?? null;
-  } catch (_error) {
+  } catch {
     return null;
   }
   return null;
@@ -84,12 +87,20 @@ function lookupEmbedded(scene, documentName, docId) {
 export function buildLinkedTileData({ regionUuid, behaviorId, texture, x, y, width, height } = {}) {
   const { fabricate } = buildLinkedVisualFlags({ regionUuid, behaviorId });
   return {
-    texture: { src: typeof texture === 'string' && texture.trim() ? texture.trim() : DEFAULT_LINKED_TILE_IMG },
+    texture: {
+      src: typeof texture === 'string' && texture.trim() ? texture.trim() : DEFAULT_LINKED_TILE_IMG,
+    },
     x: Number(x ?? 0),
     y: Number(y ?? 0),
-    width: Number.isFinite(Number(width)) && Number(width) > 0 ? Number(width) : DEFAULT_LINKED_TILE_SIZE,
-    height: Number.isFinite(Number(height)) && Number(height) > 0 ? Number(height) : DEFAULT_LINKED_TILE_SIZE,
-    flags: { fabricate }
+    width:
+      Number.isFinite(Number(width)) && Number(width) > 0
+        ? Number(width)
+        : DEFAULT_LINKED_TILE_SIZE,
+    height:
+      Number.isFinite(Number(height)) && Number(height) > 0
+        ? Number(height)
+        : DEFAULT_LINKED_TILE_SIZE,
+    flags: { fabricate },
   };
 }
 
@@ -130,13 +141,23 @@ export function buildLinkedDrawingData({
   x,
   y,
   width,
-  height
+  height,
 } = {}) {
   const { fabricate } = buildLinkedVisualFlags({ regionUuid, behaviorId });
-  const w = Number.isFinite(Number(width)) && Number(width) > 0 ? Number(width) : DEFAULT_LINKED_DRAWING_SIZE;
-  const h = Number.isFinite(Number(height)) && Number(height) > 0 ? Number(height) : DEFAULT_LINKED_DRAWING_SIZE;
-  const stroke = typeof strokeColor === 'string' && strokeColor.trim() ? strokeColor.trim() : DEFAULT_DRAWING_STROKE;
-  const fill = typeof fillColor === 'string' && fillColor.trim() ? fillColor.trim() : DEFAULT_DRAWING_FILL;
+  const w =
+    Number.isFinite(Number(width)) && Number(width) > 0
+      ? Number(width)
+      : DEFAULT_LINKED_DRAWING_SIZE;
+  const h =
+    Number.isFinite(Number(height)) && Number(height) > 0
+      ? Number(height)
+      : DEFAULT_LINKED_DRAWING_SIZE;
+  const stroke =
+    typeof strokeColor === 'string' && strokeColor.trim()
+      ? strokeColor.trim()
+      : DEFAULT_DRAWING_STROKE;
+  const fill =
+    typeof fillColor === 'string' && fillColor.trim() ? fillColor.trim() : DEFAULT_DRAWING_FILL;
   return {
     x: Number(x ?? 0),
     y: Number(y ?? 0),
@@ -149,7 +170,7 @@ export function buildLinkedDrawingData({
     fillAlpha: 0.15,
     fontSize: 24,
     textColor: stroke,
-    flags: { fabricate }
+    flags: { fabricate },
   };
 }
 
@@ -172,7 +193,17 @@ export function buildLinkedDrawingData({
  * @param {string} [params.fillColor]
  * @returns {Promise<object|null>}
  */
-export async function createLinkedDrawing({ scene, behavior, x, y, width, height, text, strokeColor, fillColor } = {}) {
+export async function createLinkedDrawing({
+  scene,
+  behavior,
+  x,
+  y,
+  width,
+  height,
+  text,
+  strokeColor,
+  fillColor,
+} = {}) {
   if (!scene) return null;
   const region = behavior?.parent ?? null;
   const regionUuid = typeof region?.uuid === 'string' ? region.uuid : null;
@@ -180,28 +211,41 @@ export async function createLinkedDrawing({ scene, behavior, x, y, width, height
   if (!regionUuid || !behaviorId) return null;
 
   // Default the label to the interactable name when no explicit text is given.
-  const label = typeof text === 'string'
-    ? text
-    : (typeof behavior?.system?.name === 'string' ? behavior.system.name : '');
+  const label =
+    typeof text === 'string'
+      ? text
+      : typeof behavior?.system?.name === 'string'
+        ? behavior.system.name
+        : '';
 
   let drawingData;
   try {
-    drawingData = buildLinkedDrawingData({ regionUuid, behaviorId, text: label, strokeColor, fillColor, x, y, width, height });
-  } catch (_error) {
+    drawingData = buildLinkedDrawingData({
+      regionUuid,
+      behaviorId,
+      text: label,
+      strokeColor,
+      fillColor,
+      x,
+      y,
+      width,
+      height,
+    });
+  } catch {
     return null;
   }
 
   try {
-    const DrawingDocument = globalThis.foundry?.documents?.DrawingDocument
-      ?? globalThis.CONFIG?.Drawing?.documentClass;
+    const DrawingDocument =
+      globalThis.foundry?.documents?.DrawingDocument ?? globalThis.CONFIG?.Drawing?.documentClass;
     if (DrawingDocument?.create) {
-      return await DrawingDocument.create(drawingData, { parent: scene }) ?? null;
+      return (await DrawingDocument.create(drawingData, { parent: scene })) ?? null;
     }
     if (scene.createEmbeddedDocuments) {
       const [created] = await scene.createEmbeddedDocuments('Drawing', [drawingData]);
       return created ?? null;
     }
-  } catch (_error) {
+  } catch {
     return null;
   }
   return null;
@@ -235,21 +279,21 @@ export async function createLinkedTile({ scene, behavior, texture, x, y, width, 
   let tileData;
   try {
     tileData = buildLinkedTileData({ regionUuid, behaviorId, texture, x, y, width, height });
-  } catch (_error) {
+  } catch {
     return null;
   }
 
   try {
-    const TileDocument = globalThis.foundry?.documents?.TileDocument
-      ?? globalThis.CONFIG?.Tile?.documentClass;
+    const TileDocument =
+      globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
     if (TileDocument?.create) {
-      return await TileDocument.create(tileData, { parent: scene }) ?? null;
+      return (await TileDocument.create(tileData, { parent: scene })) ?? null;
     }
     if (scene.createEmbeddedDocuments) {
       const [created] = await scene.createEmbeddedDocuments('Tile', [tileData]);
       return created ?? null;
     }
-  } catch (_error) {
+  } catch {
     return null;
   }
   return null;
@@ -266,7 +310,10 @@ export async function createLinkedTile({ scene, behavior, texture, x, y, width, 
  * @returns {{ linkedVisual: { uuid: string, documentName: string } } | null}
  */
 export function planRelinkVisual(selectedDoc) {
-  const uuid = typeof selectedDoc?.uuid === 'string' && selectedDoc.uuid.trim() ? selectedDoc.uuid.trim() : null;
+  const uuid =
+    typeof selectedDoc?.uuid === 'string' && selectedDoc.uuid.trim()
+      ? selectedDoc.uuid.trim()
+      : null;
   const documentName = resolveDocumentName(selectedDoc);
   if (!uuid || !documentName) return null;
   return { linkedVisual: { uuid, documentName } };
@@ -274,7 +321,7 @@ export function planRelinkVisual(selectedDoc) {
 
 function resolveDocumentName(doc) {
   const name = doc?.documentName ?? doc?.constructor?.documentName ?? null;
-  if (name === 'Tile' || name === 'Drawing' || name === 'Token') return name;
+  if (['Tile', 'Drawing', 'Token'].includes(name)) return name;
   return null;
 }
 
@@ -291,9 +338,9 @@ export function buildClearLinkedVisualFlags() {
       fabricate: {
         isInteractableVisual: null,
         linkedRegionUuid: null,
-        linkedBehaviorId: null
-      }
-    }
+        linkedBehaviorId: null,
+      },
+    },
   };
 }
 
@@ -318,7 +365,11 @@ export function buildClearLinkedVisualFlags() {
  *   Write a visual document update (the reverse-flag write/clear), active-GM routed.
  * @returns {Promise<object|null>}
  */
-export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate, identify, applyVisualUpdate } = {}) {
+export async function relinkVisual(
+  behavior,
+  selectedDoc,
+  { applyBehaviorUpdate, identify, applyVisualUpdate } = {}
+) {
   const patch = planRelinkVisual(selectedDoc);
   if (!patch) return null;
   const ref = identify?.(behavior);
@@ -350,7 +401,7 @@ export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate,
         sceneId: ref.sceneId,
         visualUuid: priorUuid,
         documentName: priorDocumentName ?? newDocumentName,
-        update: buildClearLinkedVisualFlags()
+        update: buildClearLinkedVisualFlags(),
       });
     }
 
@@ -361,7 +412,7 @@ export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate,
         sceneId: ref.sceneId,
         visualUuid: newUuid,
         documentName: newDocumentName,
-        update: { flags: buildLinkedVisualFlags({ regionUuid, behaviorId }) }
+        update: { flags: buildLinkedVisualFlags({ regionUuid, behaviorId }) },
       });
     }
   }
@@ -388,13 +439,20 @@ export async function relinkVisual(behavior, selectedDoc, { applyBehaviorUpdate,
  * @param {(behavior: object) => ({sceneId,regionId,behaviorId}|null)} deps.identify
  * @returns {Promise<object|null>}
  */
-export async function recreateLinkedTile(behavior, { scene, texture, x, y, width, height } = {}, { applyBehaviorUpdate, identify } = {}) {
+export async function recreateLinkedTile(
+  behavior,
+  { scene, texture, x, y, width, height } = {},
+  { applyBehaviorUpdate, identify } = {}
+) {
   const tile = await createLinkedTile({ scene, behavior, texture, x, y, width, height });
   if (!tile) return null;
   const ref = identify?.(behavior);
   const uuid = typeof tile?.uuid === 'string' ? tile.uuid : null;
   if (ref && uuid) {
-    await applyBehaviorUpdate?.({ ...ref, update: { system: { linkedVisual: { uuid, documentName: 'Tile' } } } });
+    await applyBehaviorUpdate?.({
+      ...ref,
+      update: { system: { linkedVisual: { uuid, documentName: 'Tile' } } },
+    });
   }
   return tile;
 }
@@ -421,13 +479,30 @@ export async function recreateLinkedTile(behavior, { scene, texture, x, y, width
  * @param {(behavior: object) => ({sceneId,regionId,behaviorId}|null)} deps.identify
  * @returns {Promise<object|null>}
  */
-export async function recreateLinkedDrawing(behavior, { scene, x, y, width, height, text, strokeColor, fillColor } = {}, { applyBehaviorUpdate, identify } = {}) {
-  const drawing = await createLinkedDrawing({ scene, behavior, x, y, width, height, text, strokeColor, fillColor });
+export async function recreateLinkedDrawing(
+  behavior,
+  { scene, x, y, width, height, text, strokeColor, fillColor } = {},
+  { applyBehaviorUpdate, identify } = {}
+) {
+  const drawing = await createLinkedDrawing({
+    scene,
+    behavior,
+    x,
+    y,
+    width,
+    height,
+    text,
+    strokeColor,
+    fillColor,
+  });
   if (!drawing) return null;
   const ref = identify?.(behavior);
   const uuid = typeof drawing?.uuid === 'string' ? drawing.uuid : null;
   if (ref && uuid) {
-    await applyBehaviorUpdate?.({ ...ref, update: { system: { linkedVisual: { uuid, documentName: 'Drawing' } } } });
+    await applyBehaviorUpdate?.({
+      ...ref,
+      update: { system: { linkedVisual: { uuid, documentName: 'Drawing' } } },
+    });
   }
   return drawing;
 }
@@ -449,10 +524,12 @@ export async function recreateLinkedDrawing(behavior, { scene, x, y, width, heig
  * @returns {{ action: 'none'|'ok'|'warn'|'recreate' }}
  */
 export function planMissingPolicy(behaviorSystem, resolved) {
-  const linked = behaviorSystem?.linkedVisual && typeof behaviorSystem.linkedVisual === 'object'
-    ? behaviorSystem.linkedVisual
-    : {};
-  const hasConfiguredVisual = linked.mode === 'marker' && typeof linked.uuid === 'string' && linked.uuid.trim();
+  const linked =
+    behaviorSystem?.linkedVisual && typeof behaviorSystem.linkedVisual === 'object'
+      ? behaviorSystem.linkedVisual
+      : {};
+  const hasConfiguredVisual =
+    linked.mode === 'marker' && typeof linked.uuid === 'string' && linked.uuid.trim();
   if (!hasConfiguredVisual) return { action: 'none' };
   if (resolved === true) return { action: 'ok' };
 
@@ -477,10 +554,16 @@ export function planMissingPolicy(behaviorSystem, resolved) {
  *   Recreate seam (defaults to {@link recreateLinkedTile}-style); injectable.
  * @returns {Promise<{ action: string }>}
  */
-export async function applyMissingPolicy(behaviorSystem, { scene, behavior, notify, recreate } = {}) {
-  const system = behaviorSystem && typeof behaviorSystem === 'object'
-    ? (behaviorSystem.linkedVisual ? behaviorSystem : (readInteractableBehaviorSystem(behaviorSystem) ?? behaviorSystem))
-    : {};
+export async function applyMissingPolicy(
+  behaviorSystem,
+  { scene, behavior, notify, recreate } = {}
+) {
+  const system =
+    behaviorSystem && typeof behaviorSystem === 'object'
+      ? behaviorSystem.linkedVisual
+        ? behaviorSystem
+        : (readInteractableBehaviorSystem(behaviorSystem) ?? behaviorSystem)
+      : {};
   const resolved = resolveLinkedVisual(system, { scene }) !== null;
   const decision = planMissingPolicy(system, resolved);
 

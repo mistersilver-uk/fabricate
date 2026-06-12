@@ -17,10 +17,7 @@ export async function cleanupStalePreferences(
   validRecipeIds,
   getSetting,
   setSetting,
-  {
-    resolveGatheringActor = null,
-    isSelectableGatheringActor = null
-  } = {}
+  { resolveGatheringActor = null, isSelectableGatheringActor = null } = {}
 ) {
   // 1. Validate lastManagedCraftingSystem
   const lastSystem = getSetting(SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM);

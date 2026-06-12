@@ -38,7 +38,10 @@ import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
  * @returns {{ systemId: string, toolId: string } | null} The first matching
  *   system+tool, preferring the preferred system; null when nothing matches.
  */
-export function resolveItemUuidToTool(uuid, { resolveItem, getSystems, getPreferredSystemId } = {}) {
+export function resolveItemUuidToTool(
+  uuid,
+  { resolveItem, getSystems, getPreferredSystemId } = {}
+) {
   if (typeof uuid !== 'string' || !uuid) return null;
   if (typeof resolveItem !== 'function' || typeof getSystems !== 'function') return null;
 
@@ -91,7 +94,9 @@ function firstToolMatch(item, system) {
   for (const tool of tools) {
     const componentId = tool?.componentId;
     if (!componentId) continue;
-    const component = components.find((candidate) => String(candidate?.id ?? '') === String(componentId));
+    const component = components.find(
+      (candidate) => String(candidate?.id ?? '') === String(componentId)
+    );
     if (!component) continue;
     if (itemMatchesComponentSource(item, component)) {
       const toolId = String(tool?.id ?? '');

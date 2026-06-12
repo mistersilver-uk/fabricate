@@ -46,14 +46,14 @@ export function migrateStaminaRegenPolicy(gatheringConfig = {}) {
         ...economy,
         stamina: {
           ...stamina,
-          regen: { ...regen, policy: 'overTime' }
-        }
-      }
+          regen: { ...regen, policy: 'overTime' },
+        },
+      },
     };
     systemsChanged = true;
   }
 
   return {
-    gatheringConfig: systemsChanged ? { ...gatheringConfig, systems } : gatheringConfig
+    gatheringConfig: systemsChanged ? { ...gatheringConfig, systems } : gatheringConfig,
   };
 }

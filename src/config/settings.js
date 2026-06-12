@@ -1,7 +1,7 @@
 import {
   DEFAULT_FABRICATE_THEME,
   FABRICATE_THEME_CHOICES,
-  applyFabricateTheme
+  applyFabricateTheme,
 } from '../ui/theme.js';
 
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
@@ -22,7 +22,7 @@ export const SETTING_KEYS = Object.freeze({
   RECENTLY_CRAFTED: 'recentlyCrafted',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
   THEME: 'theme',
-  EXPERIMENTAL_FEATURES: 'experimentalFeatures'
+  EXPERIMENTAL_FEATURES: 'experimentalFeatures',
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -31,35 +31,35 @@ const BASE_DEFINITIONS = Object.freeze({
     scope: 'world',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.CRAFTING_SYSTEMS]: {
     name: 'Crafting Systems',
     scope: 'world',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.GATHERING_ENVIRONMENTS]: {
     name: 'Gathering Environments',
     scope: 'world',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.GATHERING_CONFIG]: {
     name: 'Gathering Configuration',
     scope: 'world',
     config: false,
     type: Object,
-    default: {}
+    default: {},
   },
   [SETTING_KEYS.GATHERING_PARTIES]: {
     name: 'Gathering Parties',
     scope: 'world',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.THEME]: {
     name: 'FABRICATE.Settings.Theme.Name',
@@ -69,7 +69,7 @@ const BASE_DEFINITIONS = Object.freeze({
     type: String,
     choices: FABRICATE_THEME_CHOICES,
     default: DEFAULT_FABRICATE_THEME,
-    onChange: applyFabricateTheme
+    onChange: applyFabricateTheme,
   },
   [SETTING_KEYS.EXPERIMENTAL_FEATURES]: {
     name: 'FABRICATE.Settings.ExperimentalFeatures.Name',
@@ -77,71 +77,71 @@ const BASE_DEFINITIONS = Object.freeze({
     scope: 'world',
     config: true,
     type: Boolean,
-    default: false
+    default: false,
   },
   [SETTING_KEYS.LAST_CRAFTING_ACTOR]: {
     name: 'Last Crafting Actor',
     scope: 'client',
     config: false,
     type: String,
-    default: ''
+    default: '',
   },
   [SETTING_KEYS.LAST_GATHERING_ACTOR]: {
     name: 'Last Gathering Actor',
     scope: 'client',
     config: false,
     type: String,
-    default: ''
+    default: '',
   },
   [SETTING_KEYS.LAST_COMPONENT_SOURCES]: {
     name: 'Last Component Source Actors',
     scope: 'client',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM]: {
     name: 'Last Managed Crafting System',
     scope: 'client',
     config: false,
     type: String,
-    default: ''
+    default: '',
   },
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',
     scope: 'client',
     config: false,
     type: Object,
-    default: {}
+    default: {},
   },
   [SETTING_KEYS.MIGRATION_VERSION]: {
     name: 'Migration Version',
     scope: 'world',
     config: false,
     type: String,
-    default: '0.0.0'
+    default: '0.0.0',
   },
   [SETTING_KEYS.FAVOURITE_RECIPES]: {
     name: 'Favourite Recipes',
     scope: 'client',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.RECENTLY_CRAFTED]: {
     name: 'Recently Crafted Recipes',
     scope: 'client',
     config: false,
     type: Array,
-    default: []
+    default: [],
   },
   [SETTING_KEYS.LAST_ALCHEMY_SYSTEM]: {
     name: 'Last Alchemy System',
     scope: 'client',
     config: false,
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 });
 
 const keys = Object.values(SETTING_KEYS);

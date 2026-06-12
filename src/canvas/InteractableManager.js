@@ -29,41 +29,43 @@
  * modules were removed in Phase 1d.
  */
 
+import { getSetting, SETTING_KEYS } from '../config/settings.js';
+import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
+
+import { promptDropEnvironment } from './environmentDialog.js';
+import { resolveDropEnvironment } from './environmentResolution.js';
+import { buildInteractableDragPayload } from './interactableDragPayload.js';
+import { resolveItemUuidToTool } from './interactableItemResolution.js';
 import {
   classifyInteractableDrop,
   buildRegionSpawnRequest,
   buildActiveCanvasTool,
-  parseInteractableSourceUuid
+  parseInteractableSourceUuid,
 } from './interactableResolution.js';
-import { resolveItemUuidToTool } from './interactableItemResolution.js';
-import { buildInteractableDragPayload } from './interactableDragPayload.js';
 import {
-  buildInteractableBehaviorSystem,
-  readInteractableBehaviorSystem,
-  isInteractableRegionBehavior,
-  buildLinkedVisualFlags
-} from './regions/interactableRegionFlags.js';
+  INTERACTABLE_SOCKET,
+  INTERACTABLE_ACTIVATION_GRANTED,
+  INTERACTABLE_ACTIVATION_DENIED,
+} from './interactableSocket.js';
+import {
+  regionEnvironmentIdsAtPoint,
+  interactableBehaviorsContainingToken,
+} from './regionHitTest.js';
 import {
   shouldPromptOnEnter,
   buildActivationRequest,
   validateActivationRequest,
   describeGrant,
-  activationDenialMessageKey
+  activationDenialMessageKey,
 } from './regions/interactableRegionActivation.js';
 import {
-  identifyRegionBehaviorRef
-} from './regions/interactableRegionNodeAdapter.js';
-import {
-  INTERACTABLE_SOCKET,
-  INTERACTABLE_ACTIVATE,
-  INTERACTABLE_ACTIVATION_GRANTED,
-  INTERACTABLE_ACTIVATION_DENIED
-} from './interactableSocket.js';
-import { resolveDropEnvironment } from './environmentResolution.js';
-import { regionEnvironmentIdsAtPoint, interactableBehaviorsContainingToken } from './regionHitTest.js';
-import { promptDropEnvironment } from './environmentDialog.js';
-import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
-import { getSetting, SETTING_KEYS } from '../config/settings.js';
+  buildInteractableBehaviorSystem,
+  readInteractableBehaviorSystem,
+  isInteractableRegionBehavior,
+  buildLinkedVisualFlags,
+} from './regions/interactableRegionFlags.js';
+import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
+
 /** Fallback tile image when no tool/task icon can be resolved. */
 const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
 
@@ -89,9 +91,8 @@ class InteractableManager {
     getAppClass = getFabricateAppClass,
     getPromptAppClass = getInteractionPromptAppClass,
     regionEnvironmentIdsAtPoint: regionHitTest = regionEnvironmentIdsAtPoint,
-    promptDropEnvironment: promptEnvironment = promptDropEnvironment
+    promptDropEnvironment: promptEnvironment = promptDropEnvironment,
   } = {}) {
-    this._registered = false;
     this._getAppClass = getAppClass;
     this._getPromptAppClass = getPromptAppClass;
     this._regionEnvironmentIdsAtPoint = regionHitTest;
@@ -133,10 +134,13 @@ class InteractableManager {
         name: 'FABRICATE.Canvas.Interactable.Keybinding.Name',
         hint: 'FABRICATE.Canvas.Interactable.Keybinding.Hint',
         editable: [{ key: 'KeyE' }],
-        onDown: () => { this._interactHere(); return true; },
-        restricted: false
+        onDown: () => {
+          this._interactHere();
+          return true;
+        },
+        restricted: false,
       });
-    } catch (_error) {
+    } catch {
       // Defensive: a keybinding registration must never break init.
     }
   }
@@ -154,13 +158,13 @@ class InteractableManager {
    */
   _onDrop(canvas, data) {
     const classification = classifyInteractableDrop(data, this._resolutionDeps());
-    if (!classification) return undefined; // not ours — let Foundry handle it.
+    if (!classification) return; // not ours — let Foundry handle it.
 
     // Interactable spawning is GM-only.
     if (globalThis.game?.user?.isGM !== true) {
       globalThis.ui?.notifications?.warn?.(
-        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.GMOnlySpawn')
-        ?? 'Only a GM can place Fabricate interactables on the canvas.'
+        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.GMOnlySpawn') ??
+          'Only a GM can place Fabricate interactables on the canvas.'
       );
       return false; // suppress: we recognized it but cannot spawn.
     }
@@ -176,7 +180,8 @@ class InteractableManager {
     }
 
     // Alt held during the drop forces the GM dialog (override tiers 1 + 2).
-    const forceDialog = data?.altKey === true || globalThis.game?.keyboard?.isModifierActive?.('Alt') === true;
+    const forceDialog =
+      data?.altKey === true || globalThis.game?.keyboard?.isModifierActive?.('Alt') === true;
     void this._spawnGatheringTask({ classification, point, forceDialog, visualMode });
     return false; // suppress Foundry's default item-drop handling.
   }
@@ -193,8 +198,18 @@ class InteractableManager {
    * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no marker).
    * @returns {boolean}
    */
-  placeInteractableAtViewCenter({ interactableType, systemId, referenceId, visualMode = 'marker' } = {}) {
-    const payload = buildInteractableDragPayload({ interactableType, systemId, referenceId, visualMode });
+  placeInteractableAtViewCenter({
+    interactableType,
+    systemId,
+    referenceId,
+    visualMode = 'marker',
+  } = {}) {
+    const payload = buildInteractableDragPayload({
+      interactableType,
+      systemId,
+      referenceId,
+      visualMode,
+    });
     if (!payload) return false;
     const center = this._viewCenter();
     const data = { ...payload, x: center.x, y: center.y };
@@ -223,7 +238,7 @@ class InteractableManager {
       height: this._gridSize(),
       gridSize: this._gridSize(),
       visualMode,
-      buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn)
+      buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn),
     });
   }
 
@@ -237,7 +252,10 @@ class InteractableManager {
    */
   async _spawnGatheringTask({ classification, point, forceDialog, visualMode = 'marker' }) {
     const deps = this._resolutionDeps();
-    const task = deps.getTask({ systemId: classification.systemId, taskId: classification.referenceId });
+    const task = deps.getTask({
+      systemId: classification.systemId,
+      taskId: classification.referenceId,
+    });
     const environments = this._systemEnvironments(classification.systemId);
     const environmentExists = (id) => environments.some((env) => String(env.id) === String(id));
 
@@ -247,7 +265,7 @@ class InteractableManager {
       regionEnvironmentIds,
       defaultEnvironmentId: task?.defaultEnvironmentId ?? null,
       forceDialog,
-      environmentExists
+      environmentExists,
     });
 
     let environmentId = resolution.environmentId;
@@ -255,7 +273,7 @@ class InteractableManager {
       environmentId = await this._promptDropEnvironment({
         environments,
         defaultEnvironmentId: task?.defaultEnvironmentId ?? '',
-        localize: (key, fallback) => globalThis.game?.i18n?.localize?.(key) ?? fallback
+        localize: (key, fallback) => globalThis.game?.i18n?.localize?.(key) ?? fallback,
       });
       if (!environmentId) return null; // cancel ⇒ abort.
     }
@@ -263,10 +281,10 @@ class InteractableManager {
     if (resolution.notify && environmentId) {
       const env = environments.find((candidate) => String(candidate.id) === String(environmentId));
       const name = env?.name || environmentId;
-      const message = (globalThis.game?.i18n?.format?.(
-        'FABRICATE.Canvas.Interactable.EnvironmentAutoResolved',
-        { environment: name }
-      )) ?? `Resource node placed in environment "${name}".`;
+      const message =
+        globalThis.game?.i18n?.format?.('FABRICATE.Canvas.Interactable.EnvironmentAutoResolved', {
+          environment: name,
+        }) ?? `Resource node placed in environment "${name}".`;
       globalThis.ui?.notifications?.info?.(message);
     }
 
@@ -274,7 +292,7 @@ class InteractableManager {
       classification,
       point,
       environmentId: environmentId ?? undefined,
-      visualMode
+      visualMode,
     });
     return this._spawnInteractableRegion(spawnRequest);
   }
@@ -286,7 +304,8 @@ class InteractableManager {
    * @returns {Array<{ id: string, name: string }>}
    */
   _systemEnvironments(systemId) {
-    const environments = globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+    const environments =
+      globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
     return (Array.isArray(environments) ? environments : [])
       .filter((env) => String(env?.craftingSystemId ?? '') === String(systemId))
       .map((env) => ({ id: String(env.id), name: String(env.name ?? env.id) }));
@@ -324,24 +343,26 @@ class InteractableManager {
           x: Number(tile.x ?? 0) - Number(tile.width ?? this._gridSize()) / 2,
           y: Number(tile.y ?? 0) - Number(tile.height ?? this._gridSize()) / 2,
           width: Number(tile.width ?? region.shape?.width ?? this._gridSize()),
-          height: Number(tile.height ?? region.shape?.height ?? this._gridSize())
+          height: Number(tile.height ?? region.shape?.height ?? this._gridSize()),
         }
       : {
           x: Number(region.shape?.x ?? 0),
           y: Number(region.shape?.y ?? 0),
           width: Number(region.shape?.width ?? this._gridSize()),
-          height: Number(region.shape?.height ?? this._gridSize())
+          height: Number(region.shape?.height ?? this._gridSize()),
         };
 
-    let regionDoc = null;
+    let regionDoc;
     try {
-      const [created] = await scene.createEmbeddedDocuments('Region', [{
-        name: region.name,
-        shapes: [{ type: 'rectangle', x, y, width, height }],
-        behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }]
-      }]);
+      const [created] = await scene.createEmbeddedDocuments('Region', [
+        {
+          name: region.name,
+          shapes: [{ type: 'rectangle', x, y, width, height }],
+          behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }],
+        },
+      ]);
       regionDoc = created ?? null;
-    } catch (_error) {
+    } catch {
       regionDoc = null;
     }
     if (!regionDoc) {
@@ -373,24 +394,28 @@ class InteractableManager {
           y: Number(tile?.y ?? 0),
           width: Number(tile?.width ?? this._gridSize()),
           height: Number(tile?.height ?? this._gridSize()),
-          flags: { fabricate }
+          flags: { fabricate },
         };
-        const TileDocument = globalThis.foundry?.documents?.TileDocument
-          ?? globalThis.CONFIG?.Tile?.documentClass;
+        const TileDocument =
+          globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
         if (TileDocument?.create) {
-          tileDoc = await TileDocument.create(tileData, { parent: scene }) ?? null;
+          tileDoc = (await TileDocument.create(tileData, { parent: scene })) ?? null;
         } else if (scene.createEmbeddedDocuments) {
           const [created] = await scene.createEmbeddedDocuments('Tile', [tileData]);
           tileDoc = created ?? null;
         }
-      } catch (_error) {
+      } catch {
         tileDoc = null;
       }
     }
 
     if (!tileDoc) {
       // Roll back the orphan Region so the failed spawn leaves no trace.
-      try { await regionDoc.delete?.(); } catch (_error) { /* tolerate. */ }
+      try {
+        await regionDoc.delete?.();
+      } catch {
+        /* tolerate. */
+      }
       this._notifySpawnFailure();
       return null;
     }
@@ -402,8 +427,10 @@ class InteractableManager {
     const tileUuid = typeof tileDoc?.uuid === 'string' ? tileDoc.uuid : null;
     if (behavior?.update && tileUuid) {
       try {
-        await behavior.update({ system: { linkedVisual: { uuid: tileUuid, documentName: 'Tile' } } });
-      } catch (_error) {
+        await behavior.update({
+          system: { linkedVisual: { uuid: tileUuid, documentName: 'Tile' } },
+        });
+      } catch {
         // Defensive: a working region-only interactable is acceptable.
       }
     }
@@ -422,14 +449,18 @@ class InteractableManager {
     const behaviors = regionDoc?.behaviors;
     const list = Array.isArray(behaviors?.contents)
       ? behaviors.contents
-      : (typeof behaviors?.values === 'function' ? Array.from(behaviors.values()) : (Array.isArray(behaviors) ? behaviors : []));
+      : typeof behaviors?.values === 'function'
+        ? [...behaviors.values()]
+        : Array.isArray(behaviors)
+          ? behaviors
+          : [];
     return list.find((b) => isInteractableRegionBehavior(b)) ?? list[0] ?? null;
   }
 
   _notifySpawnFailure() {
     globalThis.ui?.notifications?.warn?.(
-      globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.SpawnFailed')
-      ?? 'Failed to place the Fabricate interactable on the canvas.'
+      globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.SpawnFailed') ??
+        'Failed to place the Fabricate interactable on the canvas.'
     );
   }
 
@@ -469,7 +500,12 @@ class InteractableManager {
       behaviorRef: `${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`,
       name: system.name || '',
       promptText: system.presentation?.promptText ?? null,
-      onInteract: () => this._requestActivation(behavior, { actorId, userId: globalThis.game?.user?.id ?? null, activationSource: 'regionEnter' })
+      onInteract: () =>
+        this._requestActivation(behavior, {
+          actorId,
+          userId: globalThis.game?.user?.id ?? null,
+          activationSource: 'regionEnter',
+        }),
     });
   }
 
@@ -531,7 +567,7 @@ class InteractableManager {
     const matches = interactableBehaviorsContainingToken({
       scene,
       token: tokenPlaceable,
-      isInteractableBehavior: isInteractableRegionBehavior
+      isInteractableBehavior: isInteractableRegionBehavior,
     });
     for (const { behavior } of matches) {
       const system = readInteractableBehaviorSystem(behavior);
@@ -548,7 +584,12 @@ class InteractableManager {
         behaviorRef: `${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`,
         name: system.name || '',
         promptText: system.presentation?.promptText ?? null,
-        onInteract: () => this._requestActivation(behavior, { actorId, userId: globalThis.game?.user?.id ?? null, activationSource: 'regionEnter' })
+        onInteract: () =>
+          this._requestActivation(behavior, {
+            actorId,
+            userId: globalThis.game?.user?.id ?? null,
+            activationSource: 'regionEnter',
+          }),
       });
       return; // one prompt at a time.
     }
@@ -576,7 +617,7 @@ class InteractableManager {
       actorId: ctx.actorId ?? null,
       userId: ctx.userId ?? globalThis.game?.user?.id ?? null,
       activationSource: ctx.activationSource ?? 'regionEnter',
-      ts: Date.now()
+      ts: Date.now(),
     });
 
     if (isActiveGM()) {
@@ -585,8 +626,8 @@ class InteractableManager {
     }
     if (!globalThis.game?.users?.activeGM) {
       globalThis.ui?.notifications?.warn?.(
-        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM')
-        ?? 'A GM must be online to gather here.'
+        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM') ??
+          'A GM must be online to gather here.'
       );
       return;
     }
@@ -624,9 +665,10 @@ class InteractableManager {
     const isGM = globalThis.game?.users?.get?.(String(request.userId ?? ''))?.isGM === true;
     const canControlActor = this._userCanControlActor(request.userId, request.actorId);
     const sourceExists = this._sourceExists(system);
-    const environmentExists = system.interactableType === 'gatheringTask'
-      ? this._environmentExists(system.environmentId)
-      : true;
+    const environmentExists =
+      system.interactableType === 'gatheringTask'
+        ? this._environmentExists(system.environmentId)
+        : true;
     const tokenInside = this._tokenInsideRegion(behavior, request.actorId, request.userId);
     const validation = validateActivationRequest(request, {
       behaviorSystem: system,
@@ -635,7 +677,7 @@ class InteractableManager {
       canControlActor,
       sourceExists,
       environmentExists,
-      tokenInside
+      tokenInside,
     });
     if (!validation.ok) {
       // Tell the requesting user WHY (localized) instead of failing silently.
@@ -648,8 +690,15 @@ class InteractableManager {
 
     // For a tool, resolve the live activeCanvasTool to thread into the grant.
     if (system.interactableType === 'tool') {
-      const tool = this._resolutionDeps().getTool({ systemId: system.systemId, toolId: system.toolId });
-      const activeCanvasTool = buildActiveCanvasTool({ systemId: system.systemId, toolId: system.toolId, tool });
+      const tool = this._resolutionDeps().getTool({
+        systemId: system.systemId,
+        toolId: system.toolId,
+      });
+      const activeCanvasTool = buildActiveCanvasTool({
+        systemId: system.systemId,
+        toolId: system.toolId,
+        tool,
+      });
       if (!activeCanvasTool) return false;
       grant.context = { ...grant.context, activeCanvasTool };
     }
@@ -662,15 +711,19 @@ class InteractableManager {
       grant: {
         tab: grant.tab,
         context: grant.context,
-        ref: { sceneId: request.sceneId, regionId: request.regionId, behaviorId: request.behaviorId },
+        ref: {
+          sceneId: request.sceneId,
+          regionId: request.regionId,
+          behaviorId: request.behaviorId,
+        },
         interactableType: system.interactableType,
         environmentId: system.environmentId ?? null,
         taskId: system.taskId ?? null,
         // The interacting actor (the token the player walked in) becomes the
         // default selected actor when the granted session opens. Already
         // ownership-validated above (`canControlActor`).
-        actorId: request.actorId ?? null
-      }
+        actorId: request.actorId ?? null,
+      },
     };
     // The requesting user opens the session locally. When the GM IS the requester
     // (GM activated their own token), open it here (a socket emit never reaches
@@ -751,7 +804,7 @@ class InteractableManager {
     globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
       action: INTERACTABLE_ACTIVATION_DENIED,
       userId: userId ?? null,
-      reason: reason ?? null
+      reason: reason ?? null,
     });
   }
 
@@ -831,7 +884,11 @@ class InteractableManager {
     const user = globalThis.game?.users?.get?.(String(userId ?? ''));
     if (user?.isGM === true) return true;
     if (typeof actor.testUserPermission === 'function' && user) {
-      try { return actor.testUserPermission(user, 'OWNER') === true; } catch (_error) { /* fall through */ }
+      try {
+        return actor.testUserPermission(user, 'OWNER') === true;
+      } catch {
+        /* fall through */
+      }
     }
     return false;
   }
@@ -848,8 +905,11 @@ class InteractableManager {
 
   _environmentExists(environmentId) {
     if (!environmentId) return false;
-    const environments = globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
-    return (Array.isArray(environments) ? environments : []).some((env) => String(env?.id) === String(environmentId));
+    const environments =
+      globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+    return (Array.isArray(environments) ? environments : []).some(
+      (env) => String(env?.id) === String(environmentId)
+    );
   }
 
   /**
@@ -872,15 +932,21 @@ class InteractableManager {
     const tokens = scene?.tokens;
     const list = Array.isArray(tokens?.contents)
       ? tokens.contents
-      : (typeof tokens?.values === 'function' ? Array.from(tokens.values()) : []);
-    const tokenDocs = list.filter((t) => String(t?.actorId ?? t?.actor?.id ?? '') === String(actorId ?? ''));
+      : typeof tokens?.values === 'function'
+        ? [...tokens.values()]
+        : [];
+    const tokenDocs = list.filter(
+      (t) => String(t?.actorId ?? t?.actor?.id ?? '') === String(actorId ?? '')
+    );
     if (tokenDocs.length === 0) return true; // can't locate — don't block.
     for (const tokenDoc of tokenDocs) {
       const center = tokenDoc?.object?.center ?? null;
       const point = center ?? { x: Number(tokenDoc?.x ?? 0), y: Number(tokenDoc?.y ?? 0) };
       try {
         if (region.testPoint({ x: point.x, y: point.y, elevation: 0 }) === true) return true;
-      } catch (_error) { /* tolerate */ }
+      } catch {
+        /* tolerate */
+      }
     }
     return false;
   }
@@ -909,7 +975,7 @@ class InteractableManager {
       if (local && Number.isFinite(local.x) && Number.isFinite(local.y)) {
         return { x: local.x, y: local.y };
       }
-    } catch (_err) {
+    } catch {
       return null;
     }
     return null;
@@ -921,7 +987,9 @@ class InteractableManager {
       const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem?.(classification.systemId);
       const componentId = entry?.componentId;
-      const component = (system?.components ?? []).find((c) => String(c?.id ?? '') === String(componentId));
+      const component = (system?.components ?? []).find(
+        (c) => String(c?.id ?? '') === String(componentId)
+      );
       const img = component?.img;
       if (typeof img === 'string' && img.trim()) return img.trim();
     }
@@ -936,28 +1004,29 @@ class InteractableManager {
    * @returns {number}
    */
   _gridSize() {
-    const size = globalThis.canvas?.scene?.grid?.size
-      ?? globalThis.canvas?.grid?.size
-      ?? globalThis.canvas?.dimensions?.size;
+    const size =
+      globalThis.canvas?.scene?.grid?.size ??
+      globalThis.canvas?.grid?.size ??
+      globalThis.canvas?.dimensions?.size;
     return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;
   }
-
 
   _resolutionDeps() {
     const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
     return {
       getTool: ({ systemId, toolId }) => {
         const system = systemManager?.getSystem?.(systemId);
-        return (system?.tools ?? []).find(tool => tool?.id === toolId) ?? null;
+        return (system?.tools ?? []).find((tool) => tool?.id === toolId) ?? null;
       },
       getTask: ({ systemId, taskId }) => {
         const tasks = this._readLibraryTasks(systemId);
-        return tasks.find(task => task?.id === taskId) ?? null;
+        return tasks.find((task) => task?.id === taskId) ?? null;
       },
-      resolveItemUuidToTool: (uuid) => resolveItemUuidToTool(uuid, {
-        resolveItem: (id) => globalThis.fromUuidSync?.(id) ?? null,
-        getSystems: () => systemManager?.getSystems?.() ?? []
-      })
+      resolveItemUuidToTool: (uuid) =>
+        resolveItemUuidToTool(uuid, {
+          resolveItem: (id) => globalThis.fromUuidSync?.(id) ?? null,
+          getSystems: () => systemManager?.getSystems?.() ?? [],
+        }),
     };
   }
 
@@ -971,9 +1040,10 @@ class InteractableManager {
   _dropPoint(canvas, data) {
     return {
       x: Number(data?.x ?? 0),
-      y: Number(data?.y ?? 0)
+      y: Number(data?.y ?? 0),
     };
   }
+  _registered = false;
 }
 
 /** The shared InteractableManager singleton. */
@@ -982,6 +1052,8 @@ const instance = new InteractableManager();
 // Expose the singleton as a static so callers use `InteractableManager.instance.register()`.
 InteractableManager.instance = instance;
 
-export { InteractableManager, parseInteractableSourceUuid };
+export { InteractableManager };
 
 export default InteractableManager;
+
+export { parseInteractableSourceUuid } from './interactableResolution.js';

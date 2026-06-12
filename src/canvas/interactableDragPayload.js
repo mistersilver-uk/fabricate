@@ -39,7 +39,12 @@ export const INTERACTABLE_DRAG_TYPE = 'fabricate-interactable';
  * @returns {{ type: string, fabricate: { interactableType: string, systemId: string,
  *   toolId?: string, taskId?: string, visualMode?: 'none' } } | null}  Null when the inputs are invalid.
  */
-export function buildInteractableDragPayload({ interactableType, systemId, referenceId, visualMode } = {}) {
+export function buildInteractableDragPayload({
+  interactableType,
+  systemId,
+  referenceId,
+  visualMode,
+} = {}) {
   const sysId = typeof systemId === 'string' ? systemId.trim() : '';
   const refId = typeof referenceId === 'string' ? referenceId.trim() : '';
   if (!sysId || !refId) return null;
@@ -51,13 +56,13 @@ export function buildInteractableDragPayload({ interactableType, systemId, refer
   if (interactableType === 'tool') {
     return {
       type: INTERACTABLE_DRAG_TYPE,
-      fabricate: { interactableType: 'tool', systemId: sysId, toolId: refId, ...visual }
+      fabricate: { interactableType: 'tool', systemId: sysId, toolId: refId, ...visual },
     };
   }
   if (interactableType === 'gatheringTask') {
     return {
       type: INTERACTABLE_DRAG_TYPE,
-      fabricate: { interactableType: 'gatheringTask', systemId: sysId, taskId: refId, ...visual }
+      fabricate: { interactableType: 'gatheringTask', systemId: sysId, taskId: refId, ...visual },
     };
   }
   return null;

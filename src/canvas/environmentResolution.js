@@ -50,7 +50,7 @@ export function resolveDropEnvironment({
   regionEnvironmentIds = [],
   defaultEnvironmentId = null,
   forceDialog = false,
-  environmentExists = () => true
+  environmentExists = () => true,
 } = {}) {
   const exists = (id) => typeof id === 'string' && id !== '' && environmentExists(id) === true;
 
@@ -66,14 +66,24 @@ export function resolveDropEnvironment({
     .filter((id) => exists(id));
   const uniqueRegionHits = [...new Set(regionHits)];
   if (uniqueRegionHits.length === 1) {
-    return { source: 'region', environmentId: uniqueRegionHits[0], needsDialog: false, notify: true };
+    return {
+      source: 'region',
+      environmentId: uniqueRegionHits[0],
+      needsDialog: false,
+      notify: true,
+    };
   }
 
   // Tier 2: task static default (only when region detection was not ambiguous).
   if (uniqueRegionHits.length === 0) {
     const taskDefault = typeof defaultEnvironmentId === 'string' ? defaultEnvironmentId.trim() : '';
     if (exists(taskDefault)) {
-      return { source: 'taskDefault', environmentId: taskDefault, needsDialog: false, notify: false };
+      return {
+        source: 'taskDefault',
+        environmentId: taskDefault,
+        needsDialog: false,
+        notify: false,
+      };
     }
   }
 
