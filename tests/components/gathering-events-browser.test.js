@@ -72,10 +72,21 @@ describe('GatheringEventsBrowserView source contract', () => {
   it('uses a four-column grid for the event table and a scrollable tags cell', () => {
     const gridMatch = css.match(/--fab-mv2-gathering-event-grid:([^;]+);/);
     assert.ok(gridMatch, 'event grid CSS variable should be defined');
-    // Mask parenthesized groups (e.g. minmax(0, 1fr)) before splitting on
-    // whitespace so each top-level column counts once. Bounded negated classes
-    // keep both regexes linear (no catastrophic backtracking).
-    const columns = gridMatch[1].replace(/\([^)]*\)/g, 'X').split(/\s+/).filter(Boolean);
+    // Count top-level columns with a depth-aware scan (no regex) so whitespace
+    // inside a function like minmax(0, 1fr) does not split that column in two.
+    const columns = [];
+    let depth = 0;
+    let token = '';
+    for (const ch of gridMatch[1].trim()) {
+      if (ch === '(') depth += 1;
+      else if (ch === ')') depth -= 1;
+      if ((ch === ' ' || ch === '\t' || ch === '\n') && depth === 0) {
+        if (token) { columns.push(token); token = ''; }
+      } else {
+        token += ch;
+      }
+    }
+    if (token) columns.push(token);
     assert.equal(columns.length, 4, 'expected four grid columns (identity, tags, status, actions)');
 
     const tagsBlock = css.match(/\.manager-gathering-event-tags-cell\s*\{[^}]*\}/);
