@@ -13,12 +13,21 @@
  * the default `none`).
  */
 
-const LEGACY_MODE_MAP = Object.freeze({ time: 'none', nodes: 'nodes', stamina: 'stamina', hybrid: 'stamina' });
+const LEGACY_MODE_MAP = Object.freeze({
+  time: 'none',
+  nodes: 'nodes',
+  stamina: 'stamina',
+  hybrid: 'stamina',
+});
 
 function defaultEconomy(mode = 'none') {
   return {
     mode,
-    stamina: { max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '', lastRoll: null } }
+    stamina: {
+      max: '',
+      start: '',
+      regen: { policy: 'none', unit: 'hours', amount: '', lastRoll: null },
+    },
   };
 }
 
@@ -36,14 +45,19 @@ export function migrateGatheringEconomy(gatheringConfig = {}, environments = [])
   for (const env of envs) {
     const legacy = env?.economyMode;
     const mapped = legacy ? LEGACY_MODE_MAP[legacy] : undefined;
-    if (mapped && mapped !== 'none' && env?.craftingSystemId && !legacyModeBySystem[env.craftingSystemId]) {
+    if (
+      mapped &&
+      mapped !== 'none' &&
+      env?.craftingSystemId &&
+      !legacyModeBySystem[env.craftingSystemId]
+    ) {
       legacyModeBySystem[env.craftingSystemId] = mapped;
     }
   }
 
   // Seed/update economy only where a legacy mode must be preserved, so worlds
   // with the default `time` economy see no config churn.
-  const systems = { ...(gatheringConfig?.systems || {}) };
+  const systems = { ...gatheringConfig?.systems };
   let systemsChanged = false;
   for (const [systemId, desiredMode] of Object.entries(legacyModeBySystem)) {
     const system = systems[systemId];
@@ -60,11 +74,11 @@ export function migrateGatheringEconomy(gatheringConfig = {}, environments = [])
   }
 
   // Strip the removed fields from every environment and task.
-  const nextEnvironments = envs.map(env => {
+  const nextEnvironments = envs.map((env) => {
     if (!env || typeof env !== 'object') return env;
     const { economyMode, ...restEnv } = env;
     const tasks = Array.isArray(env.tasks)
-      ? env.tasks.map(task => {
+      ? env.tasks.map((task) => {
           if (!task || typeof task !== 'object' || !('attemptLimit' in task)) return task;
           const { attemptLimit, ...restTask } = task;
           return restTask;
@@ -75,6 +89,6 @@ export function migrateGatheringEconomy(gatheringConfig = {}, environments = [])
 
   return {
     gatheringConfig: systemsChanged ? { ...gatheringConfig, systems } : gatheringConfig,
-    environments: nextEnvironments
+    environments: nextEnvironments,
   };
 }

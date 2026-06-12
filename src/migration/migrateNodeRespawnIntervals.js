@@ -27,7 +27,7 @@
  * zero churn.
  */
 
-const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86400, weeks: 604800 });
+const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86_400, weeks: 604_800 });
 
 /**
  * Express a seconds count as `{intervalUnit, intervalAmount}`, preferring the
@@ -40,7 +40,8 @@ function secondsToUnitAmount(seconds) {
   const total = Number(seconds) || 0;
   for (const unit of ['weeks', 'days', 'hours', 'minutes']) {
     const size = SECONDS_PER_UNIT[unit];
-    if (total > 0 && total % size === 0) return { intervalUnit: unit, intervalAmount: total / size };
+    if (total > 0 && total % size === 0)
+      return { intervalUnit: unit, intervalAmount: total / size };
   }
   return { intervalUnit: 'hours', intervalAmount: total ? total / SECONDS_PER_UNIT.hours : 0 };
 }
@@ -72,7 +73,7 @@ function migrateTask(task) {
 function migrateTasks(tasks) {
   if (!Array.isArray(tasks)) return tasks;
   let changed = false;
-  const next = tasks.map(task => {
+  const next = tasks.map((task) => {
     const migrated = migrateTask(task);
     if (migrated !== task) changed = true;
     return migrated;
@@ -106,11 +107,11 @@ export function migrateNodeRespawnIntervals(gatheringConfig = {}, environments =
     const nextSystems = {};
     for (const [sid, system] of Object.entries(systems)) {
       const tasks = migrateTasks(system?.tasks);
-      if (tasks !== system?.tasks) {
+      if (tasks === system?.tasks) {
+        nextSystems[sid] = system;
+      } else {
         systemsChanged = true;
         nextSystems[sid] = { ...system, tasks };
-      } else {
-        nextSystems[sid] = system;
       }
     }
     if (systemsChanged) nextConfig = { ...gatheringConfig, systems: nextSystems };
@@ -118,7 +119,7 @@ export function migrateNodeRespawnIntervals(gatheringConfig = {}, environments =
 
   // Environment inline tasks + per-environment runtime state.
   const envs = Array.isArray(environments) ? environments : [];
-  const nextEnvironments = envs.map(env => {
+  const nextEnvironments = envs.map((env) => {
     if (!env || typeof env !== 'object') return env;
     const tasks = migrateTasks(env.tasks);
     const nodeRuntime = migrateNodeRuntime(env.nodeRuntime);

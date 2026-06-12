@@ -86,6 +86,10 @@ export default [
           varsIgnorePattern: '^_',
           caughtErrors: 'all',
           caughtErrorsIgnorePattern: '^_',
+          // Allow the destructure-to-omit idiom: `const { drop, ...rest } = obj`
+          // pulls `drop` out solely to strip it from `rest`. Renaming it would
+          // change which key is stripped, so the extracted sibling is exempt.
+          ignoreRestSiblings: true,
         },
       ],
 

@@ -42,14 +42,14 @@ export function migrateGatheringLimitationToggles(gatheringConfig = {}) {
     const { mode, ...restEconomy } = economy;
     const nextEconomy = {
       ...restEconomy,
-      stamina: { ...(restEconomy.stamina || {}), enabled: mode === 'stamina' },
-      nodes: { ...(restEconomy.nodes || {}), enabled: mode === 'nodes' }
+      stamina: { ...restEconomy.stamina, enabled: mode === 'stamina' },
+      nodes: { ...restEconomy.nodes, enabled: mode === 'nodes' },
     };
     systems[systemId] = { ...system, economy: nextEconomy };
     systemsChanged = true;
   }
 
   return {
-    gatheringConfig: systemsChanged ? { ...gatheringConfig, systems } : gatheringConfig
+    gatheringConfig: systemsChanged ? { ...gatheringConfig, systems } : gatheringConfig,
   };
 }

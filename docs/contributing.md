@@ -62,13 +62,14 @@ SonarCloud quality gate (which scores duplication, reliability, and security on 
 code* — so a path is widened in its own focused PR, not bundled into an unrelated change). The
 gate (`npm run lint` / `npm run format:check`) currently covers the low-coupling leaf modules:
 
-- `src/models/`, `src/utils/`, `src/integrations/`, and `src/toolBreakageRuntime.js`
+- `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`, and
+  `src/toolBreakageRuntime.js`
 
 Not yet gated (tracked for follow-up — run `npm run lint:all` / `npm run lint:svelte` to see them):
 
-- `src/systems/`, `src/canvas/`, `src/migration/`, `src/config/` — lint-clean, but reformatting
-  them surfaces pre-existing SonarCloud findings (regex/complexity, and `config/`'s preset-data
-  duplication) that must be addressed in their own PRs
+- `src/systems/`, `src/canvas/` — lint-clean after autofix, but reformatting them surfaces
+  pre-existing SonarCloud findings (regex/complexity) that must be addressed in their own PRs.
+  `src/systems/` is large (~31 files) so it is split across more than one follow-up PR
 - the `tests/` suite — same reason (sort comparators, fixture duplication)
 - `src/ui/**` and all `*.svelte` components (Svelte parsing is wired up; findings triaged later)
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by

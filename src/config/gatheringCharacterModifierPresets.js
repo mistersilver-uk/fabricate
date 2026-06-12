@@ -10,28 +10,77 @@
  */
 
 /**
+ * Shared display metadata (label + icon) for every modifier id used by the
+ * preset bundles. Each Foundry-system bundle reuses these so the two bundles
+ * differ only in their `provider` and roll `expression`.
+ *
+ * @type {Readonly<Record<string, {label: string, icon: string}>>}
+ */
+const MODIFIER_DISPLAY = Object.freeze({
+  strength: { label: 'Strength', icon: 'fa-solid fa-dumbbell' },
+  dexterity: { label: 'Dexterity', icon: 'fa-solid fa-feather' },
+  constitution: { label: 'Constitution', icon: 'fa-solid fa-heart-pulse' },
+  intelligence: { label: 'Intelligence', icon: 'fa-solid fa-brain' },
+  wisdom: { label: 'Wisdom', icon: 'fa-solid fa-eye' },
+  charisma: { label: 'Charisma', icon: 'fa-solid fa-comments' },
+  acrobatics: { label: 'Acrobatics', icon: 'fa-solid fa-person-running' },
+  athletics: { label: 'Athletics', icon: 'fa-solid fa-mountain' },
+  stealth: { label: 'Stealth', icon: 'fa-solid fa-user-secret' },
+  perception: { label: 'Perception', icon: 'fa-solid fa-bullseye' },
+  investigation: { label: 'Investigation', icon: 'fa-solid fa-magnifying-glass' },
+  nature: { label: 'Nature', icon: 'fa-solid fa-leaf' },
+  survival: { label: 'Survival', icon: 'fa-solid fa-campground' },
+  history: { label: 'History', icon: 'fa-solid fa-scroll' },
+  occultism: { label: 'Occultism', icon: 'fa-solid fa-hat-wizard' },
+});
+
+/**
+ * Build a frozen preset bundle from a provider id and an ordered id→expression
+ * map, pulling shared label/icon metadata from {@link MODIFIER_DISPLAY}. The
+ * resulting array preserves the insertion order of `expressions`.
+ *
+ * @param {string} provider Provider id stamped onto every preset.
+ * @param {Record<string, string>} expressions Ordered map of modifier id to
+ *   the system-specific roll expression.
+ * @returns {ReadonlyArray<object>} Frozen preset bundle.
+ */
+function buildPresetBundle(provider, expressions) {
+  return Object.freeze(
+    Object.entries(expressions).map(([id, expression]) =>
+      Object.freeze({
+        id,
+        label: MODIFIER_DISPLAY[id].label,
+        icon: MODIFIER_DISPLAY[id].icon,
+        provider,
+        expression,
+      })
+    )
+  );
+}
+
+/**
  * D&D 5e ability and skill presets. The expressions assume the Foundry
  * `dnd5e` system's actor roll data shape (`@abilities.<key>.mod`,
  * `@skills.<key>.total`).
  *
  * @type {ReadonlyArray<object>}
  */
-export const DND5E_CHARACTER_MODIFIER_PRESETS = Object.freeze([
-  Object.freeze({ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' }),
-  Object.freeze({ id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-feather', provider: 'dnd5e', expression: '@abilities.dex.mod' }),
-  Object.freeze({ id: 'constitution', label: 'Constitution', icon: 'fa-solid fa-heart-pulse', provider: 'dnd5e', expression: '@abilities.con.mod' }),
-  Object.freeze({ id: 'intelligence', label: 'Intelligence', icon: 'fa-solid fa-brain', provider: 'dnd5e', expression: '@abilities.int.mod' }),
-  Object.freeze({ id: 'wisdom', label: 'Wisdom', icon: 'fa-solid fa-eye', provider: 'dnd5e', expression: '@abilities.wis.mod' }),
-  Object.freeze({ id: 'charisma', label: 'Charisma', icon: 'fa-solid fa-comments', provider: 'dnd5e', expression: '@abilities.cha.mod' }),
-  Object.freeze({ id: 'acrobatics', label: 'Acrobatics', icon: 'fa-solid fa-person-running', provider: 'dnd5e', expression: '@skills.acr.total' }),
-  Object.freeze({ id: 'athletics', label: 'Athletics', icon: 'fa-solid fa-mountain', provider: 'dnd5e', expression: '@skills.ath.total' }),
-  Object.freeze({ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-user-secret', provider: 'dnd5e', expression: '@skills.ste.total' }),
-  Object.freeze({ id: 'perception', label: 'Perception', icon: 'fa-solid fa-bullseye', provider: 'dnd5e', expression: '@skills.prc.total' }),
-  Object.freeze({ id: 'investigation', label: 'Investigation', icon: 'fa-solid fa-magnifying-glass', provider: 'dnd5e', expression: '@skills.inv.total' }),
-  Object.freeze({ id: 'nature', label: 'Nature', icon: 'fa-solid fa-leaf', provider: 'dnd5e', expression: '@skills.nat.total' }),
-  Object.freeze({ id: 'survival', label: 'Survival', icon: 'fa-solid fa-campground', provider: 'dnd5e', expression: '@skills.sur.total' }),
-  Object.freeze({ id: 'history', label: 'History', icon: 'fa-solid fa-scroll', provider: 'dnd5e', expression: '@skills.his.total' })
-]);
+export const DND5E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle('dnd5e', {
+  strength: '@abilities.str.mod',
+  dexterity: '@abilities.dex.mod',
+  constitution: '@abilities.con.mod',
+  intelligence: '@abilities.int.mod',
+  wisdom: '@abilities.wis.mod',
+  charisma: '@abilities.cha.mod',
+  acrobatics: '@skills.acr.total',
+  athletics: '@skills.ath.total',
+  stealth: '@skills.ste.total',
+  perception: '@skills.prc.total',
+  investigation: '@skills.inv.total',
+  nature: '@skills.nat.total',
+  survival: '@skills.sur.total',
+  history: '@skills.his.total',
+});
 
 /**
  * Pathfinder 2e ability and skill presets. The expressions assume the
@@ -39,21 +88,21 @@ export const DND5E_CHARACTER_MODIFIER_PRESETS = Object.freeze([
  *
  * @type {ReadonlyArray<object>}
  */
-export const PF2E_CHARACTER_MODIFIER_PRESETS = Object.freeze([
-  Object.freeze({ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'pf2e', expression: '@actor.system.abilities.str.mod' }),
-  Object.freeze({ id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-feather', provider: 'pf2e', expression: '@actor.system.abilities.dex.mod' }),
-  Object.freeze({ id: 'constitution', label: 'Constitution', icon: 'fa-solid fa-heart-pulse', provider: 'pf2e', expression: '@actor.system.abilities.con.mod' }),
-  Object.freeze({ id: 'intelligence', label: 'Intelligence', icon: 'fa-solid fa-brain', provider: 'pf2e', expression: '@actor.system.abilities.int.mod' }),
-  Object.freeze({ id: 'wisdom', label: 'Wisdom', icon: 'fa-solid fa-eye', provider: 'pf2e', expression: '@actor.system.abilities.wis.mod' }),
-  Object.freeze({ id: 'charisma', label: 'Charisma', icon: 'fa-solid fa-comments', provider: 'pf2e', expression: '@actor.system.abilities.cha.mod' }),
-  Object.freeze({ id: 'acrobatics', label: 'Acrobatics', icon: 'fa-solid fa-person-running', provider: 'pf2e', expression: '@actor.system.skills.acrobatics.totalModifier' }),
-  Object.freeze({ id: 'athletics', label: 'Athletics', icon: 'fa-solid fa-mountain', provider: 'pf2e', expression: '@actor.system.skills.athletics.totalModifier' }),
-  Object.freeze({ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-user-secret', provider: 'pf2e', expression: '@actor.system.skills.stealth.totalModifier' }),
-  Object.freeze({ id: 'perception', label: 'Perception', icon: 'fa-solid fa-bullseye', provider: 'pf2e', expression: '@actor.system.perception.totalModifier' }),
-  Object.freeze({ id: 'nature', label: 'Nature', icon: 'fa-solid fa-leaf', provider: 'pf2e', expression: '@actor.system.skills.nature.totalModifier' }),
-  Object.freeze({ id: 'survival', label: 'Survival', icon: 'fa-solid fa-campground', provider: 'pf2e', expression: '@actor.system.skills.survival.totalModifier' }),
-  Object.freeze({ id: 'occultism', label: 'Occultism', icon: 'fa-solid fa-hat-wizard', provider: 'pf2e', expression: '@actor.system.skills.occultism.totalModifier' })
-]);
+export const PF2E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle('pf2e', {
+  strength: '@actor.system.abilities.str.mod',
+  dexterity: '@actor.system.abilities.dex.mod',
+  constitution: '@actor.system.abilities.con.mod',
+  intelligence: '@actor.system.abilities.int.mod',
+  wisdom: '@actor.system.abilities.wis.mod',
+  charisma: '@actor.system.abilities.cha.mod',
+  acrobatics: '@actor.system.skills.acrobatics.totalModifier',
+  athletics: '@actor.system.skills.athletics.totalModifier',
+  stealth: '@actor.system.skills.stealth.totalModifier',
+  perception: '@actor.system.perception.totalModifier',
+  nature: '@actor.system.skills.nature.totalModifier',
+  survival: '@actor.system.skills.survival.totalModifier',
+  occultism: '@actor.system.skills.occultism.totalModifier',
+});
 
 /**
  * Return the matching preset bundle for the active Foundry game system id.
@@ -108,10 +157,10 @@ export function seedCharacterModifierPresets({ presets = [], currentLibrary = []
       icon: String(preset.icon || 'fa-solid fa-user'),
       provider: preset.provider || 'dnd5e',
       expression: String(preset.expression || ''),
-      macroUuid: String(preset.macroUuid || '')
+      macroUuid: String(preset.macroUuid || ''),
     };
     seen.set(id, cloned);
     added.push(cloned);
   }
-  return { added, skipped, next: Array.from(seen.values()) };
+  return { added, skipped, next: [...seen.values()] };
 }

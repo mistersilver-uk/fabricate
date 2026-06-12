@@ -28,7 +28,7 @@ const POLICY_MAP = Object.freeze({
   manual: { policy: 'manual' },
   elapsedTime: { policy: 'overTime', gainMode: 'guaranteed' },
   probability: { policy: 'overTime', gainMode: 'chance' },
-  manualAndElapsedTime: { policy: 'overTime', gainMode: 'chance' }
+  manualAndElapsedTime: { policy: 'overTime', gainMode: 'chance' },
 });
 
 function migrateRespawn(respawn) {
@@ -56,7 +56,7 @@ function migrateTask(task) {
 function migrateTasks(tasks) {
   if (!Array.isArray(tasks)) return tasks;
   let changed = false;
-  const next = tasks.map(task => {
+  const next = tasks.map((task) => {
     const migrated = migrateTask(task);
     if (migrated !== task) changed = true;
     return migrated;
@@ -90,11 +90,11 @@ export function migrateNodeRespawnModes(gatheringConfig = {}, environments = [])
     const nextSystems = {};
     for (const [sid, system] of Object.entries(systems)) {
       const tasks = migrateTasks(system?.tasks);
-      if (tasks !== system?.tasks) {
+      if (tasks === system?.tasks) {
+        nextSystems[sid] = system;
+      } else {
         systemsChanged = true;
         nextSystems[sid] = { ...system, tasks };
-      } else {
-        nextSystems[sid] = system;
       }
     }
     if (systemsChanged) nextConfig = { ...gatheringConfig, systems: nextSystems };
@@ -102,7 +102,7 @@ export function migrateNodeRespawnModes(gatheringConfig = {}, environments = [])
 
   // Environment inline tasks + per-environment runtime state.
   const envs = Array.isArray(environments) ? environments : [];
-  const nextEnvironments = envs.map(env => {
+  const nextEnvironments = envs.map((env) => {
     if (!env || typeof env !== 'object') return env;
     const tasks = migrateTasks(env.tasks);
     const nodeRuntime = migrateNodeRuntime(env.nodeRuntime);

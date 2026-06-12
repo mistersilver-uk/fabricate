@@ -54,7 +54,9 @@ function vocabId(value) {
   if (value && typeof value === 'object') {
     return vocabId(value.id ?? value.value ?? value.label);
   }
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 /**
@@ -90,11 +92,15 @@ function regionValuesFor(systemConfig) {
  */
 export function migrateUnifyGatheringRegions(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
-  const gatheringConfig = isPlainObject(data?.gatheringConfig) ? clone(data.gatheringConfig) : data?.gatheringConfig;
+  const gatheringConfig = isPlainObject(data?.gatheringConfig)
+    ? clone(data.gatheringConfig)
+    : data?.gatheringConfig;
   const environments = Array.isArray(data?.environments) ? clone(data.environments) : [];
 
   const configSystems = isPlainObject(gatheringConfig?.systems) ? gatheringConfig.systems : {};
-  const systemsById = new Map(systems.filter(isPlainObject).map(system => [String(system?.id ?? ''), system]));
+  const systemsById = new Map(
+    systems.filter(isPlainObject).map((system) => [String(system?.id ?? ''), system])
+  );
 
   // Per crafting-system: the set of region ids known after derivation (existing +
   // newly derived), so environment mapping can tell a real region from an orphan.
@@ -103,8 +109,11 @@ export function migrateUnifyGatheringRegions(data = {}) {
   // system whose vocab is gone) still maps instead of being treated as an orphan.
   const derivedRegionIdsBySystem = new Map();
   for (const [sysId, system] of systemsById) {
-    const ids = new Set((Array.isArray(system?.gatheringRegions) ? system.gatheringRegions : [])
-      .map(region => vocabId(region?.id)).filter(Boolean));
+    const ids = new Set(
+      (Array.isArray(system?.gatheringRegions) ? system.gatheringRegions : [])
+        .map((region) => vocabId(region?.id))
+        .filter(Boolean)
+    );
     derivedRegionIdsBySystem.set(sysId, ids);
   }
   const unifiedSystemNames = [];
@@ -121,7 +130,9 @@ export function migrateUnifyGatheringRegions(data = {}) {
     // unrelated configs are never rewritten.
     const hadRegionVocab = values.length > 0;
     if (hadRegionVocab) {
-      systemConfig.vocabularies = isPlainObject(systemConfig.vocabularies) ? systemConfig.vocabularies : {};
+      systemConfig.vocabularies = isPlainObject(systemConfig.vocabularies)
+        ? systemConfig.vocabularies
+        : {};
       systemConfig.vocabularies.regions = { values: [] };
       // Track the systems that actually carried region data for the GM notice
       // (only when a crafting system exists to receive the derived regions).
@@ -131,9 +142,13 @@ export function migrateUnifyGatheringRegions(data = {}) {
     const system = systemsById.get(sysId);
     if (!system) continue; // No crafting system to write regions onto; skip.
 
-    const existingIds = derivedRegionIdsBySystem.get(sysId)
-      || new Set((Array.isArray(system.gatheringRegions) ? system.gatheringRegions : [])
-        .map(region => vocabId(region?.id)).filter(Boolean));
+    const existingIds =
+      derivedRegionIdsBySystem.get(sysId) ||
+      new Set(
+        (Array.isArray(system.gatheringRegions) ? system.gatheringRegions : [])
+          .map((region) => vocabId(region?.id))
+          .filter(Boolean)
+      );
     derivedRegionIdsBySystem.set(sysId, existingIds);
 
     for (const rawEntry of values) {
@@ -149,13 +164,13 @@ export function migrateUnifyGatheringRegions(data = {}) {
         id: entry.id,
         craftingSystemId: sysId,
         name: entry.label || entry.id,
-        enabled: true
+        enabled: true,
       });
     }
   }
 
   // Resolve the GM-notice system names to display names where available.
-  const unifiedRegionSystems = unifiedSystemNames.map(sysId => {
+  const unifiedRegionSystems = unifiedSystemNames.map((sysId) => {
     const system = systemsById.get(sysId);
     const name = isPlainObject(system) ? String(system?.name ?? '').trim() : '';
     return name || sysId;
@@ -181,7 +196,9 @@ export function migrateUnifyGatheringRegions(data = {}) {
     if (!isPlainObject(environment)) continue;
     const regionId = vocabId(environment.region);
     if (!regionId) continue;
-    const existingIncluded = Array.isArray(environment.includedRegionIds) ? environment.includedRegionIds : [];
+    const existingIncluded = Array.isArray(environment.includedRegionIds)
+      ? environment.includedRegionIds
+      : [];
     if (existingIncluded.length > 0) continue; // Already mapped → idempotent.
 
     const sysId = String(environment.craftingSystemId ?? '');

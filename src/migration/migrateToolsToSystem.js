@@ -31,7 +31,8 @@
 export function migrateToolsToSystem(systems, gatheringConfig) {
   const safeSystems = Array.isArray(systems) ? systems : [];
   const config = gatheringConfig && typeof gatheringConfig === 'object' ? gatheringConfig : {};
-  const configSystems = config.systems && typeof config.systems === 'object' ? config.systems : null;
+  const configSystems =
+    config.systems && typeof config.systems === 'object' ? config.systems : null;
 
   if (!configSystems) {
     return { systems: safeSystems, gatheringConfig: config, movedCount: 0 };
@@ -63,8 +64,8 @@ export function migrateToolsToSystem(systems, gatheringConfig) {
     }
     const existingIds = new Set(
       system.tools
-        .filter(tool => tool && typeof tool === 'object' && tool.id)
-        .map(tool => String(tool.id))
+        .filter((tool) => tool && typeof tool === 'object' && tool.id)
+        .map((tool) => String(tool.id))
     );
 
     for (const tool of configTools) {

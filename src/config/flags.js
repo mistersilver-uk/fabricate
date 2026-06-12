@@ -14,7 +14,7 @@ export function getFabricateFlag(document, key, defaultValue = null) {
   try {
     const value = document.getFlag(FABRICATE_FLAG_NAMESPACE, normalizeFlagKey(key));
     return value !== undefined && value !== null ? value : defaultValue;
-  } catch (err) {
+  } catch {
     return defaultValue;
   }
 }
@@ -26,7 +26,7 @@ export async function setFabricateFlag(document, key, value) {
 
   try {
     return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizeFlagKey(key), value);
-  } catch (err) {
+  } catch {
     return null;
   }
 }

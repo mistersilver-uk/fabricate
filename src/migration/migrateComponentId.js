@@ -90,7 +90,7 @@ function _migrateCatalysts(catalysts) {
  */
 function _migrateResultGroups(resultGroups) {
   if (!Array.isArray(resultGroups)) return resultGroups;
-  return resultGroups.map(rg => {
+  return resultGroups.map((rg) => {
     if (rg && Array.isArray(rg.results)) {
       rg.results = rg.results.map(_migrateResult);
     }
@@ -118,7 +118,7 @@ function _migrateIngredientSet(set) {
   }
 
   if (Array.isArray(set.ingredientGroups)) {
-    set.ingredientGroups = set.ingredientGroups.map(group => {
+    set.ingredientGroups = set.ingredientGroups.map((group) => {
       if (group && Array.isArray(group.options)) {
         group.options = group.options.map(_migrateIngredient);
       }
@@ -167,7 +167,7 @@ function _migrateStep(step) {
 export function migrateRecipes(recipes) {
   if (!Array.isArray(recipes)) return recipes;
 
-  return JSON.parse(JSON.stringify(recipes)).map(recipe => {
+  return JSON.parse(JSON.stringify(recipes)).map((recipe) => {
     if (recipe == null || typeof recipe !== 'object') return recipe;
 
     // Top-level catalysts
@@ -208,7 +208,7 @@ export function migrateRecipes(recipes) {
 export function migrateCraftingSystems(systems) {
   if (!Array.isArray(systems)) return systems;
 
-  return JSON.parse(JSON.stringify(systems)).map(system => {
+  return JSON.parse(JSON.stringify(systems)).map((system) => {
     if (system == null || typeof system !== 'object') return system;
 
     // Rename managedItems -> components
@@ -222,7 +222,7 @@ export function migrateCraftingSystems(systems) {
     // Migrate salvage fields on each component
     const componentList = system.components;
     if (Array.isArray(componentList)) {
-      system.components = componentList.map(component => {
+      system.components = componentList.map((component) => {
         if (component == null || typeof component !== 'object') return component;
         if (component.salvage && typeof component.salvage === 'object') {
           if (Array.isArray(component.salvage.catalysts)) {
@@ -249,6 +249,6 @@ export function migrateCraftingSystems(systems) {
 export function runComponentIdMigration(recipes, systems) {
   return {
     recipes: migrateRecipes(recipes),
-    systems: migrateCraftingSystems(systems)
+    systems: migrateCraftingSystems(systems),
   };
 }
