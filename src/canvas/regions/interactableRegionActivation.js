@@ -22,13 +22,9 @@
  * when the scoped session is opened, not here.
  */
 
-const ACTIVATION_ACTION = 'interactableActivate';
+import { numberOrNull } from './coercion.js';
 
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+const ACTIVATION_ACTION = 'interactableActivate';
 
 /**
  * Evaluate whether an interactable is currently eligible for activation from its
@@ -144,15 +140,10 @@ function isConcealed(system) {
  * @param {number} ctx.ts                 Timestamp (ms).
  * @returns {object}
  */
-export function buildActivationRequest(system, {
-  regionId,
-  behaviorId,
-  sceneId,
-  actorId,
-  userId,
-  activationSource,
-  ts
-} = {}) {
+export function buildActivationRequest(
+  system,
+  { regionId, behaviorId, sceneId, actorId, userId, activationSource, ts } = {}
+) {
   return {
     action: ACTIVATION_ACTION,
     sceneId,
@@ -167,7 +158,7 @@ export function buildActivationRequest(system, {
     actorId,
     userId,
     activationSource,
-    ts
+    ts,
   };
 }
 
@@ -195,15 +186,10 @@ export function buildActivationRequest(system, {
  * @param {boolean} [ctx.tokenInside]
  * @returns {{ ok: boolean, reason: string|null }}
  */
-export function validateActivationRequest(request, {
-  behaviorSystem,
-  now,
-  isGM,
-  canControlActor,
-  sourceExists,
-  environmentExists,
-  tokenInside
-} = {}) {
+export function validateActivationRequest(
+  request,
+  { behaviorSystem, now, isGM, canControlActor, sourceExists, environmentExists, tokenInside } = {}
+) {
   if (!behaviorSystem || typeof behaviorSystem !== 'object') return fail('NO_BEHAVIOR');
   if (request?.interactableType !== behaviorSystem.interactableType) return fail('TYPE_MISMATCH');
 
@@ -257,7 +243,7 @@ const DENIAL_MESSAGE_KEYS = {
   TOKEN_NOT_INSIDE: `${DENIAL_PREFIX}.NotInside`,
   SOURCE_MISSING: `${DENIAL_PREFIX}.SourceMissing`,
   ENVIRONMENT_MISSING: `${DENIAL_PREFIX}.EnvironmentMissing`,
-  __default: `${DENIAL_PREFIX}.Generic`
+  __default: `${DENIAL_PREFIX}.Generic`,
 };
 
 /**
@@ -285,8 +271,8 @@ export function describeGrant(system) {
       tab: 'gathering',
       context: {
         environmentId: system.environmentId ?? null,
-        taskId: system.taskId ?? null
-      }
+        taskId: system.taskId ?? null,
+      },
     };
   }
   return null;

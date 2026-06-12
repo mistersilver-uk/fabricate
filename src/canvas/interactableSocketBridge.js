@@ -22,11 +22,9 @@ import {
   routeInteractableBehaviorMessage,
   routeInteractableActivateMessage,
   routeInteractableActivationGranted,
-  routeInteractableActivationDenied
+  routeInteractableActivationDenied,
 } from './interactableSocket.js';
-import {
-  identifyRegionBehaviorRef
-} from './regions/interactableRegionNodeAdapter.js';
+import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
 /** Whether this client is the primary (active) GM. */
 function isActiveGM() {
@@ -55,12 +53,17 @@ function resolveRegionBehavior({ sceneId, regionId, behaviorId } = {}) {
  * @param {{ sceneId: string, regionId: string, behaviorId: string, update: object }} args
  * @returns {Promise<void>}
  */
-export async function applyInteractableBehaviorUpdate({ sceneId, regionId, behaviorId, update } = {}) {
+export async function applyInteractableBehaviorUpdate({
+  sceneId,
+  regionId,
+  behaviorId,
+  update,
+} = {}) {
   const behavior = resolveRegionBehavior({ sceneId, regionId, behaviorId });
   if (!behavior?.update) return;
   try {
     await behavior.update(update);
-  } catch (_error) {
+  } catch {
     // Defensive: a behaviour write must never throw into the socket handler.
   }
 }
@@ -77,7 +80,7 @@ function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {
     try {
       const doc = globalThis.fromUuidSync?.(String(visualUuid));
       if (doc) return doc;
-    } catch (_error) {
+    } catch {
       // fall through to the embedded lookup
     }
   }
@@ -98,12 +101,18 @@ function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {
  * @param {object} args
  * @returns {Promise<void>}
  */
-export async function applyInteractableVisualUpdate({ sceneId, visualUuid, docId, documentName, update } = {}) {
+export async function applyInteractableVisualUpdate({
+  sceneId,
+  visualUuid,
+  docId,
+  documentName,
+  update,
+} = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.update) return;
   try {
     await doc.update(update);
-  } catch (_error) {
+  } catch {
     // Defensive: a missing/locked visual must not throw.
   }
 }
@@ -114,12 +123,17 @@ export async function applyInteractableVisualUpdate({ sceneId, visualUuid, docId
  * @param {object} args
  * @returns {Promise<void>}
  */
-export async function applyInteractableVisualDelete({ sceneId, visualUuid, docId, documentName } = {}) {
+export async function applyInteractableVisualDelete({
+  sceneId,
+  visualUuid,
+  docId,
+  documentName,
+} = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.delete) return;
   try {
     await doc.delete();
-  } catch (_error) {
+  } catch {
     // Defensive: a missing/locked visual must not throw.
   }
 }
@@ -142,7 +156,7 @@ export function emitInteractableVisualUpdate({ sceneId, visualUuid, documentName
     sceneId,
     visualUuid,
     documentName,
-    update
+    update,
   });
 }
 
@@ -162,7 +176,7 @@ export function emitInteractableVisualDelete({ sceneId, visualUuid, documentName
     action: INTERACTABLE_VISUAL_DELETE,
     sceneId,
     visualUuid,
-    documentName
+    documentName,
   });
 }
 
@@ -179,16 +193,16 @@ export function emitInteractableBehaviorWrite(behavior) {
   const writer = createInteractableBehaviorWriter({
     isActiveGM,
     emitUpdate: (payload) => globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload),
-    applyUpdate: applyInteractableBehaviorUpdate
+    applyUpdate: applyInteractableBehaviorUpdate,
   });
   return (update) => {
     const ref = identifyRegionBehaviorRef(behavior);
-    if (!ref) return undefined;
+    if (!ref) return;
     return writer.write({
       sceneId: ref.sceneId,
       regionId: ref.regionId,
       behaviorId: ref.behaviorId,
-      update
+      update,
     });
   };
 }
@@ -210,7 +224,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
   if (action === INTERACTABLE_BEHAVIOR_UPDATE) {
     void routeInteractableBehaviorMessage(payload, {
       isActiveGM,
-      applyUpdate: applyInteractableBehaviorUpdate
+      applyUpdate: applyInteractableBehaviorUpdate,
     });
     return;
   }
@@ -233,7 +247,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     if (typeof deps.validateAndGrant === 'function') {
       void routeInteractableActivateMessage(payload, {
         isActiveGM,
-        validateAndGrant: deps.validateAndGrant
+        validateAndGrant: deps.validateAndGrant,
       });
     }
     return;
@@ -245,7 +259,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     if (typeof deps.openGrant === 'function') {
       void routeInteractableActivationGranted(payload, {
         isLocalUser: (userId) => globalThis.game?.user?.id === userId,
-        openGrant: deps.openGrant
+        openGrant: deps.openGrant,
       });
     }
     return;
@@ -253,12 +267,10 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
 
   // Activation denied → the targeted local user is told WHY (localized). The
   // notify body is injected by main.js.
-  if (action === INTERACTABLE_ACTIVATION_DENIED) {
-    if (typeof deps.notifyDenied === 'function') {
-      void routeInteractableActivationDenied(payload, {
-        isLocalUser: (userId) => globalThis.game?.user?.id === userId,
-        notifyDenied: deps.notifyDenied
-      });
-    }
+  if (action === INTERACTABLE_ACTIVATION_DENIED && typeof deps.notifyDenied === 'function') {
+    void routeInteractableActivationDenied(payload, {
+      isLocalUser: (userId) => globalThis.game?.user?.id === userId,
+      notifyDenied: deps.notifyDenied,
+    });
   }
 }

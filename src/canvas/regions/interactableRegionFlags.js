@@ -26,6 +26,8 @@
  *   activation   : { trigger:'regionEnter', audience:'players'|'all' }
  */
 
+import { numberOrNull } from './coercion.js';
+
 export const INTERACTABLE_BEHAVIOR_SUBTYPE = 'fabricate.interactable';
 
 export const INTERACTABLE_TYPES = Object.freeze(['tool', 'gatheringTask']);
@@ -41,13 +43,7 @@ function coerceString(value) {
 
 function stringOrNull(value) {
   const trimmed = coerceString(value);
-  return trimmed ? trimmed : null;
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  return trimmed || null;
 }
 
 /**
@@ -63,18 +59,13 @@ export function buildInteractableBehaviorSchema(fields) {
   if (!fields || typeof fields !== 'object') {
     throw new Error('buildInteractableBehaviorSchema requires a Foundry fields namespace');
   }
-  const {
-    StringField,
-    BooleanField,
-    NumberField,
-    SchemaField
-  } = fields;
+  const { StringField, BooleanField, NumberField, SchemaField } = fields;
 
   return {
     interactableType: new StringField({
       required: true,
       blank: false,
-      choices: [...INTERACTABLE_TYPES]
+      choices: [...INTERACTABLE_TYPES],
     }),
     sourceUuid: new StringField({ required: true, blank: false }),
     systemId: new StringField({ required: true, blank: false }),
@@ -85,7 +76,7 @@ export function buildInteractableBehaviorSchema(fields) {
 
     presentation: new SchemaField({
       promptText: new StringField({ required: false, blank: true, nullable: true, initial: null }),
-      hidden: new BooleanField({ initial: false })
+      hidden: new BooleanField({ initial: false }),
     }),
 
     linkedVisual: new SchemaField({
@@ -95,20 +86,20 @@ export function buildInteractableBehaviorSchema(fields) {
         blank: true,
         nullable: true,
         initial: null,
-        choices: [...LINKED_VISUAL_DOCUMENT_NAMES]
+        choices: [...LINKED_VISUAL_DOCUMENT_NAMES],
       }),
       mode: new StringField({
         required: true,
         blank: false,
         initial: 'marker',
-        choices: [...LINKED_VISUAL_MODES]
+        choices: [...LINKED_VISUAL_MODES],
       }),
       missingPolicy: new StringField({
         required: true,
         blank: false,
         initial: 'warn',
-        choices: [...LINKED_VISUAL_MISSING_POLICIES]
-      })
+        choices: [...LINKED_VISUAL_MISSING_POLICIES],
+      }),
     }),
 
     state: new SchemaField({
@@ -117,12 +108,12 @@ export function buildInteractableBehaviorSchema(fields) {
       locked: new BooleanField({ initial: false }),
       uses: new SchemaField({
         max: new NumberField({ required: false, nullable: true, initial: null }),
-        used: new NumberField({ required: true, nullable: false, initial: 0 })
+        used: new NumberField({ required: true, nullable: false, initial: 0 }),
       }),
       cooldown: new SchemaField({
         seconds: new NumberField({ required: false, nullable: true, initial: null }),
-        lastUsedWorldTime: new NumberField({ required: false, nullable: true, initial: null })
-      })
+        lastUsedWorldTime: new NumberField({ required: false, nullable: true, initial: null }),
+      }),
     }),
 
     activation: new SchemaField({
@@ -130,15 +121,15 @@ export function buildInteractableBehaviorSchema(fields) {
         required: true,
         blank: false,
         initial: 'regionEnter',
-        choices: [...ACTIVATION_TRIGGERS]
+        choices: [...ACTIVATION_TRIGGERS],
       }),
       audience: new StringField({
         required: true,
         blank: false,
         initial: 'players',
-        choices: [...ACTIVATION_AUDIENCES]
-      })
-    })
+        choices: [...ACTIVATION_AUDIENCES],
+      }),
+    }),
   };
 }
 
@@ -170,7 +161,7 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
     environmentId,
     name,
     presentation,
-    linkedVisual
+    linkedVisual,
   } = spawnRequest;
 
   if (!INTERACTABLE_TYPES.includes(interactableType)) {
@@ -191,7 +182,7 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
     name: coerceString(name),
     presentation: {
       promptText: stringOrNull(presentation?.promptText),
-      hidden: presentation?.hidden === true
+      hidden: presentation?.hidden === true,
     },
     linkedVisual: {
       uuid: stringOrNull(linkedVisual?.uuid),
@@ -201,19 +192,19 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
       mode: LINKED_VISUAL_MODES.includes(linkedVisual?.mode) ? linkedVisual.mode : 'marker',
       missingPolicy: LINKED_VISUAL_MISSING_POLICIES.includes(linkedVisual?.missingPolicy)
         ? linkedVisual.missingPolicy
-        : 'warn'
+        : 'warn',
     },
     state: {
       enabled: true,
       consumed: false,
       locked: false,
       uses: { max: null, used: 0 },
-      cooldown: { seconds: null, lastUsedWorldTime: null }
+      cooldown: { seconds: null, lastUsedWorldTime: null },
     },
     activation: {
       trigger: 'regionEnter',
-      audience: 'players'
-    }
+      audience: 'players',
+    },
   };
 }
 
@@ -234,18 +225,15 @@ export function readInteractableBehaviorSystem(behavior) {
     : null;
   if (!interactableType) return null;
 
-  const presentation = system.presentation && typeof system.presentation === 'object'
-    ? system.presentation
-    : {};
-  const linkedVisual = system.linkedVisual && typeof system.linkedVisual === 'object'
-    ? system.linkedVisual
-    : {};
+  const presentation =
+    system.presentation && typeof system.presentation === 'object' ? system.presentation : {};
+  const linkedVisual =
+    system.linkedVisual && typeof system.linkedVisual === 'object' ? system.linkedVisual : {};
   const state = system.state && typeof system.state === 'object' ? system.state : {};
   const uses = state.uses && typeof state.uses === 'object' ? state.uses : {};
   const cooldown = state.cooldown && typeof state.cooldown === 'object' ? state.cooldown : {};
-  const activation = system.activation && typeof system.activation === 'object'
-    ? system.activation
-    : {};
+  const activation =
+    system.activation && typeof system.activation === 'object' ? system.activation : {};
 
   return {
     interactableType,
@@ -257,7 +245,7 @@ export function readInteractableBehaviorSystem(behavior) {
     name: coerceString(system.name),
     presentation: {
       promptText: stringOrNull(presentation.promptText),
-      hidden: presentation.hidden === true
+      hidden: presentation.hidden === true,
     },
     linkedVisual: {
       uuid: stringOrNull(linkedVisual.uuid),
@@ -267,7 +255,7 @@ export function readInteractableBehaviorSystem(behavior) {
       mode: LINKED_VISUAL_MODES.includes(linkedVisual.mode) ? linkedVisual.mode : 'marker',
       missingPolicy: LINKED_VISUAL_MISSING_POLICIES.includes(linkedVisual.missingPolicy)
         ? linkedVisual.missingPolicy
-        : 'warn'
+        : 'warn',
     },
     state: {
       enabled: state.enabled !== false,
@@ -276,13 +264,17 @@ export function readInteractableBehaviorSystem(behavior) {
       uses: { max: numberOrNull(uses.max), used: numberOrNull(uses.used) ?? 0 },
       cooldown: {
         seconds: numberOrNull(cooldown.seconds),
-        lastUsedWorldTime: numberOrNull(cooldown.lastUsedWorldTime)
-      }
+        lastUsedWorldTime: numberOrNull(cooldown.lastUsedWorldTime),
+      },
     },
     activation: {
-      trigger: ACTIVATION_TRIGGERS.includes(activation.trigger) ? activation.trigger : 'regionEnter',
-      audience: ACTIVATION_AUDIENCES.includes(activation.audience) ? activation.audience : 'players'
-    }
+      trigger: ACTIVATION_TRIGGERS.includes(activation.trigger)
+        ? activation.trigger
+        : 'regionEnter',
+      audience: ACTIVATION_AUDIENCES.includes(activation.audience)
+        ? activation.audience
+        : 'players',
+    },
   };
 }
 
@@ -316,8 +308,8 @@ export function buildLinkedVisualFlags({ regionUuid, behaviorId } = {}) {
     fabricate: {
       isInteractableVisual: true,
       linkedRegionUuid: region,
-      linkedBehaviorId: behavior
-    }
+      linkedBehaviorId: behavior,
+    },
   };
 }
 

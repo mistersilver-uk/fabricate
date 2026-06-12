@@ -20,7 +20,7 @@
 
 import {
   INTERACTABLE_BEHAVIOR_SUBTYPE,
-  buildInteractableBehaviorSchema
+  buildInteractableBehaviorSchema,
 } from './interactableRegionFlags.js';
 
 const DEFAULT_ICON = 'fas fa-mortar-pestle';
@@ -44,7 +44,9 @@ const DEFAULT_LABEL = 'FABRICATE.Canvas.Interactable.BehaviorLabel';
  */
 export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fields } = {}) {
   if (typeof RegionBehaviorType !== 'function') {
-    throw new Error('createInteractableRegionBehaviorClass requires a RegionBehaviorType base class');
+    throw new TypeError(
+      'createInteractableRegionBehaviorClass requires a RegionBehaviorType base class'
+    );
   }
   if (!fields || typeof fields !== 'object') {
     throw new Error('createInteractableRegionBehaviorClass requires a Foundry fields namespace');
@@ -73,7 +75,7 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
         const subscribedEvents = ['tokenEnter', 'tokenExit'];
         schema.events = RegionBehaviorType._createEventsField({
           events: subscribedEvents,
-          initial: subscribedEvents
+          initial: subscribedEvents,
         });
       }
       return schema;
@@ -94,22 +96,24 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
       // undefined manager is a safe no-op.
       tokenEnter: async function tokenEnter(event) {
         try {
-          const manager = globalThis.game?.fabricate?.interactableManager
-            ?? globalThis.fabricate?.interactableManager;
+          const manager =
+            globalThis.game?.fabricate?.interactableManager ??
+            globalThis.fabricate?.interactableManager;
           await manager?.onRegionEnter?.(event, this?.behavior ?? this?.parent ?? this);
-        } catch (_error) {
+        } catch {
           // Defensive: a region-event handler must never throw into Foundry.
         }
       },
       tokenExit: async function tokenExit(event) {
         try {
-          const manager = globalThis.game?.fabricate?.interactableManager
-            ?? globalThis.fabricate?.interactableManager;
+          const manager =
+            globalThis.game?.fabricate?.interactableManager ??
+            globalThis.fabricate?.interactableManager;
           await manager?.onRegionExit?.(event, this?.behavior ?? this?.parent ?? this);
-        } catch (_error) {
+        } catch {
           // Defensive: a region-event handler must never throw into Foundry.
         }
-      }
+      },
     };
   }
 
@@ -130,7 +134,11 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
  * @param {string} [opts.label]
  * @returns {Function|null}
  */
-export function assignInteractableBehaviorRegistration(config, Class, { icon = DEFAULT_ICON, label = DEFAULT_LABEL } = {}) {
+export function assignInteractableBehaviorRegistration(
+  config,
+  Class,
+  { icon = DEFAULT_ICON, label = DEFAULT_LABEL } = {}
+) {
   const regionConfig = config?.RegionBehavior;
   if (!regionConfig || typeof regionConfig !== 'object') return null;
   if (!regionConfig.dataModels || typeof regionConfig.dataModels !== 'object') return null;
@@ -166,8 +174,8 @@ export function assignInteractableBehaviorRegistration(config, Class, { icon = D
  * @returns {Function|null} The registered class, or `null` when it could not register.
  */
 export function registerInteractableRegionBehavior(config = globalThis.CONFIG, deps = {}) {
-  const RegionBehaviorType = deps.RegionBehaviorType
-    ?? globalThis.foundry?.data?.regionBehaviors?.RegionBehaviorType;
+  const RegionBehaviorType =
+    deps.RegionBehaviorType ?? globalThis.foundry?.data?.regionBehaviors?.RegionBehaviorType;
   const fields = deps.fields ?? globalThis.foundry?.data?.fields;
 
   if (typeof RegionBehaviorType !== 'function' || !fields || typeof fields !== 'object') {
@@ -184,11 +192,11 @@ export function registerInteractableRegionBehavior(config = globalThis.CONFIG, d
   let Class;
   try {
     Class = createInteractableRegionBehaviorClass({ RegionBehaviorType, fields });
-  } catch (_error) {
+  } catch {
     return null;
   }
   return assignInteractableBehaviorRegistration(config, Class, {
     icon: deps.icon ?? DEFAULT_ICON,
-    label: deps.label ?? DEFAULT_LABEL
+    label: deps.label ?? DEFAULT_LABEL,
   });
 }

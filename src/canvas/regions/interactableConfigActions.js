@@ -20,20 +20,10 @@
  * restock plan or node-state summary here.
  */
 
-import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
 import { resolveLinkedVisual } from '../linkedVisuals/linkedInteractableVisual.js';
 
-/**
- * Coerce a value to a finite number, or null.
- *
- * @param {*} value
- * @returns {number|null}
- */
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+import { numberOrNull } from './coercion.js';
+import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
 
 /**
  * Read a behaviour system as a normalized view, tolerating BOTH a raw behaviour
@@ -130,8 +120,10 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
   const view = asSystemView(system);
   if (!view) return null;
 
-  const linked = view.linkedVisual && typeof view.linkedVisual === 'object' ? view.linkedVisual : {};
-  const hasConfiguredVisual = linked.mode === 'marker' && typeof linked.uuid === 'string' && linked.uuid.trim() !== '';
+  const linked =
+    view.linkedVisual && typeof view.linkedVisual === 'object' ? view.linkedVisual : {};
+  const hasConfiguredVisual =
+    linked.mode === 'marker' && typeof linked.uuid === 'string' && linked.uuid.trim() !== '';
   let visualStatus = 'none';
   if (hasConfiguredVisual) {
     const resolved = typeof resolveVisual === 'function' ? resolveVisual(view) : null;
@@ -152,18 +144,18 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
     sourceUuid: view.sourceUuid || '',
     presentation: {
       promptText: view.presentation?.promptText ?? null,
-      hidden: view.presentation?.hidden === true
+      hidden: view.presentation?.hidden === true,
     },
     linkedVisual: {
       uuid: linked.uuid ?? null,
       documentName: linked.documentName ?? null,
       mode: linked.mode ?? 'marker',
       missingPolicy: linked.missingPolicy ?? 'warn',
-      status: visualStatus
+      status: visualStatus,
     },
     activation: {
       trigger: view.activation?.trigger ?? 'regionEnter',
-      audience: view.activation?.audience ?? 'players'
+      audience: view.activation?.audience ?? 'players',
     },
     state: {
       enabled: state.enabled !== false,
@@ -171,12 +163,12 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
       locked: state.locked === true,
       uses: {
         max: numberOrNull(state.uses?.max),
-        used: numberOrNull(state.uses?.used) ?? 0
+        used: numberOrNull(state.uses?.used) ?? 0,
       },
       cooldown: {
         seconds: numberOrNull(state.cooldown?.seconds),
-        lastUsedWorldTime: numberOrNull(state.cooldown?.lastUsedWorldTime)
-      }
-    }
+        lastUsedWorldTime: numberOrNull(state.cooldown?.lastUsedWorldTime),
+      },
+    },
   };
 }

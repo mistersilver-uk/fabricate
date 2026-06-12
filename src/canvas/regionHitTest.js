@@ -83,8 +83,8 @@ function collectRegions(collection) {
   if (!collection) return [];
   if (Array.isArray(collection)) return collection;
   if (Array.isArray(collection.contents)) return collection.contents;
-  if (typeof collection.values === 'function') return Array.from(collection.values());
-  if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
+  if (typeof collection.values === 'function') return [...collection.values()];
+  if (typeof collection[Symbol.iterator] === 'function') return [...collection];
   return [];
 }
 
@@ -106,7 +106,11 @@ function collectRegions(collection) {
  * @param {(behavior: object) => boolean} args.isInteractableBehavior  Subtype predicate.
  * @returns {Array<{ region: object, behavior: object }>}
  */
-export function interactableBehaviorsContainingToken({ scene, token, isInteractableBehavior } = {}) {
+export function interactableBehaviorsContainingToken({
+  scene,
+  token,
+  isInteractableBehavior,
+} = {}) {
   const point = tokenCenter(token);
   if (!point) return [];
   const regions = collectRegions(scene?.regions);
@@ -115,7 +119,8 @@ export function interactableBehaviorsContainingToken({ scene, token, isInteracta
     if (!regionContainsPoint(region, point)) continue;
     const behaviors = collectRegions(region?.behaviors);
     for (const behavior of behaviors) {
-      if (typeof isInteractableBehavior === 'function' && isInteractableBehavior(behavior) !== true) continue;
+      if (typeof isInteractableBehavior === 'function' && isInteractableBehavior(behavior) !== true)
+        continue;
       out.push({ region, behavior });
     }
   }
@@ -168,8 +173,8 @@ export function tokenDocumentCenter(token) {
     const w = Number(token?.width);
     const h = Number(token?.height);
     return {
-      x: x + grid * (Number.isFinite(w) ? w : 1) / 2,
-      y: y + grid * (Number.isFinite(h) ? h : 1) / 2
+      x: x + (grid * (Number.isFinite(w) ? w : 1)) / 2,
+      y: y + (grid * (Number.isFinite(h) ? h : 1)) / 2,
     };
   }
   // Fallbacks for gridless / unusual scenes where the footprint cannot be sized.

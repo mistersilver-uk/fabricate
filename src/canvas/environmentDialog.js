@@ -22,15 +22,21 @@
  * @returns {Promise<string|null>}  The chosen environment id, or null when the GM
  *   cancels / closes the dialog (abort the spawn) or no environments exist.
  */
-export async function promptDropEnvironment({ environments = [], defaultEnvironmentId = '', localize } = {}) {
+export async function promptDropEnvironment({
+  environments = [],
+  defaultEnvironmentId = '',
+  localize,
+} = {}) {
   const list = (Array.isArray(environments) ? environments : []).filter((env) => env && env.id);
   if (list.length === 0) return null;
 
-  const t = typeof localize === 'function' ? localize : ((_k, fallback) => fallback);
+  const t = typeof localize === 'function' ? localize : (_k, fallback) => fallback;
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
   if (!DialogV2?.prompt) return null;
 
-  const selected = list.some((env) => env.id === defaultEnvironmentId) ? defaultEnvironmentId : list[0].id;
+  const selected = list.some((env) => env.id === defaultEnvironmentId)
+    ? defaultEnvironmentId
+    : list[0].id;
   const options = list
     .map((env) => {
       const isSelected = env.id === selected ? ' selected' : '';
@@ -48,13 +54,18 @@ export async function promptDropEnvironment({ environments = [], defaultEnvironm
 
   try {
     const result = await DialogV2.prompt({
-      window: { title: t('FABRICATE.Canvas.Interactable.EnvironmentDialogTitle', 'Resolve gathering environment') },
+      window: {
+        title: t(
+          'FABRICATE.Canvas.Interactable.EnvironmentDialogTitle',
+          'Resolve gathering environment'
+        ),
+      },
       content,
       ok: {
         label: t('FABRICATE.Canvas.Interactable.EnvironmentDialogConfirm', 'Place node'),
-        callback: (_event, button) => button?.form?.elements?.environmentId?.value ?? null
+        callback: (_event, button) => button?.form?.elements?.environmentId?.value ?? null,
       },
-      rejectClose: false
+      rejectClose: false,
     });
     const id = typeof result === 'string' ? result.trim() : '';
     return id || null;
@@ -66,8 +77,8 @@ export async function promptDropEnvironment({ environments = [], defaultEnvironm
 
 function escapeHtml(value) {
   return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }

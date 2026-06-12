@@ -46,7 +46,7 @@ export function assignInteractableConfigSheet({
   RegionBehavior,
   SheetClass,
   scope = 'fabricate',
-  makeDefault = true
+  makeDefault = true,
 } = {}) {
   if (typeof registrar?.registerSheet !== 'function') return false;
   if (typeof RegionBehavior !== 'function') return false;
@@ -60,9 +60,9 @@ export function assignInteractableConfigSheet({
     registrar.registerSheet(RegionBehavior, scope, SheetClass, {
       types: [INTERACTABLE_BEHAVIOR_SUBTYPE],
       makeDefault: makeDefault === true,
-      label: 'FABRICATE.Canvas.Interactable.Config.SheetLabel'
+      label: 'FABRICATE.Canvas.Interactable.Config.SheetLabel',
     });
-  } catch (_error) {
+  } catch {
     // Defensive: a differing API shape (or a double-register race) must not throw
     // into init.
     return false;
@@ -70,7 +70,7 @@ export function assignInteractableConfigSheet({
 
   try {
     Object.defineProperty(registrar, marker, { value: true, configurable: true });
-  } catch (_error) {
+  } catch {
     registrar[marker] = true;
   }
   return true;
@@ -101,7 +101,7 @@ export function resolveInteractableConfigTarget(doc, { resolveRegion } = {}) {
   return {
     sceneId: String(region.sceneId),
     regionId: String(region.regionId),
-    behaviorId: String(ref.behaviorId)
+    behaviorId: String(ref.behaviorId),
   };
 }
 
@@ -121,4 +121,4 @@ export function shouldOfferInteractableConfigEntry(doc, { isGM } = {}) {
   return readLinkedVisualRef(doc) !== null;
 }
 
-export { INTERACTABLE_BEHAVIOR_SUBTYPE };
+export { INTERACTABLE_BEHAVIOR_SUBTYPE } from './interactableRegionFlags.js';

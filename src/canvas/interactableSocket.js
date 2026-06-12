@@ -88,7 +88,7 @@ export function validateVisualUpdatePayload(payload) {
     visualUuid: visualUuid || null,
     docId: docId || null,
     documentName: documentName || null,
-    update
+    update,
   };
 }
 
@@ -113,7 +113,7 @@ export function validateVisualDeletePayload(payload) {
     sceneId,
     visualUuid: visualUuid || null,
     docId: docId || null,
-    documentName: documentName || null
+    documentName: documentName || null,
   };
 }
 
@@ -159,7 +159,7 @@ export function validateActivationGrantedPayload(payload) {
     userId,
     requestId: requestId || null,
     behaviorId: behaviorId || null,
-    grant: grant || null
+    grant: grant || null,
   };
 }
 
@@ -199,20 +199,20 @@ export function createInteractableBehaviorWriter({ isActiveGM, emitUpdate, apply
         sceneId,
         regionId,
         behaviorId,
-        update
+        update,
       });
-      if (!payload) return undefined;
+      if (!payload) return;
       const gm = typeof isActiveGM === 'function' ? isActiveGM() === true : false;
       if (gm) {
         return applyUpdate?.({
           sceneId: payload.sceneId,
           regionId: payload.regionId,
           behaviorId: payload.behaviorId,
-          update: payload.update
+          update: payload.update,
         });
       }
       return emitUpdate?.(payload);
-    }
+    },
   };
 }
 
@@ -234,7 +234,7 @@ export function routeInteractableBehaviorMessage(payload, { isActiveGM, applyUpd
     sceneId: normalized.sceneId,
     regionId: normalized.regionId,
     behaviorId: normalized.behaviorId,
-    update: normalized.update
+    update: normalized.update,
   });
   return true;
 }
