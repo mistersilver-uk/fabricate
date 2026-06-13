@@ -841,7 +841,6 @@
     const featureMap = [
       ['gathering', 'FABRICATE.Admin.Manager.Feature.Gathering', 'Gathering'],
       ['essences', 'FABRICATE.Admin.Manager.Feature.Essences', 'Essences'],
-      ['complexRecipes', 'FABRICATE.Admin.Manager.Feature.ComplexRecipes', 'Complex recipes'],
       ['multiStepRecipes', 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', 'Multi-step recipes'],
       ['craftingChecks', 'FABRICATE.Admin.Manager.Feature.CraftingChecks', 'Crafting checks'],
       ['outcomeRouting', 'FABRICATE.Admin.Manager.Feature.OutcomeRouting', 'Outcome routing'],

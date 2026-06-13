@@ -620,7 +620,6 @@ describe('createAdminStore', () => {
     it('toggleFeature maps optional feature names correctly', async () => {
       const expectedMappings = {
         essences: 'essences',
-        complexRecipes: 'complexRecipes',
         multiStepRecipes: 'multiStepRecipes',
         propertyMacros: 'propertyMacros',
         craftingChecks: 'craftingChecks',
@@ -1950,8 +1949,9 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       const features = vs.selectedSystem?.features;
       assert.ok(features, 'features should exist');
+      assert.ok(!('complexRecipes' in features), 'complexRecipes is no longer a normalized feature (#102)');
       for (const key of [
-        'recipeCategories', 'itemTags', 'essences', 'complexRecipes',
+        'recipeCategories', 'itemTags', 'essences',
         'multiStepRecipes', 'propertyMacros', 'craftingChecks',
         'outcomeRouting', 'effectTransfer', 'gathering'
       ]) {
