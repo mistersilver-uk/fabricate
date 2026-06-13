@@ -56,7 +56,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
   assert.ok(
     characterModifierSuggestionBlock.includes('grid-template-columns: 22px minmax(0, 1fr);')
       && characterModifierSuggestionBlock.includes('min-height: 32px;')
-      && characterModifierSuggestionBlock.includes('padding: 5px 7px;'),
+      && characterModifierSuggestionBlock.includes('padding: var(--fab-space-1) var(--fab-space-2);'),
     'character modifier suggestions should use the same icon column and row rhythm as availability menu options'
   );
   assert.ok(
@@ -347,7 +347,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
   assert.ok(expandedParentHoverBlock.includes('background: var(--fab-overlay-light-04);'), 'expanded gathering parent may have a subtle hover without becoming selected');
   assert.ok(toggleBlock.includes('top: 4px;') && toggleBlock.includes('right: 4px;'), 'gathering toggle should have stable collapsed geometry');
   assert.equal(expandedToggleBlock, '', 'expanded gathering toggle should not override collapsed geometry');
-  assert.ok(submenuBlock.includes('padding-left: 12px;'), 'gathering submenu entries should be nested inside the group');
+  assert.ok(submenuBlock.includes('padding-left: var(--fab-space-3);'), 'gathering submenu entries should be nested inside the group');
   assert.ok(subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'), 'gathering submenu entries should keep count chips inside their rows');
   assert.ok(activeSubitemBlock.includes('background: var(--fab-success-soft);'), 'only selected gathering submenu entries should use selected fill');
   assert.ok(activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'selected gathering submenu entries should keep the active left accent');
@@ -390,7 +390,7 @@ test('manager inspector count labels wrap without truncation', () => {
   assert.ok(featureListBlock.includes('align-items: flex-start;'), 'feature pills should align to the top of the card');
   assert.ok(featureListBlock.includes('place-content: flex-start flex-start;'), 'feature pills should align to the top-left of the card');
   assert.ok(conditionShortcutListBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'condition shortcut card should keep compact one-column inspector controls');
-  assert.ok(conditionShortcutListBlock.includes('gap: 10px;'), 'condition shortcut controls should have stable spacing');
+  assert.ok(conditionShortcutListBlock.includes('gap: var(--fab-space-2);'), 'condition shortcut controls should have stable spacing');
   assert.ok(conditionShortcutLabelBlock.includes('display: inline-flex;'), 'condition shortcut labels should align icons and text');
   assert.ok(conditionShortcutSelectBlock.includes('font-weight: 400;'), 'condition shortcut select text should not inherit bold label weight');
 });
@@ -450,7 +450,7 @@ test('manager gathering settings condition panels use a two-column responsive gr
 
   assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
   assert.ok(settingsBlock.includes('align-items: stretch;'), 'condition panels should stretch to equal height in the two-column layout');
-  assert.ok(settingsBlock.includes('padding: 12px;'), 'settings panel should use uniform workspace padding on all sides');
+  assert.ok(settingsBlock.includes('padding: var(--fab-space-3);'), 'settings panel should use uniform workspace padding on all sides');
   assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
   assert.ok(panelBlock.includes('height: 100%;'), 'condition panel backgrounds should fill the stretched grid row');
   assert.ok(addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 48px;'), 'condition add controls should reserve icon picker, label input, and Add button columns');
@@ -747,7 +747,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     toolsEmptyStubBlock.includes('min-height: 58px;')
-      && toolsEmptyStubBlock.includes('padding: 18px 14px;'),
+      && toolsEmptyStubBlock.includes('padding: var(--fab-space-4) var(--fab-space-4);'),
     'tools add stub should be tall enough to work as a drop target'
   );
   assert.ok(
@@ -794,7 +794,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tools editor broad input sizing should not force specialized padding onto every field'
   );
   assert.ok(
-    toolsEditorPercentInputBlock.includes('padding: 0 10px 0 0;'),
+    toolsEditorPercentInputBlock.includes('padding: 0 var(--fab-space-2) 0 0;'),
     'tools breakage chance percent input should keep its specialized compact padding'
   );
   assert.ok(editorBlock.includes('grid-auto-rows: auto;'), 'task edit route should size rows to each card so sections can be reordered; the fixed-height cards (component browser, drops) set their own height');
@@ -820,10 +820,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(
     toolInspectorActionsBlock.includes('display: grid;')
       && toolInspectorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));')
-      && toolInspectorActionsBlock.includes('gap: 8px;'),
+      && toolInspectorActionsBlock.includes('gap: var(--fab-space-2);'),
     'selected tool inspector actions should sit in a stable two-column action row inside the header card'
   );
-  assert.ok(toolInspectorActionButtonsBlock.includes('width: 100%;') && toolInspectorActionButtonsBlock.includes('padding: 0 8px;'), 'selected tool inspector action buttons should fill their grid columns without overflowing the right rail');
+  assert.ok(toolInspectorActionButtonsBlock.includes('width: 100%;') && toolInspectorActionButtonsBlock.includes('padding: 0 var(--fab-space-2);'), 'selected tool inspector action buttons should fill their grid columns without overflowing the right rail');
   assert.ok(toolInspectorActionButtonLabelBlock.includes('overflow-wrap: anywhere;'), 'selected tool inspector action labels should be allowed to wrap in narrow localized layouts');
   assert.ok(
     toolsComponentBrowserBlock.includes('grid-template-rows: auto minmax(96px, 1fr) auto;')
@@ -834,7 +834,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
       && toolsComponentBrowserBlock.includes('overflow: hidden;'),
     'tools component browser should reserve deterministic header, result scroll, and footer rows without forcing a tall inspector card'
   );
-  assert.ok(toolsComponentBrowserHeaderBlock.includes('padding: 0 0 10px;'), 'tools component browser header should own spacing without creating a large blank scroll gap');
+  assert.ok(toolsComponentBrowserHeaderBlock.includes('padding: 0 0 var(--fab-space-3);'), 'tools component browser header should own spacing without creating a large blank scroll gap');
   assert.ok(
     toolsComponentBrowserSearchBlock.includes('position: relative;')
       && toolsComponentBrowserSearchBlock.includes('display: block;')
@@ -843,7 +843,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tools component browser search should anchor its icon inside a full-width input box without inheriting the global 260px flex basis as height'
   );
   assert.ok(toolsComponentBrowserSearchInputBlock.includes('padding-left: 36px;'), 'tools component browser search input should reserve text inset for the leading search icon');
-  assert.ok(toolsComponentBrowserScrollBlock.includes('padding: 10px 0 12px;') && toolsComponentBrowserScrollBlock.includes('overflow: hidden auto;'), 'tools component browser results should show complete cards before scrolling without horizontal overflow');
+  assert.ok(toolsComponentBrowserScrollBlock.includes('padding: var(--fab-space-3) 0 var(--fab-space-3);') && toolsComponentBrowserScrollBlock.includes('overflow: hidden auto;'), 'tools component browser results should show complete cards before scrolling without horizontal overflow');
   assert.ok(toolsComponentBrowserGridBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'tools component browser should keep a one-column card grid in the narrow inspector');
   assert.ok(toolsComponentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);') && toolsComponentBrowserFooterBlock.includes('background: transparent;'), 'tools component browser footer should separate pagination without adding nested card chrome');
   assert.ok(
@@ -876,7 +876,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(dropFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'drop rules count should live in a footer area with pagination');
   assert.ok(dropFooterPaginationBlock.includes('background: transparent;'), 'drop rules footer should not nest pagination chrome');
   assert.ok(dropScrollBlock.includes('height: var(--fab-mv2-task-drop-table-visible-height);') && dropScrollBlock.includes('max-height: var(--fab-mv2-task-drop-table-visible-height);'), 'drop rules table scroll region should show exactly three complete rows before scrolling');
-  assert.ok(dropScrollBlock.includes('padding: 10px 0 0;'), 'drop rules table scroll region should not add horizontal inset');
+  assert.ok(dropScrollBlock.includes('padding: var(--fab-space-3) 0 0;'), 'drop rules table scroll region should not add horizontal inset');
   assert.ok(dropScrollBlock.includes('overflow: hidden auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
   assert.ok(dropTableBlock.includes('minmax(0, 1.05fr)') && dropTableBlock.includes('minmax(220px, 1.35fr)') && dropTableBlock.includes('56px') && dropTableBlock.includes('minmax(180px, 1.65fr)'), 'drop row desktop grid should keep component/chance/quantity geometry while widening modifiers');
@@ -887,7 +887,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(dropRowBlock.includes('gap: 0;') && dropRowBlock.includes('max-width: 100%;'), 'drop rows should use separators instead of gap-driven overflow');
   assert.ok(firstDropRowBlock.includes('border-top: 0;'), 'first drop row should not double the header bottom border');
   assert.ok(css.includes('.fabricate-manager .manager-gathering-task-drop-row {\n  min-height: 72px;'), 'drop rows should be tall enough for two visible modifier chip lines');
-  assert.ok(dropCellBlock.includes('padding: 4px 10px;') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
+  assert.ok(dropCellBlock.includes('padding: var(--fab-space-1) var(--fab-space-2);') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
   assert.ok(dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-mv2-border);'), 'drop cells should use vertical separators');
   assert.ok(css.includes('.fabricate-manager .manager-gathering-task-drop-row.is-drop-active'), 'drop rows should expose a full-row active drop target state');
   assert.ok(selectedDropRowBlock.includes('background: var(--fab-success-soft);') && selectedDropRowBlock.includes('var(--fab-mv2-accent)'), 'selected drop rows should use the component-browser success/accent family');
@@ -897,18 +897,18 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
   assert.ok(dropComponentButtonBlock.includes('grid-template-columns: 42px minmax(0, 1fr);') && dropComponentButtonBlock.includes('min-height: 40px;'), 'drop component cells should keep compact thumbnail/name geometry');
   assert.ok(
-    css.includes('.fabricate-manager .manager-drop-empty-component {\n  min-height: 52px;\n  padding: 6px 8px;\n  border: 1px dashed var(--fab-mv2-border-strong);'),
+    css.includes('.fabricate-manager .manager-drop-empty-component {\n  min-height: 52px;\n  padding: var(--fab-space-chip) var(--fab-space-2);\n  border: 1px dashed var(--fab-mv2-border-strong);'),
     'empty component placeholders should show the full drop-zone boundary'
   );
   assert.ok(dropEmptyComponentIconBlock.includes('border: 0;'), 'empty component placeholders should avoid a nested icon-only dashed border');
   assert.ok(dropComponentCopyBlock.includes('align-content: center;'), 'drop component text should be vertically centered after description removal');
   assert.ok(dropComponentNameBlock.includes('display: -webkit-box;') && dropComponentNameBlock.includes('-webkit-line-clamp: 2;') && dropComponentNameBlock.includes('white-space: normal;'), 'drop component names should wrap to two lines instead of relying on descriptions');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
-  assert.ok(dropRateValueBlock.includes('grid-template-columns: 52px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: 4px;'), 'drop chance value should keep the row editable percent close to a wider slider');
+  assert.ok(dropRateValueBlock.includes('grid-template-columns: 52px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: var(--fab-space-1);'), 'drop chance value should keep the row editable percent close to a wider slider');
   assert.ok(dropRatePercentBlock.includes('position: relative;') && dropRatePercentBlock.includes('display: block;'), 'drop chance percent should overlay the suffix without taking slider width');
   assert.ok(css.includes('--fab-drop-rate-none: #E26F6B;'), 'drop chance slider should define a distinct exact-zero colour token');
-  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance row percent should keep its existing compact centered editable numeric field');
-  assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance row percent should override generic gathering task input chrome without affecting other fields');
+  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance row percent should keep its existing compact centered editable numeric field');
+  assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance row percent should override generic gathering task input chrome without affecting other fields');
   assert.ok(
     css.includes('.fabricate-manager .manager-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;')
       && css.includes('pointer-events: none;'),
@@ -983,22 +983,22 @@ test('manager gathering task browser defines bounded toolbar and compact table g
       && noneDropRateControlBlock.includes('var(--fab-drop-rate-none)'),
     'drop chance control classes should map the selected rarity palette to the current value'
   );
-  assert.ok(dropQuantityCellBlock.includes('display: flex;') && dropQuantityCellBlock.includes('justify-content: center;') && dropQuantityCellBlock.includes('padding: 6px;'), 'quantity cells should spend less horizontal space while centering the input');
+  assert.ok(dropQuantityCellBlock.includes('display: flex;') && dropQuantityCellBlock.includes('justify-content: center;') && dropQuantityCellBlock.includes('padding: var(--fab-space-chip);'), 'quantity cells should spend less horizontal space while centering the input');
   assert.ok(dropQuantityInputBlock.includes('max-width: 44px;') && dropQuantityInputBlock.includes('box-sizing: border-box;') && dropQuantityInputBlock.includes('text-align: center;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input sized for three digits');
-  assert.ok(dropQuantityInputOverrideBlock.includes('min-height: 28px;') && dropQuantityInputOverrideBlock.includes('padding: 4px;'), 'quantity should override generic gathering input padding without widening the column');
+  assert.ok(dropQuantityInputOverrideBlock.includes('min-height: 28px;') && dropQuantityInputOverrideBlock.includes('padding: var(--fab-space-1);'), 'quantity should override generic gathering input padding without widening the column');
   assert.ok(dropModifierListBlock.includes('flex-wrap: wrap;') && dropModifierListBlock.includes('align-content: flex-start;'), 'drop modifiers should wrap into a top-aligned chip group');
   assert.ok(dropModifierListBlock.includes('max-height: 58px;') && dropModifierListBlock.includes('overflow-y: auto;'), 'drop modifiers should scroll after the two-line chip budget');
   assert.ok(dropModifierPillBlock.includes('background: var(--fab-overlay-light-06);'), 'drop modifier pills should use restrained neutral chip backgrounds');
   assert.ok(positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') && negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'), 'drop modifier chips should avoid saturated text across the whole pill');
   assert.ok(dropModifierOverflowBlock.includes('text-overflow: ellipsis;') && dropModifierOverflowBlock.includes('white-space: nowrap;'), 'the modifier overflow hint should stay a single clipped table label');
   assert.ok(dropEditorInputBlock.includes(':not([type="range"])'), 'selected drop inspector generic input chrome should not override row-style range sliders');
-  assert.ok(dropEditorInputBlock.includes('height: 28px;') && dropEditorInputBlock.includes('min-height: 28px;') && dropEditorInputBlock.includes('padding: 3px 8px;'), 'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry');
+  assert.ok(dropEditorInputBlock.includes('height: 28px;') && dropEditorInputBlock.includes('min-height: 28px;') && dropEditorInputBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-2);'), 'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry');
   assert.ok(dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') && dropEditorValuesBlock.includes('align-items: end;'), 'selected drop inspector should place chance and count in a compact two-column grid');
   assert.ok(dropEditorRateValueBlock.includes('grid-template-columns: 64px minmax(0, 1fr);'), 'selected drop inspector chance should widen only the right-menu percent column');
-  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 16px 4px 2px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector broad chance input rule should not carry the right-menu suffix padding');
-  assert.ok(dropEditorRateInputBlock.includes('height: 28px;') && dropEditorRateInputBlock.includes('min-height: 28px;') && dropEditorRateInputBlock.includes('padding: 4px 16px 4px 6px;') && dropEditorRateInputBlock.includes('box-shadow: none;'), 'selected drop inspector chance input should keep compact row-style geometry without extra suffix padding');
+  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector broad chance input rule should not carry the right-menu suffix padding');
+  assert.ok(dropEditorRateInputBlock.includes('height: 28px;') && dropEditorRateInputBlock.includes('min-height: 28px;') && dropEditorRateInputBlock.includes('padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-chip);') && dropEditorRateInputBlock.includes('box-shadow: none;'), 'selected drop inspector chance input should keep compact row-style geometry without extra suffix padding');
   assert.ok(dropEditorRateSuffixBlock.includes('right: 8px;'), 'selected drop inspector percent suffix should sit away from three-digit values');
-  assert.ok(dropEditorRateControlBlock.includes('height: 28px;') && dropEditorRateControlBlock.includes('padding: 0 7px;') && dropEditorRateControlBlock.includes('background: var(--fab-overlay-dark-18);') && dropEditorRateControlBlock.includes('overflow: hidden;'), 'selected drop inspector slider should own the dark backing box instead of relying on native range chrome');
+  assert.ok(dropEditorRateControlBlock.includes('height: 28px;') && dropEditorRateControlBlock.includes('padding: 0 var(--fab-space-2);') && dropEditorRateControlBlock.includes('background: var(--fab-overlay-dark-18);') && dropEditorRateControlBlock.includes('overflow: hidden;'), 'selected drop inspector slider should own the dark backing box instead of relying on native range chrome');
   assert.ok(dropEditorRateTrackBlock.includes('left: 7px;') && dropEditorRateTrackBlock.includes('right: 7px;') && dropEditorRateTrackBlock.includes('border: 0;') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should be inset to the thumb radius to avoid endpoint tails');
   assert.ok(dropEditorRateFillBlock.includes('border-radius: 999px;'), 'selected drop inspector fill should be rounded without relying on a wider track border');
   assert.equal(dropRateTrackBlock.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
@@ -1006,22 +1006,22 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(dropEditorRateRangeBlock.includes('height: 26px;') && dropEditorRateRangeBlock.includes('padding: 0;') && dropEditorRateRangeBlock.includes('background: transparent;') && dropEditorRateRangeBlock.includes('box-shadow: none;'), 'selected drop inspector native range should remain a transparent thumb hit target over the custom track');
   assert.ok(dropEditorRateWebkitTrackBlock.includes('border: 0;') && dropEditorRateWebkitTrackBlock.includes('background: transparent;'), 'selected drop inspector WebKit native range track should not draw over the custom track');
   assert.ok(dropEditorRateMozTrackBlock.includes('border: 0;') && dropEditorRateMozTrackBlock.includes('background: transparent;'), 'selected drop inspector Firefox native range track should not draw over the custom track');
-  assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: 6px;'), 'selected drop inspector count editor should use a compact labeled field');
+  assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: var(--fab-space-chip);'), 'selected drop inspector count editor should use a compact labeled field');
   assert.ok(dropEditorCountInputBlock.includes('min-height: 28px;') && dropEditorCountInputBlock.includes('text-align: center;'), 'selected drop inspector count input should match row count input geometry');
-  assert.ok(dropEditorInspectorCountInputBlock.includes('height: 28px;') && dropEditorInspectorCountInputBlock.includes('min-height: 28px;') && dropEditorInspectorCountInputBlock.includes('padding: 4px;') && dropEditorInspectorCountInputBlock.includes('box-shadow: none;'), 'selected drop inspector count input should override generic inspector input chrome with chance-field geometry');
-  assert.ok(dropInspectorButtonBlock.includes('min-height: 28px;') && dropInspectorButtonBlock.includes('padding: 0 9px;'), 'selected drop inspector text buttons should match the compact 28px sidebar rhythm');
+  assert.ok(dropEditorInspectorCountInputBlock.includes('height: 28px;') && dropEditorInspectorCountInputBlock.includes('min-height: 28px;') && dropEditorInspectorCountInputBlock.includes('padding: var(--fab-space-1);') && dropEditorInspectorCountInputBlock.includes('box-shadow: none;'), 'selected drop inspector count input should override generic inspector input chrome with chance-field geometry');
+  assert.ok(dropInspectorButtonBlock.includes('min-height: 28px;') && dropInspectorButtonBlock.includes('padding: 0 var(--fab-space-2);'), 'selected drop inspector text buttons should match the compact 28px sidebar rhythm');
   assert.ok(dropInspectorIconButtonBlock.includes('width: 28px;') && dropInspectorIconButtonBlock.includes('height: 28px;') && dropInspectorIconButtonBlock.includes('flex: 0 0 28px;'), 'selected drop inspector icon buttons should match the compact 28px sidebar rhythm');
   assert.ok(dropInspectorSearchInputBlock.includes('height: 28px;') && dropInspectorSearchInputBlock.includes('min-height: 28px;') && dropInspectorSearchInputBlock.includes('padding-block: 0;'), 'selected drop inspector search input should keep icon padding while using 28px height');
-  assert.ok(dropInspectorCharacterFieldBlock.includes('height: 28px;') && dropInspectorCharacterFieldBlock.includes('min-height: 28px;') && dropInspectorCharacterFieldBlock.includes('padding: 3px 8px;'), 'selected drop inspector character modifier fields should override shared 36px field height');
-  assert.ok(dropInspectorCharacterOperatorBlock.includes('height: 28px;') && dropInspectorCharacterOperatorBlock.includes('min-height: 28px;') && dropInspectorCharacterOperatorBlock.includes('padding: 0 6px;'), 'selected drop inspector character modifier operator select should keep compact 28px height');
+  assert.ok(dropInspectorCharacterFieldBlock.includes('height: 28px;') && dropInspectorCharacterFieldBlock.includes('min-height: 28px;') && dropInspectorCharacterFieldBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-2);'), 'selected drop inspector character modifier fields should override shared 36px field height');
+  assert.ok(dropInspectorCharacterOperatorBlock.includes('height: 28px;') && dropInspectorCharacterOperatorBlock.includes('min-height: 28px;') && dropInspectorCharacterOperatorBlock.includes('padding: 0 var(--fab-space-chip);'), 'selected drop inspector character modifier operator select should keep compact 28px height');
   assert.ok(dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') && dropEditorActionsBlock.includes('margin-top: 0;'), 'selected drop rule actions should sit beneath the inspector title row');
   assert.ok(dropInspectorStackBlock.includes('grid-template-rows: auto auto minmax(0, 1fr);'), 'selected drop inspector should reserve fixed header, divider, and lower scroll rows');
   assert.ok(dropInspectorStackBlock.includes('height: 100%;') && dropInspectorStackBlock.includes('overflow: visible;'), 'selected drop inspector stack should allow the divider to span the full right inspector width');
   assert.ok(dropInspectorRouteBlock.includes('overflow: hidden;'), 'gathering task edit inspector should delegate selected-drop scrolling to the lower viewport');
-  assert.ok(dropInspectorDividerBlock.includes('width: calc(100% + 24px);') && dropInspectorDividerBlock.includes('margin: 10px -12px 0;'), 'selected drop inspector divider should bleed through the right inspector padding');
+  assert.ok(dropInspectorDividerBlock.includes('width: calc(100% + 24px);') && dropInspectorDividerBlock.includes('margin: var(--fab-space-3) calc(-1 * var(--fab-space-3)) 0;'), 'selected drop inspector divider should bleed through the right inspector padding');
   assert.ok(dropInspectorDividerBlock.includes('height: 1px;') && dropInspectorDividerBlock.includes('background: var(--fab-mv2-border);'), 'selected drop inspector should render a visible divider below the header');
   assert.ok(dropInspectorScrollBlock.includes('overflow: hidden auto;'), 'selected drop lower editor content should own vertical scrolling without horizontal overflow');
-  assert.ok(dropInspectorScrollBlock.includes('padding-top: 12px;') && dropInspectorScrollBlock.includes('gap: 12px;'), 'selected drop scroll viewport should visually separate lower cards from the divider');
+  assert.ok(dropInspectorScrollBlock.includes('padding-top: var(--fab-space-3);') && dropInspectorScrollBlock.includes('gap: var(--fab-space-3);'), 'selected drop scroll viewport should visually separate lower cards from the divider');
   assert.equal(css.includes('.fabricate-manager .manager-drop-actions'), false, 'drop row actions should not reserve row layout or styling');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
   assert.ok(taskEditorIntermediateQuery.includes('minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr)'), 'intermediate task editor drop grid should preserve drop chance width while widening modifiers');
@@ -1065,7 +1065,7 @@ test('manager components browser defines drop target and compact responsive tabl
     'components table should have a no-tags/no-essences progressive grid variant'
   );
   assert.ok(dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'), 'component drop zone should reserve icon and copy space');
-  assert.ok(dropBlock.includes('margin: 12px;'), 'component drop zone should keep balanced vertical spacing around the toolbar');
+  assert.ok(dropBlock.includes('margin: var(--fab-space-3);'), 'component drop zone should keep balanced vertical spacing around the toolbar');
   assert.ok(css.includes('.fabricate-manager .manager-component-drop-zone.is-drop-active'), 'component drop zone should expose an active drag state');
   assert.ok(toolbarBlock.includes('display: grid;'), 'manager toolbar should own a grid layout for primary controls and auxiliary rows');
   assert.ok(toolbarBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'manager toolbar grid should keep rows bounded to the main content width');
@@ -1078,7 +1078,7 @@ test('manager components browser defines drop target and compact responsive tabl
   assert.ok(tagSearchBlock.includes('max-width: 320px;'), 'component tag search should keep bounded toolbar geometry');
   assert.ok(tagSuggestionsBlock.includes('position: absolute;'), 'component tag suggestions should overlay below the search field without shifting the toolbar');
   assert.ok(tagSuggestionsBlock.includes('max-height: 148px;'), 'component tag suggestions should be scroll bounded');
-  assert.ok(selectedTagPillBlock.includes('padding-right: 4px;'), 'selected tag pills should reserve compact space for the remove button');
+  assert.ok(selectedTagPillBlock.includes('padding-right: var(--fab-space-1);'), 'selected tag pills should reserve compact space for the remove button');
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
       || css.includes('.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity'),
@@ -1148,7 +1148,7 @@ test('manager essence edit route defines picker-based responsive geometry', () =
   assert.ok(sourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) 34px;'), 'essence source summary should reserve source image, evidence, and clear action columns');
   assert.ok(!inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) auto;'), 'inspector source summary should not crowd evidence and unlink into a three-column row');
   assert.ok(inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr);'), 'inspector source summary should be only the linked item evidence card');
-  assert.ok(inspectorSourceActionsBlock.includes('margin-top: 10px;'), 'inspector source action row should sit below the linked item card');
+  assert.ok(inspectorSourceActionsBlock.includes('margin-top: var(--fab-space-3);'), 'inspector source action row should sit below the linked item card');
   assert.ok(inspectorSourceActionsBlock.includes('display: grid;'), 'inspector source actions should use stable row geometry');
   assert.ok(inspectorSourceActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'inspector source actions should keep copy and unlink on the same row');
   assert.ok(!mediumQuery.includes('.fabricate-manager .manager-essence-inspector-source-actions .manager-button'), 'narrow manager layout should not stack the selected essence source actions');
@@ -1224,7 +1224,7 @@ test('manager environments browser and edit route define compact responsive geom
     'environment rows should share the compact 76px row height with the task and event browsers'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 64px minmax(0, 1fr);\n  gap: 12px;\n  align-self: center;\n  min-height: 64px;'),
+    css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 64px minmax(0, 1fr);\n  gap: var(--fab-space-3);\n  align-self: center;\n  min-height: 64px;'),
     'environment identity should reserve a square 64px thumbnail column like the task and event browsers'
   );
   assert.ok(
@@ -1295,7 +1295,7 @@ test('manager environments browser and edit route define compact responsive geom
     'narrow task rows key off manager container width and keep enough action-column width for quick action plus menu buttons'
   );
   assert.ok(
-    weightInputBlock.includes('width: 42px;') && weightInputBlock.includes('padding: 2px 4px;'),
+    weightInputBlock.includes('width: 42px;') && weightInputBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-1);'),
     'blind task weight input should be visually sized for three characters'
   );
   assert.ok(

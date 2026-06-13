@@ -24,6 +24,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - 18 new localisation keys under `FABRICATE.Alchemy.*`, `FABRICATE.Workbench.*`, and `FABRICATE.Tabs.*` in `lang/en.json`.
 - Workbench header CSS block in `styles/fabricate.css`.
 
+### Changed
+
+- **Unified spacing scale** (#78) — tokenized hardcoded padding, margin, and gap pixel values across `styles/fabricate.css` onto the shared 4px spacing scale (`--fab-space-*`), with bounded (≤2px) visual shifts. Added two fine tokens (`--fab-space-2xs: 2px`, `--fab-space-chip: 6px`) and five semantic aliases (`--fab-space-xs`/`sm`/`md`/`lg`/`xl`). `1px` hairlines and 34–42px fixed icon/grid dimensions are documented exemptions left as literals.
+
 ### Removed
 
 - `AlchemySubmitPanel.svelte` — replaced by the combined `Workbench` + `ComponentPalette` components.
