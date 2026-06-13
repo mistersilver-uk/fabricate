@@ -10,9 +10,12 @@
  * reach the emitter), so the GM-on-GM case must branch on `isActiveGM` exactly
  * like `eventSceneCoordinator`.
  *
- * NOTE: a gathering-task interactable carries NO per-interactable node pool —
- * depletion/respawn is owned by the environment's `nodeRuntime[taskId]`, so these
- * behaviour writes never carry node state.
+ * NOTE: a gathering-task interactable is LINKED to the task by default, sharing
+ * the environment's `nodeRuntime[taskId]` for depletion/respawn, but may be
+ * UNLINKED (issue 302) and own its own independent node pool carried verbatim on
+ * the behaviour `system.node` (`taskNodeLink === 'unlinked'`). When unlinked,
+ * these behaviour writes DO carry node state (the active GM persists the
+ * independent pool's `current`/respawn timers).
  *
  * This module holds the PURE routing decision (who applies, payload validation);
  * `main.js` registers the socket handler and injects the thin Foundry edges

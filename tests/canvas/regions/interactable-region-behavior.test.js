@@ -67,8 +67,10 @@ test('factory builds a subclass whose defineSchema returns the behaviour schema'
   const schema = Class.defineSchema();
   assert.ok(schema.interactableType);
   assert.ok(schema.state);
-  // A region-first interactable carries no per-interactable node pool.
-  assert.equal('node' in schema, false);
+  // A gatheringTask interactable may be linked to the task or own its own node
+  // pool, gated by the `taskNodeLink` discriminator (default 'linked').
+  assert.ok(schema.taskNodeLink);
+  assert.ok('node' in schema);
 });
 
 test('defineSchema subscribes to tokenEnter/tokenExit via the base events field', () => {

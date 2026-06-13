@@ -10,9 +10,16 @@
   through the active-GM behaviour-update edge inside the services bag — the panel
   never mutates a behaviour directly.
 
-  A gathering-task interactable carries NO per-interactable node pool — node
-  depletion/respawn is owned by the environment's `nodeRuntime[taskId]` — so this
-  panel has no resource-node section or restock control.
+  A gathering-task interactable is either LINKED to the gathering task or UNLINKED
+  (independent), selected by `taskNodeLink` — much like an FVTT token↔actor link.
+  The "Resource node" section below (gatheringTask only) offers a link toggle
+  (linked = shares the task's node; unlinked = its own independent pool) plus, when
+  unlinked, a minimal count / deplete-timing / respawn editor and a GM Restock
+  action (the latter only when the pool regenerates). Each write routes through the
+  `services.setTaskNodeLink` / `services.updateScopedNode` / `services.restockScopedNode`
+  seams (which wrap the pure `planSetTaskNodeLink` / `planRestockScopedNode` helpers).
+  When LINKED (the default) depletion/respawn follow the task via the environment's
+  `nodeRuntime[taskId]` and no independent controls render.
 
   Editable fields (name, prompt text, hidden, audience, missing-policy) write back
   via `services.updateBehavior(systemPatch)`. The non-trivial view logic (label
@@ -99,6 +106,42 @@
     services?.updateBehavior?.({ linkedVisual: { missingPolicy } });
     refresh();
   }
+
+  // --- Interactable-scoped resource node (issue 302) --------------------------
+  const isGatheringTask = $derived(view?.interactableType === 'gatheringTask');
+  const taskNodeLink = $derived(view?.taskNodeLink ?? 'linked');
+  const isUnlinked = $derived(taskNodeLink === 'unlinked');
+  const scopedNode = $derived(view?.node ?? null);
+  const respawnPolicy = $derived(scopedNode?.respawn?.policy ?? 'manual');
+  const nodeIsNonRegenerating = $derived(respawnPolicy === 'nonRegenerating');
+
+  async function setTaskNodeLink(link) {
+    await services?.setTaskNodeLink?.(link);
+    refresh();
+  }
+
+  async function setNodeCount(value) {
+    const max = Math.max(0, Math.floor(Number(value) || 0));
+    // Authoring a count seeds the pool full (current = max), mirroring the task editor.
+    await services?.updateScopedNode?.({ max, current: max });
+    refresh();
+  }
+
+  async function setNodeDeplete(depletionTiming) {
+    await services?.updateScopedNode?.({ depletionTiming });
+    refresh();
+  }
+
+  async function setNodeRespawnPolicy(policy) {
+    await services?.updateScopedNode?.({ respawn: { ...(scopedNode?.respawn ?? {}), policy } });
+    refresh();
+  }
+
+  async function restockFull() {
+    if (!scopedNode) return;
+    await services?.restockScopedNode?.({ current: Number(scopedNode.max || 0), max: Number(scopedNode.max || 0) });
+    refresh();
+  }
 </script>
 
 <div class="fabricate-interactable-config">
@@ -171,6 +214,95 @@
         </div>
       </dl>
     </section>
+
+    <!-- Resource node (gatheringTask only): task-node link toggle + independent
+         pool editor. Linked = shares the gathering task's node; unlinked = this
+         interactable owns its own pool (FVTT token↔actor link framing). -->
+    {#if isGatheringTask}
+      <section class="fab-ic-section" data-interactable-node-section>
+        <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.Node.Heading', 'Resource node')}</h3>
+        <div class="fab-ic-field">
+          <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Node.LinkLabel', 'Task node link')}</span>
+          <button
+            type="button"
+            class="fab-ic-btn fab-ic-btn-toggle"
+            class:is-active={!isUnlinked}
+            aria-pressed={!isUnlinked}
+            onclick={() => setTaskNodeLink(isUnlinked ? 'linked' : 'unlinked')}
+            data-interactable-node-link
+          >
+            <i class="fas {isUnlinked ? 'fa-link-slash' : 'fa-link'}" aria-hidden="true"></i>
+            <span>{isUnlinked
+              ? text('FABRICATE.Canvas.Interactable.Config.Node.LinkUnlinked', 'Independent (this interactable only)')
+              : text('FABRICATE.Canvas.Interactable.Config.Node.LinkLinked', 'Linked to gathering task')}</span>
+          </button>
+        </div>
+
+        {#if !isUnlinked}
+          <p class="fab-ic-fact-muted fab-ic-node-hint">{text('FABRICATE.Canvas.Interactable.Config.Node.LinkedHint', 'Depletion and respawn follow the gathering task\'s shared node.')}</p>
+        {:else if scopedNode}
+          <p class="fab-ic-fact-muted fab-ic-node-hint">{text('FABRICATE.Canvas.Interactable.Config.Node.UnlinkedHint', 'Independent count, regeneration, and max — separate from the task.')}</p>
+          <p class="fab-ic-node-state" data-interactable-node-state>
+            {#if scopedNode.current <= 0 && nodeIsNonRegenerating}
+              <span class="fab-ic-node-exhausted">{text('FABRICATE.Canvas.Interactable.Config.Node.Exhausted', 'Permanently exhausted')}</span>
+            {:else if scopedNode.current <= 0}
+              <span class="fab-ic-node-depleted">{text('FABRICATE.Canvas.Interactable.Config.Node.Depleted', 'Depleted')}</span>
+            {:else}
+              <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Available', 'Available')}</span>
+            {/if}
+            <span class="fab-ic-fact-muted">{scopedNode.current} / {scopedNode.max}</span>
+          </p>
+
+          <label class="fab-ic-field">
+            <span class="fab-ic-field-label">{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
+            <input
+              type="number" min="0" step="1" placeholder="—"
+              value={scopedNode.max > 0 ? scopedNode.max : ''}
+              onchange={(e) => setNodeCount(e.currentTarget.value)}
+              data-interactable-node-count
+            />
+          </label>
+
+          <label class="fab-ic-field">
+            <span class="fab-ic-field-label">{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
+            <select value={scopedNode.depletionTiming} onchange={(e) => setNodeDeplete(e.currentTarget.value)} data-interactable-node-deplete>
+              <option value="onStart">{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option>
+              <option value="onSuccess">{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option>
+            </select>
+          </label>
+
+          <label class="fab-ic-field">
+            <span class="fab-ic-field-label">{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
+            <select value={respawnPolicy} onchange={(e) => setNodeRespawnPolicy(e.currentTarget.value)} data-interactable-node-respawn>
+              <option value="manual">{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option>
+              <option value="overTime">{text('FABRICATE.Admin.Manager.Economy.RespawnOverTime', 'Over world time')}</option>
+              <option value="nonRegenerating">{text('FABRICATE.Admin.Manager.Economy.RespawnNone', 'Does not regenerate')}</option>
+            </select>
+          </label>
+
+          {#if nodeIsNonRegenerating}
+            <!-- A nonRegenerating pool is a permanent reserve: no Restock action,
+                 only a read-only permanence hint. The node-count input above still
+                 authors the reserve size. -->
+            <p class="fab-ic-fact-muted fab-ic-node-hint" data-interactable-node-no-restock-hint>
+              {text('FABRICATE.Canvas.Interactable.Config.Node.NoRestock', 'Cannot restock — this node does not regenerate.')}
+            </p>
+          {:else}
+            <div class="fab-ic-actions fab-ic-actions-inline">
+              <button
+                type="button"
+                class="fab-ic-btn"
+                onclick={restockFull}
+                data-interactable-node-restock
+              >
+                <i class="fas fa-arrows-rotate" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Restock', 'Restock')}</span>
+              </button>
+            </div>
+          {/if}
+        {/if}
+      </section>
+    {/if}
 
     <!-- Linked visual -->
     <section class="fab-ic-section">
@@ -501,5 +633,28 @@
     margin: 0;
     font-size: 0.9rem;
     opacity: 0.75;
+  }
+
+  .fab-ic-node-hint {
+    margin: 0;
+    font-size: 0.85rem;
+  }
+
+  .fab-ic-node-state {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+  }
+
+  .fab-ic-node-depleted {
+    color: var(--fab-warning);
+    font-weight: 600;
+  }
+
+  .fab-ic-node-exhausted {
+    color: var(--fab-danger);
+    font-weight: 600;
   }
 </style>

@@ -92,7 +92,7 @@ test('buildRegionSpawnRequest (tool) shapes region geometry + behaviour system +
   assert.equal(request.region.shape.y + request.region.shape.height / 2, request.tile.y);
 });
 
-test('buildRegionSpawnRequest (gatheringTask) carries environmentId into the behaviour system (no per-interactable node)', () => {
+test('buildRegionSpawnRequest (gatheringTask) carries environmentId into the behaviour system (environment-scoped node by default)', () => {
   const request = buildRegionSpawnRequest({
     classification: taskClassification(),
     point: { x: 0, y: 0 },
@@ -108,7 +108,9 @@ test('buildRegionSpawnRequest (gatheringTask) carries environmentId into the beh
   assert.equal(request.behaviorSystem.taskId, 'task-9');
   assert.equal(request.behaviorSystem.toolId, null);
   assert.equal(request.behaviorSystem.environmentId, 'env-1');
-  assert.equal('node' in request.behaviorSystem, false, 'no per-interactable node is seeded on the behaviour');
+  // Default linked: no independent node is seeded on the behaviour.
+  assert.equal(request.behaviorSystem.taskNodeLink, 'linked');
+  assert.equal(request.behaviorSystem.node, null, 'no independent node is seeded by default');
 
   // The gathering-task tile center and region center both land on the drop point.
   assert.equal(request.tile.x, 0); // tile center == drop point x
@@ -178,7 +180,7 @@ test('buildRegionSpawnRequest (visualMode none) → hidden + linkedVisual.mode n
   assert.equal(request.tile, null, 'tile is null for the no-marker variant');
 });
 
-test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the env (no per-interactable node)', () => {
+test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the env (environment-scoped node by default)', () => {
   const request = buildRegionSpawnRequest({
     classification: taskClassification(),
     point: { x: 0, y: 0 },
@@ -191,7 +193,8 @@ test('buildRegionSpawnRequest (visualMode none) for a gathering task keeps the e
   assert.equal(request.behaviorSystem.presentation.hidden, true);
   assert.equal(request.behaviorSystem.linkedVisual.mode, 'none');
   assert.equal(request.behaviorSystem.environmentId, 'env-1', 'env still resolved');
-  assert.equal('node' in request.behaviorSystem, false, 'no per-interactable node is seeded on the behaviour');
+  assert.equal(request.behaviorSystem.taskNodeLink, 'linked');
+  assert.equal(request.behaviorSystem.node, null, 'no independent node is seeded by default');
 });
 
 test('buildRegionSpawnRequest defaults to the with-marker path (mode marker, tile present)', () => {

@@ -1,12 +1,14 @@
 /**
  * Region-behaviour identity helper for the region-first interactable model.
  *
- * A canvas gathering-task interactable is a pure (environment, task) shortcut: it
- * carries NO per-interactable node pool. The environment's `nodeRuntime[taskId]`
- * is the single source of truth for depletion/respawn, so there is no
- * behaviour-backed node-state adapter here. What remains is the pure ref resolver
- * used by the config panel / socket edges to address one placed behaviour by
- * `{ sceneId, regionId, behaviorId }`.
+ * A canvas gathering-task interactable defaults to a LINKED (environment, task)
+ * shortcut whose depletion/respawn follows the task via the environment's
+ * `nodeRuntime[taskId]`. It may be UNLINKED with its own independent node pool
+ * (issue 302) when `taskNodeLink === 'unlinked'` (the pool lives verbatim on the
+ * behaviour `system.node`; `GatheringRichStateService._resolveNodeSource` selects
+ * which pool an attempt addresses). Either way, the pure ref resolver below is the
+ * shared way the config panel / socket / respawn edges address one placed
+ * behaviour by `{ sceneId, regionId, behaviorId }`.
  */
 
 /**

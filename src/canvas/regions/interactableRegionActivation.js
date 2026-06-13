@@ -16,10 +16,11 @@
  *
  * Activation eligibility is purely the behaviour's own
  * `enabled/locked/consumed/uses/cooldown` gate (shared by tool stations and
- * gathering-task shortcuts). A gathering-task interactable carries NO
- * per-interactable node pool: node depletion/respawn is owned by the
- * environment's `nodeRuntime[taskId]` and is enforced by the gathering engine
- * when the scoped session is opened, not here.
+ * gathering-task shortcuts). Resource-node depletion/respawn is orthogonal to this
+ * gate and enforced by the gathering engine when the scoped session opens — never
+ * here — whether the interactable is LINKED to the task (default, shared
+ * `environment.nodeRuntime[taskId]`) or UNLINKED with its own independent pool
+ * (issue 302, `taskNodeLink === 'unlinked'` on the behaviour `system.node`).
  */
 
 import { numberOrNull } from './coercion.js';
@@ -33,9 +34,10 @@ const ACTIVATION_ACTION = 'interactableActivate';
  *
  * Precedence: DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN.
  *
- * A gathering-task interactable carries NO per-interactable node pool — node
- * depletion/respawn is owned by the environment's `nodeRuntime[taskId]`, checked
- * by the gathering engine when the session is opened — so there is no
+ * Resource-node depletion is orthogonal to this gate and enforced by the
+ * gathering engine when the scoped session opens — against the environment's
+ * `nodeRuntime[taskId]` (default, linked) or the interactable's own independent
+ * pool when `taskNodeLink === 'unlinked'` (issue 302) — so there is no
  * NODE_DEPLETED gate here.
  *
  * `isGM` is accepted for future use but eligibility is purely state-based here
