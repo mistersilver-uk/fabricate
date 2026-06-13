@@ -3078,7 +3078,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 9);
+    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 10);
+    const dropModifierModeSelect = target.querySelector('#manager-gathering-rule-drop-modifier-mode');
+    assert.ok(dropModifierModeSelect, 'drop modifier mode select renders in the rules inspector');
+    assert.deepEqual(
+      Array.from(dropModifierModeSelect.options).map(option => option.value),
+      ['additive', 'multiplicative']
+    );
+    assert.deepEqual(
+      Array.from(dropModifierModeSelect.options).map(option => option.textContent.trim()),
+      ['Additive (percentage points)', 'Multiplicative (scale by percentage)']
+    );
     const eventVisibilitySelect = target.querySelector('#manager-gathering-rule-event-visibility');
     assert.ok(eventVisibilitySelect, 'event visibility select renders in the rules inspector');
     assert.deepEqual(

@@ -277,7 +277,7 @@
     {#if eventList.length === 0}
       <div class="manager-empty">
         <div>
-          <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+          <i class="fas fa-masks-theater" aria-hidden="true"></i>
           <h3>{text('FABRICATE.Admin.Manager.Environment.Events.EmptyTitle', 'No gathering events yet')}</h3>
           <p>{text('FABRICATE.Admin.Manager.Environment.Events.EmptyHint', 'Create reusable events before attaching them to environments.')}</p>
           <button type="button" class="manager-button is-primary" onclick={() => onCreateEvent(selectedSystemId)}>

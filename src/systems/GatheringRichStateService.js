@@ -79,6 +79,26 @@ const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
+// System-default drop-modifier application mode and the per-reference/per-entry
+// override vocabulary. `'default'` (reference-only) inherits the system mode.
+// Covers character modifiers AND condition modifiers (weather/time-of-day/biome).
+const DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
+const DROP_MODIFIER_REFERENCE_MODES = new Set(['default', 'additive', 'multiplicative']);
+
+/**
+ * Resolve a reference's effective additive/multiplicative mode: an explicit
+ * per-reference override wins; `'default'` (or an unknown value) inherits the
+ * system-level mode, which itself falls back to `'additive'`.
+ *
+ * @param {string} [referenceMode] The per-reference `mode`.
+ * @param {string} [systemMode] The system default `dropModifierMode`.
+ * @returns {'additive'|'multiplicative'}
+ */
+function resolveEffectiveModifierMode(referenceMode, systemMode) {
+  const refMode = DROP_MODIFIER_REFERENCE_MODES.has(referenceMode) ? referenceMode : 'default';
+  if (refMode !== 'default') return refMode;
+  return DROP_MODIFIER_MODES.has(systemMode) ? systemMode : 'additive';
+}
 // Legacy system-level limitation mode values, retained only for the read-time
 // compat mapping in normalizeGatheringEconomy (legacy `mode` ⇒ stamina/nodes
 // flags). The canonical state is the two independent booleans, not this enum.
@@ -107,6 +127,7 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   revealPolicy: 'never',
   revealScope: 'actor',
   eventVisibility: 'encounterChance',
+  dropModifierMode: 'additive',
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -381,6 +402,12 @@ export class GatheringRichStateService {
         ? environment.__libraryCharacterModifiers
         : new Map();
 
+    // Resolve rules up front so the system-default character-modifier mode is
+    // available while resolving each reference (the loops below predate the
+    // later `rules` use at selection time, which now reuses this value).
+    const rules = resolveRulesForAttempt(task, environment);
+    const dropModifierMode = rules.dropModifierMode;
+
     const diagnostics = [];
     const enabledRows = itemRows
       .filter((row) => row?.enabled !== false)
@@ -406,19 +433,19 @@ export class GatheringRichStateService {
           event: null,
           viewer,
           system,
+          dropModifierMode,
         });
         if (!resolved.ok) {
           diagnostics.push(resolved.diagnostic);
           continue;
         }
-        contributions.push(resolved.contribution);
+        contributions.push(resolved.contributionEntry);
         rowEvidence.push(resolved.evidence);
       }
       rowSnapshots.push({ rowId: row.id, contributions: rowEvidence });
       rowContributions.push({
         row,
         contributions,
-        characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0),
       });
     }
 
@@ -448,19 +475,19 @@ export class GatheringRichStateService {
           event,
           viewer,
           system,
+          dropModifierMode,
         });
         if (!resolved.ok) {
           diagnostics.push(resolved.diagnostic);
           continue;
         }
-        contributions.push(resolved.contribution);
+        contributions.push(resolved.contributionEntry);
         eventEvidence.push(resolved.evidence);
       }
       eventSnapshots.push({ eventId: event.id, contributions: eventEvidence });
       eventContributions.push({
         event,
         contributions,
-        characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0),
       });
     }
 
@@ -475,7 +502,6 @@ export class GatheringRichStateService {
       };
     }
 
-    const rules = resolveRulesForAttempt(task, environment);
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
     const biomeAggregation = rules.biomeModifierAggregation;
 
@@ -489,6 +515,7 @@ export class GatheringRichStateService {
           conditions,
           biomes,
           biomeAggregation,
+          dropModifierMode: rules.dropModifierMode,
           characterModifierContributions: entry.contributions,
         })
       )
@@ -505,6 +532,7 @@ export class GatheringRichStateService {
           conditions,
           biomes,
           biomeAggregation,
+          dropModifierMode: rules.dropModifierMode,
           characterModifierContributions: entry.contributions,
         })
       )
@@ -571,9 +599,11 @@ export class GatheringRichStateService {
         ? environment.__libraryCharacterModifiers
         : new Map();
 
+    const dropModifierMode = rules.dropModifierMode;
     const drops = [];
     for (const row of rows) {
       const character = [];
+      const characterEntries = [];
       for (const reference of normalizeList(row.characterModifiers)) {
         const entry = library.get(String(reference.modifierId)) || null;
         const resolved = await this._resolveCharacterModifierContribution({
@@ -586,26 +616,52 @@ export class GatheringRichStateService {
           event: null,
           viewer,
           system,
+          dropModifierMode,
         });
         if (resolved.ok) {
           character.push({
             label: resolved.evidence.label,
             icon: resolved.evidence.icon,
             contribution: resolved.evidence.contribution,
+            mode: resolved.evidence.mode,
           });
+          characterEntries.push(resolved.contributionEntry);
         }
       }
-      const characterTotal = character.reduce(
-        (sum, entry) => sum + Number(entry.contribution || 0),
-        0
-      );
-      const weather = conditionModifierForKind(row.conditionModifiers, 'weather', conditions);
-      const timeOfDay = conditionModifierForKind(row.conditionModifiers, 'timeOfDay', conditions);
-      const biome = matchingBiomeModifier(row.conditionModifiers?.biome, biomes, biomeAggregation);
       const base = clampDropRate(row.dropRate);
-      const finalRate = Math.min(
-        100,
-        Math.max(0, base + weather + timeOfDay + biome + characterTotal)
+      // Authoritative final chance comes from the shared mixer over ALL drop
+      // modifiers (condition + character), so additive-then-multiplicative mixing
+      // matches resolveD100Attempt/rollDropRow exactly. The per-kind display
+      // payload below is purely for the breakdown UI and MUST NOT re-derive the
+      // final number.
+      const conditionEntries = matchingConditionModifierEntries(
+        row.conditionModifiers,
+        conditions,
+        biomes,
+        biomeAggregation,
+        dropModifierMode
+      );
+      const { finalRate } = applyDropModifierContributions(base, [
+        ...conditionEntries,
+        ...characterEntries,
+      ]);
+      const weather = conditionKindDisplay(
+        row.conditionModifiers,
+        'weather',
+        conditions,
+        dropModifierMode
+      );
+      const timeOfDay = conditionKindDisplay(
+        row.conditionModifiers,
+        'timeOfDay',
+        conditions,
+        dropModifierMode
+      );
+      const biome = biomeKindDisplay(
+        row.conditionModifiers?.biome,
+        biomes,
+        biomeAggregation,
+        dropModifierMode
       );
       drops.push({
         id: row.id,
@@ -616,9 +672,17 @@ export class GatheringRichStateService {
         baseChance: base / 100,
         finalChance: finalRate / 100,
         modifiers: {
-          weather: { conditionId: normalizeConditionId(conditions?.weather), value: weather },
-          timeOfDay: { conditionId: normalizeConditionId(conditions?.timeOfDay), value: timeOfDay },
-          biome: { value: biome },
+          weather: {
+            conditionId: normalizeConditionId(conditions?.weather),
+            value: weather.value,
+            factor: weather.factor,
+          },
+          timeOfDay: {
+            conditionId: normalizeConditionId(conditions?.timeOfDay),
+            value: timeOfDay.value,
+            factor: timeOfDay.factor,
+          },
+          biome: { value: biome.value, factor: biome.factor },
           character,
         },
       });
@@ -652,13 +716,23 @@ export class GatheringRichStateService {
     if (rows.length === 0) return null;
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
-    const biomeAggregation = resolveRulesForAttempt(task, environment).biomeModifierAggregation;
+    const rules = resolveRulesForAttempt(task, environment);
+    const biomeAggregation = rules.biomeModifierAggregation;
+    const dropModifierMode = rules.dropModifierMode;
     const missAll = rows.reduce((product, row) => {
       const base = clampDropRate(row.dropRate);
-      const weather = conditionModifierForKind(row.conditionModifiers, 'weather', conditions);
-      const timeOfDay = conditionModifierForKind(row.conditionModifiers, 'timeOfDay', conditions);
-      const biome = matchingBiomeModifier(row.conditionModifiers?.biome, biomes, biomeAggregation);
-      const finalRate = Math.min(100, Math.max(0, base + weather + timeOfDay + biome));
+      // Same additive-then-multiplicative mixing as resolveD100Attempt so the
+      // listing's success bar honors multiplicative condition modifiers too.
+      const { finalRate } = applyDropModifierContributions(
+        base,
+        matchingConditionModifierEntries(
+          row.conditionModifiers,
+          conditions,
+          biomes,
+          biomeAggregation,
+          dropModifierMode
+        )
+      );
       return product * (1 - finalRate / 100);
     }, 1);
     return 1 - missAll;
@@ -683,7 +757,9 @@ export class GatheringRichStateService {
    * @param {object|null} [payload.event]
    * @param {object} [payload.viewer]
    * @param {object} [payload.system]
-   * @returns {Promise<{ok: boolean, contribution: number, evidence: object, diagnostic?: object}>}
+   * @param {string} [payload.dropModifierMode] System default mode the
+   *   reference inherits when its own `mode` is `'default'`.
+   * @returns {Promise<{ok: boolean, contribution: number, contributionEntry?: object, evidence: object, diagnostic?: object}>}
    */
   async _resolveCharacterModifierContribution({
     reference,
@@ -695,12 +771,17 @@ export class GatheringRichStateService {
     event,
     viewer,
     system,
+    dropModifierMode = 'additive',
   }) {
     const referenceId = stringOrFallback(reference?.id, '');
     const modifierId = stringOrFallback(reference?.modifierId, '');
     const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator)
       ? reference.operator
       : '+';
+    // Per-reference mode (`'default'`) inherits the system-level mode; an explicit
+    // additive/multiplicative override always wins. The resolved value is clamped
+    // and operator-signed identically for both modes — only aggregation differs.
+    const effectiveMode = resolveEffectiveModifierMode(reference?.mode, dropModifierMode);
     const min = numberOrNullStrict(reference?.min);
     const max = numberOrNullStrict(reference?.max);
 
@@ -738,42 +819,19 @@ export class GatheringRichStateService {
       };
     }
 
-    const conditions = environment?.conditions || {};
-    let rawValue = null;
-    try {
-      if (effectiveProvider === 'macro') {
-        if (typeof this.runMacro === 'function') {
-          rawValue = await this.runMacro(effectiveMacroUuid, {
-            kind: 'characterModifier',
-            actor,
-            environment,
-            task,
-            row,
-            event,
-            conditions,
-            modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
-            viewer,
-            system,
-          });
-        }
-      } else if (typeof this.evaluateExpression === 'function') {
-        rawValue = await this.evaluateExpression({
-          expression: effectiveExpression,
-          provider: effectiveProvider,
-          actor,
-          kind: 'characterModifier',
-          environment,
-          task,
-          row,
-          event,
-          viewer,
-          system,
-          modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
-        });
-      }
-    } catch {
-      rawValue = null;
-    }
+    const rawValue = await this._resolveModifierRawValue({
+      provider: effectiveProvider,
+      expression: effectiveExpression,
+      macroUuid: effectiveMacroUuid,
+      modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
+      actor,
+      environment,
+      task,
+      row,
+      event,
+      viewer,
+      system,
+    });
 
     if (rawValue == null || rawValue === '') {
       return {
@@ -821,11 +879,70 @@ export class GatheringRichStateService {
       rawValue: numeric,
       clampedValue: clamped,
       operator,
+      mode: effectiveMode,
       contribution,
       bounds: { min, max },
     };
 
-    return { ok: true, contribution, evidence };
+    // Structured entry carries everything aggregation needs to apply this
+    // contribution either additively (signed delta) or multiplicatively
+    // (factor `1 ± value/100`) without re-deriving the mode.
+    const contributionEntry = {
+      mode: effectiveMode,
+      operator,
+      value: clamped,
+      contribution,
+    };
+
+    return { ok: true, contribution, contributionEntry, evidence };
+  }
+
+  /**
+   * Resolve a character modifier's raw numeric value from its provider, via the
+   * injected macro runner (`macro` provider) or expression evaluator. Returns
+   * `null` when no evaluator is wired or the resolution throws — the caller maps
+   * that to a non-finite diagnostic. Extracted from
+   * {@link _resolveCharacterModifierContribution} to keep that method's branching
+   * shallow.
+   *
+   * @param {object} payload
+   * @returns {Promise<*>} The raw resolved value, or `null`.
+   */
+  async _resolveModifierRawValue({
+    provider,
+    expression,
+    macroUuid,
+    modifier,
+    actor,
+    environment,
+    task,
+    row,
+    event,
+    viewer,
+    system,
+  }) {
+    const conditions = environment?.conditions || {};
+    const base = {
+      kind: 'characterModifier',
+      actor,
+      environment,
+      task,
+      row,
+      event,
+      viewer,
+      system,
+      modifier,
+    };
+    try {
+      if (provider === 'macro') {
+        if (typeof this.runMacro !== 'function') return null;
+        return await this.runMacro(macroUuid, { ...base, conditions });
+      }
+      if (typeof this.evaluateExpression !== 'function') return null;
+      return await this.evaluateExpression({ ...base, expression, provider });
+    } catch {
+      return null;
+    }
   }
 
   inspectEnvironment(environmentId) {
@@ -2015,6 +2132,9 @@ export class GatheringRichStateService {
         event: null,
         viewer,
         system,
+        // Stamina-cost adjustments stay additive regardless of the system drop
+        // mode: a force-additive resolution sums signed deltas onto the base.
+        dropModifierMode: 'additive',
       });
       if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
     }
@@ -2503,6 +2623,7 @@ function normalizeCharacterModifierReference(ref, index) {
     id: stringOrFallback(ref.id, `char-mod-${modifierId}-${index + 1}`),
     modifierId,
     operator: CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
+    mode: DROP_MODIFIER_REFERENCE_MODES.has(ref.mode) ? ref.mode : 'default',
     min: numberOrNullStrict(ref.min),
     max: numberOrNullStrict(ref.max),
     expressionOverride: stringOrFallback(ref.expressionOverride, ''),
@@ -2538,6 +2659,108 @@ function numericModifier(provider = null, fallback = 0) {
   return Number.isFinite(fallbackNumber) ? fallbackNumber : 0;
 }
 
+/**
+ * Aggregate resolved drop-modifier contributions (character AND condition
+ * modifiers: weather/time-of-day/biome) onto a base drop rate.
+ *
+ * Deterministic mixing order: sum every entry's additive percentage-point delta
+ * onto `baseRate` FIRST, then multiply by the PRODUCT of all multiplicative
+ * factors, then clamp to [0, 100] and `Math.round` exactly once. A
+ * multiplicative factor is `1 - value/100` for `-` and `1 + value/100` for `+`,
+ * floored at 0 so an over-100 `-` reduction never flips the rate negative.
+ * Additive-only inputs leave `multiplicativeFactor === 1`, so the rounding is an
+ * identity and the result is byte-identical to the pre-feature flat sum
+ * (`base + conditionAdditive + charAdditive`).
+ *
+ * Entries are structured payloads `{ mode, operator, value, contribution }`; a
+ * legacy plain-number entry is treated as an additive delta for safety.
+ *
+ * @param {number} baseRate Row/event base drop rate (already a percentage).
+ * @param {Array<object|number>} entries Resolved contribution entries (character
+ *   + condition), each carrying its own resolved `mode`.
+ * @returns {{finalRate: number, additiveTotal: number, multiplicativeFactor: number}}
+ */
+function applyDropModifierContributions(baseRate, entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  let additiveTotal = 0;
+  let multiplicativeFactor = 1;
+  for (const entry of list) {
+    if (entry == null) continue;
+    if (typeof entry === 'number') {
+      additiveTotal += Number(entry) || 0;
+      continue;
+    }
+    if (entry.mode === 'multiplicative') {
+      const value = Number(entry.value) || 0;
+      const factor = entry.operator === '-' ? 1 - value / 100 : 1 + value / 100;
+      multiplicativeFactor *= Math.max(0, factor);
+      continue;
+    }
+    additiveTotal += Number(entry.contribution) || 0;
+  }
+  const finalRate = Math.min(
+    100,
+    Math.max(0, Math.round((Number(baseRate) + additiveTotal) * multiplicativeFactor))
+  );
+  return { finalRate, additiveTotal, multiplicativeFactor };
+}
+
+/**
+ * Build a structured aggregation entry for a single condition modifier. The
+ * per-entry `mode` (`'default'` inherits the system `dropModifierMode`) selects
+ * additive vs multiplicative; the shape matches the character `contributionEntry`
+ * so both feed the same {@link applyDropModifierContributions} mixer.
+ *
+ * @param {object} modifier Normalized condition modifier (`operator`/`value`/`mode`).
+ * @param {string} dropModifierMode System default mode.
+ * @returns {{mode:'additive'|'multiplicative',operator:string,value:number,contribution:number}}
+ */
+function conditionEntry(modifier, dropModifierMode) {
+  const value = Number(modifier.value) || 0;
+  return {
+    mode: resolveEffectiveModifierMode(modifier.mode, dropModifierMode),
+    operator: modifier.operator,
+    value,
+    contribution: modifier.operator === '-' ? -value : value,
+  };
+}
+
+/**
+ * Resolve the active condition modifiers (weather + time-of-day + biome) into a
+ * flat list of structured aggregation entries, each carrying its own resolved
+ * additive/multiplicative mode. Weather/time-of-day match by `conditionId`
+ * against the current condition; biome entries are collapsed per-mode by
+ * {@link matchingBiomeModifierEntries}.
+ *
+ * @param {object} modifiers Row/event `conditionModifiers` ({timeOfDay,weather,biome}).
+ * @param {object} conditions Current environment conditions.
+ * @param {Array<string>} biomes Active biome tags.
+ * @param {string} biomeAggregation Biome aggregation policy.
+ * @param {string} dropModifierMode System default mode.
+ * @returns {Array<object>} Structured entries.
+ */
+function matchingConditionModifierEntries(
+  modifiers = {},
+  conditions = {},
+  biomes = [],
+  biomeAggregation = 'strongestOfEach',
+  dropModifierMode = 'additive'
+) {
+  const entries = [];
+  for (const kind of ['timeOfDay', 'weather']) {
+    const current = normalizeConditionId(conditions?.[kind]);
+    if (!current) continue;
+    for (const modifier of normalizeDropConditionModifierList(modifiers?.[kind])) {
+      if (modifier.conditionId !== current) continue;
+      entries.push(conditionEntry(modifier, dropModifierMode));
+    }
+  }
+  entries.push(
+    ...matchingBiomeModifierEntries(modifiers?.biome, biomes, biomeAggregation, dropModifierMode)
+  );
+  return entries;
+}
+
 function rollDropRow({
   row,
   index,
@@ -2546,22 +2769,41 @@ function rollDropRow({
   conditions = {},
   biomes = [],
   biomeAggregation = 'strongestOfEach',
+  dropModifierMode = 'additive',
   characterModifierContributions = [],
 }) {
   const effectiveRoll = Number(roll) + Number(modifier || 0);
-  const conditionModifier = matchingConditionModifier(
+  const conditionEntries = matchingConditionModifierEntries(
     row.conditionModifiers,
     conditions,
     biomes,
-    biomeAggregation
+    biomeAggregation,
+    dropModifierMode
   );
-  const characterModifierTotal = (
-    Array.isArray(characterModifierContributions) ? characterModifierContributions : []
-  ).reduce((sum, value) => sum + Number(value || 0), 0);
-  const finalDropRate = Math.min(
-    100,
-    Math.max(0, Number(row.dropRate) + conditionModifier + characterModifierTotal)
-  );
+  // Evidence parity: `conditionModifier` reports the signed ADDITIVE condition
+  // delta only (the field's historical meaning), so additive-only configs keep
+  // emitting exactly the same number as before the multiplicative split.
+  const conditionModifier = conditionEntries
+    .filter((entry) => entry.mode !== 'multiplicative')
+    .reduce((sum, entry) => sum + (Number(entry.contribution) || 0), 0);
+  // Character-only additive total / multiplicative product, kept as their own
+  // evidence fields so existing assertions about character contributions hold.
+  const charList = Array.isArray(characterModifierContributions)
+    ? characterModifierContributions
+    : [];
+  const characterModifierTotal = charList
+    .filter((entry) => entry && typeof entry === 'object' && entry.mode !== 'multiplicative')
+    .reduce((sum, entry) => sum + (Number(entry.contribution) || 0), 0);
+  const characterModifierFactor = charList
+    .filter((entry) => entry && typeof entry === 'object' && entry.mode === 'multiplicative')
+    .reduce((product, entry) => {
+      const value = Number(entry.value) || 0;
+      const factor = entry.operator === '-' ? 1 - value / 100 : 1 + value / 100;
+      return product * Math.max(0, factor);
+    }, 1);
+  const allEntries = [...conditionEntries, ...charList];
+  const { finalRate } = applyDropModifierContributions(Number(row.dropRate), allEntries);
+  const finalDropRate = finalRate;
   const threshold = 101 - finalDropRate;
   return {
     ...cloneJson(row),
@@ -2570,6 +2812,7 @@ function rollDropRow({
     modifier: Number(modifier || 0),
     conditionModifier,
     characterModifierTotal,
+    characterModifierFactor,
     finalDropRate,
     effectiveRoll,
     threshold,
@@ -2600,57 +2843,131 @@ function normalizeDropConditionModifierList(values = []) {
         conditionId,
         operator,
         value: Math.abs(truncated),
+        // Per-entry additive/multiplicative override; `'default'` inherits the
+        // system `dropModifierMode` (same vocabulary as character modifiers).
+        mode: DROP_MODIFIER_REFERENCE_MODES.has(modifier?.mode) ? modifier.mode : 'default',
       };
     })
     .filter(Boolean);
 }
 
-function matchingConditionModifier(
+// Display split for a single condition kind ('weather'|'timeOfDay') under the
+// current conditions — used by previewDropBreakdown so the player UI can show
+// the additive percentage-point delta and the multiplicative factor (product of
+// the matching `1 ± value/100` factors, `1` when none) separately. The
+// authoritative final chance is computed elsewhere from the structured entries.
+function conditionKindDisplay(
   modifiers = {},
+  kind,
   conditions = {},
-  biomes = [],
-  biomeAggregation = 'strongestOfEach'
+  dropModifierMode = 'additive'
 ) {
-  const conditionTotal = ['timeOfDay', 'weather'].reduce((total, kind) => {
-    const current = normalizeConditionId(conditions?.[kind]);
-    if (!current) return total;
-    return (
-      total +
-      normalizeDropConditionModifierList(modifiers?.[kind])
-        .filter((modifier) => modifier.conditionId === current)
-        .reduce(
-          (sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value),
-          0
-        )
-    );
-  }, 0);
-  return conditionTotal + matchingBiomeModifier(modifiers?.biome, biomes, biomeAggregation);
-}
-
-// The signed condition-modifier total for a single kind ('weather'|'timeOfDay')
-// under the current conditions — the per-kind split of matchingConditionModifier,
-// used by previewDropBreakdown so the player UI can show weather and time-of-day
-// contributions separately.
-function conditionModifierForKind(modifiers = {}, kind, conditions = {}) {
   const current = normalizeConditionId(conditions?.[kind]);
-  if (!current) return 0;
-  return normalizeDropConditionModifierList(modifiers?.[kind])
-    .filter((modifier) => modifier.conditionId === current)
-    .reduce(
-      (sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value),
-      0
-    );
+  if (!current) return { value: 0, factor: 1 };
+  let value = 0;
+  let factor = 1;
+  for (const modifier of normalizeDropConditionModifierList(modifiers?.[kind])) {
+    if (modifier.conditionId !== current) continue;
+    const entry = conditionEntry(modifier, dropModifierMode);
+    if (entry.mode === 'multiplicative') {
+      const f = entry.operator === '-' ? 1 - entry.value / 100 : 1 + entry.value / 100;
+      factor *= Math.max(0, f);
+    } else {
+      value += entry.contribution;
+    }
+  }
+  return { value, factor };
 }
 
-function matchingBiomeModifier(biomeModifiers = [], biomes = [], aggregation = 'strongestOfEach') {
+// Display split for biome modifiers: the additive delta (signed, per
+// aggregation) and the single multiplicative factor derived from the aggregated
+// signed percent. Mirrors matchingBiomeModifierEntries so the breakdown matches
+// the rolled result.
+function biomeKindDisplay(
+  biomeModifiers = [],
+  biomes = [],
+  aggregation = 'strongestOfEach',
+  dropModifierMode = 'additive'
+) {
+  const entries = matchingBiomeModifierEntries(
+    biomeModifiers,
+    biomes,
+    aggregation,
+    dropModifierMode
+  );
+  let value = 0;
+  let factor = 1;
+  for (const entry of entries) {
+    if (entry.mode === 'multiplicative') {
+      factor *= Math.max(0, entry.operator === '-' ? 1 - entry.value / 100 : 1 + entry.value / 100);
+    } else {
+      value += entry.contribution;
+    }
+  }
+  return { value, factor };
+}
+
+/**
+ * Collapse the active biome modifiers into at most two structured aggregation
+ * entries — one additive, one multiplicative — respecting the per-entry mode
+ * (`'default'` inherits `dropModifierMode`).
+ *
+ * The additive and multiplicative subsets are aggregated INDEPENDENTLY by the
+ * existing {@link aggregateBiomeModifierValues} over their signed values. The
+ * additive subset preserves today's exact behavior for every aggregation. The
+ * multiplicative subset is aggregated in SIGNED-PERCENT space (not as a product
+ * of factors) so cumulative/strongestOfEach/dominant stay consistent with the
+ * additive intuition and yield one deterministic biome factor; that single
+ * signed percent is then turned into one `± value` multiplicative entry.
+ *
+ * @param {Array} biomeModifiers Normalized biome condition-modifier list.
+ * @param {Array<string>} biomes Active biome tags.
+ * @param {string} aggregation Biome aggregation policy.
+ * @param {string} dropModifierMode System default mode.
+ * @returns {Array<object>} Zero, one, or two structured entries.
+ */
+function matchingBiomeModifierEntries(
+  biomeModifiers = [],
+  biomes = [],
+  aggregation = 'strongestOfEach',
+  dropModifierMode = 'additive'
+) {
   const activeBiomes = new Set(
     (Array.isArray(biomes) ? biomes : []).map(normalizeTag).filter(Boolean)
   );
-  if (activeBiomes.size === 0) return 0;
-  const values = normalizeDropConditionModifierList(biomeModifiers)
-    .filter((modifier) => activeBiomes.has(normalizeTag(modifier.conditionId)))
-    .map((modifier) => (modifier.operator === '-' ? -modifier.value : modifier.value));
-  return aggregateBiomeModifierValues(values, aggregation);
+  if (activeBiomes.size === 0) return [];
+  const matching = normalizeDropConditionModifierList(biomeModifiers).filter((modifier) =>
+    activeBiomes.has(normalizeTag(modifier.conditionId))
+  );
+  const additiveValues = [];
+  const multiplicativeValues = [];
+  for (const modifier of matching) {
+    const signed = modifier.operator === '-' ? -modifier.value : modifier.value;
+    if (resolveEffectiveModifierMode(modifier.mode, dropModifierMode) === 'multiplicative') {
+      multiplicativeValues.push(signed);
+    } else {
+      additiveValues.push(signed);
+    }
+  }
+  const entries = [];
+  const additiveDelta = aggregateBiomeModifierValues(additiveValues, aggregation);
+  if (additiveDelta !== 0) {
+    entries.push({
+      mode: 'additive',
+      operator: additiveDelta < 0 ? '-' : '+',
+      value: Math.abs(additiveDelta),
+      contribution: additiveDelta,
+    });
+  }
+  const multiplicativePercent = aggregateBiomeModifierValues(multiplicativeValues, aggregation);
+  if (multiplicativePercent !== 0) {
+    entries.push({
+      mode: 'multiplicative',
+      operator: multiplicativePercent < 0 ? '-' : '+',
+      value: Math.abs(multiplicativePercent),
+    });
+  }
+  return entries;
 }
 
 function aggregateBiomeModifierValues(values = [], aggregation = 'strongestOfEach') {
@@ -2698,6 +3015,16 @@ function normalizeGatheringRules(rules = {}) {
     eventVisibility: GATHERING_EVENT_VISIBILITIES.has(rules?.eventVisibility)
       ? rules.eventVisibility
       : DEFAULT_GATHERING_RULES.eventVisibility,
+    // `dropModifierMode` is the generalized system default (character + condition
+    // modifiers). Read the new key first, then fall back to the legacy
+    // `characterModifierMode` (issue 324 was never released, so this is a
+    // read-time compat shim, not a migration), then the default. Never emit the
+    // legacy key.
+    dropModifierMode: DROP_MODIFIER_MODES.has(rules?.dropModifierMode)
+      ? rules.dropModifierMode
+      : DROP_MODIFIER_MODES.has(rules?.characterModifierMode)
+        ? rules.characterModifierMode
+        : DEFAULT_GATHERING_RULES.dropModifierMode,
   };
 }
 
