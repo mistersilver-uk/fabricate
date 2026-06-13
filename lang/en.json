@@ -10,6 +10,9 @@
       },
       "UnifyRegions": {
         "Notice": "Fabricate unified gathering realms for: {systems}. Realms are now geography only — Travel & Realms is disabled by default, so enable it per system to use travel. Realm-scoped tasks/events no longer match by realm and may now appear in more environments."
+      },
+      "Aborted": {
+        "Notice": "Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance."
       }
     },
     "Canvas": {

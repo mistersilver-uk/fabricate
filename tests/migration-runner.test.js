@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
+import { FatalMigrationError, isFatalMigrationError } from '../src/migration/migrationErrors.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -657,4 +658,357 @@ test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re
   const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('gatheringConfig'), 'unchanged config should not be re-persisted');
   assert.deepEqual(settings.store.get('gatheringConfig'), alreadyMigrated);
+});
+
+// ---------------------------------------------------------------------------
+// Group: Fatal migration abort, rollback, and GM recovery guidance (#178)
+// ---------------------------------------------------------------------------
+
+/**
+ * Capture console.error/console.warn output for the duration of `fn`.
+ * Returns { error: string[], warn: string[] } of the formatted lines.
+ */
+async function captureConsole(fn) {
+  const lines = { error: [], warn: [] };
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  console.error = (...args) => { lines.error.push(args.join(' ')); };
+  console.warn = (...args) => { lines.warn.push(args.join(' ')); };
+  try {
+    await fn();
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+  return lines;
+}
+
+/**
+ * Build a runner with an injected migration registry so tests can supply a
+ * fatal/non-fatal migration without touching the production MIGRATIONS array.
+ */
+function makeRunnerWithMigrations(migrations, overrides = {}) {
+  const settings = makeSettings(overrides.initial ?? {});
+  const runner = new MigrationRunner({
+    getSetting: settings.getSetting,
+    setSetting: settings.setSetting,
+    moduleVersion: overrides.moduleVersion,
+    promptRecovery: overrides.promptRecovery,
+    migrations
+  });
+  return { runner, settings };
+}
+
+test('isFatalMigrationError recognises the fatal flag', () => {
+  assert.equal(isFatalMigrationError(new FatalMigrationError('boom')), true);
+  assert.equal(isFatalMigrationError(new Error('plain')), false);
+  assert.equal(isFatalMigrationError(null), false);
+  assert.equal(isFatalMigrationError(undefined), false);
+  assert.equal(isFatalMigrationError({ fatal: true }), true);
+});
+
+test('FatalMigrationError carries documents and downgradeTo', () => {
+  const docs = [{ type: 'recipe', id: 'r1', name: 'Sword', error: 'bad', fix: 'fix it' }];
+  const err = new FatalMigrationError('unusable', { documents: docs, downgradeTo: '1.1.0' });
+  assert.equal(err.name, 'FatalMigrationError');
+  assert.equal(err.fatal, true);
+  assert.deepEqual(err.documents, docs);
+  assert.equal(err.downgradeTo, '1.1.0');
+  // Non-array documents are coerced to [].
+  const err2 = new FatalMigrationError('x', { documents: 'nope' });
+  assert.deepEqual(err2.documents, []);
+  assert.equal(err2.downgradeTo, null);
+});
+
+test('fatal abort persists no data and leaves migrationVersion unchanged', async () => {
+  const fatal = {
+    version: '2.0.0',
+    label: 'Unusable-document migration',
+    downgradeTo: '1.2.0',
+    migrate() {
+      throw new FatalMigrationError('Recipe missing required result group', {
+        documents: [{ type: 'recipe', id: 'r1', name: 'Iron Sword', error: 'missing resultSelection', fix: 'Add a result selection or delete the recipe' }],
+        downgradeTo: '1.2.0'
+      });
+    }
+  };
+  const { runner, settings } = makeRunnerWithMigrations([fatal], {
+    initial: {
+      migrationVersion: '1.2.0',
+      recipes: [{ id: 'r1' }],
+      craftingSystems: [{ id: 's1' }],
+      gatheringConfig: { systems: {} },
+      gatheringEnvironments: [{ id: 'env-1' }],
+      gatheringParties: [{ id: 'p1' }]
+    }
+  });
+
+  let summary;
+  await captureConsole(async () => { summary = await runner.run(); });
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes must not be persisted on abort');
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems must not be persisted on abort');
+  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig must not be persisted on abort');
+  assert.ok(!setKeys.includes('gatheringEnvironments'), 'gatheringEnvironments must not be persisted on abort');
+  assert.ok(!setKeys.includes('gatheringParties'), 'gatheringParties must not be persisted on abort');
+  assert.ok(!setKeys.includes('migrationVersion'), 'migrationVersion must not be bumped on abort');
+  assert.equal(setKeys.length, 0, 'no settings writes at all on abort');
+
+  assert.equal(summary.aborted, true);
+  assert.equal(summary.ran, 0);
+  assert.equal(summary.abortedMigration, 'Unusable-document migration');
+  assert.equal(summary.downgradeTo, '1.2.0');
+  assert.equal(summary.failures.length, 1);
+});
+
+test('migrationVersion is unchanged after a fatal abort', async () => {
+  const fatal = {
+    version: '2.0.0',
+    label: 'Fatal',
+    migrate() { throw new FatalMigrationError('unusable', { downgradeTo: '1.2.0' }); }
+  };
+  const { runner, settings } = makeRunnerWithMigrations([fatal], {
+    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] }
+  });
+
+  await captureConsole(() => runner.run());
+
+  assert.equal(settings.getSetting('migrationVersion'), '1.2.0');
+});
+
+test('fatal abort persists no partially-mutated data even when a migration mutates in place', async () => {
+  const originalRecipes = [{ id: 'r1', name: 'Original' }];
+  const originalSystems = [{ id: 's1', name: 'System' }];
+  // A second, successful migration runs first and returns a fresh payload; the
+  // fatal migration then mutates THAT payload in place before throwing. The
+  // runner must restore the pre-fatal checkpoint and persist nothing, so no
+  // partially-migrated recipe/system data reaches the store.
+  const succeed = {
+    version: '2.0.0',
+    label: 'Succeeds first (fresh payload)',
+    migrate(data) {
+      return {
+        recipes: data.recipes.map(r => ({ ...r })),
+        systems: data.systems.map(s => ({ ...s }))
+      };
+    }
+  };
+  const fatal = {
+    version: '2.1.0',
+    label: 'Mutate-then-throw',
+    migrate(data) {
+      // Mutate the live (post-success) payload in place BEFORE throwing.
+      data.recipes.push({ id: 'r2', name: 'PartiallyMigrated' });
+      data.recipes[0].name = 'Corrupted';
+      data.systems[0].name = 'CorruptedSystem';
+      throw new FatalMigrationError('blew up mid-transform', {
+        documents: [{ type: 'recipe', id: 'r2', error: 'invalid', fix: 'remove it' }],
+        downgradeTo: '1.2.0'
+      });
+    }
+  };
+  const { runner, settings } = makeRunnerWithMigrations([succeed, fatal], {
+    initial: {
+      migrationVersion: '1.2.0',
+      recipes: JSON.parse(JSON.stringify(originalRecipes)),
+      craftingSystems: JSON.parse(JSON.stringify(originalSystems))
+    }
+  });
+
+  await captureConsole(() => runner.run());
+
+  // Nothing was persisted: no setSetting writes occurred for any payload key,
+  // so the corrupted/partial in-place mutation never reached a settings write.
+  assert.equal(settings.calls.set.length, 0, 'no setting writes on abort');
+});
+
+test('a successful migration followed by a fatal one persists nothing and keeps version', async () => {
+  const succeed = {
+    version: '2.0.0',
+    label: 'Succeeds and rewrites recipes',
+    migrate(data) {
+      return { recipes: data.recipes.map(r => ({ ...r, migrated: true })) };
+    }
+  };
+  const fatal = {
+    version: '2.1.0',
+    label: 'Then fails fatally',
+    migrate() {
+      throw new FatalMigrationError('unusable after second step', {
+        documents: [{ type: 'craftingSystem', id: 's1', error: 'bad', fix: 'fix' }],
+        downgradeTo: '1.2.0'
+      });
+    }
+  };
+  const { runner, settings } = makeRunnerWithMigrations([succeed, fatal], {
+    initial: {
+      migrationVersion: '1.2.0',
+      recipes: [{ id: 'r1' }],
+      craftingSystems: [{ id: 's1' }]
+    }
+  });
+
+  let summary;
+  await captureConsole(async () => { summary = await runner.run(); });
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.equal(setKeys.length, 0, 'the earlier success is rolled back / not written');
+  // The earlier successful transform is not visible in the store.
+  assert.deepEqual(settings.store.get('recipes'), [{ id: 'r1' }]);
+  assert.equal(settings.getSetting('migrationVersion'), '1.2.0');
+  assert.equal(summary.aborted, true);
+});
+
+test('fatal abort emits GM recovery guidance: header, downgrade target, per-document remediation', async () => {
+  const fatal = {
+    version: '2.0.0',
+    label: 'Unusable macro recipe',
+    migrate() {
+      throw new FatalMigrationError('Recipe macro output is malformed', {
+        documents: [
+          {
+            type: 'recipe',
+            id: 'recipe-42',
+            name: 'Potion of Healing',
+            error: 'macroOutcome provider has no return keys',
+            fix: 'Update the recipe macro to return { components } or delete the recipe',
+            macroHint: 'return { components: [{ componentId, quantity }] }'
+          }
+        ],
+        downgradeTo: '1.2.0'
+      });
+    }
+  };
+  const { runner } = makeRunnerWithMigrations([fatal], {
+    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] }
+  });
+
+  const lines = await captureConsole(() => runner.run());
+  const out = lines.error.join('\n');
+
+  assert.ok(
+    out.includes('Fabricate | Migration aborted. Existing data has been kept unchanged.'),
+    'exact abort header present'
+  );
+  assert.ok(out.includes('1.2.0'), 'recommended downgrade target present');
+  assert.ok(out.includes('downgrade'), 'downgrade recommendation phrased as guidance');
+  assert.ok(out.includes('recipe'), 'document type present');
+  assert.ok(out.includes('recipe-42'), 'document id present');
+  assert.ok(out.includes('Potion of Healing'), 'document name present');
+  assert.ok(out.includes('macroOutcome provider has no return keys'), 'exact error present');
+  assert.ok(out.includes('Update the recipe macro'), 'required fix action present');
+  assert.ok(out.includes('return { components:'), 'macro hint present');
+});
+
+test('promptRecovery seam is invoked with downgrade/documents/label on abort', async () => {
+  const calls = [];
+  const fatal = {
+    version: '2.0.0',
+    label: 'Fatal with prompt',
+    migrate() {
+      throw new FatalMigrationError('unusable', {
+        documents: [{ type: 'recipe', id: 'r1', error: 'e', fix: 'f' }],
+        downgradeTo: '1.2.0'
+      });
+    }
+  };
+  const { runner } = makeRunnerWithMigrations([fatal], {
+    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] },
+    promptRecovery: (ctx) => { calls.push(ctx); }
+  });
+
+  await captureConsole(() => runner.run());
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].downgradeTo, '1.2.0');
+  assert.equal(calls[0].label, 'Fatal with prompt');
+  assert.equal(calls[0].documents.length, 1);
+});
+
+test('downgradeTo falls back to migration metadata then moduleVersion when error omits it', async () => {
+  // Error has no downgradeTo; migration provides one.
+  const fromMigration = {
+    version: '2.0.0',
+    label: 'Fatal, downgrade on migration',
+    downgradeTo: '1.1.0',
+    migrate() { throw new FatalMigrationError('unusable'); }
+  };
+  const r1 = makeRunnerWithMigrations([fromMigration], {
+    initial: { migrationVersion: '1.0.0', recipes: [], craftingSystems: [] }
+  });
+  let s1;
+  await captureConsole(async () => { s1 = await r1.runner.run(); });
+  assert.equal(s1.downgradeTo, '1.1.0');
+
+  // No downgradeTo anywhere except moduleVersion.
+  const noDowngrade = {
+    version: '2.0.0',
+    label: 'Fatal, no downgrade',
+    migrate() { throw new FatalMigrationError('unusable'); }
+  };
+  const r2 = makeRunnerWithMigrations([noDowngrade], {
+    initial: { migrationVersion: '1.0.0', recipes: [], craftingSystems: [] },
+    moduleVersion: '1.3.0'
+  });
+  let s2;
+  await captureConsole(async () => { s2 = await r2.runner.run(); });
+  assert.equal(s2.downgradeTo, '1.3.0');
+});
+
+test('non-fatal migration error still warns, continues, persists later results, and bumps version', async () => {
+  const throwsNonFatal = {
+    version: '2.0.0',
+    label: 'Non-fatal flaky migration',
+    migrate() { throw new Error('soft failure'); }
+  };
+  const succeeds = {
+    version: '2.1.0',
+    label: 'Succeeds after the soft failure',
+    migrate(data) {
+      return { recipes: data.recipes.map(r => ({ ...r, touched: true })) };
+    }
+  };
+  const { runner, settings } = makeRunnerWithMigrations([throwsNonFatal, succeeds], {
+    initial: {
+      migrationVersion: '1.2.0',
+      recipes: [{ id: 'r1' }],
+      craftingSystems: []
+    }
+  });
+
+  let summary;
+  const lines = await captureConsole(async () => { summary = await runner.run(); });
+
+  // Warned about the non-fatal failure with the exact spec phrasing.
+  assert.ok(
+    lines.warn.some(l => l.includes('Fabricate | Migration "Non-fatal flaky migration" failed: soft failure')),
+    'non-fatal failure is warned, not aborted'
+  );
+
+  assert.equal(summary.aborted, false);
+  assert.equal(summary.ran, 2);
+
+  // The later migration's result is persisted and version is bumped.
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(setKeys.includes('recipes'), 'later migration result persisted');
+  assert.equal(settings.store.get('recipes')[0].touched, true);
+  assert.equal(settings.getSetting('migrationVersion'), '2.1.0');
+});
+
+test('successful injected run reports aborted:false and preserves the summary shape', async () => {
+  const succeeds = {
+    version: '2.0.0',
+    label: 'Plain success',
+    migrate(data) { return { recipes: data.recipes.map(r => ({ ...r, ok: true })) }; }
+  };
+  const { runner } = makeRunnerWithMigrations([succeeds], {
+    initial: { migrationVersion: '1.2.0', recipes: [{ id: 'r1' }], craftingSystems: [] }
+  });
+
+  const summary = await runner.run();
+  assert.equal(summary.aborted, false);
+  assert.equal(summary.ran, 1);
+  assert.equal(summary.migratedCatalystCount, 0);
+  assert.deepEqual(summary.unifiedRegionSystems, []);
 });
