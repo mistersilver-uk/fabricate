@@ -373,6 +373,66 @@ describe('GatheringView ↔ actor bar wiring', () => {
     assert.equal(attempts[0].taskId, 'task-1');
   });
 
+  // #287: when no environment is selected (every environment locked, or the
+  // empty/loading state) the header condition chips must still respect the
+  // active system's weather / time-of-day settings instead of defaulting to
+  // shown. The engine stamps weatherEnabled / timeOfDayEnabled on every
+  // environment summary (including locked teasers), so the view derives header
+  // visibility from the listing when there is no selection.
+  it('#287: no selection (all envs locked) hides a system-disabled weather chip, keeping time-of-day', async () => {
+    const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+    store.loadSelectableActors();
+    flushSync();
+    const envs = [
+      environment({ id: 'e1', locked: true, attemptable: false, weatherEnabled: false, timeOfDayEnabled: true }),
+      environment({ id: 'e2', locked: true, attemptable: false, weatherEnabled: false, timeOfDayEnabled: true })
+    ];
+    const { services } = makeGatheringServices(listing(envs));
+    services.actorBar = store;
+
+    await mountView(services);
+    await settle();
+
+    // No environment is auto-selected when every environment is locked.
+    assert.equal(store.conditionVisibility.weather, false, 'weather chip hidden: every listed system disables weather');
+    assert.equal(store.conditionVisibility.timeOfDay, true, 'time-of-day chip still shown independently');
+  });
+
+  it('#287: no selection (all envs locked) hides a system-disabled time-of-day chip, keeping weather', async () => {
+    const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+    store.loadSelectableActors();
+    flushSync();
+    const envs = [
+      environment({ id: 'e1', locked: true, attemptable: false, weatherEnabled: true, timeOfDayEnabled: false })
+    ];
+    const { services } = makeGatheringServices(listing(envs));
+    services.actorBar = store;
+
+    await mountView(services);
+    await settle();
+
+    assert.equal(store.conditionVisibility.timeOfDay, false, 'time-of-day chip hidden: the system disables it');
+    assert.equal(store.conditionVisibility.weather, true, 'weather chip still shown independently');
+  });
+
+  it('#287: no selection shows a dimension when at least one listed system enables it', async () => {
+    const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+    store.loadSelectableActors();
+    flushSync();
+    const envs = [
+      environment({ id: 'e1', locked: true, attemptable: false, weatherEnabled: false, timeOfDayEnabled: false }),
+      environment({ id: 'e2', locked: true, attemptable: false, weatherEnabled: true, timeOfDayEnabled: false })
+    ];
+    const { services } = makeGatheringServices(listing(envs));
+    services.actorBar = store;
+
+    await mountView(services);
+    await settle();
+
+    assert.equal(store.conditionVisibility.weather, true, 'weather shown: e2 enables it even though e1 does not');
+    assert.equal(store.conditionVisibility.timeOfDay, false, 'time-of-day hidden: no listed system enables it');
+  });
+
   it('surfaces a warning notification when an attempt is rejected (never a silent no-op)', async () => {
     const warns = [];
     globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
