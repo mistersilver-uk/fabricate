@@ -89,6 +89,10 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(rootSource.includes('onUpdateEventCharacterModifier'), 'root should expose update character modifier handler');
     assert.ok(rootSource.includes('onDeleteEventCharacterModifier'), 'root should expose delete character modifier handler');
     assert.ok(rootSource.includes('pickCharacterModifierForEvent'), 'root should expose a picker for adding character modifiers');
+    assert.ok(
+      rootSource.includes('onUpdateEventCharacterModifier(ref.id, { mode: event.currentTarget.value })'),
+      'event character modifier editor should render a per-modifier mode select'
+    );
   });
 
   it('renders condition modifiers as a single signed number input that colors its box by value', () => {

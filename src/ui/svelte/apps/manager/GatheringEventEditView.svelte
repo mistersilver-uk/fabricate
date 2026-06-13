@@ -468,7 +468,7 @@
   {:else}
     <div class="manager-empty">
       <div>
-        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+        <i class="fas fa-masks-theater" aria-hidden="true"></i>
         <h3>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select an event to edit')}</h3>
         <p>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEventHint', 'Choose an event from the browser to edit its identity, matching, and modifiers.')}</p>
       </div>

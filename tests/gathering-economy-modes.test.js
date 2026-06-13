@@ -529,6 +529,30 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     assert.equal(floored, 0); // never negative
   });
 
+  it('issue 299: stamina cost stays additive even for a multiplicative-mode reference', async () => {
+    // A reference flagged multiplicative still adjusts stamina additively: the
+    // signed contribution is summed onto the base, never used as a factor.
+    const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 5 });
+    const env = environment();
+    const cost = await service._effectiveStaminaCost({
+      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env,
+      task: task({ staminaCost: 10, staminaCostModifiers: [{ modifierId: 'str', operator: '-', mode: 'multiplicative' }] })
+    });
+    assert.equal(cost, 5); // 10 - 5 (additive), NOT 10 * 0.95 = 9.5
+  });
+
+  it('issue 299: stamina cost stays additive under a multiplicative system default', async () => {
+    const config = costConfig();
+    config.systems[SYSTEM].rules = { dropModifierMode: 'multiplicative' };
+    const { service } = makeRichState({ config, evaluateExpression: () => 5 });
+    const env = environment();
+    const cost = await service._effectiveStaminaCost({
+      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env,
+      task: task({ staminaCost: 10, staminaCostModifiers: [{ modifierId: 'str', operator: '-' }] })
+    });
+    assert.equal(cost, 5); // additive 10 - 5, the system multiplicative default does not apply to stamina
+  });
+
   it('exposes the per-actor effective cost for the player listing (not the base)', async () => {
     const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 2 });
     const env = environment();

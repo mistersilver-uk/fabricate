@@ -123,3 +123,47 @@ test('previewDropBreakdown returns no drops for a non-d100 task', async () => {
   });
   assert.deepEqual(result.drops, []);
 });
+
+test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt for a multiplicative row', async () => {
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, {}]]);
+  const service = new GatheringRichStateService({
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    getUserId: () => 'user-1',
+    rollD100: () => 100,
+    hooks: { callAll: () => {} },
+    evaluateExpression: async () => 10
+  });
+  const library = [{ id: 'mod', label: 'Mod', icon: 'fa-user', provider: 'dnd5e', expression: '@mod' }];
+  const environment = {
+    conditions: { weather: 'rain', timeOfDay: 'night' },
+    biomes: ['forest'],
+    // System default multiplicative; reference inherits it via mode 'default'.
+    rules: { rewardSelectionMode: 'allDrops', rewardLimit: 99, dropModifierMode: 'multiplicative' }
+  };
+  Object.defineProperty(environment, '__libraryCharacterModifiers', {
+    value: new Map(library.map(entry => [String(entry.id), entry])),
+    enumerable: false
+  });
+  const task = {
+    id: 't',
+    resolutionMode: 'd100',
+    dropRows: [{
+      id: 'd1', name: 'Iron', componentId: 'iron', quantity: 1, dropRate: 25,
+      characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '-', mode: 'default' }]
+    }]
+  };
+
+  const preview = await service.previewDropBreakdown({ environment, task, actor: {}, viewer: {}, system: {} });
+  const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
+
+  // 25 * 0.9 = 22.5 -> Math.round => 23
+  assert.equal(Math.round(preview.drops[0].finalChance * 100), 23);
+  assert.equal(resolved.items[0].finalDropRate, 23);
+  assert.equal(
+    Math.round(preview.drops[0].finalChance * 100),
+    resolved.items[0].finalDropRate,
+    'preview and resolution agree on the multiplicative final rate'
+  );
+});
