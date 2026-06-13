@@ -12,6 +12,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 let tempRoot;
 let GatheringView;
+let GatheringTaskRow;
+let GatheringTaskDetail;
 let mounted;
 let target;
 
@@ -111,6 +113,26 @@ async function settle() {
   flushSync();
 }
 
+// Mount the task ROW / task DETAIL components directly (issue 301 exhausted-node
+// assertions), reusing this suite's compiled-component harness.
+async function renderRow(props = {}) {
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(GatheringTaskRow, { target, props });
+  flushSync();
+  await tick();
+  flushSync();
+}
+
+async function renderDetail(props = {}) {
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(GatheringTaskDetail, { target, props: { hasTasks: true, ...props } });
+  flushSync();
+  await tick();
+  flushSync();
+}
+
 // Switch the center column to a given tab ('tasks' | 'events').
 function clickTab(tab) {
   target.querySelector(`[data-gathering-detail-tab="${tab}"]`).click();
@@ -191,6 +213,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     GatheringView = (await import(pathToFileURL(join(
       tempRoot,
       'src/ui/svelte/apps/gathering/GatheringView.svelte.js'
+    )))).default;
+    GatheringTaskRow = (await import(pathToFileURL(join(
+      tempRoot,
+      'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte.js'
+    )))).default;
+    GatheringTaskDetail = (await import(pathToFileURL(join(
+      tempRoot,
+      'src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte.js'
     )))).default;
   });
 
@@ -838,5 +868,82 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'), 'aggregate chance bar still shown for a blind env');
     assert.equal(target.querySelector('.gathering-event-row'), null, 'no individual event rows for a blind env');
     assert.ok(target.querySelector('[data-gathering-events-hidden]'), 'a "events hidden" hint is shown instead');
+  });
+
+  // issue 301: permanently-exhausted (nonRegenerating) node state — the task ROW
+  // surfaces an "Exhausted" callout, and the DETAIL shows the permanent-exhaustion
+  // copy (no "replenishes over time" message and no respawn ETA).
+  it('row shows the Exhausted callout for a NODE_EXHAUSTED block', async () => {
+    await renderRow({
+      task: { id: 't1', name: 'Vein', attemptable: false, blockedReasons: [{ code: 'NODE_EXHAUSTED' }] }
+    });
+    const callouts = target.querySelector('[data-gathering-callouts]');
+    assert.ok(callouts, 'header callout bar renders for a blocked task');
+    assert.ok(callouts.textContent.includes('Callout.NodeExhausted'), 'the exhausted callout label is shown');
+  });
+
+  it('detail shows the permanent-exhaustion copy and no respawn ETA for an exhausted node', async () => {
+    await renderDetail({
+      task: {
+        id: 't1', name: 'Vein', attemptable: false,
+        blockedReasons: [{ code: 'NODE_EXHAUSTED' }],
+        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: true, current: 0, max: 5 } }
+      }
+    });
+    const callout = target.querySelector('[data-gathering-node-depleted]');
+    assert.ok(callout, 'the depleted/exhausted callout renders');
+    assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the permanent-exhaustion copy');
+    assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
+    assert.equal(target.querySelector('[data-gathering-node-respawn-eta]'), null, 'no respawn ETA for a permanently exhausted node');
+  });
+
+  it('detail still shows the replenishes-over-time copy for a regenerating depleted node (regression)', async () => {
+    await renderDetail({
+      task: {
+        id: 't2', name: 'Berries', attemptable: false,
+        blockedReasons: [{ code: 'NODE_DEPLETED' }],
+        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: false, current: 0, max: 5 } }
+      }
+    });
+    const callout = target.querySelector('[data-gathering-node-depleted]');
+    assert.ok(callout, 'the depleted callout renders');
+    assert.ok(callout.textContent.includes('NodeDepletedRespawns'), 'shows the replenishes-over-time copy');
+    assert.ok(!callout.textContent.includes('NodeExhaustedPermanent'), 'does NOT show the permanent copy');
+  });
+
+  // issue 301 (UI simplification): a nonRegenerating pool surfaces a plain permanence
+  // line BEFORE exhaustion (scarcity, current > 0) and the exhausted permanence copy
+  // once exhausted (current <= 0), distinct from the regenerating "replenishes over
+  // time" copy. Neither line repeats the node count (shown on the NodesAvailable line).
+  it('detail shows the permanence line for a nonRegenerating node with current > 0', async () => {
+    await renderDetail({
+      task: {
+        id: 't3', name: 'Vein', attemptable: true,
+        rich: { nodes: { enabled: true, available: true, depleted: false, permanentlyExhausted: false, nonRegenerating: true, current: 3, max: 5 } }
+      }
+    });
+    const scarce = target.querySelector('[data-gathering-node-scarce]');
+    assert.ok(scarce, 'the permanence callout renders before exhaustion');
+    assert.ok(scarce.textContent.includes('NodeScarcePermanent'), 'uses the permanence/scarcity key');
+    assert.ok(!scarce.textContent.includes('"current"') && !scarce.textContent.includes('"max"'), 'does not repeat the node count');
+    // It is NOT the depleted/exhausted callout (resource is not yet exhausted).
+    assert.equal(target.querySelector('[data-gathering-node-depleted]'), null, 'no depleted/exhausted callout while current > 0');
+  });
+
+  it('detail shows the exhausted permanence copy for an exhausted nonRegenerating node (current <= 0)', async () => {
+    await renderDetail({
+      task: {
+        id: 't4', name: 'Vein', attemptable: false,
+        blockedReasons: [{ code: 'NODE_EXHAUSTED' }],
+        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: true, nonRegenerating: true, current: 0, max: 5 } }
+      }
+    });
+    const callout = target.querySelector('[data-gathering-node-depleted]');
+    assert.ok(callout, 'the exhausted callout renders');
+    assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the exhausted permanence copy when exhausted');
+    assert.ok(!callout.textContent.includes('"current"') && !callout.textContent.includes('"max"'), 'does not repeat the node count');
+    assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
+    assert.equal(target.querySelector('[data-gathering-node-respawn-eta]'), null, 'no respawn ETA for a permanently exhausted node');
+    assert.equal(target.querySelector('[data-gathering-node-scarce]'), null, 'the pre-exhaustion scarcity callout is not used at current <= 0');
   });
 });
