@@ -4,20 +4,14 @@
   /* Fabricate product UI design-system tokens.
      See the UI design-system requirements in openspec/specs/ui-integration/spec.md.
      Theme colour literals live only in `[data-fabricate-theme]` blocks below.
-     Existing `--fab-v2-*` and legacy `--fabricate-*` aliases map through
-     canonical `--fab-*` tokens until each component migrates intentionally. */
+     Existing `--fab-v2-*` aliases map through canonical `--fab-*` tokens until
+     each component migrates intentionally. */
   --fab-space-1: 4px;
   --fab-space-2: 8px;
   --fab-space-3: 12px;
   --fab-space-4: 16px;
   --fab-space-5: 20px;
   --fab-space-6: 24px;
-  --fabricate-primary: var(--fab-info);
-  --fabricate-success: var(--fab-success);
-  --fabricate-warning: var(--fab-warning);
-  --fabricate-danger: var(--fab-danger);
-  --fabricate-dark: var(--fab-bg-3);
-  --fabricate-light: var(--fab-text);
   --fab-v2-bg: var(--fab-bg-0);
   --fab-v2-surface-1: var(--fab-bg-1);
   --fab-v2-surface-2: var(--fab-bg-2);
