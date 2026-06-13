@@ -11,6 +11,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - **Configurable interaction-prompt position** (#300) — the region-entry interaction prompt's on-screen anchor is now a per-client setting (`fabricate.interactionPromptPosition`) offering the four screen corners and four edge-centers. Defaults to bottom-center (unchanged behavior); lets players move the prompt away from other modules' on-screen widgets.
+- **Fatal migration abort, rollback, and GM recovery guidance** (#178) — `MigrationRunner` now treats unusable-document migration failures as fatal: it rolls the in-memory payload back to the last known-good per-migration checkpoint, persists nothing (no recipe/system/gathering writes and no `migrationVersion` bump), and emits explicit GM recovery guidance to the console (abort header, recommended downgrade target, and per-document fix instructions including optional macro hints).
+  - New `FatalMigrationError` class and `isFatalMigrationError` helper (`src/migration/migrationErrors.js`); migration registry entries may carry an optional `downgradeTo` for recovery guidance.
+  - `main.js` surfaces an aborted pass to the GM via a `ui.notifications.error` notice (`FABRICATE.Migration.Aborted.Notice`) and skips the success notices; the runner accepts an optional `promptRecovery` seam for a GM decision prompt.
+
 - **Alchemy Tab redesign** — replaced the legacy drag-drop `AlchemySubmitPanel` with a fully-featured two-panel alchemy workspace:
   - `AlchemySystemSelector` — drop-down to choose between multiple alchemy systems; hidden when only one system exists. The selection persists per client via the new `fabricate.lastAlchemySystem` setting.
   - `ComponentPalette` — responsive grid of every component in the selected system, each showing the item image, name, and a quantity badge (available inventory minus workbench). Left-click to stage a component; right-click to un-stage one.

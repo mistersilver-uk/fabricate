@@ -21,6 +21,9 @@ import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringR
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { isFatalMigrationError } from './migrationErrors.js';
+
+export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
 
 // ---------------------------------------------------------------------------
 // Semver comparison utility (no npm dependency)
@@ -168,12 +171,24 @@ const MIGRATIONS = [
 
 export class MigrationRunner {
   /**
-   * @param {{ getSetting: Function, setSetting: Function, moduleVersion?: string }} opts
+   * @param {{
+   *   getSetting: Function,
+   *   setSetting: Function,
+   *   moduleVersion?: string,
+   *   promptRecovery?: Function,
+   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string }>
+   * }} opts
+   *   `promptRecovery` is an optional seam invoked with the abort context so the
+   *   caller can present a GM decision prompt; `migrations` overrides the default
+   *   registry (used by tests to inject a fatal migration) and defaults to the
+   *   production `MIGRATIONS`.
    */
-  constructor({ getSetting, setSetting, moduleVersion }) {
+  constructor({ getSetting, setSetting, moduleVersion, promptRecovery, migrations } = {}) {
     this._getSetting = getSetting;
     this._setSetting = setSetting;
     this._moduleVersion = moduleVersion;
+    this._promptRecovery = promptRecovery;
+    this._migrations = Array.isArray(migrations) ? migrations : MIGRATIONS;
   }
 
   /**
@@ -181,19 +196,19 @@ export class MigrationRunner {
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
    *
-   * @returns {Promise<{ ran: number, migratedCatalystCount: number, unifiedRegionSystems: string[] }>}
+   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
    *   a summary of the run so the caller can fire one-time edge effects (e.g. the
-   *   GM catalyst-migration and region-unification notices).
+   *   GM catalyst-migration and region-unification notices) or surface an aborted pass.
    */
   async run() {
     const lastRunVersion = this._getSetting(SETTING_KEYS.MIGRATION_VERSION) ?? '0.0.0';
 
-    const pending = MIGRATIONS.filter((m) => compareSemver(m.version, lastRunVersion) > 0).sort(
-      (a, b) => compareSemver(a.version, b.version)
-    );
+    const pending = this._migrations
+      .filter((m) => compareSemver(m.version, lastRunVersion) > 0)
+      .sort((a, b) => compareSemver(a.version, b.version));
 
     if (pending.length === 0) {
-      return { ran: 0, migratedCatalystCount: 0, unifiedRegionSystems: [] };
+      return { ran: 0, aborted: false, migratedCatalystCount: 0, unifiedRegionSystems: [] };
     }
 
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
@@ -220,6 +235,11 @@ export class MigrationRunner {
     let unifiedRegionSystems = [];
 
     for (const migration of pending) {
+      // Capture the last known-good transformed payload BEFORE running this
+      // migration as the rollback baseline (spec § Startup Migration Flow step 8
+      // / Per-Migration Error Handling). The deep clone isolates it from any
+      // in-place mutation a fatal migration performs before throwing.
+      const checkpoint = JSON.parse(JSON.stringify(data));
       try {
         const result = migration.migrate(data);
         if (result && typeof result === 'object') {
@@ -230,6 +250,36 @@ export class MigrationRunner {
         }
         highestVersion = migration.version;
       } catch (error) {
+        if (isFatalMigrationError(error)) {
+          // Fatal: roll the in-memory payload back to the last known-good
+          // checkpoint, emit recovery guidance, persist NOTHING (no
+          // recipe/system/gathering writes and no migrationVersion bump), and
+          // abort the pass (spec § Per-Migration Error Handling / Migration
+          // Abort Recovery Guidance). Because the aborted pass returns before any
+          // persistence, restoring `data` here keeps the in-memory state
+          // consistent for any post-return inspection of the checkpoint.
+          data = checkpoint;
+          void data;
+
+          const downgradeTo =
+            error.downgradeTo ?? migration.downgradeTo ?? this._moduleVersion ?? null;
+          const failures = Array.isArray(error.documents) ? error.documents : [];
+
+          this._emitMigrationRecoveryGuidance(migration, error, downgradeTo);
+
+          // Optional GM decision-prompt seam (defaults to "Keep existing data").
+          this._promptRecovery?.({ downgradeTo, documents: failures, label: migration.label });
+
+          return {
+            ran: 0,
+            aborted: true,
+            abortedMigration: migration.label,
+            downgradeTo,
+            failures,
+            migratedCatalystCount: 0,
+            unifiedRegionSystems: [],
+          };
+        }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
       }
     }
@@ -278,6 +328,54 @@ export class MigrationRunner {
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
 
-    return { ran: pending.length, migratedCatalystCount, unifiedRegionSystems };
+    return { ran: pending.length, aborted: false, migratedCatalystCount, unifiedRegionSystems };
+  }
+
+  /**
+   * Emit GM-facing recovery guidance to the console after a migration pass aborts.
+   *
+   * Output (spec § Migration Abort Recovery Guidance):
+   *  - a clear abort header confirming existing data was kept unchanged,
+   *  - a recommended downgrade target version,
+   *  - per-document fix instructions (type, id/name, exact error, required fix),
+   *  - macro-oriented remediation hints when present.
+   *
+   * @param {{ label: string }} migration
+   * @param {{ message?: string, documents?: object[] }} error
+   * @param {string|null} downgradeTo
+   */
+  _emitMigrationRecoveryGuidance(migration, error, downgradeTo) {
+    console.error('Fabricate | Migration aborted. Existing data has been kept unchanged.');
+    console.error(`Fabricate | Aborted during migration: "${migration.label}"`);
+    if (error?.message) {
+      console.error(`Fabricate | Reason: ${error.message}`);
+    }
+
+    const downgradeTarget = downgradeTo ?? 'unknown';
+    console.error(
+      `Fabricate | Recommended action: downgrade Fabricate to version ${downgradeTarget} to continue using your existing data without manual remediation.`
+    );
+
+    const documents = Array.isArray(error?.documents) ? error.documents : [];
+    if (documents.length === 0) {
+      console.error('Fabricate | No per-document failure details were provided by this migration.');
+      return;
+    }
+
+    console.error(`Fabricate | ${documents.length} document(s) require manual remediation:`);
+    let index = 0;
+    for (const doc of documents) {
+      index += 1;
+      const type = doc?.type ?? 'unknown';
+      const identity = doc?.id ?? doc?.name ?? 'unknown';
+      const name = doc?.name ? ` (${doc.name})` : '';
+      console.error(
+        `Fabricate |   [${index}] ${type} ${identity}${name}: ${doc?.error ?? 'unknown error'}`
+      );
+      console.error(`Fabricate |       Fix: ${doc?.fix ?? 'no fix action provided'}`);
+      if (doc?.macroHint) {
+        console.error(`Fabricate |       Macro hint: ${doc.macroHint}`);
+      }
+    }
   }
 }
