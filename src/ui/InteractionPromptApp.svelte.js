@@ -1,5 +1,9 @@
 import { registerInteractionPromptApp } from './appFactory.js';
 import { planPromptDismiss, buildPromptBehaviorRef } from './interactionPromptSingleton.js';
+import {
+  DEFAULT_INTERACTION_PROMPT_POSITION,
+  resolveInteractionPromptPositionStyle,
+} from './interactionPromptPosition.js';
 
 /**
  * The non-blocking, SINGLETON player prompt for a Fabricate interactable region
@@ -78,12 +82,13 @@ export class InteractionPromptApp {
     toast.setAttribute('role', 'dialog');
     toast.setAttribute('aria-live', 'polite');
     // CRITICAL layout/positioning lives INLINE so the toast works with zero
-    // external CSS: fixed, bottom-center, above most UI, non-blocking.
+    // external CSS: fixed, anchored, above most UI, non-blocking. The anchor is
+    // a per-client setting (default bottom-center) so a player can move it away
+    // from a conflicting on-screen widget; an unreadable setting falls back to
+    // the default.
     toast.style.cssText = [
       'position:fixed',
-      'left:50%',
-      'bottom:96px',
-      'transform:translateX(-50%)',
+      ...resolveInteractionPromptPositionStyle(InteractionPromptApp._readConfiguredPosition()),
       'z-index:70',
       'max-width:min(90vw,420px)',
       'pointer-events:auto'
@@ -151,6 +156,24 @@ export class InteractionPromptApp {
   static dismiss(behaviorRef) {
     if (!planPromptDismiss(InteractionPromptApp._behaviorRef, behaviorRef)) return;
     InteractionPromptApp._removeInstance();
+  }
+
+  /**
+   * Read the configured prompt anchor from the per-client setting, tolerating a
+   * not-yet-ready or absent `game.settings` (Node tests, dev server) by falling
+   * back to the default. Read inline (literal namespace/key) to preserve the
+   * module's zero-import robustness contract. The style resolver additionally
+   * defaults any unknown value, so a stale/corrupt setting is safe.
+   *
+   * @returns {string} A position anchor id.
+   */
+  static _readConfiguredPosition() {
+    try {
+      const value = globalThis.game?.settings?.get?.('fabricate', 'interactionPromptPosition');
+      return typeof value === 'string' && value ? value : DEFAULT_INTERACTION_PROMPT_POSITION;
+    } catch (_error) {
+      return DEFAULT_INTERACTION_PROMPT_POSITION;
+    }
   }
 
   /**

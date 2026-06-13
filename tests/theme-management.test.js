@@ -54,6 +54,7 @@ describe('Fabricate theme management', () => {
       .sort();
     assert.deepEqual(configurableKeys, [
       SETTING_KEYS.EXPERIMENTAL_FEATURES,
+      SETTING_KEYS.INTERACTION_PROMPT_POSITION,
       SETTING_KEYS.THEME
     ].sort());
 
