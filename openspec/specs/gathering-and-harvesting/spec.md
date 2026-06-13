@@ -140,7 +140,7 @@ GatheringEnvironment = {
 
 1. `craftingSystemId` must reference an existing `CraftingSystem`.
 2. `selectionMode` must be either `"targeted"` or `"blind"`.
-3. If `selectionMode === "targeted"`, the environment must define at least one Environment Task.
+3. A gathering environment may be **saved** without any task source so a GM can persist a partially-authored place and return to it later. It may only be **enabled** when it has at least one composed task source (a matching library task in automatic mode, or an `enabledTaskIds` / `forcedTaskIds` entry in manual mode), in either `targeted` or `blind` selection mode. A disabled environment with no task source persists fine; enabling it (via the editor toggle or a save with `enabled: true`) is rejected until a task source exists. This gates enable, not save.
 4. If `selectionMode === "blind"`, the environment may define one or more hidden Environment Tasks. Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
 5. `img` is an optional player-facing environment image independent of any linked scene.
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.

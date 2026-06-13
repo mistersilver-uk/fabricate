@@ -6,7 +6,7 @@
  * Svelte, Foundry, or store dependencies so it stays unit-testable.
  *
  * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
- * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', recordKind?: 'task' | 'event', recordId?: string, recordName?: string }} ReadinessIssue
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', recordKind?: 'task' | 'event', recordId?: string, recordName?: string }} ReadinessIssue
  */
 
 function trimmed(value) {
@@ -52,10 +52,10 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   const active = environment?.enabled !== false;
 
   if (!hasAvailableTask) {
-    issues.push({ id: 'noAvailableTasks', severity: 'critical' });
+    issues.push({ id: 'noAvailableTasks', severity: active ? 'critical' : 'warning', blocks: 'enable' });
   }
   if (active && !hasAvailableTask) {
-    issues.push({ id: 'activeNoComposition', severity: 'critical' });
+    issues.push({ id: 'activeNoComposition', severity: 'critical', blocks: 'enable' });
   }
   for (const entry of [...tasks, ...events]) {
     if (entry.compositionState === 'includedButUnavailable') {
@@ -85,4 +85,8 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
 
 export function countIssues(issues = [], severity) {
   return issues.filter(issue => issue.severity === severity).length;
+}
+
+export function blocksEnable(issues = []) {
+  return issues.some(issue => issue.blocks === 'enable');
 }
