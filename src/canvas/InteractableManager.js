@@ -743,10 +743,12 @@ class InteractableManager {
    *   tool          → SvelteFabricateApp.show('crafting', { activeCanvasTool }).
    *   gatheringTask → SvelteFabricateApp.show('gathering', { environmentId, taskId }).
    *
-   * A gathering-task interactable is a pure (environment, task) shortcut: it opens
-   * the gathering session scoped to that environment + task and reads/decrements the
-   * SAME environment `nodeRuntime[taskId]` as opening gathering directly. There is
-   * NO per-interactable node override.
+   * A gathering-task interactable opens the gathering session scoped to that
+   * environment + task. When LINKED (`taskNodeLink === 'linked'`, the default) it
+   * reads / decrements the SAME environment `nodeRuntime[taskId]` as opening
+   * gathering directly. When UNLINKED with its own node pool (issue 302) the
+   * `grant.ref` is threaded through as `interactableRef` so the session resolves
+   * + decrements that scoped pool instead.
    *
    * @param {object} payload  A validated `interactableActivationGranted` payload.
    */
@@ -782,7 +784,19 @@ class InteractableManager {
       if (!environmentId || !taskId) {
         return;
       }
-      void AppClass.show('gathering', { environmentId, taskId, actorId });
+      // The scene-interactable ref (issue 302): only meaningful when the
+      // interactable owns its own scoped node pool, but always passed through —
+      // the engine falls back to the environment scope when the behaviour is
+      // environment-scoped or gone.
+      const interactableRef =
+        grant.ref && typeof grant.ref === 'object'
+          ? {
+              sceneId: grant.ref.sceneId ?? null,
+              regionId: grant.ref.regionId ?? null,
+              behaviorId: grant.ref.behaviorId ?? null,
+            }
+          : null;
+      void AppClass.show('gathering', { environmentId, taskId, actorId, interactableRef });
     }
   }
 

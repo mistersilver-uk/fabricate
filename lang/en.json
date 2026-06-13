@@ -113,7 +113,20 @@
           "RemoveVisualDelete": "Unlink + delete marker",
           "RemoveVisualCancel": "Cancel",
           "NoSelection": "Select a tile, drawing, or token on the canvas first.",
-          "NoVisual": "This interactable has no linked marker to jump to."
+          "NoVisual": "This interactable has no linked marker to jump to.",
+          "Node": {
+            "Heading": "Resource node",
+            "LinkLabel": "Task node link",
+            "LinkLinked": "Linked to gathering task",
+            "LinkUnlinked": "Independent (this interactable only)",
+            "LinkedHint": "Depletion and respawn follow the gathering task's shared node.",
+            "UnlinkedHint": "Independent count, regeneration, and max — separate from the task.",
+            "Available": "Available",
+            "Depleted": "Depleted",
+            "Exhausted": "Permanently exhausted",
+            "Restock": "Restock",
+            "NoRestock": "Cannot restock — this node does not regenerate."
+          }
         }
       },
       "SceneControl": {
@@ -166,6 +179,14 @@
           "environmentId": {
             "label": "Environment",
             "hint": "The gathering environment this resource node belongs to."
+          },
+          "taskNodeLink": {
+            "label": "Task node link (advanced)",
+            "hint": "Whether this gathering task is linked to the gathering task's shared node pool or owns its own independent pool."
+          },
+          "node": {
+            "label": "Independent resource node (advanced)",
+            "hint": "This interactable's own resource node pool, used when it is unlinked from the gathering task. Edit from the Configure Fabricate Interactable window."
           },
           "name": {
             "label": "Name",

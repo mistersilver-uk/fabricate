@@ -11,13 +11,15 @@
  *    `canvasReady` too, so a disabled/hidden interactable loads hidden for players.
  *  - IMAGE-SWAP (gatheringTask only): the env-node depletion image swap below.
  *
- * The image-swap feature: when an environment's node for a task is depleted
- * (`environment.nodeRuntime[taskId].current <= 0`) AND the task configures a
- * `depletedBehavior.swapImage`, EVERY linked Tile marker for that
- * `(environment, task)` shows the swap image; when the node recharges (respawns
- * above 0) all markers flip back to the available image. Markers reflect the
- * SHARED environment node — there is no per-marker pool. The active GM applies the
- * tile writes and every client sees them via Foundry document sync.
+ * The image-swap feature: when a gathering task's node is depleted (`current <=
+ * 0`) AND it configures a `depletedBehavior.swapImage`, the linked Tile marker
+ * shows the swap image; when the node recharges (respawns above 0) it flips back
+ * to the available image. The depleted state is read from whichever pool the
+ * interactable uses: the SHARED environment node (default,
+ * `environment.nodeRuntime[taskId]`) OR — when `taskNodeLink === 'unlinked'`
+ * (issue 302) — the behaviour's OWN scoped `system.node` (read independently, no
+ * env/task resolution needed). The active GM applies the tile writes and every
+ * client sees them via Foundry document sync.
  *
  * The DECISION (`resolveMarkerImage`) is PURE + unit-tested. The EDGE
  * (`syncInteractableMarkers`) iterates scenes/regions/behaviours and performs the
@@ -83,11 +85,27 @@ export function resolveMarkerImage({ behaviorSystem, environment, task, availabl
   const linked = system.linkedVisual;
   if (!linked || linked.documentName !== 'Tile' || !linked.uuid) return null;
 
+  const available =
+    typeof availableImg === 'string' && availableImg.trim() ? availableImg.trim() : '';
+
+  // Interactable-SCOPED node (issue 302): depletion + swap image come from the
+  // behaviour's OWN node pool, never the environment runtime. Independent of any
+  // resolved env/task.
+  if (system.taskNodeLink === 'unlinked' && system.node) {
+    const swapImage =
+      typeof system.node.depletedBehavior?.swapImage === 'string'
+        ? system.node.depletedBehavior.swapImage.trim()
+        : '';
+    if (!swapImage) return { desiredImg: available, depleted: false };
+    const depleted = Number(system.node.current || 0) <= 0;
+    return { desiredImg: depleted ? swapImage : available, depleted };
+  }
+
+  // Environment-scoped node (default, unchanged): depletion + swap image come from
+  // the resolved env runtime + library task.
   const taskId = system.taskId;
   if (!taskId || !environment || !task) return null;
 
-  const available =
-    typeof availableImg === 'string' && availableImg.trim() ? availableImg.trim() : '';
   const swapImage =
     typeof task?.nodes?.depletedBehavior?.swapImage === 'string'
       ? task.nodes.depletedBehavior.swapImage.trim()
@@ -188,17 +206,22 @@ async function syncOneBehavior(
       update.hidden = desiredHidden;
     }
 
-    // Image-swap reconcile (gatheringTask only): env-node depletion drives the
-    // marker texture between the available and `depletedBehavior.swapImage`.
+    // Image-swap reconcile (gatheringTask only): node depletion drives the marker
+    // texture between the available and `depletedBehavior.swapImage`. For an
+    // interactable-SCOPED node (issue 302) the depletion + swap image come from the
+    // behaviour's own pool and need no env/task resolution; the default
+    // environment-scoped path still resolves the env runtime + library task.
     if (system.interactableType === 'gatheringTask') {
-      const environment = system.environmentId
-        ? (resolveEnvironment?.(system.environmentId) ?? null)
-        : null;
+      const scoped = system.taskNodeLink === 'unlinked' && system.node;
+      const environment =
+        !scoped && system.environmentId
+          ? (resolveEnvironment?.(system.environmentId) ?? null)
+          : null;
       const task =
-        system.systemId && system.taskId
+        !scoped && system.systemId && system.taskId
           ? (resolveTask?.(system.systemId, system.taskId) ?? null)
           : null;
-      if (environment && task) {
+      if (scoped || (environment && task)) {
         // Prefer a previously-stashed available image; else the current tile texture
         // (when available) so a non-depleted tile's restore target is the GM's actual
         // marker; finally the task img.

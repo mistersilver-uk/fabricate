@@ -8,6 +8,22 @@ const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inve
 const DEFAULT_TAB = 'crafting';
 
 /**
+ * Normalize a scene-interactable ref to `{sceneId, regionId, behaviorId}` (issue
+ * 302), or null when any id is missing.
+ *
+ * @param {object|null} ref
+ * @returns {{sceneId:string, regionId:string, behaviorId:string}|null}
+ */
+function normalizeInteractableRef(ref) {
+  if (!ref || typeof ref !== 'object') return null;
+  const sceneId = typeof ref.sceneId === 'string' ? ref.sceneId : null;
+  const regionId = typeof ref.regionId === 'string' ? ref.regionId : null;
+  const behaviorId = typeof ref.behaviorId === 'string' ? ref.behaviorId : null;
+  if (!sceneId || !regionId || !behaviorId) return null;
+  return { sceneId, regionId, behaviorId };
+}
+
+/**
  * The unified Fabricate window: a single shared application with a full-height
  * left navigation (Crafting, Gathering, Journal, Inventory). Tab content is an
  * empty placeholder shell for now.
@@ -46,6 +62,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   // is granted the interacting actor (the token the player walked in) becomes the
   // default-selected actor in the top bar (when selectable). Cleared on close.
   _scopedActorId = null;
+  // Session-scoped scene-interactable ref ({sceneId, regionId, behaviorId}) for a
+  // gathering-task interactable that owns its own scoped node pool (issue 302).
+  // Threaded into the gathering attempt so it decrements that scoped pool. Cleared
+  // on close.
+  _scopedInteractableRef = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
@@ -79,6 +100,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (typeof options.actorId === 'string') {
       this._scopedActorId = options.actorId;
     }
+    if (options.interactableRef && typeof options.interactableRef === 'object') {
+      this._scopedInteractableRef = normalizeInteractableRef(options.interactableRef);
+    }
   }
 
   _buildServices() {
@@ -107,6 +131,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       }) ?? null,
       startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.({
         presentTools: presentTools(),
+        // Thread the session-scoped interactable ref (issue 302) unless the caller
+        // overrode it. Inert when null (the engine uses the environment scope).
+        interactableRef: this._scopedInteractableRef,
         ...opts
       }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
@@ -220,6 +247,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._scopedEnvironmentId = null;
     this._scopedTaskId = null;
     this._scopedActorId = null;
+    this._scopedInteractableRef = null;
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
@@ -232,6 +260,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._scopedEnvironmentId = null;
     this._scopedTaskId = null;
     this._scopedActorId = null;
+    this._scopedInteractableRef = null;
     super._onClose(options);
   }
 
@@ -254,23 +283,28 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * @param {string} [options.actorId] Scoped interacting actor — seeds the default
    *   top-bar selection (set when supplied, cleared when not, like the tool/env/task
    *   context).
+   * @param {object} [options.interactableRef] Scoped scene-interactable ref
+   *   (`{sceneId, regionId, behaviorId}`) for a gathering-task interactable that
+   *   owns its own node pool (issue 302); threaded into the attempt.
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId } = {}) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
     const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
     const nextTaskId = typeof taskId === 'string' ? taskId : null;
     const nextActorId = typeof actorId === 'string' ? actorId : null;
+    const nextInteractableRef = normalizeInteractableRef(interactableRef);
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
-      // Re-show REPLACES the session-scoped canvas tool + scoped env/task/actor
+      // Re-show REPLACES the session-scoped canvas tool + scoped env/task/actor/ref
       // context (set when supplied, cleared when not) so a manual re-open never
       // inherits a stale station context.
       existing._activeCanvasTool = nextCanvasTool;
       existing._scopedEnvironmentId = nextEnvironmentId;
       existing._scopedTaskId = nextTaskId;
       existing._scopedActorId = nextActorId;
+      existing._scopedInteractableRef = nextInteractableRef;
       // Push the replaced tool + scoped env/task/actor to the mounted tree so the
       // status chip updates, the gathering view re-auto-selects the scoped env+task,
       // and a re-interaction with a different actor re-seeds the selection.
@@ -289,7 +323,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       activeCanvasTool: nextCanvasTool,
       environmentId: nextEnvironmentId,
       taskId: nextTaskId,
-      actorId: nextActorId
+      actorId: nextActorId,
+      interactableRef: nextInteractableRef
     });
     SvelteFabricateApp._instance = app;
     await app.render(true);

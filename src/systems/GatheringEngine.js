@@ -1,4 +1,9 @@
 import {
+  isInteractableRegionBehavior,
+  readInteractableBehaviorSystem,
+} from '../canvas/regions/interactableRegionFlags.js';
+import { identifyRegionBehaviorRef } from '../canvas/regions/interactableRegionNodeAdapter.js';
+import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
@@ -119,6 +124,13 @@ export class GatheringEngine {
         globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id
       ),
     getActors = () => [...(globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [])],
+    // Scene graph + scoped-behaviour writer seams for interactable-scoped node
+    // respawn (issue 302). `scenes` is scanned for `fabricate.interactable`
+    // behaviours that own their own node pool; `applyInteractableBehaviorUpdate`
+    // routes the resulting behaviour-system patch through the active GM. Both are
+    // injected by main.js (fake in tests); absent → no scoped respawn pass.
+    scenes = () => globalThis.game?.scenes ?? null,
+    applyInteractableBehaviorUpdate = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.runManager = runManager;
@@ -144,6 +156,11 @@ export class GatheringEngine {
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
     this.getActors = typeof getActors === 'function' ? getActors : () => [];
+    this.scenes = typeof scenes === 'function' ? scenes : () => null;
+    this.applyInteractableBehaviorUpdate =
+      typeof applyInteractableBehaviorUpdate === 'function'
+        ? applyInteractableBehaviorUpdate
+        : null;
   }
 
   /**
@@ -190,9 +207,11 @@ export class GatheringEngine {
     // never double-apply; regen/respawn are idempotent per advanced anchor.
     let staminaRegen = [];
     let nodeRespawn = [];
+    let interactableNodeRespawn = [];
     if (this.isPrimaryGM()) {
       staminaRegen = await this._processStaminaRegen(worldTime);
       nodeRespawn = await this._processNodeRespawn(worldTime);
+      interactableNodeRespawn = await this._processInteractableNodeRespawn(worldTime);
     }
 
     return {
@@ -204,6 +223,7 @@ export class GatheringEngine {
       errors,
       staminaRegen,
       nodeRespawn,
+      interactableNodeRespawn,
     };
   }
 
@@ -268,6 +288,76 @@ export class GatheringEngine {
     return changed;
   }
 
+  /**
+   * Respawn interactable-SCOPED resource nodes as world time passes (issue 302).
+   * Scans every scene region behaviour for `fabricate.interactable` gathering
+   * tasks that own their own node pool (`taskNodeLink === 'unlinked'`, with a
+   * real `node`) in a nodes-enabled system, advances each pool through the same
+   * calendar-aware respawn arithmetic the environment pass uses, and writes the
+   * changed `system.node` back via the active-GM routed seam. `nonRegenerating` /
+   * `manual` pools never gain (the math short-circuits). Per-behaviour failures
+   * are swallowed so one bad behaviour cannot abort the tick. Returns the list of
+   * changed `{sceneId, regionId, behaviorId}` refs.
+   *
+   * @param {number} worldTime
+   * @returns {Promise<Array<{sceneId:string, regionId:string, behaviorId:string}>>}
+   */
+  async _processInteractableNodeRespawn(worldTime) {
+    if (typeof this.richState?.respawnInteractableNode !== 'function') return [];
+    const sceneGraph = this.scenes?.();
+    if (!sceneGraph || typeof this.applyInteractableBehaviorUpdate !== 'function') return [];
+    const now = Number(worldTime);
+    if (!Number.isFinite(now)) return [];
+
+    const changed = [];
+    for (const scene of iterateCollection(sceneGraph)) {
+      for (const region of iterateCollection(scene?.regions)) {
+        for (const behavior of iterateCollection(region?.behaviors)) {
+          try {
+            if (!isInteractableRegionBehavior(behavior)) continue;
+            const view = readInteractableBehaviorSystem(behavior);
+            if (!view || view.taskNodeLink !== 'unlinked' || !view.node) continue;
+            if (this.richState.nodesEnabled?.(view.systemId) !== true) continue;
+
+            const ref = identifyRegionBehaviorRef(behavior);
+            if (!ref) continue;
+
+            const result = await this.richState.respawnInteractableNode({
+              node: view.node,
+              worldTime: now,
+            });
+            if (!result?.changed) continue;
+
+            await this.applyInteractableBehaviorUpdate(ref, {
+              system: { node: result.node },
+            });
+            this._callRespawnHook(ref, view, result.node);
+            changed.push(ref);
+          } catch (error) {
+            console.warn('Fabricate | interactable-scoped node respawn failed:', error);
+
+            continue;
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
+  _callRespawnHook(ref, view, node) {
+    try {
+      globalThis.Hooks?.callAll?.('fabricate.gathering.nodeRespawned', {
+        interactableRef: ref,
+        systemId: view.systemId,
+        taskId: view.taskId,
+        current: Number(node?.current || 0),
+        max: Number(node?.max || 0),
+      });
+    } catch {
+      // A hook callback must never abort the respawn pass.
+    }
+  }
+
   async startAttempt({
     viewer = null,
     actor = null,
@@ -279,6 +369,10 @@ export class GatheringEngine {
     // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
     // ONLY for tasks in the matching crafting system — componentId is per-system.
     presentTools = null,
+    // Optional scene-interactable ref ({sceneId, regionId, behaviorId}) when the
+    // attempt was opened against an interactable that owns its own scoped node
+    // pool (issue 302). Null for the default environment-scoped flow.
+    interactableRef = null,
   } = {}) {
     const resolved = await this._resolveStartContext({
       viewer,
@@ -456,6 +550,7 @@ export class GatheringEngine {
       system,
       environment,
       task,
+      interactableRef,
     });
     if (richAttempt.blockedReasons.length > 0) {
       return this._blockedStart({
@@ -493,6 +588,7 @@ export class GatheringEngine {
         environment,
         task,
         richAttempt,
+        interactableRef,
       });
     }
 
@@ -504,6 +600,7 @@ export class GatheringEngine {
       task,
       richAttempt,
       presentTools,
+      interactableRef,
     });
   }
 
@@ -514,7 +611,7 @@ export class GatheringEngine {
       return this._cancelMissingReferenceRun({ viewer, actor, run, resolved });
     }
 
-    const { system, environment, task } = resolved;
+    const { system, environment, task, interactableRef } = resolved;
     const configuration = this._validateStartTask(task);
     if (configuration.valid !== true) {
       return this._clearMisconfiguredWaitingRun({
@@ -591,6 +688,7 @@ export class GatheringEngine {
       task,
       outcome,
       viewer,
+      interactableRef,
     });
     const completedRunWithRichEvidence =
       richEvidence && typeof richEvidence === 'object'
@@ -1055,7 +1153,15 @@ export class GatheringEngine {
       return { missingReference: 'task', system, environment };
     }
 
-    return { system, environment: snapshotEnvironment || environment, task };
+    return {
+      system,
+      environment: snapshotEnvironment || environment,
+      task,
+      // Scoped-node ref persisted at start (issue 302); null for the env flow.
+      // `_resolveNodeSource` falls back to the environment branch if the behaviour
+      // no longer resolves at maturity, so the decrement is never dropped.
+      interactableRef: normalizeInteractableRef(run?.interactableRef),
+    };
   }
 
   _isSelectableActor(actor, viewer, selectableActors) {
@@ -2255,14 +2361,29 @@ export class GatheringEngine {
    * @returns {Promise<{blockedReasons: object[], evidence: object}>} Mapped
    *   blocked reasons and the rich-listing evidence.
    */
-  async _evaluateRichAttempt({ actor, viewer, system, environment, task, transparent = false }) {
+  async _evaluateRichAttempt({
+    actor,
+    viewer,
+    system,
+    environment,
+    task,
+    transparent = false,
+    interactableRef = null,
+  }) {
     if (typeof this.richState?.evaluateStart !== 'function') {
       return {
         blockedReasons: [],
         evidence: this._richListingMetadata({ environment, task, actor, viewer }),
       };
     }
-    const result = await this.richState.evaluateStart({ actor, viewer, system, environment, task });
+    const result = await this.richState.evaluateStart({
+      actor,
+      viewer,
+      system,
+      environment,
+      task,
+      interactableRef,
+    });
     const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     return {
       blockedReasons: normalizeList(result?.blockedReasons).map((reason) =>
@@ -2438,7 +2559,15 @@ export class GatheringEngine {
     };
   }
 
-  async _startWaitingAttempt({ viewer, actor, system, environment, task, richAttempt = null }) {
+  async _startWaitingAttempt({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    richAttempt = null,
+    interactableRef = null,
+  }) {
     if (typeof this.runManager?.createWaitingRun !== 'function') {
       return this._blockedStart({
         viewer,
@@ -2461,6 +2590,11 @@ export class GatheringEngine {
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id),
     };
+    // Persist the scene-interactable ref so a timed run that matures later
+    // decrements the SAME scoped node it gated against (issue 302). Null/absent
+    // for the environment-scoped flow (no behaviour stored).
+    const persistedRef = normalizeInteractableRef(interactableRef);
+    if (persistedRef) runData.interactableRef = persistedRef;
     if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
       const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
       richPayload.economyEvidence = {
@@ -2498,6 +2632,7 @@ export class GatheringEngine {
         task,
         outcome: { status: 'waitingTime' },
         viewer,
+        interactableRef,
       });
       const waitingRun =
         richEvidence && typeof richEvidence === 'object'
@@ -2543,6 +2678,7 @@ export class GatheringEngine {
     task,
     richAttempt = null,
     presentTools = null,
+    interactableRef = null,
   }) {
     const outcome =
       task.resolutionMode === 'd100'
@@ -2649,6 +2785,7 @@ export class GatheringEngine {
       task,
       outcome,
       viewer,
+      interactableRef,
     });
     if (richEvidence && typeof richEvidence === 'object') {
       run = {
@@ -2817,7 +2954,15 @@ export class GatheringEngine {
     };
   }
 
-  async _commitRichAttempt({ actor, system, environment, task, outcome, viewer = null }) {
+  async _commitRichAttempt({
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    viewer = null,
+    interactableRef = null,
+  }) {
     if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
     return this.richState.commitAcceptedAttempt({
       actor,
@@ -2826,6 +2971,7 @@ export class GatheringEngine {
       task,
       outcome,
       viewer,
+      interactableRef,
     });
   }
 
@@ -4288,6 +4434,39 @@ function stringOrNull(value) {
 function stringOrEmpty(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+/**
+ * Normalize a scene-interactable ref to `{sceneId, regionId, behaviorId}` (issue
+ * 302), or null when any id is missing. Used to persist the ref on a waiting run
+ * and resolve it back at maturity.
+ *
+ * @param {object|null} ref
+ * @returns {{sceneId:string, regionId:string, behaviorId:string}|null}
+ */
+/**
+ * Iterate a Foundry collection / array / EmbeddedCollection (scenes, regions,
+ * behaviours) tolerantly, mirroring the scan in `interactableMarkerDepletion`.
+ * Returns an empty array for nullish input so callers can `for...of` safely.
+ *
+ * @param {*} collection
+ * @returns {Iterable<*>}
+ */
+function iterateCollection(collection) {
+  if (!collection) return [];
+  if (typeof collection[Symbol.iterator] === 'function') return collection;
+  if (Array.isArray(collection?.contents)) return collection.contents;
+  if (typeof collection?.values === 'function') return collection.values();
+  return [];
+}
+
+function normalizeInteractableRef(ref) {
+  if (!ref || typeof ref !== 'object') return null;
+  const sceneId = stringOrNull(ref.sceneId);
+  const regionId = stringOrNull(ref.regionId);
+  const behaviorId = stringOrNull(ref.behaviorId);
+  if (!sceneId || !regionId || !behaviorId) return null;
+  return { sceneId, regionId, behaviorId };
 }
 
 function defaultLocalize(key) {
