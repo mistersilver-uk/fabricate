@@ -38,7 +38,7 @@ test('essence icon picker options use a fixed icon column with compact padding',
   const block = match[0];
 
   assert.ok(block.includes('grid-template-columns: 28px minmax(0, 1fr);'), 'option rows should reserve a fixed icon column');
-  assert.ok(block.includes('padding: 4px 8px;'), 'option rows should use compact row padding');
+  assert.ok(block.includes('padding: var(--fab-space-1) var(--fab-space-2);'), 'option rows should use compact row padding');
   assert.ok(block.includes('min-height: 34px;'), 'option rows should preserve a stable row height');
 });
 
@@ -53,7 +53,7 @@ test('essence icon picker trigger shares the option icon column and padding', ()
     'trigger should share the 28px icon column with option rows'
   );
   assert.ok(
-    block.includes('padding: 4px 8px;'),
+    block.includes('padding: var(--fab-space-1) var(--fab-space-2);'),
     'trigger should use the same compact padding as picker rows'
   );
 });

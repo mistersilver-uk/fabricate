@@ -4,20 +4,21 @@
   /* Fabricate product UI design-system tokens.
      See the UI design-system requirements in openspec/specs/ui-integration/spec.md.
      Theme colour literals live only in `[data-fabricate-theme]` blocks below.
-     Existing `--fab-v2-*` and legacy `--fabricate-*` aliases map through
-     canonical `--fab-*` tokens until each component migrates intentionally. */
+     Existing `--fab-v2-*` aliases map through canonical `--fab-*` tokens until
+     each component migrates intentionally. */
   --fab-space-1: 4px;
   --fab-space-2: 8px;
   --fab-space-3: 12px;
   --fab-space-4: 16px;
   --fab-space-5: 20px;
   --fab-space-6: 24px;
-  --fabricate-primary: var(--fab-info);
-  --fabricate-success: var(--fab-success);
-  --fabricate-warning: var(--fab-warning);
-  --fabricate-danger: var(--fab-danger);
-  --fabricate-dark: var(--fab-bg-3);
-  --fabricate-light: var(--fab-text);
+  --fab-space-2xs: 2px; /* fine: tokenizes hairline spacing, zero shift */
+  --fab-space-chip: 6px; /* dense optical unit (icon+label gaps, chips), zero shift */
+  --fab-space-xs: var(--fab-space-1); /* 4 */
+  --fab-space-sm: var(--fab-space-2); /* 8 */
+  --fab-space-md: var(--fab-space-3); /* 12 */
+  --fab-space-lg: var(--fab-space-4); /* 16 */
+  --fab-space-xl: var(--fab-space-6); /* 24 */
   --fab-v2-bg: var(--fab-bg-0);
   --fab-v2-surface-1: var(--fab-bg-1);
   --fab-v2-surface-2: var(--fab-bg-2);
@@ -43,7 +44,7 @@
   --fab-v2-thumb-sm: 40px;
   --fab-v2-thumb-md: 58px;
   --fab-v2-row-height: 72px;
-  --fab-v2-panel-gap: 8px;
+  --fab-v2-panel-gap: var(--fab-space-2);
   --fab-v2-shadow: var(--fab-shadow-lg);
   --fab-action-text: var(--fab-on-accent);
   --fab-status-success-text: var(--fab-success-text);
@@ -835,7 +836,7 @@
 
 .fabricate-manager .image-path-picker-controls {
   display: flex;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -848,7 +849,7 @@
 .fabricate-manager .image-path-picker {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -866,7 +867,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex: 0 0 auto;
   white-space: nowrap;
 }
@@ -881,7 +882,7 @@
   flex: 1 1 auto;
   justify-content: flex-start;
   height: 36px;
-  padding: 0 12px;
+  padding: 0 var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-20);
@@ -975,9 +976,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 12px 14px;
+  padding: var(--fab-space-3) var(--fab-space-4);
   border-bottom: 1px solid var(--fab-mv2-border);
   background: var(--fab-mv2-surface-1);
 }
@@ -987,7 +988,7 @@
 }
 
 .fabricate-manager .manager-kicker {
-  margin: 0 0 3px;
+  margin: 0 0 var(--fab-space-2xs);
   color: var(--fab-mv2-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -1003,7 +1004,7 @@
 }
 
 .fabricate-manager .manager-subtitle {
-  margin: 3px 0 0;
+  margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.82rem;
   line-height: 1.35;
@@ -1015,7 +1016,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex-wrap: wrap;
 }
 
@@ -1027,9 +1028,9 @@
 .fabricate-manager .manager-breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
-  margin: 0 0 6px;
+  margin: 0 0 var(--fab-space-chip);
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
   font-weight: 700;
@@ -1079,8 +1080,8 @@
 .fabricate-manager .manager-rail {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
   border-right: 1px solid var(--fab-mv2-border);
   background: var(--fab-bg-0);
 }
@@ -1114,8 +1115,8 @@
 .fabricate-manager .manager-inspector {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
   border-left: 1px solid var(--fab-mv2-border);
   background: var(--fab-mv2-surface-2);
   overflow-y: auto;
@@ -1126,7 +1127,7 @@
 .fabricate-manager .manager-character-modifier-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-character-modifier-card-header {
@@ -1134,13 +1135,13 @@
   flex-flow: row wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-character-modifier-card-header-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
   flex: 1 1 0;
   min-width: 0;
   max-width: 60ch;
@@ -1149,7 +1150,7 @@
 .fabricate-manager .manager-character-modifier-card-header-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-items: center;
   flex: 0 0 auto;
 }
@@ -1164,14 +1165,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-character-modifier-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-mv2-surface-1);
@@ -1180,7 +1181,7 @@
 .fabricate-manager .manager-character-modifier-summary {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-character-modifier-icon {
@@ -1209,7 +1210,7 @@
   font-size: 0.7rem;
   border: 1px solid var(--fab-mv2-border);
   background: var(--fab-mv2-surface-1);
-  padding: 2px 6px;
+  padding: var(--fab-space-2xs) var(--fab-space-chip);
   border-radius: 999px;
 }
 
@@ -1221,12 +1222,12 @@
 .fabricate-manager .manager-character-modifier-editor {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-character-modifier-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   justify-content: flex-end;
 }
 
@@ -1248,17 +1249,17 @@
 .fabricate-manager .manager-drop-inspector-divider {
   width: calc(100% + 24px);
   height: 1px;
-  margin: 10px -12px 0;
+  margin: var(--fab-space-3) calc(-1 * var(--fab-space-3)) 0;
   background: var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-drop-inspector-scroll {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
-  padding-top: 12px;
+  padding-top: var(--fab-space-3);
   overflow: hidden auto;
 }
 
@@ -1276,14 +1277,14 @@
 .fabricate-manager .manager-drop-editor-header-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-character-modifier-row-card,
 .fabricate-manager .manager-drop-editor-condition-modifier-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-character-modifier-row-card-header {
@@ -1291,13 +1292,13 @@
   flex-flow: row wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-character-modifier-row-card-heading {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
   flex: 1 1 0;
   min-width: 0;
   max-width: 36ch;
@@ -1315,9 +1316,9 @@
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-height: 32px;
-  padding: 5px 7px;
+  padding: var(--fab-space-1) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-character-modifier-add-suggestion > i {
@@ -1333,15 +1334,15 @@
 .fabricate-manager .manager-condition-modifier-row-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-character-modifier-row-reference,
 .fabricate-manager .manager-condition-modifier-row-reference {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-mv2-surface-1);
@@ -1350,7 +1351,7 @@
 .fabricate-manager .manager-character-modifier-row-reference-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex-wrap: wrap;
 }
 
@@ -1384,7 +1385,7 @@
   width: 56px;
   height: 28px;
   min-height: 28px;
-  padding: 3px 16px 3px 4px;
+  padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
   text-align: center;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
@@ -1407,7 +1408,7 @@
 .fabricate-manager .manager-condition-modifier-add-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
 }
 
@@ -1437,7 +1438,7 @@
   background: var(--fab-mv2-bg);
   color: inherit;
   font-size: 0.75rem;
-  padding: 0 6px;
+  padding: 0 var(--fab-space-chip);
   cursor: pointer;
 }
 
@@ -1478,7 +1479,7 @@
 
 .fabricate-manager .manager-character-modifier-row-bounds {
   display: flex;
-  gap: 12px;
+  gap: var(--fab-space-3);
   flex-wrap: wrap;
 }
 
@@ -1491,7 +1492,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-character-modifier-override-row .manager-status-toggle {
@@ -1513,7 +1514,7 @@
 .fabricate-manager .manager-provider-expression-input {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .visually-hidden {
@@ -1531,7 +1532,7 @@
 .fabricate-manager .manager-section-header,
 .fabricate-manager .manager-toolbar {
   min-width: 0;
-  padding: 12px;
+  padding: var(--fab-space-3);
   border-bottom: 1px solid var(--fab-mv2-border);
 }
 
@@ -1539,13 +1540,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: start;
   background: var(--fab-overlay-light-03);
 }
@@ -1571,7 +1572,7 @@
 .fabricate-manager .manager-toolbar-primary {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -1579,7 +1580,7 @@
 .fabricate-manager .manager-toolbar-pills {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
   width: 100%;
@@ -1594,7 +1595,7 @@
 .fabricate-manager .manager-filter {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
@@ -1624,7 +1625,7 @@
 .fabricate-manager .manager-tag-search {
   position: relative;
   display: grid;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex: 1 1 210px;
   min-width: 180px;
   max-width: 320px;
@@ -1652,9 +1653,9 @@
   right: 0;
   left: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   max-height: 148px;
-  padding: 4px;
+  padding: var(--fab-space-1);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 6px;
   background: var(--fab-mv2-surface-1);
@@ -1666,10 +1667,10 @@
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   min-height: 28px;
-  padding: 4px 8px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 0;
   border-radius: 4px;
   color: var(--fab-mv2-text);
@@ -1684,7 +1685,7 @@
 }
 
 .fabricate-manager .manager-tag-no-matches {
-  padding: 5px 8px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
   font-weight: 600;
@@ -1693,13 +1694,13 @@
 .fabricate-manager .manager-selected-tag-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
 }
 
 .fabricate-manager .manager-selected-tag-pill {
-  padding-right: 4px;
+  padding-right: var(--fab-space-1);
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
@@ -1735,7 +1736,7 @@
 
 .fabricate-manager .manager-clear-filters {
   margin-left: auto;
-  padding: 0 10px;
+  padding: 0 var(--fab-space-2);
   min-height: 30px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -1748,8 +1749,8 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
   border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-03);
   color: var(--fab-mv2-text-muted);
@@ -1763,7 +1764,7 @@
 .fabricate-manager .manager-pagination-nav {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-pagination-page {
@@ -1776,7 +1777,7 @@
 .fabricate-manager .manager-pagination-size {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-pagination-size select {
@@ -1793,13 +1794,13 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
-  padding: 10px 12px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3) var(--fab-space-3);
 }
 
 .fabricate-manager .manager-systems-table {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -1808,7 +1809,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -1821,7 +1822,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -1858,7 +1859,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -1867,7 +1868,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -1876,7 +1877,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -1888,13 +1889,13 @@
 .fabricate-manager .manager-system-row {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(92px, 0.42fr) 72px 118px;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
 
 .fabricate-manager .manager-table-head {
-  padding: 0 10px 2px;
+  padding: 0 var(--fab-space-2) var(--fab-space-2xs);
   color: var(--fab-mv2-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -1905,7 +1906,7 @@
 .fabricate-manager .manager-recipe-row {
   display: grid;
   grid-template-columns: var(--fab-mv2-recipe-grid);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
   min-width: 0;
@@ -1915,7 +1916,7 @@
 .fabricate-manager .manager-component-row {
   display: grid;
   grid-template-columns: var(--fab-mv2-component-grid);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
   min-width: 0;
@@ -1925,7 +1926,7 @@
 .fabricate-manager .manager-environment-row {
   display: grid;
   grid-template-columns: var(--fab-mv2-environment-grid);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
   min-width: 0;
@@ -1935,7 +1936,7 @@
 .fabricate-manager .manager-gathering-task-row {
   display: grid;
   grid-template-columns: var(--fab-mv2-gathering-task-grid);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
   min-width: 0;
@@ -1945,7 +1946,7 @@
 .fabricate-manager .manager-essence-row {
   display: grid;
   grid-template-columns: var(--fab-mv2-essence-grid);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
   min-width: 0;
@@ -1967,7 +1968,7 @@
 .fabricate-manager .manager-system-row {
   width: 100%;
   min-height: 72px;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -2009,12 +2010,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 5px;
+  gap: var(--fab-space-1);
   width: auto;
   min-width: 0;
   max-width: 64px;
   height: 24px;
-  padding: 3px 7px 3px 3px;
+  padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 999px;
   color: var(--fab-mv2-text);
@@ -2064,7 +2065,7 @@
   width: 24px;
   height: 14px;
   flex: 0 0 24px;
-  padding: 2px;
+  padding: var(--fab-space-2xs);
   border-radius: 999px;
   background: var(--fab-overlay-light-14);
 }
@@ -2123,7 +2124,7 @@
 .fabricate-manager .manager-essence-row {
   width: 100%;
   min-height: 76px;
-  padding: 9px 10px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -2153,7 +2154,7 @@
 .fabricate-manager .manager-inspector-title-row {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -2161,7 +2162,7 @@
 .fabricate-manager .manager-inspector-title-row.is-hero-large {
   grid-template-columns: 56px minmax(0, 1fr);
   align-items: start;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-system-identity {
@@ -2199,11 +2200,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px;
   align-items: start;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
   height: 64px;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: inherit;
@@ -2258,7 +2259,7 @@
   -webkit-appearance: none;
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   width: 100%;
   min-width: 0;
@@ -2273,14 +2274,14 @@
 
 .fabricate-manager .manager-environment-identity {
   grid-template-columns: 64px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-self: center;
   min-height: 64px;
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity {
   grid-template-columns: 64px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: center;
   align-self: center;
   min-height: 64px;
@@ -2302,7 +2303,7 @@
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   align-self: center;
   min-width: 0;
 }
@@ -2316,13 +2317,13 @@
    height is driven by the 64px thumbnail, not a wrapped second button row. */
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-row .manager-action-group {
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-gathering-task-tags-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-content: flex-start;
   align-items: flex-start;
   align-self: flex-start;
@@ -2331,7 +2332,7 @@
   /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
   height: 64px;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-availability-pill.is-realm { --fab-chip-color: var(--fab-info); }
@@ -2413,7 +2414,7 @@
 .fabricate-manager .manager-environment-thumb.is-fallback,
 .fabricate-manager .manager-environment-preview.is-fallback {
   object-fit: contain;
-  padding: 8px;
+  padding: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-system-icon i,
@@ -2449,7 +2450,7 @@
 
 .fabricate-manager .manager-system-description,
 .fabricate-manager .manager-muted {
-  margin: 3px 0 0;
+  margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -2486,11 +2487,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: var(--fab-space-1);
   width: fit-content;
   max-width: 100%;
   min-height: 24px;
-  padding: 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -2503,7 +2504,7 @@
 .fabricate-manager .manager-chip-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -2547,11 +2548,11 @@
 .fabricate-manager .manager-component-drop-zone {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  margin: 12px;
-  padding: 11px 12px;
+  margin: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -2595,7 +2596,7 @@
 }
 
 .fabricate-manager .manager-component-drop-zone small {
-  margin-top: 2px;
+  margin-top: var(--fab-space-2xs);
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
   line-height: 1.35;
@@ -2604,20 +2605,20 @@
 .fabricate-manager .manager-tags-categories-workspace {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-vocabulary-panel {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
   min-height: 0;
-  padding: 12px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-mv2-surface-2);
@@ -2632,14 +2633,14 @@
 .fabricate-manager .manager-vocabulary-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: end;
 }
 
 .fabricate-manager .manager-vocabulary-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
   overflow: auto;
 }
@@ -2647,10 +2648,10 @@
 .fabricate-manager .manager-vocabulary-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 32px;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-height: 52px;
-  padding: 9px;
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
@@ -2669,7 +2670,7 @@
 
 .fabricate-manager .manager-vocabulary-main {
   display: grid;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -2681,9 +2682,9 @@
 
 .fabricate-manager .manager-vocabulary-empty {
   display: grid;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
-  padding: 14px;
+  padding: var(--fab-space-4);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text-muted);
@@ -2699,7 +2700,7 @@
 .fabricate-manager .manager-essence-identity {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -2742,23 +2743,23 @@
 .fabricate-manager .manager-essence-edit-view {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   overflow: auto;
 }
 
 .fabricate-manager .manager-essence-edit-grid {
   display: grid;
   grid-template-columns: var(--fab-mv2-essence-icon-column, 156px) minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
 .fabricate-manager .manager-essence-icon-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -2785,7 +2786,7 @@
 .fabricate-manager .manager-essence-icon-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -2801,7 +2802,7 @@
 
 .fabricate-manager .manager-essence-icon-actions {
   display: grid;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -2813,7 +2814,7 @@
 .fabricate-manager .manager-essence-core-fields {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -2831,25 +2832,25 @@
 
 .fabricate-manager .manager-essence-source-panel {
   display: grid;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding-top: 12px;
+  padding-top: var(--fab-space-3);
   border-top: 1px solid var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-essence-source-stack {
   display: grid;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-essence-source-summary {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr) 34px;
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  padding: 8px;
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
@@ -2863,9 +2864,9 @@
 .fabricate-manager .manager-essence-inspector-source-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  margin-top: 10px;
+  margin-top: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-essence-inspector-source-actions .manager-button {
@@ -2933,11 +2934,11 @@
   display: inline-grid;
   grid-template-columns: 28px minmax(0, 1fr) 16px;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
   min-height: 36px;
-  padding: 4px 8px;
+  padding: var(--fab-space-1) var(--fab-space-2);
 }
 
 .fabricate-manager .essence-icon-picker-trigger-label {
@@ -2970,7 +2971,7 @@
   width: 140px;
   max-width: 100%;
   aspect-ratio: 1 / 1;
-  padding: 8px;
+  padding: var(--fab-space-2);
   overflow: hidden;
 }
 
@@ -2998,7 +2999,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
   line-height: 1.25;
@@ -3048,9 +3049,9 @@
   z-index: 120;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 8px;
   background: var(--fab-mv2-surface-2);
@@ -3063,7 +3064,7 @@
   width: 100%;
   min-width: 0;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -3073,7 +3074,7 @@
 .fabricate-manager .essence-icon-picker-options,
 .fabricate-manager .essence-source-picker-grid {
   display: grid;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-height: 0;
   overflow: auto;
 }
@@ -3085,22 +3086,22 @@
 .fabricate-manager .essence-icon-picker-option {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
   min-height: 34px;
-  padding: 4px 8px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   text-align: left;
 }
 
 .fabricate-manager .essence-source-picker-option {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
   min-height: 44px;
-  padding: 5px;
+  padding: var(--fab-space-1);
   text-align: left;
 }
 
@@ -3132,7 +3133,7 @@
 .fabricate-manager .manager-environment-evidence {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -3149,7 +3150,7 @@
   align-items: center;
   justify-content: flex-end;
   justify-self: end;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   width: 100%;
 }
 
@@ -3157,13 +3158,13 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
@@ -3181,17 +3182,17 @@
 .fabricate-manager .manager-inspector-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-requirement-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  padding: 7px 8px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
@@ -3206,10 +3207,10 @@
 .fabricate-manager .manager-essence-usage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
-  gap: 6px;
+  gap: var(--fab-space-chip);
   max-height: 132px;
   min-width: 0;
-  margin-top: 10px;
+  margin-top: var(--fab-space-3);
   overflow: auto;
 }
 
@@ -3244,11 +3245,11 @@
 .fabricate-manager .manager-system-edit-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-editor-shell {
@@ -3257,7 +3258,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-editor-shell .environments-panel {
@@ -3277,7 +3278,7 @@
 .fabricate-manager .manager-environment-edit-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
 }
@@ -3298,14 +3299,14 @@
 .fabricate-manager .manager-environment-details-band {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-task-tabs {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -3316,10 +3317,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-height: 32px;
   min-width: 0;
-  padding: 0 10px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text-muted);
@@ -3341,20 +3342,20 @@
 .fabricate-manager .manager-environment-details-grid {
   display: grid;
   grid-template-columns: minmax(300px, 1.02fr) minmax(360px, 1.1fr) minmax(230px, 0.58fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   align-items: stretch;
 }
 
 .fabricate-manager .manager-environment-fields-card,
 .fabricate-manager .manager-environment-status-card {
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -3367,8 +3368,8 @@
   display: grid;
   grid-template-columns: 154px minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 10px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-scene-card img {
@@ -3384,11 +3385,11 @@
 
 .fabricate-manager .manager-environment-scene-card img:not(.is-linked) {
   object-fit: contain;
-  padding: 24px;
+  padding: var(--fab-space-6);
 }
 
 .fabricate-manager .manager-environment-scene-card h3 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--fab-space-2);
   font-size: 1rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -3401,8 +3402,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 14px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-4);
   min-height: 96px;
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 6px;
@@ -3453,13 +3454,13 @@
 .fabricate-manager .manager-environment-status-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-status-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -3483,7 +3484,7 @@
 .fabricate-manager .manager-environment-validation-band {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   padding: 0;
 }
 
@@ -3492,9 +3493,9 @@
   -webkit-appearance: none;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--fab-space-2);
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -3521,16 +3522,16 @@
 }
 
 .fabricate-manager .manager-environment-validation-body {
-  padding: 10px 12px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3) var(--fab-space-3);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-workspace {
   display: grid;
   grid-template-columns: minmax(220px, 0.45fr) minmax(420px, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
 }
@@ -3539,23 +3540,23 @@
 .fabricate-manager .manager-environment-task-editor {
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-task-rail-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-task-rail-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18px 34px;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-items: center;
   min-width: 0;
-  padding: 6px;
+  padding: var(--fab-space-chip);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
@@ -3575,7 +3576,7 @@
   -webkit-appearance: none;
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
-  gap: 7px;
+  gap: var(--fab-space-2);
   align-items: start;
   min-width: 0;
   padding: 0;
@@ -3588,7 +3589,7 @@
 .fabricate-manager .manager-task-rail-select span {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -3609,10 +3610,10 @@
 .fabricate-manager .manager-task-editor-header {
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr) 34px;
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  margin-bottom: 10px;
+  margin-bottom: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-task-editor-header img {
@@ -3625,7 +3626,7 @@
 }
 
 .fabricate-manager .manager-task-editor-header h3 {
-  margin: 0 0 6px;
+  margin: 0 0 var(--fab-space-chip);
   font-size: 1.04rem;
   overflow-wrap: anywhere;
 }
@@ -3633,15 +3634,15 @@
 .fabricate-manager .manager-environment-task-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  margin-top: 10px;
+  margin-top: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-task-panel details {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-task-panel summary.environment-task-header {
@@ -3657,7 +3658,7 @@
 .fabricate-manager .manager-environment-task-panel .environment-time-authoring,
 .fabricate-manager .manager-environment-task-panel .environment-failure-authoring {
   min-width: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
@@ -3674,7 +3675,7 @@
 .fabricate-manager .environment-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .environment-fields .span-2,
@@ -3687,7 +3688,7 @@
 .fabricate-manager .form-group {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--fab-space-1);
   min-width: 0;
   color: var(--fab-mv2-text);
   font-size: 0.8rem;
@@ -3708,19 +3709,19 @@
 .fabricate-manager .form-group input,
 .fabricate-manager .form-group select {
   min-height: 34px;
-  padding: 0 9px;
+  padding: 0 var(--fab-space-2);
 }
 
 .fabricate-manager .form-group textarea {
   min-height: 78px;
-  padding: 8px 9px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
 .fabricate-manager .checkbox-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
   color: var(--fab-mv2-text);
   font-size: 0.82rem;
@@ -3738,7 +3739,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -3769,10 +3770,10 @@
 .fabricate-manager .environment-empty-action.compact {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text-muted);
@@ -3787,7 +3788,7 @@
 .fabricate-manager .environment-selected-item {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -3803,10 +3804,10 @@
 .fabricate-manager .environment-catalyst-row {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) minmax(160px, 1fr) minmax(88px, 0.35fr) auto;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  padding: 8px 0;
+  padding: var(--fab-space-2) 0;
   border-top: 1px solid var(--fab-mv2-border);
 }
 
@@ -3815,13 +3816,13 @@
 }
 
 .fabricate-manager .environment-result-actions {
-  margin-top: 8px;
+  margin-top: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-validation-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -3830,15 +3831,15 @@
 .fabricate-manager .manager-validation-groups {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-validation-group {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 8px;
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
@@ -3848,7 +3849,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -3862,7 +3863,7 @@
 .fabricate-manager .manager-validation-list li {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   color: var(--fab-warning-text);
 }
 
@@ -3882,9 +3883,9 @@
 .fabricate-manager .manager-edit-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 12px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
@@ -3894,21 +3895,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
 .fabricate-manager .manager-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   color: var(--fab-mv2-text);
   font-size: 0.82rem;
@@ -3933,12 +3934,12 @@
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select {
   height: 36px;
-  padding: 0 10px;
+  padding: 0 var(--fab-space-2);
 }
 
 .fabricate-manager .manager-field textarea {
   min-height: 92px;
-  padding: 9px 10px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
@@ -3953,17 +3954,17 @@
 .fabricate-manager .manager-toggle-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-toggle-row {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: flex-start;
   min-width: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
@@ -3979,7 +3980,7 @@
 .fabricate-manager .manager-toggle-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -3995,7 +3996,7 @@
 .fabricate-manager .manager-inspector-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -4014,11 +4015,11 @@
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
   min-height: 36px;
-  padding: 7px 8px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -4045,12 +4046,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
 }
 
 .fabricate-manager .manager-nav-group.is-expanded {
-  gap: 6px;
+  gap: var(--fab-space-chip);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
   box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
@@ -4108,10 +4109,10 @@
 .fabricate-manager .manager-nav-submenu {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-left: 12px;
-  padding-bottom: 6px;
-  padding-right: 6px;
+  gap: var(--fab-space-2xs);
+  padding-left: var(--fab-space-3);
+  padding-bottom: var(--fab-space-chip);
+  padding-right: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-nav-subitem {
@@ -4120,11 +4121,11 @@
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
   min-height: 30px;
-  padding: 5px 8px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 5px;
   color: var(--fab-mv2-text-muted);
@@ -4178,7 +4179,7 @@
 }
 
 .fabricate-manager .manager-inspector-card {
-  padding: 12px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
@@ -4187,19 +4188,19 @@
 .fabricate-manager .manager-fact-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-evidence-list {
-  margin: 6px 0 0;
-  padding: 0 0 0 18px;
+  margin: var(--fab-space-chip) 0 0;
+  padding: 0 0 0 var(--fab-space-4);
   color: var(--fab-mv2-text-muted);
   font-size: 0.82rem;
   line-height: 1.4;
 }
 
 .fabricate-manager .manager-evidence-list > li {
-  margin: 0 0 4px;
+  margin: 0 0 var(--fab-space-1);
 }
 
 .fabricate-manager .manager-evidence-list > li:last-child {
@@ -4211,7 +4212,7 @@
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  padding: 8px;
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
@@ -4258,7 +4259,7 @@
   display: flex;
   align-items: flex-start;
   place-content: flex-start flex-start;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -4266,17 +4267,17 @@
 .fabricate-manager .manager-condition-shortcut-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-condition-shortcut {
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-condition-shortcut-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   color: var(--fab-mv2-text);
   line-height: 1.25;
@@ -4300,7 +4301,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--fab-mv2-border);
@@ -4322,7 +4323,7 @@
 
 .fabricate-manager .manager-button {
   min-height: 34px;
-  padding: 0 12px;
+  padding: 0 var(--fab-space-3);
   font-weight: 700;
 }
 
@@ -4403,7 +4404,7 @@
 
 .fabricate-manager .manager-gathering-panel {
   display: grid;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -4424,7 +4425,7 @@
 .fabricate-manager .manager-gathering-encounters-shell {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-height: 0;
   min-width: 0;
 }
@@ -4434,7 +4435,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -4442,7 +4443,7 @@
 .fabricate-manager .manager-gathering-event-row {
   display: grid;
   grid-template-columns: var(--fab-mv2-gathering-event-grid);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
   min-width: 0;
@@ -4456,7 +4457,7 @@
 .fabricate-manager .manager-gathering-event-row {
   width: 100%;
   min-height: 76px;
-  padding: 9px 10px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -4479,7 +4480,7 @@
 .fabricate-manager .manager-gathering-event-identity {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
   padding: 0;
   border: none;
@@ -4510,7 +4511,7 @@
 .fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: center;
   align-self: center;
   min-height: 64px;
@@ -4527,7 +4528,7 @@
 .fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-system-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   align-self: center;
   min-width: 0;
 }
@@ -4548,13 +4549,13 @@
    height is driven by the 64px thumbnail, not a wrapped second button row. */
 .fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-action-group {
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-gathering-event-tags-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-content: flex-start;
   align-items: flex-start;
   align-self: flex-start;
@@ -4563,7 +4564,7 @@
   /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
   height: 64px;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-danger-tag-pill {
@@ -4571,11 +4572,11 @@
   -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   box-sizing: border-box;
   min-height: 28px;
   max-width: 100%;
-  padding: 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 5px;
   background: var(--fab-mv2-surface-1);
@@ -4640,9 +4641,9 @@
 
 .fabricate-manager .manager-danger-tag-input-row {
   display: flex;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-items: center;
-  margin-top: 6px;
+  margin-top: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-danger-tag-input-row input {
@@ -4653,10 +4654,10 @@
 .fabricate-manager .manager-gathering-event-edit-view {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-height: 0;
   min-width: 0;
-  padding: 14px;
+  padding: var(--fab-space-4);
   overflow: auto;
 }
 
@@ -4667,7 +4668,7 @@
 .fabricate-manager .manager-gathering-event-edit-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: stretch;
   min-width: 0;
 }
@@ -4686,9 +4687,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-height: 48px;
-  padding: 10px 14px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text-muted);
@@ -4705,9 +4706,9 @@
 .fabricate-manager .manager-gathering-event-scene-linked {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 8px 10px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-mv2-surface-1);
@@ -4762,12 +4763,12 @@
 
 .fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 32px;
-  padding: 5px 9px;
+  padding: var(--fab-space-1) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-gathering-event-edit-view textarea {
   min-height: 54px;
-  padding: 7px 9px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
@@ -4777,15 +4778,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-gathering-event-character-modifier-row {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) 90px 90px 90px minmax(0, 1.4fr) 40px;
   align-items: end;
-  gap: 8px;
-  padding: 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-mv2-surface-2);
@@ -4794,7 +4795,7 @@
 .fabricate-manager .manager-gathering-event-character-modifier-summary {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -4804,14 +4805,14 @@
 
 .fabricate-manager .manager-field-error {
   display: block;
-  margin-top: 4px;
+  margin-top: var(--fab-space-1);
   color: var(--fab-danger-border, var(--fab-warning-border));
   font-size: 0.78rem;
 }
 
 .fabricate-manager .manager-gathering-panel-tools {
   grid-template-rows: auto;
-  padding: 12px;
+  padding: var(--fab-space-3);
   overflow: auto;
 }
 
@@ -4822,10 +4823,10 @@
      component-browser, drops — set their own `height`). This keeps the stack
      order free: sections can be reordered without breaking heights. */
   grid-auto-rows: auto;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-height: 0;
   min-width: 0;
-  padding: 14px;
+  padding: var(--fab-space-4);
   overflow: auto;
 }
 
@@ -4842,12 +4843,12 @@
 
 .fabricate-manager .manager-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 32px;
-  padding: 5px 9px;
+  padding: var(--fab-space-1) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-gathering-task-edit-view textarea {
   min-height: 54px;
-  padding: 7px 9px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
@@ -4872,7 +4873,7 @@
 
 .fabricate-manager .manager-task-workspace-header {
   display: grid;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -4880,7 +4881,7 @@
   display: inline-flex;
   align-items: center;
   justify-self: start;
-  gap: 7px;
+  gap: var(--fab-space-2);
   min-height: 30px;
   padding: 0;
   border: 0;
@@ -4896,7 +4897,7 @@
 .fabricate-manager .manager-task-title-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.24fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: center;
   min-width: 0;
 }
@@ -4909,14 +4910,14 @@
 
 .fabricate-manager .manager-task-title-copy {
   display: grid;
-  gap: 3px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
 .fabricate-manager .manager-task-title-line {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -4956,14 +4957,14 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-check-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-height: 32px;
   color: var(--fab-mv2-text);
   font-size: 0.85rem;
@@ -4973,14 +4974,14 @@
 .fabricate-manager .manager-task-editor-tabs {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: var(--fab-space-4);
   min-width: 0;
   border-bottom: 1px solid var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-task-editor-tabs button {
   min-height: 36px;
-  padding: 0 2px;
+  padding: 0 var(--fab-space-2xs);
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--fab-mv2-text-muted);
@@ -5008,14 +5009,14 @@
 
 .fabricate-manager .manager-task-core-card {
   display: grid;
-  gap: 10px;
-  padding: 13px 16px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-task-availability-card {
   display: grid;
-  gap: 10px;
-  padding: 12px 16px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-task-component-browser-card {
@@ -5032,7 +5033,7 @@
   align-items: start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -5046,7 +5047,7 @@
 }
 
 .fabricate-manager .manager-task-card-heading h3 {
-  margin: 0 0 3px;
+  margin: 0 0 var(--fab-space-2xs);
   color: var(--fab-mv2-text);
   font-size: 1rem;
 }
@@ -5058,7 +5059,7 @@
 .fabricate-manager .manager-task-core-grid {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
-  gap: 14px;
+  gap: var(--fab-space-3);
   align-items: start;
   min-width: 0;
 }
@@ -5067,7 +5068,7 @@
   display: grid;
   align-content: start;
   justify-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -5089,7 +5090,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 7px;
+  padding: var(--fab-space-2);
 }
 
 /* The edit/lock affordance (fa-pen, or fa-lock when the image is scene-locked)
@@ -5148,7 +5149,7 @@
 .fabricate-manager .manager-task-identity-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -5160,7 +5161,7 @@
   display: grid;
   align-content: start;
   justify-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -5178,7 +5179,7 @@
 .fabricate-manager .manager-task-availability-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(160px, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -5195,10 +5196,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-height: 34px;
-  padding: 6px 8px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -5221,9 +5222,9 @@
   left: 0;
   right: 0;
   display: grid;
-  gap: 4px;
+  gap: var(--fab-space-1);
   max-height: 190px;
-  padding: 6px;
+  padding: var(--fab-space-chip);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 6px;
   background: var(--fab-mv2-surface-2);
@@ -5234,10 +5235,10 @@
 .fabricate-manager .manager-availability-option {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-height: 32px;
-  padding: 5px 7px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 5px;
   color: var(--fab-mv2-text);
@@ -5259,7 +5260,7 @@
 }
 
 .fabricate-manager .manager-availability-empty {
-  padding: 6px 8px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
 }
@@ -5267,17 +5268,17 @@
 .fabricate-manager .manager-availability-pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-availability-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-height: 28px;
   max-width: 100%;
-  padding: 3px 4px 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-1) var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-warning-border);
   border-radius: 5px;
   color: var(--fab-mv2-text);
@@ -5334,13 +5335,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-task-drops-summary-card {
   display: grid;
-  gap: 10px;
-  padding: 12px 16px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-mv2-surface-2);
@@ -5349,15 +5350,15 @@
 .fabricate-manager .manager-task-drops-summary-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-task-drop-summary-chip {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px 4px 4px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-1) var(--fab-space-1);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-mv2-surface-1);
@@ -5391,20 +5392,20 @@
 .fabricate-manager .manager-event-environment-usage-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-3);
 }
 
 .fabricate-manager [data-task-environment-usage] > [data-task-environment-usage-empty],
 .fabricate-manager [data-event-environment-usage] > [data-event-environment-usage-empty] {
-  margin-top: 10px;
+  margin-top: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-task-environment-usage-card,
 .fabricate-manager .manager-event-environment-usage-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
 }
 
@@ -5433,8 +5434,8 @@
 .fabricate-manager .manager-task-overview-card {
   display: grid;
   grid-template-columns: minmax(230px, 0.88fr) minmax(280px, 1.18fr) minmax(180px, 0.64fr);
-  gap: 18px;
-  padding: 13px 18px;
+  gap: var(--fab-space-4);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-task-basic-info,
@@ -5442,14 +5443,14 @@
 .fabricate-manager .manager-task-status-summary {
   display: grid;
   align-content: start;
-  gap: 9px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-task-availability-summary,
 .fabricate-manager .manager-task-status-summary {
   border-left: 1px solid var(--fab-mv2-border);
-  padding-left: 18px;
+  padding-left: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-task-availability-summary .manager-chip-field {
@@ -5469,7 +5470,7 @@
 .fabricate-manager .manager-selected-drop-fields label {
   display: grid;
   grid-template-columns: 86px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: start;
 }
 
@@ -5485,7 +5486,7 @@
 .fabricate-manager .manager-task-condition-line {
   display: grid;
   grid-template-columns: 24px minmax(90px, 0.5fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -5498,17 +5499,17 @@
 .fabricate-manager .manager-chip-field {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: var(--fab-space-2);
   min-width: 0;
   margin: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-chip-field legend {
-  padding: 0 4px;
+  padding: 0 var(--fab-space-1);
   color: var(--fab-mv2-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -5518,9 +5519,9 @@
 .fabricate-manager .manager-check-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-height: 26px;
-  padding: 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 999px;
   color: var(--fab-mv2-text);
@@ -5533,15 +5534,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 10px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border-bottom: 1px solid var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-task-drop-header-copy {
   display: grid;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: min(180px, 100%);
 }
 
@@ -5553,7 +5554,7 @@
 .fabricate-manager .manager-task-card-header h4 {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -5566,7 +5567,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -5584,7 +5585,7 @@
 .fabricate-manager .manager-task-component-browser-controls {
   display: grid;
   grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: start;
   justify-content: end;
   min-width: min(420px, 100%);
@@ -5610,21 +5611,21 @@
 
 .fabricate-manager .manager-task-component-pills {
   min-height: 0;
-  padding: 7px 12px 0;
+  padding: var(--fab-space-2) var(--fab-space-3) 0;
   border-top: 1px solid var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-task-component-browser-scroll {
   grid-row-start: 3;
   min-height: 0;
-  padding: 10px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   overflow: hidden auto;
 }
 
 .fabricate-manager .manager-task-component-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -5641,13 +5642,13 @@
 .fabricate-manager .manager-tool-inspector-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-tool-inspector-actions .manager-button {
   width: 100%;
-  padding: 0 8px;
+  padding: 0 var(--fab-space-2);
 }
 
 .fabricate-manager .manager-tool-inspector-actions .manager-button span {
@@ -5658,9 +5659,9 @@
 .fabricate-manager .manager-tools-component-browser-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
-  padding: 0 0 10px;
+  padding: 0 0 var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-component-browser-card .manager-search.is-compact {
@@ -5678,21 +5679,21 @@
 
 .fabricate-manager .manager-tools-component-browser-scroll {
   min-height: 0;
-  padding: 10px 0 12px;
+  padding: var(--fab-space-3) 0 var(--fab-space-3);
   overflow: hidden auto;
 }
 
 .fabricate-manager .manager-tools-component-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-tools-component-browser-footer {
   display: block;
   min-width: 0;
-  padding: 8px 0 0;
+  padding: var(--fab-space-2) 0 0;
   border-top: 1px solid var(--fab-mv2-border);
   background: transparent;
 }
@@ -5701,7 +5702,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   padding: 0;
   border-top: 0;
@@ -5735,11 +5736,11 @@
 .fabricate-manager .manager-task-component-card {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 18px;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
   min-height: 72px;
-  padding: 7px 8px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -5762,7 +5763,7 @@
 
 .fabricate-manager .manager-task-component-card-copy {
   display: grid;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -5791,7 +5792,7 @@
 
 .fabricate-manager .manager-task-component-card-tags {
   display: flex;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
   overflow: hidden;
 }
@@ -5800,7 +5801,7 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 72px;
-  padding: 1px 5px;
+  padding: 1px var(--fab-space-1);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 999px;
   color: var(--fab-mv2-text-muted);
@@ -5826,9 +5827,9 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 7px 12px;
+  padding: var(--fab-space-2) var(--fab-space-3);
   border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-03);
 }
@@ -5842,8 +5843,8 @@
 .fabricate-manager .manager-task-required-tools-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-4);
   height: 340px;
   min-height: 340px;
   max-height: 340px;
@@ -5869,7 +5870,7 @@
 }
 
 .fabricate-manager .manager-required-tool-pill {
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-required-tool-thumb {
@@ -5913,19 +5914,19 @@
   flex: 1 1 auto;
   width: 100%;
   min-height: 0;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-task-required-tools-scroll > .manager-empty > div > i {
   width: 32px;
   height: 32px;
-  margin-bottom: 6px;
+  margin-bottom: var(--fab-space-chip);
   font-size: 1.1rem;
 }
 
 .fabricate-manager .manager-task-required-tools-scroll > .manager-empty h3 {
   font-size: 0.86rem;
-  margin: 0 0 4px;
+  margin: 0 0 var(--fab-space-1);
 }
 
 .fabricate-manager .manager-task-required-tools-scroll > .manager-empty p {
@@ -5937,7 +5938,7 @@
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -5986,7 +5987,7 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -6007,9 +6008,9 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 8px 12px;
+  padding: var(--fab-space-2) var(--fab-space-3);
   border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-03);
 }
@@ -6017,7 +6018,7 @@
 .fabricate-manager .manager-task-drop-footer .manager-pagination {
   flex: 1 1 auto;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
   padding: 0;
   border-top: 0;
@@ -6031,9 +6032,9 @@
 .fabricate-manager .manager-warning-band {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 9px 11px;
+  padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-warning-border);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -6070,8 +6071,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 4px;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-1);
   box-sizing: border-box;
 }
 
@@ -6082,7 +6083,7 @@
   line-height: 1;
   color: var(--fab-mv2-text-muted);
   text-align: center;
-  margin: 3px 0;
+  margin: var(--fab-space-2xs) 0;
 }
 
 .fabricate-manager .manager-drop-rank-button {
@@ -6096,7 +6097,7 @@
 .fabricate-manager .manager-task-drops-card .manager-table-scroll {
   height: var(--fab-mv2-task-drop-table-visible-height);
   max-height: var(--fab-mv2-task-drop-table-visible-height);
-  padding: 10px 0 0;
+  padding: var(--fab-space-3) 0 0;
   overflow: hidden auto;
 }
 
@@ -6137,7 +6138,7 @@
 .fabricate-manager .manager-gathering-task-drop-table-head > *,
 .fabricate-manager .manager-gathering-task-drop-row > * {
   min-width: 0;
-  padding: 4px 10px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   box-sizing: border-box;
 }
 
@@ -6167,13 +6168,13 @@
 .fabricate-manager .manager-drop-component-button,
 .fabricate-manager .manager-drop-empty-component {
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-height: 40px;
 }
 
 .fabricate-manager .manager-drop-empty-component {
   min-height: 52px;
-  padding: 6px 8px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -6217,7 +6218,7 @@
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-drop-rate-percent {
@@ -6232,7 +6233,7 @@
   min-width: 0;
   height: 28px;
   box-sizing: border-box;
-  padding: 4px 16px 4px 2px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -6244,7 +6245,7 @@
 
 .fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input[type="text"] {
   min-height: 28px;
-  padding: 4px 16px 4px 2px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
 }
@@ -6342,7 +6343,7 @@
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
-  margin-top: -4px;
+  margin-top: calc(-1 * var(--fab-space-1));
   border: 2px solid var(--fab-mv2-bg);
   border-radius: 999px;
   background: var(--fab-drop-rate-color);
@@ -6445,12 +6446,12 @@
 .fabricate-manager .manager-gathering-task-drop-row > .manager-drop-quantity-cell {
   display: flex;
   justify-content: center;
-  padding: 6px;
+  padding: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-gathering-task-edit-view .manager-drop-quantity-cell input[type="text"] {
   min-height: 28px;
-  padding: 4px;
+  padding: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-gathering-task-drop-row:hover {
@@ -6476,10 +6477,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-height: 46px;
-  padding: 8px;
+  padding: var(--fab-space-2);
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 8px;
   color: var(--fab-mv2-text-muted);
@@ -6498,7 +6499,7 @@
 
 .fabricate-manager .manager-empty-drop-cell {
   display: grid;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
   width: 100%;
 }
@@ -6508,7 +6509,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 30px;
-  padding: 0 8px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text-muted);
@@ -6526,7 +6527,7 @@
 
 .fabricate-manager .manager-quantity-input {
   display: grid;
-  gap: 3px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -6545,14 +6546,14 @@
   display: flex;
   align-items: center;
   align-content: flex-start;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
 
   /* Two-line chip budget; extra modifier chips scroll within the cell. */
   max-height: 58px;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-chip.is-positive {
@@ -6615,7 +6616,7 @@
   width: max-content;
   max-width: 100%;
   min-height: 24px;
-  padding: 2px 9px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-info-border);
   border-radius: 6px;
   color: var(--fab-info-text);
@@ -6632,16 +6633,16 @@
 .fabricate-manager .manager-selected-drop-fields {
   display: grid;
   grid-template-columns: minmax(120px, 0.5fr) minmax(180px, 0.7fr) minmax(120px, 0.5fr);
-  gap: 12px;
-  padding: 12px 14px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-drop-modifier-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 0 14px 14px;
+  padding: 0 var(--fab-space-3) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-drop-modifier-panel {
@@ -6654,19 +6655,19 @@
 .fabricate-manager .manager-drop-editor-card {
   display: grid;
   align-content: start;
-  gap: 13px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-drop-editor-card .manager-field {
   display: grid;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-drop-editor-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
   margin-top: 0;
   min-width: 0;
 }
@@ -6678,7 +6679,7 @@
 
 .fabricate-manager .manager-drop-inspector-stack .manager-button {
   min-height: 28px;
-  padding: 0 9px;
+  padding: 0 var(--fab-space-2);
 }
 
 .fabricate-manager .manager-drop-inspector-stack .manager-icon-button {
@@ -6692,7 +6693,7 @@
   min-width: 0;
   height: 28px;
   min-height: 28px;
-  padding: 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -6710,19 +6711,19 @@
 .fabricate-manager .manager-character-modifier-row-card .manager-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   height: 28px;
   min-height: 28px;
-  padding: 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-drop-editor-condition-modifier-card .manager-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   height: 28px;
   min-height: 28px;
-  padding: 3px 8px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="text"] {
   height: 28px;
   min-height: 28px;
-  padding: 4px 16px 4px 2px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
   text-align: center;
@@ -6735,7 +6736,7 @@
 .fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="text"] {
   height: 28px;
   min-height: 28px;
-  padding: 4px 16px 4px 6px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-chip);
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
 }
@@ -6747,7 +6748,7 @@
 .fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-control {
   height: 28px;
   min-height: 28px;
-  padding: 0 7px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-18);
@@ -6789,7 +6790,7 @@
 .fabricate-manager .manager-drop-editor-values {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 72px;
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: end;
   min-width: 0;
 }
@@ -6797,13 +6798,13 @@
 .fabricate-manager .manager-drop-rate-editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-drop-count-editor {
   display: grid;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -6811,7 +6812,7 @@
   width: 100%;
   min-width: 0;
   min-height: 28px;
-  padding: 4px;
+  padding: var(--fab-space-1);
   box-sizing: border-box;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -6820,7 +6821,7 @@
 .fabricate-manager .manager-drop-editor-card .manager-drop-count-editor[data-gathering-drop-inspector-count] input[type="text"] {
   height: 28px;
   min-height: 28px;
-  padding: 4px;
+  padding: var(--fab-space-1);
   box-sizing: border-box;
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
@@ -6832,7 +6833,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -6849,7 +6850,7 @@
 
 .fabricate-manager .manager-task-summary-card h4,
 .fabricate-manager .manager-drop-preview-card h4 {
-  margin: 10px 0 0;
+  margin: var(--fab-space-3) 0 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
@@ -6858,21 +6859,21 @@
 .fabricate-manager .manager-current-conditions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-current-conditions span {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-matching-logic-card ol {
   display: grid;
-  gap: 8px;
+  gap: var(--fab-space-2);
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--fab-space-4);
   color: var(--fab-mv2-text-muted);
 }
 
@@ -6883,20 +6884,20 @@
 .fabricate-manager .manager-gathering-settings {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: stretch;
   overflow: auto;
   min-height: 0;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-condition-panel {
   display: grid;
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-content: start;
   height: 100%;
   min-width: 0;
-  padding: 14px;
+  padding: var(--fab-space-4);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
@@ -6911,14 +6912,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-condition-panel-title {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
   color: var(--fab-mv2-text);
   font-size: 0.95rem;
@@ -6943,7 +6944,7 @@
 }
 
 .fabricate-manager .manager-condition-panel-hint {
-  margin: -2px 0 0;
+  margin: calc(-1 * var(--fab-space-2xs)) 0 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -6952,7 +6953,7 @@
 .fabricate-manager .manager-condition-add {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) 48px;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -6968,7 +6969,7 @@
 .fabricate-manager .manager-add-button {
   width: 48px;
   height: 36px;
-  padding: 0 10px;
+  padding: 0 var(--fab-space-2);
   justify-content: center;
   font-size: 0.78rem;
 }
@@ -6981,19 +6982,19 @@
 .fabricate-manager .manager-condition-pill-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-condition-pill {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 24px;
-  gap: 4px;
+  gap: var(--fab-space-1);
   align-items: center;
   width: 100%;
   min-width: 0;
   min-height: 34px;
-  padding: 2px;
+  padding: var(--fab-space-2xs);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -7069,7 +7070,7 @@
   min-width: 30px;
   height: 100%;
   min-height: 30px;
-  padding: 3px;
+  padding: var(--fab-space-2xs);
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -7094,9 +7095,9 @@
   box-sizing: border-box;
   z-index: 120;
   display: grid;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 220px;
-  padding: 8px;
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 6px;
   background: var(--fab-mv2-surface-2);
@@ -7106,7 +7107,7 @@
 .fabricate-manager .manager-color-preset-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-color-preset {
@@ -7120,7 +7121,7 @@
 
 .fabricate-manager .manager-color-custom {
   display: grid;
-  gap: 4px;
+  gap: var(--fab-space-1);
   color: var(--fab-mv2-text);
   font-size: 0.72rem;
   font-weight: 600;
@@ -7131,7 +7132,7 @@
   min-width: 0;
   min-height: 28px;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 var(--fab-space-chip);
   font-size: 0.76rem;
 }
 
@@ -7162,7 +7163,7 @@
   min-height: 0;
   height: 20px;
   max-height: 20px;
-  padding: 0 4px;
+  padding: 0 var(--fab-space-1);
   border: 0;
   color: var(--fab-mv2-text);
   background: transparent;
@@ -7200,14 +7201,14 @@
 .fabricate-manager .manager-rules-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-rule-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: start;
   min-width: 0;
 }
@@ -7227,7 +7228,7 @@
 .fabricate-manager .manager-rule-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
   color: var(--fab-mv2-text);
   font-size: 0.82rem;
@@ -7248,7 +7249,7 @@
   grid-column: 2;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   color: var(--fab-mv2-text);
   font-size: 0.82rem;
@@ -7268,20 +7269,20 @@
 }
 
 .fabricate-manager .manager-rule-field select {
-  padding: 0 10px;
+  padding: 0 var(--fab-space-2);
 }
 
 .fabricate-manager .manager-rule-stepper {
   grid-column: 2;
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) 34px;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   padding-left: 42px;
   min-width: 0;
 }
 
 .fabricate-manager .manager-rule-stepper input {
-  padding: 0 8px;
+  padding: 0 var(--fab-space-2);
   text-align: center;
 }
 
@@ -7289,7 +7290,7 @@
   display: grid;
   place-items: center;
   min-height: 220px;
-  padding: 18px;
+  padding: var(--fab-space-4);
   border: 1px dashed var(--fab-mv2-border);
   color: var(--fab-mv2-text-muted);
   text-align: center;
@@ -7302,7 +7303,7 @@
   justify-content: center;
   width: 46px;
   height: 46px;
-  margin-bottom: 12px;
+  margin-bottom: var(--fab-space-3);
   color: var(--fab-mv2-text);
   font-size: 1.55rem;
 }
@@ -7315,7 +7316,7 @@
 
 .fabricate-manager .manager-empty h3,
 .fabricate-manager .manager-empty p {
-  margin: 0 0 8px;
+  margin: 0 0 var(--fab-space-2);
 }
 
 .fabricate-manager .manager-empty h3 {
@@ -7331,9 +7332,9 @@
 
 .fabricate-manager .manager-setup-card {
   display: grid;
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-content: start;
-  padding: 16px;
+  padding: var(--fab-space-4);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
@@ -7342,7 +7343,7 @@
 .fabricate-manager .manager-setup-card-header {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -7370,22 +7371,22 @@
 
 .fabricate-manager .manager-setup-list {
   display: grid;
-  gap: 8px;
+  gap: var(--fab-space-2);
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--fab-space-4);
   color: var(--fab-mv2-text-muted);
   font-size: 0.82rem;
   line-height: 1.35;
 }
 
 .fabricate-manager .manager-setup-list li {
-  padding-left: 2px;
+  padding-left: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-setup-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-setup-links .manager-button {
@@ -7581,7 +7582,7 @@
   .fabricate-manager .manager-labeled-cell {
     display: grid;
     grid-template-columns: minmax(88px, 0.35fr) minmax(0, 1fr);
-    gap: 8px;
+    gap: var(--fab-space-2);
     align-items: center;
   }
 
@@ -7636,7 +7637,7 @@
   }
 
   .fabricate-manager .manager-gathering-task-edit-view {
-    padding: 12px;
+    padding: var(--fab-space-3);
   }
 
   .fabricate-manager .manager-task-card-header {
@@ -7707,17 +7708,17 @@
 .fabricate-manager .manager-component-edit-view {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 10px;
+  padding: var(--fab-space-3);
   overflow: auto;
 }
 
 .fabricate-manager .manager-component-edit-tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
-  padding: 4px;
+  padding: var(--fab-space-1);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -7725,7 +7726,7 @@
 
 .fabricate-manager .manager-component-edit-tab {
   flex: 0 1 auto;
-  padding: 6px 14px;
+  padding: var(--fab-space-chip) var(--fab-space-3);
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -7750,7 +7751,7 @@
 .fabricate-manager .manager-component-identity-grid {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   align-items: start;
 }
@@ -7758,7 +7759,7 @@
 .fabricate-manager .manager-component-identity-image {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -7788,7 +7789,7 @@
 .fabricate-manager .manager-component-identity-fields {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -7802,14 +7803,14 @@
 
 .fabricate-manager .manager-component-source-stack {
   display: grid;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-component-source-summary {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -7833,7 +7834,7 @@
 .fabricate-manager .manager-component-source-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -7864,7 +7865,7 @@
 .fabricate-manager .manager-component-source-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -7872,9 +7873,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-height: 48px;
-  padding: 10px 14px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text-muted);
@@ -7891,15 +7892,15 @@
 .fabricate-manager .manager-component-tag-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-component-tag-option {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 999px;
   color: var(--fab-mv2-text);
@@ -7915,7 +7916,7 @@
 .fabricate-manager .manager-component-essence-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -7923,8 +7924,8 @@
   display: grid;
   grid-template-columns: auto auto auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
@@ -7933,7 +7934,7 @@
 .fabricate-manager .manager-component-essence-quantity {
   width: 56px;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 var(--fab-space-chip);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -7969,37 +7970,37 @@
 .fabricate-manager .manager-tools-main {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-card-header > div {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
   min-width: 0;
 }
 
 .fabricate-manager .manager-tools-empty {
-  margin-top: 6px;
+  margin-top: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-tools-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-tools-row {
@@ -8030,9 +8031,9 @@
 .fabricate-manager .manager-tools-row-body {
   display: grid;
   grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
-  padding: 12px;
+  padding: var(--fab-space-3);
   cursor: pointer;
   background: transparent;
   border: none;
@@ -8049,14 +8050,14 @@
 .fabricate-manager .manager-tools-identity {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--fab-space-2);
   align-items: center;
   width: 100%;
   min-width: 0;
 }
 
 .fabricate-manager .manager-tools-identity.is-component-drop-zone {
-  padding: 6px 8px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -8080,7 +8081,7 @@
 .fabricate-manager .manager-tools-identity-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -8100,7 +8101,7 @@
 
 .fabricate-manager .manager-tools-row-summary {
   display: flex;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -8111,7 +8112,7 @@
 
 .fabricate-manager .manager-tools-row-summary .manager-chip {
   min-height: 26px;
-  padding: 2px 7px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   white-space: nowrap;
 }
 
@@ -8139,7 +8140,7 @@
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-mv2-surface-1);
-  gap: 5px;
+  gap: var(--fab-space-1);
   white-space: nowrap;
   box-shadow:
     inset 0 0 0 999px var(--fab-warning-soft),
@@ -8149,7 +8150,7 @@
 .fabricate-manager .manager-tool-inspector-heading {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -8157,8 +8158,8 @@
 .fabricate-manager .manager-tools-row-editor {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
+  gap: var(--fab-space-4);
+  padding: var(--fab-space-4);
   border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-04);
   border-bottom-left-radius: 8px;
@@ -8168,10 +8169,10 @@
 .fabricate-manager .manager-tools-section {
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
-  padding: 12px;
+  padding: var(--fab-space-3);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
   margin: 0;
 }
 
@@ -8181,14 +8182,14 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fab-mv2-text-muted);
-  padding: 0 4px;
+  padding: 0 var(--fab-space-1);
 }
 
 .fabricate-manager .manager-tools-inline-field {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  column-gap: 10px;
+  column-gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-tools-inline-field > span:first-child {
@@ -8210,7 +8211,7 @@
 .fabricate-manager .manager-tools-replacement-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: stretch;
   width: 100%;
   min-width: 0;
@@ -8228,7 +8229,7 @@
 .fabricate-manager .manager-tools-requirement-help {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   color: var(--fab-mv2-text-muted);
   font-size: 0.8rem;
   line-height: 1.35;
@@ -8241,20 +8242,20 @@
 
 .fabricate-manager .manager-tools-requirement-help ul {
   display: grid;
-  gap: 3px;
-  padding-left: 18px;
+  gap: var(--fab-space-2xs);
+  padding-left: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-inline-fields {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: center;
 }
 
 .fabricate-manager .manager-tools-identity-row {
   display: flex;
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -8278,17 +8279,17 @@
 .fabricate-manager .manager-tools-row-editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-tools-empty-stub {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-height: 58px;
-  padding: 18px 14px;
+  padding: var(--fab-space-4) var(--fab-space-4);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 8px;
   background: transparent;
@@ -8314,11 +8315,11 @@
 .fabricate-manager .manager-radio-group {
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-radio-group-legend {
@@ -8327,21 +8328,21 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fab-mv2-text-muted);
-  padding: 0 4px;
+  padding: 0 var(--fab-space-1);
 }
 
 .fabricate-manager .manager-radio-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-radio-option {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
@@ -8387,12 +8388,12 @@
 }
 
 .fabricate-manager .manager-tools-row-editor .manager-drop-rate-percent input[type="text"] {
-  padding: 0 10px 0 0;
+  padding: 0 var(--fab-space-2) 0 0;
 }
 
 .fabricate-manager .manager-tools-row-editor .manager-button {
   min-height: 28px;
-  padding: 0 12px;
+  padding: 0 var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-row-editor .manager-icon-button {
@@ -8402,7 +8403,7 @@
 }
 
 .fabricate-manager .manager-tools-row-editor .manager-radio-option {
-  padding: 6px 12px;
+  padding: var(--fab-space-chip) var(--fab-space-3);
 }
 
 /* ---------------------------------------------------------------------------
@@ -8412,7 +8413,7 @@
 .fabricate-manager .manager-environment-edit-view[data-environment-editor] {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-height: 0;
 }
 
@@ -8420,14 +8421,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--fab-space-3);
   flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-environment-status-pills {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
 }
 
@@ -8439,7 +8440,7 @@
 .fabricate-manager .manager-environment-tabs {
   display: flex;
   align-items: stretch;
-  gap: 4px;
+  gap: var(--fab-space-1);
   flex-wrap: wrap;
   min-width: 0;
   border-bottom: 1px solid var(--fab-mv2-border);
@@ -8450,9 +8451,9 @@
   -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-height: 38px;
-  padding: 0 14px;
+  padding: 0 var(--fab-space-3);
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -8473,7 +8474,7 @@
 }
 
 .fabricate-manager .manager-environment-tab-badge {
-  margin-left: 2px;
+  margin-left: var(--fab-space-2xs);
 }
 
 /* stylelint-disable-next-line no-duplicate-selectors -- known latent duplicate
@@ -8485,7 +8486,7 @@
 .fabricate-manager .manager-environment-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
 }
@@ -8504,7 +8505,7 @@
      column) when the panel scrolls. The padding works even when the host
      renders an overlay-style scrollbar that ignores `scrollbar-gutter`. */
   scrollbar-gutter: stable;
-  padding-right: 12px;
+  padding-right: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-workspace .manager-environment-inspector {
@@ -8512,27 +8513,27 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-environment-tab-intro {
-  margin: 0 0 10px;
+  margin: 0 0 var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-overview-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-overview-duo {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-card {
@@ -8540,23 +8541,23 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
-  padding: 12px;
+  padding: var(--fab-space-3);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-context-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--fab-space-3);
   align-items: start;
 }
 
 .fabricate-manager .manager-environment-context-col {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -8567,14 +8568,14 @@
 }
 
 .fabricate-manager .manager-environment-context-field .manager-availability-pill-row {
-  margin-top: 2px;
+  margin-top: var(--fab-space-2xs);
 }
 
 /* Segmented toggle (player-facing behaviour + composition mode) */
 .fabricate-manager .manager-environment-mode-control {
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-2xs);
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
@@ -8586,11 +8587,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   height: auto;
   min-height: 34px;
-  padding: 6px 10px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: none;
   border-radius: 4px;
   background: none;
@@ -8613,14 +8614,14 @@
 .fabricate-manager .manager-environment-mode-head {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .fabricate-manager .manager-environment-mode-hint {
-  margin: 6px 0 0;
+  margin: var(--fab-space-chip) 0 0;
   font-size: 0.85em;
   white-space: normal;
   line-height: 1.35;
@@ -8630,14 +8631,14 @@
 .fabricate-manager .manager-environment-composition {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-section-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-environment-section-head h4 {
@@ -8650,11 +8651,11 @@
 
 .fabricate-manager .manager-environment-evidence {
   list-style: none;
-  margin: 4px 0 0;
+  margin: var(--fab-space-1) 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-environment-evidence-label {
@@ -8670,9 +8671,9 @@
 .fabricate-manager .manager-environment-diagnostics-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   background: none;
   border: none;
   color: var(--fab-mv2-text-muted);
@@ -8686,7 +8687,7 @@
 }
 
 .fabricate-manager .manager-environment-diagnostics-body {
-  padding: 0 10px 10px;
+  padding: 0 var(--fab-space-2) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-layer-list,
@@ -8696,13 +8697,13 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-environment-validation {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-check-list {
@@ -8711,14 +8712,14 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px 16px;
+  gap: var(--fab-space-chip) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-environment-layer,
 .fabricate-manager .manager-environment-check {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-layer-label {
@@ -8739,8 +8740,8 @@
 .fabricate-manager .manager-environment-issue {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
@@ -8753,15 +8754,15 @@
 
 .fabricate-manager .manager-environment-inspector-facts {
   display: flex;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-environment-scene-dropzone {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text-muted);
@@ -8775,8 +8776,8 @@
 .fabricate-manager .manager-environment-scene-linked {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 6px;
 }
@@ -8821,7 +8822,7 @@
 .fabricate-manager .manager-fact-grid-inline .manager-fact {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-field.is-disabled {
@@ -8832,18 +8833,18 @@
 .fabricate-manager .manager-environment-header-pills {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: var(--fab-space-2);
 }
 
 /* Tasks/Events composition tab header + callout */
 .fabricate-manager .manager-environment-comp-callout {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin: 0 0 14px;
-  padding: 10px 12px;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-4);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-left: 3px solid var(--fab-mv2-accent);
   border-radius: 6px;
@@ -8853,7 +8854,7 @@
 
 .fabricate-manager .manager-environment-comp-callout i {
   color: var(--fab-mv2-accent);
-  margin-top: 2px;
+  margin-top: var(--fab-space-2xs);
 }
 
 /* Composition table */
@@ -8863,7 +8864,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
@@ -8878,8 +8879,8 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-environment-comp-band h4 {
@@ -8897,8 +8898,8 @@
   display: grid;
   grid-template-columns: var(--fab-env-comp-grid);
   align-items: center;
-  gap: 10px;
-  padding: 0 10px 6px;
+  gap: var(--fab-space-2);
+  padding: 0 var(--fab-space-2) var(--fab-space-chip);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -8909,19 +8910,19 @@
 
 .fabricate-manager .manager-environment-comp-rows {
   list-style: none;
-  margin: 6px 0 0;
+  margin: var(--fab-space-chip) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-environment-comp-row {
   display: grid;
   grid-template-columns: var(--fab-env-comp-grid);
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
@@ -8950,7 +8951,7 @@
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   color: var(--fab-mv2-text-muted);
   cursor: grab;
   transform: translateY(3px);
@@ -8965,7 +8966,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
   text-align: left;
   cursor: pointer;
@@ -8989,7 +8990,7 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
@@ -9026,8 +9027,8 @@
 .fabricate-manager .manager-environment-waiting-for {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 2px;
+  gap: var(--fab-space-1);
+  margin-top: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-environment-waiting-for .manager-kicker {
@@ -9037,7 +9038,7 @@
 .fabricate-manager .manager-environment-comp-weight {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -9054,7 +9055,7 @@
 .fabricate-manager .manager-environment-comp-weight-field input {
   width: 42px;
   height: 28px;
-  padding: 2px 4px;
+  padding: var(--fab-space-2xs) var(--fab-space-1);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 4px;
   background: var(--fab-mv2-surface-1);
@@ -9084,7 +9085,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-environment-comp-quick-action {
@@ -9092,8 +9093,8 @@
 }
 
 .fabricate-manager .manager-environment-comp-empty {
-  margin: 6px 0 0;
-  padding: 6px 10px;
+  margin: var(--fab-space-chip) 0 0;
+  padding: var(--fab-space-chip) var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-comp-menu-wrap {
@@ -9110,8 +9111,8 @@
   min-width: 176px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-1);
   box-sizing: border-box;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
@@ -9124,10 +9125,10 @@
   grid-template-columns: 18px minmax(0, 1fr);
   place-items: center start;
   justify-content: start;
-  column-gap: 8px;
+  column-gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: none;
   border-radius: 4px;
   background: none;
@@ -9169,10 +9170,10 @@
   grid-template-columns: 18px minmax(0, 1fr);
   place-items: center start;
   justify-content: start;
-  column-gap: 8px;
+  column-gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   color: var(--fab-mv2-text-muted);
   white-space: nowrap;
   font-size: 0.82rem;
@@ -9188,21 +9189,21 @@
 .fabricate-manager .manager-environment-evidence.is-chips {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
 .fabricate-manager .manager-environment-evidence-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-environment-evidence-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
+  gap: var(--fab-space-1);
+  padding: 1px var(--fab-space-chip);
   border-radius: 4px;
   font-size: 0.72rem;
   border: 1px solid var(--fab-mv2-border);
@@ -9267,14 +9268,14 @@
 
 .fabricate-manager .manager-environment-evidence-dimension,
 .fabricate-manager .manager-environment-evidence-values {
-  padding: 6px 0;
+  padding: var(--fab-space-chip) 0;
   vertical-align: middle;
   line-height: 1.25;
 }
 
 .fabricate-manager .manager-environment-evidence-dimension {
   width: 82px;
-  padding-right: 10px;
+  padding-right: var(--fab-space-3);
   font-weight: 700;
   color: var(--fab-mv2-text);
   font-size: 0.75rem;
@@ -9285,7 +9286,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 3px 4px;
+  gap: var(--fab-space-2xs) var(--fab-space-1);
   min-width: 0;
 }
 
@@ -9294,7 +9295,7 @@
   align-items: center;
   max-width: 100%;
   min-width: 0;
-  padding: 1px 6px;
+  padding: 1px var(--fab-space-chip);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 4px;
   background: transparent;
@@ -9328,7 +9329,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-overrides-copy {
@@ -9340,11 +9341,11 @@
   flex: 0 0 auto;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-heading {
-  margin: 10px 0 0;
+  margin: var(--fab-space-3) 0 0;
   color: var(--fab-mv2-text);
   font-size: 0.84rem;
   font-weight: 700;
@@ -9354,19 +9355,19 @@
 .fabricate-manager .manager-environment-drop-adjustment-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-node-count {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-node-count-value {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
+  gap: var(--fab-space-1);
   font-variant-numeric: tabular-nums;
 }
 
@@ -9378,8 +9379,8 @@
   display: grid;
   grid-template-columns: minmax(112px, 1fr) 92px;
   align-items: end;
-  gap: 8px;
-  padding: 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
@@ -9393,8 +9394,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
-  padding: 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-positive {
@@ -9421,7 +9422,7 @@
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -9446,7 +9447,7 @@
   grid-template-columns: max-content 56px max-content 28px;
   align-items: center;
   justify-content: start;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -9483,7 +9484,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-copy strong,
@@ -9499,7 +9500,7 @@
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-input {
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop .manager-environment-drop-adjustment-input {
@@ -9521,7 +9522,7 @@
   width: 56px;
   height: 28px;
   min-height: 28px;
-  padding: 3px 16px 3px 4px;
+  padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
   text-align: center;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
@@ -9581,9 +9582,9 @@
 .fabricate-gather-chat {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--fab-space-2);
   margin: 1px 0;
-  padding: 8px 10px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-overlay-dark-12);
   border-left: 3px solid var(--fab-accent-strong);
   border-radius: 5px;
@@ -9621,7 +9622,7 @@
 .fabricate-gather-chat__section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-gather-chat__heading {
@@ -9642,7 +9643,7 @@
 .fabricate-gather-chat__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 5px;
+  gap: var(--fab-space-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -9651,9 +9652,9 @@
 .fabricate-gather-chat__item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
-  padding: 3px 6px;
+  padding: var(--fab-space-2xs) var(--fab-space-chip);
   border: 1px solid var(--fab-overlay-dark-10);
   border-radius: 4px;
   background: var(--fab-overlay-dark-05);
@@ -9679,16 +9680,16 @@
 .fabricate-gather-chat__footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 8px;
-  padding-top: 6px;
+  gap: var(--fab-space-chip) var(--fab-space-2);
+  padding-top: var(--fab-space-chip);
   border-top: 1px solid var(--fab-overlay-dark-10);
 }
 
 .fabricate-gather-chat__stat {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 9px;
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-overlay-dark-15);
   border-radius: 999px;
   background: var(--fab-overlay-dark-05);
@@ -9715,8 +9716,8 @@
 .fabricate-interaction-prompt {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 10px;
   background: var(--fab-bg-2);
@@ -9727,7 +9728,7 @@
 .fabricate-interaction-prompt .fabricate-interaction-prompt__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   max-width: 360px;
 }
 
@@ -9746,10 +9747,10 @@
 .fabricate-interaction-prompt .fabricate-interaction-prompt__action {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   height: auto;
   min-height: 30px;
-  padding: 4px 12px;
+  padding: var(--fab-space-1) var(--fab-space-3);
   white-space: nowrap;
 }
 
@@ -9896,10 +9897,10 @@
 .fabricate-manager .manager-travel-realms-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-height: 0;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-travel-realms-row {
@@ -9916,17 +9917,17 @@
 .fabricate-manager .manager-map-link-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-height: 0;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-map-link-row {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -9945,10 +9946,10 @@
 .fabricate-manager .manager-map-link-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex: 1 1 auto;
   min-width: 0;
-  padding: 10px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   cursor: pointer;
   background: transparent;
   border: none;
@@ -9992,7 +9993,7 @@
   /* Every row's link picker is the same fixed width so the column lines up;
      overflowing region names truncate with an ellipsis inside the trigger. */
   width: 200px;
-  padding: 6px 10px 6px 0;
+  padding: var(--fab-space-chip) var(--fab-space-2) var(--fab-space-chip) 0;
 }
 
 .fabricate-manager .manager-map-link-picker-cell .manager-travel-picker {
@@ -10027,7 +10028,7 @@
   background: transparent;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-map-link-region-card .manager-inspector-title-row {
@@ -10035,7 +10036,7 @@
 }
 
 .fabricate-manager .manager-travel-map-links-empty {
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-travel-realms-row:hover {
@@ -10045,8 +10046,8 @@
 .fabricate-manager .manager-travel-realms-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
   cursor: pointer;
   background: transparent;
   border: none;
@@ -10068,7 +10069,7 @@
 .fabricate-manager .manager-travel-realms-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -10100,7 +10101,7 @@
 .fabricate-manager .manager-travel-realms-count-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--fab-space-1);
   white-space: nowrap;
 }
 
@@ -10116,7 +10117,7 @@
 
 .fabricate-manager .manager-travel-realms-editor {
   min-height: 56px;
-  padding: 16px;
+  padding: var(--fab-space-4);
   border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-04);
   border-bottom-left-radius: 8px;
@@ -10130,14 +10131,14 @@
 .fabricate-manager .manager-realm-env-editor {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--fab-space-4);
   align-items: start;
 }
 
 .fabricate-manager .manager-realm-env-column {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -10151,14 +10152,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-realm-env-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
@@ -10190,7 +10191,7 @@
 .fabricate-manager .manager-realm-env-column .manager-card-subtitle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-realm-env-name {
@@ -10220,15 +10221,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-travel-region-environments li,
 .fabricate-manager .manager-travel-region-parties li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
@@ -10281,10 +10282,10 @@
 .fabricate-manager .manager-travel-parties-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-height: 0;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-travel-parties-row {
@@ -10304,8 +10305,8 @@
 .fabricate-manager .manager-travel-parties-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
   cursor: pointer;
   background: transparent;
   border: none;
@@ -10327,7 +10328,7 @@
 .fabricate-manager .manager-travel-parties-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -10363,14 +10364,14 @@
 .fabricate-manager .manager-travel-parties-members-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--fab-space-1);
   white-space: nowrap;
 }
 
 .fabricate-manager .manager-travel-parties-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex: 0 0 auto;
   margin-left: auto;
 }
@@ -10383,7 +10384,7 @@
 .fabricate-manager .manager-travel-parties-override-trigger {
   width: 100%;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--fab-space-2);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -10411,7 +10412,7 @@
 
 .fabricate-manager .manager-travel-parties-editor {
   min-height: 56px;
-  padding: 16px;
+  padding: var(--fab-space-4);
   border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-04);
   border-bottom-left-radius: 8px;
@@ -10422,7 +10423,7 @@
 .fabricate-manager .manager-party-body {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 16px;
+  gap: var(--fab-space-4);
   align-items: start;
 }
 
@@ -10430,7 +10431,7 @@
 .fabricate-manager .manager-party-travel-marker {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -10453,7 +10454,7 @@
 .fabricate-manager .manager-party-add {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -10468,14 +10469,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-party-member-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
@@ -10497,7 +10498,7 @@
 .fabricate-manager .manager-party-member-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   flex: 0 0 auto;
 }
 
@@ -10510,9 +10511,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-height: 120px;
-  padding: 12px;
+  padding: var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -10838,7 +10839,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 32px;
-  padding: 0 8px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -10856,7 +10857,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   padding: var(--fab-space-2);
   overflow-y: auto;
 }
@@ -10896,7 +10897,7 @@
   gap: var(--fab-space-1);
   height: auto;
   min-height: 28px;
-  padding: 2px var(--fab-space-2);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 999px;
   background: var(--fab-surface);
@@ -10962,7 +10963,7 @@
   justify-content: center;
   height: auto;
   min-height: 28px;
-  padding: 2px var(--fab-space-2);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 999px;
   background: var(--fab-surface);

@@ -263,14 +263,30 @@
     store?.setStaminaPool(selectedEnvironment?.staminaPool ?? null);
   });
 
-  // Report whether weather / time-of-day are enabled for the selected
-  // environment's system so the header bar can hide the chip for a disabled
-  // condition. Defaults to shown when no environment is selected.
+  // Resolve a single condition dimension's header visibility from the selected
+  // environment when one is selected, else from the listing's environments
+  // (shown if any enables it), else shown (no system context).
+  function resolveConditionVisibility(flag) {
+    if (selectedEnvironment) return selectedEnvironment[flag] !== false;
+    if (environments.length > 0) return environments.some((environment) => environment?.[flag] !== false);
+    return true;
+  }
+
+  // Report whether weather / time-of-day are enabled for the active gathering
+  // system so the header bar can hide the chip for a disabled condition (issue 287).
+  // The selected environment's flags drive it when one is selected. When none
+  // is — every environment locked, or the empty/loading state — fall back to
+  // the listing's environments (the engine sets these flags on every summary,
+  // including locked teasers) so a system that disables a dimension still hides
+  // its header chip rather than defaulting to shown. A dimension shows only if
+  // at least one listed environment's system enables it; with no environments
+  // at all there is no system context, so it defaults to shown.
+  const headerConditionVisibility = $derived({
+    weather: resolveConditionVisibility('weatherEnabled'),
+    timeOfDay: resolveConditionVisibility('timeOfDayEnabled')
+  });
   $effect(() => {
-    store?.setConditionVisibility({
-      weather: selectedEnvironment ? selectedEnvironment.weatherEnabled !== false : true,
-      timeOfDay: selectedEnvironment ? selectedEnvironment.timeOfDayEnabled !== false : true
-    });
+    store?.setConditionVisibility(headerConditionVisibility);
   });
 
   // Report the party's current-realm summary for the selected environment's
