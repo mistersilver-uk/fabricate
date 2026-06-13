@@ -359,6 +359,7 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
     const byId = new Map(environments.map(e => [e.id, e]));
     const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYSTEM]: { economy: economyForMode(mode), tasks: [task] } } }]]);
     const queue = [...rolls];
+    const hookCalls = [];
     const service = new GatheringRichStateService({
       getSetting: key => settings.get(key),
       setSetting: async (key, value) => { settings.set(key, value); return value; },
@@ -369,9 +370,9 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
         update: async (id, patch) => { Object.assign(byId.get(id), patch); return byId.get(id); }
       },
       rollD100: () => queue.shift() ?? 100,
-      hooks: { callAll: () => {} }
+      hooks: { callAll: (name, payload) => { hookCalls.push({ name, payload }); } }
     });
-    return { service, environments, env: environments[0], task };
+    return { service, environments, env: environments[0], task, hookCalls };
   }
 
   it('carries node config into the runtime task: seeds current=max, else uses stored runtime', async () => {
@@ -465,6 +466,116 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
     const composed = service._libraryTaskToRuntimeTask(lowered, env);
     assert.equal(composed.nodes.max, 1);
     assert.equal(composed.nodes.current, 1, 'current cannot exceed the lowered library cap');
+  });
+
+  // --- nonRegenerating (permanently depletable) pools (issue 301) -------------
+
+  const NONREGEN = { policy: 'nonRegenerating' };
+
+  it('restockNode is a no-op for a nonRegenerating pool (no write, no nodeRestocked hook)', async () => {
+    const { service, env, hookCalls } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: NONREGEN } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: NONREGEN } }
+    });
+    const before = { ...env.nodeRuntime['lib-1'] };
+    const result = await service.restockNode({ environmentId: env.id, taskId: 'lib-1', current: 5, max: null });
+    assert.equal(env.nodeRuntime['lib-1'].current, 0, 'a permanently depletable pool stays exhausted');
+    assert.deepEqual(env.nodeRuntime['lib-1'], before, 'restock did not mutate the stored runtime');
+    assert.equal(result.current, 0, 'restock returns the unchanged pool');
+    assert.equal(hookCalls.some(c => c.name === 'fabricate.gathering.nodeRestocked'), false, 'no restock hook fires');
+  });
+
+  it('restockNode still refills manual and overTime pools (regression vs the nonRegenerating no-op)', async () => {
+    const manual = libService({ nodeRuntime: { 'lib-1': { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } } });
+    await manual.service.restockNode({ environmentId: manual.env.id, taskId: 'lib-1', current: 5, max: null });
+    assert.equal(manual.env.nodeRuntime['lib-1'].current, 2, 'manual pool refills (clamped to max)');
+    assert.equal(manual.hookCalls.some(c => c.name === 'fabricate.gathering.nodeRestocked'), true);
+
+    const overTime = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }
+    });
+    await overTime.service.restockNode({ environmentId: overTime.env.id, taskId: 'lib-1', current: 2, max: null });
+    assert.equal(overTime.env.nodeRuntime['lib-1'].current, 2, 'overTime pool is still restockable');
+  });
+
+  it('the world-time respawn pass never regrows a nonRegenerating pool', async () => {
+    const { service, env } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: NONREGEN } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: NONREGEN } }
+    });
+    await service.respawnNodes({ environment: env, worldTime: 0 });
+    await service.respawnNodes({ environment: env, worldTime: 100 * HOUR });
+    assert.equal(env.nodeRuntime['lib-1'].current, 0, 'a permanently depletable pool stays at 0 across world time');
+  });
+
+  it('evaluateStart blocks a depleted nonRegenerating pool with NODE_EXHAUSTED, not NODE_DEPLETED', async () => {
+    const { service, env, task } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 1, current: 1, depletionTiming: 'onStart', respawn: NONREGEN } })
+    });
+    const actor = makeFakeActor();
+    // Deplete to exhaustion through the real attempt-commit path.
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 0);
+
+    const gate = await service.evaluateStart({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env) });
+    assert.equal(gate.blockedReasons.some(r => r.code === 'NODE_EXHAUSTED'), true, 'exhausted pool surfaces a distinct reason');
+    assert.equal(gate.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), false, 'and not the generic depleted reason');
+
+    // A world-time advance must not clear the exhausted state.
+    await service.respawnNodes({ environment: env, worldTime: 100 * HOUR });
+    const stillExhausted = await service.evaluateStart({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env) });
+    assert.equal(stillExhausted.blockedReasons.some(r => r.code === 'NODE_EXHAUSTED'), true, 'world time does not revive it');
+  });
+
+  it('evaluateStart still uses NODE_DEPLETED for depleted manual/overTime pools (regression)', async () => {
+    const manual = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 1, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 1, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }
+    });
+    const gateM = await manual.service.evaluateStart({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: manual.env, task: manual.service._libraryTaskToRuntimeTask(manual.task, manual.env) });
+    assert.equal(gateM.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
+    assert.equal(gateM.blockedReasons.some(r => r.code === 'NODE_EXHAUSTED'), false);
+
+    const overTime = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 1, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 1, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }
+    });
+    const gateO = await overTime.service.evaluateStart({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: overTime.env, task: overTime.service._libraryTaskToRuntimeTask(overTime.task, overTime.env) });
+    assert.equal(gateO.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
+    assert.equal(gateO.blockedReasons.some(r => r.code === 'NODE_EXHAUSTED'), false);
+  });
+
+  it('buildListingMetadata flags permanentlyExhausted only for a depleted nonRegenerating pool', async () => {
+    const { service, env, task } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: NONREGEN } })
+    });
+    const actor = makeFakeActor();
+    const viewer = { isGM: true };
+
+    // Not yet depleted → not exhausted, but the nonRegenerating flag is true
+    // (it drives count-bearing scarcity copy before exhaustion).
+    const full = service.buildListingMetadata({ environment: env, task: service._libraryTaskToRuntimeTask(task, env), actor, viewer });
+    assert.equal(full.nodes.permanentlyExhausted, false);
+    assert.equal(full.nodes.nonRegenerating, true, 'the nonRegenerating policy flag is exposed before exhaustion');
+
+    // Drain to 0.
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'succeeded' } });
+    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: service._libraryTaskToRuntimeTask(task, env), outcome: { status: 'succeeded' } });
+    assert.equal(env.nodeRuntime['lib-1'].current, 0);
+    const exhausted = service.buildListingMetadata({ environment: env, task: service._libraryTaskToRuntimeTask(task, env), actor, viewer });
+    assert.equal(exhausted.nodes.permanentlyExhausted, true);
+    assert.equal(exhausted.nodes.nonRegenerating, true, 'the nonRegenerating flag stays true at exhaustion');
+
+    // A depleted overTime pool is NOT permanently exhausted (it will regrow) and is
+    // NOT nonRegenerating.
+    const overTime = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 1, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 1, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }
+    });
+    const otMeta = overTime.service.buildListingMetadata({ environment: overTime.env, task: overTime.service._libraryTaskToRuntimeTask(overTime.task, overTime.env), actor, viewer });
+    assert.equal(otMeta.nodes.permanentlyExhausted, false, 'an overTime pool at 0 is depleted, not exhausted');
+    assert.equal(otMeta.nodes.nonRegenerating, false, 'an overTime pool is not flagged nonRegenerating');
   });
 });
 

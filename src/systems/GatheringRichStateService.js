@@ -132,6 +132,7 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
 
 const BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
+  NODE_EXHAUSTED: 'FABRICATE.Gathering.Blocked.NodeExhausted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
 });
 
@@ -963,6 +964,16 @@ export class GatheringRichStateService {
             enabled: true,
             available: Number(displayNode.current || 0) > 0,
             depleted: Number(displayNode.current || 0) <= 0,
+            // Derived player-safe boolean: a depleted `nonRegenerating` pool is
+            // exhausted for good. We surface only this flag, never the full
+            // respawn block, to the player payload.
+            permanentlyExhausted:
+              Number(displayNode.current || 0) <= 0 &&
+              displayNode.respawn?.policy === 'nonRegenerating',
+            // Player-safe policy flag: drives count-bearing scarcity copy ("N of M
+            // remaining — will not replenish") before exhaustion. Just the policy,
+            // no extra counts leaked beyond the existing current/max.
+            nonRegenerating: displayNode.respawn?.policy === 'nonRegenerating',
             current: showNodeCounts ? Number(displayNode.current || 0) : null,
             max: showNodeCounts ? Number(displayNode.max || 0) : null,
           }
@@ -1219,6 +1230,16 @@ export class GatheringRichStateService {
     if (!environment) return null;
     const existing = this._currentNodeState(environment, taskId);
     if (!existing) return null;
+    // Resolve the EFFECTIVE policy from the library config ("config is
+    // authoritative", mirroring _mergeNodeConfigState) so a `nonRegenerating`
+    // pool can never be restocked even if a stale per-environment snapshot
+    // claims otherwise. A permanently depletable node is a no-op: return it
+    // unchanged without writing state or firing the nodeRestocked hook.
+    const effective = this._mergeNodeConfigState(
+      this._libraryNodeConfigs(environment.craftingSystemId).get(String(taskId)) || null,
+      existing
+    );
+    if (effective?.respawn?.policy === 'nonRegenerating') return existing;
     // A null/undefined max keeps the existing cap (don't let Number(null)→0 wipe it).
     const nextMax =
       max === null || max === undefined
@@ -1744,7 +1765,12 @@ export class GatheringRichStateService {
 
     const gateNode = task?.nodes ?? null;
     if (nodesEnabled && gateNode && Number(gateNode.current || 0) <= 0) {
-      blockedReasons.push(this._blockedReason('NODE_DEPLETED', { taskId: task.id }));
+      // A `nonRegenerating` pool at 0 is permanently exhausted (it never
+      // regrows and cannot be restocked), so surface a distinct reason.
+      const exhausted = gateNode.respawn?.policy === 'nonRegenerating';
+      blockedReasons.push(
+        this._blockedReason(exhausted ? 'NODE_EXHAUSTED' : 'NODE_DEPLETED', { taskId: task.id })
+      );
     }
 
     if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {

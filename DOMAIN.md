@@ -170,7 +170,7 @@ Gathering Environment
 `- tasks
    |- toolIds (references system.tools)
    |- defaultEnvironmentId (drop-time placement hint; canvas only)
-   |- node config + depletedBehavior (task-level config; environment nodeRuntime owns depletion/respawn; depletedBehavior.swapImage drives the SHARED env-node-driven linked-Tile marker swap)
+   |- node config + depletedBehavior (task-level config; environment nodeRuntime owns depletion/respawn; respawn.policy is `manual` | `overTime` | `nonRegenerating` — `nonRegenerating` is a permanently depletable pool that never regrows and cannot be restocked; depletedBehavior.swapImage drives the SHARED env-node-driven linked-Tile marker swap)
    |- visibility gate
    |- timeRequirement
    |- check

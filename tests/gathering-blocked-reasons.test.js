@@ -31,6 +31,16 @@ describe('gatheringBlockedReasons', () => {
     assert.equal(BLOCK_LABEL_KEYS.NO_CURRENT_REALM, 'FABRICATE.App.Gathering.Detail.Callout.NoRealm');
   });
 
+  it('maps the permanently-exhausted (nonRegenerating) node code to its own label (issue 301)', () => {
+    assert.equal(BLOCK_LABEL_KEYS.NODE_EXHAUSTED, 'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted');
+    // It is distinct from the regenerating "depleted" code.
+    assert.notEqual(BLOCK_LABEL_KEYS.NODE_EXHAUSTED, BLOCK_LABEL_KEYS.NODE_DEPLETED);
+    assert.deepEqual(
+      localizeBlockedReasons([{ code: 'NODE_EXHAUSTED' }], localize),
+      ['FABRICATE.App.Gathering.Detail.Callout.NodeExhausted']
+    );
+  });
+
   it('falls back to the reason message, then a generic label, for unknown codes', () => {
     assert.deepEqual(
       localizeBlockedReasons([{ code: 'WEIRD_CODE', message: 'Custom reason' }], localize),
