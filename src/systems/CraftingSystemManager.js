@@ -251,6 +251,10 @@ export class CraftingSystemManager {
   _normalizeFeatures(system = {}) {
     const features = system.features || {};
     const has = (k) => Object.prototype.hasOwnProperty.call(features, k);
+    // `complexRecipes` was removed as a feature (#102): recipe-control visibility
+    // derives from resolution mode, not a persistent flag. It survives ONLY as a
+    // legacy compatibility INPUT that seeds `multiStepRecipes` for old systems
+    // saved before the rename; it is no longer emitted as a normalized feature.
     const multiStepEnabled = has('multiStepRecipes')
       ? features.multiStepRecipes === true
       : has('complexRecipes')
@@ -262,7 +266,6 @@ export class CraftingSystemManager {
       categories: true,
       itemTags: true,
       essences: has('essences') ? features.essences === true : system.enableEssences === true,
-      complexRecipes: has('complexRecipes') ? features.complexRecipes === true : false,
       multiStepRecipes: multiStepEnabled,
       propertyMacros: has('propertyMacros') ? features.propertyMacros === true : false,
       craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,

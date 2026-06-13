@@ -717,7 +717,6 @@
             "RecipeCategories": "Adds category organization to recipe browsing and authoring.",
             "ItemTags": "Enables managed component tags and tag-based ingredient options.",
             "Essences": "Enables essence definitions and essence requirements.",
-            "ComplexRecipes": "Keeps legacy complex recipe controls available where this system uses them.",
             "MultiStepRecipes": "Enables explicit recipe steps and step-level requirements.",
             "PropertyMacros": "Allows macro-backed component property behavior.",
             "CraftingChecks": "Enables system-level crafting check configuration in the current admin.",
@@ -1971,7 +1970,6 @@
           "RecipeCategories": "Recipe categories",
           "ItemTags": "Item tags",
           "Essences": "Essences",
-          "ComplexRecipes": "Complex recipes",
           "MultiStepRecipes": "Multi-step recipes",
           "CraftingChecks": "Crafting checks",
           "OutcomeRouting": "Outcome routing",
@@ -2349,10 +2347,6 @@
           "Save": "Save Essence",
           "Cancel": "Cancel Editing",
           "Remove": "Remove Essence"
-        },
-        "ComplexRecipes": {
-          "Title": "Complex Recipes",
-          "Hint": "Allow multiple ingredient sets, multiple result groups, and advanced routing controls."
         },
         "MultiStepRecipes": {
           "Title": "Multi-Step Recipes",

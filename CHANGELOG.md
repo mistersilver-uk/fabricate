@@ -31,4 +31,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Removed
 
+- **`features.complexRecipes`** (#102) — removed the unused `complexRecipes` system feature flag from the schema, normalization, admin store, and manager feature-chip display. Recipe-control visibility derives from resolution mode, not a persistent flag. `complexRecipes` is retained only as a legacy compatibility input that seeds `multiStepRecipes` for systems saved before the rename.
 - `AlchemySubmitPanel.svelte` — replaced by the combined `Workbench` + `ComponentPalette` components.

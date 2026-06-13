@@ -58,6 +58,35 @@ test('effectTransfer is false when set to a non-boolean truthy value', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #102: complexRecipes is removed as a normalized feature, but survives as a
+// legacy compatibility input that seeds multiStepRecipes.
+// ---------------------------------------------------------------------------
+
+test('#102: complexRecipes is no longer emitted as a normalized feature', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  assert.equal('complexRecipes' in manager._normalizeFeatures({}), false);
+  assert.equal('complexRecipes' in manager._normalizeFeatures({ features: { complexRecipes: true } }), false);
+});
+
+test('#102: legacy features.complexRecipes still seeds multiStepRecipes when multiStepRecipes is absent', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  assert.equal(manager._normalizeFeatures({ features: { complexRecipes: true } }).multiStepRecipes, true);
+  assert.equal(manager._normalizeFeatures({ features: { complexRecipes: false } }).multiStepRecipes, false);
+});
+
+test('#102: an explicit multiStepRecipes wins over the legacy complexRecipes seed', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  assert.equal(
+    manager._normalizeFeatures({ features: { multiStepRecipes: false, complexRecipes: true } }).multiStepRecipes,
+    false
+  );
+  assert.equal(
+    manager._normalizeFeatures({ features: { multiStepRecipes: true, complexRecipes: false } }).multiStepRecipes,
+    true
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Helpers for Group 2
 // ---------------------------------------------------------------------------
 
