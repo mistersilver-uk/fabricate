@@ -957,7 +957,7 @@ function _inferEnvironmentValidationTarget(message, draft, context = _createEnvi
   const task = _findTaskForValidationMessage(message, draft);
   const lower = String(message || '').toLowerCase();
 
-  if (/at least one task before it can be enabled|at least one task/.test(lower)) return { path: 'enabled' };
+  if (/at least one task before it can be enabled/.test(lower)) return { path: 'enabled' };
   if (/selection requires|selectionmode/.test(lower)) return { path: 'environment.selectionMode' };
   if (/craftingsystemid/.test(lower)) return { path: 'environment.craftingSystemId' };
 

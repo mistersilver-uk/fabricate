@@ -420,9 +420,7 @@ export class GatheringEnvironmentStore {
 
     const hasTaskSource = this._environmentHasTaskSource(normalized);
     if (normalized.enabled !== false && !hasTaskSource) {
-      errors.push(
-        `Environment "${label}" must have at least one task before it can be enabled`
-      );
+      errors.push(`Environment "${label}" must have at least one task before it can be enabled`);
     }
     if (!VALID_RISK_LEVELS.has(original?.risk ?? normalized.risk)) {
       errors.push(`Environment "${label}" risk must be safe, hazardous, unsafe, or extreme`);
