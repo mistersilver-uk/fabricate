@@ -24,6 +24,7 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
 - Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, for future experimental feature gates. It defaults to disabled.
+- Fabricate exposes a per-client module setting, `fabricate.interactionPromptPosition`, for the on-screen anchor of the region-entry interaction prompt toast. It offers the four screen corners and four edge-centers and defaults to `bottom-center` (the prompt's historical position). The setting is client-scoped so each user can move the prompt away from their own conflicting on-screen widgets; an unset or unrecognized value resolves to `bottom-center`.
 - `Fabricate` is the default theme.
 - `Mythwright` preserves the previous dark green product palette.
 - The supported preset catalog also includes `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and `Foundry Native`.
@@ -876,6 +877,7 @@ World settings:
 
 Client settings:
 
+- `fabricate.interactionPromptPosition`
 - `fabricate.lastCraftingActor`
 - `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`

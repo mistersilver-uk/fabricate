@@ -10,6 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Configurable interaction-prompt position** (#300) — the region-entry interaction prompt's on-screen anchor is now a per-client setting (`fabricate.interactionPromptPosition`) offering the four screen corners and four edge-centers. Defaults to bottom-center (unchanged behavior); lets players move the prompt away from other modules' on-screen widgets.
 - **Alchemy Tab redesign** — replaced the legacy drag-drop `AlchemySubmitPanel` with a fully-featured two-panel alchemy workspace:
   - `AlchemySystemSelector` — drop-down to choose between multiple alchemy systems; hidden when only one system exists. The selection persists per client via the new `fabricate.lastAlchemySystem` setting.
   - `ComponentPalette` — responsive grid of every component in the selected system, each showing the item image, name, and a quantity badge (available inventory minus workbench). Left-click to stage a component; right-click to un-stage one.
