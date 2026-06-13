@@ -27,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - **Unified spacing scale** (#78) — tokenized hardcoded padding, margin, and gap pixel values across `styles/fabricate.css` onto the shared 4px spacing scale (`--fab-space-*`), with bounded (≤2px) visual shifts. Added two fine tokens (`--fab-space-2xs: 2px`, `--fab-space-chip: 6px`) and five semantic aliases (`--fab-space-xs`/`sm`/`md`/`lg`/`xl`). `1px` hairlines and 34–42px fixed icon/grid dimensions are documented exemptions left as literals.
+- **Gathering environments can be saved before tasks are added** (#298) — a gathering environment may now be saved without any task source so a GM can persist a partially-authored place and return to it later. A task source is only required to **enable** an environment: enabling a task-less environment (via the editor toggle or a save with `enabled: true`) is still rejected. The readiness "no available tasks" issue downgrades to a non-blocking warning for a disabled draft and stays critical for an active environment. Every other validation invariant (system id, realm ids, enum values, drop-rate adjustments, conditions) still blocks save unconditionally.
 
 ### Removed
 

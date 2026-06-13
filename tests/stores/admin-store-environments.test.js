@@ -82,11 +82,10 @@ function validateEnvironmentForFakeCreate(environment) {
   const hasTaskSource = (Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0)
     || (Array.isArray(environment.forcedTaskIds) && environment.forcedTaskIds.length > 0)
     || (Array.isArray(environment.tasks) && environment.tasks.length > 0);
-  if (environment.selectionMode === 'targeted' && !hasTaskSource) {
-    errors.push('targeted selection requires at least one task');
-  }
-  if (environment.selectionMode === 'blind' && !hasTaskSource) {
-    errors.push('blind selection requires at least one task');
+  // A task source is only required to ENABLE an environment; a disabled draft may
+  // be saved without one (issue #298).
+  if (environment.enabled !== false && !hasTaskSource) {
+    errors.push('Environment must have at least one task before it can be enabled');
   }
   for (const task of environment.tasks || []) {
     const resultGroupNames = new Map();
@@ -1060,6 +1059,46 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(result, false);
     assert.match(get(store.viewState).environmentSaveError, /Toggle failed/);
     assert.equal(services._environments.find(environment => environment.id === 'environment-b').enabled, false);
+  });
+
+  it('rejects enabling a persisted environment that has no task source', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [
+        // A disabled draft persisted earlier with no task source (issue #298).
+        makeEnvironment({ id: 'environment-a', name: 'Forest', enabled: false, tasks: [], enabledTaskIds: [], forcedTaskIds: [] })
+      ]
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+
+    const result = await store.toggleEnvironmentEnabled('environment-a', true);
+
+    assert.equal(result, false);
+    assert.match(get(store.viewState).environmentSaveError, /at least one task before it can be enabled/);
+    // The enable attempt is rejected, so the persisted record stays disabled.
+    assert.equal(services._environments.find(environment => environment.id === 'environment-a').enabled, false);
+  });
+
+  it('saves a new disabled environment with no task source', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: []
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    await store.createEnvironmentDraft();
+
+    // New drafts default to enabled: false, so a task-less draft persists fine.
+    const createResult = await store.saveEnvironmentDraft();
+    assert.equal(createResult.ok, true);
+    assert.equal(services._environmentCalls.create.length, 1);
+    assert.equal(services._environmentCalls.create[0].enabled, false);
+    // No task source authored on the draft, yet the disabled draft persists.
+    assert.ok(!services._environmentCalls.create[0].enabledTaskIds?.length);
+    assert.equal(get(store.viewState).environmentSaveError, null);
   });
 
   it('setEnvironmentRealmMembership adds and removes a realm tag on an environment', async () => {

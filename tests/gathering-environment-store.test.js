@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
-import { GatheringEnvironmentStore } from '../src/systems/GatheringEnvironmentStore.js';
+import { GatheringEnvironmentStore, GatheringEnvironmentValidationError } from '../src/systems/GatheringEnvironmentStore.js';
 
 function makeMemoryStore({
   saved = [],
@@ -184,7 +184,53 @@ test('validation permits composition-only environments backed by matching librar
     biomes: ['swamp']
   }));
   assert.equal(unmatched.valid, false);
-  assert.match(unmatched.errors.join('\n'), /targeted selection requires at least one task/);
+  assert.match(unmatched.errors.join('\n'), /must have at least one task before it can be enabled/);
+});
+
+test('a disabled environment may be saved without any task source', async () => {
+  const { store } = makeMemoryStore();
+  store.load();
+
+  // No matching library task and no enabled/forced ids, but disabled — so it may
+  // persist as a partially-authored draft. The task-source gate only blocks enable.
+  const draft = environment({
+    id: 'env-disabled-draft',
+    enabled: false,
+    enabledTaskIds: [],
+    compositionMode: 'automatic',
+    biomes: ['swamp']
+  });
+
+  const result = store.validate(draft);
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.errors, []);
+
+  const created = await store.create(draft);
+  assert.equal(created.enabled, false);
+  assert.deepEqual(created.enabledTaskIds, []);
+});
+
+test('enabling a saved task-less environment is rejected', async () => {
+  const { store } = makeMemoryStore();
+  store.load();
+
+  const created = await store.create(environment({
+    id: 'env-toggle-on',
+    enabled: false,
+    enabledTaskIds: [],
+    compositionMode: 'automatic',
+    biomes: ['swamp']
+  }));
+  assert.equal(created.enabled, false);
+
+  await assert.rejects(
+    () => store.update('env-toggle-on', { enabled: true }),
+    error => {
+      assert.ok(error instanceof GatheringEnvironmentValidationError);
+      assert.match(error.errors.join('\n'), /must have at least one task before it can be enabled/);
+      return true;
+    }
+  );
 });
 
 test('drop-rate adjustments normalize to non-zero integer deltas and validate raw ranges', async () => {

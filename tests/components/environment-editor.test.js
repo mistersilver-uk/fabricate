@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { evaluateEnvironmentReadiness } from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
+import { evaluateEnvironmentReadiness, blocksEnable } from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -496,9 +496,38 @@ describe('evaluateEnvironmentReadiness', () => {
     assert.equal(checks.find(check => check.id === 'hasName').satisfied, true);
     assert.equal(checks.find(check => check.id === 'hasBiome').satisfied, true);
     assert.equal(checks.find(check => check.id === 'hasAvailableTask').satisfied, false);
-    assert.ok(issues.some(issue => issue.id === 'noAvailableTasks' && issue.severity === 'critical'));
-    assert.ok(issues.some(issue => issue.id === 'activeNoComposition' && issue.severity === 'critical'));
+    assert.ok(issues.some(issue => issue.id === 'noAvailableTasks' && issue.severity === 'critical' && issue.blocks === 'enable'));
+    assert.ok(issues.some(issue => issue.id === 'activeNoComposition' && issue.severity === 'critical' && issue.blocks === 'enable'));
     assert.ok(issues.some(issue => issue.id === 'noScene' && issue.severity === 'warning'));
+    assert.equal(blocksEnable(issues), true);
+  });
+
+  it('treats a disabled draft with no available tasks as a non-blocking warning', () => {
+    const disabled = { enabled: false, name: 'Mines', biomes: ['cave'], dangerTags: ['hazardous'], sceneUuid: '' };
+    const { issues } = evaluateEnvironmentReadiness(disabled, { counts: { availableTasks: 0 }, tasks: [], events: [] });
+    // The disabled draft now saves fine, so noAvailableTasks downgrades to a warning
+    // but still flags that the environment cannot be enabled yet.
+    const noAvailable = issues.find(issue => issue.id === 'noAvailableTasks');
+    assert.ok(noAvailable, 'should still surface the no-available-tasks issue');
+    assert.equal(noAvailable.severity, 'warning');
+    assert.equal(noAvailable.blocks, 'enable');
+    // activeNoComposition only fires for an active environment.
+    assert.ok(!issues.some(issue => issue.id === 'activeNoComposition'));
+    // The single noAvailableTasks issue still blocks enabling.
+    assert.equal(blocksEnable(issues), true);
+  });
+
+  it('does not block enabling when only advisory issues are present', () => {
+    const composition = {
+      counts: { availableTasks: 1, unavailableTasks: 1 },
+      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedButUnavailable', record: { name: 'Stale Task' } }],
+      events: []
+    };
+    const { issues } = evaluateEnvironmentReadiness(environment, composition);
+    const stale = issues.find(issue => issue.id === 'staleIncluded');
+    // staleIncluded is advisory critical and carries no blocks field.
+    assert.equal(stale.blocks, undefined);
+    assert.equal(blocksEnable(issues), false);
   });
 
   it('raises a critical issue for an included-but-unavailable record', () => {
