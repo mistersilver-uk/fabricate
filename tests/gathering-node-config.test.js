@@ -3,9 +3,40 @@ import assert from 'node:assert/strict';
 
 import { normalizeRespawn, normalizeDepletedBehavior, normalizeNodeConfig, VALID_RESPAWN_POLICIES, VALID_RESPAWN_GAIN_MODES, VALID_RESPAWN_UNITS } from '../src/systems/gatheringNodeConfig.js';
 
-test('the respawn schema exposes exactly two policies and three gain modes', () => {
-  assert.deepEqual([...VALID_RESPAWN_POLICIES].sort(), ['manual', 'overTime']);
+test('the respawn schema exposes exactly three policies and three gain modes', () => {
+  assert.deepEqual([...VALID_RESPAWN_POLICIES].sort(), ['manual', 'nonRegenerating', 'overTime']);
   assert.deepEqual([...VALID_RESPAWN_GAIN_MODES].sort(), ['chance', 'expression', 'guaranteed']);
+});
+
+test('normalizeRespawn preserves the nonRegenerating policy but never derives it from legacy/unknown values', () => {
+  // The permanently-depletable policy round-trips...
+  assert.equal(normalizeRespawn({ policy: 'nonRegenerating' }).policy, 'nonRegenerating');
+  // ...but the legacy `none` token (and any unknown value) still maps to manual,
+  // NOT nonRegenerating — `none` collides with the legacy no-respawn token.
+  assert.equal(normalizeRespawn({ policy: 'none' }).policy, 'manual');
+  assert.equal(normalizeRespawn({ policy: 'bogus' }).policy, 'manual');
+  assert.equal(normalizeRespawn(null).policy, 'manual');
+});
+
+test('normalizeRespawn strips all respawn-timing/gain fields for nonRegenerating to a bare policy block', () => {
+  // A pool that never regrows needs no interval/gain/chance/expression or timing
+  // fields, so they are dropped rather than persisted.
+  assert.deepEqual(
+    normalizeRespawn({
+      policy: 'nonRegenerating',
+      intervalUnit: 'hours',
+      intervalAmount: 5,
+      gainMode: 'chance',
+      chance: 50,
+      amountExpression: '1d4',
+      lastEvaluatedWorldTime: 1000,
+      nextEvaluationWorldTime: 2000,
+      lastRoll: { worldTime: 1000, rolls: [1] },
+    }),
+    { policy: 'nonRegenerating' }
+  );
+  // Idempotent: re-normalizing the minimal block yields itself.
+  assert.deepEqual(normalizeRespawn({ policy: 'nonRegenerating' }), { policy: 'nonRegenerating' });
 });
 
 test('normalizeRespawn defaults a missing/invalid block to manual', () => {

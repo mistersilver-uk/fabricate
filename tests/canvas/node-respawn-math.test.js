@@ -130,6 +130,16 @@ test('nextRespawnEta: manual policy / at-max → null (never auto-respawns)', ()
   assert.equal(nextRespawnEta(null, secondsPerHour, 0), null);
 });
 
+// issue 301: a permanently-depletable pool is skipped by respawn exactly like
+// manual — no gain over any elapsed interval, and never a respawn ETA.
+test('nonRegenerating: respawnNodeOnce never gains and nextRespawnEta is null', () => {
+  const node = { current: 0, max: 5, respawn: { policy: 'nonRegenerating', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 0 } };
+  const { changed, node: next } = respawnNodeOnce(node, { now: 100 * HOUR, secondsPerUnit: secondsPerHour });
+  assert.equal(changed, false, 'a nonRegenerating pool is left untouched by the respawn pass');
+  assert.equal(next.current, 0, 'current stays exhausted');
+  assert.equal(nextRespawnEta(node, secondsPerHour, 0), null, 'no respawn ETA for a permanently depletable pool');
+});
+
 // --- DRIFT GUARD: math vs _respawnNode on a shared fixture ------------------
 
 function driftService(rolls) {

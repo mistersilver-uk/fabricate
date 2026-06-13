@@ -55,6 +55,7 @@
     GAME_PAUSED: { icon: 'fa-pause', key: 'FABRICATE.App.Gathering.Detail.Callout.Paused', tone: 'neutral' },
     DUPLICATE_ACTIVE_RUN: { icon: 'fa-hourglass-half', key: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun', tone: 'neutral' },
     NODE_DEPLETED: { icon: 'fa-mountain', key: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted', tone: 'warning' },
+    NODE_EXHAUSTED: { icon: 'fa-mountain', key: 'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted', tone: 'warning' },
     STAMINA_BLOCKED: { icon: 'fa-bolt', key: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked', tone: 'warning' }
   };
 

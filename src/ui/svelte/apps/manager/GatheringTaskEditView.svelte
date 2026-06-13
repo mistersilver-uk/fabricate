@@ -856,6 +856,7 @@
           <select value={respawn.policy} onchange={(event) => setRespawnPolicy(event.currentTarget.value)} data-gathering-task-node-respawn>
             <option value="manual">{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option>
             <option value="overTime">{text('FABRICATE.Admin.Manager.Economy.RespawnOverTime', 'Over world time')}</option>
+            <option value="nonRegenerating">{text('FABRICATE.Admin.Manager.Economy.RespawnNone', 'Does not regenerate')}</option>
           </select>
         </label>
 
