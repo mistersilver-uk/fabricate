@@ -371,6 +371,59 @@ describe('adminStore library tools (system-owned)', () => {
       assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, []);
     });
 
+    it('issue 297: saveAllDirtyToolDrafts discards a blank unmodified new-tool draft and succeeds', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.enterToolsDraft('sys1');
+      // User clicks "Add tool" but never assigns a component (invalid + blank).
+      const added = store.addToolToDraft();
+      assert.equal(store.validateToolDraft(added.id).valid, false, 'blank new tool is invalid (no component)');
+
+      const saved = await store.saveAllDirtyToolDrafts();
+      assert.equal(saved, true, 'save completes cleanly instead of silently blocking');
+      const state = get(store.viewState);
+      assert.equal(state.toolsDraft.find(tool => tool.id === added.id), undefined, 'the blank new draft is discarded');
+      assert.deepEqual(state.toolsDraftDirtyToolIds, [], 'no dirty drafts remain');
+      assert.equal(services._systemTools().length, 0, 'nothing blank was persisted');
+    });
+
+    it('issue 297: saveAllDirtyToolDrafts keeps a valid tool and drops only the blank new draft', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.enterToolsDraft('sys1');
+      const valid = store.addToolToDraft();
+      store.updateToolInDraft(valid.id, { componentId: 'comp-axe', label: 'Iron Pickaxe' });
+      store.addToolToDraft();
+
+      const saved = await store.saveAllDirtyToolDrafts();
+      assert.equal(saved, true);
+      const persisted = services._systemTools();
+      assert.equal(persisted.length, 1, 'only the valid tool persists');
+      assert.equal(persisted[0].componentId, 'comp-axe');
+      assert.equal(get(store.viewState).toolsDraft.length, 1, 'blank new draft discarded, valid tool kept');
+    });
+
+    it('issue 297: saveAllDirtyToolDrafts returns false for a partially-edited invalid tool (no component)', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.enterToolsDraft('sys1');
+      const added = store.addToolToDraft();
+      // Edited (named) but still missing the required component: NOT blank, so it
+      // must block the save rather than being silently discarded.
+      store.updateToolInDraft(added.id, { label: 'Unfinished Tool' });
+
+      const saved = await store.saveAllDirtyToolDrafts();
+      assert.equal(saved, false, 'a partially-edited invalid tool blocks the save so the caller can warn');
+      const state = get(store.viewState);
+      assert.ok(state.toolsDraft.some(tool => tool.id === added.id), 'the edited invalid tool is preserved, not discarded');
+      const validation = store.validateToolsDraft();
+      assert.equal(validation.valid, false, 'validateToolsDraft reports the offending tool for the warning');
+      assert.equal(validation.errors[0].id, added.id);
+    });
+
     it('saveToolDraft writes only the selected dirty tool and leaves other dirty tools unsaved', async () => {
       const services = createMockServices({
         systemTools: [
@@ -412,6 +465,10 @@ describe('adminStore library tools (system-owned)', () => {
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
       const added = store.addToolToDraft();
+      // A non-blank invalid tool (edited but missing the required component). A
+      // genuinely-invalid tool still blocks the save and sets the error state;
+      // only blank, unmodified new drafts are discarded cleanly (issue 297).
+      store.updateToolInDraft(added.id, { label: 'Unfinished Tool' });
       const validation = store.validateToolsDraft();
       assert.equal(validation.valid, false);
       assert.equal(validation.errors[0].id, added.id);

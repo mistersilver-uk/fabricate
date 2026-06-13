@@ -1815,7 +1815,46 @@ export function createAdminStore(services) {
     }
   }
 
+  // A brand-new tool draft (id absent from the persisted baseline) that the user
+  // added but never filled in matches the canonical empty-tool shape for its id.
+  // Such a draft has nothing to save and must not block a "Save all".
+  function _isBlankNewToolDraft(tool, baselineIds) {
+    if (!tool || baselineIds.has(String(tool.id))) return false;
+    const normalized = _normalizeGatheringLibraryTool({ ...tool }, _randomID);
+    const blank = _normalizeGatheringLibraryTool({ id: tool.id }, _randomID);
+    return JSON.stringify(normalized) === JSON.stringify(blank);
+  }
+
+  // Drop blank, unmodified, brand-new tool drafts (e.g. the user clicked "Add
+  // tool" then tried to save/navigate away without assigning a component).
+  // Discarding them lets a "Save all" complete cleanly instead of silently
+  // blocking on an empty, invalid row (issue 297). Repairs selection/expansion
+  // when they pointed at a discarded draft.
+  function _discardBlankNewToolDrafts() {
+    const current = get(toolsDraft);
+    if (!Array.isArray(current)) return;
+    const baselineIds = new Set((get(toolsDraftBaseline) || []).map(entry => String(entry.id)));
+    const kept = current.filter(tool => !_isBlankNewToolDraft(tool, baselineIds));
+    if (kept.length === current.length) return;
+    toolsDraft.set(kept);
+    const keptIds = new Set(kept.map(entry => String(entry.id)));
+    if (!keptIds.has(String(get(toolsDraftSelectedToolId)))) {
+      toolsDraftSelectedToolId.set(kept[0]?.id || '');
+    }
+    if (!keptIds.has(String(get(toolsDraftExpandedToolId)))) {
+      toolsDraftExpandedToolId.set('');
+    }
+    _recomputeToolsDraftDirty();
+    _patchToolsDraftViewState();
+  }
+
   async function saveAllDirtyToolDrafts() {
+    // A "Save all" should not be blocked by an empty new-tool row the user never
+    // filled in: discard blank, unmodified, brand-new drafts first so they don't
+    // fail validation and silently abort the save (issue 297). A partially-edited
+    // invalid tool (e.g. a named tool with no component) still returns false so
+    // the caller can surface why.
+    _discardBlankNewToolDrafts();
     const dirtyIds = [...get(toolsDraftDirtyToolIds)];
     for (const toolId of dirtyIds) {
       if (!isToolDraftDirty(toolId)) continue;

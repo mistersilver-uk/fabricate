@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
@@ -1213,10 +1213,25 @@
     return confirmToolsRouteExit(nextView);
   }
 
+  // When a "Save all" is blocked by a tool that fails validation (after blank,
+  // unmodified new drafts are discarded by the store), tell the user why and
+  // focus the offending tool, instead of silently aborting the save and leaving
+  // them stranded on the tools page (issue 297).
+  function surfaceToolsSaveValidationError() {
+    const validation = store?.validateToolsDraft?.() ?? { valid: true, errors: [] };
+    if (validation.valid) return;
+    const firstInvalidId = validation.errors?.[0]?.id;
+    if (firstInvalidId) store?.selectDraftTool?.(firstInvalidId);
+    notifyWarn(localize('FABRICATE.Admin.Manager.Tools.SaveBlockedInvalid'));
+  }
+
   async function finishToolsRouteExit(action) {
     if (action === 'save') {
       const saved = await store?.saveAllDirtyToolDrafts?.();
-      if (saved === false) return false;
+      if (saved === false) {
+        surfaceToolsSaveValidationError();
+        return false;
+      }
       store?.cancelToolsDraft?.();
       return true;
     }

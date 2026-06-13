@@ -2274,7 +2274,8 @@
             "SaveAll": "Save All",
             "Discard": "Discard Changes",
             "Cancel": "Keep Editing"
-          }
+          },
+          "SaveBlockedInvalid": "Can't save: assign a component to every tool first. The highlighted tool still needs one."
         }
       },
       "Sidebar": {
