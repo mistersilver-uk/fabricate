@@ -2123,6 +2123,35 @@ async function main() {
           tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
 
+        // Seed one `fabricate.interactable` Region behaviour on the Azure Grove
+        // scene so the canvas interactable config panel (Link/Unlink toggle +
+        // node editor) gets screenshot coverage in Phase D0. It is bound to the
+        // reusable GM library gathering task (`smoke-forage-library`) and the
+        // Azure Grove environment, linked by default (taskNodeLink: 'linked',
+        // node: null). The synthetic sourceUuid mirrors buildInteractableSourceUuid
+        // (`Fabricate.<systemId>.gatheringTask.<taskId>`). The Region is embedded
+        // in the scene, so Phase F's scene cleanup removes it — no extra cleanup.
+        const interactableTaskId = 'smoke-forage-library';
+        const [interactableRegion] = await azureGroveScene.createEmbeddedDocuments('Region', [{
+          name: 'Fabricate Smoke Node',
+          shapes: [{ type: 'rectangle', x: 1000, y: 1000, width: 400, height: 400 }],
+          behaviors: [{
+            type: 'fabricate.interactable',
+            system: {
+              interactableType: 'gatheringTask',
+              sourceUuid: `Fabricate.${systemId}.gatheringTask.${interactableTaskId}`,
+              systemId,
+              taskId: interactableTaskId,
+              environmentId: gatheringEnvironment.id,
+              taskNodeLink: 'linked',
+              node: null
+            }
+          }]
+        }]);
+        const interactableBehavior = interactableRegion?.behaviors?.find(
+          behavior => behavior?.type === 'fabricate.interactable'
+        ) ?? null;
+
         return {
           systemId,
           componentMap,
@@ -2130,13 +2159,20 @@ async function main() {
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
-          playerGatheringEnvironmentIds: playerGatheringFixtures.map(environment => environment.id)
+          playerGatheringEnvironmentIds: playerGatheringFixtures.map(environment => environment.id),
+          interactable: {
+            sceneId: azureGroveScene.id,
+            regionId: interactableRegion?.id ?? null,
+            behaviorId: interactableBehavior?.id ?? null
+          }
         };
       });
 
       cleanup.systemId = craftingSetup.systemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
       cleanup.sceneIds = craftingSetup.sceneIds;
+      // The interactable Region is embedded in azureGroveScene, so it is cleaned
+      // up with the scene (cleanup.sceneIds) — no separate cleanup key needed.
       process.stdout.write(`  Created crafting system and ${craftingSetup.recipeIds.length} recipes.\n`);
 
       results.steps.push({ step: 'create-crafting-system', passed: true });
@@ -2710,6 +2746,57 @@ async function main() {
         await assertManagerLayoutStable(page, 'tools normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-tools-normal');
+
+        // ── Canvas interactable config panel (#302) ────────────────────────────
+        // Open the GM config panel for the seeded `fabricate.interactable` Region
+        // behaviour and capture its node section in both states: linked (shares the
+        // gathering task's node) and unlinked (its own independent node editor).
+        // The config app is independent of the manager window; both are closed by
+        // closeOpenApplications below. Guarded so a failure here records a failed
+        // step but does not abort the manager phase or later phases.
+        try {
+          const interactableRef = craftingSetup.interactable;
+          if (!interactableRef?.sceneId || !interactableRef?.regionId || !interactableRef?.behaviorId) {
+            throw new Error(`Interactable behaviour ref is incomplete: ${JSON.stringify(interactableRef)}`);
+          }
+          await page.evaluate(({ s, r, b }) => {
+            return game.fabricate.api.getInteractableConfigAppClass().show({ sceneId: s, regionId: r, behaviorId: b });
+          }, { s: interactableRef.sceneId, r: interactableRef.regionId, b: interactableRef.behaviorId });
+
+          const configRoot = page.locator('.fabricate-interactable-config').first();
+          await configRoot.waitFor({ state: 'visible', timeout: 10_000 });
+          const nodeSection = page.locator('[data-interactable-node-section]').first();
+          await nodeSection.waitFor({ state: 'visible', timeout: 10_000 });
+
+          const linkToggle = page.locator('[data-interactable-node-link]').first();
+          await linkToggle.waitFor({ state: 'visible', timeout: 10_000 });
+          if (await linkToggle.getAttribute('aria-pressed') !== 'true') {
+            throw new Error('Interactable config opened unlinked; expected the linked default (aria-pressed="true").');
+          }
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactable-config-linked');
+
+          // Toggle to the independent (unlinked) node editor and wait for its
+          // count/respawn controls to mount, then confirm the toggle flipped.
+          await linkToggle.click();
+          await page.locator('[data-interactable-node-count]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await page.locator('[data-interactable-node-respawn]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          if (await linkToggle.getAttribute('aria-pressed') !== 'false') {
+            throw new Error('Interactable config did not unlink after toggle (expected aria-pressed="false").');
+          }
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactable-config-unlinked');
+
+          await page.evaluate(() => {
+            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
+            return app?.close?.();
+          }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
+
+          results.steps.push({ step: 'interactable-config', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'interactable-config', passed: false, error: err.message });
+          process.stderr.write(`Interactable config capture failed: ${err.message}\n`);
+        }
 
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();

@@ -55,11 +55,13 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
     'interactableType',
     'linkedVisual',
     'name',
+    'node',
     'presentation',
     'sourceUuid',
     'state',
     'systemId',
     'taskId',
+    'taskNodeLink',
     'toolId'
   ]);
 
@@ -77,10 +79,16 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
   }
 
   assert.equal(schema.name.kind, 'StringField');
-  // A region-first interactable carries NO per-interactable node pool — the
-  // environment's `nodeRuntime[taskId]` owns depletion/respawn — so there is no
-  // behaviour `node` schema field.
-  assert.equal('node' in schema, false);
+  // A gatheringTask interactable may be LINKED to the task or UNLINKED with its
+  // own independent node pool, gated by `taskNodeLink` (default 'linked' shares the
+  // task's `environment.nodeRuntime[taskId]`). The independent pool is stored
+  // verbatim in the `node` ObjectField.
+  assert.equal(schema.taskNodeLink.kind, 'StringField');
+  assert.equal(schema.taskNodeLink.options.initial, 'linked');
+  assert.deepEqual(schema.taskNodeLink.options.choices, ['linked', 'unlinked']);
+  assert.equal(schema.node.kind, 'ObjectField');
+  assert.equal(schema.node.options.nullable, true);
+  assert.equal(schema.node.options.initial, null);
 });
 
 test('buildInteractableBehaviorSchema nests presentation/linkedVisual/state/activation with the right choices', () => {
@@ -131,7 +139,10 @@ test('buildInteractableBehaviorSystem applies sane defaults for a tool', () => {
   assert.equal(system.toolId, 't1');
   assert.equal(system.taskId, null);
   assert.equal(system.environmentId, null);
-  assert.equal('node' in system, false, 'no per-interactable node field');
+  // A tool is forced to linked with a null node (only a gatheringTask may carry
+  // an independent pool).
+  assert.equal(system.taskNodeLink, 'linked');
+  assert.equal(system.node, null);
   assert.deepEqual(system.state, {
     enabled: true,
     consumed: false,
@@ -149,7 +160,7 @@ test('buildInteractableBehaviorSystem applies sane defaults for a tool', () => {
   assert.deepEqual(system.presentation, { promptText: null, hidden: false });
 });
 
-test('buildInteractableBehaviorSystem carries the environment for a gathering task (no per-interactable node)', () => {
+test('buildInteractableBehaviorSystem carries the environment for a gathering task (linked node by default)', () => {
   const system = buildInteractableBehaviorSystem({
     interactableType: 'gatheringTask',
     sourceUuid: 'Fabricate.sys.gatheringTask.task1',
@@ -162,7 +173,9 @@ test('buildInteractableBehaviorSystem carries the environment for a gathering ta
   assert.equal(system.taskId, 'task1');
   assert.equal(system.toolId, null);
   assert.equal(system.environmentId, 'env-7');
-  assert.equal('node' in system, false, 'no per-interactable node field');
+  // No taskNodeLink requested → default linked, null node.
+  assert.equal(system.taskNodeLink, 'linked');
+  assert.equal(system.node, null);
   assert.deepEqual(system.presentation, { promptText: 'Mine here', hidden: true });
   assert.deepEqual(system.linkedVisual, {
     uuid: 'Scene.s.Tile.t',
@@ -172,15 +185,48 @@ test('buildInteractableBehaviorSystem carries the environment for a gathering ta
   });
 });
 
-test('buildInteractableBehaviorSystem never emits a node and rejects bad input', () => {
+test('buildInteractableBehaviorSystem forces a tool to linked and rejects bad input', () => {
   const system = buildInteractableBehaviorSystem({
     interactableType: 'tool',
     sourceUuid: 'Fabricate.sys.tool.t1',
-    systemId: 'sys'
+    systemId: 'sys',
+    // A tool may never carry an independent node, even if one is requested.
+    taskNodeLink: 'unlinked',
+    node: { enabled: true, max: 5, current: 5 }
   });
-  assert.equal('node' in system, false, 'no per-interactable node field');
+  assert.equal(system.taskNodeLink, 'linked');
+  assert.equal(system.node, null);
   assert.throws(() => buildInteractableBehaviorSystem({ interactableType: 'nope', sourceUuid: 'x' }));
   assert.throws(() => buildInteractableBehaviorSystem({ interactableType: 'tool', sourceUuid: '  ' }));
+});
+
+test('buildInteractableBehaviorSystem carries an independent node for a gatheringTask when taskNodeLink is unlinked', () => {
+  const system = buildInteractableBehaviorSystem({
+    interactableType: 'gatheringTask',
+    sourceUuid: 'Fabricate.sys.gatheringTask.task1',
+    systemId: 'sys',
+    taskId: 'task1',
+    environmentId: 'env-7',
+    taskNodeLink: 'unlinked',
+    node: { enabled: true, max: 5, current: 3, depletionTiming: 'onSuccess' }
+  });
+  assert.equal(system.taskNodeLink, 'unlinked');
+  assert.equal(system.node.max, 5);
+  assert.equal(system.node.current, 3);
+  assert.equal(system.node.depletionTiming, 'onSuccess');
+});
+
+test('buildInteractableBehaviorSystem downgrades to linked when the independent node is empty', () => {
+  const system = buildInteractableBehaviorSystem({
+    interactableType: 'gatheringTask',
+    sourceUuid: 'Fabricate.sys.gatheringTask.task1',
+    systemId: 'sys',
+    taskId: 'task1',
+    taskNodeLink: 'unlinked',
+    node: null
+  });
+  assert.equal(system.taskNodeLink, 'linked');
+  assert.equal(system.node, null);
 });
 
 test('readInteractableBehaviorSystem round-trips a built system on a fake behaviour', () => {
@@ -198,9 +244,57 @@ test('readInteractableBehaviorSystem round-trips a built system on a fake behavi
   assert.equal(view.taskId, 'task1');
   assert.equal(view.environmentId, 'env-1');
   assert.equal(view.name, 'Iron Vein');
-  assert.equal('node' in view, false, 'the reader does not surface a per-interactable node');
+  // Default linked round-trips with a null independent node.
+  assert.equal(view.taskNodeLink, 'linked');
+  assert.equal(view.node, null);
   assert.equal(view.state.enabled, true);
   assert.equal(view.activation.trigger, 'regionEnter');
+});
+
+test('readInteractableBehaviorSystem surfaces an unlinked node and downgrades a malformed one', () => {
+  const scoped = readInteractableBehaviorSystem({
+    type: 'fabricate.interactable',
+    system: {
+      interactableType: 'gatheringTask',
+      sourceUuid: 'x',
+      systemId: 's',
+      taskId: 't',
+      taskNodeLink: 'unlinked',
+      node: { enabled: true, max: 4, current: 2 }
+    }
+  });
+  assert.equal(scoped.taskNodeLink, 'unlinked');
+  assert.equal(scoped.node.max, 4);
+  assert.equal(scoped.node.current, 2);
+
+  // Link claims unlinked but the node does not normalize → DOWNGRADE to linked.
+  const downgraded = readInteractableBehaviorSystem({
+    type: 'fabricate.interactable',
+    system: {
+      interactableType: 'gatheringTask',
+      sourceUuid: 'x',
+      systemId: 's',
+      taskId: 't',
+      taskNodeLink: 'unlinked',
+      node: null
+    }
+  });
+  assert.equal(downgraded.taskNodeLink, 'linked');
+  assert.equal(downgraded.node, null);
+
+  // A tool never surfaces an independent node even if the raw system claims one.
+  const tool = readInteractableBehaviorSystem({
+    type: 'fabricate.interactable',
+    system: {
+      interactableType: 'tool',
+      sourceUuid: 'x',
+      systemId: 's',
+      taskNodeLink: 'unlinked',
+      node: { enabled: true, max: 4, current: 2 }
+    }
+  });
+  assert.equal(tool.taskNodeLink, 'linked');
+  assert.equal(tool.node, null);
 });
 
 test('readInteractableBehaviorSystem defends against partial/absent state', () => {

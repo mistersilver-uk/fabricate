@@ -46,6 +46,46 @@ function resolveRegionBehavior({ sceneId, regionId, behaviorId } = {}) {
 }
 
 /**
+ * Public ref→behaviour resolver for the gathering rich-state service's
+ * `resolveRegionBehavior` seam (issue 302). Resolves a live `fabricate.interactable`
+ * Region Behaviour from a `{sceneId, regionId, behaviorId}` ref, or null. No-throw.
+ *
+ * @param {{sceneId:string, regionId:string, behaviorId:string}} ref
+ * @returns {object|null}
+ */
+export function resolveInteractableBehaviorByRef(ref) {
+  try {
+    return resolveRegionBehavior(ref);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GM-routed writer for an interactable's scoped node (issue 302). Routes a
+ * `{ system: { node } }` behaviour write through the active GM (local apply on the
+ * active GM, socket emit otherwise), addressing the behaviour by ref.
+ *
+ * @param {{sceneId:string, regionId:string, behaviorId:string}} ref
+ * @param {{ node: object }} patch
+ * @returns {void|Promise<void>}
+ */
+export function writeInteractableBehaviorNode(ref, { node } = {}) {
+  if (!ref) return;
+  const writer = createInteractableBehaviorWriter({
+    isActiveGM,
+    emitUpdate: (payload) => globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload),
+    applyUpdate: applyInteractableBehaviorUpdate,
+  });
+  return writer.write({
+    sceneId: ref.sceneId,
+    regionId: ref.regionId,
+    behaviorId: ref.behaviorId,
+    update: { system: { node } },
+  });
+}
+
+/**
  * Apply a behaviour-document update to a `fabricate.interactable` Region Behaviour
  * (the active-GM edge for `{ system: { state } }` and other behaviour writes).
  * No-throw.

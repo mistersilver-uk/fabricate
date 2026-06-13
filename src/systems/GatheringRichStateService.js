@@ -1,3 +1,5 @@
+import { readInteractableBehaviorSystem } from '../canvas/regions/interactableRegionFlags.js';
+
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { respawnNodeOnce } from './nodeRespawnMath.js';
@@ -178,6 +180,12 @@ export class GatheringRichStateService {
     evaluateExpression = null,
     runMacro = null,
     secondsPerUnit = null,
+    // Interactable-scoped node seams (issue 302). These resolve + write the node
+    // pool carried by a scene interactable's `fabricate.interactable` behaviour,
+    // injected so the rich-state service never reaches for `game.scenes`. When
+    // absent (the default), every node path falls back to the environment scope.
+    resolveRegionBehavior = null,
+    writeInteractableBehavior = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.getSetting = getSetting;
@@ -197,6 +205,10 @@ export class GatheringRichStateService {
       typeof secondsPerUnit === 'function'
         ? secondsPerUnit
         : (unit) => SECONDS_PER_UNIT[unit] || SECONDS_PER_UNIT.hours;
+    this.resolveRegionBehavior =
+      typeof resolveRegionBehavior === 'function' ? resolveRegionBehavior : null;
+    this.writeInteractableBehavior =
+      typeof writeInteractableBehavior === 'function' ? writeInteractableBehavior : null;
   }
 
   /**
@@ -951,11 +963,11 @@ export class GatheringRichStateService {
     return environment ? cloneJson(environment) : null;
   }
 
-  buildListingMetadata({ environment, task, actor, viewer }) {
+  buildListingMetadata({ environment, task, actor, viewer, interactableRef = null }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
     const staminaEnabled = this.staminaEnabled(environment?.craftingSystemId);
     const nodesEnabled = this.nodesEnabled(environment?.craftingSystemId);
-    const displayNode = task?.nodes ?? null;
+    const displayNode = this._resolveNodeSource({ environment, task, interactableRef }).read();
     const showNodeCounts =
       displayNode?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
     const nodes =
@@ -1273,6 +1285,60 @@ export class GatheringRichStateService {
   }
 
   /**
+   * Resolve the node source for an attempt: either the ENVIRONMENT pool (default,
+   * unchanged) or an interactable's OWN scoped pool (issue 302), selected by the
+   * `interactableRef`. Returns a `{ kind, read(), write(node) }` handle so the
+   * gate / depletion / listing touchpoints stay scope-agnostic.
+   *
+   * - No `interactableRef` → `kind: 'environment'`. `read()` returns the task's
+   *   composed node (`task.nodes`); `write(node)` persists into the per-environment
+   *   `nodeRuntime[taskId]` via {@link _writeNodeState}. This is the UNCHANGED path
+   *   and never resolves a behaviour.
+   * - With an `interactableRef` whose behaviour resolves to `taskNodeLink:'unlinked'`
+   *   with a real `node` → `kind: 'interactable'`. `read()` returns that scoped node
+   *   verbatim (self-authoritative — NO library merge); `write(node)` patches the
+   *   behaviour `system.node` via the injected `writeInteractableBehavior` seam.
+   * - Any other ref (behaviour gone, environment scope, malformed node) falls back
+   *   to the environment branch — safe and never throws.
+   *
+   * @param {object} params
+   * @param {object} params.environment
+   * @param {object} params.task
+   * @param {{sceneId:string,regionId:string,behaviorId:string}|null} [params.interactableRef]
+   * @returns {{ kind: 'environment'|'interactable', read: () => (object|null), write: (node: object) => (void|Promise<void>) }}
+   */
+  _resolveNodeSource({ environment, task, interactableRef = null } = {}) {
+    const environmentSource = {
+      kind: 'environment',
+      read: () => task?.nodes ?? null,
+      write: (node) =>
+        this._writeNodeState({ environmentId: environment?.id, taskId: task?.id, node }),
+    };
+
+    if (!interactableRef || typeof this.resolveRegionBehavior !== 'function') {
+      return environmentSource;
+    }
+
+    let view = null;
+    try {
+      const behavior = this.resolveRegionBehavior(interactableRef);
+      view = behavior ? readInteractableBehaviorSystem(behavior) : null;
+    } catch {
+      view = null;
+    }
+    if (!view || view.taskNodeLink !== 'unlinked' || !view.node) {
+      return environmentSource;
+    }
+
+    return {
+      kind: 'interactable',
+      // Self-authoritative scoped pool — no library merge (it owns its own config).
+      read: () => view.node,
+      write: (node) => this.writeInteractableBehavior?.(interactableRef, { node }),
+    };
+  }
+
+  /**
    * Persist a node object for a task into the per-environment `nodeRuntime` map
    * (reading the raw stored environment so a composed/runtime environment is
    * never written).
@@ -1573,6 +1639,65 @@ export class GatheringRichStateService {
   }
 
   /**
+   * Respawn one interactable-SCOPED node pool as world time passes (issue 302).
+   * The scoped node is self-authoritative — it carries its OWN config + state, so
+   * (unlike the per-environment path) there is no library merge. Applies the same
+   * pure respawn arithmetic ({@link respawnNodeOnce}) with the identical
+   * calendar/random seams the environment path injects: `overTime` pools regrow
+   * per the gain mode; `manual` / `nonRegenerating` pools never gain (the math
+   * short-circuits on policy). Returns `{ changed, node }`; the caller persists the
+   * changed node back onto the behaviour.
+   *
+   * @param {object} params
+   * @param {object} params.node The scoped node object (config + state).
+   * @param {number} params.worldTime Current world time (seconds).
+   * @returns {Promise<{ changed: boolean, node: object }>}
+   */
+  async respawnInteractableNode({ node, worldTime } = {}) {
+    const respawn = node?.respawn;
+    if (!node || !respawn || respawn.policy !== 'overTime') {
+      return { changed: false, node };
+    }
+    const now = Number(worldTime);
+    if (!Number.isFinite(now)) return { changed: false, node };
+
+    // Pre-roll expression amounts asynchronously (the math is sync), mirroring the
+    // env path's bound: elapsed whole intervals capped by the restock room.
+    let expressionRolls = null;
+    let expressionCursor = 0;
+    if ((respawn.gainMode || 'guaranteed') === 'expression') {
+      const interval = respawn.intervalUnit
+        ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
+        : Number(respawn.intervalSeconds || 0);
+      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
+        ? Number(respawn.lastEvaluatedWorldTime)
+        : now;
+      if (interval > 0 && now > last) {
+        const elapsedIntervals = Math.floor((now - last) / interval);
+        const room = Math.max(0, Number(node.max || 0) - Number(node.current || 0));
+        const needed = Math.min(Math.max(0, elapsedIntervals), room);
+        expressionRolls = [];
+        for (let i = 0; i < needed; i++) {
+          expressionRolls.push(
+            await this._respawnExpressionAmount({
+              expression: respawn.amountExpression,
+              environment: null,
+            })
+          );
+        }
+      }
+    }
+
+    return respawnNodeOnce(node, {
+      now,
+      secondsPerUnit: (unit) => this._respawnIntervalSecondsSeam(respawn, unit),
+      rollChance: () => Number(this.rollD100()),
+      rollExpression: () =>
+        expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0,
+    });
+  }
+
+  /**
    * `secondsPerUnit` seam for `respawnNodeOnce` on the env path: resolve the
    * interval unit through the calendar-aware `_durationToSeconds(1, unit)`, so
    * day/week lengths follow the active world calendar exactly like the per-token
@@ -1756,14 +1881,21 @@ export class GatheringRichStateService {
     return ids.map((id) => optionsById.get(id) ?? normalizeVocabularyOption('biomes', id));
   }
 
-  async evaluateStart({ actor, system, environment, task, viewer } = {}) {
+  async evaluateStart({ actor, system, environment, task, viewer, interactableRef = null } = {}) {
     const blockedReasons = [];
-    const evidence = this.buildListingMetadata({ environment, task, actor, viewer });
+    const evidence = this.buildListingMetadata({
+      environment,
+      task,
+      actor,
+      viewer,
+      interactableRef,
+    });
     const systemId = system?.id || environment?.craftingSystemId;
     const staminaEnabled = this.staminaEnabled(systemId);
     const nodesEnabled = this.nodesEnabled(systemId);
 
-    const gateNode = task?.nodes ?? null;
+    const source = this._resolveNodeSource({ environment, task, interactableRef });
+    const gateNode = source.read();
     if (nodesEnabled && gateNode && Number(gateNode.current || 0) <= 0) {
       // A `nonRegenerating` pool at 0 is permanently exhausted (it never
       // regrows and cannot be restocked), so surface a distinct reason.
@@ -1800,6 +1932,7 @@ export class GatheringRichStateService {
     task,
     outcome = null,
     viewer = null,
+    interactableRef = null,
   } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
@@ -1817,11 +1950,12 @@ export class GatheringRichStateService {
     const staminaEnabled = this.staminaEnabled(systemId);
     const nodesEnabled = this.nodesEnabled(systemId);
 
-    const depletionSource = task?.nodes ?? null;
+    const source = this._resolveNodeSource({ environment, task, interactableRef });
+    const depletionSource = source.read();
     if (nodesEnabled && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
       // Persist the full node object (config + respawn timers) with one consumed,
-      // so the per-environment pool (nodeRuntime for library tasks) is seeded and
-      // decremented in a single write.
+      // so the resolved pool (env `nodeRuntime[taskId]` OR the interactable's own
+      // scoped `node`) is seeded and decremented in a single write.
       const max = Number(depletionSource.max || 0);
       const current = Math.min(max, Math.max(0, Number(depletionSource.current || 0) - 1));
       const node = { ...cloneJson(depletionSource), current };
@@ -1835,8 +1969,13 @@ export class GatheringRichStateService {
           lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0),
         };
       }
-      await this._writeNodeState({ environmentId: environment.id, taskId: task.id, node });
-      evidence.node = { taskId: task.id, consumed: 1, remaining: current };
+      await source.write(node);
+      evidence.node = {
+        taskId: task.id,
+        consumed: 1,
+        remaining: current,
+        scope: source.kind,
+      };
     }
 
     if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {
