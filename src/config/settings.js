@@ -1,4 +1,8 @@
 import {
+  DEFAULT_INTERACTION_PROMPT_POSITION,
+  INTERACTION_PROMPT_POSITION_CHOICES,
+} from '../ui/interactionPromptPosition.js';
+import {
   DEFAULT_FABRICATE_THEME,
   FABRICATE_THEME_CHOICES,
   applyFabricateTheme,
@@ -23,6 +27,7 @@ export const SETTING_KEYS = Object.freeze({
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
+  INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -78,6 +83,15 @@ const BASE_DEFINITIONS = Object.freeze({
     config: true,
     type: Boolean,
     default: false,
+  },
+  [SETTING_KEYS.INTERACTION_PROMPT_POSITION]: {
+    name: 'FABRICATE.Settings.InteractionPromptPosition.Name',
+    hint: 'FABRICATE.Settings.InteractionPromptPosition.Hint',
+    scope: 'client',
+    config: true,
+    type: String,
+    choices: INTERACTION_PROMPT_POSITION_CHOICES,
+    default: DEFAULT_INTERACTION_PROMPT_POSITION,
   },
   [SETTING_KEYS.LAST_CRAFTING_ACTOR]: {
     name: 'Last Crafting Actor',

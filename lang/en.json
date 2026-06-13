@@ -447,6 +447,20 @@
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
         "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
+      },
+      "InteractionPromptPosition": {
+        "Name": "Interaction Prompt Position",
+        "Hint": "Where the region-entry interaction prompt appears on your screen. Move it away from other modules' on-screen widgets. Default: Bottom Center.",
+        "Choices": {
+          "TopLeft": "Top Left",
+          "TopCenter": "Top Center",
+          "TopRight": "Top Right",
+          "MiddleLeft": "Middle Left",
+          "MiddleRight": "Middle Right",
+          "BottomLeft": "Bottom Left",
+          "BottomCenter": "Bottom Center",
+          "BottomRight": "Bottom Right"
+        }
       }
     },
     "Chat": {

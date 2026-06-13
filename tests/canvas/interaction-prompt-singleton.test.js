@@ -125,6 +125,40 @@ test('show() builds exactly one fixed-position toast appended to <body>', async 
   });
 });
 
+test('show() applies the configured anchor from the per-client setting (issue 300)', async () => {
+  const previousGame = globalThis.game;
+  globalThis.game = { settings: { get: (ns, key) => (ns === 'fabricate' && key === 'interactionPromptPosition' ? 'top-right' : undefined) } };
+  try {
+    await withFakeDocument((App) => {
+      const toast = App.show({ behaviorRef: 's1.r1.b1', name: 'Ore Vein' });
+      assert.match(toast.style.cssText, /position:fixed/);
+      assert.match(toast.style.cssText, /right:16px/);
+      assert.match(toast.style.cssText, /top:16px/);
+      assert.doesNotMatch(toast.style.cssText, /left:50%/, 'no centering for a corner anchor');
+      assert.doesNotMatch(toast.style.cssText, /transform:/, 'no transform for a corner anchor');
+    });
+  } finally {
+    if (previousGame === undefined) delete globalThis.game;
+    else globalThis.game = previousGame;
+  }
+});
+
+test('show() falls back to bottom-center when the position setting read throws (issue 300)', async () => {
+  const previousGame = globalThis.game;
+  globalThis.game = { settings: { get() { throw new Error('settings not ready'); } } };
+  try {
+    await withFakeDocument((App) => {
+      const toast = App.show({ behaviorRef: 's1.r1.b1', name: 'Ore Vein' });
+      assert.match(toast.style.cssText, /left:50%/);
+      assert.match(toast.style.cssText, /bottom:96px/);
+      assert.match(toast.style.cssText, /transform:translateX\(-50%\)/);
+    });
+  } finally {
+    if (previousGame === undefined) delete globalThis.game;
+    else globalThis.game = previousGame;
+  }
+});
+
 test('show() replaces the live toast (singleton: one prompt at a time)', async () => {
   await withFakeDocument((App, dom) => {
     App.show({ behaviorRef: 's1.r1.b1', name: 'First' });
