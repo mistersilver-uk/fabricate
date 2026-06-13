@@ -79,8 +79,8 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     ]) {
       assert.ok(editorSource.includes(attr), `node card should expose ${attr}`);
     }
-    // The two simplified respawn policies are offered.
-    for (const policy of ['"manual"', '"overTime"']) {
+    // The three respawn policies are offered (issue 301 adds nonRegenerating).
+    for (const policy of ['"manual"', '"overTime"', '"nonRegenerating"']) {
       assert.ok(editorSource.includes(`value=${policy}`), `respawn select should offer policy ${policy}`);
     }
     // The three over-time gain modes are offered.
@@ -238,6 +238,9 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.equal(keys.DepleteOnStart, 'On start');
     assert.equal(keys.RespawnManual, 'Manual');
     assert.equal(keys.RespawnOverTime, 'Over world time');
+    // issue 301: the nonRegenerating policy reuses the RespawnNone key for its
+    // "does not regenerate" label (the legacy `none` policy label is long gone).
+    assert.equal(keys.RespawnNone, 'Does not regenerate');
     assert.equal(keys.RespawnGainMode, 'Each interval');
     assert.equal(keys.GainGuaranteed, 'Add one node');
     assert.equal(keys.GainChance, 'Chance to add one');
@@ -245,7 +248,6 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.equal(keys.RespawnChance, 'Chance');
     assert.equal(keys.RespawnAmount, 'Amount per interval');
     // The removed legacy labels are gone.
-    assert.equal(keys.RespawnNone, undefined);
     assert.equal(keys.RespawnElapsed, undefined);
     assert.equal(keys.RespawnProbability, undefined);
     assert.equal(keys.RespawnManualElapsed, undefined);

@@ -749,7 +749,7 @@ GatheringNodeConfig = {
   current?: number,
   depletionTiming?: "onStart" | "onSuccess",
   respawn?: {
-    policy: "manual" | "overTime",
+    policy: "manual" | "overTime" | "nonRegenerating",
     gainMode: "guaranteed" | "chance" | "expression", // when policy is overTime
     intervalUnit: "minutes" | "hours" | "days" | "weeks", // day/week lengths are calendar-derived at runtime
     intervalAmount: number,
@@ -757,6 +757,9 @@ GatheringNodeConfig = {
     amountExpression?: string,  // dice expression, for gainMode "expression"
     // legacy: nodes authored before the unit/amount schema may carry a raw
     // intervalSeconds instead; the runtime honours it until migrated.
+    // A `nonRegenerating` pool normalizes to a bare `{ policy: "nonRegenerating" }`:
+    // the gain/interval/chance/expression and respawn-timing fields are dropped
+    // because a pool that never regrows needs none of them.
   },
 }
 ```
@@ -772,7 +775,7 @@ GatheringNodeConfig = {
 7. Supported depletion timing includes at least `onStart` and `onSuccess`.
 8. If a task is blind, node count display to non-GM users uses generic availability copy unless revealing the count is explicitly safe for that environment.
 9. GM users can inspect and manually adjust node availability.
-10. A respawn policy may be `manual` or `overTime`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval. Legacy pre-0.4.0 auto-respawn policies (`elapsedTime`, `probability`, `manualAndElapsedTime`) are mapped to `overTime` at read time (matching the 0.4.0 migration), so a world whose node data was never migrated still respawns instead of silently degrading to `manual`; `none`/unknown remain `manual`.
+10. A respawn policy may be `manual`, `overTime`, or `nonRegenerating`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval; `nonRegenerating` is a permanently depletable pool that never regrows over world time AND cannot be restocked, so once its `current` reaches 0 it is permanently exhausted (model a larger starting reserve with a bigger authored `max`, since `current` seeds to `max`). Legacy pre-0.4.0 auto-respawn policies (`elapsedTime`, `probability`, `manualAndElapsedTime`) are mapped to `overTime` at read time (matching the 0.4.0 migration), so a world whose node data was never migrated still respawns instead of silently degrading to `manual`; the legacy `none` token and any unknown policy remain `manual` (NOT `nonRegenerating`).
 11. An `overTime` policy selects a `gainMode` per interval: `guaranteed` (+1), `chance` (a configured 0..1 probability of +1, persisted as a roll), or `expression` (roll a dice expression and add the rolled total).
 12. The respawn interval is authored as `intervalUnit` (`minutes` | `hours` | `days` | `weeks`) + `intervalAmount`. A unit of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) at runtime so it tracks custom calendars; `minutes`/`hours` are fixed (60s/3600s); with no calendar the lengths fall back to 86400s/604800s. Nodes authored before this schema may persist a raw `intervalSeconds`, which the runtime honours until a migration rewrites it to unit+amount.
 13. `chance`-mode respawn persists the evaluated roll/outcome so repeated listing refreshes do not reroll the same interval.
@@ -783,6 +786,9 @@ GatheringNodeConfig = {
 18. Player-facing UI should show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
 19. A per-environment node runtime entry persists only STATE — the current count, a GM-overridable `max`, and the respawn timers (anchor/roll). The respawn CONFIG (policy, gain mode, interval, depletion timing) is sourced from the current library task at evaluation time and is never frozen at first depletion, so editing a task's respawn config takes effect in every environment, including pools already depleted to zero.
 20. All resource-node mechanics (availability gating, depletion, and respawn) apply only when the owning crafting system's economy `nodes.enabled` flag is set (see "Gathering Economy and Stamina"). When `nodes.enabled` is false, per-task node configuration is inert and node pools are neither enforced nor respawned, regardless of per-task `nodes` data. The per-task node mechanics above are otherwise unchanged.
+21. A `nonRegenerating` pool is skipped by the world-time respawn pass exactly like `manual` (the pass only advances `overTime` pools), so it never regrows over world time; and a GM restock action is a no-op for it — the restock API returns the pool unchanged without writing state or firing the restock event — so an exhausted `nonRegenerating` pool stays at 0 permanently. A `nonRegenerating` node config normalizes to a bare `{ policy: "nonRegenerating" }`: the respawn-timing/gain fields (`gainMode`, `intervalUnit`/`intervalAmount`/`intervalSeconds`, `chance`, `amountExpression`, and the `lastEvaluatedWorldTime`/`nextEvaluationWorldTime`/`lastRoll` timing fields) are never persisted for it, since a pool that never regrows needs none of them.
+22. A permanently-exhausted `nonRegenerating` pool (`current <= 0`) blocks non-GM start attempts like any depleted pool, but surfaces a distinct *exhausted* state (a derived player-safe flag and a dedicated blocked reason/copy) rather than the "depleted — replenishes over time" copy, since it will never come back.
+23. Because a `nonRegenerating` pool can never be restocked, the GM admin UI REMOVES (does not merely disable) the restock/step controls for it and shows a read-only `current / max` count with a permanence hint; the regenerating policies keep the step controls. The player-facing detail UI surfaces a permanence line ("This resource will not replenish.") for a `nonRegenerating` pool BEFORE exhaustion (scarcity messaging while `current > 0`), and the exhausted permanence copy ("Exhausted — this resource will not replenish.") at `current <= 0`, kept visually distinct from the regenerating "depleted — replenishes over time" treatment and carrying no respawn ETA. Neither line repeats the node count, which is already shown on the available-nodes line. The rich-state listing payload exposes a player-safe `nonRegenerating` policy flag (no extra counts beyond the existing current/max) to drive this copy.
 
 ## Gathering Attempt Limits (removed)
 

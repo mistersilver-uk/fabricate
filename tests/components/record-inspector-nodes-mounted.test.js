@@ -166,4 +166,35 @@ describe('RecordInspector available-node stepper', () => {
     });
     assert.equal(nodeSection(), null);
   });
+
+  // issue 301: a nonRegenerating pool can never be restocked, so the GM restock/step
+  // controls are removed entirely — the count is shown read-only with a permanence hint.
+  it('removes the step controls and shows a read-only count plus the no-restock hint for a nonRegenerating pool', async () => {
+    await render({
+      entry: taskEntry({ record: { name: 'Vein', img: 'icons/ore.webp', nodes: { enabled: true, max: 5, current: 2, respawn: { policy: 'nonRegenerating' } } } }),
+      environment: { id: 'environment-a', nodeRuntime: { 'mine-ore': { max: 5, current: 2, respawn: { policy: 'nonRegenerating' } } } }
+    });
+    // Neither the increment nor the decrement control renders for a permanent pool.
+    assert.equal(nodeSection().querySelector('[data-node-count-inc]'), null, 'increment control is absent for a permanently depletable pool');
+    assert.equal(nodeSection().querySelector('[data-node-count-dec]'), null, 'decrement control is absent for a permanently depletable pool');
+    // The read-only count is still shown via the data-node-count hook.
+    const count = nodeSection().querySelector('[data-node-count]');
+    assert.ok(count, 'the read-only count still renders');
+    assert.equal(count.textContent.replace(/\s+/g, ' ').trim(), '2 / 5', 'count reads current / max');
+    assert.ok(nodeSection().querySelector('[data-node-no-restock-hint]'), 'the cannot-restock hint renders');
+  });
+
+  it('keeps the increment control enabled for manual and overTime pools (regression)', async () => {
+    for (const policy of ['manual', 'overTime']) {
+      await render({
+        entry: taskEntry({ record: { name: 'Vein', img: 'icons/ore.webp', nodes: { enabled: true, max: 5, current: 2, respawn: { policy } } } }),
+        environment: { id: 'environment-a', nodeRuntime: { 'mine-ore': { max: 5, current: 2, respawn: { policy } } } }
+      });
+      assert.equal(nodeSection().querySelector('[data-node-count-inc]').disabled, false, `increment stays enabled for ${policy}`);
+      assert.equal(nodeSection().querySelector('[data-node-no-restock-hint]'), null, `no restock hint for ${policy}`);
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+  });
 });

@@ -13,10 +13,15 @@
  * and honored by the runtime until the node-interval migration rewrites it.
  *
  * Respawn `policy` is one of `manual` (no automatic respawn — the GM tops up
- * counts via the restock API) or `overTime` (one evaluation per elapsed
- * interval). For `overTime`, `gainMode` selects the per-interval node gain:
- * `guaranteed` (+1), `chance` (a 0-1 probability of +1), or `expression`
- * (roll `amountExpression`, e.g. `1d4`, and add the rolled total).
+ * counts via the restock API), `overTime` (one evaluation per elapsed interval),
+ * or `nonRegenerating` (a permanently depletable pool — never regrows over world
+ * time and cannot be restocked; once `current` hits 0 it is exhausted for good).
+ * A `nonRegenerating` node normalizes to a bare `{ policy: 'nonRegenerating' }`:
+ * the interval/gain/chance/expression and respawn-timing fields are dropped, since
+ * a pool that never regrows needs none of them.
+ * For `overTime`, `gainMode` selects the per-interval node gain: `guaranteed`
+ * (+1), `chance` (a 0-1 probability of +1), or `expression` (roll
+ * `amountExpression`, e.g. `1d4`, and add the rolled total).
  *
  * Library tasks carry node CONFIG; each environment keeps its own runtime STATE
  * (the `current` count + respawn timers) under `environment.nodeRuntime[taskId]`,
@@ -25,7 +30,7 @@
  */
 
 export const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
-export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime']);
+export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime', 'nonRegenerating']);
 export const VALID_RESPAWN_GAIN_MODES = new Set(['guaranteed', 'chance', 'expression']);
 export const VALID_RESPAWN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 
@@ -77,6 +82,11 @@ export function normalizeRespawn(data = null) {
   const policy = VALID_RESPAWN_POLICIES.has(data.policy)
     ? data.policy
     : (legacy?.policy ?? 'manual');
+  // A `nonRegenerating` pool never regrows and cannot be restocked, so it needs
+  // none of the respawn-timing/gain fields: every respawn pass already no-ops on
+  // it. Persist a minimal block so irrelevant interval/gain/timing data is never
+  // written or carried. Idempotent: re-normalizing a minimal block yields itself.
+  if (policy === 'nonRegenerating') return { policy: 'nonRegenerating' };
   const gainMode = VALID_RESPAWN_GAIN_MODES.has(data.gainMode)
     ? data.gainMode
     : (legacy?.gainMode ?? 'guaranteed');

@@ -21,6 +21,7 @@ export const BLOCK_LABEL_KEYS = Object.freeze({
   DUPLICATE_ACTIVE_RUN: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun',
   SCENE_TOKEN_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.VisitScene',
   NODE_DEPLETED: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted',
+  NODE_EXHAUSTED: 'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted',
   STAMINA_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked',
   LOCATION_BLOCKED: 'FABRICATE.App.Gathering.Detail.Callout.Location',
   NO_CURRENT_REALM: 'FABRICATE.App.Gathering.Detail.Callout.NoRealm'

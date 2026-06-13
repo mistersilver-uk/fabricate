@@ -55,6 +55,20 @@
   const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
     ? `${richNodes.current}/${richNodes.max}` : null);
   const nodeDepleted = $derived(richNodes != null && richNodes.available === false);
+  // A `nonRegenerating` pool that has hit 0 is exhausted for good: the runtime
+  // surfaces this as a derived `permanentlyExhausted` flag. Show the permanent
+  // copy instead of the "replenishes over time" message and suppress the
+  // respawn-ETA block (already null for non-overTime policies).
+  const nodeExhausted = $derived(richNodes?.permanentlyExhausted === true);
+  // A `nonRegenerating` pool never replenishes, so surface a plain permanence line
+  // ("This resource will not replenish.") BEFORE exhaustion (current > 0). The count
+  // is already shown on the NodesAvailable line above, so this copy does not repeat
+  // it. At current <= 0 the exhausted callout shows the distinct exhausted permanence
+  // copy instead (no respawn ETA), via the depleted callout's `is-depleted` treatment.
+  const nodeNonRegenerating = $derived(richNodes?.nonRegenerating === true);
+  const nodeScarcePermanentText = $derived(
+    nodeNonRegenerating ? localize('FABRICATE.App.Gathering.Detail.NodeScarcePermanent') : ''
+  );
   // Per-region node respawn ETA (canvas gathering-task region): the engine surfaces
   // `rich.nodes.respawnEta = { nextWorldTime, secondsUntil }` only for a placed
   // interactable whose node is under cap. Format `secondsUntil` into a calendar-aware
@@ -185,11 +199,29 @@
       <div class="gathering-node-depleted-callout is-depleted" role="status" data-gathering-node-depleted>
         <i class="fas fa-mountain-sun" aria-hidden="true"></i>
         <span class="gathering-node-depleted-text">
-          {localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
-          {#if respawnEtaText !== ''}
-            <span class="gathering-node-respawn-eta" data-gathering-node-respawn-eta>{respawnEtaText}</span>
+          {#if nodeExhausted}
+            <!-- Permanently exhausted nonRegenerating pool: show the exhausted
+                 permanence copy. No count (already on the NodesAvailable line) and
+                 no respawn ETA — distinct from the regenerating "replenishes" copy. -->
+            {localize('FABRICATE.App.Gathering.Detail.NodeExhaustedPermanent')}
+          {:else}
+            {localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
+            {#if respawnEtaText !== ''}
+              <span class="gathering-node-respawn-eta" data-gathering-node-respawn-eta>{respawnEtaText}</span>
+            {/if}
           {/if}
         </span>
+      </div>
+    {:else if nodeNonRegenerating && nodeScarcePermanentText !== ''}
+      <!--
+        Permanence callout for a nonRegenerating pool BEFORE exhaustion (current > 0).
+        Distinct from the regenerating "replenishes over time" copy: this resource will
+        never replenish. The remaining count is already shown on the NodesAvailable
+        line above, so this copy does not repeat it.
+      -->
+      <div class="gathering-node-scarce-callout" role="status" data-gathering-node-scarce>
+        <i class="fas fa-mountain-sun" aria-hidden="true"></i>
+        <span class="gathering-node-scarce-text">{nodeScarcePermanentText}</span>
       </div>
     {/if}
 
@@ -363,6 +395,25 @@
   }
 
   .gathering-node-respawn-eta {
+    font-weight: 600;
+  }
+
+  /* Count-bearing scarcity callout for a nonRegenerating pool before exhaustion.
+     Uses the info palette (not the warning palette) so it reads as informational
+     scarcity, visually distinct from the depleted/exhausted warning banner. */
+  .gathering-node-scarce-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    background: var(--fab-info-soft);
+    border: 1px solid var(--fab-info-border);
+    color: var(--fab-info-text);
+  }
+
+  .gathering-node-scarce-text {
     font-weight: 600;
   }
 

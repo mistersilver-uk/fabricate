@@ -34,6 +34,11 @@
     const value = Number.isFinite(stored) ? stored : nodeMax;
     return Math.max(0, Math.min(nodeMax, value));
   })());
+  // A `nonRegenerating` pool is permanently depletable: it can never be restocked
+  // (the runtime's restockNode is a no-op for it), so the GM restock/step controls
+  // are removed entirely and the count is shown read-only. Policy is library
+  // config, so read it from `nodeConfig.respawn`.
+  const nodeIsNonRegenerating = $derived(nodeConfig?.respawn?.policy === 'nonRegenerating');
   const environmentMatchTitle = $derived(kind === 'event'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.EventEnvironmentMatching', 'Event Environment Matching')
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.TaskEnvironmentMatching', 'Task Environment Matching'));
@@ -189,35 +194,50 @@
   {#if hasNodes}
     <section class="manager-inspector-card" data-record-inspector-section="nodes">
       <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableNodes', 'Available nodes')}</h3>
-      <div class="manager-environment-node-count">
-        <button
-          type="button"
-          class="manager-icon-button manager-environment-node-count-step"
-          aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
-          title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
-          disabled={nodeCurrent <= 0}
-          data-node-count-dec
-          onclick={() => adjustNodeCount(-1)}
-        >
-          <i class="fas fa-minus" aria-hidden="true"></i>
-        </button>
-        <span class="manager-environment-node-count-value" data-node-count>
-          <strong>{nodeCurrent}</strong>
-          <span aria-hidden="true">/</span>
-          <span>{nodeMax}</span>
-        </span>
-        <button
-          type="button"
-          class="manager-icon-button manager-environment-node-count-step"
-          aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
-          title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
-          disabled={nodeCurrent >= nodeMax}
-          data-node-count-inc
-          onclick={() => adjustNodeCount(1)}
-        >
-          <i class="fas fa-plus" aria-hidden="true"></i>
-        </button>
-      </div>
+      {#if nodeIsNonRegenerating}
+        <!-- A nonRegenerating pool can never be restocked, so no stepper renders:
+             the count is read-only and a hint states the permanence. (issue 301) -->
+        <div class="manager-environment-node-count manager-environment-node-count-readonly">
+          <span class="manager-environment-node-count-value" data-node-count>
+            <strong>{nodeCurrent}</strong>
+            <span aria-hidden="true">/</span>
+            <span>{nodeMax}</span>
+          </span>
+        </div>
+        <p class="manager-environment-node-no-restock-hint" data-node-no-restock-hint>
+          {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NodeNoRestock', 'Cannot restock — permanently depletable.')}
+        </p>
+      {:else}
+        <div class="manager-environment-node-count">
+          <button
+            type="button"
+            class="manager-icon-button manager-environment-node-count-step"
+            aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
+            title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
+            disabled={nodeCurrent <= 0}
+            data-node-count-dec
+            onclick={() => adjustNodeCount(-1)}
+          >
+            <i class="fas fa-minus" aria-hidden="true"></i>
+          </button>
+          <span class="manager-environment-node-count-value" data-node-count>
+            <strong>{nodeCurrent}</strong>
+            <span aria-hidden="true">/</span>
+            <span>{nodeMax}</span>
+          </span>
+          <button
+            type="button"
+            class="manager-icon-button manager-environment-node-count-step"
+            aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
+            title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
+            disabled={nodeCurrent >= nodeMax}
+            data-node-count-inc
+            onclick={() => adjustNodeCount(1)}
+          >
+            <i class="fas fa-plus" aria-hidden="true"></i>
+          </button>
+        </div>
+      {/if}
     </section>
   {/if}
 
