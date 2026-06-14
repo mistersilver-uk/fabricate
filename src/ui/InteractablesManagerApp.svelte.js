@@ -20,6 +20,14 @@ import {
 import { resolveDropEnvironment } from '../canvas/environmentResolution.js';
 import { promptDropEnvironment } from '../canvas/environmentDialog.js';
 import { confirmDialog, localize } from './svelte/util/foundryBridge.js';
+import {
+  listSystemOptions,
+  listSystemTools,
+  listSystemComponents,
+  listSystemTasks,
+  listToolSourceOptions,
+  listTaskSourceOptions,
+} from './interactableSourceLibrary.js';
 
 /**
  * The GM-only "Manage Interactables" scene panel (issue 335): a scene-level
@@ -100,31 +108,44 @@ export class InteractablesManagerApp extends SvelteApplicationMixin(
     return { x, y };
   }
 
+  /**
+   * The dependency bag the shared {@link interactableSourceLibrary} reads through:
+   * the live crafting-system manager (Tools + managed components) and the persisted
+   * gathering config (Tasks). Reusing this bag means the promote picker enumerates
+   * sources through the EXACT SAME path the Interactable browser does — no third
+   * enumeration that can drift (issue 335 promote-picker "No sources" fix).
+   */
+  _sourceDeps() {
+    return {
+      getCraftingSystemManager: () => globalThis.game?.fabricate?.getCraftingSystemManager?.() ?? null,
+      getGatheringConfig: () => getSetting(SETTING_KEYS.GATHERING_CONFIG),
+    };
+  }
+
   /** Library gathering tasks for a system (same source the browser + manager read). */
   _readLibraryTasks(systemId) {
-    if (!systemId) return [];
-    const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
-    const tasks = config?.systems?.[systemId]?.tasks;
-    return Array.isArray(tasks) ? tasks : [];
+    return listSystemTasks(this._sourceDeps(), systemId);
   }
 
   /** Resolve a source's human label (tool / task name) for a behaviour system. */
   _resolveSourceLabel(system) {
     if (!system) return null;
-    const manager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
+    const deps = this._sourceDeps();
     if (system.interactableType === 'tool') {
-      const sys = manager?.getSystem?.(system.systemId);
-      const tool = (sys?.tools ?? []).find((t) => String(t?.id) === String(system.toolId));
+      const tool = listSystemTools(deps, system.systemId).find(
+        (t) => String(t?.id) === String(system.toolId)
+      );
       if (!tool) return null;
       const label = String(tool?.label || '').trim();
       if (label) return label;
-      const component = (sys?.components ?? []).find(
+      const component = listSystemComponents(deps, system.systemId).find(
         (c) => String(c?.id) === String(tool?.componentId)
       );
       return component?.name ? String(component.name) : null;
     }
-    const tasks = this._readLibraryTasks(system.systemId);
-    const task = tasks.find((t) => String(t?.id) === String(system.taskId));
+    const task = listSystemTasks(deps, system.systemId).find(
+      (t) => String(t?.id) === String(system.taskId)
+    );
     return task?.name ? String(task.name) : null;
   }
 
@@ -197,31 +218,12 @@ export class InteractablesManagerApp extends SvelteApplicationMixin(
       sceneName: () => this._scene()?.name ?? '',
 
       // --- Crafting library reads (promote source picker) ------------------
-      listSystems: () => {
-        const systems = game?.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [];
-        return Array.from(systems).map((system) => ({ id: system?.id, name: system?.name }));
-      },
-      listToolsForSystem: (systemId) => {
-        if (!systemId) return [];
-        const system = game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId);
-        const tools = Array.isArray(system?.tools) ? system.tools : [];
-        const components = Array.isArray(system?.components) ? system.components : [];
-        return tools.map((tool) => {
-          const label = String(tool?.label || '').trim();
-          const component = components.find((c) => String(c?.id) === String(tool?.componentId));
-          return {
-            id: String(tool?.id ?? ''),
-            name: label || (component?.name ? String(component.name) : String(tool?.id ?? ''))
-          };
-        });
-      },
-      listTasksForSystem: (systemId) => {
-        const tasks = this._readLibraryTasks(systemId);
-        return tasks.map((task) => ({
-          id: String(task?.id ?? ''),
-          name: String(task?.name || task?.id || '')
-        }));
-      },
+      // Tool + Gathering-Task sources are enumerated through the SAME shared
+      // interactableSourceLibrary the Interactable browser reads — one source of
+      // truth so the picker can never diverge from what the browser places.
+      listSystems: () => listSystemOptions(this._sourceDeps()),
+      listToolsForSystem: (systemId) => listToolSourceOptions(this._sourceDeps(), systemId),
+      listTasksForSystem: (systemId) => listTaskSourceOptions(this._sourceDeps(), systemId),
 
       // --- Region picker (promote) -----------------------------------------
       listRegions: () => this._listRegions(),
