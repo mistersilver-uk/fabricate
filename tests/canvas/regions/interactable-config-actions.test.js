@@ -185,6 +185,23 @@ describe('planConfigureSource (issue 342 — never writes a partial identity)', 
     assert.equal(patch.system.sourceUuid, 'Fabricate.system-b.gatheringTask.task-9');
   });
 
+  it('clears the off-type id when RE-TARGETING the OTHER direction (task → tool)', () => {
+    // Mirror of the tool → gatheringTask re-target: re-target a configured
+    // gatheringTask → tool. The resulting patch must set the tool identity and
+    // CLEAR both task-side ids (taskId/environmentId) so no stale task id lingers.
+    const current = taskSystem();
+    const patch = planConfigureSource(current, {
+      interactableType: 'tool',
+      systemId: 'system-b',
+      toolId: 'tool-9'
+    });
+    assert.equal(patch.system.interactableType, 'tool');
+    assert.equal(patch.system.toolId, 'tool-9');
+    assert.equal(patch.system.taskId, null);
+    assert.equal(patch.system.environmentId, null);
+    assert.equal(patch.system.sourceUuid, 'Fabricate.system-b.tool.tool-9');
+  });
+
   it('no-ops (returns null) on an INCOMPLETE selection — never a partial write', () => {
     // Missing reference id.
     assert.equal(planConfigureSource(null, { interactableType: 'tool', systemId: 'system-a' }), null);

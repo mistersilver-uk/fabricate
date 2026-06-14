@@ -136,6 +136,23 @@ function unconfiguredToolSystem(overrides = {}) {
   };
 }
 
+// A gatheringTask-TYPED interactable that is still unconfigured. The activation
+// layer must treat it as inert via the same type-agnostic gate as the tool case —
+// a regression that special-cased `interactableType:'tool'` would wrongly let a
+// gatheringTask-typed-but-unconfigured behaviour activate.
+function unconfiguredTaskSystem(overrides = {}) {
+  return {
+    interactableType: 'gatheringTask',
+    sourceUuid: 'Fabricate.unconfigured.tool',
+    systemId: 'unconfigured',
+    toolId: null,
+    taskId: null,
+    environmentId: null,
+    state: baseState(),
+    ...overrides
+  };
+}
+
 test('unconfigured ⇒ concealed: no on-enter prompt, marker hidden from players', () => {
   const system = unconfiguredToolSystem();
   assert.equal(shouldPromptOnEnter(system), false, 'no prompt while unconfigured');
@@ -146,6 +163,61 @@ test('a configured interactable is unaffected by the unconfigured concealment', 
   // The fully-configured tool/task fixtures still prompt + stay visible.
   assert.equal(shouldPromptOnEnter(toolSystem()), true);
   assert.equal(resolveMarkerHidden(toolSystem()), false);
+});
+
+test('gatheringTask-TYPED unconfigured interactable is inert via the activation layer (type-agnostic gate)', () => {
+  // SAFETY-CRITICAL: the inert-until-configured property must hold for a
+  // gatheringTask-typed behaviour too, not only the tool-typed sentinel. A
+  // regression special-casing interactableType:'tool' would let this through.
+  //
+  // Variant A — both sentinels (the native "+ Add Behavior" default, retyped to
+  // gatheringTask): concealed (no prompt, hidden marker) and DENIED (returned,
+  // never thrown) with the dedicated UNCONFIGURED reason.
+  const sentinel = unconfiguredTaskSystem();
+  assert.equal(shouldPromptOnEnter(sentinel), false, 'no prompt while unconfigured');
+  assert.equal(resolveMarkerHidden(sentinel), true, 'marker hidden while unconfigured');
+  assert.deepEqual(
+    validateActivationRequest(
+      { interactableType: 'gatheringTask' },
+      {
+        behaviorSystem: sentinel,
+        now: 0,
+        isGM: true,
+        canControlActor: true,
+        sourceExists: true,
+        environmentExists: true,
+        tokenInside: true
+      }
+    ),
+    { ok: false, reason: 'UNCONFIGURED' }
+  );
+
+  // Variant B — REAL sourceUuid/systemId but the type-appropriate id is missing
+  // (taskId:null for a gatheringTask). Still unconfigured ⇒ same inert/denied
+  // result: a partial identity can never be a real configured interactable.
+  const partialIdentity = unconfiguredTaskSystem({
+    sourceUuid: 'Fabricate.sys.gatheringTask.task1',
+    systemId: 'sys',
+    taskId: null,
+    environmentId: null
+  });
+  assert.equal(shouldPromptOnEnter(partialIdentity), false, 'no prompt while taskId missing');
+  assert.equal(resolveMarkerHidden(partialIdentity), true, 'marker hidden while taskId missing');
+  assert.deepEqual(
+    validateActivationRequest(
+      { interactableType: 'gatheringTask' },
+      {
+        behaviorSystem: partialIdentity,
+        now: 0,
+        isGM: true,
+        canControlActor: true,
+        sourceExists: true,
+        environmentExists: true,
+        tokenInside: true
+      }
+    ),
+    { ok: false, reason: 'UNCONFIGURED' }
+  );
 });
 
 test('eligibility: eligible when no gate trips', () => {
@@ -333,6 +405,19 @@ test('validateActivationRequest: an UNCONFIGURED interactable is DENIED (never t
     { behaviorSystem: system, now: 0, isGM: true, canControlActor: true, tokenInside: true }
   );
   assert.equal(mismatch.reason, 'UNCONFIGURED');
+});
+
+test('validateActivationRequest: UNCONFIGURED takes precedence over SOURCE_MISSING', () => {
+  // Pins the deliberate denial-reason precedence the PR documents: an unconfigured
+  // behaviour with sourceExists:false still denies with UNCONFIGURED (the clearer
+  // GM-facing reason), never the generic SOURCE_MISSING ("no longer available").
+  const system = unconfiguredToolSystem();
+  const result = validateActivationRequest(
+    { interactableType: 'tool' },
+    { behaviorSystem: system, now: 0, isGM: true, canControlActor: true, tokenInside: true, sourceExists: false }
+  );
+  assert.equal(result.reason, 'UNCONFIGURED');
+  assert.notEqual(result.reason, 'SOURCE_MISSING');
 });
 
 test('validateActivationRequest: a configured interactable is unaffected by the unconfigured gate', () => {
