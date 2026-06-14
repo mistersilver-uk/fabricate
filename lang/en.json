@@ -45,6 +45,9 @@
         "SpawnFailed": "Failed to place the Fabricate interactable on the canvas.",
         "LinkedVisualMissing": "This interactable's linked marker is missing.",
         "BehaviorLabel": "Fabricate Interactable",
+        "Create": {
+          "NoSource": "Add Fabricate interactables from the Fabricate scene control or the Interactable browser, not the native Region Behaviors tab. A dedicated Manage Interactables panel is coming (issue 335)."
+        },
         "Prompt": {
           "Interact": "Interact",
           "Close": "Dismiss"

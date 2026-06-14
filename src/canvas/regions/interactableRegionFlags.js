@@ -48,7 +48,7 @@ export const ACTIVATION_AUDIENCES = Object.freeze(['players', 'all']);
 //     depletion timing, respawn policy). Only a `gatheringTask` may carry one.
 export const TASK_NODE_LINKS = Object.freeze(['linked', 'unlinked']);
 
-function coerceString(value) {
+export function coerceString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 

@@ -69,6 +69,11 @@ import {
   writeInteractableBehaviorNode
 } from './canvas/interactableSocketBridge.js';
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
+import {
+  evaluateInteractableCreate,
+  neutralizeInheritedLinkedVisual
+} from './canvas/regions/interactableCreationGuard.js';
+import { isInteractableRegionBehavior } from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
   assignInteractableConfigSheet,
@@ -1713,6 +1718,57 @@ Hooks.on('renderTileHUD', (hud, element) => {
 
 Hooks.on('renderTokenHUD', (hud, element) => {
   installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken' });
+});
+
+// Crash-hardening guard for `fabricate.interactable` Region Behaviour creation
+// (issue 334). The native Region → Behaviors "+ Add Behavior → Fabricate
+// Interactable" path instantiates the DataModel with empty `system`, so the three
+// required no-`initial` fields (interactableType/sourceUuid/systemId) are
+// undefined → DataModelValidationError + a cascading `reading 'sheet'` TypeError.
+// Foundry's region duplication also clones an interactable behaviour's
+// `linkedVisual` verbatim, so the copy points at the original's marker. All
+// decisions are pure (`interactableCreationGuard.js`); this is the thin, no-throw
+// Foundry edge. NEVER interferes with any non-interactable behaviour subtype.
+Hooks.on('preCreateRegionBehavior', (document) => {
+  try {
+    const decision = evaluateInteractableCreate(document);
+    if (decision.allow === false) {
+      // No resolvable source — cancel the broken native create and guide the GM
+      // to the supported authoring surfaces.
+      const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Create.NoSource');
+      const message =
+        out && out !== 'FABRICATE.Canvas.Interactable.Create.NoSource'
+          ? out
+          : 'Add Fabricate interactables from the Fabricate scene control or the Interactable browser, not the native Region Behaviors tab.';
+      ui.notifications?.warn?.(message);
+      return false; // Foundry preCreate cancel.
+    }
+
+    // Product rule: a freshly-created interactable never inherits another
+    // interactable's marker link (region-duplication case). Clear an inherited
+    // linkedVisual link via the preCreate source-mutation seam so the copy is
+    // born region-only. `updateSource` is the correct preCreate mutation seam in
+    // V13 — preCreate hooks mutate the document's source in place (dot-notation),
+    // they do not return create data.
+    //
+    // The pure neutralisation helper is intentionally type-agnostic, so gate it at
+    // this edge to `fabricate.interactable` behaviours only — a non-interactable
+    // behaviour that happens to carry `system.linkedVisual.uuid` must never have it
+    // cleared.
+    if (isInteractableRegionBehavior(document)) {
+      const neutralised = neutralizeInheritedLinkedVisual(document?.system);
+      if (neutralised.changed && typeof document?.updateSource === 'function') {
+        document.updateSource({
+          'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
+          'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
+        });
+      }
+    }
+    return undefined;
+  } catch (_error) {
+    // Defensive: a guard error must never block an unrelated behaviour creation.
+    return undefined;
+  }
 });
 
 /**
