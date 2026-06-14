@@ -156,52 +156,71 @@ describe('InteractablesManagerApp singleton window', () => {
 });
 
 describe('InteractablesManagerRoot body', () => {
+  // Table-driven source-shape assertions: each entry is `[needle, label]`. Driving
+  // the checks through one helper keeps the suite compact and (deliberately)
+  // distinct in shape from the sibling browser/config source-shape suites.
+  const expectAll = (pairs) => {
+    for (const [needle, label] of pairs) {
+      assert.ok(rootSource.includes(needle), label);
+    }
+  };
+
   it('reads everything through the injected services bag (no duplicate data access)', () => {
-    assert.ok(rootSource.includes('services?.listRows?.()'), 'rows via services');
-    assert.ok(rootSource.includes('services?.listRegions?.()'), 'regions via services');
-    assert.ok(rootSource.includes('services?.listSystems?.()'), 'systems via services');
-    assert.ok(rootSource.includes('services?.listToolsForSystem?.('), 'tools via services');
-    assert.ok(rootSource.includes('services?.listTasksForSystem?.('), 'tasks via services');
+    expectAll([
+      ['services?.listRows?.()', 'rows via services'],
+      ['services?.listRegions?.()', 'regions via services'],
+      ['services?.listSystems?.()', 'systems via services'],
+      ['services?.listToolsForSystem?.(', 'tools via services'],
+      ['services?.listTasksForSystem?.(', 'tasks via services'],
+    ]);
   });
 
   it('renders each row with name, type, source label, state, and marker status', () => {
-    assert.ok(rootSource.includes('row.name'), 'row name');
-    assert.ok(rootSource.includes('typeLabel(row.interactableType)'), 'row type label');
-    assert.ok(rootSource.includes('row.sourceLabel'), 'row source label');
-    assert.ok(rootSource.includes('stateBadges(row.state)'), 'row state badges');
-    assert.ok(rootSource.includes('markerLabel(row.markerStatus)'), 'row marker status');
+    expectAll([
+      ['row.name', 'row name'],
+      ['typeLabel(row.interactableType)', 'row type label'],
+      ['row.sourceLabel', 'row source label'],
+      ['stateBadges(row.state)', 'row state badges'],
+      ['markerLabel(row.markerStatus)', 'row marker status'],
+    ]);
   });
 
   it('covers each marker-status variant + each state in its label maps', () => {
-    for (const status of ['Tile', 'Drawing', 'Token', 'region-only', 'missing']) {
-      assert.ok(rootSource.includes(`'${status}'`), `marker label map handles ${status}`);
-    }
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.StateDisabled'), 'disabled state badge');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.StateLocked'), 'locked state badge');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.StateConsumed'), 'consumed state badge');
+    expectAll([
+      ...['Tile', 'Drawing', 'Token', 'region-only', 'missing'].map((s) => [`'${s}'`, `marker map handles ${s}`]),
+      ['FABRICATE.Canvas.Manage.StateDisabled', 'disabled state badge'],
+      ['FABRICATE.Canvas.Manage.StateLocked', 'locked state badge'],
+      ['FABRICATE.Canvas.Manage.StateConsumed', 'consumed state badge'],
+    ]);
   });
 
   it('each row exposes keyboard-actionable open-config / jump / delete buttons', () => {
-    assert.ok(rootSource.includes('openConfig(row.ref)'), 'open config action');
-    assert.ok(rootSource.includes('jump(row.ref)'), 'jump action');
-    assert.ok(rootSource.includes('remove(row.ref)'), 'delete action');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.OpenConfig'), 'localized open-config label');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.JumpToRegion'), 'localized jump label');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.Delete'), 'localized delete label');
+    expectAll([
+      ['openConfig(row.ref)', 'open config action'],
+      ['jump(row.ref)', 'jump action'],
+      ['remove(row.ref)', 'delete action'],
+      ['FABRICATE.Canvas.Manage.OpenConfig', 'localized open-config label'],
+      ['FABRICATE.Canvas.Manage.JumpToRegion', 'localized jump label'],
+      ['FABRICATE.Canvas.Manage.Delete', 'localized delete label'],
+    ]);
   });
 
   it('surfaces the promote affordance + source picker (region, system, type, source, marker)', () => {
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.PromoteToggle'), 'promote toggle');
-    assert.ok(rootSource.includes('bind:value={selectedRegionId}'), 'region picker');
-    assert.ok(rootSource.includes('bind:value={selectedSystemId}'), 'system picker');
-    assert.ok(rootSource.includes('bind:group={sourceType}'), 'source-type chooser (tool / task)');
-    assert.ok(rootSource.includes('bind:value={selectedReferenceId}'), 'source picker');
-    assert.ok(rootSource.includes('bind:group={visualMode}'), 'marker vs region-only');
-    assert.ok(rootSource.includes('services?.promote?.('), 'confirm calls the promote seam');
+    expectAll([
+      ['FABRICATE.Canvas.Manage.PromoteToggle', 'promote toggle'],
+      ['bind:value={selectedRegionId}', 'region picker'],
+      ['bind:value={selectedSystemId}', 'system picker'],
+      ['bind:group={sourceType}', 'source-type chooser (tool / task)'],
+      ['bind:value={selectedReferenceId}', 'source picker'],
+      ['bind:group={visualMode}', 'marker vs region-only'],
+      ['services?.promote?.(', 'confirm calls the promote seam'],
+    ]);
   });
 
   it('renders an empty state when the scene has no interactables', () => {
-    assert.ok(rootSource.includes('{#if rows.length === 0}'), 'empty branch');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Manage.Empty'), 'localized empty-state copy');
+    expectAll([
+      ['{#if rows.length === 0}', 'empty branch'],
+      ['FABRICATE.Canvas.Manage.Empty', 'localized empty-state copy'],
+    ]);
   });
 });

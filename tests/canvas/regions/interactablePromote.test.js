@@ -16,35 +16,24 @@ import {
 import { buildInteractableBehaviorSystem } from '../../../src/canvas/regions/interactableRegionFlags.js';
 
 describe('validatePromoteSource', () => {
-  it('rejects an unknown interactable type', () => {
-    assert.deepEqual(validatePromoteSource({ interactableType: 'nope', systemId: 's', referenceId: 'r' }), {
-      valid: false,
-      reason: 'type',
+  // Table-driven validation cases: `[picked source, expected result]`.
+  const rejections = [
+    [{ interactableType: 'nope', systemId: 's', referenceId: 'r' }, 'type'],
+    [{ interactableType: 'tool', systemId: '', referenceId: 'r' }, 'system'],
+    [{ interactableType: 'tool', systemId: 's', referenceId: '  ' }, 'reference'],
+  ];
+  for (const [source, reason] of rejections) {
+    it(`rejects an invalid pick with reason "${reason}"`, () => {
+      assert.deepEqual(validatePromoteSource(source), { valid: false, reason });
     });
-  });
-
-  it('rejects a missing system id', () => {
-    assert.deepEqual(validatePromoteSource({ interactableType: 'tool', systemId: '', referenceId: 'r' }), {
-      valid: false,
-      reason: 'system',
-    });
-  });
-
-  it('rejects a missing reference id', () => {
-    assert.deepEqual(validatePromoteSource({ interactableType: 'tool', systemId: 's', referenceId: '  ' }), {
-      valid: false,
-      reason: 'reference',
-    });
-  });
+  }
 
   it('accepts a complete tool / gathering-task pick', () => {
-    assert.deepEqual(validatePromoteSource({ interactableType: 'tool', systemId: 's', referenceId: 'r' }), {
-      valid: true,
-    });
-    assert.deepEqual(
-      validatePromoteSource({ interactableType: 'gatheringTask', systemId: 's', referenceId: 't' }),
-      { valid: true }
-    );
+    for (const interactableType of ['tool', 'gatheringTask']) {
+      assert.deepEqual(validatePromoteSource({ interactableType, systemId: 's', referenceId: 'r' }), {
+        valid: true,
+      });
+    }
   });
 });
 
