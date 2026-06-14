@@ -19,7 +19,16 @@
  * patch lives in `src/main.js`.
  */
 
-import { isInteractableRegionBehavior, coerceString } from './interactableRegionFlags.js';
+import {
+  isInteractableRegionBehavior,
+  isUnconfiguredInteractable,
+  coerceString,
+  UNCONFIGURED_SOURCE_UUID,
+  UNCONFIGURED_SYSTEM_ID,
+} from './interactableRegionFlags.js';
+
+/** Default `interactableType` stamped onto an unconfigured native-path interactable. */
+const UNCONFIGURED_INTERACTABLE_TYPE = 'tool';
 
 /**
  * Decide whether a `fabricate.interactable` Region Behaviour may be created.
@@ -40,8 +49,10 @@ import { isInteractableRegionBehavior, coerceString } from './interactableRegion
  */
 export function evaluateInteractableCreate(behaviorDocOrShape) {
   // Reference the arg so the (now unconditional) decision still documents that it
-  // is type-aware and never throws on a malformed shape.
-  void isInteractableRegionBehavior(behaviorDocOrShape);
+  // is type-aware and never throws on a malformed shape. The result is computed but
+  // intentionally not branched on yet — kept as the single seam for a future
+  // cancellation policy.
+  isInteractableRegionBehavior(behaviorDocOrShape);
   return { allow: true };
 }
 
@@ -78,4 +89,43 @@ export function neutralizeInheritedLinkedVisual(system) {
       },
     },
   };
+}
+
+/**
+ * Decide the defensive unconfigured-sentinel `updateSource` patch for a
+ * native-path (`+ Add Behavior`) interactable's `system` (issue 342).
+ *
+ * Belt-and-suspenders for the case where Foundry's empty-`system` instantiation
+ * does not apply the nested `initial` sentinels: only fields left empty are
+ * stamped, so an already-configured (or partially-configured) interactable is
+ * never clobbered. Returns `{ changed: false }` when the system is already a
+ * fully-configured interactable or nothing needs stamping.
+ *
+ * PURE: returns the flat `updateSource` patch keyed by dotted source paths
+ * (`system.sourceUuid` etc.), so the `main.js` edge stays a thin orchestrator.
+ *
+ * @param {object} system  The behaviour `system` data (raw or normalized view).
+ * @returns {{ changed: false } | { changed: true, patch: Record<string, string> }}
+ */
+export function buildUnconfiguredSentinelPatch(system) {
+  if (!isUnconfiguredInteractable(system)) {
+    return { changed: false };
+  }
+
+  const patch = {};
+  if (!coerceString(system?.sourceUuid)) {
+    patch['system.sourceUuid'] = UNCONFIGURED_SOURCE_UUID;
+  }
+  if (!coerceString(system?.systemId)) {
+    patch['system.systemId'] = UNCONFIGURED_SYSTEM_ID;
+  }
+  if (!coerceString(system?.interactableType)) {
+    patch['system.interactableType'] = UNCONFIGURED_INTERACTABLE_TYPE;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { changed: false };
+  }
+
+  return { changed: true, patch };
 }
