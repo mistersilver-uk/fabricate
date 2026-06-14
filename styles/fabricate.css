@@ -3355,6 +3355,10 @@
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
+.fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 .fabricate-manager .manager-environment-edit-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

@@ -1840,3 +1840,40 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
     'narrow container query should still stack the collapsed body to a single column'
   );
 });
+
+test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {
+  // Find each top-level view-specific `.manager-body` grid override (those that keep a
+  // distinct fixed rail column). Each must ship a matching `.is-rail-collapsed` override that
+  // narrows column one to 56px, otherwise the later view rule wins on equal specificity and the
+  // collapse no-ops (issue #331 regression: a wide, mostly-empty icon strip).
+  //
+  // Two simple, linear-time regexes are used deliberately (rather than one combined pattern with
+  // chained `+` quantifiers) to keep the matching free of any backtracking concern.
+  const viewNames = Array.from(css.matchAll(/data-manager-view="(\w[\w-]*)"\] \.manager-body \{/g), (m) => m[1]);
+  const views = Array.from(new Set(viewNames));
+
+  assert.ok(views.length > 0, 'expected at least one view-specific manager-body grid override to pin');
+
+  for (const view of views) {
+    const overrideBlock = blockFor(`.fabricate-manager[data-manager-view="${view}"] .manager-body`);
+    const columnsMatch = overrideBlock.match(/grid-template-columns:\s*(\S+)/);
+    const firstColumn = columnsMatch ? columnsMatch[1] : '';
+    // A view that stacks to a single column (e.g. inside a narrow container query) has no rail
+    // column to narrow, so it does not need a collapsed override.
+    if (firstColumn === '1fr' || firstColumn.startsWith('minmax')) {
+      continue;
+    }
+
+    const collapsedBlock = blockFor(
+      `.fabricate-manager[data-manager-view="${view}"] .manager-body.is-rail-collapsed`
+    );
+    assert.ok(
+      collapsedBlock,
+      `view "${view}" overrides the manager-body grid but is missing a .is-rail-collapsed override; the collapse will be overridden on equal specificity`
+    );
+    assert.ok(
+      collapsedBlock.includes('grid-template-columns: 56px '),
+      `view "${view}" collapsed override should narrow the rail column to 56px`
+    );
+  }
+});
