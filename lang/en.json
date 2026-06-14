@@ -46,7 +46,7 @@
         "LinkedVisualMissing": "This interactable's linked marker is missing.",
         "BehaviorLabel": "Fabricate Interactable",
         "Create": {
-          "NoSource": "Add Fabricate interactables from the Fabricate scene control or the Interactable browser, not the native Region Behaviors tab. A dedicated Manage Interactables panel is coming (issue 335)."
+          "Unconfigured": "Created an unconfigured Fabricate interactable. Configure its source (type, system, tool/task) from the Interactable config panel; it stays hidden and inert to players until then."
         },
         "Prompt": {
           "Interact": "Interact",
@@ -61,6 +61,7 @@
           "CannotControl": "You don't control that token.",
           "NotInside": "Your token must be inside the area.",
           "SourceMissing": "This interactable is no longer available.",
+          "Unconfigured": "This interactable hasn't been set up yet.",
           "EnvironmentMissing": "This gathering point's environment is missing.",
           "Generic": "You can't interact here right now."
         },
@@ -148,6 +149,23 @@
             "Exhausted": "Permanently exhausted",
             "Restock": "Restock",
             "NoRestock": "Cannot restock — this node does not regenerate."
+          },
+          "Identity": {
+            "Heading": "Source",
+            "NeedsConfigTitle": "Needs configuration",
+            "NeedsConfigHint": "This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.",
+            "Retarget": "Change source",
+            "Hide": "Hide",
+            "TypeLabel": "Type",
+            "SystemLabel": "Crafting system",
+            "SelectSystem": "Select a crafting system…",
+            "ToolLabel": "Tool",
+            "TaskLabel": "Gathering task",
+            "SelectTool": "Select a tool…",
+            "SelectTask": "Select a gathering task…",
+            "EnvironmentLabel": "Environment (optional)",
+            "SelectEnvironment": "No environment",
+            "Apply": "Apply source"
           }
         }
       },

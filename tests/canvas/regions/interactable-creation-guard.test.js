@@ -11,26 +11,18 @@ import { INTERACTABLE_BEHAVIOR_SUBTYPE } from '../../../src/canvas/regions/inter
 // this test cannot silently mirror a stale subtype string.
 const INTERACTABLE = INTERACTABLE_BEHAVIOR_SUBTYPE;
 
-test('evaluateInteractableCreate cancels a fabricate.interactable with empty sourceUuid', () => {
-  // The native "+ Add Behavior" path instantiates with empty system data.
+test('evaluateInteractableCreate ALLOWS a sourceless fabricate.interactable (issue 342)', () => {
+  // The native "+ Add Behavior" path instantiates with empty system data. Since
+  // issue 342 this is allowed through (born unconfigured + inert), not cancelled.
   const emptySystem = { type: INTERACTABLE, system: {} };
-  assert.deepEqual(evaluateInteractableCreate(emptySystem), {
-    allow: false,
-    reason: 'no-source',
-  });
+  assert.deepEqual(evaluateInteractableCreate(emptySystem), { allow: true });
 
-  // A blank/whitespace-only sourceUuid is also treated as no source.
+  // A blank/whitespace-only sourceUuid is likewise allowed.
   const blankSource = { type: INTERACTABLE, system: { sourceUuid: '   ' } };
-  assert.deepEqual(evaluateInteractableCreate(blankSource), {
-    allow: false,
-    reason: 'no-source',
-  });
+  assert.deepEqual(evaluateInteractableCreate(blankSource), { allow: true });
 
   // A missing system object entirely.
-  assert.deepEqual(evaluateInteractableCreate({ type: INTERACTABLE }), {
-    allow: false,
-    reason: 'no-source',
-  });
+  assert.deepEqual(evaluateInteractableCreate({ type: INTERACTABLE }), { allow: true });
 });
 
 test('evaluateInteractableCreate allows a fully-formed interactable (real placement)', () => {
@@ -67,10 +59,10 @@ test('evaluateInteractableCreate never cancels a non-interactable carrying a lin
   );
 });
 
-test('evaluateInteractableCreate keys ONLY on sourceUuid (not the other required fields)', () => {
-  // Documented design: a resolvable sourceUuid alone distinguishes a real
-  // Fabricate placement from the native empty-system path. The guard does NOT
-  // require interactableType/systemId to be present to allow creation.
+test('evaluateInteractableCreate allows any interactable shape (issue 342 allow-through)', () => {
+  // Since issue 342 the guard always allows an interactable create — sourceless or
+  // not — because a sourceless one is born unconfigured + inert and configured
+  // later. The only creation-time mutation is the linked-visual neutralisation.
   assert.deepEqual(
     evaluateInteractableCreate({
       type: INTERACTABLE,

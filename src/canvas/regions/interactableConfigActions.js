@@ -25,10 +25,15 @@
  */
 
 import { normalizeNodeConfig } from '../../systems/gatheringNodeConfig.js';
+import { buildInteractableSourceUuid } from '../interactableResolution.js';
 import { resolveLinkedVisual } from '../linkedVisuals/linkedInteractableVisual.js';
 
 import { numberOrNull } from './coercion.js';
-import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
+import {
+  readInteractableBehaviorSystem,
+  isUnconfiguredInteractable,
+  INTERACTABLE_TYPES,
+} from './interactableRegionFlags.js';
 
 /**
  * Read a behaviour system as a normalized view, tolerating BOTH a raw behaviour
@@ -161,6 +166,10 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
 
   return {
     interactableType: view.interactableType,
+    // Whether the interactable still needs its identity/source configured (issue
+    // 342). The single authority; the panel renders a "Needs configuration" state
+    // and conceals/inerts the interactable while true.
+    unconfigured: isUnconfiguredInteractable(view),
     name: view.name || '',
     taskNodeLink,
     node: nodeSummary,
@@ -268,4 +277,82 @@ export function planRestockScopedNode(system, { current, max } = {}) {
     return null; // no-op.
   }
   return { system: { node: { ...node, max: nextMax, current: nextCurrent } } };
+}
+
+/** Local string-coercion mirror (avoids re-exporting from the flags module here). */
+function trimmedString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Plan the IDENTITY / SOURCE patch that configures a (typically unconfigured)
+ * interactable from a GM selection in the config panel (issue 342). PURE: builds
+ * the canonical `sourceUuid` via {@link buildInteractableSourceUuid} and the
+ * type-scoped ids, and returns the minimal behaviour patch. The actual write is the
+ * panel's existing GM-routed `updateBehavior` seam.
+ *
+ * SAFETY: this NEVER writes a PARTIAL identity. It returns null (a no-op) unless the
+ * selection is complete for its type:
+ *   - tool          → `{ interactableType, systemId, toolId }`;
+ *   - gatheringTask → `{ interactableType, systemId, taskId }` (+ optional
+ *                      `environmentId`).
+ * The off-type id is cleared to null so a re-target never leaves a stale id behind.
+ *
+ * @param {object} _system  The current behaviour system (accepted for symmetry; the
+ *   patch is derived entirely from the selection, so a re-target is deterministic).
+ * @param {object} selection
+ * @param {'tool'|'gatheringTask'} selection.interactableType
+ * @param {string} selection.systemId
+ * @param {string} [selection.toolId]         Required for a tool.
+ * @param {string} [selection.taskId]         Required for a gatheringTask.
+ * @param {string} [selection.environmentId]  Optional (gatheringTask only).
+ * @returns {{ system: object } | null}  The behaviour patch, or null for an
+ *   incomplete/invalid selection (no-op).
+ */
+export function planConfigureSource(_system, selection = {}) {
+  const interactableType = selection?.interactableType;
+  if (!INTERACTABLE_TYPES.includes(interactableType)) return null;
+
+  const systemId = trimmedString(selection.systemId);
+  if (!systemId) return null;
+
+  if (interactableType === 'tool') {
+    const toolId = trimmedString(selection.toolId);
+    if (!toolId) return null; // never write a partial identity.
+    return {
+      system: {
+        interactableType: 'tool',
+        systemId,
+        sourceUuid: buildInteractableSourceUuid({
+          interactableType: 'tool',
+          systemId,
+          referenceId: toolId,
+        }),
+        toolId,
+        // Clear the off-type id so a re-target from a gatheringTask leaves nothing stale.
+        taskId: null,
+        environmentId: null,
+      },
+    };
+  }
+
+  // gatheringTask
+  const taskId = trimmedString(selection.taskId);
+  if (!taskId) return null; // never write a partial identity.
+  const environmentId = trimmedString(selection.environmentId) || null;
+  return {
+    system: {
+      interactableType: 'gatheringTask',
+      systemId,
+      sourceUuid: buildInteractableSourceUuid({
+        interactableType: 'gatheringTask',
+        systemId,
+        referenceId: taskId,
+      }),
+      taskId,
+      environmentId,
+      // Clear the off-type id so a re-target from a tool leaves nothing stale.
+      toolId: null,
+    },
+  };
 }

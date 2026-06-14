@@ -107,11 +107,45 @@ test('resolveMarkerHidden: locked + disabled → disabled wins (hidden)', () => 
   assert.equal(resolveMarkerHidden(toolSystem({ enabled: false, locked: true })), true);
 });
 
-test('visibility decisions tolerate a missing/empty system shape (no throw)', () => {
-  assert.equal(shouldPromptOnEnter(undefined), true);
-  assert.equal(shouldPromptOnEnter({}), true);
-  assert.equal(resolveMarkerHidden(undefined), false);
-  assert.equal(resolveMarkerHidden({}), false);
+test('visibility decisions tolerate a missing/empty system shape (no throw) and treat it as unconfigured/inert', () => {
+  // Since issue 342 a missing/empty system is UNCONFIGURED ⇒ concealed/inert: no
+  // prompt, marker hidden. This is the safe default (an undefined/malformed system
+  // can never be a real configured interactable) and never throws.
+  assert.equal(shouldPromptOnEnter(undefined), false);
+  assert.equal(shouldPromptOnEnter({}), false);
+  assert.equal(resolveMarkerHidden(undefined), true);
+  assert.equal(resolveMarkerHidden({}), true);
+});
+
+// --- Unconfigured interactable is inert (issue 342) -------------------------
+//
+// A `fabricate.interactable` born via the native "+ Add Behavior" path carries the
+// unconfigured sentinels and no real id. It must be concealed (no prompt, hidden
+// marker) and DENIED (never thrown) until a GM configures it.
+
+function unconfiguredToolSystem(overrides = {}) {
+  return {
+    interactableType: 'tool',
+    sourceUuid: 'Fabricate.unconfigured.tool',
+    systemId: 'unconfigured',
+    toolId: null,
+    taskId: null,
+    environmentId: null,
+    state: baseState(),
+    ...overrides
+  };
+}
+
+test('unconfigured ⇒ concealed: no on-enter prompt, marker hidden from players', () => {
+  const system = unconfiguredToolSystem();
+  assert.equal(shouldPromptOnEnter(system), false, 'no prompt while unconfigured');
+  assert.equal(resolveMarkerHidden(system), true, 'marker hidden while unconfigured');
+});
+
+test('a configured interactable is unaffected by the unconfigured concealment', () => {
+  // The fully-configured tool/task fixtures still prompt + stay visible.
+  assert.equal(shouldPromptOnEnter(toolSystem()), true);
+  assert.equal(resolveMarkerHidden(toolSystem()), false);
 });
 
 test('eligibility: eligible when no gate trips', () => {
@@ -281,6 +315,35 @@ test('validateActivationRequest: ENVIRONMENT_MISSING only for gatheringTask', ()
   );
 });
 
+test('validateActivationRequest: an UNCONFIGURED interactable is DENIED (never thrown), checked first', () => {
+  const system = unconfiguredToolSystem();
+  // Even with every other collaborator green, an unconfigured behaviour is denied
+  // with the dedicated UNCONFIGURED reason — and it does not throw.
+  const result = validateActivationRequest(
+    { interactableType: 'tool' },
+    { behaviorSystem: system, now: 0, isGM: true, canControlActor: true, tokenInside: true, sourceExists: true }
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'UNCONFIGURED');
+
+  // UNCONFIGURED is decided ahead of TYPE_MISMATCH: a stale request type against
+  // the sentinel default still denies cleanly with UNCONFIGURED.
+  const mismatch = validateActivationRequest(
+    { interactableType: 'gatheringTask' },
+    { behaviorSystem: system, now: 0, isGM: true, canControlActor: true, tokenInside: true }
+  );
+  assert.equal(mismatch.reason, 'UNCONFIGURED');
+});
+
+test('validateActivationRequest: a configured interactable is unaffected by the unconfigured gate', () => {
+  const system = toolSystem();
+  const result = validateActivationRequest(
+    { interactableType: 'tool' },
+    { behaviorSystem: system, now: 0, canControlActor: true, tokenInside: true, sourceExists: true }
+  );
+  assert.equal(result.ok, true);
+});
+
 test('describeGrant encodes tab + context shape per type (tools open Crafting)', () => {
   // A Tool station belongs to crafting, so it opens the Crafting tab.
   assert.deepEqual(describeGrant(toolSystem()), { tab: 'crafting', context: { activeCanvasTool: null } });
@@ -306,6 +369,7 @@ test('activationDenialMessageKey maps every reason to a non-default key', () => 
     CANNOT_CONTROL_ACTOR: 'FABRICATE.Canvas.Interactable.Denied.CannotControl',
     TOKEN_NOT_INSIDE: 'FABRICATE.Canvas.Interactable.Denied.NotInside',
     SOURCE_MISSING: 'FABRICATE.Canvas.Interactable.Denied.SourceMissing',
+    UNCONFIGURED: 'FABRICATE.Canvas.Interactable.Denied.Unconfigured',
     ENVIRONMENT_MISSING: 'FABRICATE.Canvas.Interactable.Denied.EnvironmentMissing'
   };
   const generic = 'FABRICATE.Canvas.Interactable.Denied.Generic';

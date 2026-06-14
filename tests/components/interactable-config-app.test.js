@@ -116,6 +116,23 @@ describe('InteractableConfigApp shell', () => {
     assert.ok(appSource.includes('registerInteractableConfigApp(InteractableConfigApp)'), 'registers with the factory');
   });
 
+  it('configures the source through the pure planner + the GM-routed write seam (issue 342)', () => {
+    // The identity picker reuses the SHARED source enumeration (no third
+    // enumeration) and writes through the existing GM-routed updateBehavior seam
+    // via the pure planConfigureSource (never a partial identity).
+    assert.ok(appSource.includes("from './interactableSourceLibrary.js'"), 'reuses the shared source enumeration');
+    assert.ok(appSource.includes('listSystemOptions(this._sourceDeps())'), 'lists systems from the shared library');
+    assert.ok(appSource.includes('listToolSourceOptions(this._sourceDeps()'), 'lists tools from the shared library');
+    assert.ok(appSource.includes('listTaskSourceOptions(this._sourceDeps()'), 'lists tasks from the shared library');
+    assert.ok(appSource.includes('configureSource:'), 'declares the configureSource service');
+    assert.ok(appSource.includes('planConfigureSource(readInteractableBehaviorSystem(behavior)'), 'uses the pure planner');
+    assert.ok(/configureSource:[\s\S]*?_assertGM\(\)/.test(appSource), 'configureSource is GM-guarded');
+    // The write routes through writeBehavior (the GM-routed seam), and no-ops on an
+    // incomplete selection (planner returns null → no partial write).
+    assert.ok(/configureSource:[\s\S]*?if \(!patch\) return undefined/.test(appSource), 'no-ops on an incomplete selection (no partial write)');
+    assert.ok(/configureSource:[\s\S]*?writeBehavior\(patch\.system\)/.test(appSource), 'routes the GM behaviour-update seam');
+  });
+
   it('reconciles the linked tile hidden on enable/disable + hidden toggles, but NOT on lock', () => {
     // setEnabled + setHidden reconcile the marker's player visibility (concealed
     // ⇒ tile.hidden = true) immediately after the behaviour write; setLocked must
@@ -259,6 +276,24 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('repeat(3, minmax(0, 1fr))'), '3 columns when the environment fact is present');
     // dt/dd semantics preserved.
     assert.ok(rootSource.includes('<dt>') && rootSource.includes('<dd>'), 'keeps dt/dd fact semantics');
+  });
+
+  it('pins the "Needs configuration" identity state + the picker write-through (issue 342)', () => {
+    // A prominent unconfigured state, driven by the single authority surfaced on
+    // the view model (view.unconfigured), with a write-through picker.
+    assert.ok(rootSource.includes('view?.unconfigured === true'), 'reads the unconfigured authority from the view model');
+    assert.ok(rootSource.includes('data-interactable-needs-config'), 'renders the Needs-configuration state');
+    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'), 'localized Needs-configuration title');
+    assert.ok(rootSource.includes('data-interactable-identity-section'), 'declares the identity/source section');
+    // The picker reads the shared enumeration through services and writes the
+    // selection back via the configureSource seam.
+    assert.ok(rootSource.includes('services?.listSystems?.()'), 'lists systems via services');
+    assert.ok(rootSource.includes('services?.listTools?.(') && rootSource.includes('services?.listTasks?.('), 'lists tools/tasks via services');
+    assert.ok(rootSource.includes('services?.configureSource?.(selection)'), 'applies the selection through configureSource');
+    // The Apply button is gated so an incomplete selection cannot be submitted.
+    assert.ok(rootSource.includes('disabled={!canApplyIdentity}'), 'Apply is disabled until the selection is complete');
+    // The unconfigured state uses theme tokens only (no literal colours).
+    assert.ok(/\.fab-ic-identity\.is-unconfigured\s*\{[\s\S]*?var\(--fab-accent/.test(rootSource), 'unconfigured treatment uses themed accent token');
   });
 
   it('rewords the prompt placeholder away from "toast" jargon', () => {

@@ -15,6 +15,7 @@ import {
   planSetEnabled,
   planSetLocked,
   planClearVisualLink,
+  planConfigureSource,
   summarizeInteractable
 } from '../../../src/canvas/regions/interactableConfigActions.js';
 
@@ -125,5 +126,86 @@ describe('summarizeInteractable', () => {
 
   it('returns null for a non-interactable system', () => {
     assert.equal(summarizeInteractable({ foo: 'bar' }, { resolveVisual: () => null }), null);
+  });
+});
+
+describe('planConfigureSource (issue 342 — never writes a partial identity)', () => {
+  it('builds the correct patch for a tool selection', () => {
+    const patch = planConfigureSource(null, {
+      interactableType: 'tool',
+      systemId: 'system-a',
+      toolId: 'tool-1'
+    });
+    assert.deepEqual(patch, {
+      system: {
+        interactableType: 'tool',
+        systemId: 'system-a',
+        sourceUuid: 'Fabricate.system-a.tool.tool-1',
+        toolId: 'tool-1',
+        // Off-type id cleared.
+        taskId: null,
+        environmentId: null
+      }
+    });
+  });
+
+  it('builds the correct patch for a gatheringTask selection (with environment)', () => {
+    const patch = planConfigureSource(null, {
+      interactableType: 'gatheringTask',
+      systemId: 'system-a',
+      taskId: 'task-1',
+      environmentId: 'env-1'
+    });
+    assert.deepEqual(patch, {
+      system: {
+        interactableType: 'gatheringTask',
+        systemId: 'system-a',
+        sourceUuid: 'Fabricate.system-a.gatheringTask.task-1',
+        taskId: 'task-1',
+        environmentId: 'env-1',
+        // Off-type id cleared.
+        toolId: null
+      }
+    });
+  });
+
+  it('clears the off-type id when RE-TARGETING a configured interactable', () => {
+    // Re-target a configured tool → gatheringTask: the resulting patch must carry
+    // toolId:null so the stale tool id never lingers.
+    const current = toolSystem();
+    const patch = planConfigureSource(current, {
+      interactableType: 'gatheringTask',
+      systemId: 'system-b',
+      taskId: 'task-9'
+    });
+    assert.equal(patch.system.interactableType, 'gatheringTask');
+    assert.equal(patch.system.toolId, null);
+    assert.equal(patch.system.taskId, 'task-9');
+    assert.equal(patch.system.environmentId, null);
+    assert.equal(patch.system.sourceUuid, 'Fabricate.system-b.gatheringTask.task-9');
+  });
+
+  it('no-ops (returns null) on an INCOMPLETE selection — never a partial write', () => {
+    // Missing reference id.
+    assert.equal(planConfigureSource(null, { interactableType: 'tool', systemId: 'system-a' }), null);
+    assert.equal(planConfigureSource(null, { interactableType: 'gatheringTask', systemId: 'system-a' }), null);
+    // Missing system id.
+    assert.equal(planConfigureSource(null, { interactableType: 'tool', toolId: 'tool-1' }), null);
+    // Blank/whitespace values.
+    assert.equal(planConfigureSource(null, { interactableType: 'tool', systemId: '  ', toolId: 'tool-1' }), null);
+    assert.equal(planConfigureSource(null, { interactableType: 'tool', systemId: 'system-a', toolId: '   ' }), null);
+    // Unknown / missing type.
+    assert.equal(planConfigureSource(null, { interactableType: 'mystery', systemId: 'system-a', toolId: 'tool-1' }), null);
+    assert.equal(planConfigureSource(null, {}), null);
+  });
+
+  it('treats a blank environment as no environment for a gatheringTask', () => {
+    const patch = planConfigureSource(null, {
+      interactableType: 'gatheringTask',
+      systemId: 'system-a',
+      taskId: 'task-1',
+      environmentId: '   '
+    });
+    assert.equal(patch.system.environmentId, null);
   });
 });

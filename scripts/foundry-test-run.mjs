@@ -2218,6 +2218,21 @@ async function main() {
           behavior => behavior?.type === 'fabricate.interactable'
         ) ?? null;
 
+        // Seed an UNCONFIGURED `fabricate.interactable` (issue 342): a behaviour
+        // created with an EMPTY `system`, exactly like the native Region → Behaviors
+        // "+ Add Behavior → Fabricate Interactable" path. The schema `initial`s make
+        // it instantiate VALID (no DataModelValidationError) and born unconfigured +
+        // inert. The config panel's "Needs configuration" identity section is
+        // captured against this one. Embedded in the scene → cleaned up with it.
+        const [unconfiguredRegion] = await azureGroveScene.createEmbeddedDocuments('Region', [{
+          name: 'Fabricate Unconfigured Node',
+          shapes: [{ type: 'rectangle', x: 1600, y: 1000, width: 400, height: 400 }],
+          behaviors: [{ type: 'fabricate.interactable' }]
+        }]);
+        const unconfiguredBehavior = unconfiguredRegion?.behaviors?.find(
+          behavior => behavior?.type === 'fabricate.interactable'
+        ) ?? null;
+
         return {
           systemId,
           componentMap,
@@ -2230,6 +2245,11 @@ async function main() {
             sceneId: azureGroveScene.id,
             regionId: interactableRegion?.id ?? null,
             behaviorId: interactableBehavior?.id ?? null
+          },
+          unconfiguredInteractable: {
+            sceneId: azureGroveScene.id,
+            regionId: unconfiguredRegion?.id ?? null,
+            behaviorId: unconfiguredBehavior?.id ?? null
           }
         };
       });
@@ -2900,6 +2920,65 @@ async function main() {
         } catch (err) {
           results.steps.push({ step: 'interactable-config', passed: false, error: err.message });
           process.stderr.write(`Interactable config capture failed: ${err.message}\n`);
+        }
+
+        // ── Canvas interactable config: source/identity section (issue 342) ────
+        // Capture the new Identity/source section in BOTH states:
+        //   (a) UNCONFIGURED — the prominent "Needs configuration" state on a
+        //       natively-added (empty-system) behaviour, born inert; and
+        //   (b) CONFIGURED — the collapsed "Change source" section expanded on a
+        //       fully-configured interactable (re-target affordance).
+        // Each AppV2 window is fully closed before the next opens (await close) so
+        // there is no bleed-through. Guarded so a failure records a failed step but
+        // does not abort the phase.
+        try {
+          const unconfiguredRef = craftingSetup.unconfiguredInteractable;
+          if (!unconfiguredRef?.sceneId || !unconfiguredRef?.regionId || !unconfiguredRef?.behaviorId) {
+            throw new Error(`Unconfigured interactable ref is incomplete: ${JSON.stringify(unconfiguredRef)}`);
+          }
+          await page.evaluate(({ s, r, b }) => {
+            return game.fabricate.api.getInteractableConfigAppClass().show({ sceneId: s, regionId: r, behaviorId: b });
+          }, { s: unconfiguredRef.sceneId, r: unconfiguredRef.regionId, b: unconfiguredRef.behaviorId });
+
+          const unconfiguredRoot = page.locator('.fabricate-interactable-config').first();
+          await unconfiguredRoot.waitFor({ state: 'visible', timeout: 10_000 });
+          // The prominent "Needs configuration" banner must be present + the picker mounted.
+          await page.locator('[data-interactable-needs-config]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await page.locator('[data-interactable-identity-type]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactable-config-needs-configuration');
+
+          await page.evaluate(async () => {
+            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
+            if (app?.close) await app.close();
+          }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
+
+          // (b) CONFIGURED — open the fully-configured interactable and expand the
+          // collapsed "Change source" section so the configured identity picker shows.
+          const configuredRef = craftingSetup.interactable;
+          await page.evaluate(({ s, r, b }) => {
+            return game.fabricate.api.getInteractableConfigAppClass().show({ sceneId: s, regionId: r, behaviorId: b });
+          }, { s: configuredRef.sceneId, r: configuredRef.regionId, b: configuredRef.behaviorId });
+
+          const configuredRoot = page.locator('.fabricate-interactable-config').first();
+          await configuredRoot.waitFor({ state: 'visible', timeout: 10_000 });
+          // The configured panel shows the collapsed toggle; expand it to reveal the picker.
+          const identityToggle = page.locator('[data-interactable-identity-toggle]').first();
+          await identityToggle.waitFor({ state: 'visible', timeout: 10_000 });
+          await identityToggle.click();
+          await page.locator('[data-interactable-identity-body]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactable-config-source-configured');
+
+          await page.evaluate(async () => {
+            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
+            if (app?.close) await app.close();
+          }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
+
+          results.steps.push({ step: 'interactable-config-source', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'interactable-config-source', passed: false, error: err.message });
+          process.stderr.write(`Interactable config source capture failed: ${err.message}\n`);
         }
 
         // ── Manage Interactables panel (issue 335) ─────────────────────────────
