@@ -131,6 +131,29 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
     ],
   },
+  // The source/identity section (issue 342) publishes TWO distinct frames (the
+  // unconfigured "Needs configuration" state + the configured re-target picker).
+  // `collect` emits ONE file per recipe id, so each frame needs its own recipe.
+  {
+    id: 'interactable-config-needs-configuration',
+    label: 'Canvas interactable config — unconfigured "Needs configuration" state (#342)',
+    smokeLabels: ['interactable-config-needs-configuration'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+      /^src\/ui\/interactableSourceLibrary\.js$/,
+    ],
+  },
+  {
+    id: 'interactable-config-source-configured',
+    label: 'Canvas interactable config — configured source/identity section (#342)',
+    smokeLabels: ['interactable-config-source-configured'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+      /^src\/ui\/interactableSourceLibrary\.js$/,
+    ],
+  },
   // The Manage Interactables panel publishes THREE distinct frames (populated
   // list, expanded promote form, dedicated empty state). `collect` emits ONE
   // file per recipe id (it takes the first matching smoke label), so each frame

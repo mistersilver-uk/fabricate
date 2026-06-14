@@ -32,6 +32,18 @@ import { numberOrNull } from './coercion.js';
 
 export const INTERACTABLE_BEHAVIOR_SUBTYPE = 'fabricate.interactable';
 
+// Unconfigured sentinels (issue 342). When a `fabricate.interactable` behaviour is
+// created through Foundry's native Region → Behaviors "+ Add Behavior" path it has
+// an empty `system`, so the three required identity fields take these schema
+// `initial`s. The sourceUuid is deliberately NON-RESOLVABLE — it is a 3-segment
+// string, so `parseInteractableSourceUuid` returns null for it and no resolver can
+// mistake it for a real tool/task. A behaviour carrying these sentinels (or any
+// otherwise-incomplete identity) is UNCONFIGURED: it is concealed/inert until a GM
+// configures its identity from the rich config panel. `isUnconfiguredInteractable`
+// is the SINGLE authority for "not yet configured".
+export const UNCONFIGURED_SOURCE_UUID = 'Fabricate.unconfigured.tool';
+export const UNCONFIGURED_SYSTEM_ID = 'unconfigured';
+
 export const INTERACTABLE_TYPES = Object.freeze(['tool', 'gatheringTask']);
 export const LINKED_VISUAL_DOCUMENT_NAMES = Object.freeze(['Tile', 'Drawing', 'Token']);
 export const LINKED_VISUAL_MODES = Object.freeze(['marker', 'none']);
@@ -76,6 +88,11 @@ export function buildInteractableBehaviorSchema(fields) {
     interactableType: new StringField({
       required: true,
       blank: false,
+      // Native "+ Add Behavior" instantiates with an empty `system`; an `initial`
+      // lets the DataModel instantiate valid (no DataModelValidationError). A real
+      // Fabricate placement always supplies a real value, so this only ever takes
+      // effect on the native unconfigured path.
+      initial: 'tool',
       choices: [...INTERACTABLE_TYPES],
     }),
 
@@ -93,8 +110,15 @@ export function buildInteractableBehaviorSchema(fields) {
     // when `taskNodeLink === 'unlinked'`; null otherwise. `normalizeNodeConfig` is
     // the schema authority for its shape, so an ObjectField stores it opaquely.
     node: new ObjectField({ required: false, nullable: true, initial: null }),
-    sourceUuid: new StringField({ required: true, blank: false }),
-    systemId: new StringField({ required: true, blank: false }),
+    // The unconfigured sentinels keep these fields `required, blank:false` (they can
+    // never be persisted empty) while letting the native empty-system instantiation
+    // produce a VALID-but-unconfigured behaviour rather than throwing (issue 342).
+    sourceUuid: new StringField({
+      required: true,
+      blank: false,
+      initial: UNCONFIGURED_SOURCE_UUID,
+    }),
+    systemId: new StringField({ required: true, blank: false, initial: UNCONFIGURED_SYSTEM_ID }),
     toolId: new StringField({ required: false, blank: true, nullable: true, initial: null }),
     taskId: new StringField({ required: false, blank: true, nullable: true, initial: null }),
     environmentId: new StringField({ required: false, blank: true, nullable: true, initial: null }),
@@ -341,6 +365,47 @@ export function readInteractableBehaviorSystem(behavior) {
  */
 export function isInteractableRegionBehavior(behavior) {
   return behavior?.type === INTERACTABLE_BEHAVIOR_SUBTYPE;
+}
+
+/**
+ * The SINGLE authority for "is this interactable not yet configured?" (issue 342).
+ *
+ * A `fabricate.interactable` created through Foundry's native "+ Add Behavior" path
+ * is born with the unconfigured sentinels ({@link UNCONFIGURED_SOURCE_UUID} /
+ * {@link UNCONFIGURED_SYSTEM_ID}) and no real tool/task id. Creation, activation,
+ * marker concealment, and the config panel all consult THIS predicate so they can
+ * never drift on what "configured" means.
+ *
+ * Tolerates a raw behaviour `system` object OR a normalized view. Treated as
+ * unconfigured when ANY of:
+ *   - `sourceUuid` is empty or the unconfigured sentinel;
+ *   - `systemId` is empty or the unconfigured sentinel;
+ *   - the type-appropriate id is missing (`toolId` for a tool, `taskId` for a
+ *     gatheringTask).
+ *
+ * @param {object} system  A behaviour `system` (raw or normalized view).
+ * @returns {boolean}
+ */
+export function isUnconfiguredInteractable(system) {
+  if (!system || typeof system !== 'object') return true;
+
+  const sourceUuid = coerceString(system.sourceUuid);
+  if (!sourceUuid || sourceUuid === UNCONFIGURED_SOURCE_UUID) return true;
+
+  const systemId = coerceString(system.systemId);
+  if (!systemId || systemId === UNCONFIGURED_SYSTEM_ID) return true;
+
+  const interactableType = system.interactableType;
+  if (interactableType === 'tool') {
+    if (!coerceString(system.toolId)) return true;
+  } else if (interactableType === 'gatheringTask') {
+    if (!coerceString(system.taskId)) return true;
+  } else {
+    // An unknown/missing type can never be a fully-configured interactable.
+    return true;
+  }
+
+  return false;
 }
 
 /**

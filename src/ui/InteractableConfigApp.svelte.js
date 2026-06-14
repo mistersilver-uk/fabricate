@@ -8,8 +8,14 @@ import {
   planClearVisualLink,
   planSetTaskNodeLink,
   planRestockScopedNode,
+  planConfigureSource,
   summarizeInteractable
 } from '../canvas/regions/interactableConfigActions.js';
+import {
+  listSystemOptions,
+  listToolSourceOptions,
+  listTaskSourceOptions
+} from './interactableSourceLibrary.js';
 import { normalizeNodeConfig } from '../systems/gatheringNodeConfig.js';
 import {
   applyInteractableBehaviorUpdate,
@@ -213,6 +219,36 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
 
       // --- Editable field writes (active-GM routed) -------------------------
       updateBehavior: (systemPatch) => writeBehavior(systemPatch),
+
+      // --- Source / identity configuration (issue 342) ----------------------
+      // The shared source enumeration the Interactable browser + Manage panel read
+      // (`interactableSourceLibrary`), so the three surfaces can never drift.
+      listSystems: () => listSystemOptions(this._sourceDeps()),
+      listTools: (systemId) => listToolSourceOptions(this._sourceDeps(), systemId),
+      listTasks: (systemId) => listTaskSourceOptions(this._sourceDeps(), systemId),
+      listEnvironments: () => {
+        const environments =
+          globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+        return (Array.isArray(environments) ? environments : []).map((env) => ({
+          id: String(env?.id ?? ''),
+          name: String(env?.name ?? env?.id ?? '')
+        }));
+      },
+      // Apply a complete identity selection. The pure `planConfigureSource` builds
+      // the canonical patch (or no-ops on an incomplete selection); the write routes
+      // through the same active-GM seam. On success the panel refreshes out of the
+      // unconfigured state.
+      configureSource: (selection) => {
+        if (!this._assertGM()) return undefined;
+        const behavior = this._resolveBehavior();
+        const patch = planConfigureSource(readInteractableBehaviorSystem(behavior), selection || {});
+        if (!patch) return undefined; // incomplete/invalid selection — no partial write.
+        const result = writeBehavior(patch.system);
+        const after = () => this._refresh();
+        if (result && typeof result.then === 'function') return result.then(after);
+        after();
+        return result;
+      },
 
       // --- Action seams (each owns its live edge) ---------------------------
       testAsPlayer: () => {
@@ -489,6 +525,21 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         try { await region.delete?.(); } catch (_error) { /* tolerate. */ }
         void this.close();
       }
+    };
+  }
+
+  /**
+   * The shared source-enumeration dependency bag for `interactableSourceLibrary`
+   * (issue 342) — the SAME live `CraftingSystemManager` + persisted gathering
+   * config the Interactable browser / Manage panel read, so the config panel's
+   * source picker can never drift from them.
+   *
+   * @returns {{ getCraftingSystemManager: Function, getGatheringConfig: Function }}
+   */
+  _sourceDeps() {
+    return {
+      getCraftingSystemManager: () => globalThis.game?.fabricate?.getCraftingSystemManager?.() ?? null,
+      getGatheringConfig: () => globalThis.game?.settings?.get?.('fabricate', 'gatheringConfig') ?? null
     };
   }
 

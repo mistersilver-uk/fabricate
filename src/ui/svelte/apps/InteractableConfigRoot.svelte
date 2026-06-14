@@ -55,6 +55,72 @@
   const sourceLabel = $derived.by(() => { void tick; return services?.resolveSourceLabel?.() ?? null; });
   const environmentLabel = $derived.by(() => { void tick; return services?.resolveEnvironmentLabel?.() ?? null; });
 
+  // --- Identity / source configuration (issue 342) ----------------------------
+  // An unconfigured interactable (born via the native "+ Add Behavior" path) is
+  // inert until a GM picks its source here. The section also expands (collapsed by
+  // default) to RE-TARGET a configured interactable.
+  const unconfigured = $derived(view?.unconfigured === true);
+
+  let identityOpen = $state(false);
+  // Open the section automatically while unconfigured (the prominent "Needs
+  // configuration" state); a configured interactable keeps it collapsed until asked.
+  $effect(() => { if (unconfigured) identityOpen = true; });
+  const showIdentityBody = $derived(unconfigured || identityOpen);
+
+  // Selection drafts. Seed the type from the current view so a re-target starts sensibly.
+  let selType = $state('tool');
+  let selSystemId = $state('');
+  let selReferenceId = $state('');
+  let selEnvironmentId = $state('');
+  $effect(() => {
+    // Re-seed the type from the view once when it loads, without clobbering an
+    // in-progress selection (only when nothing is chosen yet).
+    if (!selSystemId && view?.interactableType) selType = view.interactableType;
+  });
+
+  const systemOptions = $derived.by(() => { void tick; return services?.listSystems?.() ?? []; });
+  const sourceOptions = $derived.by(() => {
+    void tick;
+    if (!selSystemId) return [];
+    return selType === 'tool'
+      ? (services?.listTools?.(selSystemId) ?? [])
+      : (services?.listTasks?.(selSystemId) ?? []);
+  });
+  const environmentOptions = $derived.by(() => { void tick; return services?.listEnvironments?.() ?? []; });
+
+  const canApplyIdentity = $derived(
+    Boolean(selSystemId) && Boolean(selReferenceId)
+  );
+
+  function onSelectType(next) {
+    selType = next;
+    // A reference id is type-scoped; clear it (and the gathering-only environment).
+    selReferenceId = '';
+    if (next === 'tool') selEnvironmentId = '';
+  }
+
+  function onSelectSystem(next) {
+    selSystemId = next;
+    selReferenceId = '';
+  }
+
+  async function applyIdentity() {
+    if (!canApplyIdentity) return;
+    const selection = {
+      interactableType: selType,
+      systemId: selSystemId,
+      ...(selType === 'tool'
+        ? { toolId: selReferenceId }
+        : { taskId: selReferenceId, environmentId: selEnvironmentId || undefined })
+    };
+    await services?.configureSource?.(selection);
+    // Reset drafts after a successful re-target; the panel refreshes via the service.
+    selSystemId = '';
+    selReferenceId = '';
+    selEnvironmentId = '';
+    refresh();
+  }
+
   const visualStatus = $derived(describeVisualStatus(view?.linkedVisual ?? null));
   const activationGate = $derived(describeActivationGate(view?.state ?? null, { now: worldTime }));
 
@@ -156,6 +222,100 @@
           : text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}
       </span>
     </header>
+
+    <!-- Identity / source (issue 342). Prominent "Needs configuration" state while
+         unconfigured; collapsed re-target affordance once configured. -->
+    <section class="fab-ic-section fab-ic-identity" class:is-unconfigured={unconfigured} data-interactable-identity-section>
+      {#if unconfigured}
+        <div class="fab-ic-identity-banner" data-interactable-needs-config>
+          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+          <div>
+            <strong>{text('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle', 'Needs configuration')}</strong>
+            <p class="fab-ic-fact-muted fab-ic-identity-hint">
+              {text('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint', 'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.')}
+            </p>
+          </div>
+        </div>
+      {:else}
+        <div class="fab-ic-identity-head">
+          <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.Identity.Heading', 'Source')}</h3>
+          <button
+            type="button"
+            class="fab-ic-btn fab-ic-identity-toggle"
+            aria-expanded={identityOpen}
+            onclick={() => (identityOpen = !identityOpen)}
+            data-interactable-identity-toggle
+          >
+            {identityOpen
+              ? text('FABRICATE.Canvas.Interactable.Config.Identity.Hide', 'Hide')
+              : text('FABRICATE.Canvas.Interactable.Config.Identity.Retarget', 'Change source')}
+          </button>
+        </div>
+      {/if}
+
+      {#if showIdentityBody}
+        <div class="fab-ic-identity-body" data-interactable-identity-body>
+          <label class="fab-ic-field">
+            <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Identity.TypeLabel', 'Type')}</span>
+            <select value={selType} onchange={(e) => onSelectType(e.currentTarget.value)} data-interactable-identity-type>
+              <option value="tool">{text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station')}</option>
+              <option value="gatheringTask">{text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}</option>
+            </select>
+          </label>
+
+          <label class="fab-ic-field">
+            <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Identity.SystemLabel', 'Crafting system')}</span>
+            <select value={selSystemId} onchange={(e) => onSelectSystem(e.currentTarget.value)} data-interactable-identity-system>
+              <option value="">{text('FABRICATE.Canvas.Interactable.Config.Identity.SelectSystem', 'Select a crafting system…')}</option>
+              {#each systemOptions as option (option.id)}
+                <option value={option.id}>{option.name}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="fab-ic-field">
+            <span class="fab-ic-field-label">
+              {selType === 'tool'
+                ? text('FABRICATE.Canvas.Interactable.Config.Identity.ToolLabel', 'Tool')
+                : text('FABRICATE.Canvas.Interactable.Config.Identity.TaskLabel', 'Gathering task')}
+            </span>
+            <select value={selReferenceId} onchange={(e) => (selReferenceId = e.currentTarget.value)} disabled={!selSystemId} data-interactable-identity-source>
+              <option value="">{selType === 'tool'
+                ? text('FABRICATE.Canvas.Interactable.Config.Identity.SelectTool', 'Select a tool…')
+                : text('FABRICATE.Canvas.Interactable.Config.Identity.SelectTask', 'Select a gathering task…')}</option>
+              {#each sourceOptions as option (option.id)}
+                <option value={option.id}>{option.name}</option>
+              {/each}
+            </select>
+          </label>
+
+          {#if selType === 'gatheringTask'}
+            <label class="fab-ic-field">
+              <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Identity.EnvironmentLabel', 'Environment (optional)')}</span>
+              <select value={selEnvironmentId} onchange={(e) => (selEnvironmentId = e.currentTarget.value)} data-interactable-identity-environment>
+                <option value="">{text('FABRICATE.Canvas.Interactable.Config.Identity.SelectEnvironment', 'No environment')}</option>
+                {#each environmentOptions as option (option.id)}
+                  <option value={option.id}>{option.name}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
+
+          <div class="fab-ic-actions fab-ic-actions-inline">
+            <button
+              type="button"
+              class="fab-ic-btn fab-ic-btn-primary"
+              disabled={!canApplyIdentity}
+              onclick={applyIdentity}
+              data-interactable-identity-apply
+            >
+              <i class="fas fa-check" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Canvas.Interactable.Config.Identity.Apply', 'Apply source')}</span>
+            </button>
+          </div>
+        </div>
+      {/if}
+    </section>
 
     <!-- Editable identity -->
     <section class="fab-ic-section">
@@ -656,5 +816,52 @@
   .fab-ic-node-exhausted {
     color: var(--fab-danger);
     font-weight: 600;
+  }
+
+  /* Identity / source section (issue 342). The unconfigured state is given a
+     prominent themed-accent treatment so the GM cannot miss the "Needs
+     configuration" call to action; once configured the section collapses. */
+  .fab-ic-identity {
+    gap: 0.55rem;
+  }
+
+  .fab-ic-identity.is-unconfigured {
+    padding: 0.6rem;
+    border: 1px solid var(--fab-accent);
+    border-radius: 6px;
+    background: var(--fab-accent-soft);
+  }
+
+  .fab-ic-identity-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    color: var(--fab-accent-strong);
+  }
+
+  .fab-ic-identity-banner strong {
+    font-size: 0.95rem;
+  }
+
+  .fab-ic-identity-hint {
+    margin: 0.15rem 0 0;
+    font-size: 0.82rem;
+  }
+
+  .fab-ic-identity-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .fab-ic-identity-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .fab-ic-identity-toggle {
+    flex: 0 0 auto;
   }
 </style>
