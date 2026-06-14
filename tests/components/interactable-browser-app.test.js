@@ -66,18 +66,26 @@ describe('InteractableBrowserApp singleton window', () => {
     assert.ok(appSource.includes('registerInteractableBrowserApp(InteractableBrowserApp)'), 'registers with the factory');
   });
 
-  it('services bag reuses the existing per-system Tool/Task library reads', () => {
+  it('services bag reuses the SHARED interactableSourceLibrary enumeration (no local re-walk)', () => {
     assert.ok(
-      appSource.includes('getCraftingSystemManager?.()?.getSystems?.()'),
-      'listSystems reads the live crafting system manager'
+      appSource.includes("from './interactableSourceLibrary.js'"),
+      'imports the shared source enumeration'
     );
     assert.ok(
-      appSource.includes('getCraftingSystemManager?.()?.getSystem?.(systemId)') && appSource.includes('system?.tools'),
-      'listToolsForSystem reads the per-system Tool library'
+      appSource.includes('listSystems: () => listSystemOptions(this._sourceDeps())'),
+      'listSystems delegates to the shared system enumeration'
     );
     assert.ok(
-      appSource.includes('getSetting(SETTING_KEYS.GATHERING_CONFIG)') && appSource.includes("config?.systems?.[systemId]?.tasks"),
-      'listTasksForSystem reads the persisted gathering config tasks'
+      appSource.includes('listToolsForSystem: (systemId) => listSystemTools(this._sourceDeps(), systemId)'),
+      'listToolsForSystem delegates to the shared Tool enumeration'
+    );
+    assert.ok(
+      appSource.includes('listTasksForSystem: (systemId) => listSystemTasks(this._sourceDeps(), systemId)'),
+      'listTasksForSystem delegates to the shared Task enumeration'
+    );
+    assert.ok(
+      appSource.includes('getCraftingSystemManager: () =>') && appSource.includes('getGatheringConfig: () => getSetting(SETTING_KEYS.GATHERING_CONFIG)'),
+      'the shared deps bag wires the live manager + persisted gathering config'
     );
   });
 
@@ -94,12 +102,8 @@ describe('InteractableBrowserApp singleton window', () => {
       'services bag exposes getComponentForSystem'
     );
     assert.ok(
-      appSource.includes('Array.isArray(system?.components)'),
-      'component lookup reads the same system.components source ToolsBrowserView uses'
-    );
-    assert.ok(
-      appSource.includes('name: component.name') && appSource.includes('img: component.img'),
-      'component lookup returns name + img for resolution'
+      appSource.includes('getSystemComponent(this._sourceDeps(), systemId, componentId)'),
+      'component lookup delegates to the shared system.components resolution'
     );
   });
 });
