@@ -89,6 +89,9 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Bind the user-controlled input to an env var instead of interpolating
+          # it directly into the run block (avoids shell-injection; githubactions:S7630).
+          RC_TAG: ${{ inputs.rc_tag }}
         run: |
           BASE="${{ steps.version.outputs.base }}"
           ZIP="dist/fabricate-v${BASE}.zip"
@@ -111,7 +114,7 @@ jobs:
             echo "----- Aggregated release notes (preview) -----"
             cat /tmp/release-notes.md
             {
-              echo "## Dry run: promote ${{ inputs.rc_tag }} → v${BASE}"
+              echo "## Dry run: promote ${RC_TAG} → v${BASE}"
               echo ""
               echo "No GitHub release was created. The non-dry run would execute:"
               echo ""
