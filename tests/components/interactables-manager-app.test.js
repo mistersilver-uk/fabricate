@@ -126,15 +126,26 @@ describe('InteractablesManagerApp singleton window', () => {
     );
   });
 
-  it('reuses the browser source enumeration (Tools + Gathering Tasks) for the picker', () => {
+  it('reuses the SHARED browser source enumeration (Tools + Gathering Tasks) for the picker', () => {
     assert.ok(
-      appSource.includes('getCraftingSystemManager?.()?.getSystems?.()'),
-      'listSystems reads the live crafting system manager'
+      appSource.includes("from './interactableSourceLibrary.js'"),
+      'imports the same shared source enumeration the browser uses'
     );
-    assert.ok(appSource.includes('listToolsForSystem:'), 'enumerates Tools for the picker');
     assert.ok(
-      appSource.includes('getSetting(SETTING_KEYS.GATHERING_CONFIG)'),
-      'enumerates Gathering Tasks from the persisted gathering config'
+      appSource.includes('listSystems: () => listSystemOptions(this._sourceDeps())'),
+      'listSystems delegates to the shared system enumeration'
+    );
+    assert.ok(
+      appSource.includes('listToolsForSystem: (systemId) => listToolSourceOptions(this._sourceDeps(), systemId)'),
+      'the promote Tool picker delegates to the shared Tool enumeration (the No-sources fix)'
+    );
+    assert.ok(
+      appSource.includes('listTasksForSystem: (systemId) => listTaskSourceOptions(this._sourceDeps(), systemId)'),
+      'the promote Task picker delegates to the shared Task enumeration'
+    );
+    assert.ok(
+      appSource.includes('getGatheringConfig: () => getSetting(SETTING_KEYS.GATHERING_CONFIG)'),
+      'the shared deps bag wires the persisted gathering config for Tasks'
     );
   });
 

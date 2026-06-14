@@ -82,11 +82,48 @@ describe('classifyMarkerStatus', () => {
       MARKER_STATUS.MISSING
     );
   });
+
+  it('defaults a resolved marker with an UNKNOWN documentName to Tile (still present)', () => {
+    assert.equal(
+      classifyMarkerStatus({ linkedVisual: { mode: 'marker', uuid: 'u', documentName: 'Wall' } }, true),
+      MARKER_STATUS.TILE
+    );
+  });
 });
 
 describe('buildInteractableRow', () => {
   it('returns null for a non-interactable behaviour', () => {
     assert.equal(buildInteractableRow({ type: 'other.thing', system: {} }), null);
+  });
+
+  it('returns null for an interactable behaviour with an INVALID interactableType', () => {
+    assert.equal(
+      buildInteractableRow({ type: 'fabricate.interactable', system: { interactableType: 'bogus' } }),
+      null
+    );
+  });
+
+  it('returns null when the behaviour has no resolvable ref (missing parent ids)', () => {
+    // A valid system but no parent region/scene ⇒ identifyRegionBehaviorRef yields null.
+    assert.equal(
+      buildInteractableRow({ type: 'fabricate.interactable', system: { interactableType: 'tool', toolId: 't' } }),
+      null
+    );
+  });
+
+  it('falls back to the raw sourceUuid when label, name, and id are all blank', () => {
+    const row = buildInteractableRow(
+      behavior({
+        name: '',
+        toolId: '',
+        taskId: null,
+        sourceUuid: 'Fabricate.sys.tool.lonely',
+        linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' },
+      }),
+      { resolveSourceLabel: () => '', resolveVisualResolved: () => false }
+    );
+    assert.equal(row.sourceLabel, 'Fabricate.sys.tool.lonely');
+    assert.equal(row.name, 'Fabricate.sys.tool.lonely');
   });
 
   it('builds a row with ref, name, type, source label, state, and marker status', () => {
@@ -156,6 +193,15 @@ describe('scanSceneInteractables', () => {
     const rows = scanSceneInteractables({ regions }, { resolveVisualResolved: () => false });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].markerStatus, MARKER_STATUS.MISSING);
+  });
+
+  it('tolerates a live Collection shape with only .values() for regions + behaviors', () => {
+    const regionsCollection = {
+      values: () => [{ behaviors: { values: () => [behavior({ id: 'v' })].values() } }].values(),
+    };
+    const rows = scanSceneInteractables({ regions: regionsCollection }, { resolveVisualResolved: () => true });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].ref.behaviorId, 'v');
   });
 
   it('returns an empty list for a scene with no regions', () => {

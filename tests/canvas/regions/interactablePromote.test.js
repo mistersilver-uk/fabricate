@@ -109,6 +109,28 @@ describe('decidePromoteRegion', () => {
     assert.equal(result.behaviorSystem.linkedVisual.uuid, null);
   });
 
+  it('promotes with a Tile marker but a null center when no center is supplied', () => {
+    const result = decidePromoteRegion({
+      source: { interactableType: 'tool', systemId: 'sys', referenceId: 'tool-1' },
+      center: null,
+      buildBehaviorSystem: build,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.marker.kind, 'Tile');
+    assert.equal(result.marker.center, null);
+  });
+
+  it('drops a non-finite center to null on the marker (the marker still defaults to Tile)', () => {
+    const result = decidePromoteRegion({
+      source: { interactableType: 'tool', systemId: 'sys', referenceId: 'tool-1' },
+      center: { x: 'x', y: 2 },
+      buildBehaviorSystem: build,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.marker.kind, 'Tile');
+    assert.equal(result.marker.center, null);
+  });
+
   it('defaults an unknown marker kind to Tile', () => {
     const result = decidePromoteRegion({
       source: { interactableType: 'tool', systemId: 'sys', referenceId: 'tool-1' },
