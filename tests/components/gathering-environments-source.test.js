@@ -105,8 +105,11 @@ describe('GatheringView 3-column layout and states', () => {
 
   it('enforces a minimum window size on the Fabricate app so the columns cannot be clipped', () => {
     // ApplicationV2 V13 has no `position.minWidth`/`minHeight` (the position
-    // object is non-extensible), so the floor is enforced via a CSS min-size on
-    // the app root plus an _onResize clamp for programmatic setPosition.
+    // object is non-extensible, assigning to it throws), so the floor is enforced
+    // via a CSS min-size on the app root plus a clamp in `_updatePosition` — the V13
+    // position-transform hook applied by BOTH setPosition() and drag-resize. (The
+    // pointer-only `_onResize` drag handler does not consume a returned position in
+    // V13, so clamping there would be dead code.)
     assert.equal(
       appSource.includes('minWidth: 1024'),
       false,
@@ -114,11 +117,12 @@ describe('GatheringView 3-column layout and states', () => {
     );
     assert.ok(appSource.includes('MIN_WINDOW_WIDTH = 1024'), 'the app should define the minimum window width derived from the column minimums');
     assert.ok(appSource.includes('MIN_WINDOW_HEIGHT = 640'), 'the app should define the minimum window height');
-    assert.ok(appSource.includes('_onResize(event, position)'), 'the app should clamp resize as a defensive backstop for the min size');
+    assert.ok(appSource.includes('_updatePosition(position)'), 'the app should clamp the min size in _updatePosition, the V13 hook applied by setPosition and drag-resize');
+    assert.ok(appSource.includes('super._updatePosition(position)'), 'the clamp should resolve the base position first, then floor it');
     assert.ok(
       appSource.includes('Math.max(result.width, SvelteFabricateApp.MIN_WINDOW_WIDTH)')
         && appSource.includes('Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT)'),
-      'the resize clamp should floor both width and height at the configured minimum'
+      'the clamp should floor both width and height at the configured minimum'
     );
     // The drag-resize floor lives on the app root in the global stylesheet.
     assert.ok(cssSource.includes('min-width: 1024px;'), 'the app root CSS should floor the window width');

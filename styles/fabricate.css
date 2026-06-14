@@ -804,8 +804,8 @@
      gathering view's three 280px-floored columns can never be clipped. Derived
      from the ~84px nav rail + 3 x 280px columns + 2 gutters + content padding +
      window chrome. ApplicationV2 V13 has no `position.minWidth`/`minHeight`, so
-     this CSS floor is the drag-resize mechanism; SvelteFabricateApp._onResize
-     backstops programmatic setPosition calls. */
+     this CSS floor is what visually stops the drag handle; SvelteFabricateApp's
+     `_updatePosition` clamp backstops it for both setPosition and drag-resize. */
   min-width: 1024px;
   min-height: 640px;
 }
