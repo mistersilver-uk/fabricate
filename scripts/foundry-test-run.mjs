@@ -2931,38 +2931,35 @@ async function main() {
         // Each AppV2 window is fully closed before the next opens (await close) so
         // there is no bleed-through. Guarded so a failure records a failed step but
         // does not abort the phase.
-        try {
-          const unconfiguredRef = craftingSetup.unconfiguredInteractable;
-          if (!unconfiguredRef?.sceneId || !unconfiguredRef?.regionId || !unconfiguredRef?.behaviorId) {
-            throw new Error(`Unconfigured interactable ref is incomplete: ${JSON.stringify(unconfiguredRef)}`);
-          }
-          await page.evaluate(({ s, r, b }) => {
-            return game.fabricate.api.getInteractableConfigAppClass().show({ sceneId: s, regionId: r, behaviorId: b });
-          }, { s: unconfiguredRef.sceneId, r: unconfiguredRef.regionId, b: unconfiguredRef.behaviorId });
-
-          const unconfiguredRoot = page.locator('.fabricate-interactable-config').first();
-          await unconfiguredRoot.waitFor({ state: 'visible', timeout: 10_000 });
-          // The prominent "Needs configuration" banner must be present + the picker mounted.
-          await page.locator('[data-interactable-needs-config]').first().waitFor({ state: 'visible', timeout: 10_000 });
-          await page.locator('[data-interactable-identity-type]').first().waitFor({ state: 'visible', timeout: 10_000 });
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'interactable-config-needs-configuration');
-
+        // Sweep EVERY interactable-config window fully closed (await each fade-out)
+        // and assert the root is gone, so no prior config panel bleeds into the next
+        // capture or is re-resolved as its root.
+        const closeAllConfigWindows = async () => {
           await page.evaluate(async () => {
-            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
-            if (app?.close) await app.close();
+            const apps = Object.values(ui.windows).filter(w => w?.options?.id === 'fabricate-interactable-config');
+            for (const app of apps) { if (app?.close) await app.close(); }
           }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
-
-          // (b) CONFIGURED — open the fully-configured interactable and expand the
-          // collapsed "Change source" section so the configured identity picker shows.
-          const configuredRef = craftingSetup.interactable;
+          await page.locator('.fabricate-interactable-config').first()
+            .waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+        };
+        const openConfig = async (ref) => {
           await page.evaluate(({ s, r, b }) => {
             return game.fabricate.api.getInteractableConfigAppClass().show({ sceneId: s, regionId: r, behaviorId: b });
-          }, { s: configuredRef.sceneId, r: configuredRef.regionId, b: configuredRef.behaviorId });
+          }, { s: ref.sceneId, r: ref.regionId, b: ref.behaviorId });
+          await page.waitForTimeout(400); // let the AppV2 render + the Svelte view model settle.
+          await page.locator('.fabricate-interactable-config').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await page.locator('[data-interactable-identity-section]').first().waitFor({ state: 'visible', timeout: 10_000 });
+        };
 
-          const configuredRoot = page.locator('.fabricate-interactable-config').first();
-          await configuredRoot.waitFor({ state: 'visible', timeout: 10_000 });
-          // The configured panel shows the collapsed toggle; expand it to reveal the picker.
+        try {
+          // (a) CONFIGURED — open the fully-configured interactable FIRST (no prior
+          // config window to bleed) and expand the collapsed "Change source" section.
+          await closeAllConfigWindows();
+          const configuredRef = craftingSetup.interactable;
+          await openConfig(configuredRef);
+          if (await page.locator('[data-interactable-needs-config]').count() > 0) {
+            throw new Error('Configured interactable rendered the unconfigured state.');
+          }
           const identityToggle = page.locator('[data-interactable-identity-toggle]').first();
           await identityToggle.waitFor({ state: 'visible', timeout: 10_000 });
           await identityToggle.click();
@@ -2970,11 +2967,20 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'interactable-config-source-configured');
 
-          await page.evaluate(async () => {
-            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
-            if (app?.close) await app.close();
-          }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
+          // (b) UNCONFIGURED — the prominent "Needs configuration" state on a
+          // natively-added (empty-system) behaviour, born inert.
+          await closeAllConfigWindows();
+          const unconfiguredRef = craftingSetup.unconfiguredInteractable;
+          if (!unconfiguredRef?.sceneId || !unconfiguredRef?.regionId || !unconfiguredRef?.behaviorId) {
+            throw new Error(`Unconfigured interactable ref is incomplete: ${JSON.stringify(unconfiguredRef)}`);
+          }
+          await openConfig(unconfiguredRef);
+          await page.locator('[data-interactable-needs-config]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await page.locator('[data-interactable-identity-type]').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactable-config-needs-configuration');
 
+          await closeAllConfigWindows();
           results.steps.push({ step: 'interactable-config-source', passed: true });
         } catch (err) {
           results.steps.push({ step: 'interactable-config-source', passed: false, error: err.message });
