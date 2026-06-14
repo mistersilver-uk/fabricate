@@ -400,7 +400,7 @@ Fabricate uses [semantic-release](https://semantic-release.gitbook.io/) to autom
 4. Creates a GitHub Release with the zip and the raw `module.json` as assets.
 5. On `main`, the release-candidate workflow detects the newly-created RC tag at `HEAD` and publishes that exact tag to S3 through the reusable S3 workflow.
 
-GitHub Releases are the canonical release history. The CI release flow does not commit a repository changelog back to `main`; branch protection requires pull requests and status checks on `main`, so release automation publishes tags and GitHub Releases without a protected-branch writeback step.
+GitHub Releases are the canonical release history. There is no committed `CHANGELOG.md` in this repository; release notes are generated from Conventional Commits per release candidate and aggregated across that base's RCs when an RC is promoted. The CI release flow does not commit a repository changelog back to `main`; branch protection requires pull requests and status checks on `main`, so release automation publishes tags and GitHub Releases without a protected-branch writeback step.
 
 ### Running the release script locally
 

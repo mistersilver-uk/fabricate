@@ -10,14 +10,14 @@ Read first:
 
 Use Codex subagents explicitly:
 
-- Spawn `fabricate_pr_explorer` to map Fabricate docs, specs, UI files, and changelog context.
+- Spawn `fabricate_pr_explorer` to map Fabricate docs, specs, and UI files.
 - Spawn `fabricate_competitive_analyst` to update `COMPETITIVE_ANALYSIS.md` and draft/create issues from concrete recommendations.
 - Do not ask child agents to spawn further agents.
 
 Task:
 
 1. Read the existing report first and update it incrementally.
-2. Understand Fabricate from `docs/`, `openspec/specs/`, `src/ui/svelte/`, and `CHANGELOG.md` before competitor analysis.
+2. Understand Fabricate from `docs/`, `openspec/specs/`, and `src/ui/svelte/` before competitor analysis.
 3. Research competitors and monetization landscape when network access is available.
 4. If current pricing, policy, or competitor data cannot be verified, mark the section stale with a dated note rather than guessing.
 5. Update only `COMPETITIVE_ANALYSIS.md`.
