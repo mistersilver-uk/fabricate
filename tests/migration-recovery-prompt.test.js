@@ -54,10 +54,11 @@ test('default / pre-selected button is "Keep existing data" (spec § GM prompt d
 test('config exposes both choices: keep and fix/retry', () => {
   const config = buildMigrationRecoveryPrompt(ABORT_CONTEXT);
 
+  const byName = (a, b) => a.localeCompare(b);
   const actions = config.buttons.map((button) => button.action);
   assert.deepEqual(
-    [...actions].sort(),
-    [MIGRATION_RECOVERY_ACTIONS.FIX_AND_RETRY, MIGRATION_RECOVERY_ACTIONS.KEEP].sort()
+    [...actions].sort(byName),
+    [MIGRATION_RECOVERY_ACTIONS.FIX_AND_RETRY, MIGRATION_RECOVERY_ACTIONS.KEEP].sort(byName)
   );
 
   const fixButton = config.buttons.find(
@@ -99,11 +100,12 @@ test('content documents the explicit, reload-driven retry (no same-pass auto-ret
 });
 
 test('uses an injected localizer when provided', () => {
-  const localize = (key, data) => {
+  const localize = (key) => {
     if (key === 'FABRICATE.Migration.Recovery.KeepButton') return 'KEEP_LOCALIZED';
     if (key === 'FABRICATE.Migration.Recovery.Title') return 'TITLE_LOCALIZED';
-    // Echo the key for everything else to exercise the key-echo fallback path.
-    return data ? key : key;
+    // Echo the key for everything else to exercise the key-echo fallback path in
+    // the builder's localizer wrapper (an unresolved key returns the fallback).
+    return key;
   };
   const config = buildMigrationRecoveryPrompt(ABORT_CONTEXT, localize);
 
