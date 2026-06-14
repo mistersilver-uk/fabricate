@@ -66,10 +66,12 @@ Check for:
 
 PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When opening or updating a PR, use these H2 sections in order:
+When opening or updating a PR, use these H2 sections in order. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 
 ```md
 ## Description
+
+Closes #<issue>
 
 ## Benefit(s)
 
