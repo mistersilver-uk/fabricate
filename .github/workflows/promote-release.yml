@@ -7,6 +7,11 @@ on:
         description: "RC tag to promote (e.g. v1.0.0-rc.3)"
         required: true
         type: string
+      dry_run:
+        description: "Dry run: build, aggregate notes, and validate release assets WITHOUT creating the GitHub release"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -86,8 +91,55 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           BASE="${{ steps.version.outputs.base }}"
+          ZIP="dist/fabricate-v${BASE}.zip"
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "::notice::DRY RUN — no GitHub release will be created for v${BASE}."
+
+            # Validate the release assets the real run would upload actually exist.
+            missing=0
+            for asset in "$ZIP" dist/module.json; do
+              if [ -f "$asset" ]; then
+                echo "asset OK: $asset ($(wc -c < "$asset") bytes)"
+              else
+                echo "::error::Dry run: expected release asset '$asset' not found"
+                missing=1
+              fi
+            done
+
+            # Surface the plan + aggregated notes in the job log and the run summary.
+            echo "----- Aggregated release notes (preview) -----"
+            cat /tmp/release-notes.md
+            {
+              echo "## Dry run: promote ${{ inputs.rc_tag }} → v${BASE}"
+              echo ""
+              echo "No GitHub release was created. The non-dry run would execute:"
+              echo ""
+              echo '```'
+              echo "gh release create v${BASE} \\"
+              echo "  $ZIP \\"
+              echo "  dist/module.json \\"
+              echo "  --title v${BASE} \\"
+              echo "  --notes-file /tmp/release-notes.md \\"
+              echo "  --latest"
+              echo '```'
+              echo ""
+              echo "### Aggregated release notes"
+              echo '```'
+              cat /tmp/release-notes.md
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "$missing" = "1" ]; then
+              echo "::error::Dry run failed: one or more release assets are missing."
+              exit 1
+            fi
+            echo "Dry run complete — assets validated, no release created."
+            exit 0
+          fi
+
           gh release create "v${BASE}" \
-            "dist/fabricate-v${BASE}.zip" \
+            "$ZIP" \
             dist/module.json \
             --title "v${BASE}" \
             --notes-file /tmp/release-notes.md \
