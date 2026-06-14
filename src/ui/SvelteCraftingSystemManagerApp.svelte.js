@@ -456,6 +456,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       services: {
         importSingleManagedItemFromDrop,
         pickImagePath: this._services.pickImagePath,
+        getSetting: this._services.getSetting,
+        setSetting: this._services.setSetting,
         onDropItem: async (data) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           const systemId = get(this._adminStore.selectedSystemId) || '';

@@ -92,6 +92,24 @@ describe('Fabricate theme management', () => {
     assert.equal(experimental.definition.default, false);
   });
 
+  it('registers a hidden client-scoped boolean for the collapsed manager rail preference', () => {
+    const registrations = [];
+    globalThis.game.settings.register = (namespace, key, definition) => {
+      registrations.push({ namespace, key, definition });
+    };
+
+    registerFabricateSettings();
+
+    assert.equal(SETTING_KEYS.MANAGER_RAIL_COLLAPSED, 'managerRailCollapsed');
+    const railSetting = registrations.find(entry => entry.key === SETTING_KEYS.MANAGER_RAIL_COLLAPSED);
+    assert.ok(railSetting, 'manager rail collapsed setting should be registered');
+    assert.equal(railSetting.namespace, FABRICATE_SETTINGS_NAMESPACE);
+    assert.equal(railSetting.definition.scope, 'client');
+    assert.equal(railSetting.definition.config, false);
+    assert.equal(railSetting.definition.type, Boolean);
+    assert.equal(railSetting.definition.default, false);
+  });
+
   it('applies theme changes through the registered setting onChange callback and stamps open Fabricate app roots', () => {
     let themeDefinition;
     globalThis.game.settings.register = (_namespace, key, definition) => {

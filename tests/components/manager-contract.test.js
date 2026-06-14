@@ -127,7 +127,7 @@ describe('CraftingSystemManager source contract', () => {
       'data-manager-view={currentView}',
       'class="manager-header"',
       'class="manager-breadcrumbs"',
-      'class="manager-body"',
+      'class={`manager-body ${railCollapsed ? \'is-rail-collapsed\' : \'\'}`}',
       'class="manager-rail"',
       'class="manager-inspector"',
       'ComponentsBrowserView',
@@ -862,5 +862,44 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!toolsBrowserSource.includes('ProviderExpressionInput'), 'tools requirement editor should not expose provider selection');
     assert.ok(toolsBrowserSource.includes('manager-tools-requirement-expression'), 'tools requirement editor should expose a single expression input');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Tools, 'Tools');
+  });
+
+  it('wires a collapsible left rail persisted via the manager setting seam', () => {
+    assert.ok(
+      rootSource.includes("let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);"),
+      'rail collapsed state should initialize from the persisted managerRailCollapsed client setting'
+    );
+    assert.ok(
+      rootSource.includes('function toggleManagerRail()'),
+      'root should expose a rail toggle handler'
+    );
+    assert.ok(
+      rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
+      'toggling the rail should persist managerRailCollapsed through the setSetting seam'
+    );
+    assert.ok(
+      rootSource.includes("class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}"),
+      'manager-body should bind the is-rail-collapsed modifier from rail state'
+    );
+    assert.ok(
+      rootSource.includes('class="manager-rail-toggle"'),
+      'rail should render a dedicated collapse/expand control'
+    );
+    assert.ok(
+      rootSource.includes('aria-pressed={railCollapsed}'),
+      'rail toggle should expose aria-pressed reflecting collapsed state'
+    );
+    assert.ok(
+      rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail')
+        && rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandRail'),
+      'rail toggle labels should be localized for both states'
+    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseRail, 'Collapse navigation rail');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandRail, 'Expand navigation rail');
+    assert.ok(
+      appSource.includes('getSetting: this._services.getSetting,')
+        && appSource.includes('setSetting: this._services.setSetting,'),
+      'manager app should expose the setting seam to the Svelte component services'
+    );
   });
 });

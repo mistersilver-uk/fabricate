@@ -20,6 +20,7 @@ export const SETTING_KEYS = Object.freeze({
   LAST_GATHERING_ACTOR: 'lastGatheringActor',
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
   LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
+  MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
@@ -120,6 +121,13 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: String,
     default: '',
+  },
+  [SETTING_KEYS.MANAGER_RAIL_COLLAPSED]: {
+    name: 'Crafting System Manager Rail Collapsed',
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false,
   },
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',

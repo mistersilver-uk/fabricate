@@ -1079,6 +1079,10 @@
   overflow: hidden;
 }
 
+.fabricate-manager .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr) 300px;
+}
+
 .fabricate-manager .manager-rail,
 .fabricate-manager .manager-main,
 .fabricate-manager .manager-inspector {
@@ -1094,6 +1098,72 @@
   padding: var(--fab-space-3);
   border-right: 1px solid var(--fab-mv2-border);
   background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-rail-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-rail-toggle:hover {
+  color: var(--fab-mv2-text);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-rail-toggle:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail {
+  padding: var(--fab-space-2) var(--fab-space-1);
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-toggle {
+  align-self: center;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-block {
+  display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {
+  display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-button {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  padding-right: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-parent {
+  padding-right: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-toggle,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-submenu {
+  display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-group.is-expanded {
+  background: transparent;
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-main {
@@ -3283,6 +3353,10 @@
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
 }
 
 .fabricate-manager .manager-environment-edit-view {
@@ -7449,7 +7523,8 @@
 }
 
 @container fabricate-manager (max-width: 1120px) {
-  .fabricate-manager .manager-body {
+  .fabricate-manager .manager-body,
+  .fabricate-manager .manager-body.is-rail-collapsed {
     grid-template-columns: 1fr;
     overflow-y: auto;
   }

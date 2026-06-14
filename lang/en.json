@@ -841,6 +841,8 @@
           "Environments": "Gathering",
           "ExpandGathering": "Expand gathering menu",
           "CollapseGathering": "Collapse gathering menu",
+          "CollapseRail": "Collapse navigation rail",
+          "ExpandRail": "Expand navigation rail",
           "Essences": "Essences",
           "Tools": "Tools",
           "TagsCategories": "Tags & Categories",
