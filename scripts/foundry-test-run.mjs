@@ -2401,6 +2401,40 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-selected-normal');
 
+        // Collapsible left rail: capture both the expanded default and the
+        // collapsed icon-strip state where the middle content column reclaims
+        // the freed rail width and section navigation stays reachable.
+        const railToggle = page.locator('.fabricate-manager .manager-rail-toggle').first();
+        if (await railToggle.count() === 0) {
+          throw new Error('Manager rail is missing its collapse/expand toggle control.');
+        }
+        if (await page.locator('.fabricate-manager .manager-body.is-rail-collapsed').count() > 0) {
+          // Ensure we start from the expanded baseline before capturing it.
+          await railToggle.click();
+          await page.waitForTimeout(400);
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-rail-expanded');
+
+        await railToggle.click();
+        await page.waitForTimeout(500);
+        if (await page.locator('.fabricate-manager .manager-body.is-rail-collapsed').count() === 0) {
+          throw new Error('Manager rail toggle did not collapse the navigation rail.');
+        }
+        const collapsedNavIcons = await page.locator('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-button:visible').count();
+        if (collapsedNavIcons === 0) {
+          throw new Error('Collapsed manager rail should keep section navigation reachable as an icon strip.');
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-rail-collapsed');
+
+        // Restore the expanded rail so subsequent manager steps see the default layout.
+        await railToggle.click();
+        await page.waitForTimeout(400);
+        if (await page.locator('.fabricate-manager .manager-body.is-rail-collapsed').count() > 0) {
+          throw new Error('Manager rail toggle did not re-expand the navigation rail.');
+        }
+
         await page.locator('.fabricate-manager .manager-scope-return').first().click();
         await page.waitForTimeout(750);
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>

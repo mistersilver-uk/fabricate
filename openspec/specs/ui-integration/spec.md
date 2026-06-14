@@ -106,6 +106,7 @@ Selected-system navigation:
 
 Rail and count layout:
 
+- The manager left rail can be collapsed to an icon-only strip to reclaim horizontal width for the middle content column; section navigation (System settings, Recipes, Components, Essences, Tools, the Gathering submenu parent, etc.) remains reachable when collapsed via its section icons, and a localized, keyboard-reachable toggle control switches between expanded and collapsed. The per-client preference persists in `fabricate.managerRailCollapsed` (default expanded).
 - The selected-system rail scope has stable geometry. Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
 - Systems library row status is an interactive on/off toggle button bound to the crafting system's `enabled` state. It is color-coded, keyboard reachable, and must not trigger row selection when toggled.
 - Count facts in the right inspector use a grid. Enabled facts render as an inline phrase that keeps the value and first label word together when wrapping, for example `3 Gathering` on the first line and `environments` on the next.
@@ -888,6 +889,7 @@ Client settings:
 - `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
+- `fabricate.managerRailCollapsed`
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
 - `fabricate.recentlyCrafted`

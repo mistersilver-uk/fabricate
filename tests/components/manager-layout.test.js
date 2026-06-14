@@ -1818,3 +1818,25 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
   assert.ok(css.includes('.fabricate-manager .manager-button:disabled'), 'disabled manager buttons should have explicit disabled styling');
   assert.ok(css.includes('.fabricate-manager .manager-button:not(:disabled):hover'), 'manager hover styles should not target disabled buttons');
 });
+
+test('collapsed manager rail reclaims content width and keeps section nav as an icon strip', () => {
+  const bodyBlock = blockFor('.fabricate-manager .manager-body');
+  const collapsedBodyBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed');
+  const toggleBlock = blockFor('.fabricate-manager .manager-rail-toggle');
+  const collapsedRailBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-rail');
+  const collapsedNavButtonBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-button');
+
+  assert.ok(bodyBlock.includes('grid-template-columns: 220px minmax(0, 1fr) 300px;'), 'expanded manager body keeps the fixed 220px rail column');
+  assert.ok(collapsedBodyBlock.includes('grid-template-columns: 56px minmax(0, 1fr) 300px;'), 'collapsed manager body narrows the rail column so the main column reclaims the freed width');
+  assert.ok(toggleBlock.includes('appearance: none;') && toggleBlock.includes('cursor: pointer;'), 'rail toggle should be a normalized button control');
+  assert.ok(collapsedRailBlock.includes('padding:'), 'collapsed rail should tighten its padding for the icon strip');
+  assert.ok(
+    css.includes('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {'),
+    'collapsed rail should hide nav labels and counts to leave an icon-only strip'
+  );
+  assert.ok(collapsedNavButtonBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'collapsed nav buttons should collapse to a single centered icon column');
+  assert.ok(
+    css.includes('@container fabricate-manager (max-width: 1120px) {\n  .fabricate-manager .manager-body,\n  .fabricate-manager .manager-body.is-rail-collapsed {'),
+    'narrow container query should still stack the collapsed body to a single column'
+  );
+});

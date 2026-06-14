@@ -24,6 +24,18 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
   {
+    id: 'manager-rail-expanded',
+    label: 'Manager rail expanded (default)',
+    smokeLabels: ['manager-rail-expanded'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/, /^styles\/fabricate\.css$/],
+  },
+  {
+    id: 'manager-rail-collapsed',
+    label: 'Manager rail collapsed (icon strip)',
+    smokeLabels: ['manager-rail-collapsed'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/, /^styles\/fabricate\.css$/],
+  },
+  {
     id: 'manager-system-edit',
     label: 'Manager system settings',
     smokeLabels: ['manager-system-edit-normal', 'manager-system-edit-narrow'],

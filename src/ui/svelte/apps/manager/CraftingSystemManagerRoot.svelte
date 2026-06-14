@@ -40,6 +40,13 @@
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
+  // svelte-ignore state_referenced_locally
+  let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
+
+  function toggleManagerRail() {
+    railCollapsed = !railCollapsed;
+    services?.setSetting?.('managerRailCollapsed', railCollapsed);
+  }
 
   function selectTravelTab(tabId) {
     if (['parties', 'realms', 'map'].includes(tabId)) activeTravelTab = tabId;
@@ -3046,8 +3053,22 @@
     {/if}
   </header>
 
-  <div class="manager-body">
+  <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
     <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
+      <button
+        type="button"
+        class="manager-rail-toggle"
+        aria-pressed={railCollapsed}
+        aria-label={railCollapsed
+          ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+          : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+        title={railCollapsed
+          ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+          : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+        onclick={toggleManagerRail}
+      >
+        <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
+      </button>
       <section class="manager-rail-block" aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}>
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
         {#if selectedSystem}
