@@ -55,6 +55,7 @@ import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
+import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
@@ -679,7 +680,20 @@ class Fabricate {
    * Run versioned startup data migrations via MigrationRunner.
    */
   async _runMigrations() {
-    const runner = new MigrationRunner({ getSetting, setSetting });
+    const runner = new MigrationRunner({
+      getSetting,
+      setSetting,
+      // GM-only interactive recovery prompt (DialogV2). The runner invokes this
+      // seam on a fatal abort with { downgradeTo, documents, label }; we build a
+      // Foundry-free config via the pure helper and open DialogV2 here. The
+      // "Keep existing data" choice is the default and matches the runner's
+      // already-applied behavior (rollback, persist nothing, version unchanged).
+      // The fix/retry choice is informational only: retry is explicit and
+      // user-initiated — the GM fixes/deletes the failed documents and RELOADS
+      // Foundry, at which point migrations re-run automatically because
+      // migrationVersion was not advanced. There is NO same-pass auto-retry.
+      promptRecovery: (context) => this._promptMigrationRecovery(context)
+    });
     const summary = await runner.run();
 
     // Aborted pass: a fatal migration error rolled the in-memory data back and
@@ -715,6 +729,49 @@ class Fabricate {
       const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
         || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
       ui.notifications?.info?.(message);
+    }
+  }
+
+  /**
+   * Thin Foundry edge for the GM migration-abort recovery prompt.
+   *
+   * GM-only and defensive (never throws): a failure to open the dialog must not
+   * break startup — the console guidance and the aborted error notification
+   * already covered the GM. Builds the dialog config via the pure
+   * `buildMigrationRecoveryPrompt` helper, then opens `DialogV2` with both
+   * choices and "Keep existing data" pre-selected as the default.
+   *
+   * @param {{ downgradeTo?: string|null, documents?: object[], label?: string }} context
+   *   abort context from the MigrationRunner `promptRecovery` seam.
+   */
+  async _promptMigrationRecovery(context) {
+    try {
+      if (!game.user?.isGM) return;
+      const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
+      if (!DialogV2?.wait && !DialogV2?.prompt) return;
+
+      const localize = (key, data) =>
+        data ? game.i18n?.format?.(key, data) ?? key : game.i18n?.localize?.(key) ?? key;
+      const config = buildMigrationRecoveryPrompt(context, localize);
+
+      const buttons = config.buttons.map((button) => ({
+        action: button.action,
+        label: button.label,
+        default: button.default
+      }));
+
+      // DialogV2.wait resolves to the chosen action; both choices are
+      // informational here (the runner already kept existing data). Closing the
+      // dialog is equivalent to "Keep existing data".
+      await DialogV2.wait({
+        window: { title: config.title },
+        content: config.content,
+        buttons,
+        default: config.default,
+        rejectClose: false
+      });
+    } catch (error) {
+      console.warn(`Fabricate | Failed to present migration recovery prompt: ${error?.message ?? error}`);
     }
   }
 

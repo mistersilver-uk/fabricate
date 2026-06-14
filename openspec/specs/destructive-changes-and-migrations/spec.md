@@ -166,11 +166,13 @@ When a migration pass aborts, Fabricate must provide explicit GM guidance:
    - exact validation or transform error
    - required fix action
 4. When applicable, include macro-oriented remediation suggestions in console output (for example, suggested macro payload shape or required return keys).
-5. Show a GM prompt with choices:
-   - `Keep existing data` (default)
+5. Show a GM-only interactive prompt (`foundry.applications.api.DialogV2`) with choices:
+   - `Keep existing data` (the pre-selected default button)
    - `I will manually fix or delete failed documents, then retry migration`
 6. If the GM keeps existing data, no additional migration writes occur during that startup session.
-7. If the GM opts to fix/delete and retry, retry is explicit and user-initiated (never automatic in the same aborted pass).
+7. If the GM opts to fix/delete and retry, retry is explicit and user-initiated (never automatic in the same aborted pass). Because `migrationVersion` is unchanged on abort, the pending migrations re-run automatically on the next world reload after the GM fixes or deletes the failed documents; the fix/retry choice is informational and triggers no same-pass retry.
+
+The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry. The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
 
 ### Write-on-Change Persistence
 
