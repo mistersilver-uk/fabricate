@@ -317,6 +317,7 @@
     <p>{localize('FABRICATE.App.Gathering.Environments.Empty')}</p>
   </div>
 {:else}
+  <div class="gathering-view-container">
   <div class="gathering-view-grid" data-gathering-state="populated">
     <div class="gathering-view-column gathering-view-column-left">
       <GatheringEnvironmentList {environments} {selectedId} {onSelect} />
@@ -355,12 +356,31 @@
       {/if}
     </section>
   </div>
+  </div>
 {/if}
 
 <style>
+  /* The grid's wrapper is the size container so the columns reflow against the
+     Fabricate window width (not the viewport): the app can be resized and docked
+     at any width, so a viewport media query would be wrong here. A container
+     cannot query its own size, so the container lives on the wrapper and the
+     grid (a descendant) responds to it — the same parent-container pattern the
+     manager view uses with `container-type: inline-size`. */
+  .gathering-view-container {
+    container-type: inline-size;
+    container-name: fabricate-gathering;
+    height: 100%;
+    min-height: 0;
+  }
+
   .gathering-view-grid {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(0, 1.5fr) minmax(280px, 1fr);
+    /* The centre column carries a non-zero minimum (matching the side columns)
+       so it no longer collapses to 0 ahead of the 280px-floored side columns:
+       all three columns now scale down together proportionally instead of the
+       centre dying first. Below the stacking breakpoint they reflow to a single
+       column (see the @container rule). */
+    grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr);
     gap: var(--fab-space-4);
     height: 100%;
     min-height: 0;
@@ -368,6 +388,25 @@
     box-sizing: border-box;
     background: var(--fab-surface);
     color: var(--fab-text);
+  }
+
+  /* Below the combined three-column minimum (3 x 280px + 2 gutters) the columns
+     reflow into a single vertical stack so the view stays usable on a narrow
+     window instead of overflowing or clipping the side columns. The grid scrolls
+     vertically in this mode; each column gets a sensible minimum height so its
+     content is not crushed. */
+  @container fabricate-gathering (max-width: 900px) {
+    .gathering-view-grid {
+      grid-template-columns: 1fr;
+      grid-auto-rows: minmax(min-content, max-content);
+      height: auto;
+      min-height: 100%;
+      overflow-y: auto;
+    }
+
+    .gathering-view-column {
+      min-height: 220px;
+    }
   }
 
   .gathering-view-column {

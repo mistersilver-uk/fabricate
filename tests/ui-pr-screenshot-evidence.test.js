@@ -46,9 +46,13 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/gathering/GatheringDetail.svelte',
     ]);
 
-    assert.deepEqual(views.map(view => view.id), ['player-gathering', 'player-gathering-realm-locked']);
+    assert.deepEqual(
+      views.map(view => view.id),
+      ['player-gathering', 'player-gathering-realm-locked', 'player-gathering-stacked']
+    );
     assert.deepEqual(views[0].smokeLabels, ['player-gathering-environments']);
     assert.deepEqual(views[1].smokeLabels, ['player-gathering-realm-locked']);
+    assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
   });
 
   it('keeps every screenshot recipe backed by real smoke labels', () => {

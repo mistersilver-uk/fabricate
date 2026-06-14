@@ -798,6 +798,16 @@
   font-family: var(--font-primary);
   color: var(--fab-text);
   background: var(--fab-bg-1);
+
+  /* Minimum window size for the resizable Fabricate window (issue 330). The
+     drag-resize handle cannot shrink the window below this floor, so the
+     gathering view's three 280px-floored columns can never be clipped. Derived
+     from the ~84px nav rail + 3 x 280px columns + 2 gutters + content padding +
+     window chrome. ApplicationV2 V13 has no `position.minWidth`/`minHeight`, so
+     this CSS floor is what visually stops the drag handle; SvelteFabricateApp's
+     `_updatePosition` clamp backstops it for both setPosition and drag-resize. */
+  min-width: 1024px;
+  min-height: 640px;
 }
 
 .fabricate.fabricate-app .window-content {
