@@ -24,6 +24,7 @@
  */
 
 import { numberOrNull } from './coercion.js';
+import { isUnconfiguredInteractable } from './interactableRegionFlags.js';
 
 const ACTIVATION_ACTION = 'interactableActivate';
 
@@ -116,14 +117,20 @@ export function resolveMarkerHidden(system) {
 }
 
 /**
- * Whether an interactable is concealed from players: DISABLED or explicitly
- * HIDDEN. Shared by {@link shouldPromptOnEnter} (no prompt) and
- * {@link resolveMarkerHidden} (hidden marker) so the two decisions can never drift.
+ * Whether an interactable is concealed from players: UNCONFIGURED (issue 342),
+ * DISABLED, or explicitly HIDDEN. Shared by {@link shouldPromptOnEnter} (no prompt)
+ * and {@link resolveMarkerHidden} (hidden marker) so the two decisions can never
+ * drift.
+ *
+ * An UNCONFIGURED interactable (born via the native "+ Add Behavior" path, not yet
+ * given a real source) is INERT: it raises no on-enter prompt and its marker is
+ * hidden from players, exactly like a disabled one, until a GM configures it.
  *
  * @param {object} system
  * @returns {boolean}
  */
 function isConcealed(system) {
+  if (isUnconfiguredInteractable(system)) return true;
   return system?.state?.enabled === false || system?.presentation?.hidden === true;
 }
 
@@ -193,6 +200,11 @@ export function validateActivationRequest(
   { behaviorSystem, now, isGM, canControlActor, sourceExists, environmentExists, tokenInside } = {}
 ) {
   if (!behaviorSystem || typeof behaviorSystem !== 'object') return fail('NO_BEHAVIOR');
+  // An UNCONFIGURED interactable (issue 342) is inert: it never grants activation
+  // and must never throw. Deny it FIRST with a dedicated reason — clearer for the
+  // GM than the generic SOURCE_MISSING ("no longer available"), and ahead of the
+  // TYPE_MISMATCH check (the sentinel's default type may not match a stale request).
+  if (isUnconfiguredInteractable(behaviorSystem)) return fail('UNCONFIGURED');
   if (request?.interactableType !== behaviorSystem.interactableType) return fail('TYPE_MISMATCH');
 
   const eligibility = evaluateActivationEligibility(behaviorSystem, { now, isGM });
@@ -244,6 +256,7 @@ const DENIAL_MESSAGE_KEYS = {
   CANNOT_CONTROL_ACTOR: `${DENIAL_PREFIX}.CannotControl`,
   TOKEN_NOT_INSIDE: `${DENIAL_PREFIX}.NotInside`,
   SOURCE_MISSING: `${DENIAL_PREFIX}.SourceMissing`,
+  UNCONFIGURED: `${DENIAL_PREFIX}.Unconfigured`,
   ENVIRONMENT_MISSING: `${DENIAL_PREFIX}.EnvironmentMissing`,
   __default: `${DENIAL_PREFIX}.Generic`,
 };

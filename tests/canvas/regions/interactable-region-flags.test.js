@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 
 import {
   INTERACTABLE_BEHAVIOR_SUBTYPE,
+  UNCONFIGURED_SOURCE_UUID,
+  UNCONFIGURED_SYSTEM_ID,
   buildInteractableBehaviorSchema,
   buildInteractableBehaviorSystem,
   readInteractableBehaviorSystem,
   isInteractableRegionBehavior,
+  isUnconfiguredInteractable,
   buildLinkedVisualFlags,
   readLinkedVisualRef
 } from '../../../src/canvas/regions/interactableRegionFlags.js';
+import { parseInteractableSourceUuid } from '../../../src/canvas/interactableResolution.js';
 
 /**
  * A fake `foundry.data.fields` namespace. Each field class records its own kind +
@@ -68,9 +72,19 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
   assert.equal(schema.interactableType.kind, 'StringField');
   assert.deepEqual(schema.interactableType.options.choices, ['tool', 'gatheringTask']);
   assert.equal(schema.interactableType.options.blank, false);
+  // Unconfigured-sentinel initials (issue 342) keep the three identity fields
+  // required/blank:false while letting the native empty-system instantiation
+  // produce a valid-but-unconfigured behaviour.
+  assert.equal(schema.interactableType.options.initial, 'tool');
 
   assert.equal(schema.sourceUuid.kind, 'StringField');
+  assert.equal(schema.sourceUuid.options.required, true);
+  assert.equal(schema.sourceUuid.options.blank, false);
+  assert.equal(schema.sourceUuid.options.initial, UNCONFIGURED_SOURCE_UUID);
   assert.equal(schema.systemId.kind, 'StringField');
+  assert.equal(schema.systemId.options.required, true);
+  assert.equal(schema.systemId.options.blank, false);
+  assert.equal(schema.systemId.options.initial, UNCONFIGURED_SYSTEM_ID);
 
   for (const nullableKey of ['toolId', 'taskId', 'environmentId']) {
     assert.equal(schema[nullableKey].kind, 'StringField', nullableKey);
@@ -324,6 +338,95 @@ test('isInteractableRegionBehavior is a type predicate tolerant of null', () => 
   assert.equal(isInteractableRegionBehavior(null), false);
   assert.equal(isInteractableRegionBehavior(undefined), false);
   assert.equal(isInteractableRegionBehavior({}), false);
+});
+
+test('UNCONFIGURED sentinels are the documented constants', () => {
+  assert.equal(UNCONFIGURED_SOURCE_UUID, 'Fabricate.unconfigured.tool');
+  assert.equal(UNCONFIGURED_SYSTEM_ID, 'unconfigured');
+});
+
+test('the unconfigured sourceUuid sentinel parses to null (non-resolvable)', () => {
+  // The sentinel is a 3-segment string, so no resolver can mistake it for a real
+  // tool/task — `_sourceExists` returns false for it and activation is denied.
+  assert.equal(parseInteractableSourceUuid(UNCONFIGURED_SOURCE_UUID), null);
+});
+
+test('isUnconfiguredInteractable truth table (tool & gatheringTask)', () => {
+  // Sentinel sourceUuid + systemId, no real id → unconfigured.
+  assert.equal(
+    isUnconfiguredInteractable({
+      interactableType: 'tool',
+      sourceUuid: UNCONFIGURED_SOURCE_UUID,
+      systemId: UNCONFIGURED_SYSTEM_ID
+    }),
+    true
+  );
+
+  // Empty sourceUuid → unconfigured.
+  assert.equal(
+    isUnconfiguredInteractable({ interactableType: 'tool', sourceUuid: '', systemId: 'sys', toolId: 't1' }),
+    true
+  );
+
+  // Sentinel systemId only → unconfigured.
+  assert.equal(
+    isUnconfiguredInteractable({
+      interactableType: 'tool',
+      sourceUuid: 'Fabricate.sys.tool.t1',
+      systemId: UNCONFIGURED_SYSTEM_ID,
+      toolId: 't1'
+    }),
+    true
+  );
+
+  // tool with a real source but MISSING toolId → unconfigured.
+  assert.equal(
+    isUnconfiguredInteractable({
+      interactableType: 'tool',
+      sourceUuid: 'Fabricate.sys.tool.t1',
+      systemId: 'sys',
+      toolId: null
+    }),
+    true
+  );
+
+  // gatheringTask MISSING taskId → unconfigured.
+  assert.equal(
+    isUnconfiguredInteractable({
+      interactableType: 'gatheringTask',
+      sourceUuid: 'Fabricate.sys.gatheringTask.k1',
+      systemId: 'sys',
+      taskId: ''
+    }),
+    true
+  );
+
+  // Unknown/missing type → unconfigured. Also a null system.
+  assert.equal(isUnconfiguredInteractable({ interactableType: 'mystery', sourceUuid: 'x', systemId: 's' }), true);
+  assert.equal(isUnconfiguredInteractable(null), true);
+  assert.equal(isUnconfiguredInteractable(undefined), true);
+
+  // A FULLY-configured tool → false.
+  assert.equal(
+    isUnconfiguredInteractable({
+      interactableType: 'tool',
+      sourceUuid: 'Fabricate.sys.tool.t1',
+      systemId: 'sys',
+      toolId: 't1'
+    }),
+    false
+  );
+
+  // A FULLY-configured gatheringTask → false.
+  assert.equal(
+    isUnconfiguredInteractable({
+      interactableType: 'gatheringTask',
+      sourceUuid: 'Fabricate.sys.gatheringTask.k1',
+      systemId: 'sys',
+      taskId: 'k1'
+    }),
+    false
+  );
 });
 
 test('linked-visual flags build/read round-trip', () => {

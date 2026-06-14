@@ -72,9 +72,13 @@ import {
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
 import {
   evaluateInteractableCreate,
-  neutralizeInheritedLinkedVisual
+  neutralizeInheritedLinkedVisual,
+  buildUnconfiguredSentinelPatch
 } from './canvas/regions/interactableCreationGuard.js';
-import { isInteractableRegionBehavior } from './canvas/regions/interactableRegionFlags.js';
+import {
+  isInteractableRegionBehavior,
+  readInteractableBehaviorSystem
+} from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
   assignInteractableConfigSheet,
@@ -1726,56 +1730,97 @@ Hooks.on('renderTokenHUD', (hud, element) => {
   installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken' });
 });
 
-// Crash-hardening guard for `fabricate.interactable` Region Behaviour creation
-// (issue 334). The native Region → Behaviors "+ Add Behavior → Fabricate
-// Interactable" path instantiates the DataModel with empty `system`, so the three
-// required no-`initial` fields (interactableType/sourceUuid/systemId) are
-// undefined → DataModelValidationError + a cascading `reading 'sheet'` TypeError.
-// Foundry's region duplication also clones an interactable behaviour's
-// `linkedVisual` verbatim, so the copy points at the original's marker. All
-// decisions are pure (`interactableCreationGuard.js`); this is the thin, no-throw
-// Foundry edge. NEVER interferes with any non-interactable behaviour subtype.
+// `fabricate.interactable` Region Behaviour creation edge (issues 334 + 342).
+//
+// The native Region → Behaviors "+ Add Behavior → Fabricate Interactable" path
+// instantiates the DataModel with an empty `system`. Since issue 342 the three
+// identity fields carry unconfigured-sentinel `initial`s, so this instantiates a
+// VALID-but-UNCONFIGURED behaviour (no DataModelValidationError). This edge now
+// ALLOWS that create (it reverses #334's cancellation): it defensively stamps the
+// sentinel (belt-and-suspenders if Foundry's empty-system instantiation does not
+// apply the nested initials) and shows the GM an INFO notice pointing at the
+// Interactable config panel. The behaviour is born inert (concealed, never grants
+// activation) until the GM configures its identity there.
+//
+// Foundry's region duplication still clones an interactable behaviour's
+// `linkedVisual` verbatim, so the copy would point at the original's marker; that
+// inherited link is neutralised here (the region-duplication footgun is KEPT). All
+// decisions are pure (`interactableCreationGuard.js` / `interactableRegionFlags.js`);
+// this is the thin, no-throw Foundry edge. NEVER interferes with any
+// non-interactable behaviour subtype.
 Hooks.on('preCreateRegionBehavior', (document) => {
   try {
-    const decision = evaluateInteractableCreate(document);
-    if (decision.allow === false) {
-      // No resolvable source — cancel the broken native create and guide the GM
-      // to the supported authoring surfaces.
-      const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Create.NoSource');
-      const message =
-        out && out !== 'FABRICATE.Canvas.Interactable.Create.NoSource'
-          ? out
-          : 'Add Fabricate interactables from the Fabricate scene control or the Interactable browser, not the native Region Behaviors tab.';
-      ui.notifications?.warn?.(message);
-      return false; // Foundry preCreate cancel.
+    // The decision seam is always allow-through now; reference it so the edge
+    // keeps a single decision point (and a future cancellation policy has a home).
+    evaluateInteractableCreate(document);
+    if (!isInteractableRegionBehavior(document)) {
+      return undefined;
     }
 
-    // Product rule: a freshly-created interactable never inherits another
-    // interactable's marker link (region-duplication case). Clear an inherited
-    // linkedVisual link via the preCreate source-mutation seam so the copy is
-    // born region-only. `updateSource` is the correct preCreate mutation seam in
-    // V13 — preCreate hooks mutate the document's source in place (dot-notation),
-    // they do not return create data.
-    //
-    // The pure neutralisation helper is intentionally type-agnostic, so gate it at
-    // this edge to `fabricate.interactable` behaviours only — a non-interactable
-    // behaviour that happens to carry `system.linkedVisual.uuid` must never have it
-    // cleared.
-    if (isInteractableRegionBehavior(document)) {
-      const neutralised = neutralizeInheritedLinkedVisual(document?.system);
-      if (neutralised.changed && typeof document?.updateSource === 'function') {
-        document.updateSource({
-          'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
-          'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
-        });
-      }
+    // Defensively stamp the unconfigured sentinel + notify, then neutralise an
+    // inherited marker link. Each step is a thin local orchestrator over a pure
+    // decision helper, so this edge stays simple and no-throw.
+    if (applyUnconfiguredSentinelStamp(document)) {
+      notifyUnconfiguredInteractableCreated();
     }
+    neutralizeInheritedInteractableLink(document);
     return undefined;
   } catch (_error) {
     // Defensive: a guard error must never block an unrelated behaviour creation.
     return undefined;
   }
 });
+
+/**
+ * Defensively stamp the unconfigured sentinel onto any identity field the
+ * empty-system instantiation left empty, so the persisted behaviour is always a
+ * recognisable UNCONFIGURED interactable. `updateSource` is the correct preCreate
+ * mutation seam in V13 (preCreate hooks mutate the document source in place; they
+ * do not return create data).
+ *
+ * @param {object} document  The preCreate `RegionBehavior` document.
+ * @returns {boolean}  `true` when an unconfigured sentinel patch was applied.
+ */
+function applyUnconfiguredSentinelStamp(document) {
+  const system = readInteractableBehaviorSystem(document) ?? document?.system ?? {};
+  const sentinel = buildUnconfiguredSentinelPatch(system);
+  if (!sentinel.changed || typeof document?.updateSource !== 'function') {
+    return false;
+  }
+  document.updateSource(sentinel.patch);
+  return true;
+}
+
+/**
+ * Guide the GM to the supported configuration surface. INFO (not an error):
+ * creation succeeded; the interactable just needs configuring.
+ */
+function notifyUnconfiguredInteractableCreated() {
+  const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Create.Unconfigured');
+  const message =
+    out && out !== 'FABRICATE.Canvas.Interactable.Create.Unconfigured'
+      ? out
+      : 'Created an unconfigured Fabricate interactable. Configure its source (type, system, tool/task) from the Interactable config panel; it stays inert until then.';
+  ui.notifications?.info?.(message);
+}
+
+/**
+ * Product rule: a freshly-created interactable never inherits another
+ * interactable's marker link (region-duplication case). Clear an inherited
+ * linkedVisual link so the copy is born region-only. The pure neutralisation
+ * helper is type-agnostic, so it is gated to interactable behaviours by the caller.
+ *
+ * @param {object} document  The preCreate `RegionBehavior` document.
+ */
+function neutralizeInheritedInteractableLink(document) {
+  const neutralised = neutralizeInheritedLinkedVisual(document?.system);
+  if (neutralised.changed && typeof document?.updateSource === 'function') {
+    document.updateSource({
+      'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
+      'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
+    });
+  }
+}
 
 /**
  * System-agnostic crafting button integration
