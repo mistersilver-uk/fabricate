@@ -13,7 +13,9 @@ import assert from 'node:assert/strict';
 import {
   regionEnvironmentIdsAtPoint,
   sceneRegionUuidsContainingToken,
-  tokenDocumentCenter
+  tokenDocumentCenter,
+  interactableBehaviorsContainingToken,
+  selectRepromptTokenDoc
 } from '../../src/canvas/regionHitTest.js';
 
 function region({ envId, contains }) {
@@ -63,11 +65,6 @@ test('prefers the document testPoint, falls back to the deprecated placeable, to
 });
 
 // --- interactableBehaviorsContainingToken (re-trigger) ----------------------
-
-import {
-  interactableBehaviorsContainingToken,
-  selectRepromptTokenDoc,
-} from '../../src/canvas/regionHitTest.js';
 
 function regionWithBehaviors({ contains, behaviors }) {
   return {
