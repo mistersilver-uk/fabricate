@@ -86,10 +86,12 @@ Use a Conventional Commits-compliant PR title. For `feat`, `fix`, and `perf`, us
 
 Validate with `npx commitlint` before pushing.
 
-Use this PR description template:
+Use this PR description template. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging the PR auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only when the change is partial and the issue should stay open.
 
 ```md
 ## Description
+
+Closes #<issue>
 
 ## Benefit(s)
 
