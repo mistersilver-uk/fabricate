@@ -804,13 +804,14 @@ class InteractableManager {
       // recoverable). The re-prompt reuses `_promptForTokenInsideRegion`, which
       // applies the authoritative in-region hit-test + ownership guard + prompt
       // ref-matching — a token that has since left the region is not re-prompted.
-      void AppClass.show('gathering', {
+      const gatheringOptions = {
         environmentId,
         taskId,
         actorId,
         interactableRef,
         onClose: () => this._repromptAfterInteractableClose({ ref: grant.ref, actorId }),
-      });
+      };
+      Promise.resolve(AppClass.show('gathering', gatheringOptions)).catch(() => {});
     }
   }
 

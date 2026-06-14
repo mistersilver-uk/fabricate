@@ -64,7 +64,10 @@ test('prefers the document testPoint, falls back to the deprecated placeable, to
 
 // --- interactableBehaviorsContainingToken (re-trigger) ----------------------
 
-import { interactableBehaviorsContainingToken } from '../../src/canvas/regionHitTest.js';
+import {
+  interactableBehaviorsContainingToken,
+  selectRepromptTokenDoc,
+} from '../../src/canvas/regionHitTest.js';
 
 function regionWithBehaviors({ contains, behaviors }) {
   return {
@@ -108,8 +111,6 @@ test('interactableBehaviorsContainingToken returns [] when the token point canno
 });
 
 // --- selectRepromptTokenDoc (issue 332) -------------------------------------
-
-import { selectRepromptTokenDoc } from '../../src/canvas/regionHitTest.js';
 
 test('selectRepromptTokenDoc returns the first token doc whose actor matches', () => {
   const a = { actorId: 'actor-9' };
