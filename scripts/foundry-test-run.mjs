@@ -1334,14 +1334,66 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   });
 }
 
-async function assertNoScreenshotOverlays(page) {
+async function assertNoScreenshotOverlays(page, options = {}) {
   await dismissFoundryNotifications(page);
-  const overlays = page.locator(
-    '.dialog.application, .window-app.dialog, .application.dialog, .app.dialog, #notifications .notification'
-  );
-  const count = await overlays.count();
+  // A DialogV2 close() is an async fade-out: Foundry keeps the element in the DOM
+  // with a `minimizing` (and, on some builds, `minimized`) class while it animates
+  // away. Such a dialog is already dismissed and on its way out, so wait briefly
+  // for it to leave rather than treating the closing animation as a blocking
+  // overlay (this was a flaky false positive after destructive-confirm dialogs).
+  const OVERLAY_SELECTOR =
+    '.dialog.application, .window-app.dialog, .application.dialog, .app.dialog, #notifications .notification';
+  const blockingOverlayCount = async () =>
+    page.evaluate((selector) => {
+      return Array.from(document.querySelectorAll(selector)).filter(
+        (el) => !el.classList.contains('minimizing') && !el.classList.contains('minimized')
+      ).length;
+    }, OVERLAY_SELECTOR);
+
+  let count = await blockingOverlayCount();
   if (count > 0) {
-    throw new Error(`Screenshot target is covered by ${count} modal or notification overlay(s).`);
+    // Give any in-flight close animation a moment, then re-check, before failing.
+    await page.waitForTimeout(750);
+    await dismissFoundryNotifications(page);
+    count = await blockingOverlayCount();
+  }
+  if (count > 0) {
+    const diag = await page
+      .evaluate((selector) => {
+        return Array.from(document.querySelectorAll(selector))
+          .filter((el) => !el.classList.contains('minimizing') && !el.classList.contains('minimized'))
+          .map((el) => `${el.tagName}#${el.id}.${el.className} :: ${(el.textContent || '').trim().slice(0, 120)}`)
+          .join(' || ');
+      }, OVERLAY_SELECTOR)
+      .catch(() => '');
+    throw new Error(`Screenshot target is covered by ${count} modal or notification overlay(s). [${diag}]`);
+  }
+  // Opt-in bleed-through guard: when the caller passes the set of Fabricate window
+  // ids it EXPECTS to be open for this capture, fail on any OTHER visible
+  // Fabricate-owned window. An ApplicationV2 close() is an async fade-out, so a
+  // window closed without awaiting its promise can linger behind the next capture
+  // (the issue-335 config window bled through behind the Manage panel). Default:
+  // no stray check (back-compat with every existing call site).
+  const allowedIds = options?.allowFabricateWindowIds;
+  if (Array.isArray(allowedIds)) {
+    const allowSet = new Set(allowedIds);
+    const visibleFabricateWindows = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('[id^="fabricate-"]'))
+        .filter((el) => {
+          if (!el.classList.contains('application') && !el.classList.contains('window-app')) return false;
+          const style = window.getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
+            return false;
+          }
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
+        .map((el) => el.id);
+    });
+    const stray = visibleFabricateWindows.filter((id) => !allowSet.has(id));
+    if (stray.length > 0) {
+      throw new Error(`Screenshot target has stray Fabricate window(s) bleeding through: ${stray.join(', ')}.`);
+    }
   }
 }
 
@@ -1385,7 +1437,15 @@ async function main() {
 
   // Known non-Fabricate error patterns to ignore (keep narrow — real 404s should be caught)
   const ignoredErrorPatterns = [
-    /favicon/i
+    /favicon/i,
+    // Headless canvas-draw race: activating/redrawing a scene that gains new
+    // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
+    // fixtures) can momentarily read a canvas layer constant before the layer is
+    // initialised in the offscreen WebGL context, surfacing as
+    // "Cannot read properties of undefined (reading 'OBJECTS')". It is a Foundry
+    // canvas-rendering timing artifact of the headless harness, not a Fabricate
+    // product error — the scene draws correctly and the captures are unaffected.
+    /reading 'OBJECTS'/
   ];
 
   attachConsoleCapture(page, ignoredErrorPatterns);
@@ -1556,7 +1616,13 @@ async function main() {
         }
 
         const allSystems = csm.getSystems();
-        const staleSystems = allSystems.filter(s => s.name === 'Arcane Forge');
+        // The smoke creates "Arcane Forge" and RENAMES it to "The Herbalist's
+        // Compendium" mid-run (Phase D0). A run that crashes after the rename but
+        // before cleanup leaves an orphan under the renamed name, so purge BOTH
+        // names — otherwise duplicate same-named systems accumulate and the promote
+        // source picker can default to a tool-less duplicate.
+        const staleSystemNames = new Set(['Arcane Forge', "The Herbalist's Compendium"]);
+        const staleSystems = allSystems.filter(s => staleSystemNames.has(s.name));
         for (const sys of staleSystems) {
           console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
           try { await environmentStore?.cleanupByCraftingSystem?.(sys.id); } catch { /* ok */ }
@@ -2787,9 +2853,13 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'interactable-config-unlinked');
 
-          await page.evaluate(() => {
+          // ApplicationV2 close() is an async fade-out: AWAIT the actual close
+          // promise (not a fire-and-forget call) so the config window is fully
+          // gone before the Manage panel opens — otherwise it bleeds through
+          // behind the next capture.
+          await page.evaluate(async () => {
             const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
-            return app?.close?.();
+            if (app?.close) await app.close();
           }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
 
           results.steps.push({ step: 'interactable-config', passed: true });
@@ -2799,46 +2869,216 @@ async function main() {
         }
 
         // ── Manage Interactables panel (issue 335) ─────────────────────────────
-        // Open the GM-only Manage Interactables scene panel and capture: the
-        // populated list (the seeded azureGrove interactable is on the active
-        // scene), its scroll containment, and the expanded Promote affordance +
-        // source picker. Guarded so a failure records a failed step without
-        // aborting the manager phase or later phases.
+        // Open the GM-only Manage Interactables scene panel and capture: a
+        // POPULATED list spanning multiple marker-status variants (region-only
+        // gathering task + a real Tile marker + a missing marker) AND a Tool-type
+        // row, the dedicated EMPTY state (a scene with zero interactables), and the
+        // expanded Promote affordance with a POPULATED Source dropdown + visible
+        // action buttons. The config window from the previous block is swept
+        // (awaited close) FIRST so nothing bleeds through behind these captures.
+        // Guarded so a failure records a failed step without aborting later phases.
         try {
+          // Sweep any window left over from the config block before opening +
+          // capturing, so a still-fading ApplicationV2 cannot bleed through.
+          await closeOpenApplications(page);
+
           const interactableRef = craftingSetup.interactable;
           // Ensure the seeded interactable's scene is the active/viewed scene so the
-          // panel's scene-scan finds it in the list.
+          // panel's scene-scan finds it in the list, and wait for the canvas to
+          // actually switch to it (activation → canvas redraw is async).
+          if (interactableRef?.sceneId) {
+            await page.evaluate(async (sceneId) => {
+              const scene = game.scenes.get(sceneId);
+              if (scene && !scene.active) await scene.activate();
+            }, interactableRef.sceneId).catch(() => {});
+            await page.waitForFunction(
+              (sceneId) => globalThis.canvas?.scene?.id === sceneId,
+              interactableRef.sceneId,
+              { timeout: 15_000 }
+            ).catch(() => {});
+          }
+
+          // Seed extra interactables on the active scene so the captured list shows
+          // MULTIPLE marker-status variants + a Tool-type row (not just the lone
+          // region-only gathering task). A REAL Tile is created and linked by uuid
+          // so that row resolves to a present "Tile" marker; another row points at
+          // a non-existent Tile uuid so it renders the danger "missing" badge.
+          await page.evaluate(async ({ sceneId, systemId, toolId, taskId }) => {
+            const scene = game.scenes.get(sceneId);
+            if (!scene) return;
+
+            // A real Tile marker (Foundry core raster icon) the Tile-status row links to.
+            const [tile] = await scene.createEmbeddedDocuments('Tile', [{
+              texture: { src: 'icons/tools/smithing/anvil.webp' },
+              x: 1600, y: 1000, width: 200, height: 200, hidden: false
+            }]);
+
+            await scene.createEmbeddedDocuments('Region', [
+              {
+                name: 'Smithing Anvil (Tool)',
+                shapes: [{ type: 'rectangle', x: 1600, y: 1000, width: 200, height: 200 }],
+                behaviors: [{
+                  type: 'fabricate.interactable',
+                  system: {
+                    interactableType: 'tool',
+                    sourceUuid: `Fabricate.${systemId}.tool.${toolId}`,
+                    systemId,
+                    toolId,
+                    name: 'Smithing Anvil',
+                    linkedVisual: { mode: 'marker', uuid: tile.uuid, documentName: 'Tile', missingPolicy: 'warn' }
+                  }
+                }]
+              },
+              {
+                name: 'Lost Forage Marker',
+                shapes: [{ type: 'rectangle', x: 2000, y: 1000, width: 200, height: 200 }],
+                behaviors: [{
+                  type: 'fabricate.interactable',
+                  system: {
+                    interactableType: 'gatheringTask',
+                    sourceUuid: `Fabricate.${systemId}.gatheringTask.${taskId}`,
+                    systemId,
+                    taskId,
+                    name: 'Lost Forage',
+                    // A configured marker whose Tile no longer exists ⇒ "missing" badge.
+                    linkedVisual: { mode: 'marker', uuid: `Scene.${sceneId}.Tile.fabricateMissingTile`, documentName: 'Tile', missingPolicy: 'warn' }
+                  }
+                }]
+              }
+            ]);
+          }, {
+            sceneId: interactableRef.sceneId,
+            systemId: craftingSetup.systemId,
+            toolId: 'smoke-herbalist-sickle',
+            taskId: 'smoke-forage-library'
+          }).catch(() => {});
+
+          await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
+
+          const managerRoot = page.locator('.fabricate-interactables-manager').first();
+          await managerRoot.waitFor({ state: 'visible', timeout: 10_000 });
+          // Wait for the seeded rows (expect the original + the two seeded above).
+          await page.locator('.fabricate-interactables-manager .fab-im-row')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+          const rowCount = await page.locator('.fabricate-interactables-manager .fab-im-row').count();
+          if (rowCount < 3) {
+            throw new Error(`Manage list shows only ${rowCount} row(s); expected at least 3 marker-status variants.`);
+          }
+          // The danger "missing" badge must be present so the .is-missing branch is exercised.
+          if (await page.locator('.fabricate-interactables-manager .fab-im-chip-marker.is-missing').count() === 0) {
+            throw new Error('Manage list is missing the .is-missing danger badge variant.');
+          }
+          await assertNoScreenshotOverlays(page, { allowFabricateWindowIds: ['fabricate-interactables-manager'] });
+          await screenshot(page, 'interactables-manager-list');
+
+          // Expand the Promote affordance and capture the source picker with a
+          // POPULATED Source dropdown (proving the Tool enumeration fix) and the
+          // Promote/Cancel action buttons in frame. Select Tool, then assert the
+          // Source <select> has at least one real (non-placeholder) option.
+          const promoteToggle = page.locator('.fabricate-interactables-manager .fab-im-promote-toggle').first();
+          await promoteToggle.waitFor({ state: 'visible', timeout: 10_000 });
+          await promoteToggle.click();
+          const promotePanel = page.locator('.fabricate-interactables-manager .fab-im-promote').first();
+          await promotePanel.waitFor({ state: 'visible', timeout: 10_000 });
+          // Select the crafting system that actually owns the seeded Tool. The panel
+          // defaults to the FIRST system, and a world can hold multiple systems
+          // (even same-named ones), so pin the system explicitly to make the Tool
+          // enumeration deterministic regardless of system ordering. The system
+          // <select> is the one whose options include the seeded systemId.
+          await page.evaluate((systemId) => {
+            const selects = Array.from(document.querySelectorAll('.fabricate-interactables-manager .fab-im-promote select'));
+            const sysSelect = selects.find((sel) => Array.from(sel.options).some((o) => o.value === systemId));
+            if (sysSelect && sysSelect.value !== systemId) {
+              sysSelect.value = systemId;
+              sysSelect.dispatchEvent(new Event('change', { bubbles: true }));
+              sysSelect.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }, craftingSetup.systemId);
+          // Choose the Tool source type so the Source dropdown lists the system's tools.
+          await page.locator('.fabricate-interactables-manager input[name="fab-im-source-type"][value="tool"]').first()
+            .check({ force: true });
+          await page.waitForTimeout(150); // let the $derived source list recompute
+          // Assert the Source <select> now carries the seeded Tool (the "No sources"
+          // placeholder is the failure mode the FIX 1 enumeration repair prevents).
+          const sourceOptionCount = await page.evaluate(() => {
+            const selects = Array.from(document.querySelectorAll('.fabricate-interactables-manager .fab-im-promote select'));
+            for (const sel of selects) {
+              const opts = Array.from(sel.options).map((o) => o.textContent.trim());
+              if (opts.some((t) => /Herbalist Sickle/i.test(t))) {
+                return opts.filter((t) => t && !/^No sources/i.test(t)).length;
+              }
+            }
+            return 0;
+          });
+          if (sourceOptionCount < 1) {
+            const diag = await page.evaluate(() => {
+              const out = { selects: [], liveSystems: [] };
+              try {
+                out.liveSystems = game.fabricate.getCraftingSystemManager().getSystems()
+                  .map((s) => ({ id: s.id, name: s.name, toolCount: (s.tools || []).length }));
+              } catch (e) { out.liveSystemsErr = e.message; }
+              document.querySelectorAll('.fabricate-interactables-manager .fab-im-promote select').forEach((sel, i) => {
+                out.selects.push({ i, value: sel.value, opts: Array.from(sel.options).map((o) => `${o.value}=${o.textContent.trim()}`) });
+              });
+              return out;
+            });
+            process.stderr.write('PROMOTE DIAG: ' + JSON.stringify(diag) + '\n');
+            throw new Error('Promote Source dropdown is empty for Tool — the No-sources regression is not fixed.');
+          }
+          // Ensure the Promote/Cancel actions are in frame (not clipped below the fold).
+          await page.locator('.fabricate-interactables-manager .fab-im-promote-confirm').first()
+            .scrollIntoViewIfNeeded();
+          await page.locator('.fabricate-interactables-manager .fab-im-promote-actions').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertNoScreenshotOverlays(page, { allowFabricateWindowIds: ['fabricate-interactables-manager'] });
+          await screenshot(page, 'interactables-manager-promote');
+
+          // The Manage panel is an ApplicationV2 SINGLETON: its instance lives in
+          // foundry.applications.instances (NOT ui.windows), and a bare show() only
+          // re-focuses an open window without rescanning a newly-activated scene. So
+          // FULLY close it (closeOpenApplications sweeps Fabricate AppV2 windows)
+          // before the empty-scene capture, forcing show() to build a fresh
+          // instance that scans the empty scene.
+          await closeOpenApplications(page);
+
+          // Empty-state capture: a scene with ZERO interactables exercises the
+          // dedicated .fab-im-empty branch. Create a throwaway scene, activate it,
+          // re-open the panel, and capture the empty list. Tracked for cleanup.
+          const emptySceneId = await page.evaluate(async () => {
+            const scene = await Scene.create({
+              name: 'Fabricate Empty Interactables Scene',
+              active: false,
+              background: { src: 'icons/environment/settlement/wizard-tower.webp' }
+            });
+            await scene.activate();
+            return scene.id;
+          });
+          if (emptySceneId) cleanup.sceneIds.push(emptySceneId);
+          // The panel scans `canvas.scene`; wait until the canvas has actually
+          // switched to the empty scene before opening (activation → canvas redraw
+          // is async), otherwise the panel scans the prior populated scene and the
+          // empty branch never renders.
+          await page.waitForFunction(
+            (sceneId) => globalThis.canvas?.scene?.id === sceneId,
+            emptySceneId,
+            { timeout: 15_000 }
+          );
+          await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
+          await page.locator('.fabricate-interactables-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await page.locator('.fabricate-interactables-manager .fab-im-empty').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+          await assertNoScreenshotOverlays(page, { allowFabricateWindowIds: ['fabricate-interactables-manager'] });
+          await screenshot(page, 'interactables-manager-empty');
+
+          await closeOpenApplications(page);
+
+          // Re-activate the original scene so later phases see the expected state.
           if (interactableRef?.sceneId) {
             await page.evaluate(async (sceneId) => {
               const scene = game.scenes.get(sceneId);
               if (scene && !scene.active) await scene.activate();
             }, interactableRef.sceneId).catch(() => {});
           }
-
-          await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
-
-          const managerRoot = page.locator('.fabricate-interactables-manager').first();
-          await managerRoot.waitFor({ state: 'visible', timeout: 10_000 });
-          // Wait for at least one list row (the seeded interactable).
-          await page.locator('.fabricate-interactables-manager .fab-im-row')
-            .first().waitFor({ state: 'visible', timeout: 10_000 });
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'interactables-manager-list');
-
-          // Expand the Promote affordance and capture the source picker
-          // (region + system + source-type + source + marker controls).
-          const promoteToggle = page.locator('.fabricate-interactables-manager .fab-im-promote-toggle').first();
-          await promoteToggle.waitFor({ state: 'visible', timeout: 10_000 });
-          await promoteToggle.click();
-          await page.locator('.fabricate-interactables-manager .fab-im-promote')
-            .first().waitFor({ state: 'visible', timeout: 10_000 });
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'interactables-manager-promote');
-
-          await page.evaluate(() => {
-            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactables-manager');
-            return app?.close?.();
-          }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
 
           results.steps.push({ step: 'interactables-manager', passed: true });
         } catch (err) {
