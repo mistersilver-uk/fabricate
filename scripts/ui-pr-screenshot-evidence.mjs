@@ -113,14 +113,37 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
     ],
   },
+  // The Manage Interactables panel publishes THREE distinct frames (populated
+  // list, expanded promote form, dedicated empty state). `collect` emits ONE
+  // file per recipe id (it takes the first matching smoke label), so each frame
+  // needs its own recipe — a single recipe with three smoke labels would only
+  // ever publish the first (list) frame and silently drop promote + empty. The
+  // three share the same `matches` so any change to the panel surface republishes
+  // all three together.
   {
-    id: 'interactables-manager',
-    label: 'Canvas Manage Interactables panel',
-    smokeLabels: [
-      'interactables-manager-list',
-      'interactables-manager-promote',
-      'interactables-manager-empty',
+    id: 'interactables-manager-list',
+    label: 'Canvas Manage Interactables panel — populated list',
+    smokeLabels: ['interactables-manager-list'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/interactables\/InteractablesManagerRoot\.svelte$/,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+      /^src\/ui\/interactableSourceLibrary\.js$/,
     ],
+  },
+  {
+    id: 'interactables-manager-promote',
+    label: 'Canvas Manage Interactables panel — promote region flow',
+    smokeLabels: ['interactables-manager-promote'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/interactables\/InteractablesManagerRoot\.svelte$/,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+      /^src\/ui\/interactableSourceLibrary\.js$/,
+    ],
+  },
+  {
+    id: 'interactables-manager-empty',
+    label: 'Canvas Manage Interactables panel — empty state',
+    smokeLabels: ['interactables-manager-empty'],
     matches: [
       /^src\/ui\/svelte\/apps\/interactables\/InteractablesManagerRoot\.svelte$/,
       /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
