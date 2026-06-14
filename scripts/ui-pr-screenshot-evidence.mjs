@@ -114,6 +114,15 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    id: 'interactables-manager',
+    label: 'Canvas Manage Interactables panel',
+    smokeLabels: ['interactables-manager-list', 'interactables-manager-promote'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/interactables\/InteractablesManagerRoot\.svelte$/,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+    ],
+  },
+  {
     id: 'theme-or-global-ui',
     label: 'Global UI styling or theme',
     smokeLabels: [
