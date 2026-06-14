@@ -57,13 +57,59 @@ describe('Fabricate app wiring for the gathering tab', () => {
 describe('GatheringView 3-column layout and states', () => {
   it('renders a 3-column grid with the center column larger', () => {
     assert.ok(
-      viewSource.includes('grid-template-columns: minmax(280px, 1fr) minmax(0, 1.5fr) minmax(280px, 1fr)'),
-      'grid should use the planned column template'
+      viewSource.includes('grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr)'),
+      'grid should use the planned column template with a non-zero centre-column minimum'
     );
     assert.ok(viewSource.includes('gap: var(--fab-space-4)'), 'grid should use the base spacing token gap');
     assert.ok(viewSource.includes('gathering-view-column-left'), 'left column present');
     assert.ok(viewSource.includes('gathering-view-column-center'), 'center column present');
     assert.ok(viewSource.includes('gathering-view-column-right'), 'right column present');
+  });
+
+  it('gives the centre column a non-zero minimum so it cannot collapse ahead of the side columns', () => {
+    assert.equal(
+      viewSource.includes('minmax(0, 1.5fr)'),
+      false,
+      'the centre column must not use a 0px minimum (issue 330: it collapsed before the side columns yielded)'
+    );
+    assert.ok(
+      viewSource.includes('minmax(280px, 1.5fr)'),
+      'the centre column minimum should match the 280px floor of the side columns so all three scale together'
+    );
+  });
+
+  it('reflows the columns into a single vertical stack below the narrow-width breakpoint', () => {
+    // Container query, not a viewport media query: the app width (not the
+    // viewport) is what matters because the window is resizable/dockable.
+    assert.ok(
+      viewSource.includes('container-type: inline-size;'),
+      'the grid should establish a size container so the columns reflow against the app width'
+    );
+    assert.ok(
+      viewSource.includes('container-name: fabricate-gathering;'),
+      'the grid container should be named for the gathering container query'
+    );
+    assert.ok(
+      viewSource.includes('@container fabricate-gathering (max-width: 900px)'),
+      'a container query should drive the narrow-width stacking breakpoint'
+    );
+    const narrowQuery = viewSource.slice(
+      viewSource.indexOf('@container fabricate-gathering (max-width: 900px)')
+    );
+    assert.ok(
+      narrowQuery.includes('grid-template-columns: 1fr;'),
+      'below the breakpoint the grid should collapse to a single column (stacked layout)'
+    );
+  });
+
+  it('enforces a minimum window size on the Fabricate app so the columns cannot be clipped', () => {
+    assert.ok(appSource.includes('minWidth: 1024'), 'the app should enforce a minimum window width derived from the column minimums');
+    assert.ok(appSource.includes('minHeight: 640'), 'the app should enforce a minimum window height');
+    assert.ok(appSource.includes('_onResize(event, position)'), 'the app should clamp resize as a defensive backstop for the min size');
+    assert.ok(
+      appSource.includes('Math.max(result.width, minWidth)') && appSource.includes('Math.max(result.height, minHeight)'),
+      'the resize clamp should floor both width and height at the configured minimum'
+    );
   });
 
   it('localizes the loading, error, and empty states', () => {
