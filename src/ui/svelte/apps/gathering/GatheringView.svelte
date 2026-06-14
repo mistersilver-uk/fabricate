@@ -317,6 +317,7 @@
     <p>{localize('FABRICATE.App.Gathering.Environments.Empty')}</p>
   </div>
 {:else}
+  <div class="gathering-view-container">
   <div class="gathering-view-grid" data-gathering-state="populated">
     <div class="gathering-view-column gathering-view-column-left">
       <GatheringEnvironmentList {environments} {selectedId} {onSelect} />
@@ -355,16 +356,24 @@
       {/if}
     </section>
   </div>
+  </div>
 {/if}
 
 <style>
-  .gathering-view-grid {
-    /* The grid is its own size container so the columns reflow against the
-       Fabricate window width (not the viewport): the app can be resized and
-       docked at any width, so a viewport media query would be wrong here. The
-       manager view uses the same `container-type: inline-size` pattern. */
+  /* The grid's wrapper is the size container so the columns reflow against the
+     Fabricate window width (not the viewport): the app can be resized and docked
+     at any width, so a viewport media query would be wrong here. A container
+     cannot query its own size, so the container lives on the wrapper and the
+     grid (a descendant) responds to it — the same parent-container pattern the
+     manager view uses with `container-type: inline-size`. */
+  .gathering-view-container {
     container-type: inline-size;
     container-name: fabricate-gathering;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .gathering-view-grid {
     display: grid;
     /* The centre column carries a non-zero minimum (matching the side columns)
        so it no longer collapses to 0 ahead of the 280px-floored side columns:

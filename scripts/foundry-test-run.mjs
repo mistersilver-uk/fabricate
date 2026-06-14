@@ -3223,13 +3223,23 @@ async function main() {
           await envPrevPage.click();
           await page.waitForTimeout(150);
         }
-        // Set the app element directly to a width below the 900px grid breakpoint
-        // (the grid sits inside the content area minus the ~84px nav rail). The
-        // gathering grid's @container query then collapses it to a single column.
+        // Drive the window below the gathering grid's stacking breakpoint. This
+        // simulates the small-screen case from #330 where Foundry constrains the
+        // window to a viewport narrower than the CSS min-width floor: the inline
+        // `min-width: 0` overrides the floor (.fabricate-app min-width: 1024px)
+        // for this capture so the app can shrink past the 900px grid breakpoint,
+        // at which point the grid's @container query collapses it to one column.
         const stackedSize = await page.evaluate(() => {
           const app = document.querySelector('#fabricate-app');
           if (!app) return null;
-          Object.assign(app.style, { width: '820px', height: '760px', left: '20px', top: '20px' });
+          Object.assign(app.style, {
+            minWidth: '0px',
+            minHeight: '0px',
+            width: '780px',
+            height: '760px',
+            left: '20px',
+            top: '20px'
+          });
           return { width: app.getBoundingClientRect().width, height: app.getBoundingClientRect().height };
         });
         // Let the resize + container-query reflow settle before capturing so the

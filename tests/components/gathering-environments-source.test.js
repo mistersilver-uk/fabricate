@@ -15,6 +15,7 @@ const appSource = read('../../src/ui/SvelteFabricateApp.svelte.js');
 const viewSource = read('../../src/ui/svelte/apps/gathering/GatheringView.svelte');
 const listSource = read('../../src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
 const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
+const cssSource = read('../../styles/fabricate.css');
 
 describe('Fabricate app wiring for the gathering tab', () => {
   it('exposes listGatheringForActor and passes services down', () => {
@@ -103,13 +104,25 @@ describe('GatheringView 3-column layout and states', () => {
   });
 
   it('enforces a minimum window size on the Fabricate app so the columns cannot be clipped', () => {
-    assert.ok(appSource.includes('minWidth: 1024'), 'the app should enforce a minimum window width derived from the column minimums');
-    assert.ok(appSource.includes('minHeight: 640'), 'the app should enforce a minimum window height');
+    // ApplicationV2 V13 has no `position.minWidth`/`minHeight` (the position
+    // object is non-extensible), so the floor is enforced via a CSS min-size on
+    // the app root plus an _onResize clamp for programmatic setPosition.
+    assert.equal(
+      appSource.includes('minWidth: 1024'),
+      false,
+      'the app must not put minWidth in the non-extensible position option (V13 throws "object is not extensible")'
+    );
+    assert.ok(appSource.includes('MIN_WINDOW_WIDTH = 1024'), 'the app should define the minimum window width derived from the column minimums');
+    assert.ok(appSource.includes('MIN_WINDOW_HEIGHT = 640'), 'the app should define the minimum window height');
     assert.ok(appSource.includes('_onResize(event, position)'), 'the app should clamp resize as a defensive backstop for the min size');
     assert.ok(
-      appSource.includes('Math.max(result.width, minWidth)') && appSource.includes('Math.max(result.height, minHeight)'),
+      appSource.includes('Math.max(result.width, SvelteFabricateApp.MIN_WINDOW_WIDTH)')
+        && appSource.includes('Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT)'),
       'the resize clamp should floor both width and height at the configured minimum'
     );
+    // The drag-resize floor lives on the app root in the global stylesheet.
+    assert.ok(cssSource.includes('min-width: 1024px;'), 'the app root CSS should floor the window width');
+    assert.ok(cssSource.includes('min-height: 640px;'), 'the app root CSS should floor the window height');
   });
 
   it('localizes the loading, error, and empty states', () => {

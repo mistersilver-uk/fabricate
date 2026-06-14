@@ -79,25 +79,28 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     },
     position: {
       width: 1280,
-      height: 860,
-      // Enforce a minimum window size so the resizable window can never shrink
-      // below the point where the gathering view's three columns (each floored
-      // at 280px) get clipped. Derived from the column minimums: the ~84px nav
-      // rail + 3 x 280px columns + 2 gutters + content padding + window chrome
-      // round up to a 1024x640 floor that keeps all three columns usable before
-      // the narrow-width stacking breakpoint takes over. `_onResize` re-clamps in
-      // case a runtime/theme drops `position.minWidth`/`minHeight` support.
-      minWidth: 1024,
-      minHeight: 640
+      height: 860
     }
   };
 
+  // Minimum window size enforced on the resizable Fabricate window so it can
+  // never shrink below the point where the gathering view's three columns (each
+  // floored at 280px) get clipped. Derived from the column minimums: the ~84px
+  // nav rail + 3 x 280px columns + 2 gutters + content padding + window chrome
+  // round up to a 1024x640 floor that keeps all three columns usable before the
+  // narrow-width stacking breakpoint takes over. ApplicationV2 V13 does NOT
+  // accept `minWidth`/`minHeight` inside the (non-extensible) `position` option,
+  // so the floor is enforced two ways: a `min-width`/`min-height` on the app root
+  // (.fabricate-app, styles/fabricate.css) for drag-resize, and the `_onResize`
+  // clamp below for programmatic `setPosition` calls.
+  static MIN_WINDOW_WIDTH = 1024;
+  static MIN_WINDOW_HEIGHT = 640;
+
   /**
-   * Clamp the window to the configured minimum size. ApplicationV2 honors
-   * `position.minWidth`/`minHeight` during a drag-resize on V13, but this is a
-   * defensive backstop: if a runtime drops that support (or a programmatic
-   * `setPosition` passes a smaller size) the window still can't shrink below the
-   * size where the gathering columns clip. Mirrors the DEFAULT_OPTIONS floor.
+   * Clamp the window to the configured minimum size. This backstops the CSS
+   * `min-width`/`min-height` floor on the app root: a programmatic `setPosition`
+   * (or a runtime that bypasses the CSS floor during a drag-resize) still can't
+   * shrink the window below the size where the gathering columns clip.
    *
    * @param {PointerEvent} event
    * @param {object} position The proposed `{width, height, ...}` position.
@@ -105,11 +108,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    */
   _onResize(event, position) {
     const result = super._onResize?.(event, position) ?? position;
-    const minWidth = this.options?.position?.minWidth ?? 1024;
-    const minHeight = this.options?.position?.minHeight ?? 640;
     if (result && typeof result === 'object') {
-      if (typeof result.width === 'number') result.width = Math.max(result.width, minWidth);
-      if (typeof result.height === 'number') result.height = Math.max(result.height, minHeight);
+      if (typeof result.width === 'number') {
+        result.width = Math.max(result.width, SvelteFabricateApp.MIN_WINDOW_WIDTH);
+      }
+      if (typeof result.height === 'number') {
+        result.height = Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT);
+      }
     }
     return result;
   }
