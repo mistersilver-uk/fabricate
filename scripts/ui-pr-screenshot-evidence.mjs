@@ -99,6 +99,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/gathering\//],
   },
   {
+    id: 'player-gathering-stacked',
+    label: 'Player gathering — narrow window stacked columns (#330)',
+    smokeLabels: ['player-gathering-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/gathering\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
+  {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],

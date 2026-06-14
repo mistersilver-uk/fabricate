@@ -2922,6 +2922,37 @@ async function main() {
           await screenshot(page, 'player-gathering-realm-locked');
         }
 
+        // Narrow-window stacked evidence (#330): shrink the Fabricate window below
+        // the gathering grid's stacking breakpoint so the three columns reflow into
+        // a single vertical stack instead of clipping the side columns. Page back to
+        // the first environments page so a non-locked environment is selected and the
+        // centre detail renders, then size the app narrow and capture the stacked
+        // layout under its own distinct recipe label (player-gathering-stacked) so it
+        // never collides with the normal-width frame.
+        const envPrevPage = appShell.locator('.gathering-env-list [data-pagination-prev]');
+        for (let i = 0; i < 6 && (await envPrevPage.count()) > 0; i++) {
+          if (await envPrevPage.isDisabled()) break;
+          await envPrevPage.click();
+          await page.waitForTimeout(150);
+        }
+        // Set the app element directly to a width below the 900px grid breakpoint
+        // (the grid sits inside the content area minus the ~84px nav rail). The
+        // gathering grid's @container query then collapses it to a single column.
+        const stackedSize = await page.evaluate(() => {
+          const app = document.querySelector('#fabricate-app');
+          if (!app) return null;
+          Object.assign(app.style, { width: '820px', height: '760px', left: '20px', top: '20px' });
+          return { width: app.getBoundingClientRect().width, height: app.getBoundingClientRect().height };
+        });
+        // Let the resize + container-query reflow settle before capturing so the
+        // frame shows the fully stacked single-column layout, not a mid-transition.
+        await page.waitForTimeout(600);
+        await appShell.locator('[data-gathering-state="populated"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-stacked');
+        results.steps.push({ step: 'player-gathering-stacked', passed: true, size: stackedSize });
+
         await closeOpenApplications(page);
         results.steps.push({ step: 'open-fabricate-app-shell', passed: true });
         process.stdout.write('  Shared Fabricate app shell verified and screenshotted.\n');
