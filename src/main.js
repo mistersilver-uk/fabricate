@@ -73,6 +73,7 @@ import {
   evaluateInteractableCreate,
   neutralizeInheritedLinkedVisual
 } from './canvas/regions/interactableCreationGuard.js';
+import { isInteractableRegionBehavior } from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
   assignInteractableConfigSheet,
@@ -1749,12 +1750,19 @@ Hooks.on('preCreateRegionBehavior', (document) => {
     // born region-only. `updateSource` is the correct preCreate mutation seam in
     // V13 — preCreate hooks mutate the document's source in place (dot-notation),
     // they do not return create data.
-    const neutralised = neutralizeInheritedLinkedVisual(document?.system);
-    if (neutralised.changed && typeof document?.updateSource === 'function') {
-      document.updateSource({
-        'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
-        'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
-      });
+    //
+    // The pure neutralisation helper is intentionally type-agnostic, so gate it at
+    // this edge to `fabricate.interactable` behaviours only — a non-interactable
+    // behaviour that happens to carry `system.linkedVisual.uuid` must never have it
+    // cleared.
+    if (isInteractableRegionBehavior(document)) {
+      const neutralised = neutralizeInheritedLinkedVisual(document?.system);
+      if (neutralised.changed && typeof document?.updateSource === 'function') {
+        document.updateSource({
+          'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
+          'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
+        });
+      }
     }
     return undefined;
   } catch (_error) {

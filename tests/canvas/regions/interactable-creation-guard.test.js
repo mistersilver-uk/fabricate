@@ -5,8 +5,11 @@ import {
   evaluateInteractableCreate,
   neutralizeInheritedLinkedVisual,
 } from '../../../src/canvas/regions/interactableCreationGuard.js';
+import { INTERACTABLE_BEHAVIOR_SUBTYPE } from '../../../src/canvas/regions/interactableRegionFlags.js';
 
-const INTERACTABLE = 'fabricate.interactable';
+// Use the canonical subtype constant rather than a locally-redefined literal so
+// this test cannot silently mirror a stale subtype string.
+const INTERACTABLE = INTERACTABLE_BEHAVIOR_SUBTYPE;
 
 test('evaluateInteractableCreate cancels a fabricate.interactable with empty sourceUuid', () => {
   // The native "+ Add Behavior" path instantiates with empty system data.
@@ -52,6 +55,31 @@ test('evaluateInteractableCreate ignores non-interactable behaviours', () => {
   assert.deepEqual(evaluateInteractableCreate(undefined), { allow: true });
 });
 
+test('evaluateInteractableCreate never cancels a non-interactable carrying a linkedVisual', () => {
+  // A non-interactable behaviour that happens to carry a linkedVisual.uuid must
+  // be allowed unchanged — the guard's type discrimination keeps it hands-off.
+  assert.deepEqual(
+    evaluateInteractableCreate({
+      type: 'executeMacro',
+      system: { linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' } },
+    }),
+    { allow: true },
+  );
+});
+
+test('evaluateInteractableCreate keys ONLY on sourceUuid (not the other required fields)', () => {
+  // Documented design: a resolvable sourceUuid alone distinguishes a real
+  // Fabricate placement from the native empty-system path. The guard does NOT
+  // require interactableType/systemId to be present to allow creation.
+  assert.deepEqual(
+    evaluateInteractableCreate({
+      type: INTERACTABLE,
+      system: { sourceUuid: 'Item.abc123' },
+    }),
+    { allow: true },
+  );
+});
+
 test('neutralizeInheritedLinkedVisual clears an inherited linkedVisual.uuid', () => {
   // The region-duplication case: the copy carries the original's marker link.
   const system = {
@@ -92,4 +120,8 @@ test('neutralizeInheritedLinkedVisual is a no-op when there is nothing to neutra
   // No linkedVisual at all.
   assert.deepEqual(neutralizeInheritedLinkedVisual({}), { changed: false });
   assert.deepEqual(neutralizeInheritedLinkedVisual(undefined), { changed: false });
+
+  // A null or non-object linkedVisual is tolerated as nothing to neutralise.
+  assert.deepEqual(neutralizeInheritedLinkedVisual({ linkedVisual: null }), { changed: false });
+  assert.deepEqual(neutralizeInheritedLinkedVisual({ linkedVisual: 42 }), { changed: false });
 });
