@@ -981,3 +981,150 @@ test('openGrant opens a gathering-task session scoped to env+task with NO node o
     restoreGlobals(saved);
   }
 });
+
+// --- issue 332: re-prompt after the gathering window closes ------------------
+
+/**
+ * Build a canvas scene fake usable by BOTH the close re-prompt resolver
+ * (`scene.tokens` + `selectRepromptTokenDoc`) and the existing re-prompt path
+ * (`interactableBehaviorsContainingToken` over `scene.regions`, then
+ * `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`). The single
+ * interactable region's containment is controlled by `regionContains`.
+ */
+const REPROMPT_REF = { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' };
+
+/**
+ * Build a canvas scene fake usable by BOTH the close re-prompt resolver
+ * (`scene.tokens` + `selectRepromptTokenDoc`) and the existing re-prompt path
+ * (`interactableBehaviorsContainingToken` over `scene.regions`, then
+ * `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`). The single
+ * interactable region's containment is controlled by `regionContains`.
+ */
+function buildRepromptScene({ system = TOOL_SYSTEM, regionContains = true, actorId = 'actor-1', tokenInScene = true } = {}) {
+  const scene = { id: 'scene-1', tokens: { contents: [] } };
+  const region = { id: 'region-1', parent: scene, testPoint: () => regionContains === true };
+  const behavior = { id: 'beh-1', type: 'fabricate.interactable', system, parent: region };
+  region.behaviors = { contents: [behavior] };
+  scene.regions = { contents: [region] };
+  const tokenDoc = { actorId, actor: { id: actorId }, isOwner: true };
+  // The live placeable references its document (Foundry's placeable→document link)
+  // and carries the center the hit-test reads.
+  tokenDoc.object = { center: { x: 50, y: 50 }, document: tokenDoc };
+  if (tokenInScene) scene.tokens.contents.push(tokenDoc);
+  return { scene, region, behavior, tokenDoc };
+}
+
+/**
+ * Shared harness for the issue-332 close-reprompt tests: installs the fake
+ * runtime, a non-GM controlling user, the re-prompt scene (as the active +
+ * lookup scene unless `viewedScene` overrides the active one), an app `show`
+ * recorder, and a prompt recorder injected into the manager. Returns the
+ * collectors so each test only writes its distinct assertions.
+ */
+function setupReprompt(sceneOpts = {}, { viewedScene } = {}) {
+  installFakeFoundry({ isGM: false });
+  globalThis.game.user = { id: 'u-1', isGM: false };
+  const built = buildRepromptScene(sceneOpts);
+  globalThis.game.scenes = { get: (id) => (id === 'scene-1' ? built.scene : null) };
+  globalThis.canvas.scene = viewedScene ?? built.scene;
+  const shows = [];
+  const prompts = [];
+  const manager = new InteractableManager({
+    getAppClass: () => ({ show: (tab, options) => shows.push({ tab, options }) }),
+    getPromptAppClass: () => ({ show: (a) => prompts.push(a), dismiss: () => {} }),
+  });
+  return { manager, shows, prompts, ...built };
+}
+
+/** Open a gathering-task grant for the standard re-prompt ref. */
+function openGatheringGrant(manager) {
+  manager.openGrant({
+    grant: {
+      tab: 'gathering', interactableType: 'gatheringTask',
+      environmentId: 'env-1', taskId: 'task-9', actorId: 'actor-1', ref: REPROMPT_REF,
+    },
+  });
+}
+
+test('openGrant arms a one-shot onClose re-prompt for a gathering-task session (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { manager, shows } = setupReprompt();
+    openGatheringGrant(manager);
+    assert.equal(shows.length, 1);
+    assert.equal(typeof shows[0].options.onClose, 'function', 'the gathering session is opened with a close re-prompt callback');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('closing the gathering window RE-SHOWS the prompt when the token is STILL inside the region (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { manager, shows, prompts } = setupReprompt({ regionContains: true });
+    openGatheringGrant(manager);
+    assert.equal(prompts.length, 0, 'no prompt while the session is open');
+
+    shows[0].options.onClose(); // simulate the window closing.
+
+    assert.equal(prompts.length, 1, 'the Interact prompt re-appears on close');
+    assert.equal(prompts[0].behaviorRef, 'scene-1.region-1.beh-1', 're-prompt targets the originating behaviour');
+    assert.equal(prompts[0].name, 'Forge Anvil');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('closing the gathering window does NOT re-show the prompt when the token has LEFT the region (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    // Token still in the scene but the region no longer contains it.
+    const { manager, prompts } = setupReprompt({ regionContains: false });
+    manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
+    assert.equal(prompts.length, 0, 'a token that has left the region is not re-prompted');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('closing the gathering window does NOT re-show the prompt when the activating token is GONE (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    // The token for the activating actor no longer exists in the scene.
+    const { manager, prompts } = setupReprompt({ regionContains: true, tokenInScene: false });
+    manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
+    assert.equal(prompts.length, 0, 'a vanished activating token is not re-prompted');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('the close re-prompt is a no-op when the viewed scene is not the originating scene (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    // The player navigated to a different scene before closing the window.
+    const { manager, prompts } = setupReprompt(
+      { regionContains: true },
+      { viewedScene: { id: 'scene-OTHER', tokens: { contents: [] } } }
+    );
+    manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
+    assert.equal(prompts.length, 0, 'do not re-prompt against a scene the player is no longer viewing');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('the close re-prompt never throws on a malformed ref or missing globals (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    installFakeFoundry({ isGM: false });
+    const manager = new InteractableManager();
+    // No throw for any of these defensive cases.
+    assert.doesNotThrow(() => manager._repromptAfterInteractableClose({}));
+    assert.doesNotThrow(() => manager._repromptAfterInteractableClose({ ref: null, actorId: 'a' }));
+    assert.doesNotThrow(() => manager._repromptAfterInteractableClose({ ref: { sceneId: 'scene-1' }, actorId: null }));
+    assert.doesNotThrow(() => manager._repromptAfterInteractableClose());
+  } finally {
+    restoreGlobals(saved);
+  }
+});
