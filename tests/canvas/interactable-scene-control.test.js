@@ -15,8 +15,10 @@ import {
   addInteractableSceneControl,
   FABRICATE_SCENE_CONTROL_NAME,
   FABRICATE_INTERACTABLE_TOOL_NAME,
+  FABRICATE_MANAGE_INTERACTABLES_TOOL_NAME,
   FABRICATE_SCENE_CONTROL_ICON,
-  FABRICATE_INTERACTABLE_TOOL_ICON
+  FABRICATE_INTERACTABLE_TOOL_ICON,
+  FABRICATE_MANAGE_INTERACTABLES_TOOL_ICON
 } from '../../src/ui/interactableSceneControl.js';
 
 // A minimal V13 object-of-controls record (keyed by control name), as the hook
@@ -79,6 +81,41 @@ test('the button handler launches the browser app via onChange ONLY (no deprecat
   assert.equal(typeof tool.onChange, 'function', 'onChange is the only activation handler');
   tool.onChange();
   assert.equal(clicks, 1, 'onChange fires the launch callback');
+});
+
+test('adds the GM Manage Interactables button tool when an onManageClick is supplied (issue 335)', () => {
+  const controls = v13Controls();
+  let manageClicks = 0;
+  addInteractableSceneControl(controls, {
+    isGM: true,
+    onClick: () => {},
+    onManageClick: () => { manageClicks += 1; }
+  });
+  const tools = controls[FABRICATE_SCENE_CONTROL_NAME].tools;
+  const manage = tools[FABRICATE_MANAGE_INTERACTABLES_TOOL_NAME];
+  assert.ok(manage, 'the manage tool is keyed by its name');
+  assert.equal(manage.button, true, 'a one-shot click action, not a toggle');
+  assert.equal(manage.icon, FABRICATE_MANAGE_INTERACTABLES_TOOL_ICON, 'uses the manage tool icon');
+  assert.equal('onClick' in manage, false, 'no deprecated onClick on the manage tool');
+  assert.equal(typeof manage.onChange, 'function', 'onChange is the only activation handler');
+  manage.onChange();
+  assert.equal(manageClicks, 1, 'onChange launches the manage panel');
+  // The browser tool is still present alongside the manage tool.
+  assert.ok(tools[FABRICATE_INTERACTABLE_TOOL_NAME], 'the browser tool remains');
+});
+
+test('omits the Manage Interactables tool when no onManageClick is supplied (legacy single-button shape)', () => {
+  const controls = v13Controls();
+  addInteractableSceneControl(controls, { isGM: true, onClick: () => {} });
+  const tools = controls[FABRICATE_SCENE_CONTROL_NAME].tools;
+  assert.equal(tools[FABRICATE_MANAGE_INTERACTABLES_TOOL_NAME], undefined, 'no manage tool without a callback');
+  assert.ok(tools[FABRICATE_INTERACTABLE_TOOL_NAME], 'the browser tool is still added');
+});
+
+test('the Manage Interactables tool is GM-only (non-GM ⇒ nothing added)', () => {
+  const controls = v13Controls();
+  addInteractableSceneControl(controls, { isGM: false, onClick: () => {}, onManageClick: () => {} });
+  assert.equal(controls[FABRICATE_SCENE_CONTROL_NAME], undefined, 'players never see the manage panel');
 });
 
 test('non-GM ⇒ the Fabricate control is NOT added', () => {

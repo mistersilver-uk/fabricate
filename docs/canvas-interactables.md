@@ -86,6 +86,12 @@ Placing interactables is **GM-only**. There are three ways to place one:
 2. **Item drag.** Dragging a world/compendium or Items-directory **Item that is linked to a
    Tool component** onto the canvas also spawns a Tool station, by matching the dropped item
    against each crafting system's Tools library.
+3. **Manage Interactables panel — Promote region.** The browser drag always spawns a
+   **1-grid-square rectangle** region, so an interactable that needs an **arbitrary or
+   odd-shaped** region has no first-class authoring path through the browser. The
+   **Manage Interactables** panel (below) closes that gap: draw a region of any shape with
+   Foundry's native region tools, then **promote** it into a working interactable bound to a
+   chosen Tool or Gathering Task source.
 
 A dropped interactable snaps to the scene grid. When it has a marker, the linked Tile takes
 its image from the Tool component's icon (or the task's image), falling back to a generic
@@ -146,6 +152,35 @@ concealed for players.
 A **missing** linked visual (e.g. the GM deleted the Tile) is governed by the behaviour's
 `linkedVisual.missingPolicy` and is otherwise a clean no-op — the interactable keeps
 working region-only until the GM recreates or relinks a marker from the config panel.
+
+### Manage Interactables panel (GM)
+
+The **Manage Interactables** panel is a GM-only, scene-level window launched from a second
+button in the same **Fabricate** scene-control group (alongside *Place interactables*). It is
+the single place to see and manage every interactable on the current scene, and the supported
+authoring path for **arbitrary-shaped** interactables.
+
+**List.** The panel lists every `fabricate.interactable` on the current scene with its **name**,
+**type** (tool / gathering task), **source label**, **state** (enabled / locked / consumed), and
+**marker status** (Tile / Drawing / Token / region-only / missing). Each row offers:
+
+- **Open configuration** — opens the rich config panel for that interactable (the list is the
+  entry point that was previously only reachable from a linked marker's HUD).
+- **Jump to region** — pans the canvas to the interactable's region centre.
+- **Delete** — removes the interactable region (and its behaviour) after a confirmation dialog.
+  The linked marker, if any, is left on the scene.
+
+**Promote region to interactable.** Pick an existing drawn region of **any shape** and a Tool or
+Gathering Task source from the active crafting system, then promote it. The behaviour `system` is
+built with the **same** `buildInteractableBehaviorSystem()` builder every other placement path
+uses (so a promoted interactable is identical to a dragged one), and the behaviour is attached to
+the region you already drew — promotion **never re-shapes geometry**. You can promote with a
+visible **Tile or Drawing marker** over the region centre, or as **region-only** (no marker).
+Promoting a **gathering task** runs the same environment-resolution precedence as a canvas drop
+(region auto-detect → task default → GM dialog). The browser drag remains the 1-grid-square fast
+path; the panel is the path for everything that needs a custom shape.
+
+The panel is **GM-only** — players never see it.
 
 ---
 

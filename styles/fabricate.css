@@ -9821,6 +9821,242 @@
 }
 
 /* ==========================================
+   Manage Interactables panel (issue 335)
+   ==========================================
+   The GM-only scene panel that lists/manages every interactable on the scene and
+   promotes regions. The panel body + its element styles live here, namespaced
+   under the `.fabricate-interactables-manager` app-root class. This block carries
+   the area-level Foundry focus-ring override (strip the orange ring on :focus,
+   repaint the accent ring on :focus-visible — single area-class specificity so the
+   per-element rings still win), the custom-content button layout override (the
+   panel renders icon+label and icon-only buttons), and the panel layout. All
+   colours use `var(--fab-*)` theme tokens. */
+.fabricate-interactables-manager button:focus,
+.fabricate-interactables-manager input:focus,
+.fabricate-interactables-manager select:focus,
+.fabricate-interactables-manager textarea:focus,
+.fabricate-interactables-manager [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-interactables-manager button:focus-visible,
+.fabricate-interactables-manager input:focus-visible,
+.fabricate-interactables-manager select:focus-visible,
+.fabricate-interactables-manager textarea:focus-visible,
+.fabricate-interactables-manager [tabindex]:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* Custom-content buttons (icon + label, and icon-only action buttons) must not be
+   centred/clipped by Foundry's global button rules — left-align content and let
+   the height grow to the content. */
+.fabricate-interactables-manager button {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 1.75rem;
+}
+
+.fabricate-interactables-manager .fabricate-interactables-manager-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.fabricate-interactables-manager .fab-im-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-interactables-manager .fab-im-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.fabricate-interactables-manager .fab-im-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.fabricate-interactables-manager .fab-im-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-interactables-manager .fab-im-promote-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  width: auto;
+  flex: 0 0 auto;
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-interactables-manager .fab-im-promote-toggle.is-active {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-interactables-manager .fab-im-promote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-overlay-light-16);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-interactables-manager .fab-im-promote-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.fabricate-interactables-manager .fab-im-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-interactables-manager .fab-im-field-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.fabricate-interactables-manager .fab-im-fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-3);
+  align-items: center;
+  margin: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-overlay-light-16);
+  border-radius: 4px;
+}
+
+.fabricate-interactables-manager .fab-im-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  font-size: 0.9rem;
+}
+
+.fabricate-interactables-manager .fab-im-radio input {
+  width: auto;
+}
+
+.fabricate-interactables-manager .fab-im-promote-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-1);
+}
+
+.fabricate-interactables-manager .fab-im-promote-confirm,
+.fabricate-interactables-manager .fab-im-promote-cancel {
+  width: auto;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-interactables-manager .fab-im-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-interactables-manager .fab-im-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.fabricate-interactables-manager .fab-im-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-interactables-manager .fab-im-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-overlay-light-16);
+  border-radius: 4px;
+}
+
+.fabricate-interactables-manager .fab-im-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-interactables-manager .fab-im-row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-interactables-manager .fab-im-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-interactables-manager .fab-im-chip {
+  font-size: 0.7rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--fab-overlay-light-06);
+  border: 1px solid var(--fab-overlay-light-16);
+  white-space: nowrap;
+}
+
+.fabricate-interactables-manager .fab-im-chip-marker.is-missing {
+  color: var(--fab-danger);
+  border-color: var(--fab-danger);
+}
+
+.fabricate-interactables-manager .fab-im-chip-marker.is-region-only {
+  opacity: 0.7;
+}
+
+.fabricate-interactables-manager .fab-im-row-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-interactables-manager .fab-im-action {
+  width: 2rem;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 0;
+}
+
+.fabricate-interactables-manager .fab-im-action-delete:hover {
+  color: var(--fab-danger);
+}
+
+/* ==========================================
    Fabricate confirm dialogs (DialogV2)
    ==========================================
    Multi-button confirm dialogs (e.g. "Remove visual marker", "Delete
