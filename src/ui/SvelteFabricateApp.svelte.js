@@ -67,6 +67,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   // Threaded into the gathering attempt so it decrements that scoped pool. Cleared
   // on close.
   _scopedInteractableRef = null;
+  // One-shot close callback set by a canvas interactable activation (issue 332):
+  // when this session opened from clicking Interact, the manager registers a
+  // handler here so closing the window re-raises the Interact prompt if the token
+  // is still in the originating region. Invoked once (defensively) and cleared on
+  // close so a later manual open never re-fires it.
+  _onCloseCallback = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-app',
@@ -146,6 +152,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     if (options.interactableRef && typeof options.interactableRef === 'object') {
       this._scopedInteractableRef = normalizeInteractableRef(options.interactableRef);
+    }
+    if (typeof options.onClose === 'function') {
+      this._onCloseCallback = options.onClose;
     }
   }
 
@@ -295,7 +304,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
-    return super.close(options);
+    const result = await super.close(options);
+    // Fire the canvas re-prompt callback AFTER the window has fully closed (issue
+    // 332) so the Interact prompt re-appears against a settled canvas. One-shot
+    // and no-throw — a handler error must never break the close.
+    this._fireCloseCallback();
+    return result;
   }
 
   _onClose(options) {
@@ -306,6 +320,26 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._scopedActorId = null;
     this._scopedInteractableRef = null;
     super._onClose(options);
+    // Safety net mirroring close(): if the window is torn down via the _onClose
+    // lifecycle without our close() override (e.g. a forced teardown), still fire
+    // the one-shot re-prompt callback.
+    this._fireCloseCallback();
+  }
+
+  /**
+   * Invoke the one-shot interactable-close callback exactly once, then clear it
+   * (issue 332). Defensive: never throws — a re-prompt failure must not break the
+   * window close. Safe to call from both close() and _onClose().
+   */
+  _fireCloseCallback() {
+    const callback = this._onCloseCallback;
+    this._onCloseCallback = null;
+    if (typeof callback !== 'function') return;
+    try {
+      callback();
+    } catch {
+      // A re-prompt failure must never break the window close.
+    }
   }
 
   /**
@@ -330,15 +364,21 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * @param {object} [options.interactableRef] Scoped scene-interactable ref
    *   (`{sceneId, regionId, behaviorId}`) for a gathering-task interactable that
    *   owns its own node pool (issue 302); threaded into the attempt.
+   * @param {() => void} [options.onClose] One-shot callback invoked once the
+   *   window closes (issue 332). Set by a canvas interactable activation so the
+   *   Interact prompt re-appears when the activating token is still in the region;
+   *   REPLACED on every show (set when supplied, cleared when not) so a later
+   *   manual open never re-fires a stale interactable re-prompt.
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef } = {}) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
     const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
     const nextTaskId = typeof taskId === 'string' ? taskId : null;
     const nextActorId = typeof actorId === 'string' ? actorId : null;
     const nextInteractableRef = normalizeInteractableRef(interactableRef);
+    const nextOnClose = typeof onClose === 'function' ? onClose : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
       // Re-show REPLACES the session-scoped canvas tool + scoped env/task/actor/ref
@@ -349,6 +389,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       existing._scopedTaskId = nextTaskId;
       existing._scopedActorId = nextActorId;
       existing._scopedInteractableRef = nextInteractableRef;
+      // Replace the one-shot close re-prompt callback too (issue 332): a fresh
+      // interactable activation re-arms it; a plain re-open clears it.
+      existing._onCloseCallback = nextOnClose;
       // Push the replaced tool + scoped env/task/actor to the mounted tree so the
       // status chip updates, the gathering view re-auto-selects the scoped env+task,
       // and a re-interaction with a different actor re-seeds the selection.
@@ -368,7 +411,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       environmentId: nextEnvironmentId,
       taskId: nextTaskId,
       actorId: nextActorId,
-      interactableRef: nextInteractableRef
+      interactableRef: nextInteractableRef,
+      onClose: nextOnClose
     });
     SvelteFabricateApp._instance = app;
     await app.render(true);

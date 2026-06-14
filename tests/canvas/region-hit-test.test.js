@@ -13,7 +13,9 @@ import assert from 'node:assert/strict';
 import {
   regionEnvironmentIdsAtPoint,
   sceneRegionUuidsContainingToken,
-  tokenDocumentCenter
+  tokenDocumentCenter,
+  interactableBehaviorsContainingToken,
+  selectRepromptTokenDoc
 } from '../../src/canvas/regionHitTest.js';
 
 function region({ envId, contains }) {
@@ -64,8 +66,6 @@ test('prefers the document testPoint, falls back to the deprecated placeable, to
 
 // --- interactableBehaviorsContainingToken (re-trigger) ----------------------
 
-import { interactableBehaviorsContainingToken } from '../../src/canvas/regionHitTest.js';
-
 function regionWithBehaviors({ contains, behaviors }) {
   return {
     // Document-level testPoint (ElevatedPoint); see region() above.
@@ -105,6 +105,24 @@ test('interactableBehaviorsContainingToken uses the token document top-left when
 test('interactableBehaviorsContainingToken returns [] when the token point cannot be resolved', () => {
   const scene = { regions: [regionWithBehaviors({ contains: () => true, behaviors: { contents: [{ type: 'fabricate.interactable' }] } })] };
   assert.deepEqual(interactableBehaviorsContainingToken({ scene, token: {}, isInteractableBehavior: isInteractable }), []);
+});
+
+// --- selectRepromptTokenDoc (issue 332) -------------------------------------
+
+test('selectRepromptTokenDoc returns the first token doc whose actor matches', () => {
+  const a = { actorId: 'actor-9' };
+  const b = { actor: { id: 'actor-1' } };
+  const c = { actorId: 'actor-1' };
+  assert.equal(selectRepromptTokenDoc([a, b, c], 'actor-1'), b, 'matches via actor.id, picking the first match');
+  assert.equal(selectRepromptTokenDoc([a, c], 'actor-9'), a, 'matches via actorId');
+});
+
+test('selectRepromptTokenDoc returns null when nothing matches or inputs are absent', () => {
+  assert.equal(selectRepromptTokenDoc([{ actorId: 'actor-9' }], 'actor-1'), null, 'no matching actor ⇒ null');
+  assert.equal(selectRepromptTokenDoc([], 'actor-1'), null, 'empty list ⇒ null');
+  assert.equal(selectRepromptTokenDoc(null, 'actor-1'), null, 'non-array ⇒ null');
+  assert.equal(selectRepromptTokenDoc([{ actorId: 'actor-1' }], null), null, 'no actor id ⇒ null');
+  assert.equal(selectRepromptTokenDoc([{ actorId: 'actor-1' }], ''), null, 'empty actor id ⇒ null');
 });
 
 function uuidRegion({ uuid, contains }) {

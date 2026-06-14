@@ -150,6 +150,31 @@ export function sceneRegionUuidsContainingToken({ scene, token } = {}) {
 }
 
 /**
+ * Pick the token to re-prompt for after an interactable session closes (issue
+ * 332): from a scene's token documents, the FIRST whose actor matches `actorId`.
+ * Pure (no Foundry coupling): the caller passes the already-collected token-doc
+ * list and reads `.object` (the placeable) off the returned doc to feed the
+ * existing `_promptForTokenInsideRegion` re-prompt path, which then applies the
+ * authoritative in-region hit-test and ownership guard. Returns null when no
+ * actor matches (the activating token is gone), so a stale session-close does not
+ * try to resurrect a prompt for a token that no longer exists.
+ *
+ * @param {Array<object>} tokenDocs  TokenDocuments (each may expose `.object`).
+ * @param {string|null} actorId      The activating actor's id.
+ * @returns {object|null} The matching TokenDocument, or null.
+ */
+export function selectRepromptTokenDoc(tokenDocs, actorId) {
+  if (!actorId) return null;
+  const list = Array.isArray(tokenDocs) ? tokenDocs : [];
+  const wanted = String(actorId);
+  for (const tokenDoc of list) {
+    const id = tokenDoc?.actorId ?? tokenDoc?.actor?.id ?? null;
+    if (id != null && String(id) === wanted) return tokenDoc;
+  }
+  return null;
+}
+
+/**
  * Resolve a token's CENTER point from its DOCUMENT, preferring the authoritative
  * document position over the placeable's `center`. This matters for live travel
  * sensing: the `updateToken` hook fires before the placeable finishes its move
