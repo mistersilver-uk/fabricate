@@ -2798,6 +2798,54 @@ async function main() {
           process.stderr.write(`Interactable config capture failed: ${err.message}\n`);
         }
 
+        // ── Manage Interactables panel (issue 335) ─────────────────────────────
+        // Open the GM-only Manage Interactables scene panel and capture: the
+        // populated list (the seeded azureGrove interactable is on the active
+        // scene), its scroll containment, and the expanded Promote affordance +
+        // source picker. Guarded so a failure records a failed step without
+        // aborting the manager phase or later phases.
+        try {
+          const interactableRef = craftingSetup.interactable;
+          // Ensure the seeded interactable's scene is the active/viewed scene so the
+          // panel's scene-scan finds it in the list.
+          if (interactableRef?.sceneId) {
+            await page.evaluate(async (sceneId) => {
+              const scene = game.scenes.get(sceneId);
+              if (scene && !scene.active) await scene.activate();
+            }, interactableRef.sceneId).catch(() => {});
+          }
+
+          await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
+
+          const managerRoot = page.locator('.fabricate-interactables-manager').first();
+          await managerRoot.waitFor({ state: 'visible', timeout: 10_000 });
+          // Wait for at least one list row (the seeded interactable).
+          await page.locator('.fabricate-interactables-manager .fab-im-row')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactables-manager-list');
+
+          // Expand the Promote affordance and capture the source picker
+          // (region + system + source-type + source + marker controls).
+          const promoteToggle = page.locator('.fabricate-interactables-manager .fab-im-promote-toggle').first();
+          await promoteToggle.waitFor({ state: 'visible', timeout: 10_000 });
+          await promoteToggle.click();
+          await page.locator('.fabricate-interactables-manager .fab-im-promote')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'interactables-manager-promote');
+
+          await page.evaluate(() => {
+            const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactables-manager');
+            return app?.close?.();
+          }).catch(() => { /* best-effort; closeOpenApplications also sweeps it */ });
+
+          results.steps.push({ step: 'interactables-manager', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'interactables-manager', passed: false, error: err.message });
+          process.stderr.write(`Manage Interactables capture failed: ${err.message}\n`);
+        }
+
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, {

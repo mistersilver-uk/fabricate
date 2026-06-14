@@ -1491,6 +1491,7 @@ function bindFabricateGlobal() {
     getFabricateAppClass,
     getCraftingSystemManagerAppClass,
     getInteractableConfigAppClass,
+    getInteractablesManagerAppClass,
     CraftingSystemManager,
     CraftingRunManager,
     SalvageRunManager,
