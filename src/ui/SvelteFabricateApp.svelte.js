@@ -83,6 +83,50 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
   };
 
+  // Minimum window size enforced on the resizable Fabricate window so it can
+  // never shrink below the point where the gathering view's three columns (each
+  // floored at 280px) get clipped. Derived from the column minimums: the ~84px
+  // nav rail + 3 x 280px columns + 2 gutters + content padding + window chrome
+  // round up to a 1024x640 floor that keeps all three columns usable before the
+  // narrow-width stacking breakpoint takes over. ApplicationV2 V13 does NOT
+  // accept `minWidth`/`minHeight` inside the (non-extensible) `position` option
+  // (assigning to it throws), so the floor is enforced two ways: a
+  // `min-width`/`min-height` on the app root (.fabricate-app, styles/fabricate.css)
+  // which is what visually stops the drag handle, and the `_updatePosition` clamp
+  // below which is the single ApplicationV2 position-transform hook applied by
+  // BOTH `setPosition()` and drag-resize.
+  static MIN_WINDOW_WIDTH = 1024;
+  static MIN_WINDOW_HEIGHT = 640;
+
+  /**
+   * Clamp the window up to the configured minimum size. `_updatePosition` is the
+   * V13 ApplicationV2 hook that translates a requested position into the resolved
+   * applied position; it is invoked by BOTH programmatic `setPosition()` and the
+   * drag-resize handler, and its return value is what gets applied. We override
+   * it (rather than the pointer-only `_onResize` drag handler, whose return value
+   * V13 does not consume) so the minimum-size floor is real for every code path.
+   *
+   * We mutate `width`/`height` on the resolved position only — never
+   * `minWidth`/`minHeight`, which V13's non-extensible `position` rejects with a
+   * throw. The CSS floor on the app root is the belt-and-suspenders partner that
+   * makes the drag handle stop visually.
+   *
+   * @param {object} position Requested `{width, height, ...}` positioning data.
+   * @returns {object} The resolved, clamped position.
+   */
+  _updatePosition(position) {
+    const result = super._updatePosition(position);
+    if (result && typeof result === 'object') {
+      if (typeof result.width === 'number') {
+        result.width = Math.max(result.width, SvelteFabricateApp.MIN_WINDOW_WIDTH);
+      }
+      if (typeof result.height === 'number') {
+        result.height = Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT);
+      }
+    }
+    return result;
+  }
+
   constructor(options = {}) {
     super(options);
     if (VALID_TABS.has(options.activeTab)) {
