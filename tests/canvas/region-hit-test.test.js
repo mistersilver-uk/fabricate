@@ -107,6 +107,26 @@ test('interactableBehaviorsContainingToken returns [] when the token point canno
   assert.deepEqual(interactableBehaviorsContainingToken({ scene, token: {}, isInteractableBehavior: isInteractable }), []);
 });
 
+// --- selectRepromptTokenDoc (issue 332) -------------------------------------
+
+import { selectRepromptTokenDoc } from '../../src/canvas/regionHitTest.js';
+
+test('selectRepromptTokenDoc returns the first token doc whose actor matches', () => {
+  const a = { actorId: 'actor-9' };
+  const b = { actor: { id: 'actor-1' } };
+  const c = { actorId: 'actor-1' };
+  assert.equal(selectRepromptTokenDoc([a, b, c], 'actor-1'), b, 'matches via actor.id, picking the first match');
+  assert.equal(selectRepromptTokenDoc([a, c], 'actor-9'), a, 'matches via actorId');
+});
+
+test('selectRepromptTokenDoc returns null when nothing matches or inputs are absent', () => {
+  assert.equal(selectRepromptTokenDoc([{ actorId: 'actor-9' }], 'actor-1'), null, 'no matching actor ⇒ null');
+  assert.equal(selectRepromptTokenDoc([], 'actor-1'), null, 'empty list ⇒ null');
+  assert.equal(selectRepromptTokenDoc(null, 'actor-1'), null, 'non-array ⇒ null');
+  assert.equal(selectRepromptTokenDoc([{ actorId: 'actor-1' }], null), null, 'no actor id ⇒ null');
+  assert.equal(selectRepromptTokenDoc([{ actorId: 'actor-1' }], ''), null, 'empty actor id ⇒ null');
+});
+
 function uuidRegion({ uuid, contains }) {
   return { uuid, testPoint: (point) => contains(point) };
 }

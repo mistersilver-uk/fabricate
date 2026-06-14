@@ -50,6 +50,7 @@ import {
 import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
+  selectRepromptTokenDoc,
 } from './regionHitTest.js';
 import {
   shouldPromptOnEnter,
@@ -796,8 +797,74 @@ class InteractableManager {
               behaviorId: grant.ref.behaviorId ?? null,
             }
           : null;
-      void AppClass.show('gathering', { environmentId, taskId, actorId, interactableRef });
+      // Issue 332: clicking Interact dismisses the prompt toast and opens this
+      // gathering session. When the session window closes, re-raise the prompt if
+      // the activating token is STILL inside the originating region (so the player
+      // need not leave and re-enter a large region, and an accidental close is
+      // recoverable). The re-prompt reuses `_promptForTokenInsideRegion`, which
+      // applies the authoritative in-region hit-test + ownership guard + prompt
+      // ref-matching — a token that has since left the region is not re-prompted.
+      void AppClass.show('gathering', {
+        environmentId,
+        taskId,
+        actorId,
+        interactableRef,
+        onClose: () => this._repromptAfterInteractableClose({ ref: grant.ref, actorId }),
+      });
     }
+  }
+
+  /**
+   * Re-raise the Interact prompt after a gathering-task interactable session
+   * window closes, IFF the activating token is still inside the originating
+   * region (issue 332). Resolves the activating token's placeable from the
+   * originating ref's scene + actor, then delegates to the existing
+   * {@link _promptForTokenInsideRegion} path — which re-applies the ownership
+   * guard and the authoritative in-region hit-test, and whose `PromptApp.show`
+   * is ref-matched, so a token that has since left (or no longer exists) is not
+   * re-prompted. No-throw: a close-handler error must never break the app close.
+   *
+   * @param {object} args
+   * @param {{ sceneId?: string, regionId?: string, behaviorId?: string }|null} args.ref
+   * @param {string|null} args.actorId  The activating actor id (from the grant).
+   */
+  _repromptAfterInteractableClose({ ref, actorId } = {}) {
+    try {
+      if (!ref || typeof ref !== 'object') return;
+      const sceneId = ref.sceneId ?? null;
+      if (!sceneId || !actorId) return;
+      const scene =
+        globalThis.game?.scenes?.get?.(String(sceneId)) ??
+        (String(globalThis.canvas?.scene?.id ?? '') === String(sceneId)
+          ? globalThis.canvas?.scene
+          : null);
+      // Only re-prompt for the scene the player is currently viewing; the prompt
+      // toast and its hit-test target the active canvas scene.
+      if (!scene || String(globalThis.canvas?.scene?.id ?? '') !== String(scene.id ?? sceneId)) {
+        return;
+      }
+      const tokenDoc = selectRepromptTokenDoc(this._sceneTokenDocs(scene), actorId);
+      if (!tokenDoc) return;
+      // Prefer the live placeable (carries the canvas center used by the hit-test);
+      // fall back to the document so the shared path can still resolve a center.
+      this._promptForTokenInsideRegion(tokenDoc.object ?? tokenDoc);
+    } catch {
+      // Defensive: never let a re-prompt failure break the window close.
+    }
+  }
+
+  /**
+   * The token DOCUMENTS of a scene, tolerating the V13 collection + array shapes.
+   *
+   * @param {object} scene
+   * @returns {Array<object>}
+   */
+  _sceneTokenDocs(scene) {
+    const tokens = scene?.tokens;
+    if (Array.isArray(tokens?.contents)) return tokens.contents;
+    if (typeof tokens?.values === 'function') return [...tokens.values()];
+    if (Array.isArray(tokens)) return tokens;
+    return [];
   }
 
   /**

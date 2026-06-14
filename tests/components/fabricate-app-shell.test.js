@@ -76,7 +76,7 @@ describe('SvelteFabricateApp shell window', () => {
   describe('activeCanvasTool session context (Phase 4)', () => {
     it('show accepts a two-arg { activeCanvasTool } options bag without breaking single-arg callers', () => {
       assert.ok(
-        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef } = {})'),
+        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {})'),
         'show should be the two-arg form with an options default so single-arg callers stay valid'
       );
       // existing single-arg call sites pass no options → activeCanvasTool undefined → null.
@@ -136,6 +136,68 @@ describe('SvelteFabricateApp shell window', () => {
       assert.ok(
         appSource.includes('activeCanvasTool: this._activeCanvasTool'),
         '_prepareSvelteProps should surface the active canvas tool reactively'
+      );
+    });
+  });
+
+  describe('interactable close re-prompt callback (issue 332)', () => {
+    it('threads a one-shot onClose option through show into the constructor', () => {
+      assert.ok(
+        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {})'),
+        'show should accept an onClose option'
+      );
+      assert.ok(
+        appSource.includes('const nextOnClose = typeof onClose === \'function\' ? onClose : null;'),
+        'show should normalize a non-function onClose to null'
+      );
+      assert.ok(
+        appSource.includes('onClose: nextOnClose'),
+        'a fresh open seeds the close callback through the constructor'
+      );
+      assert.ok(
+        appSource.includes('if (typeof options.onClose === \'function\') {'),
+        'the constructor stores a function onClose'
+      );
+      assert.ok(
+        appSource.includes('this._onCloseCallback = options.onClose;'),
+        'the constructor stores onClose on the instance'
+      );
+    });
+
+    it('re-show REPLACES the one-shot close callback (set when supplied, cleared when not)', () => {
+      assert.ok(
+        appSource.includes('existing._onCloseCallback = nextOnClose;'),
+        're-show replaces the close callback so a plain re-open clears a stale interactable re-prompt'
+      );
+    });
+
+    it('fires the close callback once (no-throw) from both close paths and clears it', () => {
+      assert.ok(appSource.includes('_fireCloseCallback()'), 'a one-shot fire helper exists');
+      const closeIdx = appSource.indexOf('async close(options)');
+      const onCloseIdx = appSource.indexOf('_onClose(options)');
+      const closeBody = appSource.slice(closeIdx, onCloseIdx);
+      assert.ok(closeBody.includes('this._fireCloseCallback();'), 'close() fires the callback');
+      const onCloseBody = appSource.slice(onCloseIdx);
+      assert.ok(onCloseBody.includes('this._fireCloseCallback();'), '_onClose fires the callback as a safety net');
+      // The helper is one-shot: it clears the ref BEFORE invoking so a double
+      // close path (close → _onClose) cannot fire it twice.
+      const fireIdx = appSource.indexOf('_fireCloseCallback() {');
+      const fireBody = appSource.slice(fireIdx, fireIdx + 400);
+      assert.ok(fireBody.includes('this._onCloseCallback = null;'), 'the helper clears the callback ref');
+      assert.ok(
+        fireBody.indexOf('this._onCloseCallback = null;') < fireBody.indexOf('callback()'),
+        'the callback ref is cleared BEFORE invoking so it fires at most once'
+      );
+      assert.ok(fireBody.includes('try {') && fireBody.includes('catch'), 'the fire is wrapped no-throw');
+    });
+
+    it('fires the close callback AFTER super.close() so the canvas is settled', () => {
+      const closeIdx = appSource.indexOf('async close(options)');
+      const onCloseIdx = appSource.indexOf('_onClose(options)');
+      const closeBody = appSource.slice(closeIdx, onCloseIdx);
+      assert.ok(
+        closeBody.indexOf('await super.close(options)') < closeBody.indexOf('this._fireCloseCallback();'),
+        'the re-prompt fires after the window has fully closed'
       );
     });
   });
