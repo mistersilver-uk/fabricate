@@ -13,6 +13,22 @@
       },
       "Aborted": {
         "Notice": "Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance."
+      },
+      "Recovery": {
+        "Title": "Fabricate migration aborted",
+        "Intro": "A Fabricate data migration could not complete. Your existing data has been kept unchanged.",
+        "AbortedDuring": "Aborted during: {label}",
+        "Downgrade": "Recommended: downgrade Fabricate to version {version} to keep using your existing data without manual remediation.",
+        "DocumentsHeader": "{count} document(s) require manual remediation:",
+        "DocumentLine": "{type} {identity}{name}: {error}",
+        "DocumentFix": "Fix: {fix}",
+        "DocumentMacroHint": "Macro hint: {macroHint}",
+        "RetryHint": "To retry: fix or delete the documents above, then reload Foundry. The migration runs again automatically because it was not marked complete.",
+        "KeepButton": "Keep existing data",
+        "FixAndRetryButton": "I will manually fix or delete failed documents, then retry migration",
+        "UnknownVersion": "unknown",
+        "UnknownError": "unknown error",
+        "NoFix": "no fix action provided"
       }
     },
     "Canvas": {
