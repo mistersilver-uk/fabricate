@@ -26,6 +26,8 @@
  *   activation   : { trigger:'regionEnter', audience:'players'|'all' }
  */
 
+import { normalizeNodeConfig } from '../../systems/gatheringNodeConfig.js';
+
 import { numberOrNull } from './coercion.js';
 
 export const INTERACTABLE_BEHAVIOR_SUBTYPE = 'fabricate.interactable';
@@ -36,6 +38,15 @@ export const LINKED_VISUAL_MODES = Object.freeze(['marker', 'none']);
 export const LINKED_VISUAL_MISSING_POLICIES = Object.freeze(['ignore', 'warn', 'recreate']);
 export const ACTIVATION_TRIGGERS = Object.freeze(['regionEnter']);
 export const ACTIVATION_AUDIENCES = Object.freeze(['players', 'all']);
+// A gathering-task interactable is either LINKED to the gathering task or
+// UNLINKED (independent), much like an FVTT token↔actor link:
+//   'linked' (default) — shares the gathering task's per-environment node pool;
+//     depletion/respawn follow the task (owned by `environment.nodeRuntime[taskId]`)
+//     and the behaviour carries no node state.
+//   'unlinked'         — the behaviour owns its OWN independent node pool
+//     (`system.node`) with its own lifecycle (capacity, current count,
+//     depletion timing, respawn policy). Only a `gatheringTask` may carry one.
+export const TASK_NODE_LINKS = Object.freeze(['linked', 'unlinked']);
 
 function coerceString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -59,7 +70,7 @@ export function buildInteractableBehaviorSchema(fields) {
   if (!fields || typeof fields !== 'object') {
     throw new Error('buildInteractableBehaviorSchema requires a Foundry fields namespace');
   }
-  const { StringField, BooleanField, NumberField, SchemaField } = fields;
+  const { StringField, BooleanField, NumberField, SchemaField, ObjectField } = fields;
 
   return {
     interactableType: new StringField({
@@ -67,6 +78,21 @@ export function buildInteractableBehaviorSchema(fields) {
       blank: false,
       choices: [...INTERACTABLE_TYPES],
     }),
+
+    // Task-node link discriminator (gatheringTask only). 'linked' (default)
+    // shares the gathering task's per-environment node pool (depletion/respawn on
+    // `environment.nodeRuntime[taskId]`) and leaves `node` null; 'unlinked' carries
+    // its own independent node pool below.
+    taskNodeLink: new StringField({
+      required: true,
+      blank: false,
+      initial: 'linked',
+      choices: [...TASK_NODE_LINKS],
+    }),
+    // The independent node pool, stored verbatim as a full normalized node object
+    // when `taskNodeLink === 'unlinked'`; null otherwise. `normalizeNodeConfig` is
+    // the schema authority for its shape, so an ObjectField stores it opaquely.
+    node: new ObjectField({ required: false, nullable: true, initial: null }),
     sourceUuid: new StringField({ required: true, blank: false }),
     systemId: new StringField({ required: true, blank: false }),
     toolId: new StringField({ required: false, blank: true, nullable: true, initial: null }),
@@ -162,6 +188,8 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
     name,
     presentation,
     linkedVisual,
+    taskNodeLink,
+    node,
   } = spawnRequest;
 
   if (!INTERACTABLE_TYPES.includes(interactableType)) {
@@ -172,6 +200,17 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
     throw new Error('buildInteractableBehaviorSystem requires a non-empty sourceUuid');
   }
 
+  // Only a gatheringTask may carry an independent node pool. A tool always
+  // defaults to linked with a null node so it never carries node state.
+  const scopedNode =
+    interactableType === 'gatheringTask' && taskNodeLink === 'unlinked'
+      ? normalizeNodeConfig(node)
+      : null;
+  const resolvedTaskNodeLink =
+    interactableType === 'gatheringTask' && taskNodeLink === 'unlinked' && scopedNode
+      ? 'unlinked'
+      : 'linked';
+
   return {
     interactableType,
     sourceUuid: source,
@@ -179,6 +218,8 @@ export function buildInteractableBehaviorSystem(spawnRequest = {}) {
     toolId: interactableType === 'tool' ? stringOrNull(toolId) : null,
     taskId: interactableType === 'gatheringTask' ? stringOrNull(taskId) : null,
     environmentId: interactableType === 'gatheringTask' ? stringOrNull(environmentId) : null,
+    taskNodeLink: resolvedTaskNodeLink,
+    node: resolvedTaskNodeLink === 'unlinked' ? scopedNode : null,
     name: coerceString(name),
     presentation: {
       promptText: stringOrNull(presentation?.promptText),
@@ -235,6 +276,17 @@ export function readInteractableBehaviorSystem(behavior) {
   const activation =
     system.activation && typeof system.activation === 'object' ? system.activation : {};
 
+  // Resolve the task-node link + independent node. Only a gatheringTask may carry
+  // an independent pool; normalizeNodeConfig is the authority for the node shape.
+  // If the link claims 'unlinked' but the node does not normalize to a real pool,
+  // DOWNGRADE the view to 'linked' (so a malformed/empty node never strands the
+  // interactable on a non-existent pool).
+  const scopedNode =
+    interactableType === 'gatheringTask' && system.taskNodeLink === 'unlinked'
+      ? normalizeNodeConfig(system.node)
+      : null;
+  const taskNodeLink = scopedNode ? 'unlinked' : 'linked';
+
   return {
     interactableType,
     sourceUuid: coerceString(system.sourceUuid),
@@ -242,6 +294,8 @@ export function readInteractableBehaviorSystem(behavior) {
     toolId: stringOrNull(system.toolId),
     taskId: stringOrNull(system.taskId),
     environmentId: stringOrNull(system.environmentId),
+    taskNodeLink,
+    node: scopedNode,
     name: coerceString(system.name),
     presentation: {
       promptText: stringOrNull(presentation.promptText),

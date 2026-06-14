@@ -105,6 +105,15 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
   },
   {
+    id: 'interactable-config',
+    label: 'Canvas interactable config',
+    smokeLabels: ['interactable-config-linked', 'interactable-config-unlinked'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  },
+  {
     id: 'theme-or-global-ui',
     label: 'Global UI styling or theme',
     smokeLabels: [

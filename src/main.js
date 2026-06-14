@@ -61,7 +61,12 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
-import { handleInteractableSocketMessage } from './canvas/interactableSocketBridge.js';
+import {
+  handleInteractableSocketMessage,
+  applyInteractableBehaviorUpdate,
+  resolveInteractableBehaviorByRef,
+  writeInteractableBehaviorNode
+} from './canvas/interactableSocketBridge.js';
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
@@ -594,7 +599,11 @@ class Fabricate {
       // Calendar-aware regen/respawn intervals: day/week lengths track the active
       // Foundry V13 world calendar (falls back to the Earth table when none).
       // Resolved per call so a mid-session calendar reconfig is picked up.
-      secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null)
+      secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null),
+      // Interactable-scoped node seams (issue 302): resolve a behaviour by ref and
+      // route its scoped-node write through the active GM.
+      resolveRegionBehavior: (ref) => resolveInteractableBehaviorByRef(ref),
+      writeInteractableBehavior: (ref, patch) => writeInteractableBehaviorNode(ref, patch)
     });
     gatheringEngine = new GatheringEngine({
       environmentStore: this.gatheringEnvironmentStore,
@@ -628,7 +637,18 @@ class Fabricate {
       }),
       getRunViewer: getGatheringRunViewer,
       locationResolver: this.gatheringLocationService,
-      localize: localizeGathering
+      localize: localizeGathering,
+      // Interactable-scoped node respawn enumeration (issue 302): scan scenes for
+      // scoped-node behaviours and route the changed `system.node` write through the
+      // active GM (same edge the config panel uses).
+      scenes: () => game.scenes ?? null,
+      applyInteractableBehaviorUpdate: (ref, update) =>
+        applyInteractableBehaviorUpdate({
+          sceneId: ref?.sceneId,
+          regionId: ref?.regionId,
+          behaviorId: ref?.behaviorId,
+          update
+        })
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
     const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
@@ -1393,6 +1413,7 @@ function bindFabricateGlobal() {
     CraftingEngine,
     getFabricateAppClass,
     getCraftingSystemManagerAppClass,
+    getInteractableConfigAppClass,
     CraftingSystemManager,
     CraftingRunManager,
     SalvageRunManager,

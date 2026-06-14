@@ -6,8 +6,11 @@ import {
   planSetEnabled,
   planSetLocked,
   planClearVisualLink,
+  planSetTaskNodeLink,
+  planRestockScopedNode,
   summarizeInteractable
 } from '../canvas/regions/interactableConfigActions.js';
+import { normalizeNodeConfig } from '../systems/gatheringNodeConfig.js';
 import {
   applyInteractableBehaviorUpdate,
   emitInteractableBehaviorWrite,
@@ -381,6 +384,46 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         if (!this._assertGM()) return undefined;
         const behavior = this._resolveBehavior();
         const patch = planSetLocked(readInteractableBehaviorSystem(behavior), locked);
+        if (!patch) return undefined;
+        const result = writeBehavior(patch.system);
+        if (result && typeof result.then === 'function') return result.then(() => this._refresh());
+        this._refresh();
+        return result;
+      },
+      // --- Interactable-scoped resource node (issue 302) --------------------
+      // Toggle whether the interactable is linked to the gathering task (shares
+      // the task's pool) or unlinked (its own independent pool); only a
+      // gatheringTask may be unlinked.
+      setTaskNodeLink: (link) => {
+        if (!this._assertGM()) return undefined;
+        const behavior = this._resolveBehavior();
+        const patch = planSetTaskNodeLink(readInteractableBehaviorSystem(behavior), link);
+        if (!patch) return undefined;
+        const result = writeBehavior(patch.system);
+        if (result && typeof result.then === 'function') return result.then(() => this._refresh());
+        this._refresh();
+        return result;
+      },
+      // Patch the scoped node config (count / depletion timing / respawn policy).
+      // Merges the partial onto the current normalized scoped node and re-normalizes
+      // so the stored shape is always canonical.
+      updateScopedNode: (nodePatch) => {
+        if (!this._assertGM()) return undefined;
+        const behavior = this._resolveBehavior();
+        const system = readInteractableBehaviorSystem(behavior);
+        if (!system || system.taskNodeLink !== 'unlinked' || !system.node) return undefined;
+        const merged = normalizeNodeConfig({ ...system.node, ...(nodePatch || {}) });
+        if (!merged) return undefined;
+        const result = writeBehavior({ node: merged });
+        if (result && typeof result.then === 'function') return result.then(() => this._refresh());
+        this._refresh();
+        return result;
+      },
+      // GM "Restock" of the scoped pool (no-op for a nonRegenerating pool).
+      restockScopedNode: (values) => {
+        if (!this._assertGM()) return undefined;
+        const behavior = this._resolveBehavior();
+        const patch = planRestockScopedNode(readInteractableBehaviorSystem(behavior), values || {});
         if (!patch) return undefined;
         const result = writeBehavior(patch.system);
         if (result && typeof result.then === 'function') return result.then(() => this._refresh());

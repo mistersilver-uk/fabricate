@@ -15,11 +15,16 @@
  * a normalized view) and returns the intended mutation/decision. No `globalThis`
  * access.
  *
- * A gathering-task interactable carries NO per-interactable node pool (depletion /
- * respawn is owned by the environment's `nodeRuntime[taskId]`), so there is no
- * restock plan or node-state summary here.
+ * A gathering-task interactable is either LINKED to the gathering task or
+ * UNLINKED (independent), selected by `taskNodeLink`. When
+ * `taskNodeLink === 'unlinked'` the behaviour carries its own `node` object
+ * (independent capacity / depletion / respawn); when 'linked' (the default)
+ * depletion/respawn follow the task (owned by the environment's
+ * `nodeRuntime[taskId]`) and the behaviour carries no node state. The link toggle
+ * + independent-pool restock planners live here.
  */
 
+import { normalizeNodeConfig } from '../../systems/gatheringNodeConfig.js';
 import { resolveLinkedVisual } from '../linkedVisuals/linkedInteractableVisual.js';
 
 import { numberOrNull } from './coercion.js';
@@ -132,9 +137,33 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
 
   const state = view.state && typeof view.state === 'object' ? view.state : {};
 
+  // Task-node link + independent-pool summary (issue 302). Only an unlinked node
+  // (`taskNodeLink === 'unlinked'` with a real `node`) surfaces a node summary;
+  // the linked default reports `taskNodeLink: 'linked'` and a null node.
+  const scopedNode =
+    view.interactableType === 'gatheringTask' && view.taskNodeLink === 'unlinked' && view.node
+      ? normalizeNodeConfig(view.node)
+      : null;
+  const taskNodeLink = scopedNode ? 'unlinked' : 'linked';
+  const nodeSummary = scopedNode
+    ? {
+        max: Number(scopedNode.max || 0),
+        current: Number(scopedNode.current || 0),
+        depleted: Number(scopedNode.current || 0) <= 0,
+        // A depleted nonRegenerating pool is exhausted for good.
+        permanentlyExhausted:
+          Number(scopedNode.current || 0) <= 0 && scopedNode.respawn?.policy === 'nonRegenerating',
+        // Authoring fields the GM config panel edits inline.
+        depletionTiming: scopedNode.depletionTiming,
+        respawn: { policy: scopedNode.respawn?.policy ?? 'manual' },
+      }
+    : null;
+
   return {
     interactableType: view.interactableType,
     name: view.name || '',
+    taskNodeLink,
+    node: nodeSummary,
     systemId: view.systemId || '',
     // The id of the linked Tool (tool station) or Gathering Task, whichever applies.
     referenceId: view.interactableType === 'tool' ? (view.toolId ?? null) : (view.taskId ?? null),
@@ -171,4 +200,72 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
       },
     },
   };
+}
+
+/**
+ * Plan a task-node link toggle for a gatheringTask interactable (issue 302). PURE.
+ *
+ * Switching to `'unlinked'` seeds a fresh independent node (preserving any existing
+ * independent node) so the behaviour owns its own pool; switching to `'linked'`
+ * clears the independent node (depletion/respawn returns to following the task's
+ * environment runtime). Returns null for a non-gatheringTask, an unknown link
+ * value, or a no-op toggle.
+ *
+ * @param {object} system  A behaviour system (raw or normalized view) or a behaviour doc.
+ * @param {'linked'|'unlinked'} link
+ * @returns {{ system: { taskNodeLink: string, node: object|null } } | null}
+ */
+export function planSetTaskNodeLink(system, link) {
+  const view = asSystemView(system);
+  if (!view || view.interactableType !== 'gatheringTask') return null;
+  if (link !== 'linked' && link !== 'unlinked') return null;
+
+  const currentLink = view.taskNodeLink === 'unlinked' && view.node ? 'unlinked' : 'linked';
+  if (currentLink === link) return null; // no-op.
+
+  if (link === 'linked') {
+    return { system: { taskNodeLink: 'linked', node: null } };
+  }
+
+  // Seed an independent node: keep the existing one if present, else a sensible
+  // default single-use pool the GM can then edit through the shared node controls.
+  const existing = normalizeNodeConfig(view.node);
+  const node =
+    existing ??
+    normalizeNodeConfig({ enabled: true, max: 1, current: 1, depletionTiming: 'onStart' });
+  return { system: { taskNodeLink: 'unlinked', node } };
+}
+
+/**
+ * Plan a GM restock of a scoped node pool (issue 302). PURE. Mirrors the
+ * environment restock contract: a `nonRegenerating` pool is permanently
+ * depletable and cannot be restocked (no-op → null). Otherwise sets the pool's
+ * `max` (when provided) and clamps `current` into `[0, max]`. Returns null when
+ * there is no scoped node to restock or the values do not change it.
+ *
+ * @param {object} system  A behaviour system (raw or normalized view) or a behaviour doc.
+ * @param {{ current?: number, max?: number }} [values]
+ * @returns {{ system: { node: object } } | null}
+ */
+export function planRestockScopedNode(system, { current, max } = {}) {
+  const view = asSystemView(system);
+  if (!view || view.interactableType !== 'gatheringTask') return null;
+  const node = normalizeNodeConfig(view.node);
+  if (!node) return null;
+  // A nonRegenerating pool is exhausted-for-good and cannot be topped up.
+  if (node.respawn?.policy === 'nonRegenerating') return null;
+
+  const nextMax =
+    max === null || max === undefined
+      ? Number(node.max || 0)
+      : Math.max(0, Math.floor(Number(max) || 0));
+  const requestedCurrent =
+    current === null || current === undefined
+      ? Number(node.current || 0)
+      : Math.floor(Number(current) || 0);
+  const nextCurrent = Math.min(nextMax, Math.max(0, requestedCurrent));
+  if (nextMax === Number(node.max || 0) && nextCurrent === Number(node.current || 0)) {
+    return null; // no-op.
+  }
+  return { system: { node: { ...node, max: nextMax, current: nextCurrent } } };
 }
