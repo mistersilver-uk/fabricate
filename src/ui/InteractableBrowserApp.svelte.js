@@ -3,6 +3,12 @@ import InteractableBrowserRoot from './svelte/apps/InteractableBrowserRoot.svelt
 import { registerInteractableBrowserApp } from './appFactory.js';
 import { InteractableManager } from '../canvas/InteractableManager.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
+import {
+  listSystemOptions,
+  listSystemTools,
+  listSystemTasks,
+  getSystemComponent,
+} from './interactableSourceLibrary.js';
 
 /**
  * The GM "component browser" (Phase 7): a lightweight ApplicationV2 listing the
@@ -60,37 +66,32 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
    *
    * @returns {object}
    */
+  /**
+   * The dependency bag the shared {@link interactableSourceLibrary} reads through —
+   * the SAME bag the Manage-Interactables promote picker uses, so both surfaces
+   * enumerate Tools + Gathering Tasks from one source of truth.
+   */
+  _sourceDeps() {
+    return {
+      getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
+      getGatheringConfig: () => getSetting(SETTING_KEYS.GATHERING_CONFIG),
+    };
+  }
+
   _buildServices() {
     return {
-      // Crafting systems (id + name), via the live system manager.
-      listSystems: () => {
-        const systems = game?.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [];
-        return Array.from(systems).map((system) => ({ id: system?.id, name: system?.name }));
-      },
-      // Per-system Tool library (the same source ToolsBrowserView reads).
-      listToolsForSystem: (systemId) => {
-        if (!systemId) return [];
-        const system = game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId);
-        return Array.isArray(system?.tools) ? system.tools : [];
-      },
+      // Crafting systems (id + name), via the shared source enumeration.
+      listSystems: () => listSystemOptions(this._sourceDeps()),
+      // Per-system Tool library (the shared system-owned `getSystem(id).tools`).
+      listToolsForSystem: (systemId) => listSystemTools(this._sourceDeps(), systemId),
       // Per-system managed component lookup ({ id, name, img }), the SAME
       // `system.components` source ToolsBrowserView resolves a tool's display
       // name/image from when the tool's own `label` is empty.
-      getComponentForSystem: (systemId, componentId) => {
-        if (!systemId || !componentId) return null;
-        const system = game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId);
-        const components = Array.isArray(system?.components) ? system.components : [];
-        const component = components.find((item) => String(item?.id) === String(componentId));
-        return component ? { id: component.id, name: component.name, img: component.img } : null;
-      },
+      getComponentForSystem: (systemId, componentId) =>
+        getSystemComponent(this._sourceDeps(), systemId, componentId),
       // Per-system gathering library tasks, from the persisted gathering config
       // (the same source InteractableManager._readLibraryTasks reads).
-      listTasksForSystem: (systemId) => {
-        if (!systemId) return [];
-        const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
-        const tasks = config?.systems?.[systemId]?.tasks;
-        return Array.isArray(tasks) ? tasks : [];
-      },
+      listTasksForSystem: (systemId) => listSystemTasks(this._sourceDeps(), systemId),
       // Click-to-place a11y fallback: route through the shared spawn pipeline at
       // the current scene's view center. NOT a divergent placement path. A
       // `visualMode:'none'` routes the SAME spawn as a region-only interactable

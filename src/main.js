@@ -48,7 +48,8 @@ import {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass,
   getInteractableBrowserAppClass,
-  getInteractableConfigAppClass
+  getInteractableConfigAppClass,
+  getInteractablesManagerAppClass
 } from './ui/appFactory.js';
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
@@ -86,6 +87,7 @@ import './ui/SvelteCraftingSystemManagerApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
+import './ui/InteractablesManagerApp.svelte.js';
 
 let gatheringEngine = null;
 
@@ -1489,6 +1491,7 @@ function bindFabricateGlobal() {
     getFabricateAppClass,
     getCraftingSystemManagerAppClass,
     getInteractableConfigAppClass,
+    getInteractablesManagerAppClass,
     CraftingSystemManager,
     CraftingRunManager,
     SalvageRunManager,
@@ -1659,6 +1662,9 @@ Hooks.on('getSceneControlButtons', (controls) => {
   addInteractableSceneControl(controls, {
     isGM: game.user?.isGM === true,
     onClick: () => getInteractableBrowserAppClass().show(),
+    // The Manage Interactables panel (issue 335): a sibling GM-only tool that
+    // lists/manages every interactable on the scene and promotes regions.
+    onManageClick: () => getInteractablesManagerAppClass().show(),
     localize: (key, fallback) => {
       const out = game.i18n?.localize?.(key);
       return out && out !== key ? out : fallback;
