@@ -1000,13 +1000,14 @@ const REPROMPT_REF = { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'be
  * `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`). The single
  * interactable region's containment is controlled by `regionContains`.
  */
-function buildRepromptScene({ system = TOOL_SYSTEM, regionContains = true, actorId = 'actor-1', tokenInScene = true } = {}) {
+function buildRepromptScene({ system = TOOL_SYSTEM, regionContains = true, actorId = 'actor-1', tokenInScene = true, isOwner = true } = {}) {
   const scene = { id: 'scene-1', tokens: { contents: [] } };
   const region = { id: 'region-1', parent: scene, testPoint: () => regionContains === true };
   const behavior = { id: 'beh-1', type: 'fabricate.interactable', system, parent: region };
   region.behaviors = { contents: [behavior] };
   scene.regions = { contents: [region] };
-  const tokenDoc = { actorId, actor: { id: actorId }, isOwner: true };
+  // `_ownsToken` reads the token document's `isOwner` boolean for a non-GM user.
+  const tokenDoc = { actorId, actor: { id: actorId }, isOwner };
   // The live placeable references its document (Foundry's placeable→document link)
   // and carries the center the hit-test reads.
   tokenDoc.object = { center: { x: 50, y: 50 }, document: tokenDoc };
@@ -1124,6 +1125,43 @@ test('the close re-prompt never throws on a malformed ref or missing globals (is
     assert.doesNotThrow(() => manager._repromptAfterInteractableClose({ ref: null, actorId: 'a' }));
     assert.doesNotThrow(() => manager._repromptAfterInteractableClose({ ref: { sceneId: 'scene-1' }, actorId: null }));
     assert.doesNotThrow(() => manager._repromptAfterInteractableClose());
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('the close re-prompt does NOT fire for a token the player does not control (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    // A non-GM user (installed by setupReprompt) whose token is still inside the
+    // region but is NOT owned by this client: `_ownsToken` reads `isOwner:false`.
+    const { manager, prompts } = setupReprompt({ regionContains: true, isOwner: false });
+    manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
+    assert.equal(prompts.length, 0, 'an unowned token in-region is not re-prompted on close');
+
+    // Control: the SAME in-region scenario WITH ownership DOES re-prompt, proving
+    // the guard above suppressed a path that would otherwise have fired.
+    const owned = setupReprompt({ regionContains: true, isOwner: true });
+    owned.manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
+    assert.equal(owned.prompts.length, 1, 'the owned equivalent IS re-prompted (the guard is not a dead path)');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('the close re-prompt delegates to the shared _promptForTokenInsideRegion path (issue 332)', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { manager, tokenDoc } = setupReprompt({ regionContains: true });
+    // Spy on the shared re-prompt path: a future duplicated show-path would bypass
+    // this and fail the call-count assertion.
+    const calls = [];
+    manager._promptForTokenInsideRegion = (p) => calls.push(p);
+
+    manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
+
+    assert.equal(calls.length, 1, 'reuses the shared prompt path exactly once');
+    assert.equal(calls[0], tokenDoc.object, 'passes the resolved live placeable (whose .document is the token doc)');
   } finally {
     restoreGlobals(saved);
   }
