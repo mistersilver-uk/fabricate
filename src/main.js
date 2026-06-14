@@ -682,6 +682,19 @@ class Fabricate {
     const runner = new MigrationRunner({ getSetting, setSetting });
     const summary = await runner.run();
 
+    // Aborted pass: a fatal migration error rolled the in-memory data back and
+    // persisted nothing (migrationVersion is unchanged). Surface a GM-facing error
+    // notification and return early WITHOUT firing any success notices. Detailed
+    // per-document recovery guidance is already emitted to the console by the runner.
+    if (summary?.aborted === true) {
+      if (game.user?.isGM) {
+        const message = game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice')
+          || 'Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance.';
+        ui.notifications?.error?.(message);
+      }
+      return;
+    }
+
     // One-time GM-facing notice: when the 0.6.0 migration actually converted catalysts into
     // shared library Tools, tell the GM (so they know where the catalyst data went). GM-only
     // and only when something was migrated; the pure migration stays free of edge effects.
