@@ -1996,7 +1996,7 @@
     if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0, mode: 'default' }
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
     ];
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
@@ -2016,7 +2016,7 @@
     if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0, mode: 'default' }
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
     ];
     updateSelectedGatheringEvent({ conditionModifiers });
   }
@@ -3733,11 +3733,6 @@
                           />
                           <span aria-hidden="true">%</span>
                         </label>
-                        <select class="manager-condition-modifier-mode-select" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierMode', 'Modifier mode')} value={modifier.mode || 'default'} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { mode: event.currentTarget.value })}>
-                          <option value="default">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeDefault', 'System default')}</option>
-                          <option value="additive">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeAdditive', 'Additive')}</option>
-                          <option value="multiplicative">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeMultiplicative', 'Multiplicative')}</option>
-                        </select>
                         <button
                           type="button"
                           class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
@@ -3808,11 +3803,6 @@
                           <option value="-">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
                         </select>
                       </label>
-                      <select class="manager-character-modifier-mode-select" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierMode', 'Modifier mode')} value={ref.mode || 'default'} onchange={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { mode: event.currentTarget.value })}>
-                        <option value="default">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeDefault', 'System default')}</option>
-                        <option value="additive">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeAdditive', 'Additive')}</option>
-                        <option value="multiplicative">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeMultiplicative', 'Multiplicative')}</option>
-                      </select>
                       <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteDropCharacterModifier(selectedGatheringDrop.id, ref.id)}>
                         <i class="fas fa-trash" aria-hidden="true"></i>
                       </button>
@@ -3945,11 +3935,6 @@
                             />
                             <span aria-hidden="true">%</span>
                           </label>
-                          <select class="manager-condition-modifier-mode-select" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierMode', 'Modifier mode')} value={modifier.mode || 'default'} onchange={(event) => updateGatheringEventConditionModifier(kind, modifier.id, { mode: event.currentTarget.value })}>
-                            <option value="default">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeDefault', 'System default')}</option>
-                            <option value="additive">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeAdditive', 'Additive')}</option>
-                            <option value="multiplicative">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeMultiplicative', 'Multiplicative')}</option>
-                          </select>
                           <button
                             type="button"
                             class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
@@ -4022,11 +4007,6 @@
                             <option value="-">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
                           </select>
                         </label>
-                        <select class="manager-character-modifier-mode-select" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierMode', 'Modifier mode')} value={ref.mode || 'default'} onchange={(event) => onUpdateEventCharacterModifier(ref.id, { mode: event.currentTarget.value })}>
-                          <option value="default">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeDefault', 'System default')}</option>
-                          <option value="additive">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeAdditive', 'Additive')}</option>
-                          <option value="multiplicative">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ModifierModeMultiplicative', 'Multiplicative')}</option>
-                        </select>
                         <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteEventCharacterModifier(ref.id)}>
                           <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
@@ -4192,7 +4172,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-percent"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-drop-modifier-mode">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierMode', 'Modifier mode')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeDescription', 'Choose how drop and event modifiers (character, weather, time of day, biome) adjust a chance by default.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeDescription', 'Choose how all drop and event modifiers (character, weather, time of day, biome) adjust a chance. This applies system-wide and cannot be overridden per modifier.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-drop-modifier-mode" value={selectedGatheringRules.dropModifierMode ?? 'additive'} onchange={(event) => updateSelectedGatheringRules({ dropModifierMode: event.target.value })}>

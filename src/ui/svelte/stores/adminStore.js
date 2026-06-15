@@ -474,10 +474,10 @@ function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toS
 
 const GATHERING_CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
-// Mirrors GatheringRichStateService: system-default application mode and the
-// per-reference override vocabulary (`'default'` inherits the system mode).
+// Mirrors GatheringRichStateService: the drop-modifier application mode is a
+// single global system setting (`dropModifierMode`) and is not overridable per
+// modifier.
 const GATHERING_DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
-const GATHERING_DROP_MODIFIER_REFERENCE_MODES = new Set(['default', 'additive', 'multiplicative']);
 
 function _normalizeGatheringCharacterModifier(entry = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
   if (!entry || typeof entry !== 'object') return null;
@@ -513,7 +513,6 @@ function _normalizeGatheringCharacterModifierReference(ref, index, randomID = ()
     id: ref.id ? String(ref.id) : `char-mod-${modifierId}-${index + 1}`,
     modifierId,
     operator: GATHERING_CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
-    mode: GATHERING_DROP_MODIFIER_REFERENCE_MODES.has(ref.mode) ? ref.mode : 'default',
     min,
     max,
     expressionOverride: String(ref.expressionOverride || '')
@@ -543,10 +542,7 @@ function _normalizeGatheringDropConditionModifierList(values = [], normalizeId =
         id: String(modifier?.id || `${conditionId}-${index + 1}`),
         conditionId,
         operator,
-        value: Math.abs(truncated),
-        // Per-entry additive/multiplicative override; `'default'` inherits the
-        // system `dropModifierMode` (mirrors GatheringRichStateService).
-        mode: GATHERING_DROP_MODIFIER_REFERENCE_MODES.has(modifier?.mode) ? modifier.mode : 'default'
+        value: Math.abs(truncated)
       };
     })
     .filter(Boolean);
@@ -4917,7 +4913,6 @@ export function createAdminStore(services) {
         id,
         modifierId,
         operator: partial?.operator || '+',
-        mode: partial?.mode || 'default',
         min: partial?.min ?? null,
         max: partial?.max ?? null,
         expressionOverride: partial?.expressionOverride || ''
@@ -5016,7 +5011,6 @@ export function createAdminStore(services) {
       id,
       modifierId,
       operator: partial?.operator || '+',
-      mode: partial?.mode || 'default',
       min: partial?.min ?? null,
       max: partial?.max ?? null,
       expressionOverride: partial?.expressionOverride || ''

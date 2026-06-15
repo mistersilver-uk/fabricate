@@ -2327,8 +2327,8 @@ describe('createAdminStore', () => {
       assert.deepEqual(saved.timeOfDay, []);
       assert.equal(saved.dropRows[0].dropRate, 0);
       assert.deepEqual(saved.dropRows[0].conditionModifiers, {
-        timeOfDay: [{ id: 'night-penalty', conditionId: 'night', operator: '-', value: 5, mode: 'default' }],
-        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15, mode: 'default' }],
+        timeOfDay: [{ id: 'night-penalty', conditionId: 'night', operator: '-', value: 5 }],
+        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }],
         biome: []
       });
     });
@@ -2883,7 +2883,7 @@ describe('createAdminStore', () => {
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });
 
-    it('issue 299: normalizes dropModifierMode and per-reference/per-entry mode (defaults, unknown fallback, valid preserved, legacy key)', async () => {
+    it('issue 299: normalizes the global dropModifierMode and strips any per-reference/per-entry mode (defaults, unknown fallback, valid preserved, legacy key)', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2902,18 +2902,17 @@ describe('createAdminStore', () => {
               dropRows: [{
                 id: 'row-iron', componentId: 'iron', quantity: 1, dropRate: 50,
                 characterModifiers: [
-                  { id: 'ref-default', modifierId: 'str', operator: '+' },                       // missing -> default
-                  { id: 'ref-unknown', modifierId: 'str', operator: '+', mode: 'nonsense' },      // unknown -> default
-                  { id: 'ref-mult', modifierId: 'str', operator: '-', mode: 'multiplicative' },   // valid preserved
-                  { id: 'ref-add', modifierId: 'str', operator: '+', mode: 'additive' }           // valid preserved
+                  { id: 'ref-plain', modifierId: 'str', operator: '+' },                          // no mode
+                  { id: 'ref-mult', modifierId: 'str', operator: '-', mode: 'multiplicative' },    // stray mode stripped
+                  { id: 'ref-add', modifierId: 'str', operator: '+', mode: 'additive' }            // stray mode stripped
                 ],
                 conditionModifiers: {
                   weather: [
-                    { id: 'w-default', conditionId: 'rain', operator: '-', value: 10 },                    // missing -> default
-                    { id: 'w-mult', conditionId: 'storm', operator: '-', value: 50, mode: 'multiplicative' }
+                    { id: 'w-plain', conditionId: 'rain', operator: '-', value: 10 },                       // no mode
+                    { id: 'w-mult', conditionId: 'storm', operator: '-', value: 50, mode: 'multiplicative' } // stray mode stripped
                   ],
-                  timeOfDay: [{ id: 't-bad', conditionId: 'night', operator: '+', value: 5, mode: 'bogus' }], // unknown -> default
-                  biome: [{ id: 'b-add', conditionId: 'forest', operator: '+', value: 5, mode: 'additive' }]
+                  timeOfDay: [{ id: 't-bad', conditionId: 'night', operator: '+', value: 5, mode: 'bogus' }], // stray mode stripped
+                  biome: [{ id: 'b-add', conditionId: 'forest', operator: '+', value: 5, mode: 'additive' }]  // stray mode stripped
                 }
               }]
             }],
@@ -2932,18 +2931,19 @@ describe('createAdminStore', () => {
       // System default: unknown coerces to 'additive' and emits the new key only.
       assert.equal(config.rules.dropModifierMode, 'additive');
       assert.equal('characterModifierMode' in config.rules, false, 'legacy rule key not emitted');
+      // Per-reference/per-entry mode is no longer a configurable field: it is
+      // stripped on normalization so it cannot subvert the global system mode.
       const refs = config.tasks[0].dropRows[0].characterModifiers;
-      assert.equal(refs.find(r => r.id === 'ref-default').mode, 'default', 'missing mode -> default');
-      assert.equal(refs.find(r => r.id === 'ref-unknown').mode, 'default', 'unknown mode -> default');
-      assert.equal(refs.find(r => r.id === 'ref-mult').mode, 'multiplicative', 'valid multiplicative preserved');
-      assert.equal(refs.find(r => r.id === 'ref-add').mode, 'additive', 'valid additive preserved');
-      assert.equal(config.events[0].characterModifiers[0].mode, 'multiplicative', 'event ref mode preserved');
-      // Condition modifiers gain the same per-entry mode default/coercion.
+      for (const ref of refs) {
+        assert.equal('mode' in ref, false, `character modifier reference ${ref.id} carries no mode`);
+      }
+      assert.equal('mode' in config.events[0].characterModifiers[0], false, 'event ref carries no mode');
       const cm = config.tasks[0].dropRows[0].conditionModifiers;
-      assert.equal(cm.weather.find(m => m.id === 'w-default').mode, 'default', 'condition missing mode -> default');
-      assert.equal(cm.weather.find(m => m.id === 'w-mult').mode, 'multiplicative', 'condition multiplicative preserved');
-      assert.equal(cm.timeOfDay.find(m => m.id === 't-bad').mode, 'default', 'condition unknown mode -> default');
-      assert.equal(cm.biome.find(m => m.id === 'b-add').mode, 'additive', 'biome additive preserved');
+      for (const list of [cm.weather, cm.timeOfDay, cm.biome]) {
+        for (const entry of list) {
+          assert.equal('mode' in entry, false, `condition modifier ${entry.id} carries no mode`);
+        }
+      }
 
       // A valid system mode survives the round-trip and emits only the new key.
       await store.updateGatheringRules('sys1', { dropModifierMode: 'multiplicative' });
@@ -3559,7 +3559,7 @@ describe('createAdminStore', () => {
       assert.ok(dropRef, 'drop ref was created');
       assert.equal(dropRef.modifierId, 'strength');
       assert.equal(dropRef.operator, '+');
-      assert.equal(dropRef.mode, 'default', 'new drop ref defaults to mode "default" (issue 299)');
+      assert.equal('mode' in dropRef, false, 'new drop ref carries no per-reference mode (issue 299)');
       let task = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(task.dropRows[0].characterModifiers.length, 1);
       assert.equal(task.dropRows[0].characterModifiers[0].id, dropRef.id);
@@ -3576,7 +3576,7 @@ describe('createAdminStore', () => {
       task = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(task.dropRows[0].characterModifiers[0].modifierId, 'dexterity');
       assert.equal(task.dropRows[0].characterModifiers[0].operator, '-');
-      assert.equal(task.dropRows[0].characterModifiers[0].mode, 'multiplicative', 'update merges/normalizes mode (issue 299)');
+      assert.equal('mode' in task.dropRows[0].characterModifiers[0], false, 'a stray mode partial is dropped on normalization (issue 299)');
       assert.equal(task.dropRows[0].characterModifiers[0].min, -2);
       assert.equal(task.dropRows[0].characterModifiers[0].max, 5);
       assert.equal(task.dropRows[0].characterModifiers[0].expressionOverride, '1d4 + @abilities.dex.mod');
@@ -3588,7 +3588,7 @@ describe('createAdminStore', () => {
       assert.ok(eventRef, 'event ref was created');
       assert.equal(eventRef.modifierId, 'strength');
       assert.equal(eventRef.operator, '-');
-      assert.equal(eventRef.mode, 'default', 'new event ref defaults to mode "default" (issue 299)');
+      assert.equal('mode' in eventRef, false, 'new event ref carries no per-reference mode (issue 299)');
       let event = services._store.gatheringConfig.systems.sys1.events[0];
       assert.equal(event.characterModifiers.length, 1);
       assert.equal(event.characterModifiers[0].id, eventRef.id);

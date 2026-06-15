@@ -371,25 +371,40 @@ test('issue 299: additive negative (base 25, -10 => 15)', async () => {
 });
 
 test('issue 299: multiplicative single negative clean (base 20 x0.9 => 18)', async () => {
-  const drop = await resolveDrop({ dropRate: 20, reference: { id: 'r', modifierId: 'mod', operator: '-', mode: 'multiplicative' } });
+  const drop = await resolveDrop({
+    dropRate: 20,
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+  });
   assert.equal(drop.characterModifierTotal, 0, 'multiplicative entries contribute no additive delta');
   assert.equal(drop.characterModifierFactor, 0.9);
   assert.equal(drop.finalDropRate, 18);
 });
 
 test('issue 299: multiplicative single negative locks rounding (base 25 x0.9 => 23)', async () => {
-  const drop = await resolveDrop({ dropRate: 25, reference: { id: 'r', modifierId: 'mod', operator: '-', mode: 'multiplicative' } });
+  const drop = await resolveDrop({
+    dropRate: 25,
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+  });
   // 25 * 0.9 = 22.5 -> Math.round => 23
   assert.equal(drop.finalDropRate, 23);
 });
 
 test('issue 299: multiplicative positive (base 50 x1.2 => 60)', async () => {
-  const drop = await resolveDrop({ dropRate: 50, value: 20, reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'multiplicative' } });
+  const drop = await resolveDrop({
+    dropRate: 50,
+    value: 20,
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '+' }
+  });
   assert.equal(drop.characterModifierFactor, 1.2);
   assert.equal(drop.finalDropRate, 60);
 });
 
-test('issue 299: mixed order applies additive before multiplicative (base 20, +10 add & -50% mult => 15)', async () => {
+test('issue 299: multiplicative system mode applies multiplicatively to every reference (base 20, +10% & -50% => 11)', async () => {
+  // Under a multiplicative system mode every character modifier is its own
+  // factor that multiplies into the running product: 1.1 * 0.5 = 0.55.
   const { service } = makeRichState({
     config: configFor({ entries: [
       { id: 'add', label: 'Add', icon: 'fa-solid fa-plus', provider: 'dnd5e', expression: '@add' },
@@ -399,67 +414,72 @@ test('issue 299: mixed order applies additive before multiplicative (base 20, +1
     evaluateExpression: (payload) => (payload.modifier.id === 'add' ? 10 : 50)
   });
   const result = await composeAndResolve(service, {
+    rules: { dropModifierMode: 'multiplicative' },
     task: {
       id: 't',
       dropRows: [{
         id: 'd1', componentId: 'herb', quantity: 1, dropRate: 20,
         characterModifiers: [
-          { id: 'r-add', modifierId: 'add', operator: '+', mode: 'additive' },
-          { id: 'r-mult', modifierId: 'mult', operator: '-', mode: 'multiplicative' }
+          { id: 'r-add', modifierId: 'add', operator: '+' },
+          { id: 'r-mult', modifierId: 'mult', operator: '-' }
         ]
       }]
     }
   });
   const drop = result.items[0];
-  // (20 + 10) * 0.5 = 15. Control: reverse order (20*0.5)+10 = 20, which we must NOT get.
-  assert.equal(drop.characterModifierTotal, 10);
-  assert.equal(drop.characterModifierFactor, 0.5);
-  assert.equal(drop.finalDropRate, 15);
-  assert.notEqual(drop.finalDropRate, 20, 'multiplying base before adding would give 20');
+  // Product of factors: 1.1 * 0.5 = 0.55; 20 * 0.55 = 11. No additive delta.
+  assert.equal(drop.characterModifierTotal, 0);
+  assert.equal(drop.characterModifierFactor, 0.55);
+  assert.equal(drop.finalDropRate, 11);
 });
 
-test('issue 299: per-reference override beats system default (both directions)', async () => {
-  // System default multiplicative, but the reference forces additive.
+test('issue 299: system mode always wins; a per-reference mode value is ignored', async () => {
+  // A stray reference `mode:'multiplicative'` is dropped on normalization, so an
+  // additive system mode keeps additive math.
   const additive = await resolveDrop({
-    dropRate: 25,
-    rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'additive' }
-  });
-  assert.equal(additive.finalDropRate, 35, 'additive override under multiplicative default');
-  assert.equal(additive.characterModifierFactor, 1);
-
-  // System default additive, but the reference forces multiplicative.
-  const multiplicative = await resolveDrop({
     dropRate: 50,
     value: 20,
     rules: { dropModifierMode: 'additive' },
     reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'multiplicative' }
   });
-  assert.equal(multiplicative.finalDropRate, 60, 'multiplicative override under additive default');
+  assert.equal(additive.finalDropRate, 70, 'system additive mode ignores the per-reference value');
+  assert.equal(additive.characterModifierFactor, 1);
+  assert.equal(additive.characterModifierTotal, 20);
+
+  // A stray reference `mode:'additive'` is dropped too, so a multiplicative
+  // system mode keeps multiplicative math.
+  const multiplicative = await resolveDrop({
+    dropRate: 50,
+    value: 20,
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'additive' }
+  });
+  assert.equal(multiplicative.finalDropRate, 60, 'system multiplicative mode ignores the per-reference value');
   assert.equal(multiplicative.characterModifierFactor, 1.2);
 });
 
-test('issue 299: default reference mode inherits system default (additive vs multiplicative)', async () => {
+test('issue 299: effective mode is driven solely by the system default (additive vs multiplicative)', async () => {
   const additive = await resolveDrop({
     dropRate: 25,
     rules: { dropModifierMode: 'additive' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'default' }
+    reference: { id: 'r', modifierId: 'mod', operator: '+' }
   });
   assert.equal(additive.finalDropRate, 35);
 
   const multiplicative = await resolveDrop({
     dropRate: 20,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-', mode: 'default' }
+    reference: { id: 'r', modifierId: 'mod', operator: '-' }
   });
-  assert.equal(multiplicative.finalDropRate, 18, 'default inherits multiplicative system mode');
+  assert.equal(multiplicative.finalDropRate, 18, 'multiplicative system mode scales the base');
 });
 
 test('issue 299: min/max clamps value before factor (value 50 but max 10, - mult => x0.9)', async () => {
   const drop = await resolveDrop({
     dropRate: 20,
     value: 50,
-    reference: { id: 'r', modifierId: 'mod', operator: '-', mode: 'multiplicative', max: 10 }
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '-', max: 10 }
   });
   // value clamped 50 -> 10, factor 1 - 10/100 = 0.9, 20*0.9 = 18
   assert.equal(drop.characterModifierFactor, 0.9);
@@ -489,7 +509,8 @@ test('issue 299: rounding/clamp boundaries (100 x1.5 => 100 threshold 1)', async
   const high = await resolveDrop({
     dropRate: 100,
     value: 50,
-    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'multiplicative' }
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '+' }
   });
   assert.equal(high.finalDropRate, 100, '100 * 1.5 clamps to 100');
   assert.equal(high.threshold, 1, 'threshold floored at 1');
@@ -499,7 +520,8 @@ test('issue 299: rounding/clamp boundaries (1 x0.1 => 0 via preview)', async () 
   const drop = await previewDrop({
     dropRate: 1,
     value: 90,
-    reference: { id: 'r', modifierId: 'mod', operator: '-', mode: 'multiplicative' }
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '-' }
   });
   // 1 * 0.1 = 0.1 -> Math.round => 0
   assert.equal(Math.round(drop.finalChance * 100), 0);
@@ -509,7 +531,8 @@ test('issue 299: negative-factor guard (value 150, - mult => factor 0 => 0)', as
   const drop = await previewDrop({
     dropRate: 80,
     value: 150,
-    reference: { id: 'r', modifierId: 'mod', operator: '-', mode: 'multiplicative' }
+    rules: { dropModifierMode: 'multiplicative' },
+    reference: { id: 'r', modifierId: 'mod', operator: '-' }
   });
   // 1 - 150/100 = -0.5 -> guarded to 0; 80 * 0 = 0
   assert.equal(Math.round(drop.finalChance * 100), 0);
@@ -522,10 +545,11 @@ test('issue 299: event drop rate uses the same additive-then-multiplicative aggr
     evaluateExpression: () => 10
   });
   const result = await composeAndResolve(service, {
+    rules: { dropModifierMode: 'multiplicative' },
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
     events: [{
       id: 'h1', name: 'Trap', dropRate: 20,
-      characterModifiers: [{ id: 'rh', modifierId: 'mod', operator: '-', mode: 'multiplicative' }]
+      characterModifiers: [{ id: 'rh', modifierId: 'mod', operator: '-' }]
     }]
   });
   const event = result.events[0];
@@ -598,8 +622,9 @@ test('issue 299: additive-only condition modifiers stay byte-identical (conditio
 test('issue 299: multiplicative weather condition (base 20, rain -10% mult => 18)', async () => {
   const drop = await resolveConditionRow({
     dropRate: 20,
+    rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10, mode: 'multiplicative' }] }
+    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10 }] }
   });
   // 20 * 0.9 = 18; the multiplicative weather entry contributes no additive delta.
   assert.equal(drop.conditionModifier, 0);
@@ -609,150 +634,201 @@ test('issue 299: multiplicative weather condition (base 20, rain -10% mult => 18
 test('issue 299: multiplicative time-of-day condition (base 50, night +20% mult => 60)', async () => {
   const drop = await resolveConditionRow({
     dropRate: 50,
+    rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'clear', timeOfDay: 'night' },
-    conditionModifiers: { timeOfDay: [{ id: 't', conditionId: 'night', operator: '+', value: 20, mode: 'multiplicative' }] }
+    conditionModifiers: { timeOfDay: [{ id: 't', conditionId: 'night', operator: '+', value: 20 }] }
   });
   assert.equal(drop.finalDropRate, 60);
 });
 
-test('issue 299: multiplicative biome across aggregations + mixed additive/multiplicative subset', async () => {
-  // Two active biomes; one additive +10, one multiplicative -50%.
+test('issue 299: additive system mode aggregates biome modifiers additively across policies', async () => {
+  // Under the (default) additive system mode every active biome modifier is an
+  // additive percentage-point delta aggregated by the biome policy.
   const conditionModifiers = {
     biome: [
-      { id: 'b-add', conditionId: 'forest', operator: '+', value: 10, mode: 'additive' },
-      { id: 'b-mult', conditionId: 'swamp', operator: '-', value: 50, mode: 'multiplicative' }
+      { id: 'b1', conditionId: 'forest', operator: '+', value: 30 },
+      { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 },
+      { id: 'b3', conditionId: 'cave', operator: '-', value: 5 }
     ]
   };
-  // (20 + 10) * 0.5 = 15 regardless of aggregation when there is one of each.
-  for (const aggregation of ['cumulative', 'strongestOfEach', 'dominant']) {
-    const drop = await resolveConditionRow({
-      dropRate: 20,
-      conditions: { weather: 'clear', timeOfDay: 'day' },
-      biomes: ['forest', 'swamp'],
-      rules: { biomeModifierAggregation: aggregation },
-      conditionModifiers
-    });
-    assert.equal(drop.finalDropRate, 15, `mixed biome subset under ${aggregation}`);
-    assert.equal(drop.conditionModifier, 10, `additive biome subset reported under ${aggregation}`);
-  }
+  // cumulative: 30 - 20 - 5 = +5 => base 40 + 5 = 45.
+  const cumulative = await resolveConditionRow({
+    dropRate: 40,
+    conditions: { weather: 'clear', timeOfDay: 'day' },
+    biomes: ['forest', 'swamp', 'cave'],
+    rules: { biomeModifierAggregation: 'cumulative' },
+    conditionModifiers
+  });
+  assert.equal(cumulative.conditionModifier, 5);
+  assert.equal(cumulative.finalDropRate, 45);
 
+  // strongestOfEach: largest boost (+30) plus largest penalty (-20) = +10 => 50.
+  const strongest = await resolveConditionRow({
+    dropRate: 40,
+    conditions: { weather: 'clear', timeOfDay: 'day' },
+    biomes: ['forest', 'swamp', 'cave'],
+    rules: { biomeModifierAggregation: 'strongestOfEach' },
+    conditionModifiers
+  });
+  assert.equal(strongest.conditionModifier, 10);
+  assert.equal(strongest.finalDropRate, 50);
+
+  // dominant: single largest-magnitude delta (+30) => 70.
+  const dominant = await resolveConditionRow({
+    dropRate: 40,
+    conditions: { weather: 'clear', timeOfDay: 'day' },
+    biomes: ['forest', 'swamp', 'cave'],
+    rules: { biomeModifierAggregation: 'dominant' },
+    conditionModifiers
+  });
+  assert.equal(dominant.conditionModifier, 30);
+  assert.equal(dominant.finalDropRate, 70);
+});
+
+test('issue 299: multiplicative system mode aggregates biome modifiers multiplicatively across policies', async () => {
   // Two multiplicative biomes: cumulative aggregates the signed percents (-10 + -20 = -30 => x0.7).
   const cumulative = await resolveConditionRow({
     dropRate: 100,
+    rules: { dropModifierMode: 'multiplicative', biomeModifierAggregation: 'cumulative' },
     conditions: { weather: 'clear', timeOfDay: 'day' },
     biomes: ['forest', 'swamp'],
-    rules: { biomeModifierAggregation: 'cumulative' },
     conditionModifiers: {
       biome: [
-        { id: 'b1', conditionId: 'forest', operator: '-', value: 10, mode: 'multiplicative' },
-        { id: 'b2', conditionId: 'swamp', operator: '-', value: 20, mode: 'multiplicative' }
+        { id: 'b1', conditionId: 'forest', operator: '-', value: 10 },
+        { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 }
       ]
     }
   });
+  assert.equal(cumulative.conditionModifier, 0, 'multiplicative entries contribute no additive delta');
   assert.equal(cumulative.finalDropRate, 70, 'cumulative aggregates signed percents then applies one factor');
 
   // strongestOfEach picks the largest boost + largest penalty in signed-percent space.
   const strongest = await resolveConditionRow({
-    dropRate: 100,
+    dropRate: 50,
+    rules: { dropModifierMode: 'multiplicative', biomeModifierAggregation: 'strongestOfEach' },
     conditions: { weather: 'clear', timeOfDay: 'day' },
     biomes: ['forest', 'swamp', 'cave'],
-    rules: { biomeModifierAggregation: 'strongestOfEach' },
     conditionModifiers: {
       biome: [
-        { id: 'b1', conditionId: 'forest', operator: '+', value: 30, mode: 'multiplicative' },
-        { id: 'b2', conditionId: 'swamp', operator: '-', value: 20, mode: 'multiplicative' },
-        { id: 'b3', conditionId: 'cave', operator: '-', value: 5, mode: 'multiplicative' }
+        { id: 'b1', conditionId: 'forest', operator: '+', value: 30 },
+        { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 },
+        { id: 'b3', conditionId: 'cave', operator: '-', value: 5 }
       ]
     }
   });
-  // +30 boost + -20 penalty = +10 signed => x1.1 => 110 clamped to 100.
-  assert.equal(strongest.finalDropRate, 100);
+  // +30 boost + -20 penalty = +10 signed => x1.1 => 50 * 1.1 = 55.
+  assert.equal(strongest.finalDropRate, 55);
 
   // dominant picks the single largest-magnitude signed percent (-40 => x0.6).
   const dominant = await resolveConditionRow({
     dropRate: 100,
+    rules: { dropModifierMode: 'multiplicative', biomeModifierAggregation: 'dominant' },
     conditions: { weather: 'clear', timeOfDay: 'day' },
     biomes: ['forest', 'swamp'],
-    rules: { biomeModifierAggregation: 'dominant' },
     conditionModifiers: {
       biome: [
-        { id: 'b1', conditionId: 'forest', operator: '+', value: 10, mode: 'multiplicative' },
-        { id: 'b2', conditionId: 'swamp', operator: '-', value: 40, mode: 'multiplicative' }
+        { id: 'b1', conditionId: 'forest', operator: '+', value: 10 },
+        { id: 'b2', conditionId: 'swamp', operator: '-', value: 40 }
       ]
     }
   });
   assert.equal(dominant.finalDropRate, 60);
 });
 
-test('issue 299: mixed character + condition modifiers apply additive before multiplicative', async () => {
-  // base 20, +10 char additive, +5 weather additive, -50% biome multiplicative.
-  // (20 + 10 + 5) * 0.5 = 17.5 -> round => 18.
+test('issue 299: under multiplicative mode character + condition modifiers all apply as factors', async () => {
+  // Multiplicative system mode: char +10% (x1.1), weather +5% (x1.05),
+  // biome -50% (x0.5) all multiply the base. 20 * 1.1 * 1.05 * 0.5 = 11.55 -> 12.
   const drop = await resolveConditionRow({
     dropRate: 20,
+    rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
     biomes: ['forest'],
     characterModifiers: [{ id: 'rc', modifierId: 'mod', operator: '+' }], // resolves to +10 (value 10)
     conditionModifiers: {
       weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 5 }],
-      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50, mode: 'multiplicative' }]
+      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }]
     }
   });
-  assert.equal(drop.characterModifierTotal, 10);
-  assert.equal(drop.conditionModifier, 5, 'additive condition total (weather) only');
-  assert.equal(drop.finalDropRate, 18);
+  assert.equal(drop.characterModifierTotal, 0, 'multiplicative character modifiers contribute no additive delta');
+  assert.equal(drop.conditionModifier, 0, 'multiplicative condition modifiers contribute no additive delta');
+  assert.equal(drop.finalDropRate, 12);
 });
 
-test('issue 299: per-entry condition override beats system default; default inherits it', async () => {
-  // System default multiplicative; an explicit additive weather entry forces a sum.
-  const override = await resolveConditionRow({
-    dropRate: 20,
-    rules: { dropModifierMode: 'multiplicative' },
+test('issue 299: under additive mode character + condition modifiers all apply as deltas', async () => {
+  // base 20, +10 char, +5 weather, -50 biome (all additive) => 20 + 10 + 5 - 50 = -15 -> clamp 0.
+  const drop = await resolveConditionRow({
+    dropRate: 60,
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 10, mode: 'additive' }] }
+    biomes: ['forest'],
+    characterModifiers: [{ id: 'rc', modifierId: 'mod', operator: '+' }], // resolves to +10 (value 10)
+    conditionModifiers: {
+      weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 5 }],
+      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }]
+    }
   });
-  assert.equal(override.finalDropRate, 30, 'additive override under multiplicative default');
-  assert.equal(override.conditionModifier, 10);
+  // 60 + 10 + 5 - 50 = 25.
+  assert.equal(drop.characterModifierTotal, 10);
+  assert.equal(drop.conditionModifier, -45, 'additive weather (+5) and biome (-50) total');
+  assert.equal(drop.finalDropRate, 25);
+});
 
-  // System default multiplicative; a 'default' entry inherits it.
-  const inherited = await resolveConditionRow({
+test('issue 299: a per-entry condition mode value is ignored; system mode wins', async () => {
+  // System default additive; a stray entry `mode:'multiplicative'` is stripped
+  // on normalization, so the weather entry stays additive.
+  const additive = await resolveConditionRow({
+    dropRate: 20,
+    rules: { dropModifierMode: 'additive' },
+    conditions: { weather: 'rain', timeOfDay: 'day' },
+    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 10, mode: 'multiplicative' }] }
+  });
+  assert.equal(additive.finalDropRate, 30, 'system additive mode ignores the per-entry value');
+  assert.equal(additive.conditionModifier, 10);
+
+  // System default multiplicative; a stray entry `mode:'additive'` is stripped,
+  // so the weather entry stays multiplicative.
+  const multiplicative = await resolveConditionRow({
     dropRate: 20,
     rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10, mode: 'default' }] }
+    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10, mode: 'additive' }] }
   });
-  assert.equal(inherited.finalDropRate, 18, 'default inherits multiplicative system mode');
-  assert.equal(inherited.conditionModifier, 0);
+  assert.equal(multiplicative.finalDropRate, 18, 'system multiplicative mode ignores the per-entry value');
+  assert.equal(multiplicative.conditionModifier, 0);
 });
 
 test('issue 299: preview parity with the rolled result for a multiplicative condition', async () => {
   const args = {
     dropRate: 20,
+    rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
     biomes: ['forest'],
     conditionModifiers: {
       weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 5 }],
-      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50, mode: 'multiplicative' }]
+      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }]
     }
   };
   const rolled = await resolveConditionRow(args);
   const preview = await previewConditionRow(args);
-  // (20 + 5) * 0.5 = 12.5 -> round => 13.
-  assert.equal(rolled.finalDropRate, 13);
-  assert.equal(Math.round(preview.finalChance * 100), 13, 'preview finalChance matches the rolled rate');
-  // Display payload: additive weather value plus the biome multiplicative factor.
-  assert.equal(preview.modifiers.weather.value, 5);
+  // 20 * 1.05 * 0.5 = 10.5 -> round => 11.
+  assert.equal(rolled.finalDropRate, 11);
+  assert.equal(Math.round(preview.finalChance * 100), 11, 'preview finalChance matches the rolled rate');
+  // Display payload: weather multiplicative factor and the biome multiplicative factor.
+  assert.equal(preview.modifiers.weather.factor, 1.05);
   assert.equal(preview.modifiers.biome.factor, 0.5);
 });
 
 test('issue 299: taskSuccessChance reflects a multiplicative condition modifier', async () => {
   const service = makeRichState({ config: configFor({ entries: [] }) }).service;
-  const composed = environmentWithLibrary(service, { conditions: { weather: 'rain', timeOfDay: 'day' } });
+  const composed = environmentWithLibrary(service, {
+    conditions: { weather: 'rain', timeOfDay: 'day' },
+    rules: { dropModifierMode: 'multiplicative' }
+  });
   const task = {
     id: 't',
     resolutionMode: 'd100',
     dropRows: [{
       id: 'd1', componentId: 'herb', quantity: 1, dropRate: 20,
-      conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10, mode: 'multiplicative' }] }
+      conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10 }] }
     }]
   };
   const chance = service.taskSuccessChance(task, composed);
@@ -766,11 +842,12 @@ test('issue 299: event path honors a multiplicative condition modifier', async (
     rolls: [100, 100]
   }).service;
   const result = await composeAndResolve(service, {
+    rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
     events: [{
       id: 'h1', name: 'Trap', dropRate: 20,
-      conditionModifiers: { weather: [{ id: 'we', conditionId: 'rain', operator: '-', value: 10, mode: 'multiplicative' }] }
+      conditionModifiers: { weather: [{ id: 'we', conditionId: 'rain', operator: '-', value: 10 }] }
     }]
   });
   const event = result.events[0];
