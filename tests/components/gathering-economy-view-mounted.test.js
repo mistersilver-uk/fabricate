@@ -137,7 +137,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
   });
 
   it('persists config edits and reveals regen + actor controls when stamina is enabled', async () => {
-    const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }];
+    const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: false }];
     const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
 
@@ -187,8 +187,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('bulk-saves rolled characters (current + max override) from the header Save', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' },
-      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, provider: 'fabricate' } // un-rolled
+      { actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: false },
+      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, maxReadOnly: false } // un-rolled
     ];
     const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
@@ -211,10 +211,25 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     unmount(mounted); mounted = null; target.remove();
   });
 
+  it('disables the max-override cell for a rolled character whose max is read-only', async () => {
+    const actors = [
+      { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: true }, // rolled, read-only max
+      { actorId: 'a2', name: 'Borin', img: '', current: 4, max: 8, rolledMax: 8, maxOverride: null, maxReadOnly: false } // rolled, writable max
+    ];
+    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
+    await mountView({ services, systemId: 'sys-1' });
+
+    const readOnlyMax = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-max]');
+    assert.equal(readOnlyMax.disabled, true, 'read-only max-override cell is disabled');
+    const writableMax = target.querySelector('[data-economy-actor-id="a2"] [data-economy-actor-max]');
+    assert.equal(writableMax.disabled, false, 'writable max-override cell is enabled');
+    unmount(mounted); mounted = null; target.remove();
+  });
+
   it('shows un-rolled characters as disabled with an emphasised dice button; rolled get a reset button', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, provider: 'fabricate' }, // rolled
-      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, provider: 'fabricate' } // un-rolled
+      { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: false }, // rolled
+      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, maxReadOnly: false } // un-rolled
     ];
     const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });
@@ -237,8 +252,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('filters the character list by the search box', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, rolledMax: 5, maxOverride: null, provider: 'fabricate' },
-      { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, rolledMax: 8, maxOverride: null, provider: 'fabricate' }
+      { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, rolledMax: 5, maxOverride: null, maxReadOnly: false },
+      { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, rolledMax: 8, maxOverride: null, maxReadOnly: false }
     ];
     const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
     await mountView({ services, systemId: 'sys-1' });

@@ -165,6 +165,28 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
+    // The character-modifier editor is formula-only: a plain labelled expression
+    // input, with no provider chip, provider-label helper, or macro UUID field.
+    assert.ok(
+      !systemEditSource.includes('ProviderExpressionInput'),
+      'character-modifier editor should not import the deleted provider/expression component'
+    );
+    assert.ok(
+      !systemEditSource.includes('characterModifierProviderLabel'),
+      'character-modifier editor should not render a provider label'
+    );
+    assert.ok(
+      !systemEditSource.includes('manager-character-modifier-provider'),
+      'character-modifier summary should not render a provider chip'
+    );
+    assert.ok(
+      systemEditSource.includes("onUpdateCharacterModifier(entry.id, { expression: event.currentTarget.value })"),
+      'character-modifier editor should bind a plain expression input'
+    );
+    assert.ok(
+      systemEditSource.includes("FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression"),
+      'character-modifier editor should keep the localized Expression label'
+    );
     for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',

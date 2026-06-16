@@ -552,9 +552,7 @@ are always by id into the per-system library.
 Tool = {
   componentId: string,
   requirement: null | {
-    provider: "dnd5e" | "pf2e" | "macro",
-    formula?: string,
-    macroUuid?: string,
+    formula: string,
   },
   breakage: {
     mode: "limitedUses" | "breakageChance" | "diceExpression",
@@ -575,7 +573,10 @@ Tool = {
 1. `componentId` is required.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`). Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering. Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy. The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
 3. A referenced Tool is always required: it must be present and pass its optional `requirement` before crafting or a gathering attempt may proceed. A reference whose id no longer resolves in its library, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED`.
-4. `requirement` is optional. When present, the provider must be `dnd5e`, `pf2e`, or `macro`. Macro requirements require a non-empty `macroUuid`; system requirements require a non-empty `formula`.
+4. `requirement` is optional and formula-only.
+When present, it requires a non-empty `formula` — a Foundry roll expression evaluated against the actor's roll data.
+The actor satisfies the requirement when the result is truthy (a non-zero number or a `true` boolean).
+There is no provider discriminator and no macro support on this surface.
 5. Exactly one `breakage.mode` is configured per tool:
    - `limitedUses`: `maxUses` is null or a positive integer. Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`. The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
    - `breakageChance`: `breakageChance` is an integer in `0..100`. The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
@@ -589,8 +590,7 @@ Tool = {
 | Field                                  | Valid values                                       | Invalid values            |
 |----------------------------------------|----------------------------------------------------|---------------------------|
 | `componentId`                          | non-empty string                                   | empty or missing          |
-| `requirement.macro.macroUuid`          | non-empty string                                   | empty                     |
-| `requirement.dnd5e/pf2e.formula`       | non-empty string                                   | empty                     |
+| `requirement.formula`                  | non-empty string                                   | empty                     |
 | `breakage.limitedUses.maxUses`         | null or positive integer                           | `0`, negative, fractional |
 | `breakage.breakageChance.breakageChance` | integer `0..100`                                 | non-integer, out of range |
 | `breakage.diceExpression.formula`      | non-empty string                                   | empty                     |

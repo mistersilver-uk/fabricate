@@ -191,7 +191,7 @@ function progressiveTask(overrides = {}) {
   return routedTask({
     resolutionMode: 'progressive',
     resultSelection: null,
-    check: { provider: 'macro', macroUuid: 'Macro.check' },
+    check: { formula: '1d20 + @skills.sur.mod', threshold: '12' },
     progressive: { awardMode: 'equal' },
     resultGroups: [{
       id: 'group-progressive',

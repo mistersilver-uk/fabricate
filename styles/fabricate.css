@@ -1277,10 +1277,6 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-character-modifier-provider {
-  font-size: 0.75rem;
-}
-
 .fabricate-manager .manager-character-modifier-roll-tag {
   font-size: 0.7rem;
   background: var(--fab-mv2-surface-2);
@@ -1589,12 +1585,6 @@
 .fabricate-manager .manager-condition-modifier-row-empty {
   font-size: 0.8rem;
   font-style: italic;
-}
-
-.fabricate-manager .manager-provider-expression-input {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .visually-hidden {

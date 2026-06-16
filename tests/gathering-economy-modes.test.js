@@ -173,7 +173,7 @@ describe('gathering economy — stamina regeneration over world time', () => {
   it('skips regen when the pool has no max or the system is not in stamina mode', async () => {
     const noMax = makeRichState({ config: staminaConfig() });
     const a1 = makeFakeActor();
-    await noMax.service.setActorStamina(a1, { systemId: SYSTEM, current: 0, max: null, provider: 'external' });
+    await noMax.service.setActorStamina(a1, { systemId: SYSTEM, current: 0, max: null, maxReadOnly: true });
     assert.equal(await noMax.service.regenerateActorStamina({ actor: a1, systemId: SYSTEM, worldTime: 5 * HOUR }), null);
 
     const nodesMode = makeRichState({ config: { systems: { [SYSTEM]: { economy: economyForMode('nodes') } } } });
@@ -584,7 +584,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     return {
       systems: {
         [SYSTEM]: {
-          characterModifiers: [{ id: 'str', label: 'Str', provider: 'dnd5e', expression: '@abilities.str.mod' }],
+          characterModifiers: [{ id: 'str', label: 'Str', expression: '@abilities.str.mod' }],
           economy: economyForMode(mode)
         }
       }
@@ -595,7 +595,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     return {
       systems: {
         [SYSTEM]: {
-          characterModifiers: [{ id: 'str', label: 'Str', provider: 'dnd5e', expression: '@abilities.str.mod' }],
+          characterModifiers: [{ id: 'str', label: 'Str', expression: '@abilities.str.mod' }],
           economy: { stamina: { enabled: true }, nodes: { enabled: true } }
         }
       }
@@ -830,14 +830,50 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 3); // 8 - 5, GM included
   });
 
-  it('treats an external stamina provider max as read-only', async () => {
+  it('treats a maxReadOnly stamina pool max as read-only after seed', async () => {
     const { service } = makeRichState({ config: costConfig('stamina') });
     const actor = makeFakeActor();
-    await service.setActorStamina(actor, { systemId: SYSTEM, current: 5, max: 20, provider: 'external' });
-    await service.setActorStamina(actor, { systemId: SYSTEM, current: 8, max: 999, provider: 'external' });
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 5, max: 20, maxReadOnly: true });
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 8, max: 999, maxReadOnly: true });
     const state = service.getActorStamina(actor, SYSTEM);
-    assert.equal(state.max, 20); // external max unchanged
+    assert.equal(state.max, 20); // read-only max unchanged
     assert.equal(state.current, 8);
+    assert.equal(state.maxReadOnly, true);
+  });
+
+  it('maps a legacy { provider: "external" } argument to a read-only max', async () => {
+    const { service } = makeRichState({ config: costConfig('stamina') });
+    const actor = makeFakeActor();
+    // First write establishes the pool from the legacy provider value.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 5, max: 20, provider: 'external' });
+    // A later write that only carries the legacy prior value must keep max locked.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 8, max: 999 });
+    const state = service.getActorStamina(actor, SYSTEM);
+    assert.equal(state.max, 20); // legacy external max unchanged
+    assert.equal(state.current, 8);
+    assert.equal(state.maxReadOnly, true);
+  });
+
+  it('reads a never-rewritten legacy { provider: "external" } flag back as maxReadOnly', async () => {
+    const { service } = makeRichState({ config: costConfig('stamina') });
+    const actor = makeFakeActor();
+    // Simulate a persisted legacy pool that was never rewritten by a GM edit.
+    await actor.setFlag('fabricate', 'gatheringState', {
+      stamina: { [SYSTEM]: { current: 4, max: 12, provider: 'external', regenerationMode: 'manual' } }
+    });
+    assert.equal(service.getActorStamina(actor, SYSTEM).maxReadOnly, true);
+    // The next GM edit must not silently unlock the max.
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 6, max: 99 });
+    assert.equal(service.getActorStamina(actor, SYSTEM).max, 12);
+  });
+
+  it('reads a fabricate-owned pool back as maxReadOnly false and allows max updates', async () => {
+    const { service } = makeRichState({ config: costConfig('stamina') });
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 5, max: 20 });
+    assert.equal(service.getActorStamina(actor, SYSTEM).maxReadOnly, false);
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 6, max: 30 });
+    assert.equal(service.getActorStamina(actor, SYSTEM).max, 30);
   });
 });
 

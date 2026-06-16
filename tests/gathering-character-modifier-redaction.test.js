@@ -16,7 +16,7 @@ function configFor({ entries = [], tasks = [], events = [] } = {}) {
   };
 }
 
-const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' }];
+const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }];
 
 const BLIND_TASK = {
   id: 'task-blind',

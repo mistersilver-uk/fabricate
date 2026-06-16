@@ -1013,7 +1013,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           label: 'Herbalist Sickle',
           enabled: true,
           componentId: componentMap['Iron Sword'],
-          requirement: { provider: 'dnd5e', formula: '@tools.herbalism.value', macroUuid: '' },
+          requirement: { formula: '@tools.herbalism.value' },
           breakage: { mode: 'limitedUses', maxUses: 5 },
           onBreak: { mode: 'flagBroken' }
         }
@@ -2160,7 +2160,7 @@ async function main() {
                 label: 'Herbalist Sickle',
                 enabled: true,
                 componentId: componentMap['Iron Sword'],
-                requirement: { provider: 'dnd5e', formula: '@tools.herbalism.value', macroUuid: '' },
+                requirement: { formula: '@tools.herbalism.value' },
                 breakage: { mode: 'limitedUses', maxUses: 5 },
                 onBreak: { mode: 'flagBroken' }
               }],

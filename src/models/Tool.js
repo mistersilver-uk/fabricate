@@ -4,9 +4,7 @@
  * Spec contract (002-data-models.md, gathering-and-harvesting):
  *   componentId:       string                 - required managed item reference
  *   requirement:       null | {               - optional truthy-expression gate
- *     provider:        'dnd5e'|'pf2e'|'macro',
- *     formula?:        string,                  // when provider !== 'macro'
- *     macroUuid?:      string                   // when provider === 'macro'
+ *     formula:         string                   // dice/roll expression
  *   }
  *   breakage:          { mode, ...mode-specific fields }
  *     mode === 'limitedUses':     maxUses:        number | null     (null = unlimited; usage tracked on the item)
@@ -25,7 +23,6 @@ import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
 const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
 const ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
-const REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 
 function coerceMaxUses(value) {
   if ([null, undefined, ''].includes(value)) return null;
@@ -45,10 +42,8 @@ function coerceThreshold(value) {
 
 function normalizeRequirement(input) {
   if (!input || typeof input !== 'object') return null;
-  const provider = REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
   const formula = typeof input.formula === 'string' ? input.formula : '';
-  const macroUuid = typeof input.macroUuid === 'string' ? input.macroUuid : '';
-  return { provider, formula, macroUuid };
+  return { formula };
 }
 
 function normalizeBreakage(input) {
@@ -92,7 +87,7 @@ export class Tool {
     this.componentId =
       typeof data.componentId === 'string' && data.componentId ? data.componentId : null;
 
-    /** @type {{provider: string, formula: string, macroUuid: string}|null} Optional truthy-expression gate */
+    /** @type {{formula: string}|null} Optional truthy-expression gate */
     this.requirement =
       data.requirement === null || data.requirement === undefined
         ? null
@@ -116,16 +111,8 @@ export class Tool {
       errors.push('componentId is required');
     }
 
-    if (this.requirement) {
-      if (!REQUIREMENT_PROVIDERS.has(this.requirement.provider)) {
-        errors.push('requirement.provider must be one of dnd5e, pf2e, or macro');
-      } else if (this.requirement.provider === 'macro') {
-        if (!this.requirement.macroUuid) {
-          errors.push('requirement.macroUuid is required when provider is macro');
-        }
-      } else if (!this.requirement.formula) {
-        errors.push('requirement.formula is required for system providers');
-      }
+    if (this.requirement && !this.requirement.formula) {
+      errors.push('requirement.formula is required');
     }
 
     if (BREAKAGE_MODES.has(this.breakage.mode)) {
@@ -322,4 +309,3 @@ export class Tool {
 
 export const TOOL_BREAKAGE_MODES = [...BREAKAGE_MODES];
 export const TOOL_ON_BREAK_MODES = [...ON_BREAK_MODES];
-export const TOOL_REQUIREMENT_PROVIDERS = [...REQUIREMENT_PROVIDERS];

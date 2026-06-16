@@ -79,7 +79,6 @@ const BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
-const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // System-wide drop-modifier application mode. This is a single global system
 // setting (`dropModifierMode`) and cannot be overridden per modifier. Covers
@@ -144,9 +143,9 @@ const BLOCKED_REASON_KEYS = Object.freeze({
 export class GatheringRichStateService {
   /**
    * Construct the service with injected runtime seams. `evaluateExpression`
-   * and `runMacro` were added by the gathering character modifiers feature so
-   * d100 resolution can evaluate provider expressions and macro UUIDs against
-   * the acting actor without coupling the service to Foundry globals.
+   * was added by the gathering character modifiers feature so d100 resolution
+   * can evaluate character modifier expressions against the acting actor
+   * without coupling the service to Foundry globals.
    *
    * @param {object} options
    * @param {object} [options.environmentStore] Gathering environment store.
@@ -157,12 +156,9 @@ export class GatheringRichStateService {
    * @param {Function} [options.getUserId] Current Foundry user id getter.
    * @param {Function} [options.rollD100] D100 roller (test seam).
    * @param {object} [options.hooks] Foundry Hooks bridge.
-   * @param {Function} [options.evaluateExpression] Async provider-expression
-   *   evaluator (signature matches `evaluateGatheringExpression`); used to
-   *   resolve character modifier expressions to numeric contributions.
-   * @param {Function} [options.runMacro] Async macro runner for the `macro`
-   *   character modifier provider; receives a context payload and returns a
-   *   finite number.
+   * @param {Function} [options.evaluateExpression] Async expression evaluator
+   *   (signature matches `evaluateGatheringExpression`); used to resolve
+   *   character modifier expressions to numeric contributions.
    */
   constructor({
     environmentStore = null,
@@ -174,7 +170,6 @@ export class GatheringRichStateService {
     rollD100 = () => Math.floor(Math.random() * 100) + 1,
     hooks = globalThis.Hooks ?? null,
     evaluateExpression = null,
-    runMacro = null,
     secondsPerUnit = null,
     // Interactable-scoped node seams (issue 302). These resolve + write the node
     // pool carried by a scene interactable's `fabricate.interactable` behaviour,
@@ -192,7 +187,6 @@ export class GatheringRichStateService {
     this.rollD100 = rollD100;
     this.hooks = hooks;
     this.evaluateExpression = evaluateExpression;
-    this.runMacro = runMacro;
     // Seam: seconds in one regen/respawn unit. The default reproduces the
     // hardcoded Earth-calendar table; main.js injects a calendar-aware provider
     // so `days`/`weeks` track the active Foundry world calendar (minutes/hours
@@ -378,8 +372,8 @@ export class GatheringRichStateService {
    * Resolve a d100 gathering attempt against the supplied task/environment.
    *
    * Now async because character modifier references invoke the injected
-   * expression evaluator and (optional) macro runner, both of which return
-   * promises. Returns `{ status: 'misconfigured', diagnostics }` when any
+   * expression evaluator, which returns a promise. Returns
+   * `{ status: 'misconfigured', diagnostics }` when any
    * reference or override cannot resolve so the caller short-circuits before
    * touching nodes, stamina, or attempt-limit state.
    *
@@ -568,8 +562,8 @@ export class GatheringRichStateService {
    * each contributor moves the chance.
    *
    * Async because character-ability modifiers resolve game-system expressions
-   * (and optionally macros) against the actor. Unresolvable character modifiers
-   * are omitted from the preview (no diagnostics surfaced to players).
+   * against the actor. Unresolvable character modifiers are omitted from the
+   * preview (no diagnostics surfaced to players).
    *
    * @param {object} options
    * @param {object} options.environment Composed environment (conditions/biomes/rules).
@@ -750,11 +744,11 @@ export class GatheringRichStateService {
   /**
    * Resolve a single character modifier reference against the actor.
    *
-   * Applies override-first inheritance (provider, expression, macroUuid),
-   * detects misconfiguration (missing entry, macro override without uuid,
-   * `min > max`, non-finite resolution), invokes the injected evaluator or
-   * macro runner, clamps by min/max, then applies operator. The returned
-   * evidence is suitable for the per-row snapshot.
+   * Applies override-first inheritance (expression),
+   * detects misconfiguration (missing entry, `min > max`, non-finite
+   * resolution), invokes the injected evaluator, clamps by min/max, then
+   * applies operator. The returned evidence is suitable for the per-row
+   * snapshot.
    *
    * @param {object} payload Resolution payload.
    * @param {object} payload.reference Row-scoped reference shape.
@@ -810,9 +804,7 @@ export class GatheringRichStateService {
       };
     }
 
-    const effectiveProvider = libraryEntry?.provider || null;
     const effectiveExpression = expressionOverride || libraryEntry?.expression || '';
-    const effectiveMacroUuid = libraryEntry?.macroUuid || '';
 
     if (min !== null && max !== null && min > max) {
       return {
@@ -829,9 +821,7 @@ export class GatheringRichStateService {
     }
 
     const rawValue = await this._resolveModifierRawValue({
-      provider: effectiveProvider,
       expression: effectiveExpression,
-      macroUuid: effectiveMacroUuid,
       modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
       actor,
       environment,
@@ -882,9 +872,7 @@ export class GatheringRichStateService {
       modifierId,
       label: libraryEntry?.label || modifierId,
       icon: libraryEntry?.icon || '',
-      effectiveProvider: effectiveProvider || '',
       effectiveExpression: effectiveExpression || '',
-      effectiveMacroUuid: effectiveMacroUuid || '',
       rawValue: numeric,
       clampedValue: clamped,
       operator,
@@ -907,20 +895,17 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve a character modifier's raw numeric value from its provider, via the
-   * injected macro runner (`macro` provider) or expression evaluator. Returns
-   * `null` when no evaluator is wired or the resolution throws — the caller maps
-   * that to a non-finite diagnostic. Extracted from
-   * {@link _resolveCharacterModifierContribution} to keep that method's branching
-   * shallow.
+   * Resolve a character modifier's raw numeric value via the injected
+   * expression evaluator. Returns `null` when no evaluator is wired or the
+   * resolution throws — the caller maps that to a non-finite diagnostic.
+   * Extracted from {@link _resolveCharacterModifierContribution} to keep that
+   * method's branching shallow.
    *
    * @param {object} payload
    * @returns {Promise<*>} The raw resolved value, or `null`.
    */
   async _resolveModifierRawValue({
-    provider,
     expression,
-    macroUuid,
     modifier,
     actor,
     environment,
@@ -930,7 +915,6 @@ export class GatheringRichStateService {
     viewer,
     system,
   }) {
-    const conditions = environment?.conditions || {};
     const base = {
       kind: 'characterModifier',
       actor,
@@ -943,12 +927,8 @@ export class GatheringRichStateService {
       modifier,
     };
     try {
-      if (provider === 'macro') {
-        if (typeof this.runMacro !== 'function') return null;
-        return await this.runMacro(macroUuid, { ...base, conditions });
-      }
       if (typeof this.evaluateExpression !== 'function') return null;
-      return await this.evaluateExpression({ ...base, expression, provider });
+      return await this.evaluateExpression({ ...base, expression });
     } catch {
       return null;
     }
@@ -1028,7 +1008,9 @@ export class GatheringRichStateService {
       max,
       rolledMax,
       maxOverride,
-      provider: stamina.provider || 'fabricate',
+      // Read-time compatibility: a never-rewritten legacy pool persisted with
+      // `provider: 'external'` reads back as a read-only max.
+      maxReadOnly: stamina.maxReadOnly === true || stamina.provider === 'external',
       regenerationMode: stamina.regenerationMode || 'manual',
     };
   }
@@ -1080,7 +1062,7 @@ export class GatheringRichStateService {
     const start = startRaw == null ? max : Math.max(0, Math.round(startRaw)); // blank start ⇒ full
 
     const entry = {
-      provider: 'fabricate',
+      maxReadOnly: false,
       regenerationMode: econ.stamina?.regen?.policy === 'overTime' ? 'auto' : 'manual',
       current: Math.min(start, max),
       max,
@@ -1135,24 +1117,35 @@ export class GatheringRichStateService {
       current = null,
       max = null,
       maxOverride,
-      provider = 'fabricate',
+      maxReadOnly,
+      // Legacy API back-compat: a `provider: 'external'` argument maps to a
+      // read-only max. Any other legacy provider value is treated as writable.
+      provider,
       regenerationMode = 'manual',
     } = {}
   ) {
     const state = readState(actor);
     const key = systemId || 'default';
     const previous = state.stamina?.[key] || {};
-    const effectiveProvider = provider || previous.provider || 'fabricate';
+    // Resolve the read-only-max flag from the incoming arg (preferring the new
+    // boolean, falling back to a legacy `provider: 'external'`) and, when the
+    // arg is silent, from the prior entry (including its own legacy provider).
+    const argMaxReadOnly =
+      maxReadOnly === undefined
+        ? provider === undefined
+          ? undefined
+          : provider === 'external'
+        : maxReadOnly === true;
+    const priorMaxReadOnly = previous.maxReadOnly === true || previous.provider === 'external';
+    const effectiveMaxReadOnly = argMaxReadOnly === undefined ? priorMaxReadOnly : argMaxReadOnly;
     const priorMax = numberOrNullStrict(previous.max);
     const providedMax = numberOrNullStrict(max);
     // `max` is the rolled cap. When omitted, the prior rolled max is preserved
-    // (the panel only edits current + override). When provided: Fabricate-owned
-    // pools accept it freely; an external provider's maximum is read-only once
-    // established, but an as-yet unset external pool may still be initialized.
+    // (the panel only edits current + override). When provided: writable pools
+    // accept it freely; a read-only-max pool's maximum is fixed once
+    // established, but an as-yet unset pool may still be initialized.
     const rolledMax =
-      providedMax != null && (effectiveProvider === 'fabricate' || priorMax == null)
-        ? providedMax
-        : priorMax;
+      providedMax != null && (!effectiveMaxReadOnly || priorMax == null) ? providedMax : priorMax;
     // `maxOverride`: undefined preserves the prior override; a finite number
     // sets it; null/'' clears it. The effective cap is the override, else rolled.
     const override =
@@ -1166,7 +1159,7 @@ export class GatheringRichStateService {
     if (Number.isFinite(Number(effectiveMax)))
       currentValue = Math.min(currentValue, Number(effectiveMax));
     const next = {
-      provider: effectiveProvider,
+      maxReadOnly: effectiveMaxReadOnly,
       regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
       current: currentValue,
       max: rolledMax,
@@ -1206,7 +1199,7 @@ export class GatheringRichStateService {
     // max stays authoritative when no per-actor override exists.
     const previousOverride = numberOrNullStrict(previous.maxOverride);
     const entry = {
-      provider: previous.provider || effective.provider || 'fabricate',
+      maxReadOnly: previous.maxReadOnly === true || previous.provider === 'external',
       regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
       current: clamped,
       max: numberOrNullStrict(previous.max),
@@ -2582,16 +2575,12 @@ function normalizeItemDrop(row = {}) {
 
 const TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
 const TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
-const TOOL_REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 
 function normalizeToolRequirement(input) {
   if (input === null || input === undefined) return null;
   if (typeof input !== 'object') return null;
-  const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
   return {
-    provider,
     formula: typeof input.formula === 'string' ? input.formula : '',
-    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : '',
   };
 }
 
@@ -2725,8 +2714,8 @@ function applyEventDropRateAdjustment(event, environment) {
 
 /**
  * Normalize a per-system character modifier library entry. Returns null when
- * the entry lacks a resolvable id or has neither an expression nor a
- * macroUuid (an entry that cannot resolve to a number is dropped).
+ * the entry lacks a resolvable id or an expression (an entry that cannot
+ * resolve to a number is dropped).
  *
  * @param {object} entry Raw library entry.
  * @returns {object|null} Normalized entry or null when invalid.
@@ -2735,17 +2724,13 @@ function normalizeCharacterModifierLibraryEntry(entry = {}) {
   if (!entry || typeof entry !== 'object') return null;
   const id = stringOrFallback(entry.id, '');
   if (!id) return null;
-  const provider = CHARACTER_MODIFIER_PROVIDERS.has(entry.provider) ? entry.provider : 'dnd5e';
   const expression = stringOrFallback(entry.expression, '');
-  const macroUuid = stringOrFallback(entry.macroUuid, '');
-  if (!expression && !macroUuid) return null;
+  if (!expression) return null;
   return {
     id,
     label: stringOrFallback(entry.label, id),
     icon: stringOrFallback(entry.icon, 'fa-solid fa-user'),
-    provider,
     expression,
-    macroUuid,
     isRollExpression: ROLL_EXPRESSION_PATTERN.test(expression || ''),
   };
 }

@@ -12,7 +12,7 @@
 /**
  * Shared display metadata (label + icon) for every modifier id used by the
  * preset bundles. Each Foundry-system bundle reuses these so the two bundles
- * differ only in their `provider` and roll `expression`.
+ * differ only in their roll `expression`.
  *
  * @type {Readonly<Record<string, {label: string, icon: string}>>}
  */
@@ -35,23 +35,21 @@ const MODIFIER_DISPLAY = Object.freeze({
 });
 
 /**
- * Build a frozen preset bundle from a provider id and an ordered id→expression
- * map, pulling shared label/icon metadata from {@link MODIFIER_DISPLAY}. The
- * resulting array preserves the insertion order of `expressions`.
+ * Build a frozen preset bundle from an ordered id→expression map, pulling
+ * shared label/icon metadata from {@link MODIFIER_DISPLAY}. The resulting array
+ * preserves the insertion order of `expressions`.
  *
- * @param {string} provider Provider id stamped onto every preset.
  * @param {Record<string, string>} expressions Ordered map of modifier id to
  *   the system-specific roll expression.
  * @returns {ReadonlyArray<object>} Frozen preset bundle.
  */
-function buildPresetBundle(provider, expressions) {
+function buildPresetBundle(expressions) {
   return Object.freeze(
     Object.entries(expressions).map(([id, expression]) =>
       Object.freeze({
         id,
         label: MODIFIER_DISPLAY[id].label,
         icon: MODIFIER_DISPLAY[id].icon,
-        provider,
         expression,
       })
     )
@@ -65,7 +63,7 @@ function buildPresetBundle(provider, expressions) {
  *
  * @type {ReadonlyArray<object>}
  */
-export const DND5E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle('dnd5e', {
+export const DND5E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle({
   strength: '@abilities.str.mod',
   dexterity: '@abilities.dex.mod',
   constitution: '@abilities.con.mod',
@@ -88,7 +86,7 @@ export const DND5E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle('dnd5e', {
  *
  * @type {ReadonlyArray<object>}
  */
-export const PF2E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle('pf2e', {
+export const PF2E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle({
   strength: '@actor.system.abilities.str.mod',
   dexterity: '@actor.system.abilities.dex.mod',
   constitution: '@actor.system.abilities.con.mod',
@@ -155,9 +153,7 @@ export function seedCharacterModifierPresets({ presets = [], currentLibrary = []
       id,
       label: String(preset.label || id),
       icon: String(preset.icon || 'fa-solid fa-user'),
-      provider: preset.provider || 'dnd5e',
       expression: String(preset.expression || ''),
-      macroUuid: String(preset.macroUuid || ''),
     };
     seen.set(id, cloned);
     added.push(cloned);

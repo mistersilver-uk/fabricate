@@ -54,7 +54,7 @@ function makeEnvironment(overrides = {}) {
         enabled: true,
         resolutionMode: 'routed',
         toolIds: ['tool-a'],
-        visibility: { provider: 'macro', macroUuid: 'Macro.visibility' },
+        visibility: { formula: '@skills.sur.mod', threshold: '12' },
         timeRequirement: { minutes: 5, hours: 0, days: 0, months: 0, years: 0 },
         failureOutcome: { mode: 'text', text: 'Nothing useful turns up.' },
         resultSelection: {
@@ -123,14 +123,8 @@ function validateEnvironmentForFakeCreate(environment) {
       if (!task.progressive?.awardMode || !['partial', 'equal', 'exceed'].includes(task.progressive.awardMode)) {
         errors.push(`Task "${task.name}" progressive.awardMode must be partial, equal, or exceed`);
       }
-      if (!task.check?.provider) {
-        errors.push(`Task "${task.name}" progressive resolution requires check`);
-      }
-      if (task.check?.provider === 'macro' && !task.check.macroUuid) {
-        errors.push(`Task "${task.name}" check macro provider requires macroUuid`);
-      }
-      if ((task.check?.provider === 'dnd5e' || task.check?.provider === 'pf2e') && !task.check.formula) {
-        errors.push(`Task "${task.name}" check ${task.check.provider} provider requires formula`);
+      if (!task.check || !task.check.formula) {
+        errors.push(`Task "${task.name}" gathering check requires formula`);
       }
       if (!Array.isArray(task.resultGroups) || task.resultGroups.length !== 1) {
         errors.push(`Task "${task.name}" progressive resolution requires exactly one result group`);
@@ -139,14 +133,8 @@ function validateEnvironmentForFakeCreate(environment) {
       }
     }
     if (task.visibility) {
-      if (task.visibility.provider === 'macro' && !task.visibility.macroUuid) {
-        errors.push(`Task "${task.name}" visibility macro provider requires macroUuid`);
-      }
-      if ((task.visibility.provider === 'dnd5e' || task.visibility.provider === 'pf2e') && !task.visibility.formula) {
-        errors.push(`Task "${task.name}" visibility ${task.visibility.provider} provider requires formula`);
-      }
-      if ((task.visibility.provider === 'dnd5e' || task.visibility.provider === 'pf2e') && !task.visibility.threshold) {
-        errors.push(`Task "${task.name}" visibility ${task.visibility.provider} provider requires threshold`);
+      if (!task.visibility.formula || !task.visibility.threshold) {
+        errors.push(`Task "${task.name}" visibility gate requires formula and threshold`);
       }
     }
     if (task.timeRequirement) {

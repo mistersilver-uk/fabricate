@@ -2894,7 +2894,7 @@ describe('createAdminStore', () => {
             // Unknown system mode falls back to the additive default.
             rules: { dropModifierMode: 'bogus' },
             characterModifiers: [
-              { id: 'str', label: 'Str', icon: '', provider: 'dnd5e', expression: '@abilities.str.mod' }
+              { id: 'str', label: 'Str', icon: '', expression: '@abilities.str.mod' }
             ],
             tasks: [{
               id: 'task-iron',
@@ -3536,8 +3536,8 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             characterModifiers: [
-              { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' },
-              { id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-running', provider: 'dnd5e', expression: '@abilities.dex.mod' }
+              { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' },
+              { id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-running', expression: '@abilities.dex.mod' }
             ],
             tasks: [{
               id: 'task-iron',
@@ -3618,7 +3618,7 @@ describe('createAdminStore', () => {
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            characterModifiers: [{ id: 'strength', label: 'Strength', icon: '', provider: 'dnd5e', expression: '@abilities.str.mod' }],
+            characterModifiers: [{ id: 'strength', label: 'Strength', icon: '', expression: '@abilities.str.mod' }],
             tasks: [{ id: 'task-iron', name: 'Iron', dropRows: [{ id: 'row-iron', dropRate: 50 }] }],
             events: []
           }

@@ -205,7 +205,7 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
     });
 
     const result = await evaluator.evaluateVisibility({
-      gate: { provider: 'dnd5e', formula: '@skills.sur.mod + 10', threshold: '12' },
+      gate: { formula: '@skills.sur.mod + 10', threshold: '12' },
       actor
     });
 

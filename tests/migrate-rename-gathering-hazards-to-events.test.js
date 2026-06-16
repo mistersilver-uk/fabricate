@@ -208,7 +208,7 @@ test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at t
 
   await runner.run();
 
-  assert.equal(store.get('migrationVersion'), '1.2.0', 'advances to the new highest version');
+  assert.equal(store.get('migrationVersion'), '1.3.0', 'advances to the new highest version');
   const sys = store.get('gatheringConfig').systems['sys-a'];
   assert.ok(Array.isArray(sys.events), 'persisted gatheringConfig was rewritten to events');
   assert.equal(sys.rules.eventPolicy, 'failureWithEvent');

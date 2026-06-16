@@ -147,7 +147,7 @@ Gathering Task records support:
 | **Biomes** | Optional environment composition match tags; empty means any |
 | **Weather, time of day** | Optional runtime availability gates; empty means any |
 | **Drop rows** | Ordered d100 item/component rows with quantity, `dropRate` from 0 to 100, and optional per-drop time/weather modifiers. Authored order is the rank used by system Gathering Rules. |
-| **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
+| **Stamina and modifiers** | Optional stamina cost and gathering roll modifier expression |
 | **Required tools** | Optional references to the selected system's Gathering Tools library. All referenced tools are required. |
 
 {: .note }
@@ -161,7 +161,7 @@ Reusable event records support:
 | **Danger, biomes** | Optional environment composition match tags; empty means any. Environment danger uses the single `dangerLevel` ceiling; legacy `dangerTags` / `risk` values are fallback inputs for older data. |
 | **Weather, time of day** | Optional runtime availability gates; empty means any |
 | **Drop rate** | d100 event trigger rate from 1 to 100 |
-| **Modifier** | Optional event roll modifier provider |
+| **Modifier** | Optional event roll modifier expression |
 
 Disabled Gathering Tasks and events never match for player gathering.
 
@@ -184,9 +184,9 @@ An environment contains one or more Environment Tasks. The current GM editor sup
 | Area | Supported fields |
 |:-----|:-----------------|
 | Task basics | `name`, `description`, `img`, `enabled`, `resolutionMode` |
-| Visibility gate | Enable or clear task visibility; configure `macro`, `dnd5e`, or `pf2e` providers |
+| Visibility gate | Enable or clear task visibility; configure its `formula` and `threshold` |
 | Routed result selection | Configure `macroOutcome.macroUuid` or `rollTableOutcome.rollTableUuid` |
-| Progressive checks | Configure `awardMode` plus `macro`, `dnd5e`, or `pf2e` check providers |
+| Progressive checks | Configure `awardMode` plus the check `formula` and optional `threshold` |
 | Time requirement | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years |
 | Failure outcome | Leave clear for Fabricate's default failure feedback, or configure custom text or macro handling |
 | Result groups | Add, rename, delete, and reorder groups |
@@ -195,7 +195,7 @@ An environment contains one or more Environment Tasks. The current GM editor sup
 
 Progressive task result difficulty comes from the selected managed component's `difficulty`; result rows do not store their own difficulty value.
 
-New environments are created as disabled draft shells. Library-backed automatic environments can be configured without an inline placeholder task; legacy inline task drafts may still use disabled placeholder tasks while a GM is authoring them. Disabled placeholders can be saved while disabled, even when routed or progressive provider targets are still blank. Once a task is enabled, save validation requires complete provider configuration for the chosen resolution mode.
+New environments are created as disabled draft shells. Library-backed automatic environments can be configured without an inline placeholder task; legacy inline task drafts may still use disabled placeholder tasks while a GM is authoring them. Disabled placeholders can be saved while disabled, even when routed result-selection targets or progressive check formulas are still blank. Once a task is enabled, save validation requires complete configuration for the chosen resolution mode.
 
 Saved Script Macro UUIDs remain visible when the macro is no longer present in the current world macro list. The editor shows the unresolved UUID as the selected value, warns that it is missing, and preserves it until the GM changes the field.
 
@@ -203,15 +203,15 @@ Task images can be typed directly or selected with Foundry's image file picker w
 
 ## Visibility Gates
 
-A visibility gate controls whether a gathering task is visible to a specific actor before an attempt starts. The GM editor supports the same provider families used by the runtime evaluator:
+A visibility gate controls whether a gathering task is visible to a specific actor before an attempt starts.
+A gate is formula-only: it stores a `formula` (a Foundry roll expression) and a required `threshold`, with no provider field.
 
-| Provider | Fields | Notes |
-|:---------|:-------|:------|
-| `macro` | `macroUuid` | Selects from available Foundry Script Macros. |
-| `dnd5e` | `formula`, `threshold` | Stores a system formula and required threshold. |
-| `pf2e` | `formula`, `threshold` | Stores a system formula and required threshold. |
+| Field | Notes |
+|:------|:------|
+| `formula` | A Foundry roll expression evaluated against the viewing actor's roll data. |
+| `threshold` | The required value the formula must meet for the task to be visible. |
 
-The editor keeps incomplete provider input local until the provider's required fields are present. For example, choosing `dnd5e` without both `formula` and `threshold` does not mutate the stored task draft yet. Clearing visibility removes the stored gate only when the task already has committed visibility.
+The editor keeps incomplete input local until both `formula` and `threshold` are present. For example, supplying a `formula` without a `threshold` does not mutate the stored task draft yet. Clearing visibility removes the stored gate only when the task already has committed visibility.
 
 ## Routed Result Selection
 
@@ -228,17 +228,16 @@ The roll table field has both an assisted selector populated from the current wo
 
 ## Progressive Checks
 
-Progressive gathering tasks require a progressive award mode and a check provider.
+Progressive gathering tasks require a progressive award mode and a check formula.
 
 | Field | Description |
 |:------|:------------|
 | `progressive.awardMode` | One of `equal`, `partial`, or `exceed` |
-| `check.provider` | One of `macro`, `dnd5e`, or `pf2e` |
-| `check.macroUuid` | Required for `macro` checks; selected from available Foundry Script Macros |
-| `check.formula` | Required for `dnd5e` and `pf2e` checks |
-| `check.threshold` | Optional for `dnd5e` and `pf2e` checks |
+| `check.formula` | Required; a Foundry roll expression evaluated against the acting actor's roll data |
+| `check.threshold` | Optional; when omitted the check resolves to a value-only result |
 
-Switching check providers keeps only the fields for the selected provider. Formula and threshold values are not retained on macro checks, and macro UUIDs are not retained on system-formula checks.
+A check is formula-only — there is no provider field.
+When a `threshold` is supplied the resolved value is compared against it for success or failure; when it is absent the check yields a value-only result.
 
 ## Time Requirements
 
@@ -314,7 +313,7 @@ Gathering tasks declare their required equipment as **Tools**. There is no separ
 |:------|:------------|
 | `toolIds` | Required tool references stored on the task; each id points at the system-owned Tools library (`craftingSystemManager.getSystem(systemId).tools`) |
 | `componentId` | Required component from the current crafting system's managed item list on the library tool |
-| `requirement` | Optional Foundry expression (per provider) or macro UUID; must evaluate truthy for the actor to use the tool |
+| `requirement` | Optional `{ formula }`; a Foundry roll expression that must evaluate truthy for the actor to use the tool |
 | `breakage.mode` | One of `limitedUses`, `breakageChance`, or `diceExpression` |
 | `breakage.maxUses` | `limitedUses`: positive integer or blank (unlimited); tracked on the item via `flags.fabricate.toolUsage.timesUsed` |
 | `breakage.breakageChance` | `breakageChance`: integer percent in `0..100` |
@@ -345,13 +344,11 @@ When a failed save produces a field-addressable error, the editor automatically 
 
 Some validation errors point at collections rather than a single input. Result-group errors can target the result groups collection, a specific result group name, or a specific group's results collection. Result row component errors target the affected result row.
 
-Disabled tasks skip routed and progressive completeness checks, which allows disabled placeholder tasks to be saved while a GM is still authoring them. Enabled runnable tasks must include real provider targets:
+Disabled tasks skip routed and progressive completeness checks, which allows disabled placeholder tasks to be saved while a GM is still authoring them. Enabled runnable tasks must include complete configuration:
 
 - Routed `macroOutcome` tasks require `macroUuid`.
 - Routed `rollTableOutcome` tasks require `rollTableUuid`.
-- Progressive tasks require `progressive.awardMode`, a check provider, and provider-specific check fields.
-- Progressive `dnd5e` and `pf2e` checks require `formula`; `threshold` is optional.
-- Progressive `macro` checks require `macroUuid`.
+- Progressive tasks require `progressive.awardMode` and a check `formula`; `check.threshold` is optional.
 
 If a disabled or enabled task includes `failureOutcome`, that failure outcome is still validated.
 

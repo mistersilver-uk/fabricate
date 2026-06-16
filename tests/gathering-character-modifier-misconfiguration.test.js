@@ -47,7 +47,7 @@ test('missing library modifier aborts attempt with diagnostic', async () => {
 
 test('min > max aborts attempt with diagnostic', async () => {
   const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'str', provider: 'dnd5e', label: 'Strength', expression: '@s' }] }),
+    config: configFor({ entries: [{ id: 'str', label: 'Strength', expression: '@s' }] }),
     rolls: [100],
     evaluateExpression: () => 1
   });
@@ -63,7 +63,7 @@ test('min > max aborts attempt with diagnostic', async () => {
 
 test('non-finite expression resolution aborts', async () => {
   const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'str', provider: 'dnd5e', label: 'Strength', expression: '@s' }] }),
+    config: configFor({ entries: [{ id: 'str', label: 'Strength', expression: '@s' }] }),
     rolls: [100],
     evaluateExpression: () => null
   });
@@ -77,15 +77,15 @@ test('non-finite expression resolution aborts', async () => {
   assert.equal(result.diagnostics[0].code, 'CHARACTER_MODIFIER_NON_FINITE');
 });
 
-test('macro returning NaN aborts with CHARACTER_MODIFIER_NON_FINITE', async () => {
+test('expression returning NaN aborts with CHARACTER_MODIFIER_NON_FINITE', async () => {
   const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'm', provider: 'macro', label: 'Macro', macroUuid: 'Macro.x' }] }),
+    config: configFor({ entries: [{ id: 'str', label: 'Strength', expression: '@s' }] }),
     rolls: [100],
-    runMacro: () => Number.NaN
+    evaluateExpression: () => Number.NaN
   });
   const env = environmentWithLibrary(service);
   const result = await service.resolveD100Attempt({
-    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'm', operator: '+' }] }] },
+    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }] }] },
     environment: env,
     actor: { uuid: 'Actor.x' }
   });

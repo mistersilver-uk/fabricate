@@ -73,7 +73,6 @@ function progressiveTask(overrides = {}) {
     enabled: true,
     resolutionMode: 'progressive',
     check: {
-      provider: 'dnd5e',
       formula: '@skills.sur.mod',
       threshold: '12'
     },

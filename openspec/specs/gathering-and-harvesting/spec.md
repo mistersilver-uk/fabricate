@@ -462,9 +462,7 @@ GatheringTaskDefinition = {
       operator: "+" | "-",
       min?: number,
       max?: number,
-      providerOverride?: "dnd5e" | "pf2e" | "macro",
       expressionOverride?: string,
-      macroUuidOverride?: string,
     }>,
     enabled: boolean,
   }>,
@@ -505,9 +503,7 @@ GatheringToolLibraryEntry = {
   enabled: boolean,                            // disabled tools cannot be referenced by tasks
   componentId: string | null,
   requirement: null | {
-    provider: "dnd5e" | "pf2e" | "macro",
-    formula?: string,
-    macroUuid?: string,
+    formula: string,
   },
   breakage: {
     mode: "limitedUses" | "breakageChance" | "diceExpression",
@@ -545,9 +541,7 @@ GatheringCharacterModifier = {
   id: string,
   label: string,
   icon: string,
-  provider: "dnd5e" | "pf2e" | "macro",
-  expression?: string,
-  macroUuid?: string,
+  expression: string,
 }
 ```
 
@@ -560,9 +554,7 @@ GatheringCharacterModifierReference = {
   operator: "+" | "-",
   min?: number,
   max?: number,
-  providerOverride?: "dnd5e" | "pf2e" | "macro",
   expressionOverride?: string,
-  macroUuidOverride?: string,
 }
 ```
 
@@ -571,15 +563,15 @@ GatheringCharacterModifierReference = {
 1. Character modifier libraries are scoped to one crafting system at `gatheringConfig.systems[systemId].characterModifiers`.
 2. New system gathering shells initialize `characterModifiers` to an empty array. Presets are never seeded automatically.
 3. Fabricate may provide opt-in preset seeding for recognized Foundry systems such as `dnd5e` and `pf2e`; seeding skips existing ids and leaves seeded entries editable.
-4. Drop row and event references resolve against the selected gathering actor using the effective provider, expression, and macro UUID from the row override when present, otherwise from the library entry.
+4. Drop row and event references resolve against the selected gathering actor using the effective expression — the row `expressionOverride` when present, otherwise the library entry `expression`. Character modifiers are formula-only: there is no provider discriminator and no macro support on this surface.
 5. Operators are restricted to `+` and `-`; the operator defines the direction of the contribution. Each reference applies as either a signed percentage-point delta (additive mode) or a multiplicative factor of `(1 + V/100)` for `+` and `(1 - V/100)` for `-` (multiplicative mode), where `V` is the min/max-clamped resolved value. The application mode is NOT selectable per reference — it is the single system-wide `rules.dropModifierMode` applied uniformly to every drop/condition/character modifier.
 5a. The application mode is a single global system setting `gatheringConfig.systems[systemId].rules.dropModifierMode`, one of `"additive"` or `"multiplicative"`, defaulting to `"additive"`. It governs EVERY character-modifier reference AND condition modifier (weather/time-of-day/biome) and cannot be overridden or subverted per modifier. The default is back-compatible: configs with no mode set resolve as pre-feature additive behavior. The legacy `rules.characterModifierMode` key is still honored on read and mapped onto `dropModifierMode`.
 6. Row `min` and `max` bounds clamp the resolved numeric VALUE before the operator and mode are applied. `min > max` is misconfigured. A multiplicative `-` reduction whose clamped value exceeds 100 yields a factor guarded to 0 (never negative).
-7. Missing referenced library entries, macro-provider overrides without a macro UUID, non-finite resolution results, and invalid bounds are misconfigured attempts. They must abort before result creation, event application, history side effects that imply success, or player-visible reward output.
+7. Missing referenced library entries, non-finite resolution results, and invalid bounds are misconfigured attempts. They must abort before result creation, event application, history side effects that imply success, or player-visible reward output.
 8. Multiple character modifier references on the same row or event are evaluated independently. Aggregation is deterministic: the additive deltas are applied to the base (drop rate plus condition/biome modifiers) FIRST, then the running result is multiplied by the PRODUCT of all multiplicative factors, then the result is clamped to the 0–100 range and rounded exactly once.
 9. Timed d100 runs snapshot referenced library entries and resolved evidence at start time so later library edits do not alter completion behavior.
-10. GM-facing evidence records the modifier id, effective provider, effective expression or macro UUID, raw resolved value, signed contribution, effective application `mode`, and clamp information.
-11. Non-GM blind gathering history redacts expressions, macro UUIDs, provider diagnostics, hidden row identities, and hidden event identities.
+10. GM-facing evidence records the modifier id, effective expression, raw resolved value, signed contribution, effective application `mode`, and clamp information.
+11. Non-GM blind gathering history redacts expressions, hidden row identities, and hidden event identities.
 
 ## Reusable Gathering Event Library
 
@@ -715,24 +707,23 @@ Resolve gathering-native Gathering Task drops and composed events through ordere
 19. D100 resolution must preserve history-before-side-effects ordering.
 20. Existing routed and progressive task resolution modes remain valid compatibility behavior.
 
-## Natural Gathering Expressions and Macros
+## Natural Gathering Expressions
 
 ### Purpose
 
-Allow supported system expressions and macros to configure gathering checks, condition modifiers, stamina formulas, attempt-limit formulas, character modifiers, and per-row character modifier overrides without hardcoding system-specific logic in Fabricate core.
+Allow supported system expressions to configure gathering checks, condition modifiers, stamina formulas, attempt-limit formulas, character modifiers, and per-row character modifier overrides without hardcoding system-specific logic in Fabricate core.
 
 ### Requirements
 
-1. `dnd5e` expression fields must allow natural dnd5e roll/formula syntax with actor data references where the selected dnd5e version supports those data paths.
-2. `pf2e` expression fields must allow natural pf2e roll/formula syntax with actor data references where the selected pf2e version supports those data paths.
+1. Expression fields must allow natural system roll/formula syntax with actor data references where the selected game system supports those data paths.
+2. Expression evaluation runs the free-text expression through Foundry core (`new Roll(expression, actor.getRollData())`) with no system-specific branching, so a `dnd5e` and a `pf2e` actor each resolve against their own roll-data shape.
 3. Expression evaluation uses the selected gathering actor as the primary actor context.
-4. Expression fields support roll terms where the owning provider supports rolls, not only static numeric expressions.
-5. Fabricate core must not invent a parallel replacement formula language for dnd5e or pf2e.
-6. A GM may choose a custom macro provider instead of a dnd5e or pf2e expression provider where the relevant feature supports provider choice.
-7. Macro providers must receive enough context to make equivalent decisions: environment, task, actor, current conditions, stamina state where enabled, node/attempt state where enabled, risk, and triggering lifecycle event.
-8. Provider diagnostics from invalid expressions, unsupported data paths, macro exceptions, or malformed macro return values are GM-fix-required diagnostics, not normal player failure outcomes.
-9. Player-facing UI must show safe failure/blocking copy for provider diagnostics without exposing macro internals, expression source, or GM-only data to non-GM users.
-10. Fabricate core must not hardcode game-system-specific actor paths for character modifiers. Known system paths may be shipped only as editable opt-in preset data.
+4. Expression fields support roll terms, not only static numeric expressions.
+5. Fabricate core must not invent a parallel replacement formula language for the game system.
+6. Visibility gates, gathering checks, tool requirements, and character modifiers are formula-only: each carries a free-text `formula`/`expression` with no provider discriminator and no macro support.
+7. Diagnostics from invalid expressions, unsupported data paths, missing required fields, or malformed return values are GM-fix-required diagnostics, not normal player failure outcomes.
+8. Player-facing UI must show safe failure/blocking copy for these diagnostics without exposing expression source or GM-only data to non-GM users.
+9. Fabricate core must not hardcode game-system-specific actor paths for character modifiers. Known system paths may be shipped only as editable opt-in preset data.
 
 ## Gathering Resource Nodes
 
@@ -882,7 +873,10 @@ GatheringEconomyConfig = {
 18a. The regeneration interval `unit` of `days` or `weeks` resolves its length from the active Foundry world calendar (`game.time.calendar`) so it tracks custom (non-24h-day / non-7-day-week) calendars; `minutes` (60s) and `hours` (3600s) are fixed. With no calendar configured the lengths fall back to 86400s (day) and 604800s (week), reproducing the pre-calendar behaviour. The interval length is resolved per evaluation so a mid-session calendar change is honoured.
 19. Rest/provider-event regeneration identifies the provider event or hook contract that grants stamina.
 20. GMs can manually set current stamina for an actor when they have permission to manage that actor's gathering state.
-21. GMs should be able to manually set or override maximum stamina when the selected stamina provider is Fabricate-owned. External provider maximums may be read-only.
+21. A persisted stamina pool exposes a `maxReadOnly` boolean rather than an ownership enum.
+GMs can manually set or override maximum stamina for a writable pool (`maxReadOnly: false`).
+A pool with `maxReadOnly: true` locks `max` after seed, so a later GM edit cannot change the maximum (only the current value and override).
+A legacy pool persisted under the former `provider: "external"` value reads back as `maxReadOnly: true` at read time, and that lock is preserved on the next write.
 22. System-specific stamina formulas are provider-driven or configured; Fabricate core does not hardcode system-specific resource paths.
 23. Actor stamina state may be stored in Fabricate actor flags when no external provider owns stamina.
 24. Actor stamina display includes current and maximum values when known.
@@ -944,26 +938,21 @@ Define whether a task is visible to a given actor before an attempt begins.
 
 ```js
 GatheringVisibilityGate = {
-  provider: "dnd5e" | "pf2e" | "macro",
-  formula?: string,
+  formula: string,
   threshold?: string,
-  macroUuid?: string,
 }
 ```
 
 ### Requirements
 
-1. `provider === "macro"` requires `macroUuid`.
-2. `provider === "dnd5e"` or `provider === "pf2e"` requires both `formula` and `threshold`.
-3. Visibility evaluation resolves to a boolean for the chosen actor.
-4. Macro providers may return either:
-   - `boolean`
-   - `{ visible: boolean, description?: string }`
-5. When no `visibility` gate is configured, the task is visible to any actor that can otherwise access the environment.
+1. A configured gate requires both `formula` and `threshold` for a meaningful gate.
+2. Visibility evaluation resolves to a boolean for the chosen actor.
+3. When no `visibility` gate is configured, the task is visible to any actor that can otherwise access the environment.
+4. The gate is formula-only: there is no provider discriminator and no macro support on this surface.
 
-For `dnd5e` and `pf2e`, `formula` and `threshold` use the same actor-aware formula/expression syntax those systems already expose to users. Fabricate must not invent a parallel formula language for them.
+`formula` and `threshold` use the same actor-aware formula/expression syntax the active game system already exposes to users. Fabricate must not invent a parallel formula language.
 
-Evaluation contract for `dnd5e` and `pf2e` providers:
+Evaluation contract:
 
 1. Resolve `formula` to a numeric value using the selected actor as context.
 2. Resolve `threshold` to a numeric value or boolean comparison using the same system-native syntax and actor context.
@@ -972,7 +961,7 @@ Evaluation contract for `dnd5e` and `pf2e` providers:
 If `threshold` resolves to a numeric value, visibility is granted when `formula >= threshold`.
 If `threshold` resolves to a boolean comparison expression, that boolean result is authoritative.
 
-The exact parsing and execution details remain implementation-defined, but they must stay within the native expression capabilities of `dnd5e` and `pf2e` and must not require user-authored core patches.
+The exact parsing and execution details remain implementation-defined, but they must stay within the native expression capabilities of the active game system and must not require user-authored core patches.
 
 ## GatheringCheck
 
@@ -984,27 +973,25 @@ Define the actor-based check used by a gathering task when its resolution mode n
 
 ```js
 GatheringCheck = {
-  provider: "dnd5e" | "pf2e" | "macro",
-  formula?: string,
+  formula: string,
   threshold?: string,
-  macroUuid?: string,
 }
 ```
 
 ### Requirements
 
 1. `resolutionMode === "progressive"` requires `check`.
-2. `check.provider === "macro"` requires `macroUuid`.
-3. `check.provider === "dnd5e"` or `check.provider === "pf2e"` requires `formula`.
-4. Progressive checks must resolve to a numeric value and may additionally carry a terminal status (`success` or `failure`).
-5. Routed tasks using `macroOutcome` do not require `check`; the macro outcome provider resolves the result directly.
-6. Routed tasks using `rollTableOutcome` do not require `check` unless a future implementation adds an extra pre-roll check layer.
-7. A check result with a numeric value and no terminal status is neutral. The runtime must use the value for progressive award evaluation and must not treat the result as success or failure by itself.
-8. Check evaluator diagnostics for unsupported providers, provider exceptions, missing required fields, or malformed return values are GM-fix-required diagnostics, not terminal player failure outcomes.
+2. A configured `check` requires `formula`; `threshold` is optional.
+3. Progressive checks must resolve to a numeric value and may additionally carry a terminal status (`success` or `failure`).
+4. Routed tasks using `macroOutcome` do not require `check`; the macro outcome provider resolves the result directly.
+5. Routed tasks using `rollTableOutcome` do not require `check` unless a future implementation adds an extra pre-roll check layer.
+6. A check result with a numeric value and no terminal status is neutral. The runtime must use the value for progressive award evaluation and must not treat the result as success or failure by itself.
+7. Check evaluator diagnostics for missing required fields or malformed return values are GM-fix-required diagnostics, not terminal player failure outcomes.
+8. The check is formula-only: there is no provider discriminator and no macro support on this surface.
 
-For `dnd5e` and `pf2e`, `formula` and optional `threshold` use the same actor-aware formula/expression syntax those systems already expose to users. Fabricate must not invent a parallel formula language for them.
+`formula` and optional `threshold` use the same actor-aware formula/expression syntax the active game system already exposes to users. Fabricate must not invent a parallel formula language.
 
-Evaluation contract for `dnd5e` and `pf2e` providers:
+Evaluation contract:
 
 1. Resolve `formula` to a numeric value using the selected actor as context.
 2. If `threshold` is absent, use the resolved numeric value directly as the gathering check result.
@@ -1161,9 +1148,7 @@ Tools are the unified required-but-reusable, breakable prerequisite primitive (s
 Tool = {
   componentId: string,
   requirement: null | {
-    provider: "dnd5e" | "pf2e" | "macro",
-    formula?: string,
-    macroUuid?: string,
+    formula: string,
   },
   breakage: {
     mode: "limitedUses" | "breakageChance" | "diceExpression",
@@ -1183,7 +1168,7 @@ Tool = {
 
 1. A task may reference zero or more required tools via `toolIds: string[]`. Each id references an entry in the system-owned library `system.tools[]` (the single canonical Tools library); the composed environment's `__libraryTools` Map (sourced from `system.tools` by `GatheringRichStateService.composeEnvironment`) resolves each id to a `Tool` object at runtime. References whose id is no longer in the library, or that resolve to a disabled library tool, block start with `TOOL_BLOCKED` because the task's required equipment is misconfigured. Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth. All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing from the actor, broken, or fails its requirement.
 2. Owned items with `flags.fabricate.toolBroken === true` do not satisfy tool presence; the gate must treat them as not-present until a GM clears the flag.
-3. The optional `requirement` is evaluated against the selected acting actor through the existing system-agnostic expression adapter. A system-provider truthy value (non-zero number, non-empty string, `true`) satisfies the requirement; macro returns may be a bare boolean or `{ allowed: boolean, description?: string }`.
+3. The optional `requirement` is formula-only and is evaluated against the selected acting actor through the existing system-agnostic expression adapter. A truthy resolved value (non-zero number, non-empty string, `true`) satisfies the requirement. There is no provider discriminator and no macro support on this surface.
 4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`.
 5. Exactly one `onBreak.mode` is configured per tool. `destroy` deletes the owned item. `flagBroken` sets `flags.fabricate.toolBroken = true`. `replaceWith` deletes the original and creates the `replacementComponentId` managed component on the actor; the replacement is a normal managed component that recipes can consume to repair the tool.
 6. Tool breakage is planned before result creation so the system-level `toolBreakagePolicy` can override the outcome. The `failureOnBreak` policy (default) flips a successful attempt to `failed` and clears `outcome.resultGroups` when any tool breaks. The `successDespiteBreak` policy leaves the outcome untouched. Either way, tool destruction/flagging/replacement always commits.
@@ -1301,7 +1286,7 @@ There is no player-reorder step in gathering. Task-defined result order is autho
 
 ### Check Contract
 
-Macro-based progressive checks return:
+A formula-only progressive check resolves to a numeric result, optionally carrying a terminal status:
 
 ```js
 {
@@ -1311,9 +1296,9 @@ Macro-based progressive checks return:
 }
 ```
 
-Adapter-based progressive checks must resolve to an equivalent numeric result, with optional terminal status if the adapter supports it.
+The check is formula-only — there is no provider discriminator and no macro support on this surface; the `formula` is evaluated against the selected actor through the system-agnostic expression adapter to produce the numeric `value`.
 Value-only check results are neutral and remain eligible for progressive award evaluation. They do not force a terminal success or failure status.
-Provider diagnostics from the check evaluator abort resolution as misconfiguration/provider errors; they do not create failed gathering history, failure feedback, tool usage, or result items.
+Diagnostics from the check evaluator (missing formula or a malformed numeric result) abort resolution as misconfiguration/evaluation errors; they do not create failed gathering history, failure feedback, tool usage, or result items.
 
 ### Validation
 
@@ -1369,7 +1354,7 @@ There is no multi-step gathering state in this phase.
    - do not apply tool usage/breakage,
    - do not create result items.
 
-Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed tool side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/tool/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task tool-reference (`toolIds`) authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Tool authoring references existing per-system library Tools by id (`toolIds`); inline Tool authoring on tasks is not supported (the per-system library is the single source of truth). Visibility authoring supports enable/clear plus `macro`, `dnd5e`, and `pf2e` provider fields, with incomplete provider input kept local until required fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus `macro`, `dnd5e`, and `pf2e` checks with optional thresholds for dnd5e/pf2e. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields. Task/result/tool/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
+Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed tool side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/tool/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task tool-reference (`toolIds`) authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Tool authoring references existing per-system library Tools by id (`toolIds`); inline Tool authoring on tasks is not supported (the per-system library is the single source of truth). Visibility authoring is formula-only: it supports enable/clear plus a `formula` and `threshold` field, with incomplete input kept local until both fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus a formula-only `check` with an optional threshold. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with failure-outcome `mode` switching (`text`/`macro`) and routed result-selection `provider` switching each clearing stale fields from the prior selection. Task/result/tool/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 ### Completion Flow
 
@@ -1566,7 +1551,7 @@ If a linked scene is deleted:
 - Unit tests for task/event composition matching by biome and danger (geography — `GatheringRealm` — is not a composition axis), plus runtime condition gating by global weather and global time of day
 - Unit tests proving weather/time do not appear as player environment browse filters
 - API tests for `getConditions`, `setWeather`, `setTimeOfDay`, `setConditions`, permission checks, validation, persistence, and hook dispatch
-- Unit tests for visibility-gate evaluation using `dnd5e`, `pf2e`, and macro providers
+- Unit tests for formula-only visibility-gate evaluation (numeric and boolean-threshold comparisons)
 - Unit tests for pause-state rejection
 - Unit tests proving paused player gathering creates no stamina spend, rolls, chat, history, or item awards
 - Unit tests for scene gating and actor/token presence checks
