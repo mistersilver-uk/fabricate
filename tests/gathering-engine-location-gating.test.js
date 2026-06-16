@@ -321,3 +321,105 @@ test('realms disabled: realmsEnabled false with an empty current-realm list', as
   assert.equal(env.realmsEnabled, false, 'realm chip flag off when the subsystem is disabled');
   assert.deepEqual(env.currentRealms, []);
 });
+
+// ---------------------------------------------------------------------------
+// Listing-level realm context (listing.realmContext) — the party/system current
+// realm surfaced for the header chip independent of any environment selection,
+// so the chip shows even when every environment is realm-locked and none is
+// selectable. Uses STORE contract keys (enabled/realms/systemId) so the View
+// passes it straight through setRealmContext.
+// ---------------------------------------------------------------------------
+
+test('listing.realmContext: realms on + resolved realm surfaces the disclosed realm with no selection', async () => {
+  const engine = makeEngine({
+    // Ungated environment so it is available with no realm-lock — proves the
+    // listing-level context is independent of any selected/gated environment.
+    environments: [environment({ includedRealmIds: [], excludedRealmIds: [] })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.realmContext.enabled, true);
+  assert.equal(listing.realmContext.systemId, 'system-a');
+  assert.equal(listing.realmContext.realms.length, 1);
+  assert.equal(listing.realmContext.realms[0].label, 'Verdant Expanse');
+  assert.equal(listing.realmContext.realms[0].placeholder, false);
+});
+
+test('listing.realmContext: realms on + no current realm is enabled:true with an empty realm list', async () => {
+  // The core repro: every environment is realm-locked and none is selectable,
+  // but the chip must still show ("No current realm").
+  const engine = makeEngine({ parties: [] });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.realmContext.enabled, true);
+  assert.equal(listing.realmContext.systemId, 'system-a');
+  assert.deepEqual(listing.realmContext.realms, []);
+});
+
+test('listing.realmContext: realms off is enabled:false with no system id', async () => {
+  const engine = makeEngine({
+    systems: [system({ gatheringRealmSettings: disabledSettings })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.realmContext.enabled, false);
+  assert.equal(listing.realmContext.systemId, null);
+  assert.deepEqual(listing.realmContext.realms, []);
+});
+
+test('listing.realmContext: a secret undiscovered current realm is redacted (no leak in the serialized listing)', async () => {
+  const engine = makeEngine({
+    environments: [environment({ includedRealmIds: [], excludedRealmIds: [] })],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-secret'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.realmContext.enabled, true);
+  assert.equal(listing.realmContext.realms[0].placeholder, true, 'secret undiscovered realm redacted');
+  const serialized = JSON.stringify(listing.realmContext);
+  assert.equal(serialized.includes('Hidden Vale'), false, 'no secret name leak');
+  assert.equal(serialized.includes('r-secret'), false, 'no secret id leak');
+});
+
+test('listing.realmContext: more than one realm-enabled system is ambiguous (enabled:false)', async () => {
+  // Two realm-enabled gathering systems present — a single chip cannot honestly
+  // represent both, so the listing-level chip falls back to selection-driven.
+  const systemB = system({ id: 'system-b' });
+  const engine = makeEngine({
+    environments: [
+      environment({ includedRealmIds: [], excludedRealmIds: [] }),
+      environment({ id: 'env-b', craftingSystemId: 'system-b', includedRealmIds: [], excludedRealmIds: [] })
+    ],
+    systems: [system(), systemB],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.realmContext.enabled, false, 'ambiguous multi-system → chip omitted');
+  assert.equal(listing.realmContext.systemId, null);
+  assert.deepEqual(listing.realmContext.realms, []);
+});
+
+test('listing.realmContext: exactly one realm-enabled system among several is unambiguous (chip shows)', async () => {
+  // system-a has realms on, system-b has realms off — only one realm-enabled
+  // system present, so the chip resolves to system-a despite the second system.
+  const systemB = system({ id: 'system-b', gatheringRealmSettings: disabledSettings });
+  const engine = makeEngine({
+    environments: [
+      environment({ includedRealmIds: [], excludedRealmIds: [] }),
+      environment({ id: 'env-b', craftingSystemId: 'system-b', includedRealmIds: [], excludedRealmIds: [] })
+    ],
+    systems: [system(), systemB],
+    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.actor-1'], travelActorUuid: 'Actor.t1', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r-here'] } } }]
+  });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.equal(listing.realmContext.enabled, true);
+  assert.equal(listing.realmContext.systemId, 'system-a');
+  assert.equal(listing.realmContext.realms[0].label, 'Verdant Expanse');
+});
+
+test('_emptyListing returns a well-formed realmContext (enabled:false, realms:[], systemId:null)', async () => {
+  // No environments configured → empty listing; the View's setRealmContext must
+  // never see an undefined realmContext.
+  const engine = makeEngine({ environments: [] });
+  const listing = await engine.listForActor({ viewer, actor });
+  assert.deepEqual(listing.environments, []);
+  assert.deepEqual(listing.realmContext, { enabled: false, realms: [], systemId: null });
+});

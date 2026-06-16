@@ -433,6 +433,58 @@ describe('GatheringView ↔ actor bar wiring', () => {
     assert.equal(store.conditionVisibility.timeOfDay, false, 'time-of-day hidden: no listed system enables it');
   });
 
+  // #357: the header realm chip's baseline is the listing-level realm context
+  // (party/system-scoped), so it shows even when every environment is realm-
+  // locked and none is selectable. The View pushes listing.realmContext straight
+  // through setRealmContext when there is no selection.
+  it('#357: pushes listing.realmContext (enabled, no current realm) when no environment is selected', async () => {
+    const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+    store.loadSelectableActors();
+    flushSync();
+    // Every environment is realm-locked → none auto-selected; the listing still
+    // carries a realm context with enabled:true and an empty realm list.
+    const envs = [
+      environment({ id: 'e1', locked: true, attemptable: false }),
+      environment({ id: 'e2', locked: true, attemptable: false })
+    ];
+    const result = { ...listing(envs), realmContext: { enabled: true, realms: [], systemId: 'system-a' } };
+    const { services } = makeGatheringServices(result);
+    services.actorBar = store;
+
+    await mountView(services);
+    await settle();
+
+    assert.equal(store.realmContext.enabled, true, 'chip enabled with no selection (no current realm)');
+    assert.deepEqual(store.realmContext.realms, [], 'empty realm list ("No current realm")');
+  });
+
+  it('#357: a selected environment refines the realm context over the listing baseline', async () => {
+    const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
+    store.loadSelectableActors();
+    flushSync();
+    // A selectable (unlocked) environment auto-selects; its realmsEnabled +
+    // currentRealms refine the chip, overriding the listing baseline.
+    const envs = [
+      environment({
+        id: 'e1',
+        locked: false,
+        attemptable: true,
+        realmsEnabled: true,
+        currentRealms: [{ label: 'Verdant Expanse', placeholder: false }]
+      })
+    ];
+    const result = { ...listing(envs), realmContext: { enabled: true, realms: [], systemId: 'system-a' } };
+    const { services } = makeGatheringServices(result);
+    services.actorBar = store;
+
+    await mountView(services);
+    await settle();
+
+    assert.equal(store.realmContext.enabled, true);
+    assert.equal(store.realmContext.realms.length, 1, 'selected env refines to its disclosed realm');
+    assert.equal(store.realmContext.realms[0].label, 'Verdant Expanse');
+  });
+
   it('surfaces a warning notification when an attempt is rejected (never a silent no-op)', async () => {
     const warns = [];
     globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };

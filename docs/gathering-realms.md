@@ -153,6 +153,15 @@ Location-gated environments stay listed but blocked, with a localized reason:
 
 The listing payload also carries a redaction-safe `location` field per environment (whether it is gated, available, the resolution source, and disclosure-safe current-realm labels) and, on blocked rows, travel guidance data: the destination realms whose identity the viewer is allowed to see (non-secret or already discovered), plus a count of secret undiscovered destinations. Macros and future player UI can use this to render travel goals such as "Travel to Ashen March" without leaking secret geography.
 
+### The actor bar's current-realm chip
+
+The gathering app's actor selection bar carries a **current-realm chip** alongside the weather and time-of-day context.
+The chip's current realm is a property of the **party/system**, not of any one environment, so it is sourced from a single listing-level realm context resolved by the engine for the selected actor's active realm-enabled gathering system — independent of whether an environment is selected.
+The chip therefore appears whenever the realm subsystem is enabled, **including the all-environments-locked state** where no environment is selectable: it shows **"No current realm"** when the party has no resolved current realm, giving the player a diagnostic signal explaining why every environment is locked.
+When a current realm is resolved, the chip shows the realm name(s) with the same redaction behavior as everywhere else — a secret, undiscovered realm reads as **Undiscovered realm**, and the chip never fabricates a realm name.
+The chip carries an accessible name ("Realm: <value>") and announces its appearance and value changes through a polite live region.
+When more than one realm-enabled gathering system is present in the listing, a single chip cannot honestly represent both systems' realm contexts, so the listing-level chip is omitted and falls back to the selected environment's value; its absence in that ambiguous case is intended.
+
 ### Secret realms and discovery
 
 Realm knowledge is **actor-scoped** — it follows the character across party changes — and is stored on the actor as a Fabricate flag. For a non-GM viewer, a *secret, undiscovered* realm never exposes its name or id anywhere; it reads as **Undiscovered realm**. GMs always see real names, non-secret realms are always disclosed, and the `alwaysVisible` reveal mode discloses every realm name.

@@ -400,7 +400,7 @@
         },
         "Realm": {
           "Label": "Realm",
-          "None": "No realm selected"
+          "None": "No current realm"
         }
       },
       "Gathering": {

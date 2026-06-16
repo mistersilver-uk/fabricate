@@ -779,6 +779,19 @@ export class GatheringEngine {
    * - `biomeTags` — resolved biome display metadata (`{ id, label, icon,
    *   colorToken, customColor }`) so player chips match the GM editor.
    *
+   * The listing also carries a single top-level `realmContext`
+   * (`{ enabled: boolean, realms: object[], systemId: string|null }`) describing
+   * the party/system current realm for the header current-realm chip, resolved
+   * once per listing independent of which environment (if any) is selected — so
+   * the chip surfaces the realm context even when every environment is
+   * realm-locked and none is selectable. It is `enabled` only when exactly one
+   * realm-enabled gathering system is present among the listed environments (an
+   * ambiguous multi-system listing yields `{ enabled: false, ... }`); the
+   * `realms` use the same disclosure/redaction path as the per-environment
+   * current-realm summary. The field deliberately uses the store contract keys
+   * (`enabled`/`realms`) so the View can pass it straight to `setRealmContext`.
+   * See {@link GatheringEngine#_listingRealmContext}.
+   *
    * @param {object} [args]
    * @param {object|null} [args.viewer] Foundry user requesting the listing.
    * @param {object|null} [args.actor] Explicitly selected actor, if any.
@@ -869,6 +882,14 @@ export class GatheringEngine {
       ...activeRuns,
       ...history,
     ]);
+    const realmContext = this._listingRealmContext({
+      environmentModels,
+      environments,
+      systems,
+      viewer,
+      actor: selectedActor,
+      realmContextCache,
+    });
 
     return {
       visible: true,
@@ -882,6 +903,7 @@ export class GatheringEngine {
       activeRuns,
       history,
       gatheringSystems,
+      realmContext,
     };
   }
 
@@ -1973,6 +1995,73 @@ export class GatheringEngine {
       })
     );
     return { realmsEnabled: true, currentRealms };
+  }
+
+  /**
+   * Resolve the listing-level current-realm context for the player header chip,
+   * independent of which environment (if any) is selected. The current realm is a
+   * property of the party/system, so the chip must surface it even when every
+   * environment is realm-locked and none is selectable.
+   *
+   * The active system is derived from the listing's environments: the field is
+   * enabled ONLY when exactly ONE realm-enabled gathering system is present among
+   * them (the system-singularity rule). A single chip cannot honestly represent
+   * two systems' realm contexts at once (per-system overrides/reveal modes differ),
+   * so an ambiguous multi-system listing falls back to selection-driven behavior
+   * with `{ enabled: false, ... }`. Disambiguation keys on system identity, not
+   * realm-equality.
+   *
+   * The realms are resolved through `_currentRealmSummary` (NOT raw
+   * `context.realms`) so disclosure/redaction stays byte-for-byte identical to the
+   * per-environment path, reusing the per-listing `realmContextCache` so it hits
+   * the already-memoized context.
+   *
+   * The returned object deliberately uses the STORE contract keys
+   * (`enabled`/`realms`, NOT the helper's `realmsEnabled`/`currentRealms`) so the
+   * View can pass it straight through `setRealmContext` with no remapping — keep
+   * these keys so a future "inconsistent key" cleanup does not re-break it.
+   *
+   * @param {object} args
+   * @returns {{ enabled: boolean, realms: object[], systemId: string|null }}
+   */
+  _listingRealmContext({
+    environmentModels,
+    environments,
+    systems,
+    viewer,
+    actor,
+    realmContextCache = null,
+  }) {
+    const realmEnabledSystemIds = [
+      ...new Set(
+        normalizeList(environmentModels)
+          .filter((model) => model?.realmsEnabled === true)
+          .map((model) => stringOrNull(model?.craftingSystemId))
+          .filter(Boolean)
+      ),
+    ];
+    // System-singularity rule: a single chip can only honestly represent one
+    // system's realm context. Zero realm-enabled systems → chip stays hidden;
+    // more than one → ambiguous, fall back to selection-driven behavior.
+    if (realmEnabledSystemIds.length !== 1) {
+      return { enabled: false, realms: [], systemId: null };
+    }
+    const systemId = realmEnabledSystemIds[0];
+    const environment = normalizeList(environments).find(
+      (candidate) => stringOrNull(candidate?.craftingSystemId) === systemId
+    );
+    const summary = this._currentRealmSummary({
+      environment,
+      system: systems.get(systemId),
+      viewer,
+      actor,
+      realmContextCache,
+    });
+    return {
+      enabled: summary.realmsEnabled === true,
+      realms: summary.currentRealms,
+      systemId,
+    };
   }
 
   _realmRevealMode(system) {
@@ -3718,6 +3807,9 @@ export class GatheringEngine {
       activeRuns,
       history,
       gatheringSystems: this._gatheringSystemOptions([...activeRuns, ...history]),
+      // STORE contract keys (enabled/realms) so the View passes it straight
+      // through setRealmContext; no environments → no system context → chip off.
+      realmContext: { enabled: false, realms: [], systemId: null },
     };
   }
 
