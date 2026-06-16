@@ -50,7 +50,7 @@ test('coerces malformed library entries and drops invalid ones', () => {
   assert.equal(byId['invalid-no-expr'], undefined, 'no-expression entry dropped');
   assert.ok(byId['with-expr'], 'entry with an expression preserved');
   assert.equal(byId['with-expr'].provider, undefined, 'no provider field is stamped');
-  assert.deepEqual(Object.keys(byId.strength).sort(), ['expression', 'icon', 'id', 'isRollExpression', 'label']);
+  assert.deepEqual(Object.keys(byId.strength).sort((a, b) => a.localeCompare(b)), ['expression', 'icon', 'id', 'isRollExpression', 'label']);
   assert.equal(byId.strength.isRollExpression, false, 'flat actor ref is not roll');
 });
 

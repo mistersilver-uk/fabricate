@@ -292,11 +292,11 @@ test('character modifier expression evaluation receives correct context shape', 
     }
   });
   assert.equal(lastPayload.expression, '@mod');
-  assert.ok('actor' in lastPayload);
-  assert.ok('environment' in lastPayload);
-  assert.ok('task' in lastPayload);
-  assert.ok('row' in lastPayload);
-  assert.ok('modifier' in lastPayload);
+  assert.ok(Object.hasOwn(lastPayload, 'actor'));
+  assert.ok(Object.hasOwn(lastPayload, 'environment'));
+  assert.ok(Object.hasOwn(lastPayload, 'task'));
+  assert.ok(Object.hasOwn(lastPayload, 'row'));
+  assert.ok(Object.hasOwn(lastPayload, 'modifier'));
   assert.equal(lastPayload.kind, 'characterModifier');
 });
 
