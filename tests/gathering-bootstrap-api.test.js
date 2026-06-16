@@ -52,22 +52,32 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
   );
   assert.match(
     mainSource,
-    /rememberedActorId: this\.getSelectedGatheringActorId\(\) \|\| null,\s*\.\.\.options/,
-    'listGatheringForActor should default rememberedActorId to the persisted selection while letting options override it'
-  );
-  assert.match(
-    mainSource,
     /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'startAttempt', withRememberedActor, \(\) => game\.user\);/,
     'startGatheringAttempt should delegate through current-user viewer enforcement (with the remembered-actor default)'
   );
-  // The attempt MUST resolve the same actor the listing did: default
-  // rememberedActorId to the persisted selection (options still override) so the
-  // engine never falls back to the first owned actor — the player-app silent
-  // no-op bug.
+  // The three wrappers (list, attempt, drop breakdown) MUST resolve the SAME actor
+  // the UI displays. They default `rememberedActorId` through
+  // `_withRememberedActorDefault`: a truthy id overrides, but a null/omitted id
+  // falls back to the persisted selection — NOT the engine's arbitrary
+  // `selectableActors[0]` fallback (the wrong-actor "all tools missing / nothing
+  // happens" bug). Guarded so a regression to the old `{ persisted, ...options }`
+  // spread (where an explicit `null` clobbered the default) fails loudly.
   assert.match(
     mainSource,
-    /startGatheringAttempt\(options = \{\}\) \{[\s\S]*?rememberedActorId: this\.getSelectedGatheringActorId\(\) \|\| null,\s*\.\.\.options/,
-    'startGatheringAttempt should default rememberedActorId to the persisted selection while letting options override it'
+    /_withRememberedActorDefault\(options = \{\}\) \{[\s\S]*?rememberedActorId: options\.rememberedActorId \|\| this\.getSelectedGatheringActorId\(\) \|\| null,/,
+    '_withRememberedActorDefault should coalesce a null/omitted id to the persisted selection (a truthy id overrides)'
+  );
+  for (const wrapper of ['listGatheringForActor', 'startGatheringAttempt', 'getGatheringDropBreakdown']) {
+    assert.match(
+      mainSource,
+      new RegExp(`${wrapper}\\(options = \\{\\}\\) \\{[\\s\\S]*?const withRememberedActor = this\\._withRememberedActorDefault\\(options\\);`),
+      `${wrapper} should default the remembered actor through _withRememberedActorDefault`
+    );
+  }
+  assert.equal(
+    mainSource.includes('rememberedActorId: this.getSelectedGatheringActorId() || null,'),
+    false,
+    'the buggy `{ rememberedActorId: persisted, ...options }` spread (explicit null clobbers the default) must not return'
   );
   assert.match(
     mainSource,

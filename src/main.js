@@ -1053,6 +1053,31 @@ class Fabricate {
   }
 
   /**
+   * Merge caller `options` with the persisted remembered-actor default.
+   *
+   * A TRUTHY `options.rememberedActorId` overrides; a `null`/`undefined`/empty
+   * id falls back to the persisted last-gathering selection
+   * ({@link Fabricate#getSelectedGatheringActorId}). This matters because the UI
+   * passes `rememberedActorId: store.selectedActorId ?? null`, and on a fresh
+   * open that selection is `null` before the actor bar settles. Previously a
+   * spread (`{ rememberedActorId: persisted, ...options }`) let that explicit
+   * `null` clobber the persisted default, so the engine resolved its last-resort
+   * `selectableActors[0]` (an arbitrary first actor) instead of the displayed
+   * one — the wrong-actor bug where every required tool reads "missing" until you
+   * reselect the actor. Coalescing here keeps the displayed/persisted actor as
+   * the default for the listing, the attempt, and the drop breakdown alike.
+   *
+   * @param {object} [options]
+   * @returns {object} `options` with `rememberedActorId` defaulted.
+   */
+  _withRememberedActorDefault(options = {}) {
+    return {
+      ...options,
+      rememberedActorId: options.rememberedActorId || this.getSelectedGatheringActorId() || null,
+    };
+  }
+
+  /**
    * List gathering environments/tasks for the current user and selected actor.
    *
    * The internal GatheringEngine receives the current Foundry user as viewer,
@@ -1061,9 +1086,10 @@ class Fabricate {
    * When `options.rememberedActorId` is omitted (or otherwise absent), it
    * defaults to the persisted last-gathering selection
    * ({@link Fabricate#getSelectedGatheringActorId}) so a fresh listing honors
-   * the remembered actor. An explicit `rememberedActorId` in `options` always
-   * overrides that default (including an explicit `null`, which forces no
-   * remembered actor). The engine resolves the id against its OWNERSHIP
+   * the remembered actor. A truthy `rememberedActorId` in `options` overrides
+   * that default; a `null` or omitted id falls back to the persisted selection
+   * (it does NOT force the engine's arbitrary first-selectable-actor fallback).
+   * The engine resolves the id against its OWNERSHIP
    * selectable list, not the narrower player-character list used by the actor
    * selection bar, so a legacy persisted owned non-player-character id is still
    * honored for that fetch.
@@ -1078,16 +1104,9 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    // Default the remembered actor to the persisted last-gathering selection so
-    // a fresh listing honors it; an explicit `rememberedActorId` in `options`
-    // still overrides the persisted default. The engine resolves this id against
-    // its OWNERSHIP selectable list (not the player-character list), so a legacy
-    // persisted owned non-PC id is honored by the engine for that fetch; the bar
-    // store converges it to a player character (see design convergence contract).
-    const withRememberedActor = {
-      rememberedActorId: this.getSelectedGatheringActorId() || null,
-      ...options
-    };
+    // Resolve against the persisted last-gathering selection by default; an
+    // explicit (truthy) actor id still overrides. See _withRememberedActorDefault.
+    const withRememberedActor = this._withRememberedActorDefault(options);
 
     return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'listForActor', withRememberedActor, () => game.user);
   }
@@ -1154,16 +1173,11 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    // Default the remembered actor to the persisted last-gathering selection so
-    // the attempt resolves the SAME actor the listing/availability was computed
-    // for (an explicit `rememberedActorId` still overrides). Without this the
-    // engine falls back to the first owned selectable actor, which can differ
-    // from the selected actor and silently fail location/ownership gating — the
-    // player-app "nothing happens" bug. Mirrors `listGatheringForActor`.
-    const withRememberedActor = {
-      rememberedActorId: this.getSelectedGatheringActorId() || null,
-      ...options
-    };
+    // Resolve the SAME actor the listing/availability was computed for: default
+    // to the persisted selection, an explicit (truthy) id overrides. Without this
+    // the engine falls back to selectableActors[0] and silently mis-gates the
+    // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
+    const withRememberedActor = this._withRememberedActorDefault(options);
 
     return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', withRememberedActor, () => game.user);
   }
@@ -1182,10 +1196,7 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    const withRememberedActor = {
-      rememberedActorId: this.getSelectedGatheringActorId() || null,
-      ...options
-    };
+    const withRememberedActor = this._withRememberedActorDefault(options);
 
     return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'getTaskDropBreakdown', withRememberedActor, () => game.user);
   }
