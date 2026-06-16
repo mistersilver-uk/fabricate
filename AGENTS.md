@@ -35,6 +35,7 @@ Match the change against every signal that applies. All matching agents run in p
 | Touches `src/ui/`, `src/ui/svelte/`, or `styles/`                                                                                 | `fabricate_ux_designer`                                                                          | plan-review + post-implementation review |
 | Touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language                        | `fabricate_domain_expert`                                                                        | plan-review + docs loop                  |
 | Adds, removes, or restructures tests, or changes test infrastructure under `tests/`                                               | `fabricate_quality_engineer`                                                                     | plan-review + post-implementation review |
+| Calls Foundry VTT APIs or hooks into Foundry's lifecycle (`Hooks`; `game`/`ui`/`CONFIG`; document/`ApplicationV2`/`DialogV2`/sheet APIs; settings/flags/UUIDs; `src/integrations/`, `src/canvas/`, Foundry-facing `src/main.js`; or `module.json` compatibility) | `foundry_integrator`                                                                             | plan-review + post-implementation review |
 | Changes behaviour, public API surfaces, hooks, slash commands, settings, JSDoc-documented exports, or anything covered by `docs/` | `fabricate_docs_writer` + `fabricate_domain_expert` (paired loop)                                | post-implementation docs loop            |
 | Competitor, market, or precedent question                                                                                         | `fabricate_competitive_analyst`                                                                  | plan                                     |
 | GitHub PR investigation                                                                                                           | `fabricate_pr_explorer`                                                                          | as needed                                |
@@ -126,6 +127,14 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - [`docs/agents/foundry-css-overrides.md`](docs/agents/foundry-css-overrides.md) — where Foundry core styles fight Fabricate styles (button layout, focus rings) and the global per-area override map in `styles/fabricate.css`, including the specificity ladder that keeps area defaults from clobbering per-component rules.
 - [`docs/agents/travel-current-realm-sensing.md`](docs/agents/travel-current-realm-sensing.md) — how a gathering party's current Fabricate **realm** is resolved live from its travel-marker token (mapped from Foundry Scene Regions many-to-one via each realm's `sceneMappings[].sceneRegionUuid`), and the V13 token-movement timing trap (placeable centre lags the move → off-by-one) plus the three mitigations.
 
+## Markdown & Prose Conventions
+
+These rules apply to every agent (Claude and Codex) and to how all Markdown is authored.
+
+- Committed Markdown documents — every in-repo `*.md` (e.g. `openspec/specs/`, `docs/`, `DOMAIN.md`, `README`s, `AGENTS.md`, `CLAUDE.md`) — use semantic line breaks: one complete sentence per line. Start each sentence on its own line; never hard-wrap a single sentence across multiple lines at a fixed column. This keeps diffs sentence-scoped and review-friendly. Headings and list items stay one per line as usual, and a multi-sentence list item or table cell still puts each sentence on its own line where practical. Prettier does not format Markdown (its glob is `src/**/*.js` plus `eslint.config.js` only), so nothing re-wraps these files — author them this way by hand.
+- GitHub issue, PR, and comment bodies are written as normal prose with no manual line wrapping — one line per paragraph, and let GitHub soft-wrap. Do not hard-wrap at a fixed column, and do not apply the one-sentence-per-line rule here (GitHub renders single newlines as spaces, but unwrapped source is cleaner to read and edit).
+- Do not reflow existing documents wholesale just to apply these rules. Apply them to new content and to any section you are already editing.
+
 ## Git Conventions
 
 - All implementation, documentation, and workflow-file changes must happen on a non-`main` branch.
@@ -160,6 +169,7 @@ signals; explicit requests are only required for roles the routing table does no
 | `fabricate_docs_writer`         | `skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
 | `fabricate_ux_designer`         | `skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
 | `fabricate_quality_engineer`    | `skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
+| `foundry_integrator`            | `skills/foundry-integrator/SKILL.md`       | `.codex/agents/foundry-integrator.toml`      | `foundry-integrator`          |
 | `fabricate_competitive_analyst` | `skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
 | `fabricate_pr_explorer`         | — (no shared skill; read-only mapping)     | `.codex/agents/fabricate-pr-explorer.toml`   | `Explore` (built-in)          |
 
