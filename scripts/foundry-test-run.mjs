@@ -1345,7 +1345,7 @@ async function assertNoScreenshotOverlays(page, options = {}) {
   const visibleOverlayCount = async () =>
     page.evaluate((selector) => {
       return Array.from(document.querySelectorAll(selector)).filter((el) => {
-        const style = window.getComputedStyle(el);
+        const style = globalThis.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
         const rect = el.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
@@ -1367,7 +1367,7 @@ async function assertNoScreenshotOverlays(page, options = {}) {
   if (visibleCount > 0) {
     await page.waitForFunction((selector) => {
       return Array.from(document.querySelectorAll(selector)).every((el) => {
-        const style = window.getComputedStyle(el);
+        const style = globalThis.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return true;
         const rect = el.getBoundingClientRect();
         return rect.width === 0 || rect.height === 0;
@@ -1418,7 +1418,7 @@ async function assertNoScreenshotOverlays(page, options = {}) {
       return Array.from(document.querySelectorAll('[id^="fabricate-"]'))
         .filter((el) => {
           if (!el.classList.contains('application') && !el.classList.contains('window-app')) return false;
-          const style = window.getComputedStyle(el);
+          const style = globalThis.getComputedStyle(el);
           if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
             return false;
           }
