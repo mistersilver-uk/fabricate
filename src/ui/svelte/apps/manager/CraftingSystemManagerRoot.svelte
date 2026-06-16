@@ -4608,11 +4608,11 @@
               <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepCreate', 'Create environments after the gathering task and event libraries are ready to attach.')}</li>
             </ol>
             <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Environment.EmptySetup.Resources', 'Environment resources')}>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/gathering-environments/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/gathering-environments" target="_blank" rel="noreferrer">
                 <i class="fas fa-book-open" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs', 'Gathering docs')}</span>
               </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
                 <i class="fas fa-circle-question" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Quickstart', 'Quickstart')}</span>
               </a>
@@ -4741,11 +4741,11 @@
               <li>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.StepTransfer', 'If effect transfer is enabled, link source components whose effects should carry to crafted results.')}</li>
             </ol>
             <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Essence.EmptySetup.Resources', 'Essence resources')}>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/essences/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/essences" target="_blank" rel="noreferrer">
                 <i class="fas fa-book-open" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs', 'Essence docs')}</span>
               </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/effect-transfer/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/effect-transfer" target="_blank" rel="noreferrer">
                 <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.EffectTransferDocs', 'Effect transfer')}</span>
               </a>
@@ -4845,11 +4845,11 @@
               <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepRecipes', 'Use the managed components as recipe requirements, tools, and results.')}</li>
             </ol>
             <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Component.EmptySetup.Resources', 'Component resources')}>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/crafting-systems/#components" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/crafting-systems#components" target="_blank" rel="noreferrer">
                 <i class="fas fa-book-open" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Component.EmptySetup.ComponentDocs', 'Component docs')}</span>
               </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
                 <i class="fas fa-circle-question" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Component.EmptySetup.Quickstart', 'Quickstart')}</span>
               </a>
@@ -4975,11 +4975,11 @@
                   <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents', 'Add components')}</span>
                 </button>
               {/if}
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/recipes/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/recipes" target="_blank" rel="noreferrer">
                 <i class="fas fa-book-open" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
               </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
                 <i class="fas fa-circle-question" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
               </a>
@@ -5251,11 +5251,11 @@
             <li>{text('FABRICATE.Admin.Manager.EmptySetup.StepRecipes', 'Add recipes that consume components and award results.')}</li>
           </ol>
           <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}>
-            <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+            <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
               <i class="fas fa-book-open" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
             </a>
-            <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/" target="_blank" rel="noreferrer">
+            <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate" target="_blank" rel="noreferrer">
               <i class="fas fa-circle-question" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
             </a>

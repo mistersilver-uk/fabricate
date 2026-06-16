@@ -48,7 +48,7 @@ See [quickstart](https://mistersilver-uk.github.io/fabricate/quickstart.html) fo
 
 ## Documentation
 
-Check out the full [docs site](https://mistersilver-uk.github.io/fabricate/).
+Check out the full [docs site](https://mistersilver-uk.github.io/fabricate).
 
 ## Development
 
