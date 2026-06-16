@@ -937,7 +937,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           id: 'smoke-forage-library',
           name: 'Smoke Reusable Forage',
           description: 'Reusable library task for Manager gathering composition screenshots.',
-          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
           enabled: true,
           region: 'northreach',
           biomes: ['forest'],
@@ -964,21 +964,21 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         {
           id: 'smoke-meadow-herbs', name: 'Gather Meadow Herbs',
           description: 'Immediate successful gather for the player Gathering tab.',
-          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          img: 'icons/consumables/plants/fern-sprig-stem-leaf-herb-green.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-meadow-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 90, enabled: true }]
         },
         {
           id: 'smoke-sunken-survey', name: 'Survey Sunken Reagents',
           description: 'Visible task gated by its linked scene at the environment level.',
-          img: 'icons/svg/item-bag.svg',
+          img: 'icons/environment/wilderness/wall-ruins.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-sunken-drop', componentId: componentMap['Iron Ore'], quantity: 1, dropRate: 70, enabled: true }]
         },
         {
           id: 'smoke-crystal-dew', name: 'Bottle Crystal Dew',
           description: 'Requires the Herbalist Sickle tool, demonstrating a blocked task.',
-          img: 'icons/consumables/potions/vial-cork-empty.webp',
+          img: 'icons/consumables/potions/flask-corked-blue.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           toolIds: ['smoke-herbalist-sickle'],
           dropRows: [{ id: 'smoke-crystal-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 80, enabled: true }]
@@ -986,7 +986,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         {
           id: 'smoke-slow-bloom', name: 'Tend Slow Bloom',
           description: 'A timed gather that creates an active run before completion.',
-          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          img: 'icons/commodities/flowers/lily-bloom.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           timeRequirement: { minutes: 1, hours: 0, days: 0, months: 0, years: 0 },
           dropRows: [{ id: 'smoke-bloom-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 80, enabled: true }]
@@ -994,14 +994,14 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         {
           id: 'smoke-withered-search', name: 'Search Withered Patch',
           description: 'An exhausted patch whose only drop never lands (empty-result feedback).',
-          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          img: 'icons/consumables/plants/dried-herb-bundle-brown.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-withered-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 0, enabled: true }]
         },
         {
           id: 'smoke-moonpetal', name: 'Secret Moonpetal Harvest',
           description: 'Real task name that must stay GM-only in player blind views.',
-          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          img: 'icons/commodities/flowers/lotus-white.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-moonpetal-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 70, enabled: true }]
         }
@@ -1012,7 +1012,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           id: 'smoke-herbalist-sickle',
           label: 'Herbalist Sickle',
           enabled: true,
-          componentId: componentMap['Iron Sword'],
+          componentId: componentMap['Herbalist Sickle'],
           requirement: { formula: '@tools.herbalism.value' },
           breakage: { mode: 'limitedUses', maxUses: 5 },
           onBreak: { mode: 'flagBroken' }
@@ -1069,7 +1069,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           craftingSystemId: sysId,
           name: 'Smoke Blind Grove',
           description: 'Blind gathering site for the player Gathering tab screenshot (mask chip + discovered suffix).',
-          img: 'icons/consumables/plants/leaf-herb-green.webp',
+          img: 'icons/magic/nature/tree-spirit-green.webp',
           enabled: true,
           selectionMode: 'blind',
           region: 'northreach',
@@ -1083,7 +1083,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           craftingSystemId: sysId,
           name: 'Smoke Sealed Hollow',
           description: 'Disabled environment for the player Gathering tab screenshot (locked teaser for non-GM viewers).',
-          img: 'icons/svg/door-closed.svg',
+          img: 'icons/environment/wilderness/mine-interior-dungeon-door.webp',
           enabled: false,
           selectionMode: 'targeted',
           region: 'northreach',
@@ -1733,6 +1733,7 @@ async function main() {
           { name: 'Dragon Scale', type: itemType, img: 'icons/commodities/leather/scales-blue-white.webp' },
           { name: 'Empty Vial', type: itemType, img: 'icons/consumables/potions/vial-cork-empty.webp' },
           { name: 'Iron Sword', type: itemType, img: 'icons/weapons/swords/sword-guard-brass-worn.webp' },
+          { name: 'Herbalist Sickle', type: itemType, img: 'icons/tools/hand/sickle-worn-steel-grey.webp' },
           { name: 'Healing Potion', type: itemType, img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
           { name: 'Dragon Scale Armor', type: itemType, img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp' }
         ];
@@ -2087,6 +2088,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Azure Grove',
           description: 'A compact validation fixture for GM gathering environment authoring.',
+          img: 'icons/magic/nature/tree-spirit-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: azureGroveScene.uuid,
@@ -2104,6 +2106,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Verdant Meadow',
           description: 'A clear player-facing gathering site with an immediate successful task.',
+          img: 'icons/consumables/plants/grass-leaves-green.webp',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
@@ -2115,6 +2118,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Sunken Ruins',
           description: 'A scene-linked site that stays visible while blocked.',
+          img: 'icons/environment/wilderness/wall-ruins.webp',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: 'Scene.fabricateMissingGatheringScene',
@@ -2126,6 +2130,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Crystal Thicket',
           description: 'Requires the Herbalist Sickle tool so Bromm demonstrates a blocked task.',
+          img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
@@ -2137,6 +2142,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Timed Orchard',
           description: 'A timed gathering site that creates an active run before completion.',
+          img: 'icons/consumables/fruit/apple-red-tree-green.webp',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
@@ -2148,6 +2154,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Withered Patch',
           description: 'An exhausted patch whose only drop never lands, for empty-result feedback.',
+          img: 'icons/magic/fire/flame-burning-tree-stump.webp',
           enabled: true,
           selectionMode: 'targeted',
           sceneUuid: '',
@@ -2159,6 +2166,7 @@ async function main() {
           craftingSystemId: systemId,
           name: 'Moonlit Blind Grove',
           description: 'A blind environment that must hide task details from non-GM users.',
+          img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
           enabled: true,
           selectionMode: 'blind',
           sceneUuid: '',
@@ -2177,7 +2185,7 @@ async function main() {
                 id: 'smoke-forage-library',
                 name: 'Smoke Reusable Forage',
                 description: 'Reusable library task for Manager gathering composition screenshots.',
-                img: 'icons/consumables/plants/leaf-herb-green.webp',
+                img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
                 enabled: true,
                 region: 'northreach',
                 biomes: ['forest'],
@@ -2196,7 +2204,7 @@ async function main() {
                 id: 'smoke-herbalist-sickle',
                 label: 'Herbalist Sickle',
                 enabled: true,
-                componentId: componentMap['Iron Sword'],
+                componentId: componentMap['Herbalist Sickle'],
                 requirement: { formula: '@tools.herbalism.value' },
                 breakage: { mode: 'limitedUses', maxUses: 5 },
                 onBreak: { mode: 'flagBroken' }
@@ -2613,6 +2621,7 @@ async function main() {
                 craftingSystemId: sysId,
                 name: 'Hidden Hollow',
                 description: "Out of the party's current realm — locked until they travel there.",
+                img: 'icons/environment/wilderness/mine-interior-dungeon-door.webp',
                 enabled: true,
                 selectionMode: 'targeted',
                 sceneUuid: '',
