@@ -321,14 +321,14 @@ describe('CraftingSystemManager source contract', () => {
       'The inspector shows counts, resolution mode, and enabled features for the selected system.'
     );
     assert.ok(rootSource.includes("FABRICATE.Admin.Manager.EmptySetup.Title"), 'no-systems inspector should use localized setup copy');
-    assert.ok(rootSource.includes("https://mistersilver-uk.github.io/fabricate/quickstart/"), 'no-systems inspector should link to the published quickstart');
-    assert.ok(rootSource.includes("https://mistersilver-uk.github.io/fabricate/"), 'no-systems inspector should link to the published docs');
+    assert.ok(rootSource.includes("https://mistersilver-uk.github.io/fabricate/quickstart"), 'no-systems inspector should link to the published quickstart');
+    assert.ok(rootSource.includes("https://mistersilver-uk.github.io/fabricate"), 'no-systems inspector should link to the published docs');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Docs, 'Docs');
     assert.ok(managerSource.includes('FABRICATE.Admin.Manager.Environment.EmptyTitle'), 'empty environments browser should use Manager localized copy');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.EmptySetup.Title'), 'empty environments inspector should use localized setup copy');
-    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering-environments/'), 'empty environments inspector should link to published gathering docs');
+    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering-environments'), 'empty environments inspector should link to published gathering docs');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptyTitle, 'Prepare gathering building blocks first');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.EmptyHint,
@@ -386,7 +386,7 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
-    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/recipes/'), 'empty recipes inspector should link to published recipe docs');
+    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/recipes'), 'empty recipes inspector should link to published recipe docs');
     assert.ok(rootSource.includes('selectedCounts.components > 0'), 'empty recipes inspector should branch on selected-system component count');
     assert.ok(rootSource.includes("setView('components')"), 'empty recipes inspector should route zero-component setup to Components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.Title, 'Set up recipes');
@@ -397,11 +397,11 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents, 'Add components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs, 'Recipe docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Component.EmptySetup.Title'), 'empty components inspector should use localized setup copy');
-    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/crafting-systems/#components'), 'empty components inspector should link to published component docs');
+    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/crafting-systems#components'), 'empty components inspector should link to published component docs');
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.Title, 'Set up components');
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.ComponentDocs, 'Component docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Essence.EmptySetup.Title'), 'empty essences inspector should use localized setup copy');
-    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/essences/'), 'empty essences inspector should link to published essence docs');
+    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/essences'), 'empty essences inspector should link to published essence docs');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.Title, 'Set up essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs, 'Essence docs');
   });
