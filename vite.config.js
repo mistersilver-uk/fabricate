@@ -39,16 +39,11 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins,
-    // Drop developer-only console.log/debug/info calls from production output.
-    // console.error and console.warn are retained for user-visible messages.
-    esbuild: {
-      pure: ['console.log', 'console.debug', 'console.info']
-    },
     build: {
       outDir: 'dist',
       emptyOutDir: true,
       sourcemap: true,
-      // esbuild (default) — fast minification, reasonable output size.
+      // oxc (Vite 8 / Rolldown default) — fast minification, reasonable output size.
       minify: true,
       lib: {
         entry: resolve(import.meta.dirname, 'src/main.js'),
@@ -58,7 +53,22 @@ export default defineConfig(({ command }) => {
       rollupOptions: {
         external: [],
         output: {
-          assetFileNames: 'assets/[name].[ext]'
+          assetFileNames: 'assets/[name].[ext]',
+          // Drop developer-only console.log/debug/info calls from production
+          // output by marking them pure so dead-code elimination removes them.
+          // console.error and console.warn are retained for user-visible messages.
+          // (Rolldown's equivalent of esbuild's `pure`; the Vite-default lib
+          // minify of `{ compress: true, mangle: true, codegen: false }` is
+          // preserved, with manualPureFunctions added.)
+          minify: {
+            compress: {
+              treeshake: {
+                manualPureFunctions: ['console.log', 'console.debug', 'console.info']
+              }
+            },
+            mangle: true,
+            codegen: false
+          }
         }
       }
     }
