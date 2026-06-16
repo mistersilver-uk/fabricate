@@ -82,8 +82,9 @@
   // The current-realm chip appears only when the active gathering system's
   // realm/travel subsystem is enabled (pushed via setRealmContext). It shows
   // the party's current realm name(s) — redaction-safe, so a secret undiscovered
-  // realm resolves to the "Undiscovered realm" placeholder — or "No realm
-  // selected" when the party has no resolved current realm.
+  // realm resolves to the "Undiscovered realm" placeholder — or "No current
+  // realm" when the party has no resolved current realm (the realm is GM/travel-
+  // driven, not player-selected).
   const showRealm = $derived(store?.realmContext?.enabled === true);
   const realmNames = $derived(
     (store?.realmContext?.realms ?? [])
@@ -94,6 +95,12 @@
   );
   const realmLabel = $derived(
     realmNames.length > 0 ? realmNames.join(', ') : localize('FABRICATE.App.ActorBar.Realm.None')
+  );
+  // Accessible name for the chip — the chip is the player's primary diagnostic
+  // signal in the all-locked / no-current-realm state, so name it explicitly
+  // ("Realm: <value>") rather than relying on the bare value text.
+  const realmAriaLabel = $derived(
+    `${localize('FABRICATE.App.ActorBar.Realm.Label')}: ${realmLabel}`
   );
 
   // The selected character's stamina pool for the active stamina-mode system,
@@ -260,12 +267,21 @@
             <span class="actor-bar-condition-label">{timeOfDayLabel}</span>
           </span>
         {/if}
-        {#if showRealm}
-          <span class="actor-bar-condition actor-bar-realm" title={realmLabel}>
-            <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-            <span class="actor-bar-condition-label">{realmLabel}</span>
-          </span>
-        {/if}
+        <!-- The realm chip is the player's primary diagnostic signal in the
+             all-locked / no-current-realm state; announce its appearance and
+             value changes politely (matching the tool-chip-slot pattern above). -->
+        <span class="actor-bar-realm-slot" aria-live="polite">
+          {#if showRealm}
+            <span
+              class="actor-bar-condition actor-bar-realm"
+              title={realmLabel}
+              aria-label={realmAriaLabel}
+            >
+              <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+              <span class="actor-bar-condition-label">{realmLabel}</span>
+            </span>
+          {/if}
+        </span>
       {/if}
     </div>
   {/if}
@@ -392,6 +408,13 @@
      wrapper out of the flex layout so an empty slot (no active tool) adds no
      gap, while the chip child becomes a direct flex item of .actor-bar-right. */
   .actor-bar-tool-chip-slot {
+    display: contents;
+  }
+
+  /* aria-live wrapper for the current-realm chip. Same display:contents trick as
+     the tool-chip slot: an empty slot (realm subsystem off, or chip absent) adds
+     no gap, while the chip child stays a direct flex item of .actor-bar-right. */
+  .actor-bar-realm-slot {
     display: contents;
   }
 

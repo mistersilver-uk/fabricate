@@ -320,7 +320,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.equal(realm.getAttribute('title'), 'Whispering Wood', 'realm name exposed via title');
   });
 
-  it('shows "No region selected" when regions are enabled but none is resolved', async () => {
+  it('shows "No current realm" when regions are enabled but none is resolved', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
@@ -331,7 +331,49 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     const realm = target.querySelector('.actor-bar-realm');
     assert.ok(realm, 'realm chip still renders with no resolved realm');
-    assert.ok(realm.textContent.includes('FABRICATE.App.ActorBar.Realm.None'), 'shows the no-realm label');
+    // #357: the no-current-realm placeholder reuses the Realm.None key, whose
+    // value is now "No current realm" (the realm is GM/travel-driven, not
+    // player-selected).
+    assert.ok(realm.textContent.includes('FABRICATE.App.ActorBar.Realm.None'), 'shows the no-current-realm label');
+  });
+
+  // #357: the realm chip is the player's primary diagnostic signal in the all-
+  // locked / no-current-realm state, so it carries an accessible name and sits in
+  // a polite live region that announces its appearance and value changes.
+  it('gives the realm chip an accessible name and a polite live region', async () => {
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      realmContext: { enabled: true, realms: [{ id: 'r1', label: 'Whispering Wood', placeholder: false }] }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const slot = target.querySelector('.actor-bar-realm-slot');
+    assert.ok(slot, 'realm chip sits in a dedicated slot');
+    assert.equal(slot.getAttribute('aria-live'), 'polite', 'slot announces politely');
+    const realm = slot.querySelector('.actor-bar-realm');
+    const ariaLabel = realm.getAttribute('aria-label');
+    assert.ok(ariaLabel, 'chip carries an accessible name');
+    assert.ok(ariaLabel.includes('FABRICATE.App.ActorBar.Realm.Label'), 'aria-label leads with the Realm label');
+    assert.ok(ariaLabel.includes('Whispering Wood'), 'aria-label includes the realm value');
+  });
+
+  it('keeps the polite realm live region mounted even when no realm chip shows', async () => {
+    // The live region must persist across the chip appearing so the appearance is
+    // announced (matching the tool-chip-slot pattern).
+    const { store } = fakeStore({
+      selectableActors: ACTORS,
+      selectedActorId: 'a1',
+      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      realmContext: { enabled: false, realms: [] }
+    });
+    await mountBar({ store, activeTab: 'gathering' });
+
+    const slot = target.querySelector('.actor-bar-realm-slot');
+    assert.ok(slot, 'realm slot persists even when the chip is hidden');
+    assert.equal(slot.getAttribute('aria-live'), 'polite');
+    assert.equal(slot.querySelector('.actor-bar-realm'), null, 'no chip child when the subsystem is off');
   });
 
   it('redacts a secret undiscovered current region to the placeholder label', async () => {

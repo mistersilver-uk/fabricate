@@ -289,15 +289,26 @@
     store?.setConditionVisibility(headerConditionVisibility);
   });
 
-  // Report the party's current-realm summary for the selected environment's
-  // system so the header bar can show the current realm (or "no realm
-  // selected") when the realm/travel subsystem is enabled. Disabled (chip
-  // hidden) when no environment is selected or the system has realms off.
+  // Report the party's current-realm summary to the header bar so it can show the
+  // current realm (or "No current realm") whenever the realm/travel subsystem is
+  // enabled for the active gathering system. The baseline is the listing-level
+  // realm context (party/system-scoped, resolved by the engine independent of any
+  // selection — so the chip shows even when every environment is realm-locked and
+  // none is selectable). A selected environment refines it (identical value in the
+  // single-system case). The listing field already uses the store contract keys
+  // (enabled/realms), so it passes straight through setRealmContext. Mirrors the
+  // headerConditionVisibility derived→effect pattern: no branching in the effect,
+  // so it tracks both `listing` and `selectedEnvironment`.
+  const headerRealmContext = $derived(
+    selectedEnvironment
+      ? {
+          enabled: selectedEnvironment.realmsEnabled === true,
+          realms: selectedEnvironment.currentRealms ?? []
+        }
+      : (listing?.realmContext ?? { enabled: false, realms: [] })
+  );
   $effect(() => {
-    store?.setRealmContext({
-      enabled: selectedEnvironment?.realmsEnabled === true,
-      realms: selectedEnvironment?.currentRealms ?? []
-    });
+    store?.setRealmContext(headerRealmContext);
   });
 </script>
 
