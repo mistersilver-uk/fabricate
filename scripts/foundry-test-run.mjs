@@ -366,28 +366,19 @@ async function dismissFirstRunDialogs(page, results) {
 }
 
 /**
- * Read the current join-form state from the page.
+ * Evaluate the current join-form state from the page, optionally selecting the target user.
  * @param {import('playwright').Page} page
  * @param {string} userLabel
- * @returns {Promise<{
- *   mode: string | null,
- *   targetFound: boolean,
- *   selectionMatches: boolean,
- *   selectedLabel: string,
- *   selectedValue: string,
- *   availableUsers: string[],
- *   joinButtonDisabled: boolean,
- *   reason: string | null
- * }>}
+ * @param {'read'|'select'} action
  */
-async function readJoinState(page, userLabel) {
-  return page.evaluate(({ selectSelector, tileSelector, userLabel: targetLabel }) => {
+async function evaluateJoinControl(page, userLabel, action) {
+  return page.evaluate(({ selectSelector, tileSelector, userLabel: targetLabel, action }) => {
     const normalize = value => String(value ?? '').trim().toLowerCase();
     const target = normalize(targetLabel);
     const isVisible = element => {
       if (!(element instanceof HTMLElement)) return false;
       if (element.hidden) return false;
-      const style = window.getComputedStyle(element);
+      const style = globalThis.getComputedStyle(element);
       return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
     };
     const matchTarget = value => {
@@ -403,23 +394,25 @@ async function readJoinState(page, userLabel) {
       ];
       return candidates.map(value => String(value ?? '').trim()).find(Boolean) ?? '';
     };
-
-    const joinButton = Array.from(document.querySelectorAll('button')).find(button => {
+    const findJoinButton = () => Array.from(document.querySelectorAll('button')).find(button => {
       const text = normalize(button.textContent);
       return text.includes('join game session') || button.name === 'join';
     }) ?? null;
-    const selects = Array.from(document.querySelectorAll(selectSelector))
-      .filter(node => node instanceof HTMLSelectElement);
-    const select = selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
-
-    if (select) {
-      const options = Array.from(select.options)
+    const findSelect = () => {
+      const selects = Array.from(document.querySelectorAll(selectSelector))
+        .filter(node => node instanceof HTMLSelectElement);
+      return selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
+    };
+    const readOptions = select => Array.from(select.options)
         .map(option => ({
+          option,
           label: option.textContent?.trim() ?? '',
           value: option.value,
           disabled: option.disabled
         }))
         .filter(option => option.value && !option.disabled);
+    const readSelectState = select => {
+      const options = readOptions(select);
       const selectedOption = select.selectedOptions?.[0];
       const selectedLabel = selectedOption?.textContent?.trim() ?? '';
       const selectedValue = select.value ?? '';
@@ -431,39 +424,108 @@ async function readJoinState(page, userLabel) {
         selectedLabel,
         selectedValue,
         availableUsers: options.map(option => option.label || option.value).filter(Boolean),
-        joinButtonDisabled: Boolean(joinButton?.disabled),
+        joinButtonDisabled: Boolean(findJoinButton()?.disabled),
         reason: options.length === 0 ? 'User select has no joinable options yet.' : null
+      };
+    };
+    const readTileState = (fallbackTile = null) => {
+      const tiles = Array.from(document.querySelectorAll(tileSelector))
+        .filter(isVisible);
+      const availableUsers = tiles.map(getNodeLabel).filter(Boolean);
+      const hiddenInput = document.querySelector('input[name="userid"]');
+      const selectedValue = hiddenInput instanceof HTMLInputElement ? hiddenInput.value : '';
+      const selectedTile = tiles.find(tile =>
+        tile.matches('[aria-selected="true"], .selected, [data-selected="true"], [aria-pressed="true"]')
+      ) ?? tiles.find(tile => {
+        const tileUserId = tile.getAttribute('data-user-id') ?? '';
+        return Boolean(selectedValue) && tileUserId === selectedValue;
+      }) ?? fallbackTile;
+      const selectedLabel = selectedTile ? getNodeLabel(selectedTile) : '';
+
+      return {
+        mode: tiles.length > 0 ? 'tile' : null,
+        targetFound: availableUsers.some(matchTarget),
+        selectionMatches: Boolean(selectedValue || selectedLabel) && matchTarget(selectedLabel || selectedValue),
+        selectedLabel,
+        selectedValue,
+        availableUsers,
+        joinButtonDisabled: Boolean(findJoinButton()?.disabled),
+        reason: tiles.length === 0 ? 'Join page did not expose a selectable user control.' : null
+      };
+    };
+
+    const select = findSelect();
+    if (action === 'select') {
+      if (select) {
+        const options = readOptions(select);
+        const match = options.find(entry => matchTarget(entry.label)) ?? null;
+        if (!match) {
+          const state = readSelectState(select);
+          return {
+            ...state,
+            selected: false,
+            reason: `User "${targetLabel}" was not found in the join select.`
+          };
+        }
+
+        select.selectedIndex = match.option.index;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        const state = readSelectState(select);
+        return {
+          ...state,
+          selected: state.selectionMatches,
+          reason: null
+        };
+      }
+
+      const tiles = Array.from(document.querySelectorAll(tileSelector))
+        .filter(isVisible);
+      const match = tiles.find(tile => matchTarget(getNodeLabel(tile))) ?? null;
+      if (!match) {
+        const state = readTileState();
+        return {
+          ...state,
+          selected: false,
+          reason: `User "${targetLabel}" was not found in the join tiles.`
+        };
+      }
+
+      match.click();
+      const state = readTileState(match);
+      return {
+        ...state,
+        selected: state.selectionMatches,
+        reason: null
       };
     }
 
-    const tiles = Array.from(document.querySelectorAll(tileSelector))
-      .filter(isVisible);
-    const availableUsers = tiles.map(getNodeLabel).filter(Boolean);
-    const hiddenInput = document.querySelector('input[name="userid"]');
-    const selectedValue = hiddenInput instanceof HTMLInputElement ? hiddenInput.value : '';
-    const selectedTile = tiles.find(tile =>
-      tile.matches('[aria-selected="true"], .selected, [data-selected="true"], [aria-pressed="true"]')
-    ) ?? tiles.find(tile => {
-      const tileUserId = tile.getAttribute('data-user-id') ?? '';
-      return Boolean(selectedValue) && tileUserId === selectedValue;
-    }) ?? null;
-    const selectedLabel = selectedTile ? getNodeLabel(selectedTile) : '';
-
-    return {
-      mode: tiles.length > 0 ? 'tile' : null,
-      targetFound: availableUsers.some(matchTarget),
-      selectionMatches: Boolean(selectedValue || selectedLabel) && matchTarget(selectedLabel || selectedValue),
-      selectedLabel,
-      selectedValue,
-      availableUsers,
-      joinButtonDisabled: Boolean(joinButton?.disabled),
-      reason: tiles.length === 0 ? 'Join page did not expose a selectable user control.' : null
-    };
+    return select ? readSelectState(select) : readTileState();
   }, {
     selectSelector: JOIN_USER_SELECT_SELECTOR,
     tileSelector: JOIN_USER_TILE_SELECTOR,
-    userLabel
+    userLabel,
+    action
   });
+}
+
+/**
+ * Read the current join-form state from the page.
+ * @param {import('playwright').Page} page
+ * @param {string} userLabel
+ * @returns {Promise<{
+ *   mode: string | null,
+ *   targetFound: boolean,
+ *   selectionMatches: boolean,
+ *   selectedLabel: string,
+ *   selectedValue: string,
+ *   availableUsers: string[],
+ *   joinButtonDisabled: boolean,
+ *   reason: string | null
+ * }>}
+ */
+async function readJoinState(page, userLabel) {
+  return evaluateJoinControl(page, userLabel, 'read');
 }
 
 /**
@@ -474,41 +536,14 @@ async function readJoinState(page, userLabel) {
 async function waitForJoinUi(page, userLabel) {
   const joinButton = page.locator(JOIN_BUTTON_SELECTOR).first();
   await joinButton.waitFor({ state: 'visible', timeout: 15_000 });
-  await page.waitForFunction(({ selectSelector, tileSelector, targetLabel }) => {
-    const normalize = value => String(value ?? '').trim().toLowerCase();
-    const target = normalize(targetLabel);
-    const isVisible = element => {
-      if (!(element instanceof HTMLElement)) return false;
-      if (element.hidden) return false;
-      const style = window.getComputedStyle(element);
-      return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
-    };
-    const matchTarget = value => {
-      const normalized = normalize(value);
-      if (!normalized) return false;
-      return normalized === target || normalized.includes(target) || target.includes(normalized);
-    };
-
-    const selects = Array.from(document.querySelectorAll(selectSelector))
-      .filter(node => node instanceof HTMLSelectElement);
-    const select = selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
-    if (select) {
-      const options = Array.from(select.options)
-        .filter(option => option.value && !option.disabled);
-      return options.length > 0 && options.some(option => matchTarget(option.textContent));
-    }
-
-    const tiles = Array.from(document.querySelectorAll(tileSelector))
-      .filter(isVisible);
-    return tiles.some(tile => {
-      const label = tile.getAttribute('data-user-name') || tile.getAttribute('aria-label') || tile.textContent || '';
-      return matchTarget(label);
-    });
-  }, {
-    selectSelector: JOIN_USER_SELECT_SELECTOR,
-    tileSelector: JOIN_USER_TILE_SELECTOR,
-    targetLabel: userLabel
-  }, { timeout: 15_000 });
+  const startedAt = Date.now();
+  let lastState = null;
+  while (Date.now() - startedAt < 15_000) {
+    lastState = await readJoinState(page, userLabel);
+    if (lastState.targetFound) return;
+    await page.waitForTimeout(250);
+  }
+  throw new Error(lastState?.reason ?? `Join UI did not expose "${userLabel}" within 15000ms.`);
 }
 
 /**
@@ -525,106 +560,7 @@ async function waitForJoinUi(page, userLabel) {
  * }>}
  */
 async function selectJoinUser(page, userLabel) {
-  return page.evaluate(({ selectSelector, tileSelector, userLabel: targetLabel }) => {
-    const normalize = value => String(value ?? '').trim().toLowerCase();
-    const target = normalize(targetLabel);
-    const isVisible = element => {
-      if (!(element instanceof HTMLElement)) return false;
-      if (element.hidden) return false;
-      const style = window.getComputedStyle(element);
-      return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
-    };
-    const matchTarget = value => {
-      const normalized = normalize(value);
-      if (!normalized) return false;
-      return normalized === target || normalized.includes(target) || target.includes(normalized);
-    };
-    const getNodeLabel = node => {
-      const candidates = [
-        node.getAttribute('data-user-name'),
-        node.getAttribute('aria-label'),
-        node.textContent
-      ];
-      return candidates.map(value => String(value ?? '').trim()).find(Boolean) ?? '';
-    };
-
-    const selects = Array.from(document.querySelectorAll(selectSelector))
-      .filter(node => node instanceof HTMLSelectElement);
-    const select = selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
-
-    if (select) {
-      const options = Array.from(select.options)
-        .map(option => ({
-          option,
-          label: option.textContent?.trim() ?? '',
-          value: option.value,
-          disabled: option.disabled
-        }))
-        .filter(entry => entry.value && !entry.disabled);
-      const match = options.find(entry => matchTarget(entry.label)) ?? null;
-      if (!match) {
-        return {
-          selected: false,
-          mode: 'select',
-          availableUsers: options.map(entry => entry.label || entry.value).filter(Boolean),
-          selectedLabel: select.selectedOptions?.[0]?.textContent?.trim() ?? '',
-          selectedValue: select.value ?? '',
-          reason: `User "${targetLabel}" was not found in the join select.`
-        };
-      }
-
-      select.selectedIndex = match.option.index;
-      select.dispatchEvent(new Event('input', { bubbles: true }));
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-
-      return {
-        selected: select.value === match.value && matchTarget(select.selectedOptions?.[0]?.textContent ?? ''),
-        mode: 'select',
-        availableUsers: options.map(entry => entry.label || entry.value).filter(Boolean),
-        selectedLabel: select.selectedOptions?.[0]?.textContent?.trim() ?? '',
-        selectedValue: select.value ?? '',
-        reason: null
-      };
-    }
-
-    const tiles = Array.from(document.querySelectorAll(tileSelector))
-      .filter(isVisible);
-    const match = tiles.find(tile => matchTarget(getNodeLabel(tile))) ?? null;
-    if (!match) {
-      return {
-        selected: false,
-        mode: tiles.length > 0 ? 'tile' : null,
-        availableUsers: tiles.map(getNodeLabel).filter(Boolean),
-        selectedLabel: '',
-        selectedValue: '',
-        reason: `User "${targetLabel}" was not found in the join tiles.`
-      };
-    }
-
-    match.click();
-    const hiddenInput = document.querySelector('input[name="userid"]');
-    const selectedValue = hiddenInput instanceof HTMLInputElement ? hiddenInput.value : '';
-    const selectedTile = tiles.find(tile =>
-      tile.matches('[aria-selected="true"], .selected, [data-selected="true"], [aria-pressed="true"]')
-    ) ?? tiles.find(tile => {
-      const tileUserId = tile.getAttribute('data-user-id') ?? '';
-      return Boolean(selectedValue) && tileUserId === selectedValue;
-    }) ?? match;
-    const selectedLabel = getNodeLabel(selectedTile);
-
-    return {
-      selected: Boolean(selectedValue || selectedLabel) && matchTarget(selectedLabel || selectedValue),
-      mode: 'tile',
-      availableUsers: tiles.map(getNodeLabel).filter(Boolean),
-      selectedLabel,
-      selectedValue,
-      reason: null
-    };
-  }, {
-    selectSelector: JOIN_USER_SELECT_SELECTOR,
-    tileSelector: JOIN_USER_TILE_SELECTOR,
-    userLabel
-  });
+  return evaluateJoinControl(page, userLabel, 'select');
 }
 
 /**
@@ -752,6 +688,23 @@ async function setManagerWindowSize(page, { width, height }) {
     `setManagerWindowSize evaluate ${width}x${height}`
   );
   await page.waitForTimeout(500);
+}
+
+/**
+ * Capture a manager view after applying the standard layout and overlay checks.
+ * @param {import('playwright').Page} page
+ * @param {{ width?: number, height?: number, layout: string, label: string, settleMs?: number }} options
+ */
+async function captureStableManagerView(page, { width, height, layout, label, settleMs = 0 }) {
+  if (typeof width === 'number' && typeof height === 'number') {
+    await setManagerWindowSize(page, { width, height });
+  }
+  if (settleMs > 0) {
+    await page.waitForTimeout(settleMs);
+  }
+  await assertManagerLayoutStable(page, layout);
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, label);
 }
 
 /**
@@ -2102,77 +2055,57 @@ async function main() {
         });
 
         const playerGatheringFixtures = [];
-        playerGatheringFixtures.push(await environmentStore.create({
-          craftingSystemId: systemId,
-          name: 'Verdant Meadow',
-          description: 'A clear player-facing gathering site with an immediate successful task.',
-          img: 'icons/consumables/plants/grass-leaves-green.webp',
-          enabled: true,
-          selectionMode: 'targeted',
-          sceneUuid: '',
-          compositionMode: 'manual',
-          forcedTaskIds: ['smoke-meadow-herbs']
-        }));
-
-        playerGatheringFixtures.push(await environmentStore.create({
-          craftingSystemId: systemId,
-          name: 'Sunken Ruins',
-          description: 'A scene-linked site that stays visible while blocked.',
-          img: 'icons/environment/wilderness/wall-ruins.webp',
-          enabled: true,
-          selectionMode: 'targeted',
-          sceneUuid: 'Scene.fabricateMissingGatheringScene',
-          compositionMode: 'manual',
-          forcedTaskIds: ['smoke-sunken-survey']
-        }));
-
-        playerGatheringFixtures.push(await environmentStore.create({
-          craftingSystemId: systemId,
-          name: 'Crystal Thicket',
-          description: 'Requires the Herbalist Sickle tool so Bromm demonstrates a blocked task.',
-          img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
-          enabled: true,
-          selectionMode: 'targeted',
-          sceneUuid: '',
-          compositionMode: 'manual',
-          forcedTaskIds: ['smoke-crystal-dew']
-        }));
-
-        playerGatheringFixtures.push(await environmentStore.create({
-          craftingSystemId: systemId,
-          name: 'Timed Orchard',
-          description: 'A timed gathering site that creates an active run before completion.',
-          img: 'icons/consumables/fruit/apple-red-tree-green.webp',
-          enabled: true,
-          selectionMode: 'targeted',
-          sceneUuid: '',
-          compositionMode: 'manual',
-          forcedTaskIds: ['smoke-slow-bloom']
-        }));
-
-        playerGatheringFixtures.push(await environmentStore.create({
-          craftingSystemId: systemId,
-          name: 'Withered Patch',
-          description: 'An exhausted patch whose only drop never lands, for empty-result feedback.',
-          img: 'icons/magic/fire/flame-burning-tree-stump.webp',
-          enabled: true,
-          selectionMode: 'targeted',
-          sceneUuid: '',
-          compositionMode: 'manual',
-          forcedTaskIds: ['smoke-withered-search']
-        }));
-
-        playerGatheringFixtures.push(await environmentStore.create({
-          craftingSystemId: systemId,
-          name: 'Moonlit Blind Grove',
-          description: 'A blind environment that must hide task details from non-GM users.',
-          img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
-          enabled: true,
-          selectionMode: 'blind',
-          sceneUuid: '',
-          compositionMode: 'manual',
-          forcedTaskIds: ['smoke-moonpetal']
-        }));
+        const playerFixtureDefinitions = [
+          {
+            name: 'Verdant Meadow',
+            description: 'A clear player-facing gathering site with an immediate successful task.',
+            img: 'icons/consumables/plants/grass-leaves-green.webp',
+            forcedTaskIds: ['smoke-meadow-herbs']
+          },
+          {
+            name: 'Sunken Ruins',
+            description: 'A scene-linked site that stays visible while blocked.',
+            img: 'icons/environment/wilderness/wall-ruins.webp',
+            sceneUuid: 'Scene.fabricateMissingGatheringScene',
+            forcedTaskIds: ['smoke-sunken-survey']
+          },
+          {
+            name: 'Crystal Thicket',
+            description: 'Requires the Herbalist Sickle tool so Bromm demonstrates a blocked task.',
+            img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
+            forcedTaskIds: ['smoke-crystal-dew']
+          },
+          {
+            name: 'Timed Orchard',
+            description: 'A timed gathering site that creates an active run before completion.',
+            img: 'icons/consumables/fruit/apple-red-tree-green.webp',
+            forcedTaskIds: ['smoke-slow-bloom']
+          },
+          {
+            name: 'Withered Patch',
+            description: 'An exhausted patch whose only drop never lands, for empty-result feedback.',
+            img: 'icons/magic/fire/flame-burning-tree-stump.webp',
+            forcedTaskIds: ['smoke-withered-search']
+          },
+          {
+            name: 'Moonlit Blind Grove',
+            description: 'A blind environment that must hide task details from non-GM users.',
+            img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
+            selectionMode: 'blind',
+            forcedTaskIds: ['smoke-moonpetal']
+          }
+        ];
+        for (const fixture of playerFixtureDefinitions) {
+          const { sceneUuid = '', selectionMode = 'targeted', ...definition } = fixture;
+          playerGatheringFixtures.push(await environmentStore.create({
+            craftingSystemId: systemId,
+            enabled: true,
+            selectionMode,
+            sceneUuid,
+            compositionMode: 'manual',
+            ...definition
+          }));
+        }
 
         await game.settings.set('fabricate', 'gatheringConfig', {
           conditions: { weather: 'rain', timeOfDay: 'dusk' },
@@ -2698,9 +2631,7 @@ async function main() {
         if (await page.locator('.fabricate-manager .manager-component-drop-zone').count() === 0) {
           throw new Error('Manager components browser did not show the drop-to-add affordance.');
         }
-        await assertManagerLayoutStable(page, 'components normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-components-normal');
+        await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
         // Components → stacked. Earlier CI runs hung silently between this
@@ -2722,14 +2653,14 @@ async function main() {
         if (await page.locator('.fabricate-manager [data-tags-evidence="how-it-works"]').count() === 0) {
           throw new Error('Manager tags inspector did not render the How-it-works evidence card.');
         }
-        await assertManagerLayoutStable(page, 'tags-categories normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-tags-categories-normal');
+        await captureStableManagerView(page, { layout: 'tags-categories normal', label: 'manager-tags-categories-normal' });
 
-        await setManagerWindowSize(page, { width: 1000, height: 700 });
-        await assertManagerLayoutStable(page, 'tags-categories stacked');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-tags-categories-stacked');
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 700,
+          layout: 'tags-categories stacked',
+          label: 'manager-tags-categories-stacked'
+        });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const essenceNav = page.locator('.fabricate-manager .manager-nav-button:has-text("Essences")');
@@ -2824,15 +2755,18 @@ async function main() {
             throw new Error(`Manager gathering task editor is missing "${expected}".`);
           }
         }
-        await assertManagerLayoutStable(page, 'gathering task editor normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-gathering-task-editor-normal');
+        await captureStableManagerView(page, {
+          layout: 'gathering task editor normal',
+          label: 'manager-gathering-task-editor-normal'
+        });
 
-        await setManagerWindowSize(page, { width: 1000, height: 720 });
-        await page.waitForTimeout(250);
-        await assertManagerLayoutStable(page, 'gathering task editor stacked');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-gathering-task-editor-stacked');
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 720,
+          layout: 'gathering task editor stacked',
+          label: 'manager-gathering-task-editor-stacked',
+          settleMs: 250
+        });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         // Navigate back to environments via the side nav (always visible on
@@ -2916,15 +2850,18 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.fabricate-manager .manager-travel-parties-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertManagerLayoutStable(page, 'gathering travel normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-gathering-travel-normal');
+        await captureStableManagerView(page, {
+          layout: 'gathering travel normal',
+          label: 'manager-gathering-travel-normal'
+        });
 
-        await setManagerWindowSize(page, { width: 1000, height: 720 });
-        await page.waitForTimeout(250);
-        await assertManagerLayoutStable(page, 'gathering travel stacked');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-gathering-travel-stacked');
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 720,
+          layout: 'gathering travel stacked',
+          label: 'manager-gathering-travel-stacked',
+          settleMs: 250
+        });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
 
         // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
@@ -3428,6 +3365,31 @@ async function main() {
           await page.waitForTimeout(250);
         }
 
+        async function waitForGatheringAttempt(blocked) {
+          await appShell.locator(`[data-gathering-attempt][data-gathering-attempt-blocked="${blocked}"]`).first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+        }
+
+        async function captureCurrentPlayerGathering(label) {
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, label);
+        }
+
+        async function captureSelectedGatheringTask({ environment, task, blocked, label }) {
+          await selectGatheringEnvironment(environment);
+          await selectGatheringTask(task);
+          if (typeof blocked === 'boolean') {
+            await waitForGatheringAttempt(blocked);
+          }
+          await captureCurrentPlayerGathering(label);
+        }
+
+        async function clickReadyGatheringAttempt() {
+          await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
+          await appShell.locator('[data-gathering-state="populated"]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+        }
+
         // Documentation journey captures: exercise the user-visible gathering
         // states the quickstart and gathering docs discuss. These labels are
         // full-profile screenshot sources only; rc/ci keep their allow-listed
@@ -3436,56 +3398,47 @@ async function main() {
         await appShell.locator('[data-gathering-detail-tab="events"]').first().click();
         await appShell.locator('[data-gathering-event-section]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-events');
+        await captureCurrentPlayerGathering('player-gathering-events');
         await appShell.locator('[data-gathering-detail-tab="tasks"]').first().click();
         await appShell.locator('[data-gathering-tasks-section]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
 
-        await selectGatheringEnvironment('Verdant Meadow');
-        await selectGatheringTask('Gather Meadow Herbs');
-        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-task-ready');
-
-        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
-        await appShell.locator('[data-gathering-state="populated"]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await selectGatheringEnvironment('Verdant Meadow');
-        await selectGatheringTask('Gather Meadow Herbs');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-after-success');
-
-        await selectGatheringEnvironment('Crystal Thicket');
-        await selectGatheringTask('Bottle Crystal Dew');
-        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="true"]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-tool-blocked');
-
-        await selectGatheringEnvironment('Timed Orchard');
-        await selectGatheringTask('Tend Slow Bloom');
-        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-timed-ready');
-
-        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
-        await appShell.locator('[data-gathering-state="populated"]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await selectGatheringEnvironment('Timed Orchard');
-        await selectGatheringTask('Tend Slow Bloom');
-        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="true"]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-timed-active');
+        await captureSelectedGatheringTask({
+          environment: 'Verdant Meadow',
+          task: 'Gather Meadow Herbs',
+          blocked: false,
+          label: 'player-gathering-task-ready'
+        });
+        await clickReadyGatheringAttempt();
+        await captureSelectedGatheringTask({
+          environment: 'Verdant Meadow',
+          task: 'Gather Meadow Herbs',
+          label: 'player-gathering-after-success'
+        });
+        await captureSelectedGatheringTask({
+          environment: 'Crystal Thicket',
+          task: 'Bottle Crystal Dew',
+          blocked: true,
+          label: 'player-gathering-tool-blocked'
+        });
+        await captureSelectedGatheringTask({
+          environment: 'Timed Orchard',
+          task: 'Tend Slow Bloom',
+          blocked: false,
+          label: 'player-gathering-timed-ready'
+        });
+        await clickReadyGatheringAttempt();
+        await captureSelectedGatheringTask({
+          environment: 'Timed Orchard',
+          task: 'Tend Slow Bloom',
+          blocked: true,
+          label: 'player-gathering-timed-active'
+        });
 
         await selectGatheringEnvironment('Moonlit Blind Grove');
         await appShell.locator('[data-gathering-blind-card]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'player-gathering-blind');
+        await captureCurrentPlayerGathering('player-gathering-blind');
 
         await clearGatheringEnvironmentSearch();
 

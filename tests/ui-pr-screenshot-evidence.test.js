@@ -242,6 +242,15 @@ describe('UI PR screenshot evidence', () => {
     for (const match of harness.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
+    for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+      emitted.add(match[1]);
+    }
+    for (const match of harness.matchAll(/captureCurrentPlayerGathering\(\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
+    for (const match of harness.matchAll(/captureSelectedGatheringTask\(\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+      emitted.add(match[1]);
+    }
     assert.ok(emitted.size > 0, 'expected to parse smoke labels from foundry-test-run.mjs');
     for (const recipe of VIEW_RECIPES) {
       for (const label of recipe.smokeLabels) {
