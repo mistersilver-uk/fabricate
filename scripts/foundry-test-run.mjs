@@ -1338,17 +1338,54 @@ async function assertNoScreenshotOverlays(page, options = {}) {
   await dismissFoundryNotifications(page);
   // A DialogV2 close() is an async fade-out: Foundry keeps the element in the DOM
   // with a `minimizing` (and, on some builds, `minimized`) class while it animates
-  // away. Such a dialog is already dismissed and on its way out, so wait briefly
-  // for it to leave rather than treating the closing animation as a blocking
-  // overlay (this was a flaky false positive after destructive-confirm dialogs).
+  // away. Even though that dialog is already dismissed, it can still be visible
+  // in screenshots, so wait for visible overlays to clear before capturing.
   const OVERLAY_SELECTOR =
     '.dialog.application, .window-app.dialog, .application.dialog, .app.dialog, #notifications .notification';
+  const visibleOverlayCount = async () =>
+    page.evaluate((selector) => {
+      return Array.from(document.querySelectorAll(selector)).filter((el) => {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }).length;
+    }, OVERLAY_SELECTOR);
   const blockingOverlayCount = async () =>
     page.evaluate((selector) => {
       return Array.from(document.querySelectorAll(selector)).filter(
         (el) => !el.classList.contains('minimizing') && !el.classList.contains('minimized')
       ).length;
     }, OVERLAY_SELECTOR);
+
+  let visibleCount = await visibleOverlayCount();
+  if (visibleCount > 0) {
+    await page.waitForTimeout(750);
+    await dismissFoundryNotifications(page);
+    visibleCount = await visibleOverlayCount();
+  }
+  if (visibleCount > 0) {
+    await page.waitForFunction((selector) => {
+      return Array.from(document.querySelectorAll(selector)).every((el) => {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return true;
+        const rect = el.getBoundingClientRect();
+        return rect.width === 0 || rect.height === 0;
+      });
+    }, OVERLAY_SELECTOR, { timeout: 2_500 }).catch(() => {});
+    await dismissFoundryNotifications(page);
+    visibleCount = await visibleOverlayCount();
+  }
+  if (visibleCount > 0) {
+    const diag = await page
+      .evaluate((selector) => {
+        return Array.from(document.querySelectorAll(selector))
+          .map((el) => `${el.tagName}#${el.id}.${el.className} :: ${(el.textContent || '').trim().slice(0, 120)}`)
+          .join(' || ');
+      }, OVERLAY_SELECTOR)
+      .catch(() => '');
+    throw new Error(`Screenshot target still has ${visibleCount} visible modal or notification overlay(s). [${diag}]`);
+  }
 
   let count = await blockingOverlayCount();
   if (count > 0) {
