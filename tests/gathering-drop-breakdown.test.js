@@ -139,7 +139,7 @@ test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt fo
   const environment = {
     conditions: { weather: 'rain', timeOfDay: 'night' },
     biomes: ['forest'],
-    // System default multiplicative; reference inherits it via mode 'default'.
+    // Global system mode is multiplicative; every modifier applies as a factor.
     rules: { rewardSelectionMode: 'allDrops', rewardLimit: 99, dropModifierMode: 'multiplicative' }
   };
   Object.defineProperty(environment, '__libraryCharacterModifiers', {
@@ -151,7 +151,7 @@ test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt fo
     resolutionMode: 'd100',
     dropRows: [{
       id: 'd1', name: 'Iron', componentId: 'iron', quantity: 1, dropRate: 25,
-      characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '-', mode: 'default' }]
+      characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '-' }]
     }]
   };
 

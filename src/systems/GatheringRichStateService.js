@@ -81,24 +81,20 @@ const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
-// System-default drop-modifier application mode and the per-reference/per-entry
-// override vocabulary. `'default'` (reference-only) inherits the system mode.
-// Covers character modifiers AND condition modifiers (weather/time-of-day/biome).
+// System-wide drop-modifier application mode. This is a single global system
+// setting (`dropModifierMode`) and cannot be overridden per modifier. Covers
+// character modifiers AND condition modifiers (weather/time-of-day/biome).
 const DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
-const DROP_MODIFIER_REFERENCE_MODES = new Set(['default', 'additive', 'multiplicative']);
 
 /**
- * Resolve a reference's effective additive/multiplicative mode: an explicit
- * per-reference override wins; `'default'` (or an unknown value) inherits the
- * system-level mode, which itself falls back to `'additive'`.
+ * Resolve the effective additive/multiplicative drop-modifier mode from the
+ * system-level setting alone, falling back to `'additive'` for any unknown
+ * value. There is no per-reference/per-entry override.
  *
- * @param {string} [referenceMode] The per-reference `mode`.
- * @param {string} [systemMode] The system default `dropModifierMode`.
+ * @param {string} [systemMode] The system-level `dropModifierMode`.
  * @returns {'additive'|'multiplicative'}
  */
-function resolveEffectiveModifierMode(referenceMode, systemMode) {
-  const refMode = DROP_MODIFIER_REFERENCE_MODES.has(referenceMode) ? referenceMode : 'default';
-  if (refMode !== 'default') return refMode;
+function resolveDropModifierMode(systemMode) {
   return DROP_MODIFIER_MODES.has(systemMode) ? systemMode : 'additive';
 }
 // Legacy system-level limitation mode values, retained only for the read-time
@@ -770,8 +766,8 @@ export class GatheringRichStateService {
    * @param {object|null} [payload.event]
    * @param {object} [payload.viewer]
    * @param {object} [payload.system]
-   * @param {string} [payload.dropModifierMode] System default mode the
-   *   reference inherits when its own `mode` is `'default'`.
+   * @param {string} [payload.dropModifierMode] Global system drop-modifier mode
+   *   applied to every reference (no per-reference override).
    * @returns {Promise<{ok: boolean, contribution: number, contributionEntry?: object, evidence: object, diagnostic?: object}>}
    */
   async _resolveCharacterModifierContribution({
@@ -791,10 +787,10 @@ export class GatheringRichStateService {
     const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator)
       ? reference.operator
       : '+';
-    // Per-reference mode (`'default'`) inherits the system-level mode; an explicit
-    // additive/multiplicative override always wins. The resolved value is clamped
-    // and operator-signed identically for both modes — only aggregation differs.
-    const effectiveMode = resolveEffectiveModifierMode(reference?.mode, dropModifierMode);
+    // The application mode is the single global system mode — there is no
+    // per-reference override. The value is clamped and operator-signed
+    // identically for both modes — only aggregation differs.
+    const effectiveMode = resolveDropModifierMode(dropModifierMode);
     const min = numberOrNullStrict(reference?.min);
     const max = numberOrNullStrict(reference?.max);
 
@@ -2788,7 +2784,6 @@ function normalizeCharacterModifierReference(ref, index) {
     id: stringOrFallback(ref.id, `char-mod-${modifierId}-${index + 1}`),
     modifierId,
     operator: CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
-    mode: DROP_MODIFIER_REFERENCE_MODES.has(ref.mode) ? ref.mode : 'default',
     min: numberOrNullStrict(ref.min),
     max: numberOrNullStrict(ref.max),
     expressionOverride: stringOrFallback(ref.expressionOverride, ''),
@@ -2872,18 +2867,18 @@ function applyDropModifierContributions(baseRate, entries) {
 
 /**
  * Build a structured aggregation entry for a single condition modifier. The
- * per-entry `mode` (`'default'` inherits the system `dropModifierMode`) selects
- * additive vs multiplicative; the shape matches the character `contributionEntry`
- * so both feed the same {@link applyDropModifierContributions} mixer.
+ * global system `dropModifierMode` selects additive vs multiplicative for every
+ * modifier; the shape matches the character `contributionEntry` so both feed the
+ * same {@link applyDropModifierContributions} mixer.
  *
- * @param {object} modifier Normalized condition modifier (`operator`/`value`/`mode`).
- * @param {string} dropModifierMode System default mode.
+ * @param {object} modifier Normalized condition modifier (`operator`/`value`).
+ * @param {string} dropModifierMode System-level drop-modifier mode.
  * @returns {{mode:'additive'|'multiplicative',operator:string,value:number,contribution:number}}
  */
 function conditionEntry(modifier, dropModifierMode) {
   const value = Number(modifier.value) || 0;
   return {
-    mode: resolveEffectiveModifierMode(modifier.mode, dropModifierMode),
+    mode: resolveDropModifierMode(dropModifierMode),
     operator: modifier.operator,
     value,
     contribution: modifier.operator === '-' ? -value : value,
@@ -3008,9 +3003,6 @@ function normalizeDropConditionModifierList(values = []) {
         conditionId,
         operator,
         value: Math.abs(truncated),
-        // Per-entry additive/multiplicative override; `'default'` inherits the
-        // system `dropModifierMode` (same vocabulary as character modifiers).
-        mode: DROP_MODIFIER_REFERENCE_MODES.has(modifier?.mode) ? modifier.mode : 'default',
       };
     })
     .filter(Boolean);
@@ -3074,8 +3066,8 @@ function biomeKindDisplay(
 
 /**
  * Collapse the active biome modifiers into at most two structured aggregation
- * entries — one additive, one multiplicative — respecting the per-entry mode
- * (`'default'` inherits `dropModifierMode`).
+ * entries — one additive, one multiplicative — selected by the global system
+ * `dropModifierMode` (every biome modifier shares that mode).
  *
  * The additive and multiplicative subsets are aggregated INDEPENDENTLY by the
  * existing {@link aggregateBiomeModifierValues} over their signed values. The
@@ -3108,7 +3100,7 @@ function matchingBiomeModifierEntries(
   const multiplicativeValues = [];
   for (const modifier of matching) {
     const signed = modifier.operator === '-' ? -modifier.value : modifier.value;
-    if (resolveEffectiveModifierMode(modifier.mode, dropModifierMode) === 'multiplicative') {
+    if (resolveDropModifierMode(dropModifierMode) === 'multiplicative') {
       multiplicativeValues.push(signed);
     } else {
       additiveValues.push(signed);

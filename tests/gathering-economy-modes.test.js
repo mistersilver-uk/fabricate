@@ -640,9 +640,9 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     assert.equal(floored, 0); // never negative
   });
 
-  it('issue 299: stamina cost stays additive even for a multiplicative-mode reference', async () => {
-    // A reference flagged multiplicative still adjusts stamina additively: the
-    // signed contribution is summed onto the base, never used as a factor.
+  it('issue 299: stamina cost stays additive even when a stray mode field is present', async () => {
+    // A stray `mode` field on a stamina reference is ignored: the signed
+    // contribution is always summed onto the base, never used as a factor.
     const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 5 });
     const env = environment();
     const cost = await service._effectiveStaminaCost({
