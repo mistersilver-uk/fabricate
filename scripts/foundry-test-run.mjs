@@ -2810,6 +2810,28 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-environment-edit-placeholder');
 
+        // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
+        // capture the environment editor's composition Tasks and Events tabs so the
+        // docs can show how reusable library tasks and events are composed into an
+        // environment. The Overview tab is already captured above as
+        // manager-environment-edit-placeholder. Tab ids come from
+        // EnvironmentEditorTabs.svelte (data-environment-tab-button / -tab).
+        for (const [tabId, label] of [
+          ['tasks', 'manager-environment-edit-tasks'],
+          ['events', 'manager-environment-edit-events']
+        ]) {
+          await page.locator(`.fabricate-manager [data-environment-tab-button="${tabId}"]`).first().click();
+          await page.locator(`.fabricate-manager [data-environment-tab="${tabId}"]`).first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.waitForTimeout(250);
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, label);
+        }
+        // Restore the Overview tab before leaving the editor so later state is unchanged.
+        await page.locator('.fabricate-manager [data-environment-tab-button="overview"]').first().click();
+        await page.locator('.fabricate-manager [data-environment-tab="overview"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+
         // The "Back to environments" button runs through the unsaved-changes
         // route-exit guard. Verify it's clickable, then navigate back via the
         // side nav.
@@ -2858,6 +2880,21 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-travel-stacked');
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+
+        // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
+        // the gathering Settings tab hosts the d100 Gathering Rules (reward / event
+        // selection, event outcome) and the Stamina / Resource-node Limitation
+        // toggles. Capture it so the docs can show where those system-level rules
+        // live. Nav id from CraftingSystemManagerRoot.svelte (gathering nav 'settings'),
+        // panel id from EnvironmentsBrowserView.svelte.
+        await page.locator('.fabricate-manager #manager-gathering-nav-settings').first().click();
+        await page.locator('.fabricate-manager #manager-gathering-panel-settings').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await page.waitForTimeout(300);
+        // The gathering Settings panel is a rules/limitation form, not a table, so
+        // assertManagerLayoutStable (which requires table rows) does not apply here.
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-gathering-settings');
 
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -3312,6 +3349,99 @@ async function main() {
         // 'player-gathering' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
         await screenshot(page, 'player-gathering-environments');
         await screenshot(page, 'fabricate-app-shell');
+
+        async function clearGatheringEnvironmentSearch() {
+          const search = appShell.locator('.gathering-env-search input').first();
+          if (await search.count() === 0) return;
+          await search.fill('');
+          await page.waitForTimeout(150);
+        }
+
+        async function selectGatheringEnvironment(name) {
+          const search = appShell.locator('.gathering-env-search input').first();
+          if (await search.count() > 0) {
+            await search.fill(name);
+            await page.waitForTimeout(200);
+          }
+          const card = appShell.locator('.gathering-env-card[data-locked="false"]').filter({ hasText: name }).first();
+          await card.waitFor({ state: 'visible', timeout: 10_000 });
+          await card.click();
+          await appShell.locator('[data-gathering-detail-state="selected"]').filter({ hasText: name }).first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+        }
+
+        async function selectGatheringTask(name) {
+          const row = appShell.locator('.gathering-task-row').filter({ hasText: name }).first();
+          await row.waitFor({ state: 'visible', timeout: 10_000 });
+          await row.scrollIntoViewIfNeeded();
+          await row.click();
+          await appShell.locator('[data-gathering-task-detail]').filter({ hasText: name }).first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+          await appShell.locator('[data-gathering-drops-state="ready"], [data-gathering-drops-state="loading"]')
+            .first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+          await page.waitForTimeout(250);
+        }
+
+        // Documentation journey captures: exercise the user-visible gathering
+        // states the quickstart and gathering docs discuss. These labels are
+        // full-profile screenshot sources only; rc/ci keep their allow-listed
+        // screenshot budget and skip them through screenshot().
+        await selectGatheringEnvironment('Azure Grove');
+        await appShell.locator('[data-gathering-detail-tab="events"]').first().click();
+        await appShell.locator('[data-gathering-event-section]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-events');
+        await appShell.locator('[data-gathering-detail-tab="tasks"]').first().click();
+        await appShell.locator('[data-gathering-tasks-section]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+
+        await selectGatheringEnvironment('Verdant Meadow');
+        await selectGatheringTask('Gather Meadow Herbs');
+        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-task-ready');
+
+        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
+        await appShell.locator('[data-gathering-state="populated"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await selectGatheringEnvironment('Verdant Meadow');
+        await selectGatheringTask('Gather Meadow Herbs');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-after-success');
+
+        await selectGatheringEnvironment('Crystal Thicket');
+        await selectGatheringTask('Bottle Crystal Dew');
+        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="true"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-tool-blocked');
+
+        await selectGatheringEnvironment('Timed Orchard');
+        await selectGatheringTask('Tend Slow Bloom');
+        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-timed-ready');
+
+        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
+        await appShell.locator('[data-gathering-state="populated"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await selectGatheringEnvironment('Timed Orchard');
+        await selectGatheringTask('Tend Slow Bloom');
+        await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="true"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-timed-active');
+
+        await selectGatheringEnvironment('Moonlit Blind Grove');
+        await appShell.locator('[data-gathering-blind-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-gathering-blind');
+
+        await clearGatheringEnvironmentSearch();
 
         // Region-lock evidence (#294): the locked "Hidden Hollow" env sorts last,
         // so page forward until it appears, then capture it. The detail panel keeps

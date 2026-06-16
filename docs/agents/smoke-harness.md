@@ -11,7 +11,7 @@ The smoke harness boots a real Foundry VTT instance in Docker and walks the Craf
 - `npm run test:foundry:ci` — faster CI profile (subset of phases) used in PR CI.
 - `npm run test:foundry:rc` — release-candidate profile.
 
-Scripts live in `scripts/foundry-test-*.mjs`. The main harness is `scripts/foundry-test-run.mjs` (~2700 lines).
+Scripts live in `scripts/foundry-test-*.mjs`. The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).
 
 ## Phases
 
@@ -21,10 +21,12 @@ The run walks several phases in order. If an earlier phase fails, later phases a
 - **Phase B** — create test actors and items, screenshot sheets.
 - **Phase C** — create a crafting system + sample recipes.
 - **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step). **This is where most drift shows up** when manager markup changes. After the default-selection capture it also re-themes the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and captures `manager-theme-<themeId>` for every Fabricate theme, then restores the default. These are real, Foundry-rendered themed captures — theme fidelity is not validated via hand-authored mocks.
-- **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot). The shared actor-selection top bar mounts with the shell; the phase waits for it to flip `[data-actor-bar-state]` from `loading` to `ready` (its selectable-actor list and gathering conditions loaded) before capturing, so frames show the populated bar rather than its loading placeholder.
+- **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot).
+  The shared actor-selection top bar mounts with the shell; the phase waits for it to flip `[data-actor-bar-state]` from `loading` to `ready` (its selectable-actor list and gathering conditions loaded) before capturing, so frames show the populated bar rather than its loading placeholder.
+  The full profile also walks staged player gathering screenshots: environment list, event inspection, ready attempt detail, post-attempt refresh, missing-tool block, timed-run ready and active states, blind gathering, realm-locked listing, and stacked narrow-window layout.
 - **Phase F** — cleanup.
 
-The player-facing Crafting and Gathering app phases (former D2/D3/E2) and the standalone Recipe Editor were removed when those surfaces were retired; both sidebar buttons now open the single empty-shell window.
+The former standalone player-facing Crafting and Gathering app phases (D2/D3/E2) and standalone Recipe Editor were removed when those surfaces were retired; both sidebar buttons now open the unified Fabricate window.
 
 Phase-by-phase timing and pass/fail land in `test-results/summary.json` after each run.
 
@@ -37,6 +39,23 @@ After any run (success or failure):
 - `test-results/screenshot-*.png` — per-step screenshots; `screenshot-failure.png` captures the last DOM state if a step throws.
 
 When debugging a smoke failure, read `summary.json` first: the failing step's `error` field plus the surrounding successful steps usually point straight at the broken selector.
+
+## Documentation Screenshot Source
+
+The docs increasingly use real Foundry screenshots for each stage of gathering setup and play.
+The source of truth is the local `full` smoke profile, not hand-captured one-off browser images.
+Run `npm run test:foundry` locally, then copy only curated frames from `test-results/screenshot-*.png` into `docs/img/screenshots/` with durable names.
+Do not link docs directly to `test-results/`; that directory is transient and is wiped at the start of the next smoke run.
+
+The current gathering docs source set includes these full-profile labels:
+
+- GM setup: `manager-system-edit-normal`, `manager-components-normal`, `manager-environments-browse-normal`, `manager-environment-edit-placeholder`
+- GM gathering libraries: `manager-gathering-task-editor-normal`, `manager-gathering-event-editor-normal`
+- Environment composition: `manager-environment-edit-tasks`, `manager-environment-edit-events`, `manager-gathering-settings`
+- Player journey: `player-gathering-environments`, `player-gathering-events`, `player-gathering-task-ready`, `player-gathering-after-success`, `player-gathering-tool-blocked`, `player-gathering-timed-ready`, `player-gathering-timed-active`, `player-gathering-blind`, `player-gathering-realm-locked`, `player-gathering-stacked`
+
+The reduced `rc`/`ci` smoke profiles intentionally do not regenerate this whole docs source set.
+They keep the lightweight screenshot allow-list for CI and release-candidate confidence, while local `full` runs provide documentation evidence.
 
 ## Interpreting `passed: false`
 

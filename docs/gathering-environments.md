@@ -17,6 +17,8 @@ Gathering is opt-in per crafting system. Open the system in the Crafting Admin p
 
 When at least one crafting system has gathering enabled, players also see a dedicated **Gathering** action in the Items Directory header. This action opens the player Gathering app; it is separate from the Crafting app route and does not reuse the crafting actor-selection store. Fabricate resyncs the header action when crafting systems change and when the Items Directory rerenders, so disabling gathering on every system removes the action.
 
+![Fabricate gathering feature enabled](img/screenshots/fabricate-enable-gathering.webp)
+
 ## Gathering Limitations
 
 Each crafting system decides how often its gathering tasks can be attempted through **two independent limitations**, set on the system's gathering **Settings** tab under **Limitation**:
@@ -33,6 +35,8 @@ The two toggles are **independent, not a single choice** — each can be on or o
 - **Both on** — both limits apply at once. A single accepted attempt both depletes the node pool **and** spends the character's stamina. This is the **anti-dogpiling** combination: finite resource nodes cap the *total* pulls until they respawn, so a large, high-stamina party cannot strip a task in a single visit no matter how much collective stamina it has.
 
 Stamina enforcement only kicks in once a character actually has a pool (a non-blank **Maximum stamina** rolled for them); a task with no stamina cost is never gated by stamina. Resource-node enforcement applies per task only where you author a node pool on that task. Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles — the toggles only decide whether each limitation is *active* for the system.
+
+![Fabricate gathering settings](img/screenshots/fabricate-gathering-settings.webp)
 
 {: .note }
 > Worlds created before `0.8.0` stored a single mutually-exclusive limitation `mode` (`none` / `stamina` / `nodes`). On upgrade, a versioned `0.8.0` migration rewrites that value into the two independent flags (`stamina` ⇒ Stamina on, `nodes` ⇒ Resource nodes on, otherwise both off) and drops the old field. The same mapping is applied on read, so un-migrated worlds keep working until the migration runs. There is no longer a value that turns both limits on at once except enabling both toggles.
@@ -79,6 +83,8 @@ When gathering is enabled and no custom values exist, Fabricate seeds default vo
 
 Manager V2 stores d100 gathering rules per selected crafting system under `gatheringConfig.systems[systemId].rules`. These settings are edited from the Gathering Settings tab and are authoritative for every d100 gathering environment in that system once authored.
 
+![Fabricate gathering rules](img/screenshots/fabricate-gathering-settings.webp)
+
 | Rule | Values |
 |:-----|:-------|
 | **Rewards** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
@@ -114,6 +120,9 @@ Automatic composition can be fully library-backed. An automatic environment does
 In automatic mode, Excluded and Non-matching are separate sections. Non-matching is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records explicitly excluded through `disabledTaskIds` / `disabledEventIds`.
 
 **Weather and time-of-day are runtime gates, not matching criteria.** A task or event whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (biome, plus danger for events) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked event is skipped during the d100 event selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
+
+![Fabricate environment task composition](img/screenshots/fabricate-configure-environment-tasks.webp)
+![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
 
 ## Gathering Tools Library
 
@@ -164,6 +173,9 @@ Reusable event records support:
 | **Modifier** | Optional event roll modifier expression |
 
 Disabled Gathering Tasks and events never match for player gathering.
+
+![Fabricate gathering task editor](img/screenshots/fabricate-create-gathering-task.webp)
+![Fabricate gathering event editor](img/screenshots/fabricate-create-gathering-event.webp)
 
 ## D100 Resolution
 
@@ -304,6 +316,12 @@ How the rest of the column reads depends on the selection mode:
 The success-chance bar reflects the listing's per-task `successChance` field: a static d100 drop-rate approximation (the chance at least one item drops), not a whole-attempt success probability, so it can read high while an attempt is still blocked or fails a skill check. Tasks that are not d100 (or have no enabled drop rows) carry no bar. The transparent blind rows come from the listing's `discoveredTasks` field; the opaque blind action never exposes per-task success chances.
 
 Current player-app scope covers actor selection, visible/blocked listing, blind task labels, runtime-backed starts, last-attempt feedback, active timed runs, recent terminal history, blind redaction, and one-column active/history layout when the app container narrows. Runtime integration coverage includes scene-linked gathering through the production environment store, run manager, evaluator, and a scene adapter, plus hook-driven timed completion and a regression guard confirming harvesting has no standalone runtime/app/store/settings path.
+
+![Fabricate player gathering task](img/screenshots/fabricate-player-gathering-task.webp)
+![Fabricate player gathering events](img/screenshots/fabricate-player-gathering-events.webp)
+![Fabricate player gathering missing tool](img/screenshots/fabricate-player-gathering-tool-blocked.webp)
+![Fabricate player timed gathering run](img/screenshots/fabricate-player-gathering-timed-active.webp)
+![Fabricate player blind gathering](img/screenshots/fabricate-player-gathering-blind.webp)
 
 ## Tools
 

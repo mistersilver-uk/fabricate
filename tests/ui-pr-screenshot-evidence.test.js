@@ -50,7 +50,16 @@ describe('UI PR screenshot evidence', () => {
       views.map(view => view.id),
       ['player-gathering', 'player-gathering-realm-locked', 'player-gathering-stacked']
     );
-    assert.deepEqual(views[0].smokeLabels, ['player-gathering-environments']);
+    assert.deepEqual(views[0].smokeLabels, [
+      'player-gathering-environments',
+      'player-gathering-events',
+      'player-gathering-task-ready',
+      'player-gathering-after-success',
+      'player-gathering-tool-blocked',
+      'player-gathering-timed-ready',
+      'player-gathering-timed-active',
+      'player-gathering-blind',
+    ]);
     assert.deepEqual(views[1].smokeLabels, ['player-gathering-realm-locked']);
     assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
   });

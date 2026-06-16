@@ -101,7 +101,16 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'player-gathering',
     label: 'Player gathering tab',
-    smokeLabels: ['player-gathering-environments'],
+    smokeLabels: [
+      'player-gathering-environments',
+      'player-gathering-events',
+      'player-gathering-task-ready',
+      'player-gathering-after-success',
+      'player-gathering-tool-blocked',
+      'player-gathering-timed-ready',
+      'player-gathering-timed-active',
+      'player-gathering-blind',
+    ],
     matches: [/^src\/ui\/svelte\/apps\/gathering\//],
   },
   {
