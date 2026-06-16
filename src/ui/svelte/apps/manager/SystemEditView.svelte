@@ -1,7 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
 
   let {
     selectedSystem = null,
@@ -24,12 +23,6 @@
 
   function characterModifierIsRoll(entry) {
     return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
-  }
-
-  function characterModifierProviderLabel(provider) {
-    if (provider === 'pf2e') return text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ProviderPf2e', 'Pathfinder 2e');
-    if (provider === 'macro') return text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ProviderMacro', 'Macro');
-    return text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ProviderDnd5e', 'D&D 5e');
   }
 
   async function handleAddCharacterModifier() {
@@ -230,15 +223,10 @@
                         <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon', 'Icon')}</span>
                         <input type="text" value={entry.icon} oninput={(event) => onUpdateCharacterModifier(entry.id, { icon: event.currentTarget.value })} />
                       </label>
-                      <ProviderExpressionInput
-                        provider={entry.provider}
-                        expression={entry.expression}
-                        macroUuid={entry.macroUuid}
-                        idPrefix={`character-modifier-${entry.id}`}
-                        onProviderChange={(value) => onUpdateCharacterModifier(entry.id, { provider: value })}
-                        onExpressionChange={(value) => onUpdateCharacterModifier(entry.id, { expression: value })}
-                        onMacroUuidChange={(value) => onUpdateCharacterModifier(entry.id, { macroUuid: value })}
-                      />
+                      <label class="manager-field">
+                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
+                        <input type="text" value={entry.expression} oninput={(event) => onUpdateCharacterModifier(entry.id, { expression: event.currentTarget.value })} />
+                      </label>
                       <div class="manager-character-modifier-actions">
                         <button type="button" class="manager-action" onclick={() => characterModifierEditingId = ''}>{text('FABRICATE.Admin.Manager.Done', 'Done')}</button>
                         <button type="button" class="manager-action manager-action-danger" onclick={() => handleDeleteCharacterModifier(entry.id)}>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')}</button>
@@ -248,7 +236,6 @@
                     <div class="manager-character-modifier-summary">
                       <span class="manager-character-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
                       <span class="manager-character-modifier-label">{entry.label}</span>
-                      <span class="manager-chip manager-character-modifier-provider">{characterModifierProviderLabel(entry.provider)}</span>
                       {#if characterModifierIsRoll(entry)}
                         <span class="manager-chip manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
                       {/if}

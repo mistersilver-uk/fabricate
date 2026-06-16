@@ -24,7 +24,6 @@ function normalizeToolShape(tool = {}) {
   const id = String(t.id || Math.random().toString(36).slice(2, 10));
   const breakageModes = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
   const onBreakModes = new Set(['destroy', 'flagBroken', 'replaceWith']);
-  const providers = new Set(['dnd5e', 'pf2e', 'macro']);
   let breakage;
   const bmode = breakageModes.has(t.breakage?.mode) ? t.breakage.mode : 'limitedUses';
   if (bmode === 'limitedUses') {
@@ -45,9 +44,7 @@ function normalizeToolShape(tool = {}) {
   let requirement = null;
   if (t.requirement && typeof t.requirement === 'object') {
     requirement = {
-      provider: providers.has(t.requirement.provider) ? t.requirement.provider : 'dnd5e',
-      formula: typeof t.requirement.formula === 'string' ? t.requirement.formula : '',
-      macroUuid: typeof t.requirement.macroUuid === 'string' ? t.requirement.macroUuid : ''
+      formula: typeof t.requirement.formula === 'string' ? t.requirement.formula : ''
     };
   }
   return {

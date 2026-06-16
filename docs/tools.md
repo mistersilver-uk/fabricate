@@ -35,12 +35,9 @@ For crafting, the **applicable** set for a given attempt is the union of the rec
 
 Every applicable Tool must be **present** in the source actor's inventory and must **pass its optional requirement** before the activity can proceed. The owned item is recognised whether it is the Tool component's source world item or a copy duplicated from it.
 
-A Tool's optional `requirement` is an actor-side condition that must evaluate truthy:
-
-| Provider | Field | Example |
-|:---------|:------|:--------|
-| `dnd5e` / `pf2e` | `formula` | `@flags.dnd5e.proficient` |
-| `macro` | `macroUuid` | a macro returning `true`/`false` or `{ allowed, description }` |
+A Tool's optional `requirement` is an actor-side condition that must evaluate truthy.
+It is a single `formula` — a Foundry roll expression evaluated against the source actor's roll data (for example `@flags.dnd5e.proficient`).
+A `requirement` with no `formula` is invalid.
 
 If a referenced Tool id is missing or disabled, or the actor does not own a non-broken instance, or the requirement does not evaluate truthy, the activity is blocked. In gathering this surfaces as the `TOOL_BLOCKED` reason; in crafting the Tool appears under `missing.tools` / `toolStates` in the craftability evaluation.
 

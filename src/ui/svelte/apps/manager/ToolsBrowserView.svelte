@@ -168,16 +168,12 @@
   }
 
   function defaultRequirement() {
-    return { provider: 'dnd5e', formula: '', macroUuid: '' };
+    return { formula: '' };
   }
 
   function updateRequirementExpression(tool, formula) {
     onUpdateTool?.(tool.id, {
-      requirement: {
-        provider: 'dnd5e',
-        formula,
-        macroUuid: ''
-      }
+      requirement: { formula }
     });
   }
 

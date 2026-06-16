@@ -113,14 +113,14 @@ test('_normalizeTool keeps flagBroken onBreak without extra fields', () => {
   assert.deepEqual(tool.onBreak, { mode: 'flagBroken' });
 });
 
-test('_normalizeTool normalizes a requirement gate and coerces an unknown provider to dnd5e', () => {
+test('_normalizeTool normalizes a requirement gate to a formula-only shape', () => {
   const manager = makeManager();
-  const tool = manager._normalizeTool({ id: 't1', requirement: { provider: 'pf2e', formula: '@abilities.str.mod' } });
-  assert.deepEqual(tool.requirement, { provider: 'pf2e', formula: '@abilities.str.mod', macroUuid: '' });
+  const tool = manager._normalizeTool({ id: 't1', requirement: { formula: '@abilities.str.mod' } });
+  assert.deepEqual(tool.requirement, { formula: '@abilities.str.mod' });
 
-  const unknownProvider = manager._normalizeTool({ id: 't2', requirement: { provider: 'bogus', macroUuid: 'Macro.x' } });
-  assert.equal(unknownProvider.requirement.provider, 'dnd5e');
-  assert.equal(unknownProvider.requirement.macroUuid, 'Macro.x');
+  // Legacy provider/macroUuid fields are dropped on normalization.
+  const legacy = manager._normalizeTool({ id: 't2', requirement: { provider: 'bogus', formula: '@x', macroUuid: 'Macro.x' } });
+  assert.deepEqual(legacy.requirement, { formula: '@x' });
 
   const nullReq = manager._normalizeTool({ id: 't3', requirement: null });
   assert.equal(nullReq.requirement, null);

@@ -141,7 +141,7 @@
         actorId: actor.actorId,
         current: Number(actor.draftCurrent) || 0,
         maxOverride: actor.draftMaxOverride === '' || actor.draftMaxOverride == null ? null : Number(actor.draftMaxOverride),
-        provider: actor.provider
+        maxReadOnly: actor.maxReadOnly === true
       });
     }
     refreshStaminaActors();
@@ -304,7 +304,7 @@
                     <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
                   </span>
                   <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftCurrent} disabled={!actor.rolled} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftMaxOverride} disabled={!actor.rolled || (actor.provider && actor.provider !== 'fabricate')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`} data-economy-actor-max />
+                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftMaxOverride} disabled={!actor.rolled || actor.maxReadOnly === true} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`} data-economy-actor-max />
                   {#if actor.rolled}
                     <button type="button" class="manager-icon-button manager-economy-actor-roll" title={text('FABRICATE.Admin.Manager.Economy.ResetHint', 'Re-roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-arrows-rotate" aria-hidden="true"></i></button>
                   {:else}

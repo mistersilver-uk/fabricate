@@ -75,13 +75,13 @@ test('Tool normalizes unknown enum values to defaults', () => {
     componentId: 'comp-axe',
     breakage: { mode: 'invalid-mode', maxUses: 5 },
     onBreak: { mode: 'wat' },
-    requirement: { provider: 'invalid', formula: 'x' },
+    requirement: { formula: 'x' },
   });
 
   assert.equal(tool.breakage.mode, 'limitedUses');
   assert.equal(tool.breakage.maxUses, 5);
   assert.equal(tool.onBreak.mode, 'destroy');
-  assert.equal(tool.requirement.provider, 'dnd5e');
+  assert.deepEqual(tool.requirement, { formula: 'x' });
 });
 
 test('Tool accepts breakageChance configuration', () => {
@@ -120,22 +120,21 @@ test('Tool.validate - requires componentId', () => {
   assert.ok(result.errors.some(e => e.includes('componentId')));
 });
 
-test('Tool.validate - requirement with macro provider requires macroUuid', () => {
+test('Tool.validate - requirement requires formula', () => {
   const result = new Tool({
     componentId: 'comp-axe',
-    requirement: { provider: 'macro', macroUuid: '' },
-  }).validate();
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('macroUuid')));
-});
-
-test('Tool.validate - requirement with system provider requires formula', () => {
-  const result = new Tool({
-    componentId: 'comp-axe',
-    requirement: { provider: 'dnd5e', formula: '' },
+    requirement: { formula: '' },
   }).validate();
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => e.includes('formula')));
+});
+
+test('Tool.validate - requirement with a formula is valid', () => {
+  const result = new Tool({
+    componentId: 'comp-axe',
+    requirement: { formula: '@flags.proficient' },
+  }).validate();
+  assert.equal(result.valid, true);
 });
 
 test('Tool.validate - limitedUses rejects zero maxUses', () => {
@@ -225,7 +224,7 @@ test('Tool.validate - replaceWith requires replacementComponentId distinct from 
 test('Tool.toJSON / fromJSON round-trip preserves shape', () => {
   const original = new Tool({
     componentId: 'comp-axe',
-    requirement: { provider: 'macro', macroUuid: 'Macro.abc' },
+    requirement: { formula: '@flags.proficient' },
     breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
   });

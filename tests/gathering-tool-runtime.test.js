@@ -37,7 +37,7 @@ function makeEvaluator({ requirementResults = new Map() } = {}) {
       return { success: true, status: 'success', value: 1, reasonCode: 'CHECK_SUCCESS', diagnostic: null };
     },
     async evaluateRequirement({ requirement }) {
-      const key = `${requirement?.provider}:${requirement?.formula || requirement?.macroUuid || ''}`;
+      const key = requirement?.formula || '';
       const result = requirementResults.get(key);
       const allowed = result?.allowed === true;
       return {
@@ -190,7 +190,7 @@ test('missing tool blocks startAttempt with TOOL_BLOCKED', async () => {
 test('failed tool requirement blocks startAttempt with failedRequirements detail', async () => {
   const tool = {
     componentId: 'comp-axe',
-    requirement: { provider: 'dnd5e', formula: '@flags.proficient' },
+    requirement: { formula: '@flags.proficient' },
     breakage: { mode: 'limitedUses', maxUses: null },
     onBreak: { mode: 'destroy' }
   };

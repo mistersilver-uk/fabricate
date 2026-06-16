@@ -39,26 +39,25 @@ test('normalizes empty characterModifiers to []', () => {
 test('coerces malformed library entries and drops invalid ones', () => {
   const service = makeService(configWithLibrary([
     null,
-    { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' },
+    { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' },
     { label: 'Missing ID', expression: 'whatever' },
-    { id: 'invalid-no-expr-or-macro', provider: 'dnd5e' },
-    { id: 'macro-only', provider: 'macro', macroUuid: 'Macro.foo' },
-    { id: 'unknown-provider', provider: 'made-up', expression: '1' }
+    { id: 'invalid-no-expr', label: 'No expression' },
+    { id: 'with-expr', expression: '1' }
   ]));
   const entries = service._config().systems['system-a'].characterModifiers;
   const byId = Object.fromEntries(entries.map(entry => [entry.id, entry]));
   assert.ok(byId.strength, 'strength preserved');
-  assert.ok(byId['macro-only'], 'macro-only entry preserved');
-  assert.equal(byId['invalid-no-expr-or-macro'], undefined, 'no-expression entry dropped');
-  assert.ok(byId['unknown-provider'], 'unknown provider coerced to default');
-  assert.equal(byId['unknown-provider'].provider, 'dnd5e', 'unknown provider falls back to dnd5e');
+  assert.equal(byId['invalid-no-expr'], undefined, 'no-expression entry dropped');
+  assert.ok(byId['with-expr'], 'entry with an expression preserved');
+  assert.equal(byId['with-expr'].provider, undefined, 'no provider field is stamped');
+  assert.deepEqual(Object.keys(byId.strength).sort((a, b) => a.localeCompare(b)), ['expression', 'icon', 'id', 'isRollExpression', 'label']);
   assert.equal(byId.strength.isRollExpression, false, 'flat actor ref is not roll');
 });
 
 test('flags dice and operator expressions as roll expressions', () => {
   const service = makeService(configWithLibrary([
-    { id: 'roll-d6', provider: 'dnd5e', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' },
-    { id: 'scaled-dice', provider: 'dnd5e', label: 'Scaled', expression: '(@abilities.str.mod)d6' }
+    { id: 'roll-d6', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' },
+    { id: 'scaled-dice', label: 'Scaled', expression: '(@abilities.str.mod)d6' }
   ]));
   const entries = service._config().systems['system-a'].characterModifiers;
   assert.equal(entries.find(e => e.id === 'roll-d6').isRollExpression, true);
@@ -114,7 +113,7 @@ test('new system shell has empty character modifier library without auto-seed', 
 test('evaluator injection passes through with kind=characterModifier', async () => {
   const evaluateCalls = [];
   const service = makeService(
-    configWithLibrary([{ id: 'str', provider: 'dnd5e', label: 'Strength', expression: '@str' }]),
+    configWithLibrary([{ id: 'str', label: 'Strength', expression: '@str' }]),
     {
       evaluateExpression: async (payload) => { evaluateCalls.push(payload); return 3; }
     }
@@ -134,5 +133,5 @@ test('evaluator injection passes through with kind=characterModifier', async () 
   assert.equal(evaluateCalls.length, 1);
   assert.equal(evaluateCalls[0].kind, 'characterModifier');
   assert.equal(evaluateCalls[0].expression, '@str');
-  assert.equal(evaluateCalls[0].provider, 'dnd5e');
+  assert.equal(evaluateCalls[0].provider, undefined);
 });

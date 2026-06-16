@@ -10,7 +10,6 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
   TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
-  TOOL_REQUIREMENT_PROVIDERS as TOOL_REQUIREMENT_PROVIDER_LIST,
 } from '../models/Tool.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
@@ -26,7 +25,6 @@ import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './
 // model and the adminStore editor without duplicating the literal lists.
 const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
 const TOOL_ON_BREAK_MODES = new Set(TOOL_ON_BREAK_MODE_LIST);
-const TOOL_REQUIREMENT_PROVIDERS = new Set(TOOL_REQUIREMENT_PROVIDER_LIST);
 
 export class CraftingSystemManager {
   constructor(recipeManager) {
@@ -205,11 +203,8 @@ export class CraftingSystemManager {
   _normalizeToolRequirement(input) {
     if (input === null || input === undefined) return null;
     if (typeof input !== 'object') return null;
-    const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
     return {
-      provider,
       formula: typeof input.formula === 'string' ? input.formula : '',
-      macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : '',
     };
   }
 

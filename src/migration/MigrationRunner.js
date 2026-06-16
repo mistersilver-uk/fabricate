@@ -16,6 +16,7 @@ import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
@@ -160,6 +161,14 @@ const MIGRATIONS = [
     label: 'Unify stamina-regen policy name elapsedTime → overTime (matches node respawn)',
     migrate(data) {
       return migrateStaminaRegenPolicy(data.gatheringConfig);
+    },
+  },
+  {
+    version: '1.3.0',
+    label:
+      'Remove the dnd5e/pf2e/macro provider model from gathering gates, checks, tool requirements, and character modifiers (formula-only)',
+    migrate(data) {
+      return migrateRemoveSystemProvider(data);
     },
   },
   // Future migrations added here in version order

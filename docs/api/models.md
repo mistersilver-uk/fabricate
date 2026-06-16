@@ -142,7 +142,7 @@ A Tool entry stored under `system.tools` (the `craftingSystems` setting) has thi
   id,           // string (library id, referenced by toolIds)
   componentId,  // string (required managed component reference)
   label,        // string (optional display label)
-  requirement,  // null | { provider: 'dnd5e'|'pf2e'|'macro', formula?, macroUuid? }
+  requirement,  // null | { formula } (a Foundry roll expression; required when set)
   breakage,     // { mode: 'limitedUses', maxUses } |
                 // { mode: 'breakageChance', breakageChance } |
                 // { mode: 'diceExpression', formula, threshold }

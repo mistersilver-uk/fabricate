@@ -336,13 +336,13 @@ Current GM editor behavior:
 - Editable catalyst fields are `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`.
 - Catalyst `maxUses` is validation- and runtime-relevant only when `degradesOnUse === true`; when degradation is disabled, `maxUses` is ignored.
 - The selected task can enable, edit, and clear a visibility gate.
-- Visibility-gate authoring supports the canonical `macro`, `dnd5e`, and `pf2e` providers: `macro` uses an available script macro, while `dnd5e` and `pf2e` use `formula` and `threshold`.
-- Incomplete visibility provider input is local UI state only and must not be sent to the environment store until the provider-required fields are present. Clearing visibility calls the store only when a committed visibility gate exists.
+- Visibility-gate authoring is formula-only: it uses a `formula` and a `threshold` field, with no provider select and no macro UUID field.
+- Incomplete visibility input is local UI state only and must not be sent to the environment store until both fields are present. Clearing visibility calls the store only when a committed visibility gate exists.
 - The selected routed task can edit `resultSelection.provider` as `macroOutcome` or `rollTableOutcome`.
 - Routed `macroOutcome` authoring uses available script macro options for `macroUuid`.
 - Routed `rollTableOutcome` authoring uses a UUID text input for `rollTableUuid`.
 - The selected progressive task can edit `progressive.awardMode` as `equal`, `partial`, or `exceed`.
-- Progressive check authoring supports `macro`, `dnd5e`, and `pf2e` providers: `macro` uses an available script macro, while `dnd5e` and `pf2e` use `formula` and optional `threshold`.
+- Progressive check authoring is formula-only: it uses a `formula` and an optional `threshold` field, with no provider select and no macro UUID field.
 - Progressive difficulty is displayed from the selected managed component difficulty; result-level inline difficulty is not persisted.
 - Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups.
 - Task, result-group, result, catalyst, visibility, result-selection, progressive, check, time-requirement, and failure-outcome mutations preserve other nested task configuration.
@@ -352,7 +352,7 @@ Current GM editor behavior:
 - Delete requires confirmation and cleans referenced active and historical gathering runs through the store.
 - Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time-requirement/failure-outcome callbacks are delegated through the admin store and remain inside the environment draft save/cancel flow.
 - The selected-task time-requirement editor supports clearing `timeRequirement` for immediate resolution and editing minutes, hours, days, months, and years for timed tasks.
-- The selected-task failure-outcome editor supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields.
+- The selected-task failure-outcome editor supports clearing to default failure feedback plus text and macro custom outcomes, with failure-outcome `mode` switching (`text`/`macro`) clearing stale fields from the prior selection.
 - Save-blocking validation exposes a localized summary, inline field-addressable errors, `aria-invalid`, `aria-describedby`, keyboard focus to the first invalid field after failed save, and persistent stale-reference warnings.
 - Validation identifies invalid node counts, invalid respawn policies, invalid stamina formulas/providers, invalid condition modifiers, invalid encounter table links, invalid attempt-limit settings, and risk values outside supported vocabulary.
 - Narrow-window layout behavior is implemented with app/container-width rules so list/editor panes and advanced controls remain reachable in resized Foundry windows.

@@ -75,9 +75,7 @@ const RESOLUTION_MODE_LABEL_KEYS = {
 const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
 const ENVIRONMENTS_TAB = 'environments';
 const TASK_RESOLUTION_MODES = new Set(['routed', 'progressive']);
-const TASK_VISIBILITY_PROVIDERS = new Set(['macro', 'dnd5e', 'pf2e']);
 const TASK_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
-const TASK_CHECK_PROVIDERS = new Set(['macro', 'dnd5e', 'pf2e']);
 const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
@@ -472,7 +470,6 @@ function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toS
   };
 }
 
-const GATHERING_CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // Mirrors GatheringRichStateService: the drop-modifier application mode is a
 // single global system setting (`dropModifierMode`) and is not overridable per
@@ -483,16 +480,12 @@ function _normalizeGatheringCharacterModifier(entry = {}, randomID = () => Math.
   if (!entry || typeof entry !== 'object') return null;
   const id = entry.id ? String(entry.id) : '';
   if (!id) return null;
-  const provider = GATHERING_CHARACTER_MODIFIER_PROVIDERS.has(entry.provider) ? entry.provider : 'dnd5e';
   const expression = String(entry.expression ?? '').trim();
-  const macroUuid = String(entry.macroUuid ?? '').trim();
   return {
     id,
     label: String(entry.label || id),
     icon: String(entry.icon || 'fa-solid fa-user'),
-    provider,
-    expression,
-    macroUuid
+    expression
   };
 }
 
@@ -550,16 +543,11 @@ function _normalizeGatheringDropConditionModifierList(values = [], normalizeId =
 
 const GATHERING_TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
 const GATHERING_TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
-const GATHERING_TOOL_REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
-
 function _normalizeToolRequirement(input) {
   if (input === null || input === undefined) return null;
   if (typeof input !== 'object') return null;
-  const provider = GATHERING_TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
   return {
-    provider,
-    formula: typeof input.formula === 'string' ? input.formula : '',
-    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+    formula: typeof input.formula === 'string' ? input.formula : ''
   };
 }
 
@@ -991,24 +979,12 @@ function _inferEnvironmentValidationTarget(message, draft, context = _createEnvi
   if (/progressive\.awardmode/.test(lower) || /progressive resolution requires progressive config/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.progressive.awardMode` };
   }
-  if (/progressive resolution requires check|check provider must/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.check.provider` };
-  }
-  if (/check macro provider requires macrouuid/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.check.macroUuid` };
-  }
-  if (/check (dnd5e|pf2e) provider requires formula/.test(lower)) {
+  if (/progressive resolution requires check|gathering check requires formula/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.check.formula` };
   }
 
-  if (/visibility macro provider requires macrouuid/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.visibility.macroUuid` };
-  }
-  if (/visibility (dnd5e|pf2e) provider requires formula/.test(lower)) {
+  if (/visibility gate requires formula and threshold/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.visibility.formula` };
-  }
-  if (/visibility (dnd5e|pf2e) provider requires threshold/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.visibility.threshold` };
   }
 
   const timeUnit = lower.match(/timerequirement\.(minutes|hours|days|months|years)/)?.[1];
@@ -4763,7 +4739,7 @@ export function createAdminStore(services) {
    * shell or the proposed id already exists.
    *
    * @param {string} [systemId] Target crafting system id.
-   * @param {object} [partial] Partial entry (id, label, icon, provider, expression, macroUuid).
+   * @param {object} [partial] Partial entry (id, label, icon, expression).
    * @returns {Promise<object|null>}
    */
   async function addGatheringCharacterModifier(systemId = get(selectedSystemId), partial = {}) {
@@ -4776,9 +4752,7 @@ export function createAdminStore(services) {
       id,
       label: partial?.label || services.localize?.('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.NewLabel') || 'Character modifier',
       icon: partial?.icon || 'fa-solid fa-user',
-      provider: partial?.provider || 'dnd5e',
-      expression: partial?.expression || '',
-      macroUuid: partial?.macroUuid || ''
+      expression: partial?.expression || ''
     }, _randomID);
     if (!entry) return null;
     systemConfig.characterModifiers = [...(systemConfig.characterModifiers || []), entry];
@@ -4789,8 +4763,8 @@ export function createAdminStore(services) {
 
   /**
    * Update one library character modifier entry by id. Updates that fail
-   * normalization (e.g. no expression and no macroUuid) preserve the prior
-   * entry. Returns true when the library changed.
+   * normalization (e.g. no id) preserve the prior entry. Returns true when the
+   * library changed.
    *
    * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id.

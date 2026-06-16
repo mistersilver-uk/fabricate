@@ -17,7 +17,7 @@ function configFor({ entries = [], tasks = [], events = [] } = {}) {
   };
 }
 
-const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' }];
+const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }];
 
 function envWithLibrary(service, { events = [] } = {}) {
   const composed = service.composeEnvironment({
@@ -57,7 +57,7 @@ test('terminal run records characterModifierSnapshot evidence per row and event'
 test('dice term rolled total is captured in evidence', async () => {
   let evaluatedExpression;
   const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'roll-d6', provider: 'dnd5e', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' }] }),
+    config: configFor({ entries: [{ id: 'roll-d6', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' }] }),
     rolls: [100],
     evaluateExpression: ({ expression }) => { evaluatedExpression = expression; return 7; }
   });

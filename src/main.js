@@ -526,7 +526,6 @@ class Fabricate {
     this.salvageRunManager = new SalvageRunManager();
     this.gatheringRunManager = new GatheringRunManager();
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
-      runMacro: runGatheringMacro,
       evaluateExpression: evaluateGatheringExpression
     });
     this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
@@ -607,7 +606,6 @@ class Fabricate {
       getUserId: () => game.user?.id || null,
       hooks: Hooks,
       evaluateExpression: evaluateGatheringExpression,
-      runMacro: runGatheringMacro,
       // Calendar-aware regen/respawn intervals: day/week lengths track the active
       // Foundry V13 world calendar (falls back to the Earth table when none).
       // Resolved per call so a mid-session calendar reconfig is picked up.
@@ -1277,7 +1275,13 @@ class Fabricate {
     this._requireReady();
     this._requireGM();
     const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
-    return this.gatheringRichStateService?.setActorStamina(actor, options);
+    // Legacy API back-compat: a `{ provider: 'external' }` argument maps to a
+    // read-only max. The service also tolerates the legacy value, but mapping
+    // it here keeps the public boundary on the `maxReadOnly` vocabulary.
+    const { provider, ...rest } = options;
+    const mapped =
+      provider === undefined ? rest : { ...rest, maxReadOnly: provider === 'external' };
+    return this.gatheringRichStateService?.setActorStamina(actor, mapped);
   }
 
   adjustGatheringStamina(options = {}) {
@@ -1316,7 +1320,7 @@ class Fabricate {
    * the GM "Gathering State" panel. GM-only.
    *
    * @param {{systemId: string}} options
-   * @returns {Array<{actorId: string, name: string, img: string, current: number|null, max: number|null, provider: string}>}
+   * @returns {Array<{actorId: string, name: string, img: string, current: number|null, max: number|null, maxReadOnly: boolean}>}
    */
   getGatheringStaminaState(options = {}) {
     this._requireReady();

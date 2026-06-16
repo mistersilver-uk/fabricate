@@ -46,7 +46,7 @@ function composeAndResolve(service, { task, events = [], conditions = null, biom
 }
 
 const STR_LIBRARY = [
-  { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' }
+  { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }
 ];
 
 test('drop row sums character modifier into final threshold', async () => {
@@ -106,7 +106,7 @@ test('character modifier composes with condition modifier worked example', async
 test('event threshold reduced by negative character modifier', async () => {
   const { service } = makeRichState({
     config: configFor({
-      entries: [{ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', provider: 'dnd5e', expression: '@stealth' }]
+      entries: [{ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', expression: '@stealth' }]
     }),
     rolls: [100, 100],
     evaluateExpression: () => 4
@@ -128,7 +128,7 @@ test('event threshold reduced by negative character modifier', async () => {
 test('eventModifier and characterModifiers are independent on the same event', async () => {
   const { service } = makeRichState({
     config: configFor({
-      entries: [{ id: 'stealth', provider: 'dnd5e', label: 'Stealth', expression: '@stealth' }]
+      entries: [{ id: 'stealth', label: 'Stealth', expression: '@stealth' }]
     }),
     rolls: [100],
     evaluateExpression: () => 5
@@ -170,8 +170,8 @@ test('min/max clamp applied before operator', async () => {
 test('multiple references on one row stack contributions', async () => {
   const { service } = makeRichState({
     config: configFor({ entries: [
-      { id: 'strength', provider: 'dnd5e', label: 'Strength', expression: '@s' },
-      { id: 'athletics', provider: 'dnd5e', label: 'Athletics', expression: '@a' }
+      { id: 'strength', label: 'Strength', expression: '@s' },
+      { id: 'athletics', label: 'Athletics', expression: '@a' }
     ] }),
     rolls: [100],
     evaluateExpression: ({ expression }) => expression === '@s' ? 2 : 4
@@ -252,10 +252,10 @@ test('partial override inherits unset fields from library entry', async () => {
     }
   });
   assert.equal(lastPayload.expression, '1d6 + @abilities.str.mod');
-  assert.equal(lastPayload.provider, 'dnd5e');
+  assert.equal(lastPayload.provider, undefined);
 });
 
-test('expression override replaces library expression but keeps library provider', async () => {
+test('expression override replaces library expression', async () => {
   let lastPayload;
   const { service } = makeRichState({
     config: configFor({ entries: STR_LIBRARY }),
@@ -272,33 +272,32 @@ test('expression override replaces library expression but keeps library provider
     }
   });
   assert.equal(lastPayload.expression, '@a.b.c');
-  assert.equal(lastPayload.provider, 'dnd5e');
+  assert.equal(lastPayload.provider, undefined);
 });
 
-test('macro modifier receives correct context shape', async () => {
-  let lastMacro;
+test('character modifier expression evaluation receives correct context shape', async () => {
+  let lastPayload;
   const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'macro-mod', provider: 'macro', label: 'Macro', macroUuid: 'Macro.test' }] }),
+    config: configFor({ entries: [{ id: 'mod', label: 'Mod', expression: '@mod' }] }),
     rolls: [100],
-    runMacro: (uuid, context) => { lastMacro = { uuid, context }; return 2; }
+    evaluateExpression: (payload) => { lastPayload = payload; return 2; }
   });
   await composeAndResolve(service, {
     task: {
       id: 't',
       dropRows: [{
         id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [{ id: 'r', modifierId: 'macro-mod', operator: '+' }]
+        characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '+' }]
       }]
     }
   });
-  assert.equal(lastMacro.uuid, 'Macro.test');
-  assert.ok('actor' in lastMacro.context);
-  assert.ok('environment' in lastMacro.context);
-  assert.ok('task' in lastMacro.context);
-  assert.ok('row' in lastMacro.context);
-  assert.ok('conditions' in lastMacro.context);
-  assert.ok('modifier' in lastMacro.context);
-  assert.equal(lastMacro.context.kind, 'characterModifier');
+  assert.equal(lastPayload.expression, '@mod');
+  assert.ok(Object.hasOwn(lastPayload, 'actor'));
+  assert.ok(Object.hasOwn(lastPayload, 'environment'));
+  assert.ok(Object.hasOwn(lastPayload, 'task'));
+  assert.ok(Object.hasOwn(lastPayload, 'row'));
+  assert.ok(Object.hasOwn(lastPayload, 'modifier'));
+  assert.equal(lastPayload.kind, 'characterModifier');
 });
 
 test('final threshold is clamped to 0..100', async () => {
@@ -322,7 +321,7 @@ test('final threshold is clamped to 0..100', async () => {
 // --- issue 299: multiplicative drop-chance modifiers (additive/multiplicative toggle) ---
 
 const MOD_LIBRARY = [
-  { id: 'mod', label: 'Mod', icon: 'fa-solid fa-dice', provider: 'dnd5e', expression: '@mod' }
+  { id: 'mod', label: 'Mod', icon: 'fa-solid fa-dice', expression: '@mod' }
 ];
 
 async function resolveSingleRow(service, { dropRate, reference, rules = {}, conditionModifiers } = {}) {
@@ -407,8 +406,8 @@ test('issue 299: multiplicative system mode applies multiplicatively to every re
   // factor that multiplies into the running product: 1.1 * 0.5 = 0.55.
   const { service } = makeRichState({
     config: configFor({ entries: [
-      { id: 'add', label: 'Add', icon: 'fa-solid fa-plus', provider: 'dnd5e', expression: '@add' },
-      { id: 'mult', label: 'Mult', icon: 'fa-solid fa-xmark', provider: 'dnd5e', expression: '@mult' }
+      { id: 'add', label: 'Add', icon: 'fa-solid fa-plus', expression: '@add' },
+      { id: 'mult', label: 'Mult', icon: 'fa-solid fa-xmark', expression: '@mult' }
     ] }),
     rolls: [100],
     evaluateExpression: (payload) => (payload.modifier.id === 'add' ? 10 : 50)

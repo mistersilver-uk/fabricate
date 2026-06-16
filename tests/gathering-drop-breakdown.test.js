@@ -32,7 +32,7 @@ function environmentWithLibrary(modifiers = []) {
 test('previewDropBreakdown separates weather/time/biome + character contributions and clamps to a final chance', async () => {
   const service = makeService({ evaluateExpression: async () => 5 });
   const environment = environmentWithLibrary([
-    { id: 'mod-dex', label: 'Dexterity', icon: 'fa-user', provider: 'dnd5e', expression: '@abilities.dex.mod' }
+    { id: 'mod-dex', label: 'Dexterity', icon: 'fa-user', expression: '@abilities.dex.mod' }
   ]);
   const task = {
     resolutionMode: 'd100',
@@ -97,7 +97,7 @@ test('taskSuccessChance applies condition modifiers to the eager (no-actor) succ
 test('previewDropBreakdown clamps the final chance to [0,100] and omits unresolved character modifiers', async () => {
   const service = makeService({ evaluateExpression: async () => { throw new Error('no actor'); } });
   const environment = environmentWithLibrary([
-    { id: 'mod-bad', label: 'Broken', provider: 'dnd5e', expression: '@nope' }
+    { id: 'mod-bad', label: 'Broken', expression: '@nope' }
   ]);
   const task = {
     resolutionMode: 'd100',
@@ -135,7 +135,7 @@ test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt fo
     hooks: { callAll: () => {} },
     evaluateExpression: async () => 10
   });
-  const library = [{ id: 'mod', label: 'Mod', icon: 'fa-user', provider: 'dnd5e', expression: '@mod' }];
+  const library = [{ id: 'mod', label: 'Mod', icon: 'fa-user', expression: '@mod' }];
   const environment = {
     conditions: { weather: 'rain', timeOfDay: 'night' },
     biomes: ['forest'],

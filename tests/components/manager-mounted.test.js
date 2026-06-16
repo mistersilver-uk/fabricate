@@ -16,8 +16,7 @@ const sharedComponentNames = [
   'ManagerColorPicker',
   'ManagerColorPopover',
   'EssenceSourceSelector',
-  'Pagination',
-  'ProviderExpressionInput'
+  'Pagination'
 ];
 
 let tempRoot;
@@ -4225,7 +4224,7 @@ describe('CraftingSystemManager mounted behavior', () => {
             label: 'Artisan Catalyst',
             enabled: true,
             componentId: 'c1',
-            requirement: { provider: 'pf2e', formula: '@tools.example.value', macroUuid: 'Macro.old' },
+            requirement: { formula: '@tools.example.value' },
             breakage: { mode: 'limitedUses', maxUses: null },
             onBreak: { mode: 'destroy' }
           }]
@@ -4260,9 +4259,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
       && call[1] === 'tool-catalyst'
-      && call[2].requirement?.provider === 'dnd5e'
       && call[2].requirement?.formula === '@tools.smith.value'
-      && call[2].requirement?.macroUuid === ''));
+      && call[2].requirement?.provider === undefined
+      && call[2].requirement?.macroUuid === undefined));
   });
 
   it('renders gathering tool breakage chance as a full gradient slider without rarity tiers', async () => {
