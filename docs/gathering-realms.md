@@ -153,6 +153,8 @@ Location-gated environments stay listed but blocked, with a localized reason:
 
 The listing payload also carries a redaction-safe `location` field per environment (whether it is gated, available, the resolution source, and disclosure-safe current-realm labels) and, on blocked rows, travel guidance data: the destination realms whose identity the viewer is allowed to see (non-secret or already discovered), plus a count of secret undiscovered destinations. Macros and future player UI can use this to render travel goals such as "Travel to Ashen March" without leaking secret geography.
 
+![Fabricate player realm-locked gathering](img/screenshots/fabricate-player-gathering-realm-locked.webp)
+
 ### The actor bar's current-realm chip
 
 The gathering app's actor selection bar carries a **current-realm chip** alongside the weather and time-of-day context.

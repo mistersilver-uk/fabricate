@@ -50,7 +50,16 @@ describe('UI PR screenshot evidence', () => {
       views.map(view => view.id),
       ['player-gathering', 'player-gathering-realm-locked', 'player-gathering-stacked']
     );
-    assert.deepEqual(views[0].smokeLabels, ['player-gathering-environments']);
+    assert.deepEqual(views[0].smokeLabels, [
+      'player-gathering-environments',
+      'player-gathering-events',
+      'player-gathering-task-ready',
+      'player-gathering-after-success',
+      'player-gathering-tool-blocked',
+      'player-gathering-timed-ready',
+      'player-gathering-timed-active',
+      'player-gathering-blind',
+    ]);
     assert.deepEqual(views[1].smokeLabels, ['player-gathering-realm-locked']);
     assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
   });
@@ -231,6 +240,15 @@ describe('UI PR screenshot evidence', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
     const emitted = new Set();
     for (const match of harness.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
+    for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+      emitted.add(match[1]);
+    }
+    for (const match of harness.matchAll(/captureCurrentPlayerGathering\(\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
+    for (const match of harness.matchAll(/captureSelectedGatheringTask\(\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
       emitted.add(match[1]);
     }
     assert.ok(emitted.size > 0, 'expected to parse smoke labels from foundry-test-run.mjs');
