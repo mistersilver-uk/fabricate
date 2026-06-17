@@ -3391,56 +3391,63 @@ async function main() {
         }
 
         // Documentation journey captures: exercise the user-visible gathering
-        // states the quickstart and gathering docs discuss. These labels are
-        // full-profile screenshot sources only; rc/ci keep their allow-listed
-        // screenshot budget and skip them through screenshot().
-        await selectGatheringEnvironment('Azure Grove');
-        await appShell.locator('[data-gathering-detail-tab="events"]').first().click();
-        await appShell.locator('[data-gathering-event-section]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await captureCurrentPlayerGathering('player-gathering-events');
-        await appShell.locator('[data-gathering-detail-tab="tasks"]').first().click();
-        await appShell.locator('[data-gathering-tasks-section]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+        // states the quickstart and gathering docs discuss. These steps select
+        // the player environments by name (Verdant Meadow, Crystal Thicket,
+        // Timed Orchard, Moonlit Blind Grove), which are only listable once the
+        // full-profile gathering library and Travel/realm fixtures are seeded in
+        // Phase D0 (RUN_SCREENSHOT_PHASES). Under rc/ci that seeding is skipped,
+        // so those environments have no visible tasks and never appear — gate the
+        // whole navigation (not just the screenshot calls) behind the full
+        // profile so rc/ci does not block on a card that cannot exist.
+        if (RUN_FULL_ONLY_GATHERING_STATES) {
+          await selectGatheringEnvironment('Azure Grove');
+          await appShell.locator('[data-gathering-detail-tab="events"]').first().click();
+          await appShell.locator('[data-gathering-event-section]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+          await captureCurrentPlayerGathering('player-gathering-events');
+          await appShell.locator('[data-gathering-detail-tab="tasks"]').first().click();
+          await appShell.locator('[data-gathering-tasks-section]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
 
-        await captureSelectedGatheringTask({
-          environment: 'Verdant Meadow',
-          task: 'Gather Meadow Herbs',
-          blocked: false,
-          label: 'player-gathering-task-ready'
-        });
-        await clickReadyGatheringAttempt();
-        await captureSelectedGatheringTask({
-          environment: 'Verdant Meadow',
-          task: 'Gather Meadow Herbs',
-          label: 'player-gathering-after-success'
-        });
-        await captureSelectedGatheringTask({
-          environment: 'Crystal Thicket',
-          task: 'Bottle Crystal Dew',
-          blocked: true,
-          label: 'player-gathering-tool-blocked'
-        });
-        await captureSelectedGatheringTask({
-          environment: 'Timed Orchard',
-          task: 'Tend Slow Bloom',
-          blocked: false,
-          label: 'player-gathering-timed-ready'
-        });
-        await clickReadyGatheringAttempt();
-        await captureSelectedGatheringTask({
-          environment: 'Timed Orchard',
-          task: 'Tend Slow Bloom',
-          blocked: true,
-          label: 'player-gathering-timed-active'
-        });
+          await captureSelectedGatheringTask({
+            environment: 'Verdant Meadow',
+            task: 'Gather Meadow Herbs',
+            blocked: false,
+            label: 'player-gathering-task-ready'
+          });
+          await clickReadyGatheringAttempt();
+          await captureSelectedGatheringTask({
+            environment: 'Verdant Meadow',
+            task: 'Gather Meadow Herbs',
+            label: 'player-gathering-after-success'
+          });
+          await captureSelectedGatheringTask({
+            environment: 'Crystal Thicket',
+            task: 'Bottle Crystal Dew',
+            blocked: true,
+            label: 'player-gathering-tool-blocked'
+          });
+          await captureSelectedGatheringTask({
+            environment: 'Timed Orchard',
+            task: 'Tend Slow Bloom',
+            blocked: false,
+            label: 'player-gathering-timed-ready'
+          });
+          await clickReadyGatheringAttempt();
+          await captureSelectedGatheringTask({
+            environment: 'Timed Orchard',
+            task: 'Tend Slow Bloom',
+            blocked: true,
+            label: 'player-gathering-timed-active'
+          });
 
-        await selectGatheringEnvironment('Moonlit Blind Grove');
-        await appShell.locator('[data-gathering-blind-card]').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await captureCurrentPlayerGathering('player-gathering-blind');
+          await selectGatheringEnvironment('Moonlit Blind Grove');
+          await appShell.locator('[data-gathering-blind-card]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+          await captureCurrentPlayerGathering('player-gathering-blind');
 
-        await clearGatheringEnvironmentSearch();
+          await clearGatheringEnvironmentSearch();
+        }
 
         // Region-lock evidence (#294): the locked "Hidden Hollow" env sorts last,
         // so page forward until it appears, then capture it. The detail panel keeps
