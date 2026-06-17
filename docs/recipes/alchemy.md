@@ -13,7 +13,7 @@ Instead, a player submits a chosen combination of items to be tried.
 If the combination matches a recipe, the craft succeeds.
 If it does not match, the items may be silently consumed.
 
-Use alchemy mode for systems where recipes are secrets, such as a witch's grimoire, an experimental alchemist's bench, or any scenario where players are meant to experiment rather than follow a known formula.
+Use alchemy mode for systems where recipes are secrets, such as a witch's grimoire, an alchemist's bench, or any scenario where players are meant to experiment rather than follow a known formula.
 
 ---
 

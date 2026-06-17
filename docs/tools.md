@@ -9,9 +9,6 @@ nav_order: 5
 Tools are items that are **required for an activity but not consumed** by it.
 They represent the reusable, breakable equipment a craft or a gathering attempt depends on, such as a blacksmith's forge, an alchemist's cauldron, a wizard's focus, or a miner's pick.
 
-{: .note }
-> **Catalysts have been retired.** Earlier versions of Fabricate had a separate recipe-side **Catalyst** concept. As of version 0.6.0 it is gone. Tools are now the single shared required-but-reusable, breakable prerequisite for **crafting recipes**, **gathering tasks**, and **salvage**. Existing catalyst data is migrated to Tools automatically. See [Migration from Catalysts](#migration-from-catalysts).
-
 ---
 
 Imagine a blacksmith who needs an anvil and hammer to forge a blade, or an alchemist who brews potions in a cauldron.

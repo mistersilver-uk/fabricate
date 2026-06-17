@@ -26,12 +26,6 @@ There are two kinds of interactable:
 > The marker mirrors the interactable: it is hidden when the interactable is hidden or disabled, and its image can change when a gathering supply runs out.
 > Deleting the marker never destroys the interactable.
 
-{: .note }
-> **Double-clicking a tile is retired.**
-> Earlier builds modelled interactables as tiles you double-clicked.
-> That model is gone.
-> Players now activate by **walking a token into the region**, described under [Using interactables (players)](#using-interactables-players).
-
 ---
 
 ## The region-first model

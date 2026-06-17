@@ -19,10 +19,7 @@ Token-driven realm sensing from the travel actor's placed token, and realm modif
 > A **Gathering Realm** is the Fabricate gathering-geography concept.
 > It is **not** a Foundry scene region drawn on the canvas.
 > That is the distinct Foundry object a realm maps onto.
-> The concept was renamed from *Gathering Region* to *Gathering Realm* to remove that confusion.
 > Several Foundry scene regions can map onto one realm through the realm's scene mappings, so a single realm can span several drawn map areas.
-> A realm is geography only.
-> There is no separate "region vocabulary" or geography match tag any more.
 > A realm **never** decides which tasks or events belong to an environment (that is biome, plus danger for events).
 > It only decides location availability.
 > See [Composition](#composition-no-longer-uses-geography) below.
@@ -154,14 +151,6 @@ Including a disabled realm still resolves it (the UI marks it **Disabled**), and
 
 The inspector echoes the resulting evidence: the resolution source (**GM override**, **Travel actor**, or **No current realm**) and the resolved realm list.
 
-## Composition No Longer Uses Geography
-
-Geography is **not** a composition axis.
-Which reusable tasks and events belong to an environment is decided by **biome** (and, for events, **danger**) only, never by realm.
-Tasks and events no longer carry a geography match tag.
-Geography lives entirely in the realm.
-See [Gathering Environments]({% link gathering-environments.md %}#composition) for how composition matching works.
-
 ## Environment Realm Membership
 
 An environment declares which realms it belongs to, and it can belong to **multiple** realms.
@@ -251,29 +240,6 @@ GM-only calls set or clear a party's current-realm override and reveal or hide a
 Older macros that used the pre-rename names keep working.
 
 See the [API Reference]({% link api/index.md %}) for exact signatures.
-
-## Migrating From The Legacy Region Vocabulary
-
-Earlier versions modeled geography two ways.
-The first was a per-system **region vocabulary** (a match tag on tasks, events, and environments).
-The second was the first-class realm record (then called *Gathering Region*).
-These are now unified, and the realm is the only geography concept.
-When you open an existing world, Fabricate upgrades it automatically, once:
-
-- Each old region-vocabulary entry becomes a realm on its crafting system (entries with the same label but distinct identities stay distinct realms).
-- Each environment's old single region becomes one of its included realms when a matching realm exists.
-  A free-text region with no match is left inert, with no data loss and no broken reference.
-- The geography match tags are removed from tasks and events.
-- The per-system region vocabulary is cleared.
-- Travel & Realms is left off, so migrated systems keep the subsystem **disabled by default**.
-  Re-enable it per system with the **Enable Travel & Realms** toggle.
-
-A later, versioned upgrade renames the *Gathering Region* concept to *Gathering Realm* throughout, leaving the Foundry scene-region links untouched.
-Each character's stored realm knowledge is upgraded the next time it changes.
-
-A one-time GM notice names the systems that had geography.
-Because geography is no longer a composition axis, **geography-scoped tasks and events may now appear in more environments**: a record that was previously narrowed only by a region tag (with no biome) now matches any biome.
-Review composition on affected environments after upgrading, and add biome (or danger, for events) constraints where you want to keep records out of an environment.
 
 ## Data Persistence
 
