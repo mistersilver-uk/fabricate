@@ -209,7 +209,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
@@ -386,6 +389,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // Explanatory hint shown; the "safe" hint is not.
     assert.ok(section.textContent.includes('EventChanceHint'), 'explanatory event hint shown');
     assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
+    // Targeted (non-blind) environments never show the "events hidden" redaction
+    // hint — that is blind-only, even with chance > 0 and no individual events.
+    assert.equal(target.querySelector('[data-gathering-events-hidden]'), null, 'no "events hidden" hint for a targeted environment');
   });
 
   it('shows the "safe environment" hint (no bar) when event chance is zero', async () => {
