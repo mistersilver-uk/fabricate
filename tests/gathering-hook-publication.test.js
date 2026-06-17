@@ -336,12 +336,10 @@ test('GatheringEngine._terminalStart is a no-op without a publisher', async () =
 // --- Real timed path through processWorldTime -------------------------------
 
 class FakeActor {
-  constructor() {
-    this.id = 'actor-1';
-    this.uuid = 'Actor.actor-1';
-    this.name = 'Gatherer';
-    this.flags = { fabricate: {} };
-  }
+  id = 'actor-1';
+  uuid = 'Actor.actor-1';
+  name = 'Gatherer';
+  flags = { fabricate: {} };
 
   getFlag(namespace, key) {
     return this.flags?.[namespace]?.[key];
@@ -349,7 +347,7 @@ class FakeActor {
 
   async setFlag(namespace, key, value) {
     this.flags[namespace] = this.flags[namespace] || {};
-    this.flags[namespace][key] = JSON.parse(JSON.stringify(value));
+    this.flags[namespace][key] = structuredClone(value);
     return value;
   }
 }
