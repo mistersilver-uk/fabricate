@@ -31,50 +31,11 @@ Essences with no `sourceItemUuid`, or whose `sourceItemUuid` no longer resolves 
 
 **Enabling via the UI.** Open the Crafting Admin panel, select your system, and look for the **Essences** toggle and the **Effect Transfer** toggle in the Features card. Both must be enabled. Then configure essence definitions with a **Source item** in the Essences feature card.
 
-**Enabling via the API.** You can enable both required features programmatically:
-
-```javascript
-// Enable essence-based effect transfer for the Alchemy system
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    features: {
-      essences: true,
-      effectTransfer: true
-    }
-  });
-});
-```
+**Enabling via the API.** You can also enable both required features programmatically. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 **Controlling transfer per recipe.** Set `recipe.transferEffects = true` on each recipe that should inherit effects from its ingredient essences. Recipes where this is `false` (the default) will never transfer effects, even when both system features are on.
 
-**Example: a Potion of Fire Resistance recipe.** In an Alchemy system with essences enabled, a Fire essence definition links to a "Flame Shard" item that carries a `Fire Resistance` active effect. Any recipe that consumes a Fire-essence ingredient and has `transferEffects: true` will copy `Fire Resistance` onto the brewed potion.
-
-```javascript
-// Craft the potion — all three flags are set:
-// system.features.essences: true
-// system.features.effectTransfer: true
-// recipe.transferEffects: true (set in the recipe editor)
-//
-// If the actor's ingredients contribute the "fire" essence,
-// the crafted potion will automatically receive the "Fire Resistance" active effect
-// from the Fire essence definition's sourceItemUuid item.
-Hooks.once('fabricate.ready', async () => {
-  const engine = game.fabricate.getCraftingEngine();
-  const rm = game.fabricate.getRecipeManager();
-  const recipe = rm.getRecipe('fire-resistance-potion-recipe-id');
-  const result = await engine.craft(
-    game.user.character,
-    [game.user.character],
-    recipe,
-    null,
-    {}
-  );
-  if (result.success) {
-    console.log('Potion crafted with fire resistance effect transferred.');
-  }
-});
-```
+**Example: a Potion of Fire Resistance recipe.** In an Alchemy system with essences enabled, a Fire essence definition links to a "Flame Shard" item that carries a `Fire Resistance` active effect. Any recipe that consumes a Fire-essence ingredient and has `transferEffects: true` will copy `Fire Resistance` onto the brewed potion when all three flags are set. See the [Crafting Engine API]({% link api/crafting-engine.md %}).
 
 ---
 

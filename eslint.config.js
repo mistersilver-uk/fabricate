@@ -5,7 +5,7 @@
 // only targets the `.js` paths that are green today; `.svelte` files and any
 // not-yet-clean `.js` paths are linted by the non-gating `lint:all` /
 // `lint:svelte` scripts until follow-ups fold them into the gate. See
-// docs/contributing.md.
+// CONTRIBUTING.md.
 //
 // Block order matters in flat config: later blocks override earlier ones, and
 // `eslint-config-prettier` MUST stay last so it can switch off the stylistic

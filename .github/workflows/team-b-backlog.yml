@@ -380,7 +380,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           # Dedicated least-privilege role (pr-screenshots/* only) — NOT the
-          # module-release role. See docs/contributing.md "Screenshot publishing
+          # module-release role. See CONTRIBUTING.md "Screenshot publishing
           # infrastructure". Region/bucket vars are shared (not privileges).
           role-to-assume: ${{ vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}

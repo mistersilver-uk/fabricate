@@ -98,8 +98,6 @@ After an activity that resolved Tools, the result describes what each Tool did:
 | Property macro callback | `resolvedTools` | array of `{ item, tool }` |
 | Chat card | `tools` | the Tools involved |
 
-See [Macros]({% link macros/index.md %}) for the full macro callback contracts.
-
 ## Migration from Catalysts
 
 If you are upgrading from a version before `0.6.0`, every recipe-level, step-level, ingredient-set-level, and salvage catalyst is converted automatically into a deduped per-system library Tool, and the inline catalyst arrays are replaced with `toolIds` references. After the migration runs, the GM sees a one-time notification with a count of migrated entries and a pointer to the Tools tab.

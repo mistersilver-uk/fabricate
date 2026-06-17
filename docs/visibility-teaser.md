@@ -20,7 +20,7 @@ Use teaser mode when you want discovery to be gradual: players can see that "Phi
 
 1. The GM sets the crafting system's `listMode` to `"teaser"` in the **Recipe Visibility** card of the Crafting Admin panel.
 2. For each recipe, the GM configures a `teaser` block: which fields to hide, a `revealThreshold` (the discovery progress required to unlock the recipe fully), and an optional `teaserDescription` shown to players before unlock.
-3. API consumers receive teaser visibility state with only the permitted fields visible. The planned Crafting UI will use this state for teaser cards and progress bars.
+3. API consumers receive teaser visibility state with only the permitted fields visible.
 4. When a player's discovery progress for a recipe reaches or exceeds `revealThreshold`, the recipe transitions to fully visible and craftable through the visibility guard.
 
 ---
@@ -93,69 +93,19 @@ When `discoveryMode` is `threshold` or `both`, GMs can set discovery progress pe
 3. The Teaser Progress Editor shows a list of actors with their current discovery progress.
 4. Edit the progress value and save.
 
-Progress is stored in actor flags:
-
-```
-Actor.flags.fabricate.discoveryProgress = {
-  "<recipeId>": <number>
-}
-```
+Progress is stored in actor flags under `Actor.flags.fabricate.discoveryProgress`, keyed by recipe ID with the numeric progress value.
 
 ---
 
 ## Planned Player Experience
 
-The planned Crafting tab will show teaser recipes in a distinct visual style:
-
-- **Recipe name** and **category** are always shown.
-- **Teaser description** replaces the normal description (if set).
-- **Hidden fields** (ingredients, results, etc.) are replaced with a placeholder.
-- A **progress bar** overlay will show current progress versus `revealThreshold`.
-- When progress reaches the threshold, the progress bar will be replaced by normal recipe content and the recipe becomes craftable.
+A player-facing presentation of teaser recipes — teaser cards with progress bars that show current progress versus `revealThreshold` before transitioning to full recipe content on unlock — is planned and not yet available.
 
 ---
 
 ## Configuring via the API
 
-```javascript
-// Enable teaser mode on a system with fragment-based discovery
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('my-alchemy-system-id', {
-    recipeVisibility: {
-      listMode: 'teaser',
-      teaserConfig: {
-        enabled: true,
-        discoveryMode: 'fragments',
-        fragments: [
-          {
-            id: 'ancient-scroll-fragment',
-            name: 'Ancient Alchemical Scroll',
-            linkedItemUuid: 'Item.abc123',  // UUID of "Ancient Alchemical Scroll"
-            recipeIds: ['philosophers-stone-recipe-id'],
-            progressValue: 1,
-            description: 'Ancient Alchemical Scroll'
-          }
-        ]
-      }
-    }
-  });
-});
-```
-
-```javascript
-// Set manual discovery progress for a player actor
-Hooks.once('fabricate.ready', async () => {
-  const visibilityService = game.fabricate.getRecipeVisibilityService();
-  const actor = game.user.character;
-  // Grant 2 progress points toward "philosophers-stone-recipe-id"
-  await visibilityService.setDiscoveryProgress(
-    actor,
-    'philosophers-stone-recipe-id',
-    2
-  );
-});
-```
+Teaser mode is configured through the API only: set a system's `recipeVisibility.listMode` to `teaser` with a `teaserConfig` block (master `enabled` toggle, `discoveryMode`, and fragment definitions), and set per-actor discovery progress through the visibility service. See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
 
 ---
 

@@ -46,80 +46,11 @@ A blacksmithing recipe where the quality of the result depends on a skill check:
 
 ### The Check Macro
 
-Your crafting check macro receives context about the recipe and actors, and must return a named outcome:
-
-```javascript
-// Crafting check macro for routed macro-outcome weapon forging
-// Context is passed as the first argument
-const { craftingActor, recipe, step } = scope;
-
-// Example: roll a skill check
-const roll = await craftingActor.rollAbilityTest?.("str")
-  ?? new Roll("1d20 + @abilities.str.mod", craftingActor.getRollData());
-await roll.evaluate();
-await roll.toMessage({ flavor: `${craftingActor.name} forges a weapon...` });
-
-const total = roll.total;
-
-if (total >= 25) {
-  return { success: true, outcome: "masterwork", data: { roll: total } };
-} else if (total >= 12) {
-  return { success: true, outcome: "standard", data: { roll: total } };
-} else if (total >= 5) {
-  return { success: true, outcome: "flawed", data: { roll: total } };
-} else {
-  return { success: false, data: { roll: total } };
-}
-```
+Your crafting check macro receives context about the recipe and actors, and must return a named outcome — for example `masterwork`, `standard`, or `flawed` depending on the roll total, or a failure result when the roll is too low. The outcome name is matched against the recipe's result group names. See [Crafting Checks]({% link crafting-checks.md %}) for the macro context and return contract.
 
 ### Creating the Recipe
 
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const { Recipe, IngredientSet } = game.fabricate.api;
-
-  const recipe = new Recipe({
-    name: 'Forge Longsword',
-    craftingSystemId: 'blacksmithing-system-id',
-    resultSelection: {
-      provider: 'macroOutcome',
-      macroUuid: 'Macro.your-check-macro-uuid'  // or omit to use the system fallback
-    },
-    ingredientSets: [
-      IngredientSet.fromJSON({
-        id: 'sword-materials',
-        name: 'Sword Materials',
-        ingredientGroups: [
-          {
-            id: 'metal', name: 'Metal',
-            options: [{ quantity: 3, match: { type: 'component', componentId: 'steel-ingot-id' } }]
-          },
-          {
-            id: 'handle', name: 'Handle',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'leather-wrap-id' } }]
-          }
-        ]
-      })
-    ],
-    resultGroups: [
-      {
-        id: 'masterwork-result', name: 'Masterwork',
-        results: [{ id: 'mw-sword', componentId: 'masterwork-longsword-id', quantity: 1 }]
-      },
-      {
-        id: 'standard-result', name: 'Standard',
-        results: [{ id: 'std-sword', componentId: 'longsword-id', quantity: 1 }]
-      },
-      {
-        id: 'flawed-result', name: 'Flawed',
-        results: [{ id: 'junk', componentId: 'bent-blade-id', quantity: 1 }]
-      }
-    ]
-  });
-
-  await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-});
-```
+The recipe sets `resultSelection.provider` to `"macroOutcome"` with an optional `macroUuid` (omit it to use the system fallback), one ingredient set, and one result group per named outcome (`Masterwork`, `Standard`, `Flawed`). Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## Step-Level Routing Overrides
 
@@ -137,5 +68,5 @@ The `macroOutcome` provider is ideal when:
 ## What's next?
 
 - [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.
-- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Crafting Checks]({% link crafting-checks.md %}) -- crafting check macro contracts.
 - [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- chain multiple steps with per-step outcome routing.

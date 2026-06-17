@@ -34,7 +34,7 @@ The GM recipe editor, player-facing Crafting and Alchemy tabs in the unified Fab
 | **Effect Transfer**        | Transfer active effects from ingredients to crafted items                                                         |
 | **Macro Integration**      | Customise crafting checks, property generation, and success/failure hooks                                         |
 | **Alchemy Mode**           | Hide recipe names and let players discover formulas by experimentation                                            |
-| **Recipe Graph**           | Visualise recipe dependencies as an interactive graph in the GM admin panel                                       |
+| **Recipe Graph**           | Planned — visualise recipe dependencies as an interactive graph in the GM admin panel                             |
 | **How-To Guides**          | Quick answers to common crafting tasks                                                                            |
 
 {: .tip }
@@ -67,4 +67,4 @@ Check the [Troubleshooting]({% link troubleshooting.md %}) guide for solutions t
 
 ## How-to guides
 
-Need a quick answer? The [How-To Guides]({% link how-to/index.md %}) cover common tasks like adding skill checks, setting up recipe discovery, and importing recipes.
+Need a quick answer? The [How-To Guides]({% link how-to/index.md %}) cover common tasks like recipe discovery, degrading tools, and effect transfer.

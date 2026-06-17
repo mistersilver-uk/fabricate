@@ -49,6 +49,8 @@ Configure the built-in check using the `craftingCheck.builtIn` sub-object:
 
 When both `ability` and `skill` are set, `skill` takes precedence and Fabricate calls `actor.rollSkill()`.
 
+These check fields are configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
+
 ### D&D 5e Ability Keys
 
 | Key | Ability |
@@ -83,47 +85,7 @@ When both `ability` and `skill` are set, `skill` takes precedence and Fabricate 
 | `ste` | Stealth |
 | `sur` | Survival |
 
-### Example: D&D 5e Arcana Check
-
-This configures an alchemy system using the `macroOutcome` provider that requires an Intelligence (Arcana) check against DC 15 to determine the result:
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    craftingCheck: {
-      checkSource: 'builtIn',
-      builtIn: {
-        ability: 'int',
-        skill: 'arc',
-        dc: 15,
-        advantage: 'normal'
-      }
-    }
-  });
-});
-```
-
-### Example: Strength Check with Advantage
-
-A blacksmithing system that rewards careful setup by awarding advantage on the check:
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('blacksmithing-system-id', {
-    craftingCheck: {
-      checkSource: 'builtIn',
-      builtIn: {
-        ability: 'str',
-        skill: '',
-        dc: 12,
-        advantage: 'advantage'
-      }
-    }
-  });
-});
-```
+For example, an alchemy system using the `macroOutcome` provider might require an Intelligence (Arcana) check against DC 15 to determine the result, while a blacksmithing system might roll a Strength check at DC 12 with advantage to reward careful setup. Both are expressed through the `craftingCheck.builtIn` fields above. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ---
 
@@ -138,7 +100,7 @@ If your system uses routed mode with the `macroOutcome` provider, or progressive
 | `successMacroUuid` | Optional macro called after a successful step |
 | `failureMacroUuid` | Optional macro called after a failed step |
 
-See [Macros]({% link macros/index.md %}) for the check macro contract.
+Macro check mode is configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ---
 
@@ -156,78 +118,19 @@ When a crafting check fails, Fabricate can still consume some or all of the requ
 
 **When this applies.** These settings only take effect when a crafting check runs (whether built-in or macro) and that check returns a failure. They do not affect other failure paths such as missing ingredients, missing or unsatisfied tools, or an invalid recipe configuration — in those cases nothing is ever consumed.
 
-**Example: punishing failure.** An Alchemy system where botched potions destroy materials but spare the alchemist's mortar and pestle (a tool):
+**Example: punishing failure.** An Alchemy system where botched potions destroy materials but spare the alchemist's mortar and pestle (a tool). Both defaults match this scenario — ingredients are used up while the tool survives — so no explicit configuration is needed.
 
-```javascript
-// Both defaults match this scenario — no explicit configuration needed.
-// system.craftingCheck.consumption = {
-//   consumeIngredientsOnFail: true,   // herbs are used up
-//   consumeCatalystsOnFail: false     // the mortar and pestle tool survives
-// }
-```
+**Example: forgiving failure.** A Cooking system where a failed roll is just practice — set both `consumeIngredientsOnFail` and `consumeCatalystsOnFail` to `false` so nothing is lost.
 
-**Example: forgiving failure.** A Cooking system where a failed roll is just practice — nothing is lost:
+**Example: high-stakes ritual.** A system where both reagents and the ritual focus tool break or degrade regardless of outcome — set both consumption flags to `true`.
 
-```javascript
-// system.craftingCheck.consumption = {
-//   consumeIngredientsOnFail: false,
-//   consumeCatalystsOnFail: false
-// }
-```
-
-**Example: high-stakes ritual.** A system where both reagents and the ritual focus tool break/degrade regardless of outcome:
-
-```javascript
-// system.craftingCheck.consumption = {
-//   consumeIngredientsOnFail: true,
-//   consumeCatalystsOnFail: true
-// }
-```
+Consumption-on-failure is configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ---
 
 ## Registering a Custom Adapter
 
-If you are running a game system other than D&D 5e and want to use built-in check mode, you can register your own adapter. The adapter must extend `CraftingCheckAdapter` and implement `getAbilities()`, `getSkills()`, and `executeCheck()`.
-
-```javascript
-Hooks.once('fabricate.ready', () => {
-  const { CraftingCheckAdapter, CraftingCheckAdapterRegistry } =
-    game.fabricate.getAdapterClasses();
-
-  class Pf2eCraftingCheckAdapter extends CraftingCheckAdapter {
-    constructor() { super('pf2e'); }
-
-    getAbilities() {
-      return [
-        { key: 'str', label: 'Strength' },
-        { key: 'dex', label: 'Dexterity' },
-        // ... etc.
-      ];
-    }
-
-    getSkills() {
-      return [
-        { key: 'cra', label: 'Crafting' },
-        // ... etc.
-      ];
-    }
-
-    async executeCheck(actor, config) {
-      const { ability, skill, dc, advantage } = config;
-      // Use the PF2e API to roll, then return:
-      return {
-        success: rollTotal >= dc,
-        outcome: rollTotal >= dc ? 'pass' : 'fail',
-        value: rollTotal,
-        data: { /* raw roll data */ }
-      };
-    }
-  }
-
-  CraftingCheckAdapterRegistry.register('pf2e', Pf2eCraftingCheckAdapter);
-});
-```
+If you are running a game system other than D&D 5e and want to use built-in check mode, you can register your own adapter through the API only. The adapter extends `CraftingCheckAdapter` and implements `getAbilities()`, `getSkills()`, and `executeCheck()`, then registers itself with the `CraftingCheckAdapterRegistry`. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 The `executeCheck()` return shape:
 
@@ -244,5 +147,4 @@ The `executeCheck()` return shape:
 
 - [Crafting Systems]({% link crafting-systems.md %}) -- configure resolution mode, feature toggles, and system-level settings.
 - [Salvage]({% link salvage.md %}) -- configure salvage checks, which use a separate check pipeline to gate salvage outcomes.
-- [Macros]({% link macros/index.md %}) -- write check macros and hook into success and failure callbacks.
 - [Recipes]({% link recipes/index.md %}) -- understand routed and progressive resolution modes that require a crafting check.

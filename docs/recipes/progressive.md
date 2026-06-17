@@ -45,18 +45,7 @@ The player receives Iron Filings, Steel Ingot, and Fine Steel Ingot.
 
 ## The Check Macro
 
-```javascript
-// Progressive crafting check for ore smelting
-const { craftingActor } = scope;
-
-// Roll a skill check to determine total smelting value
-const roll = new Roll("1d20 + @abilities.con.mod + @prof",
-  craftingActor.getRollData());
-await roll.evaluate();
-await roll.toMessage({ flavor: `${craftingActor.name} works the smelter...` });
-
-return { success: true, value: roll.total };
-```
+A progressive check macro rolls a skill check and returns a numeric `value` (the total of the roll) on success, or a failure result. That value is spent against the ordered results. See [Crafting Checks]({% link crafting-checks.md %}) for the macro context and return contract.
 
 ## Player Reorder
 
@@ -66,43 +55,10 @@ Reorder preferences are persisted per-recipe in client settings.
 
 ## Creating a Progressive Recipe
 
-```javascript
-const { Recipe, IngredientSet } = game.fabricate.api;
-
-const recipe = new Recipe({
-  name: 'Smelt Ore',
-  craftingSystemId: 'smelting-system-id',
-  ingredientSets: [
-    IngredientSet.fromJSON({
-      id: 'raw-ore',
-      name: 'Raw Ore',
-      ingredientGroups: [
-        {
-          id: 'ore', name: 'Ore',
-          options: [{ quantity: 5, match: { type: 'component', componentId: 'raw-iron-ore-id' } }]
-        }
-      ]
-    })
-  ],
-  resultGroups: [
-    {
-      id: 'smelting-results',
-      name: 'Smelting Results',
-      results: [
-        { id: 'filings', componentId: 'iron-filings-id', quantity: 1 },
-        { id: 'ingot', componentId: 'steel-ingot-id', quantity: 1 },
-        { id: 'fine', componentId: 'fine-steel-ingot-id', quantity: 1 },
-        { id: 'master', componentId: 'masterwork-ingot-id', quantity: 1 }
-      ]
-    }
-  ]
-});
-
-await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-```
+A progressive recipe has one ingredient set and one result group whose `results` are listed in difficulty order — for example Iron Filings, then Steel Ingot, then Fine Steel Ingot, then Masterwork Ingot. Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 {: .note }
-> Each result's `componentId` must reference a managed component with a `difficulty` value set in the Items tab of the GM admin.
+> Each result's `componentId` must reference a managed component with a `difficulty` value of at least `1`.
 
 ## When to Use Progressive Mode
 
@@ -116,5 +72,5 @@ Progressive mode is ideal when:
 ## What's next?
 
 - [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- combine multiple steps into a single recipe workflow.
-- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Crafting Checks]({% link crafting-checks.md %}) -- crafting check macro contracts.
 - [Recipes overview]({% link recipes/index.md %}) -- compare all resolution modes side by side.

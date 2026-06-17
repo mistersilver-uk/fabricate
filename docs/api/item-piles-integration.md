@@ -208,6 +208,5 @@ Hooks.once('fabricate.ready', async () => {
 
 ## See Also
 
-- [Item Piles Integration]({% link item-piles.md %}) — user-facing guide
 - [CraftingEngine]({% link api/crafting-engine.md %}) — where currency checks and deductions are called during the craft flow
 - [CraftingSystemManager]({% link api/system-manager.md %}) — `features.itemPiles` feature toggle

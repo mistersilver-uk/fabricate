@@ -6,18 +6,9 @@ nav_order: 3.3
 
 # Salvage
 
-When the `salvage` feature is enabled on a system, players can dismantle components to recover partial materials. You configure salvage at two levels: the system (which determines how salvage checks work) and each individual component (which determines what that component yields when broken down).
+When the `salvage` feature is enabled on a system, players can dismantle components to recover partial materials. Salvage has no dedicated UI toggle today — it is an API-configured capability. You configure salvage at two levels: the system (which determines how salvage checks work) and each individual component (which determines what that component yields when broken down).
 
-Enable salvage in the Features card on the System tab of the Crafting Admin panel, or via the API:
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('blacksmithing-system-id', {
-    features: { salvage: true }
-  });
-});
-```
+Enable the `salvage` feature through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ## Salvage Resolution Mode
 
@@ -32,15 +23,7 @@ The salvage resolution mode controls how result groups are awarded when a compon
 {: .warning }
 > `"mapped"` and `"alchemy"` are not valid salvage resolution modes and will be rejected. Use `"routed"` if you need outcome-based routing.
 
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('blacksmithing-system-id', {
-    features: { salvage: true },
-    salvageResolutionMode: 'routed'
-  });
-});
-```
+Set `salvageResolutionMode` through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ## Salvage Crafting Check
 
@@ -60,27 +43,7 @@ Configure `salvageCraftingCheck` on the system:
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Whether players can reorder pending results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed outcome routing |
 
-**Example: a Disenchanting system where the artefact is always destroyed on failure but the enchanting tools are spared:**
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('disenchanting-system-id', {
-    features: { salvage: true },
-    salvageResolutionMode: 'routed',
-    salvageCraftingCheck: {
-      macroUuid: 'Macro.disenchant-check-uuid',
-      successMacroUuid: 'Macro.disenchant-success-uuid',
-      failureMacroUuid: 'Macro.disenchant-failure-uuid',
-      consumption: {
-        consumeComponentOnFail: true,   // artefact is destroyed either way
-        consumeCatalystsOnFail: false   // the enchanting focus tool survives a failed attempt
-      },
-      outcomes: ['critical', 'pass', 'fail']
-    }
-  });
-});
-```
+**Example: a Disenchanting system where the artefact is always destroyed on failure but the enchanting tools are spared.** Configure `salvageCraftingCheck` with `consumeComponentOnFail: true` (the artefact is destroyed either way) and `consumeCatalystsOnFail: false` (the enchanting focus tool survives a failed attempt), and list the named `outcomes` you route on. The salvage check is configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ## Component Salvage Configuration
 
@@ -96,53 +59,7 @@ When `features.salvage` is `true` on a system, each component gains a `salvage` 
 | `timeRequirement` | `object` | omitted | Time duration fields (`minutes`, `hours`, `days`, `months`, `years`). Only positive finite values are kept. |
 | `currencyRequirement` | `object` | omitted | `{ unit, amount }` where `unit` defaults to `"gp"` and `amount` must be a positive number. |
 
-**Example: a Dragon Scale component that breaks down differently based on the salvage roll:**
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-
-  // First, add the component to your system if it is not already there
-  const scale = await mgr.addItemFromUuid(
-    'dragoncraft-system-id',
-    'Compendium.world.items.dragonScaleUUID'
-  );
-
-  // Then update it with salvage configuration
-  await mgr.updateItem('dragoncraft-system-id', scale.id, {
-    salvage: {
-      enabled: true,
-      ingredientQuantity: 1,
-      // Require a library Tool (e.g. an acid vial) to perform the salvage. Tools
-      // are authored in the system's Tools library and referenced by id here.
-      toolIds: ['acid-vial-tool-id'],
-      resultGroups: [
-        {
-          id: 'rg-pristine',
-          name: 'Pristine Salvage',
-          results: [
-            { componentId: 'pristine-scale-shard-id', quantity: 3 }
-          ]
-        },
-        {
-          id: 'rg-damaged',
-          name: 'Damaged Salvage',
-          results: [
-            { componentId: 'cracked-scale-fragment-id', quantity: 1 }
-          ]
-        }
-      ],
-      outcomeRouting: {
-        critical: 'rg-pristine',
-        pass: 'rg-damaged',
-        fail: 'rg-damaged'
-      },
-      timeRequirement: { hours: 2 },
-      currencyRequirement: { unit: 'gp', amount: 50 }
-    }
-  });
-});
-```
+**Example: a Dragon Scale component that breaks down differently based on the salvage roll.** Enable `salvage` on the component, require a library Tool (e.g. an acid vial) via `toolIds`, define `resultGroups` for pristine and damaged salvage, and use `outcomeRouting` to map a critical result to the pristine group and pass/fail to the damaged group. Optional `timeRequirement` and `currencyRequirement` gate the operation. Component salvage configuration is set through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 {: .note }
 > The `salvage` sub-object is only included in a normalised component when `features.salvage` is `true` on the system. If you read a component from a system where salvage is disabled, the `salvage` key will be absent.
@@ -151,7 +68,6 @@ Hooks.once('fabricate.ready', async () => {
 
 ## What's next?
 
-- [Crafting Systems]({% link crafting-systems.md %}) -- enable the `salvage` feature toggle and set the resolution mode for your system.
+- [Crafting Systems]({% link crafting-systems.md %}) -- enable the `salvage` feature and set the resolution mode for your system.
 - [Crafting Checks]({% link crafting-checks.md %}) -- the recipe crafting check pipeline works similarly to salvage checks; see also consumption-on-failure policies.
 - [Tools]({% link tools.md %}) -- configure the requirement, breakage, and on-break behaviour of tools required during salvage.
-- [Macros]({% link macros/index.md %}) -- write salvage check macros and handle success and failure callbacks.

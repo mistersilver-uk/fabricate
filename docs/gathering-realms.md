@@ -6,7 +6,7 @@ nav_order: 8.3
 
 # Gathering Realms & Travel
 
-Location-aware gathering lets a GM describe campaign geography as first-class **realms**, group actors into Fabricate-managed **parties**, and make gathering environments available or unavailable based on where the party currently is. This page covers realms, parties, the GM **Travel** route, manual current-realm overrides, actor-scoped realm discovery, and location-gated environment availability. Token-driven realm sensing from the travel actor's placed token and realm modifiers applied to gathering calculations arrive in later phases.
+Location-aware gathering lets a GM describe campaign geography as first-class **realms**, group actors into Fabricate-managed **parties**, and make gathering environments available or unavailable based on where the party currently is. This page covers realms, parties, the GM **Travel** route, manual current-realm overrides, actor-scoped realm discovery, and location-gated environment availability. Token-driven realm sensing from the travel actor's placed token, and realm modifiers applied to gathering calculations, are planned, not yet available.
 
 {: .gm }
 > The whole realm and travel subsystem is **off by default** and is enabled per crafting system with the **Enable Travel & Realms** toggle in gathering Settings (see [Enabling Travel & Realms](#enabling-travel--realms)). Only GMs can manage realms and parties and set current-realm overrides. Players experience locations through the gathering app's blocked reasons and the redaction-safe location API.
@@ -65,7 +65,7 @@ A **Gathering Realm** is the Fabricate concept; a **Foundry Region** (`RegionDoc
 
 - A realm's **scene mappings** point a realm at one or more Foundry Scene Regions via `sceneRegionUuid`. The mapping is intentionally **many-to-one**: several scene regions can map onto one realm (so a single realm can span multiple drawn map areas).
 - The `sceneRegionUuid` / `sceneUuid` field names are kept verbatim because they name Foundry objects.
-- Scene Region automation (sensing which realm a travel marker is in from the Foundry Scene Regions it occupies) is a later phase; see [travel realm sensing]({% link agents/travel-current-realm-sensing.md %}) for the resolution model and the V13 token-movement timing trap.
+- Scene Region automation (sensing which realm a travel marker is in from the Foundry Scene Regions it occupies) is planned, not yet available.
 
 ### Authoring realms (Travel tab)
 
@@ -74,7 +74,7 @@ Realm create, edit, and delete all live in the **Travel** tab, as a realm list w
 - Create a realm, then edit its **name, description, image, enabled** state, **secret** flag, and **biomes** (chosen from the system biome vocabulary).
 - **Delete realm** goes through the standard confirmation dialog; if environments or party overrides still reference the realm, the confirmation surfaces referenced-by evidence (how many) before you confirm. Deletion never blocks — dangling references become stale repair evidence instead.
 
-Scene mappings and modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime; existing values on a realm are preserved untouched.
+Scene mappings and modifiers are planned, not yet available: they normalize, validate, and round-trip, but are not yet authored in the UI or applied at runtime, and existing values on a realm are preserved untouched.
 
 ### Realm settings (per system)
 
@@ -105,7 +105,7 @@ Members or travel actors whose actor no longer exists, and override realm ids wh
 A party's current realm is resolved **per crafting system**, in this order:
 
 1. **GM manual override** — set from the Travel route.
-2. **Travel actor token sensing** — a later phase; the inspector already reserves the *Travel actor* source label with an "Automation not yet available" note. When shipped, it will map the Foundry Scene Regions the travel marker occupies onto realms through each realm's scene mappings.
+2. **Travel actor token sensing** — planned, not yet available; the inspector already reserves the *Travel actor* source label with an "Automation not yet available" note.
 3. **Unresolved** — no current realm.
 
 To set the override, select one or more realm chips in the **Current realm override** section and click **Set current realm** (a party can be in several realms at once, e.g. overlapping geography). **Clear current realm** records an explicit "no override". Both writes are stamped with the updating user and time. Including a disabled realm still resolves it — the UI marks it **Disabled** — and override ids referencing deleted realms surface as stale repair evidence and do not resolve.
@@ -184,35 +184,6 @@ All methods are available on `game.fabricate` after the `fabricate.ready` hook, 
 | `clearGatheringPartyRealmOverride({ partyId, systemId })` | `clearPartyRealmOverride(options)` | GM-only | Clear the override (stamped, explicit none) |
 | `revealGatheringRealmForActor({ actorId or actor, systemId, realmId, source?, partyId? })` | `revealRealmForActor(options)` | GM-only | Record realm discovery on an actor |
 | `hideGatheringRealmForActor({ actorId or actor, systemId, realmId })` | `hideRealmForActor(options)` | GM-only | Remove a realm discovery entry |
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const systemId = game.fabricate.listCraftingSystems()[0]?.id;
-
-  // Create a realm and a party, then put the party in that realm.
-  const realmStore = game.fabricate.getGatheringRealmStore();
-  const realm = await realmStore.create(systemId, { name: 'The Verdant Expanse', biomes: ['forest'] });
-
-  const partyStore = game.fabricate.getGatheringPartyStore();
-  const party = await partyStore.create({ name: 'The Wayfarers' });
-  await partyStore.addMember(party.id, game.user.character?.uuid);
-  await partyStore.setTravelActor(party.id, 'Actor.someTravelActorId');
-  await partyStore.setEnabled(party.id, true);
-
-  await game.fabricate.setGatheringPartyRealmOverride({
-    partyId: party.id,
-    systemId,
-    realmIds: [realm.id]
-  });
-
-  // Player-callable, redaction-safe read.
-  const summary = game.fabricate.getGatheringLocationForActor({
-    actor: game.user.character,
-    systemId
-  });
-  // -> { resolved: true, source: 'manualOverride', realms: [{ id, label, ... }], ... }
-});
-```
 
 `getGatheringLocationForActor` resolves the actor's enabled party, then routes every realm through the disclosure policy: a non-GM caller never receives a secret undiscovered realm's id or name, and the raw `realmIds` / `staleRealmIds` arrays are returned empty for non-GM callers.
 

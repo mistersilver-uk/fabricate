@@ -66,16 +66,7 @@ The Scene UUID field has an assisted selector populated from the current world s
 
 ## Global Conditions And Tags
 
-Gathering weather and time of day are global gathering conditions, not environment browse filters. GMs can set current weather and current time of day in the Manager V2 gathering library/settings panel or through the public API:
-
-```js
-game.fabricate.gathering.getConditions();
-game.fabricate.gathering.setWeather("rain");
-game.fabricate.gathering.setTimeOfDay("night");
-game.fabricate.gathering.setConditions({ weather: "fog", timeOfDay: "dawn" });
-```
-
-Mutation methods require a GM user, validate values against the configured weather and time-of-day vocabularies, persist the gathering config setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings. Player-facing code may call `getConditions()` but cannot mutate conditions.
+Gathering weather and time of day are global gathering conditions, not environment browse filters. GMs can set current weather and current time of day in the Manager V2 gathering library/settings panel. Setting conditions requires a GM user, validates values against the configured weather and time-of-day vocabularies, persists the gathering config setting, and refreshes gathering listings; players cannot mutate conditions.
 
 When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRealm` authored in the Travel tab (see [Gathering Realms & Travel]({% link gathering-realms.md %})). Empty task or event match tags mean "matches any" for that dimension.
 
@@ -160,7 +151,7 @@ Gathering Task records support:
 | **Required tools** | Optional references to the selected system's Gathering Tools library. All referenced tools are required. |
 
 {: .note }
-> Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more). See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use D&D 5e and Pathfinder 2e examples.
+> Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more). See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
 
 Reusable event records support:
 

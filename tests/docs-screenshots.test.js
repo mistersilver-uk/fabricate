@@ -54,7 +54,7 @@ for (const file of docFiles) {
 // after its docs reference was removed) fails this test. The smoke harness only
 // writes frames to the transient test-results/ directory, so a screenshot
 // reaching docs/img/screenshots/ is always a deliberate curation — this keeps
-// that set honest. See docs/agents/smoke-harness.md for the curation workflow.
+// that set honest. See CONTRIBUTING.md for the curation workflow.
 test('every committed docs screenshot is referenced by an authored docs page', () => {
   const orphans = screenshotFiles.filter(file => !referenced.has(file));
   assert.deepEqual(

@@ -51,84 +51,9 @@ A three-step recipe for creating enchanted plate armour:
 - Crafting check: skill-based (routed `macroOutcome`)
 - Result: 1x Enchanted Plate Armour (quality depends on check)
 
-### Creating via Macro
+### Creating the recipe
 
-```javascript
-const { Recipe } = game.fabricate.api;
-
-const recipe = new Recipe({
-  name: 'Enchanted Plate Armour',
-  craftingSystemId: 'blacksmithing-system-id',
-  steps: [
-    {
-      id: 'forge-plates',
-      name: 'Forge the Plates',
-      description: 'Heat and hammer steel into armour plates.',
-      timeRequirement: { hours: 4 },
-      // Require the Forge tool for this step. Tools are authored in the system's
-      // Tools library and referenced here by their library id.
-      toolIds: ['forge-tool-id'],
-      ingredientSets: [{
-        id: 'forge-input',
-        ingredientGroups: [{
-          id: 'steel', name: 'Steel',
-          options: [{ quantity: 5, match: { type: 'component', componentId: 'steel-ingot-id' } }]
-        }]
-      }],
-      resultGroups: [{
-        id: 'plates-output',
-        results: [{ id: 'plates', componentId: 'unfinished-plates-id', quantity: 1 }]
-      }]
-    },
-    {
-      id: 'assemble',
-      name: 'Assemble the Armour',
-      description: 'Rivet the plates onto a leather frame.',
-      ingredientSets: [{
-        id: 'assemble-input',
-        ingredientGroups: [
-          {
-            id: 'plates', name: 'Plates',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'unfinished-plates-id' } }]
-          },
-          {
-            id: 'straps', name: 'Straps',
-            options: [{ quantity: 2, match: { type: 'component', componentId: 'leather-strap-id' } }]
-          }
-        ]
-      }],
-      resultGroups: [{
-        id: 'armour-output',
-        results: [{ id: 'armour', componentId: 'plate-armour-id', quantity: 1 }]
-      }]
-    },
-    {
-      id: 'enchant',
-      name: 'Enchant',
-      description: 'Channel magical energy into the armour.',
-      ingredientSets: [{
-        id: 'enchant-input',
-        ingredientGroups: [
-          {
-            id: 'armour', name: 'Armour',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'plate-armour-id' } }]
-          },
-          {
-            id: 'gem', name: 'Gem',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'enchanting-gem-id' } }]
-          }
-        ]
-      }],
-      resultGroups: [{
-        id: 'enchanted-output',
-        results: [{ id: 'enchanted', componentId: 'enchanted-plate-id', quantity: 1 }]
-      }]
-    }
-  ]
-});
-
-await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-```
+A multi-step recipe carries a `steps` array; each step defines its own `ingredientSets`, `resultGroups`, optional `toolIds`, and optional `timeRequirement`. For the example above, the Forge step requires the Forge tool and a 4-hour time gate, the Assemble step consumes the unfinished plates plus leather straps, and the Enchant step combines the plate armour with an enchanting gem. Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## Time Gates
 
@@ -141,7 +66,7 @@ Time gates are checked:
 
 ## Managing Runs
 
-Multi-step run state is stored on the actor through `CraftingRunManager`. Integrations can resume or cancel runs through the runtime APIs today; the planned Crafting UI will surface active runs to players with resume and cancel controls.
+Multi-step run state is stored on the actor through `CraftingRunManager`. Multi-step runs are driven via the API today; a player-facing UI for resuming and cancelling active runs is planned and not yet available.
 
 {: .warning }
 > Disabling the `multiStepRecipes` feature is destructive. All existing multi-step recipes will be deleted.

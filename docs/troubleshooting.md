@@ -56,7 +56,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
    - **Routed (macroOutcome):** `{ success: boolean, outcome: string }` (outcome is matched case-insensitively to a result group name)
    - **Progressive:** `{ success: boolean, value: number }` (value must be a finite number)
 
-**See also:** [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contract and return shapes; [Crafting Checks]({% link crafting-checks.md %}) -- crafting check configuration.
+**See also:** [Crafting Checks]({% link crafting-checks.md %}) -- crafting check configuration, macro contract, and return shapes.
 
 ---
 
@@ -194,17 +194,7 @@ Additional causes:
 
 ### Crafting App Fails to Open (`each_key_duplicate` Error)
 
-**Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes. The browser console (F12) shows a Svelte error similar to:
-
-```
-each_key_duplicate
-```
-
-or:
-
-```
-Error: Cannot have duplicate keys in an each block
-```
+**Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes. The browser console (F12) shows a Svelte error similar to `each_key_duplicate` or `Error: Cannot have duplicate keys in an each block`.
 
 **Cause:**
 

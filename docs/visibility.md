@@ -107,15 +107,7 @@ Recipe items can have limited uses:
 | `knowledge.item.maxUses` | Maximum number of times the item grants access |
 | `knowledge.item.destroyWhenExhausted` | Delete the item when uses run out |
 
-Usage is tracked per owned item instance:
-
-```
-Item.flags.fabricate.recipeItemUsage = {
-  timesUsed: <number>
-}
-```
-
-When `timesUsed >= maxUses`, the item no longer grants knowledge access.
+Usage is tracked per owned item instance under `Item.flags.fabricate.recipeItemUsage` (a `timesUsed` counter). When `timesUsed >= maxUses`, the item no longer grants knowledge access.
 
 ### Deterministic Selection
 
@@ -132,17 +124,9 @@ When `knowledge.mode` is `learned` or `itemOrLearned`, players can explicitly le
 
 1. An owned recipe item is evaluated by `RecipeVisibilityService.learnRecipesFromOwnedItem(...)`, or an integration calls `learnRecipe(...)`.
 2. Preconditions: recipe has a `linkedRecipeItemUuid`, player owns a matching item, recipe not yet learned.
-3. The service records the recipe in the actor's flags.
-4. The planned Crafting UI will expose this flow as a player "Learn" action.
+3. The service records the recipe in the actor's flags under `Actor.flags.fabricate.learnedRecipes`, keyed by recipe ID with the timestamp and source item UUID that taught it.
 
-```
-Actor.flags.fabricate.learnedRecipes = {
-  "<recipeId>": {
-    learnedAt: <timestamp>,
-    sourceItemUuid: "<the item that taught it>"
-  }
-}
-```
+A player-facing "Learn" action surfaced by the Crafting UI, along with a "Locked" badge for locked recipes, is planned and not yet available.
 
 ### Consume on Learn
 
@@ -208,7 +192,7 @@ After a drag-and-drop learn attempt, Fabricate shows notifications for successfu
 Any recipe can be `locked` regardless of visibility mode. Locked recipes:
 - Are visible to all players (so they know it exists)
 - Cannot be crafted by non-GM users
-- Return locked state through the visibility guard; the planned Crafting UI will show a "Locked" badge
+- Return locked state through the visibility guard (the planned "Locked" badge is noted above)
 
 ## Crafting Guards
 
@@ -221,34 +205,7 @@ If any guard fails, the action is blocked with a notification explaining why.
 
 ## Configuring via the API
 
-You can set visibility programmatically through the `CraftingSystemManager`:
-
-```javascript
-// Switch an Alchemy system to player-specific visibility
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    recipeVisibility: { listMode: 'player' }
-  });
-});
-```
-
-```javascript
-// Switch to knowledge mode: players must own a recipe scroll to see the recipe,
-// and the scroll is consumed when they learn it.
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'itemOrLearned',
-        learn: { consumeOnLearn: true }
-      }
-    }
-  });
-});
-```
+You can set visibility programmatically through the `CraftingSystemManager` — for example switching a system's `recipeVisibility.listMode` to `player`, or to `knowledge` with a `knowledge.mode` of `itemOrLearned` and `consumeOnLearn` enabled so a recipe scroll is consumed when learned. See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
 
 ---
 
@@ -257,4 +214,4 @@ Hooks.once('fabricate.ready', async () => {
 - [Teaser Mode]({% link visibility-teaser.md %}) -- reveal recipes gradually with fragment-based or threshold-based discovery.
 - [Recipes overview]({% link recipes/index.md %}) -- create and edit recipes, including visibility configuration in the recipe editor.
 - [Crafting Systems]({% link crafting-systems.md %}) -- configure system-level visibility settings and feature toggles.
-- [Macros & Examples]({% link macros/index.md %}) -- automate visibility and knowledge workflows with macros.
+- [Recipe Visibility Service API]({% link api/visibility-service.md %}) -- automate visibility and knowledge workflows programmatically.

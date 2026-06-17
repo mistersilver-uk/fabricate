@@ -44,53 +44,7 @@ A routed system where brewing a potion draws from a roll table to determine whic
 
 ### Creating the Recipe
 
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const { Recipe, IngredientSet } = game.fabricate.api;
-
-  const recipe = new Recipe({
-    name: 'Brew Mystery Potion',
-    craftingSystemId: 'alchemy-system-id',
-    resultSelection: {
-      provider: 'rollTableOutcome',
-      rollTableUuid: 'RollTable.your-potion-table-uuid'
-    },
-    ingredientSets: [
-      IngredientSet.fromJSON({
-        id: 'ingredients',
-        name: 'Brewing Ingredients',
-        ingredientGroups: [
-          {
-            id: 'reagent', name: 'Reagent',
-            options: [
-              { quantity: 2, match: { type: 'component', componentId: 'alchemical-herb-id' } }
-            ]
-          }
-        ]
-      })
-    ],
-    resultGroups: [
-      {
-        id: 'healing-result',
-        name: 'Healing',
-        results: [{ id: 'healing-potion', componentId: 'potion-healing-id', quantity: 1 }]
-      },
-      {
-        id: 'fire-result',
-        name: 'Fire',
-        results: [{ id: 'fire-potion', componentId: 'potion-fire-id', quantity: 1 }]
-      },
-      {
-        id: 'invisibility-result',
-        name: 'Invisibility',
-        results: [{ id: 'invis-potion', componentId: 'potion-invisibility-id', quantity: 1 }]
-      }
-    ]
-  });
-
-  await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-});
-```
+The recipe sets `resultSelection.provider` to `"rollTableOutcome"` with a required `rollTableUuid`, one ingredient set, and one result group per drawable outcome (`Healing`, `Fire`, `Invisibility`). Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## Setting Up the Roll Table
 

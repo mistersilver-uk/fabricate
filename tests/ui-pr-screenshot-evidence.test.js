@@ -26,7 +26,7 @@ describe('UI PR screenshot evidence', () => {
   it('detects UI changes with the same path rules as CI', () => {
     assert.equal(hasUiChanges(['src/ui/svelte/apps/FabricateAppRoot.svelte']), true);
     assert.equal(hasUiChanges(['styles/fabricate.css']), true);
-    assert.equal(hasUiChanges(['docs/agents/ui-pr-screenshots.md']), false);
+    assert.equal(hasUiChanges(['docs/index.md']), false);
   });
 
   it('maps changed manager files to relevant screenshot recipes', () => {

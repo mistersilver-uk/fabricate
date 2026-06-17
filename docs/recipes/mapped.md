@@ -33,67 +33,9 @@ An enchanting recipe where different gem types produce different ring effects:
 | 1x Gold Band + 1x Sapphire | Ice Ring result | 1x Ring of Frost Resistance |
 | 1x Gold Band + 1x Emerald | Nature Ring result | 1x Ring of Nature's Ward |
 
-### Creating via Macro
+### Creating the recipe
 
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const { Recipe, IngredientSet, IngredientGroup } = game.fabricate.api;
-
-  const recipe = new Recipe({
-    name: 'Enchanted Ring',
-    craftingSystemId: 'enchanting-system-id',
-    resultSelection: {
-      provider: 'ingredientSet'
-    },
-    ingredientSets: [
-      IngredientSet.fromJSON({
-        id: 'fire-ring-set',
-        name: 'Fire Ring',
-        resultGroupId: 'fire-ring-result',   // Routes to specific result group
-        ingredientGroups: [
-          {
-            id: 'band', name: 'Band',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'gold-band-id' } }]
-          },
-          {
-            id: 'gem', name: 'Gem',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'ruby-id' } }]
-          }
-        ]
-      }),
-      IngredientSet.fromJSON({
-        id: 'ice-ring-set',
-        name: 'Ice Ring',
-        resultGroupId: 'ice-ring-result',
-        ingredientGroups: [
-          {
-            id: 'band', name: 'Band',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'gold-band-id' } }]
-          },
-          {
-            id: 'gem', name: 'Gem',
-            options: [{ quantity: 1, match: { type: 'component', componentId: 'sapphire-id' } }]
-          }
-        ]
-      })
-    ],
-    resultGroups: [
-      {
-        id: 'fire-ring-result',
-        name: 'Fire Ring',
-        results: [{ id: 'fire-ring', componentId: 'ring-fire-resistance-id', quantity: 1 }]
-      },
-      {
-        id: 'ice-ring-result',
-        name: 'Ice Ring',
-        results: [{ id: 'ice-ring', componentId: 'ring-frost-resistance-id', quantity: 1 }]
-      }
-    ]
-  });
-
-  await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-});
-```
+Each ingredient set sets a `resultGroupId` that routes to its matching result group: the Fire Ring set (Gold Band + Ruby) routes to the Fire Ring result, the Ice Ring set (Gold Band + Sapphire) routes to the Ice Ring result, and so on, with `resultSelection.provider` set to `"ingredientSet"`. Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## When to Use the Ingredient Set Provider
 
@@ -109,4 +51,4 @@ The `ingredientSet` provider is ideal when:
 
 - [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %}) -- a crafting check macro's named outcome selects the result group.
 - [Routed Mode (Roll Table)]({% link recipes/routed.md %}) -- a roll table draw selects the result group.
-- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Crafting Checks]({% link crafting-checks.md %}) -- crafting check macro contracts.

@@ -70,16 +70,7 @@ Chat messages appear as if spoken by the crafting actor, using `ChatMessage.getS
 
 **When chat output does not fire.** Chat messages are only posted for craft attempts that reach the engine's resolution step. Early validation failures — missing actor, missing ingredients, missing or unsatisfied tools, invalid recipe configuration — do not post a chat message, because the craft never started.
 
-**Avoiding duplicate output.** If you have custom success or failure macros that already post chat results, disable `chatOutput` for that system to prevent double messages:
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    features: { chatOutput: false }
-  });
-});
-```
+**Avoiding duplicate output.** If you have custom success or failure macros that already post chat results, disable `chatOutput` for that system to prevent double messages. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ### Crafting Checks
 
@@ -97,7 +88,7 @@ When `itemPiles` is enabled and Item Piles v3.1.0 or later is installed, Fabrica
 - **Merchant stock** as an ingredient source — read merchant actor inventories via `getMerchantItems()`.
 - **Container contents** as crafting-station inventory — read container actors via `getContainerContents()`.
 
-No macros are required. See [Item Piles Integration]({% link item-piles.md %}) for setup steps, currency cost configuration, and worked examples.
+No macros are required. See [Item Piles Integration]({% link api/item-piles-integration.md %}) for setup steps, currency cost configuration, and worked examples.
 
 ### Recipe Visibility
 
@@ -121,9 +112,9 @@ Alchemy mode is a special resolution mode where recipe names and ingredient list
 
 ## Graph Visualization
 
-Open the **Graph** tab in the Crafting Admin panel to see a visual map of how your recipes are connected through shared components. An arrow from Recipe A to Recipe B means that Recipe A produces a component that Recipe B consumes. The graph supports pan, zoom, search, and category filtering.
+The **Graph** tab in the Crafting Admin panel is planned and not yet available. It will show a visual map of how your recipes are connected through shared components.
 
-See [Recipe Graph]({% link recipe-graph.md %}) for a full guide including how to read the layout, cycle detection, and filtering.
+See [Recipe Graph]({% link recipe-graph.md %}).
 
 ---
 
@@ -213,40 +204,7 @@ Drag a **world folder** containing Item documents onto the drop zone to import e
 
 #### Via the API
 
-Both import paths are also available programmatically:
-
-```javascript
-// Single item from a compendium
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  const result = await mgr.addItemFromUuid(
-    'blacksmithing-system-id',
-    'Compendium.dnd5e.items.ironIngot456'
-  );
-  // result.action is 'added', 'updated', or 'skipped'
-  if (result.action !== 'skipped') {
-    console.log(`${result.action}: ${result.item.name}`);
-  }
-});
-```
-
-```javascript
-// Bulk import of an entire compendium pack
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  const result = await mgr.addItemsFromPack(
-    'blacksmithing-system-id',
-    'dnd5e.items'
-  );
-  // result now includes an 'updated' count alongside added/skipped/total
-  console.log(
-    `Added ${result.added}, updated ${result.updated}, ` +
-    `skipped ${result.skipped} of ${result.total}`
-  );
-});
-```
-
-See [CraftingSystemManager API]({% link api/system-manager.md %}#additemsfrompack) for the full method reference.
+Both single-item and bulk pack import paths are also available programmatically. See the [CraftingSystemManager API]({% link api/system-manager.md %}#additemsfrompack) for the full method reference.
 
 ### Component Properties
 
@@ -279,4 +237,4 @@ Time gates are checked:
 Currency can be handled by:
 - **System adapter** -- uses the game system's built-in currency (e.g. D&D 5e gold)
 - **Custom macro** -- a macro that checks and deducts currency however you define it
-- **Item Piles** -- when `features.itemPiles` is enabled, currency costs defined on recipes are checked and deducted automatically via the Item Piles API. See [Item Piles Integration]({% link item-piles.md %}).
+- **Item Piles** -- when `features.itemPiles` is enabled, currency costs defined on recipes are checked and deducted automatically via the Item Piles API. See [Item Piles Integration]({% link api/item-piles-integration.md %}).

@@ -28,7 +28,7 @@ Every recipe has:
 | `toolIds` | Library Tool ids required for crafting; for multi-step recipes, recipe-level tools apply to every step (step and ingredient-set `toolIds` also apply) |
 | `transferEffects` | Whether to copy active effects from ingredients to results |
 | `visibility` | Access control (restricted, allowedUserIds) |
-| `linkedRecipeItemUuid` | Item that teaches this recipe (for knowledge mode). In the recipe editor you can browse for an existing item, paste a UUID directly, or use **Create Recipe Item** to generate a new world item automatically. |
+| `linkedRecipeItemUuid` | Item that teaches this recipe (for knowledge mode) |
 | `resultSelection` | How a result group is chosen in routed mode. Contains `provider` (`"ingredientSet"`, `"macroOutcome"`, or `"rollTableOutcome"`) and provider-specific fields. |
 
 {: .note }
@@ -36,40 +36,19 @@ Every recipe has:
 
 ## Enabling and Disabling Recipes
 
-The `enabled` field controls whether a recipe can be crafted. A disabled recipe is hidden from player-facing visibility checks and the planned Crafting UI, but it remains fully accessible to GMs in the Crafting Admin panel.
-
-**In the Crafting Admin panel.** Each recipe row in the recipe list includes an enable/disable toggle checkbox in the Actions column. Disabled recipes are shown with reduced opacity and a grey **Disabled** badge next to their name, so you can see at a glance which recipes are turned off. The recipe editor and the toggle are both accessible regardless of whether a recipe is disabled — click the edit button or toggle the checkbox directly on the row.
+The `enabled` field controls whether a recipe can be crafted. A disabled recipe is hidden from player-facing visibility checks, but it remains accessible to API consumers.
 
 **Why disable rather than delete?** Disabling is non-destructive. You can hide a recipe from players while you are still configuring it, or temporarily remove it from circulation without losing its ingredient and result configuration.
 
-**Programmatically.** You can toggle the enabled state via the API:
-
-```javascript
-// Disable the Iron Sword recipe while you revise it
-Hooks.once('fabricate.ready', async () => {
-  const rm = game.fabricate.getRecipeManager();
-  await rm.updateRecipe('iron-sword-recipe-id', { enabled: false });
-});
-```
-
-```javascript
-// Re-enable it when it is ready
-Hooks.once('fabricate.ready', async () => {
-  const rm = game.fabricate.getRecipeManager();
-  await rm.updateRecipe('iron-sword-recipe-id', { enabled: true });
-});
-```
+**Programmatically.** You can toggle the enabled state via the API. See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the method that updates a recipe.
 
 ## Ingredient Semantics
 
 Ingredients are organised in a three-level hierarchy:
 
-```
-Recipe
- └─ Ingredient Sets (OR -- any one set satisfies the recipe)
-     └─ Ingredient Groups (AND -- all groups in the set must be satisfied)
-         └─ Options (OR -- any one option satisfies the group)
-```
+- **Ingredient Sets** (OR — any one set satisfies the recipe)
+  - **Ingredient Groups** (AND — all groups in the set must be satisfied)
+    - **Options** (OR — any one option satisfies the group)
 
 **Example:** A sword recipe might accept either iron or steel:
 
@@ -133,41 +112,7 @@ See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage 
 
 ## Current Crafting Surface
 
-Recipes can currently be authored and managed by GMs in the Crafting Admin panel. Runtime crafting is available through the public API and macro helpers:
+Recipes can be authored through the API only today; there is no GM recipe-editor UI. Runtime crafting is likewise available through the public API. See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const actor = game.user.character;
-  const recipe = game.fabricate.getRecipeManager().getRecipe('your-recipe-id');
-
-  const access = game.fabricate.getRecipeVisibilityService().guardCraftStart({
-    viewer: game.user,
-    recipe,
-    craftingActor: actor,
-    componentSourceActors: [actor]
-  });
-
-  if (!access.craftable) {
-    ui.notifications.warn(`Recipe is not craftable: ${access.reason}`);
-    return;
-  }
-
-  const result = await game.fabricate.craft(actor, recipe, {
-    componentSourceActors: [actor]
-  });
-  console.log(result);
-});
-```
-
-`RecipeManager.evaluateCraftability(componentSourceActors, recipe)` returns the detailed ingredient, essence, and catalyst state that the planned player UI will use. `RecipeManager.canCraft(componentSourceActors, recipe)` remains the simpler backwards-compatible check.
-
-## Planned Player UI
-
-The Items sidebar **Craft Item** action currently opens the unified Fabricate window, but the Crafting tab is still a placeholder. Planned player-facing recipe functionality includes:
-
-- selecting the crafting actor and ingredient-source actors
-- browsing and searching visible recipes
-- showing available, locked, unknown, exhausted, and missing-material states
-- starting simple and multi-step crafting runs
-- presenting active and historical crafting runs
-- supporting favourites, recent recipes, and shopping-list planning
+{: .note }
+> A player-facing Crafting tab is planned and not yet available; recipe crafting works through the API today.
