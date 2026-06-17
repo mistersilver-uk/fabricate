@@ -81,17 +81,6 @@ The resolution mode determines how ingredients map to results:
 | [Progressive]({% link recipes/progressive.md %}) | 1    | 1 (ordered)   | **Yes**            | Skill check value "buys" results in order                     |
 | [Alchemy]({% link recipes/alchemy.md %})         | 1+   | 1+            | Optional           | Players experiment with ingredients. Recipe names are hidden  |
 
-### Routed Mode Providers
-
-In routed mode, a recipe chooses how the result is selected.
-There are three ways to do this.
-
-| Result chosen by | Check Required | How it works                                                                          |
-|:-----------------|:---------------|:--------------------------------------------------------------------------------------|
-| Ingredient set   | No             | The ingredient set the player uses determines which result they receive               |
-| Macro outcome    | **Yes**        | A crafting check returns a named outcome, and the matching result is produced          |
-| Roll table       | No             | A roll table is drawn, and the result matching the drawn entry is produced            |
-
 ## Multi-Step Recipes
 
 When multi-step recipes are enabled, recipes can have several sequential steps.
