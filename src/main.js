@@ -21,6 +21,7 @@ import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckE
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
 import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
+import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
 import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
@@ -55,6 +56,7 @@ import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
+import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -638,6 +640,12 @@ class Fabricate {
         evaluateExpression: evaluateGatheringExpression
       }),
       failureFeedback: createGatheringFailureFeedback(),
+      // Publishes the documented public `fabricate.gathering.*` integration hooks
+      // on terminal completion for other module authors to subscribe to.
+      hookPublisher: new GatheringHookPublisher({
+        hooks: Hooks,
+        nowWorldTime: () => Number(game.time?.worldTime || 0)
+      }),
       eventSceneTrigger: createEventSceneTrigger({
         isGM: () => !!game.user?.isGM,
         emitPrompt: ({ sceneUuid, eventName }) => game.socket?.emit(EVENT_SCENE_SOCKET, {
@@ -1528,7 +1536,10 @@ function bindFabricateGlobal() {
     SignatureValidator,
     ItemPilesIntegration,
     CompendiumImporter,
-    CraftingSystemExporter
+    CraftingSystemExporter,
+    // Public hook names module authors can subscribe to, e.g.
+    // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
+    HOOKS: FABRICATE_HOOKS
   };
 
   game.fabricate.importFromPack = (packData, options) =>

@@ -1405,6 +1405,31 @@ When world time advances to or past a run's `timeGate.availableAt`, the backend 
 11. APIs that mutate stamina, node counts, attempt limits, condition state, or reveal state validate permissions and write auditable history or GM log evidence where practical.
 12. Developer-facing contracts avoid direct dependency on Foundry globals from presentational Svelte components; Foundry access remains in runtime/service boundaries.
 
+## Public Gathering Hook Publication
+
+### Purpose
+
+Fabricate publishes a documented, stable set of Foundry hooks on gathering completion so other module authors can react to gathering outcomes (successes, failures, and triggered encounters) without depending on Fabricate internals.
+This realizes the integration surface promised by `Rich Gathering APIs and Hooks` requirement 7 for the attempt-completion and encounter-resolution phases as a versioned public contract.
+It complements `Integrations` (`openspec/specs/integrations/spec.md`), which governs graceful, opt-in companion-module behaviour.
+
+### Properties
+
+- `fabricate.gathering.attemptCompleted` — fired once for every terminal gathering attempt.
+- `fabricate.gathering.eventTriggered` — fired once per encounter/event the attempt triggered.
+- The published hook names are exposed for reference on `game.fabricate.api.HOOKS.gathering`.
+
+### Requirements
+
+1. Fabricate fires `fabricate.gathering.attemptCompleted` exactly once for every terminal gathering attempt, covering both success and failure and both immediate resolution and matured timed runs.
+2. The hook fires after the attempt's side effects (result creation, tool usage, failure feedback, chat output) have been committed, so subscribers observe the final, authoritative state.
+3. The completion payload is a cloned, JSON-serializable object carrying a `schemaVersion`, the `status` (`succeeded` | `failed`), the resolution origin (`initiatedBy`: `immediate` | `timed`), the world time, stable identifiers and display names for the actor, crafting system, environment, and task, the run id and status, the risk level and condition snapshot, the gathered items, the used tools, the triggered events, and the normalized check result.
+4. Fabricate fires `fabricate.gathering.eventTriggered` once per triggered encounter, with the event and the shared attempt context (actor, crafting system, environment, task, run, status) so a subscriber reacting to a single encounter has full context.
+5. Publication is always-on (no setting gates it), mirroring Foundry's own document hooks, and is harmless when no subscriber is registered.
+6. Published hook payloads respect blind-task redaction: for an opaque blind attempt (a non-GM viewer of a blind task) the completion payload omits the task identity, gathered items, used tools, and events, and no per-encounter hook is fired.
+7. Hook publication never throws into the gathering flow; a subscriber error is caught, logged, and does not affect the attempt outcome or the response returned to the caller.
+8. The published hook names and payload shape are a public, backwards-compatible contract within a major version; the payload carries `schemaVersion` to signal future evolution.
+
 ## Gathering Chat Messages
 
 ### Requirements
