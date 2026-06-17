@@ -73,7 +73,6 @@ This decouples recipes from specific world items, and removes the need for impre
 2. Drag items from the Items sidebar or a compendium into the components drop zone
 3. Your item is now registered as a Fabricate component
 
-![Fabricate Component Dragdrop](img/screenshots/fabricate-create-component-dragdrop.webp)
 ![Fabricate created component](img/screenshots/fabricate-created-component.webp)
 
 ## Step 4: Create a Gathering Environment

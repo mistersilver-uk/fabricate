@@ -49,13 +49,15 @@ Do not link docs directly to `test-results/`; that directory is transient and is
 
 The current gathering docs source set includes these full-profile labels:
 
-- GM setup: `manager-systems-empty` (quickstart Step 2 "Create a Crafting System" — the empty System Library onboarding card with the Create system button, captured before the smoke system exists), `manager-components-normal`, `manager-environments-browse-normal`, `manager-environment-edit-placeholder`
+- GM setup: `manager-systems-empty` (quickstart Step 2 "Create a Crafting System" — the empty System Library onboarding card with the Create system button, captured before the smoke system exists), `manager-system-edit-normal` (quickstart Step 4 "enable the gathering feature" — System settings → Optional Features with the Gathering checkbox), `manager-components-normal`, `manager-environments-browse-normal`, `manager-environment-edit-placeholder`
 - GM gathering libraries: `manager-gathering-task-editor-normal`, `manager-gathering-event-editor-normal`
 - Environment composition: `manager-environment-edit-tasks`, `manager-environment-edit-events`, `manager-gathering-settings`
 - Player journey: `player-gathering-environments`, `player-gathering-events`, `player-gathering-task-ready`, `player-gathering-after-success`, `player-gathering-tool-blocked`, `player-gathering-timed-ready`, `player-gathering-timed-active`, `player-gathering-blind`, `player-gathering-realm-locked`, `player-gathering-stacked`
 
 The reduced `rc`/`ci` smoke profiles intentionally do not regenerate this whole docs source set.
 They keep the lightweight screenshot allow-list for CI and release-candidate confidence, while local `full` runs provide documentation evidence.
+
+Only copy a frame into `docs/img/screenshots/` when an authored docs page references it. `tests/docs-screenshots.test.js` fails on any committed screenshot that is not referenced from a docs page, so a frame that was deliberately dropped from the docs cannot quietly creep back in from a later smoke run. If you remove a screenshot from a page, delete the `.webp` too (and vice versa).
 
 ## Interpreting `passed: false`
 
