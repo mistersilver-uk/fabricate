@@ -9,14 +9,14 @@
   Layout: a top HEADER bar (only when the task is blocked) surfaces each blocking
   issue as a callout chip ("Missing tool(s)", wrong conditions, …). Below it the
   main row shows the task image (with a lock overlay + desaturation when blocked),
-  the name, and a SuccessChanceBar. A short, always-visible description sits
+  the name, and a ChanceBar (success scale). A short, always-visible description sits
   underneath. The row has no Attempt button and no expand toggle — those live in
   the right-column inspector.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';
-  import SuccessChanceBar from './SuccessChanceBar.svelte';
+  import ChanceBar from './ChanceBar.svelte';
 
   let {
     task = null,
@@ -147,7 +147,7 @@
 
       {#if successChance != null}
         <span class="gathering-task-chance" data-gathering-success>
-          <SuccessChanceBar value={successChance} />
+          <ChanceBar value={successChance} scale="success" />
         </span>
       {/if}
     </div>

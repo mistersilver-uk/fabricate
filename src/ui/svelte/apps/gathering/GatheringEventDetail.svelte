@@ -14,7 +14,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { riskClass, riskLabel, biomeChipStyle, descriptionOrDefault } from '../../util/gatheringFormat.js';
-  import EventChanceBar from './EventChanceBar.svelte';
+  import ChanceBar from './ChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
   import {
     getWeatherIcon,
@@ -111,7 +111,7 @@
     <p class="gathering-event-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
 
     {#if chance != null}
-      <EventChanceBar value={chance} />
+      <ChanceBar value={chance} scale="event" />
     {/if}
 
     {#if hasDetails}
