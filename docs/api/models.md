@@ -16,7 +16,8 @@ const {
 } = game.fabricate.api;
 ```
 
-`IngredientSet` and `Result` are documented below as recipe data shapes. They are normalised through recipe and manager APIs, but they are not exported as public constructors.
+`IngredientSet` and `Result` are documented below as recipe data shapes.
+They are normalised through recipe and manager APIs, but they are not exported as public constructors.
 
 ---
 
@@ -51,7 +52,9 @@ new Recipe({
 ```
 
 {: .note }
-> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field. Legacy recipes are automatically normalised on load. Use `resultSelection` for all new routed recipes.
+> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field.
+> Legacy recipes are automatically normalised on load.
+> Use `resultSelection` for all new routed recipes.
 
 **Key methods:**
 
@@ -118,7 +121,9 @@ new Ingredient({
 ```
 
 {: .note }
-> The `match.type` value `"component"` replaces the previous `"systemItem"`. The `match.componentId` field replaces the previous `match.systemItemId`. Use the new names for all new data.
+> The `match.type` value `"component"` replaces the previous `"systemItem"`.
+> The `match.componentId` field replaces the previous `match.systemItemId`.
+> Use the new names for all new data.
 
 **Key methods:**
 
@@ -133,7 +138,10 @@ new Ingredient({
 ## Tool
 
 {: .note }
-> The standalone `Catalyst` model was removed in `0.6.0`. Tools are not constructed via `game.fabricate.api` — they are authored in the per-system Tools library through the Crafting System Manager and referenced by id (`toolIds`). See [Tools]({% link tools.md %}) for the full concept.
+> The standalone `Catalyst` model was removed in `0.6.0`.
+> Tools are not constructed via `game.fabricate.api`.
+> They are authored in the per-system Tools library through the Crafting System Manager and referenced by id (`toolIds`).
+> See [Tools]({% link tools.md %}) for the full concept.
 
 A Tool entry stored under `system.tools` (the `craftingSystems` setting) has this shape:
 
@@ -151,7 +159,8 @@ A Tool entry stored under `system.tools` (the `craftingSystems` setting) has thi
 }
 ```
 
-Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`; the `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
+Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`.
+The `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
 
 ---
 
@@ -168,7 +177,8 @@ Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.to
 ```
 
 {: .note }
-> The field was previously named `systemItemId`. Use `componentId` for all new data.
+> The field was previously named `systemItemId`.
+> Use `componentId` for all new data.
 
 Result data is validated as part of recipe validation and consumed by the crafting engine when a result group is awarded.
 

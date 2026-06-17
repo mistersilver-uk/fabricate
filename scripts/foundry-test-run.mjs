@@ -29,8 +29,8 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join } from 'node:path';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
 
@@ -41,9 +41,6 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
-const SMOKE_ACTOR_ASSET_DIR = join(ROOT, 'assets', 'img', 'actors');
-const SMOKE_ACTOR_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
-const LEGACY_SMOKE_ACTOR_NAMES = ['Brom the Blacksmith'];
 
 // Smoke profile selector. Three profiles:
 //   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
@@ -67,7 +64,7 @@ const RC_SCREENSHOT_BUDGET = new Set([
   'world-loaded',
   'fabricate-app-shell',
   'post-craft',
-  'alara-post-craft-inventory'
+  'crafter-post-craft-inventory'
 ]);
 
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
@@ -78,27 +75,6 @@ const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
 const consoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
-
-/**
- * Load every raster actor portrait under assets/img/actors as a smoke actor.
- * Actor names are intentionally derived from filenames so the Foundry smoke
- * world mirrors the checked-in portrait fixture set.
- * @returns {Promise<Array<{ name: string, img: string }>>}
- */
-async function loadSmokeActorFixtures() {
-  const actorAssetFiles = (await readdir(SMOKE_ACTOR_ASSET_DIR))
-    .filter(file => SMOKE_ACTOR_IMAGE_EXTENSIONS.has(extname(file).toLowerCase()))
-    .sort((a, b) => a.localeCompare(b, 'en'));
-
-  if (actorAssetFiles.length === 0) {
-    throw new Error('No smoke actor portrait assets found under assets/img/actors.');
-  }
-
-  return actorAssetFiles.map(file => ({
-    name: basename(file, extname(file)),
-    img: `modules/fabricate/assets/img/actors/${file}`
-  }));
-}
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
@@ -888,8 +864,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         ])),
         {
           id: 'smoke-forage-library',
-          name: 'Smoke Reusable Forage',
-          description: 'Reusable library task for Manager gathering composition screenshots.',
+          name: 'Forage Wild Herbs',
+          description: 'Forage the wayside for common herbs and roots.',
           img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
           enabled: true,
           region: 'northreach',
@@ -916,21 +892,21 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         // progressive/check/catalyst/failure task resolution no longer exists.
         {
           id: 'smoke-meadow-herbs', name: 'Gather Meadow Herbs',
-          description: 'Immediate successful gather for the player Gathering tab.',
+          description: 'Pick fresh herbs from the open meadow.',
           img: 'icons/consumables/plants/fern-sprig-stem-leaf-herb-green.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-meadow-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 90, enabled: true }]
         },
         {
           id: 'smoke-sunken-survey', name: 'Survey Sunken Reagents',
-          description: 'Visible task gated by its linked scene at the environment level.',
+          description: 'Wade the flooded ruins for reagents settled in the silt.',
           img: 'icons/environment/wilderness/wall-ruins.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-sunken-drop', componentId: componentMap['Iron Ore'], quantity: 1, dropRate: 70, enabled: true }]
         },
         {
           id: 'smoke-crystal-dew', name: 'Bottle Crystal Dew',
-          description: 'Requires the Herbalist Sickle tool, demonstrating a blocked task.',
+          description: "Cut dew-laden crystal fronds with a herbalist's sickle.",
           img: 'icons/consumables/potions/flask-corked-blue.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           toolIds: ['smoke-herbalist-sickle'],
@@ -938,7 +914,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         },
         {
           id: 'smoke-slow-bloom', name: 'Tend Slow Bloom',
-          description: 'A timed gather that creates an active run before completion.',
+          description: 'Tend the slow bloom until it ripens.',
           img: 'icons/commodities/flowers/lily-bloom.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           timeRequirement: { minutes: 1, hours: 0, days: 0, months: 0, years: 0 },
@@ -946,14 +922,14 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         },
         {
           id: 'smoke-withered-search', name: 'Search Withered Patch',
-          description: 'An exhausted patch whose only drop never lands (empty-result feedback).',
+          description: 'Pick over a blighted patch for anything still growing.',
           img: 'icons/consumables/plants/dried-herb-bundle-brown.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-withered-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 0, enabled: true }]
         },
         {
           id: 'smoke-moonpetal', name: 'Secret Moonpetal Harvest',
-          description: 'Real task name that must stay GM-only in player blind views.',
+          description: 'Harvest moonpetals that open only by night.',
           img: 'icons/commodities/flowers/lotus-white.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-moonpetal-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 70, enabled: true }]
@@ -975,8 +951,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         ...withoutIds(systemConfig.events, new Set(['smoke-bramble-event'])),
         {
           id: 'smoke-bramble-event',
-          name: 'Smoke Bramble Snare',
-          description: 'Reusable event for Manager gathering composition screenshots.',
+          name: 'Bramble Snare',
+          description: 'Thorned brambles snare the careless gatherer.',
           img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
           enabled: true,
           dangerTags: ['hazardous'],
@@ -1020,8 +996,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         await environmentStore.create({
           id: 'smoke-blind-grove',
           craftingSystemId: sysId,
-          name: 'Smoke Blind Grove',
-          description: 'Blind gathering site for the player Gathering tab screenshot (mask chip + discovered suffix).',
+          name: 'Shrouded Grove',
+          description: 'A fog-veiled grove where the harvest is never certain until tried.',
           img: 'icons/magic/nature/tree-spirit-green.webp',
           enabled: true,
           selectionMode: 'blind',
@@ -1034,8 +1010,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         await environmentStore.create({
           id: 'smoke-locked-hollow',
           craftingSystemId: sysId,
-          name: 'Smoke Sealed Hollow',
-          description: 'Disabled environment for the player Gathering tab screenshot (locked teaser for non-GM viewers).',
+          name: 'Sealed Barrow',
+          description: 'A hollow sealed against trespass, not yet open to gatherers.',
           img: 'icons/environment/wilderness/mine-interior-dungeon-door.webp',
           enabled: false,
           selectionMode: 'targeted',
@@ -1415,7 +1391,6 @@ async function main() {
   // wants current-run output; nothing here is hand-authored.
   await rm(RESULTS_DIR, { recursive: true, force: true });
   await mkdir(RESULTS_DIR, { recursive: true });
-  const smokeActorFixtures = await loadSmokeActorFixtures();
 
   process.stdout.write(`Smoke profile: ${SMOKE_PROFILE}${RAW_SMOKE_PROFILE !== SMOKE_PROFILE ? ` (from FOUNDRY_SMOKE_PROFILE=${RAW_SMOKE_PROFILE})` : ''}\n`);
 
@@ -1571,7 +1546,7 @@ async function main() {
     startPhase('phase-B');
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
-      const createdDocs = await page.evaluate(async ({ smokeActorFixtures, legacySmokeActorNames }) => {
+      const createdDocs = await page.evaluate(async () => {
         // Clean up any stale test data from previous runs.
         // 1. Clean stale crafting systems and their recipes first.
         //    Filter by literal "Arcane Forge" name so we never delete user
@@ -1623,14 +1598,11 @@ async function main() {
           try { await csm.deleteSystem(sys.id); } catch { /* ok */ }
         }
 
-        // 2. Clean stale actors
-        const smokeActorNames = new Set([
-          ...smokeActorFixtures.map(actor => actor.name),
-          ...legacySmokeActorNames
-        ]);
-        const staleActors = game.actors.contents.filter(a => smokeActorNames.has(a.name));
+        // 2. Clean stale smoke actors (tagged flags.fabricate.smokeSeed) so the
+        //    per-run re-import of the dnd5e Starter Heroes pack stays idempotent.
+        const staleActors = game.actors.contents.filter(a => a.flags?.fabricate?.smokeSeed === true);
         if (staleActors.length > 0) {
-          console.log(`Cleaning ${staleActors.length} stale test actors`);
+          console.log(`Cleaning ${staleActors.length} stale smoke actors`);
           await Actor.deleteDocuments(staleActors.map(a => a.id));
         }
 
@@ -1677,7 +1649,6 @@ async function main() {
 
         // Use 'loot' for all items — safest common type across D&D 5e versions
         const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
-        const actorType = actorTypes.includes('character') ? 'character' : actorTypes[0] || 'character';
 
         // Create world-level items (all as loot — type doesn't matter for crafting)
         const itemData = [
@@ -1700,24 +1671,35 @@ async function main() {
           itemsByName[item.name] = { id: item.id, uuid: item.uuid };
         }
 
-        // Create every actor represented by assets/img/actors portraits.
-        const actors = await Actor.createDocuments(
-          smokeActorFixtures.map(actor => ({
-            name: actor.name,
-            type: actorType,
-            img: actor.img
-          }))
-        );
-        console.log(`Created ${actors.length} actors:`, actors.map(a => a.name).join(', '));
+        // Import the dnd5e "Starter Heroes" pack so demo actors use official,
+        // non-AI art shipped with the game system instead of bundled portraits.
+        // Each imported hero is tagged flags.fabricate.smokeSeed for the
+        // idempotent pre-clean above; sorting by name gives a deterministic
+        // crafter / travel-member assignment and a stable demo character.
+        const heroPack = game.packs.get('dnd5e.heroes')
+          ?? game.packs.find(p => p.documentName === 'Actor' && /hero/i.test(p.metadata?.label ?? ''));
+        if (!heroPack) {
+          throw new Error('dnd5e Starter Heroes compendium (dnd5e.heroes) not found — cannot seed smoke actors.');
+        }
+        const heroIndex = await heroPack.getIndex();
+        const importedHeroes = [];
+        for (const entry of heroIndex) {
+          const actor = await game.actors.importFromCompendium(heroPack, entry._id);
+          if (actor?.type === 'character') importedHeroes.push(actor);
+        }
+        if (importedHeroes.length === 0) {
+          throw new Error('dnd5e Starter Heroes compendium contained no character actors.');
+        }
+        await Actor.updateDocuments(importedHeroes.map(a => ({ _id: a.id, 'flags.fabricate.smokeSeed': true })));
+        const actors = importedHeroes.slice().sort((a, b) => a.name.localeCompare(b.name, 'en'));
+        console.log(`Imported ${actors.length} dnd5e Starter Heroes:`, actors.map(a => a.name).join(', '));
         const actorIds = actors.map(a => a.id);
 
-        const requiredActor = (name) => {
-          const actor = actors.find(a => a.name === name);
-          if (!actor) throw new Error(`Smoke actor fixture "${name}" was not created.`);
-          return actor;
-        };
-        const alara = requiredActor('Alara the Alchemist');
-        const bromm = requiredActor('Bromm the Blacksmith');
+        const crafter = actors[0];
+        const travelMember = actors[1] ?? null;
+        // Remember the crafter as the default gathering actor so the player-app
+        // screenshots deterministically show the same demo character.
+        try { await game.fabricate.setSelectedGatheringActorId(crafter.id); } catch { /* best effort */ }
         const testUserData = [
           { name: 'Fabricate Gatherer', role: CONST.USER_ROLES.PLAYER, password: '' },
           { name: 'Fabricate Observer', role: CONST.USER_ROLES.PLAYER, password: '' }
@@ -1734,8 +1716,8 @@ async function main() {
         const gathererUser = users.find(user => user.name === 'Fabricate Gatherer');
         const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
-        await alara.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
-        await bromm.update({ ownership: { default: noneLevel } });
+        await crafter.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
+        if (travelMember) await travelMember.update({ ownership: { default: noneLevel } });
         const userIds = users.map(user => user.id);
 
         // Build inventory copies from world items
@@ -1754,35 +1736,37 @@ async function main() {
             flags: { core: { sourceId: item.uuid } }
           }));
 
-        // Alara gets: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale
-        await alara.createEmbeddedDocuments('Item', [
+        // Crafter gets: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale
+        await crafter.createEmbeddedDocuments('Item', [
           ...copies(byName('Mystic Herb'), 3),
           ...copies(byName('Empty Vial'), 2),
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        // Bromm gets: 3x Iron Ore, 1x Dragon Scale
-        await bromm.createEmbeddedDocuments('Item', [
-          ...copies(byName('Iron Ore'), 3),
-          ...copies(byName('Dragon Scale'), 1)
-        ]);
+        // Travel-party member gets: 3x Iron Ore, 1x Dragon Scale
+        if (travelMember) {
+          await travelMember.createEmbeddedDocuments('Item', [
+            ...copies(byName('Iron Ore'), 3),
+            ...copies(byName('Dragon Scale'), 1)
+          ]);
+        }
 
         return {
           itemIds,
           actorIds,
           userIds,
           gathererUserId: gathererUser.id,
-          alaraId: alara.id,
-          bromId: bromm.id,
+          crafterId: crafter.id,
+          travelMemberId: travelMember?.id ?? null,
           itemsByName
         };
-      }, { smokeActorFixtures, legacySmokeActorNames: LEGACY_SMOKE_ACTOR_NAMES });
+      });
 
       cleanup.itemIds = createdDocs.itemIds;
       cleanup.actorIds = createdDocs.actorIds;
       cleanup.userIds = createdDocs.userIds;
-      cleanup.alaraId = createdDocs.alaraId;
-      cleanup.bromId = createdDocs.bromId;
+      cleanup.crafterId = createdDocs.crafterId;
+      cleanup.travelMemberId = createdDocs.travelMemberId;
       cleanup.gathererUserId = createdDocs.gathererUserId;
       process.stdout.write(`  Created ${createdDocs.itemIds.length} items and ${createdDocs.actorIds.length} actors with inventories.\n`);
 
@@ -1877,6 +1861,36 @@ async function main() {
     startPhase('phase-C');
     process.stdout.write('Phase C: Creating crafting system and recipes...\n');
     try {
+      // Quickstart Step 2 evidence (full profile): the GM System Library before
+      // any system exists — the "No crafting systems yet" onboarding card with the
+      // primary "Create system" button. This is the only point in the run with a
+      // genuinely empty library; every later manager phase has the smoke system
+      // present. Defensively clear any systems left over from an aborted prior run
+      // so the empty state is deterministic, open the manager, capture, and close
+      // it before the smoke system is created below. Gated to the full profile
+      // like the other documentation captures; rc/ci skips it via screenshot().
+      if (RUN_SCREENSHOT_PHASES) {
+        await page.evaluate(async () => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          for (const system of csm.getSystems()) {
+            await csm.deleteSystem(system.id);
+          }
+          await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
+          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        });
+        await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        // The empty-library onboarding card renders its own primary action; wait
+        // on it (not assertManagerLayoutStable, which requires table rows) so the
+        // frame shows the onboarding state with the Create system button.
+        await page.locator('.fabricate-manager .manager-empty .manager-button.is-primary')
+          .filter({ hasText: 'Create system' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-systems-empty');
+        await closeOpenApplications(page);
+      }
+
       const craftingSetup = await page.evaluate(async () => {
         const csm = game.fabricate.getCraftingSystemManager();
 
@@ -2040,7 +2054,7 @@ async function main() {
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Azure Grove',
-          description: 'A compact validation fixture for GM gathering environment authoring.',
+          description: 'A tranquil grove of blue-leaved trees, rich with reagents.',
           img: 'icons/magic/nature/tree-spirit-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
@@ -2058,38 +2072,38 @@ async function main() {
         const playerFixtureDefinitions = [
           {
             name: 'Verdant Meadow',
-            description: 'A clear player-facing gathering site with an immediate successful task.',
+            description: 'Open grassland thick with common herbs, easy to harvest.',
             img: 'icons/consumables/plants/grass-leaves-green.webp',
             forcedTaskIds: ['smoke-meadow-herbs']
           },
           {
             name: 'Sunken Ruins',
-            description: 'A scene-linked site that stays visible while blocked.',
+            description: 'Half-drowned ruins where forgotten reagents still linger.',
             img: 'icons/environment/wilderness/wall-ruins.webp',
             sceneUuid: 'Scene.fabricateMissingGatheringScene',
             forcedTaskIds: ['smoke-sunken-survey']
           },
           {
             name: 'Crystal Thicket',
-            description: 'Requires the Herbalist Sickle tool so Bromm demonstrates a blocked task.',
+            description: 'A thicket of glittering crystal fronds, perilous to harvest by hand.',
             img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
             forcedTaskIds: ['smoke-crystal-dew']
           },
           {
             name: 'Timed Orchard',
-            description: 'A timed gathering site that creates an active run before completion.',
+            description: 'An orchard whose slow blooms ripen only with patience.',
             img: 'icons/consumables/fruit/apple-red-tree-green.webp',
             forcedTaskIds: ['smoke-slow-bloom']
           },
           {
             name: 'Withered Patch',
-            description: 'An exhausted patch whose only drop never lands, for empty-result feedback.',
+            description: 'A blighted patch picked all but bare.',
             img: 'icons/magic/fire/flame-burning-tree-stump.webp',
             forcedTaskIds: ['smoke-withered-search']
           },
           {
             name: 'Moonlit Blind Grove',
-            description: 'A blind environment that must hide task details from non-GM users.',
+            description: 'A moonlit grove where harvests reveal themselves only once attempted.',
             img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
             selectionMode: 'blind',
             forcedTaskIds: ['smoke-moonpetal']
@@ -2116,8 +2130,8 @@ async function main() {
               },
               tasks: [{
                 id: 'smoke-forage-library',
-                name: 'Smoke Reusable Forage',
-                description: 'Reusable library task for Manager gathering composition screenshots.',
+                name: 'Forage Wild Herbs',
+                description: 'Forage the wayside for common herbs and roots.',
                 img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
                 enabled: true,
                 region: 'northreach',
@@ -2144,8 +2158,8 @@ async function main() {
               }],
               events: [{
                 id: 'smoke-bramble-event',
-                name: 'Smoke Bramble Snare',
-                description: 'Reusable event for Manager gathering composition screenshots.',
+                name: 'Bramble Snare',
+                description: 'Thorned brambles snare the careless gatherer.',
                 img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
                 enabled: true,
                 dangerTags: ['hazardous'],
@@ -2177,7 +2191,7 @@ async function main() {
         // in the scene, so Phase F's scene cleanup removes it — no extra cleanup.
         const interactableTaskId = 'smoke-forage-library';
         const [interactableRegion] = await azureGroveScene.createEmbeddedDocuments('Region', [{
-          name: 'Fabricate Smoke Node',
+          name: 'Fabricate Forage Node',
           shapes: [{ type: 'rectangle', x: 1000, y: 1000, width: 400, height: 400 }],
           behaviors: [{
             type: 'fabricate.interactable',
@@ -2512,10 +2526,13 @@ async function main() {
           if (!realmStore || !partyStore) {
             throw new Error('Gathering realm/party stores unavailable for Travel seeding.');
           }
-          const alara = game.actors.getName('Alara the Alchemist');
-          const bromm = game.actors.getName('Bromm the Blacksmith');
-          if (!alara) {
-            throw new Error('Smoke actor "Alara the Alchemist" not found for Travel seeding.');
+          const smokeHeroes = game.actors.contents
+            .filter(a => a.type === 'character' && a.flags?.fabricate?.smokeSeed === true)
+            .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+          const crafter = smokeHeroes[0];
+          const travelMember = smokeHeroes[1];
+          if (!crafter) {
+            throw new Error('No smoke-seeded gathering actor found for Travel seeding.');
           }
           // Travel & Realms is disabled by default (#286). Enable it on this
           // system before the manager opens so the Travel nav item is visible
@@ -2528,10 +2545,10 @@ async function main() {
             .find(realm => realm.name === 'Northreach Vale');
           const realm = existingRealm
             || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
-          const party = await partyStore.create({ name: 'The Smoke Wardens' });
-          await partyStore.addMember(party.id, alara.uuid);
-          if (bromm) await partyStore.addMember(party.id, bromm.uuid);
-          await partyStore.setTravelActor(party.id, alara.uuid);
+          const party = await partyStore.create({ name: 'The Vale Wardens' });
+          await partyStore.addMember(party.id, crafter.uuid);
+          if (travelMember) await partyStore.addMember(party.id, travelMember.uuid);
+          await partyStore.setTravelActor(party.id, crafter.uuid);
           await partyStore.setEnabled(party.id, true);
           await partyStore.setCurrentRealmOverride(party.id, sysId, [realm.id]);
 
@@ -2742,8 +2759,8 @@ async function main() {
           throw new Error(`Manager smoke gathering library disappeared before task screenshot: ${JSON.stringify(preTaskLibraryCounts)}`);
         }
         await page.locator('.fabricate-manager #manager-gathering-nav-tasks').first().click();
-        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Forage Wild Herbs")').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Forage Wild Herbs") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // "Selected Drop Rule" only renders when a drop row is selected
         // (CraftingSystemManagerRoot.svelte:2957 `{#if selectedGatheringDrop}`)
@@ -2822,13 +2839,13 @@ async function main() {
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager #manager-gathering-nav-encounters').first().click();
-        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Smoke Bramble Snare")').first()
+        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Bramble Snare")').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertManagerLayoutStable(page, 'gathering events normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-events-normal');
 
-        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Smoke Bramble Snare") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Bramble Snare") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="gathering-event-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         for (const expected of ['Event Identity', 'Event Matching']) {
           if (await page.locator('.fabricate-manager').filter({ hasText: expected }).count() === 0) {
@@ -3512,29 +3529,29 @@ async function main() {
 
         // Attempt to craft via the API
         process.stdout.write('  Executing craft: Brew Healing Potion...\n');
-        const craftResult = await page.evaluate(async ({ recipeId, alaraId }) => {
-          const alara = game.actors.get(alaraId);
-          if (!alara) throw new Error(`Actor ${alaraId} not found`);
+        const craftResult = await page.evaluate(async ({ recipeId, crafterId }) => {
+          const crafter = game.actors.get(crafterId);
+          if (!crafter) throw new Error(`Actor ${crafterId} not found`);
 
-          console.log(`Crafting with ${alara.name} (${alara.id}), ${alara.items.size} items in inventory`);
+          console.log(`Crafting with ${crafter.name} (${crafter.id}), ${crafter.items.size} items in inventory`);
 
           const rm = game.fabricate.getRecipeManager();
           const recipe = rm.getRecipe(recipeId);
           if (!recipe) throw new Error(`Recipe ${recipeId} not found`);
 
-          const result = await game.fabricate.craft(alara, recipe, {
-            componentSourceActors: [alara]
+          const result = await game.fabricate.craft(crafter, recipe, {
+            componentSourceActors: [crafter]
           });
 
-          // Check Alara's inventory for the Healing Potion
-          const potionInInventory = alara.items.contents.some(i => i.name === 'Healing Potion');
+          // Check the crafter's inventory for the Healing Potion
+          const potionInInventory = crafter.items.contents.some(i => i.name === 'Healing Potion');
 
           return {
             success: result.success,
             message: result.message,
             potionInInventory
           };
-        }, { recipeId: craftingSetup.healingPotionRecipeId, alaraId: cleanup.alaraId });
+        }, { recipeId: craftingSetup.healingPotionRecipeId, crafterId: cleanup.crafterId });
 
         if (!craftResult.success) {
           process.stderr.write(`Craft returned failure: ${craftResult.message}\n`);
@@ -3545,24 +3562,24 @@ async function main() {
           results.steps.push({ step: 'craft-healing-potion', passed: true });
         }
 
-        // Wait for the Healing Potion to actually appear in Alara's inventory
+        // Wait for the Healing Potion to actually appear in the crafter's inventory
         // before screenshotting. Catches missing-craft regressions that a
         // fixed sleep would mask. Replaces a 1 s fixed sleep.
         if (craftResult.success) {
-          await page.waitForFunction((alaraId) => {
-            const alara = game.actors.get(alaraId);
-            return alara?.items?.contents?.some(i => i.name === 'Healing Potion') === true;
-          }, cleanup.alaraId, { timeout: 10_000 }).catch(() => { /* surface via post-craft step state */ });
+          await page.waitForFunction((crafterId) => {
+            const crafter = game.actors.get(crafterId);
+            return crafter?.items?.contents?.some(i => i.name === 'Healing Potion') === true;
+          }, cleanup.crafterId, { timeout: 10_000 }).catch(() => { /* surface via post-craft step state */ });
         }
         await screenshot(page, 'post-craft');
         process.stdout.write('  Screenshotted post-craft state.\n');
 
-        // Open Alara's sheet to show the crafted item (inventory tab)
-        process.stdout.write('  Opening Alara\'s inventory to verify crafted item...\n');
-        await page.evaluate(async (alaraId) => {
-          const alara = game.actors.get(alaraId);
-          if (alara) await alara.sheet.render(true);
-        }, cleanup.alaraId);
+        // Open the crafter's sheet to show the crafted item (inventory tab)
+        process.stdout.write('  Opening the crafter\'s inventory to verify crafted item...\n');
+        await page.evaluate(async (crafterId) => {
+          const crafter = game.actors.get(crafterId);
+          if (crafter) await crafter.sheet.render(true);
+        }, cleanup.crafterId);
         // Wait for the actor sheet to render (replaces a 1.5 s fixed sleep).
         await page.locator('.actor.sheet, .actor-sheet, .actor.window-app, [data-application-part="primary"]').first()
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -3576,16 +3593,16 @@ async function main() {
           } else if (typeof sheet?.activateTab === 'function') {
             sheet.activateTab('inventory');
           }
-        }, cleanup.alaraId);
+        }, cleanup.crafterId);
         await page.waitForTimeout(500);
-        await screenshot(page, 'alara-post-craft-inventory');
-        process.stdout.write('  Screenshotted Alara\'s post-craft inventory.\n');
+        await screenshot(page, 'crafter-post-craft-inventory');
+        process.stdout.write('  Screenshotted the crafter\'s post-craft inventory.\n');
 
         // Close the sheet
-        await page.evaluate((alaraId) => {
-          const alara = game.actors.get(alaraId);
-          if (alara) alara.sheet.close();
-        }, cleanup.alaraId);
+        await page.evaluate((crafterId) => {
+          const crafter = game.actors.get(crafterId);
+          if (crafter) crafter.sheet.close();
+        }, cleanup.crafterId);
 
         results.steps.push({ step: 'craft-item-phase', passed: true });
         process.stdout.write('Phase E complete.\n');

@@ -23,7 +23,7 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 
 - the change under review — the issue's `openspec-delta` block at design time, and the branch diff against `main` at implementation review.
 - the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
-- the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives under `docs/agents/` (e.g. `foundry-css-overrides.md`, `travel-current-realm-sensing.md`).
+- the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives now consolidated in `AGENTS.md` and `CONTRIBUTING.md`.
 - the target Foundry version declared in `module.json` (currently V13) — every finding is pinned to that version.
 
 ## Research method (strict order of preference)
@@ -69,7 +69,7 @@ Check the branch diff's Foundry-facing code against the real Foundry behaviour y
 - Read-only and advisory: do not edit `src/`, `tests/`, `openspec/specs/`, or docs, and do not implement features.
 - Cite the authoritative source for every behavioural claim (source file/symbol, doc URL, or community thread) and pin it to the target Foundry version; prefer source over docs over community, in that order.
 - Never invent an API shape. When you cannot verify a behaviour, say so and mark it as a risk rather than asserting it.
-- When a finding is durable Foundry knowledge worth keeping, recommend capturing it as a `docs/agents/` note and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
+- When a finding is durable Foundry knowledge worth keeping, recommend capturing it in `AGENTS.md` and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
 
 ## Expected output
 
@@ -80,5 +80,5 @@ Then list:
 - the Foundry-integration findings, each tied to a specific API/hook/lifecycle point and the code or delta it concerns.
 - the authoritative source for each finding (source file/symbol, doc URL, or community thread) and the Foundry version it was pinned to.
 - `module.json` compatibility-metadata issues, if any.
-- recommended `docs/agents/` captures for durable Foundry knowledge.
+- recommended `AGENTS.md` captures for durable Foundry knowledge.
 - open questions and risks where verification was incomplete.

@@ -9,9 +9,12 @@ has_children: true
 
 Fabricate exposes its API through two Foundry globals:
 
-- **`game.fabricate`** -- the main Fabricate instance with service accessors and a quick `craft()` helper
-- **`globalThis.fabricate`** (alias: `fabricate`) -- convenience functions for macros
-- **`game.fabricate.api`** -- constructor references for all public classes
+- **`game.fabricate`**.
+  The main Fabricate instance with service accessors and a quick `craft()` helper.
+- **`globalThis.fabricate`** (alias: `fabricate`).
+  Convenience functions for macros.
+- **`game.fabricate.api`**.
+  Constructor references for all public classes.
 
 All APIs are available after the `fabricate.ready` hook fires:
 
@@ -23,7 +26,8 @@ Hooks.on('fabricate.ready', () => {
 ```
 
 {: .warning }
-> Do not call Fabricate APIs before the `fabricate.ready` hook. The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
+> Do not call Fabricate APIs before the `fabricate.ready` hook.
+> The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
 
 ---
 
@@ -98,7 +102,9 @@ const {
 
 ### Gathering Runtime Facade
 
-Use the public `game.fabricate` methods when macros or integrations need to list or start gathering for the current user. The raw gathering engine is not exposed as a service accessor; these facade methods inject the current Foundry user as the viewer before delegating to runtime internals.
+Use the public `game.fabricate` methods when macros or integrations need to list or start gathering for the current user.
+The raw gathering engine is not exposed as a service accessor.
+These facade methods inject the current Foundry user as the viewer before delegating to runtime internals.
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -117,9 +123,13 @@ Hooks.once('fabricate.ready', async () => {
 });
 ```
 
-`listGatheringForActor` returns the current browsing state plus `activeRuns` and recent `history` for the selected actor. Those run lists are retained even when no environment/task rows are currently browseable because the actor is blocked, the environment list is empty, or visibility gates hide all tasks. For non-GM blind or missing-environment rows, the runtime redacts task IDs, result details, tool details, diagnostics, and check internals.
+`listGatheringForActor` returns the current browsing state plus `activeRuns` and recent `history` for the selected actor.
+Those run lists are retained even when no environment/task rows are currently browseable because the actor is blocked, the environment list is empty, or visibility gates hide all tasks.
+For non-GM blind or missing-environment rows, the runtime redacts task IDs, result details, tool details, diagnostics, and check internals.
 
-When `rememberedActorId` is omitted from `listGatheringForActor` options, it defaults to the persisted last-gathering selection (`getSelectedGatheringActorId()`), so a fresh listing honors the remembered actor. Passing an explicit `rememberedActorId` always overrides that default — including an explicit `null`, which forces no remembered actor.
+When `rememberedActorId` is omitted from `listGatheringForActor` options, it defaults to the persisted last-gathering selection (`getSelectedGatheringActorId()`), so a fresh listing honors the remembered actor.
+Passing an explicit `rememberedActorId` always overrides that default.
+This includes an explicit `null`, which forces no remembered actor.
 
 ### Actor Selection
 
@@ -136,13 +146,19 @@ Hooks.once('fabricate.ready', () => {
 });
 ```
 
-- `listSelectableActors()` returns the current user's selectable **player characters** (`actor.type === 'character'`) — owned actors for players, all for GMs. Each record is redaction-safe display data containing only `{ id, uuid, name, img }`; no other actor internals are exposed. This selection list is narrower than gathering attempt authorization: an owned non-player-character actor stays attempt-authorized through `listGatheringForActor` / `startGatheringAttempt` but does not appear in the bar.
+- `listSelectableActors()` returns the current user's selectable **player characters** (`actor.type === 'character'`), owned actors for players, all for GMs.
+  Each record is redaction-safe display data containing only `{ id, uuid, name, img }`.
+  No other actor internals are exposed.
+  This selection list is narrower than gathering attempt authorization.
+  An owned non-player-character actor stays attempt-authorized through `listGatheringForActor` / `startGatheringAttempt` but does not appear in the bar.
 - `getSelectedGatheringActorId()` reads the persisted remembered selection from the `fabricate.lastGatheringActor` client setting, returning `''` when unset.
 - `setSelectedGatheringActorId(id)` persists the remembered selection to that same client setting.
 
 ### Gathering Economy Block
 
-`getGatheringEconomy({ systemId })` returns the normalized per-system limitation block, and `setGatheringEconomy({ systemId, economy })` (GM-only) persists it. The block carries **two independent boolean flags** — there is no single `mode` field:
+`getGatheringEconomy({ systemId })` returns the normalized per-system limitation block, and `setGatheringEconomy({ systemId, economy })` (GM-only) persists it.
+The block carries **two independent boolean flags**.
+There is no single `mode` field:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -164,11 +180,19 @@ Hooks.once('fabricate.ready', async () => {
 });
 ```
 
-The flags map onto the rich-state service accessors `staminaEnabled(systemId)` and `nodesEnabled(systemId)` (the single read used by enforcement, world-time regen/respawn drivers, and every UI surface). The derived `economyMode(systemId)` accessor is retained for back-compat and now returns `'both' | 'stamina' | 'nodes' | 'none'` (the `'both'` value is new in `0.8.0`). Worlds upgraded from before `0.8.0` have their legacy `economy.mode` enum migrated into these flags automatically (see [Gathering Limitations]({% link gathering-environments.md %}#gathering-limitations)).
+The flags map onto the rich-state service accessors `staminaEnabled(systemId)` and `nodesEnabled(systemId)` (the single read used by enforcement, world-time regen/respawn drivers, and every UI surface).
+The derived `economyMode(systemId)` accessor is retained for back-compat and now returns `'both' | 'stamina' | 'nodes' | 'none'` (the `'both'` value is new in `0.8.0`).
+Worlds upgraded from before `0.8.0` have their legacy `economy.mode` enum migrated into these flags automatically (see [Gathering Limitations]({% link gathering-environments.md %}#gathering-limitations)).
 
 ### Realms, Parties, And Location
 
-Location-aware gathering adds stores for per-system realms and world-level parties, a current-realm resolver, and GM discovery controls. A **Gathering Realm** is the Fabricate geography concept (renamed from *Gathering Region* to avoid the collision with Foundry's own Scene `RegionDocument`; a realm maps many-to-one onto Foundry Scene Regions through its scene mappings). The whole subsystem is gated per crafting system by the `gatheringRealmSettings.enabled` flag (default off; the **Enable Travel & Realms** toggle in gathering Settings): while it is disabled, `getGatheringLocationForActor`, the override setters, and the discovery reveal/hide methods are inert (return `null` / `false` / no-op). Each method also has a shorter alias on the `game.fabricate.gathering` facade (`getPartyStore`, `getRealmStore`, `getLocationService`, `getLocationForActor`, `setPartyRealmOverride`, `clearPartyRealmOverride`, `revealRealmForActor`, `hideRealmForActor`). The pre-rename `*Region*` method and alias names are retained as deprecated delegates that warn once and forward, so existing macros keep working:
+Location-aware gathering adds stores for per-system realms and world-level parties, a current-realm resolver, and GM discovery controls.
+A **Gathering Realm** is the Fabricate geography concept (renamed from *Gathering Region* to avoid the collision with Foundry's own Scene `RegionDocument`).
+A realm maps many-to-one onto Foundry Scene Regions through its scene mappings.
+The whole subsystem is gated per crafting system by the `gatheringRealmSettings.enabled` flag (default off, the **Enable Travel & Realms** toggle in gathering Settings).
+While it is disabled, `getGatheringLocationForActor`, the override setters, and the discovery reveal/hide methods are inert (return `null` / `false` / no-op).
+Each method also has a shorter alias on the `game.fabricate.gathering` facade (`getPartyStore`, `getRealmStore`, `getLocationService`, `getLocationForActor`, `setPartyRealmOverride`, `clearPartyRealmOverride`, `revealRealmForActor`, `hideRealmForActor`).
+The pre-rename `*Region*` method and alias names are retained as deprecated delegates that warn once and forward, so existing macros keep working:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -204,7 +228,7 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.gatheringEnvironments` | Gathering environment and task configurations |
 | World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
 | World setting | `fabricate.migrationVersion` | Last completed Fabricate data migration version |
-| World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default; other presets are `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
+| World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default, with other presets `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
 | World setting | `fabricate.experimentalFeatures` | Reserved future experimental feature switch, disabled by default |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
@@ -230,4 +254,6 @@ Fabricate stores data in Foundry's settings and flags:
 |:-----|:-----|:--------|
 | `fabricate.ready` | After module initialisation and guarded startup world-time processing complete | None |
 
-Startup world-time processing awaits crafting, salvage, and gathering settlement before `fabricate.ready` fires. Later Foundry `updateWorldTime` events dispatch the same processors without blocking the hook; individual processor failures are caught and logged so one subsystem does not prevent the others from running.
+Startup world-time processing awaits crafting, salvage, and gathering settlement before `fabricate.ready` fires.
+Later Foundry `updateWorldTime` events dispatch the same processors without blocking the hook.
+Individual processor failures are caught and logged so one subsystem does not prevent the others from running.

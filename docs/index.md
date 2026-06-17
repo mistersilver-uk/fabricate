@@ -8,7 +8,7 @@ nav_order: 1
 
 # Fabricate
 
-A system-agnostic crafting module for Foundry Virtual Tabletop.
+A system-agnostic crafting and gathering module for Foundry Virtual Tabletop.
 {: .fs-6 .fw-300 }
 
 Fabricate lets GMs define crafting systems with recipes, ingredients, tools, essences, gathering environments, tasks, and events.
@@ -30,15 +30,15 @@ The GM recipe editor, player-facing Crafting and Alchemy tabs in the unified Fab
 | **Essences**               | Abstract properties on items for flexible ingredient matching                                                     |
 | **Visibility & Knowledge** | Control which recipes players can see, learn, or unlock through the visibility service                            |
 | **Teaser Mode**            | Track discovery progress and return teaser visibility state through the API                                       |
-| **Shopping List**          | Planned player-facing UI; aggregation support exists as internal utility code                                     |
+| **Shopping List**          | Planned player-facing UI. Aggregation support exists as internal utility code                                     |
 | **Effect Transfer**        | Transfer active effects from ingredients to crafted items                                                         |
 | **Macro Integration**      | Customise crafting checks, property generation, and success/failure hooks                                         |
 | **Alchemy Mode**           | Hide recipe names and let players discover formulas by experimentation                                            |
-| **Recipe Graph**           | Visualise recipe dependencies as an interactive graph in the GM admin panel                                       |
+| **Recipe Graph**           | Planned. Visualise recipe dependencies as an interactive graph in the GM admin panel                             |
 | **How-To Guides**          | Quick answers to common crafting tasks                                                                            |
 
 {: .tip }
-> Use the **search bar** in the sidebar to quickly find settings, configuration options, and macro examples across the documentation.
+> Use the **search bar** in the sidebar to quickly find settings, configuration options, and examples across the documentation.
 
 ## Quickstart
 
@@ -51,14 +51,16 @@ Tools can be both things you would carry, like a hammer, knife, or satchel or th
 
 ## Gathering
 
-GMs can define material-gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the `gathering` feature.
-Gathering can also be location-aware: GMs describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm.
+GMs can define material gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the "Gathering" feature.
+Gathering can also be location-aware! 
+GMs can describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm.
 See [Gathering Realms & Travel]({% link gathering-realms.md %}).
 
 ## Canvas Interactables
 
 GMs can place Tools and Gathering Tasks directly on the scene as **Scene Region** interactables (with an optional on-canvas marker).
-Players activate them by walking a token into the region: a non-blocking prompt appears, and clicking **Interact** opens the Fabricate UI.
+Players activate them by walking a token into the region.
+A non-blocking prompt appears, and clicking **Interact** opens the Fabricate UI.
 See [Canvas Interactables]({% link canvas-interactables.md %}).
 
 ## Having trouble?
@@ -67,4 +69,5 @@ Check the [Troubleshooting]({% link troubleshooting.md %}) guide for solutions t
 
 ## How-to guides
 
-Need a quick answer? The [How-To Guides]({% link how-to/index.md %}) cover common tasks like adding skill checks, setting up recipe discovery, and importing recipes.
+Need a quick answer?
+The [How-To Guides]({% link how-to/index.md %}) cover common tasks like recipe discovery, degrading tools, and effect transfer.

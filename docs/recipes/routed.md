@@ -1,118 +1,83 @@
 ---
 layout: default
-title: Routed Mode (Roll Table)
+title: Routed Mode
 parent: Recipes
-nav_order: 4
+nav_order: 2
 ---
 
-# Routed Mode — Roll Table Provider
+# Routed Mode
 
-A FoundryVTT roll table is drawn once per crafting attempt, and the drawn result's name determines which result group is produced. The outcome is matched case-insensitively against result group names, using the same reserved keyword rules as the macro outcome provider.
+Routed mode lets one recipe produce different results, with the result chosen at the moment of crafting.
+Use it whenever a single crafting process can lead to more than one outcome.
 
----
-
-## Rules
-
-- **One or more** ingredient sets
-- **One or more** result groups
-- `resultSelection.provider` must be `"rollTableOutcome"`
-- `resultSelection.rollTableUuid` is required — the UUID of the FoundryVTT RollTable to draw from
-- The engine draws exactly once per attempt
-- The drawn result's name is trim-normalised and compared case-insensitively against result group names
-- Result group names must be unique under case-insensitive comparison
-- Result group names may not use reserved fail/miss keywords (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`)
-
-### Reserved Keywords
-
-| Keyword | Behaviour |
-|:--------|:----------|
-| `fail`, `failed`, `failure`, `f` | The craft takes the failure path |
-| `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed` | The craft produces nothing (non-producing failure) |
-
-If the drawn result name does not match any reserved keyword and does not match any result group name, the engine aborts with a crafting-system misconfiguration error.
-
-## Example: Random Potion Brewing
-
-A routed system where brewing a potion draws from a roll table to determine which potion is produced:
-
-| Roll Table Result | Result Group | Output |
-|:------------------|:-------------|:-------|
-| "Healing" | Healing result | 1x Potion of Healing |
-| "Fire" | Fire result | 1x Potion of Fire Breath |
-| "Invisibility" | Invisibility result | 1x Potion of Invisibility |
-| "fail" | (reserved) | Craft fails; ingredients consumed |
-
-### Creating the Recipe
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const { Recipe, IngredientSet } = game.fabricate.api;
-
-  const recipe = new Recipe({
-    name: 'Brew Mystery Potion',
-    craftingSystemId: 'alchemy-system-id',
-    resultSelection: {
-      provider: 'rollTableOutcome',
-      rollTableUuid: 'RollTable.your-potion-table-uuid'
-    },
-    ingredientSets: [
-      IngredientSet.fromJSON({
-        id: 'ingredients',
-        name: 'Brewing Ingredients',
-        ingredientGroups: [
-          {
-            id: 'reagent', name: 'Reagent',
-            options: [
-              { quantity: 2, match: { type: 'component', componentId: 'alchemical-herb-id' } }
-            ]
-          }
-        ]
-      })
-    ],
-    resultGroups: [
-      {
-        id: 'healing-result',
-        name: 'Healing',
-        results: [{ id: 'healing-potion', componentId: 'potion-healing-id', quantity: 1 }]
-      },
-      {
-        id: 'fire-result',
-        name: 'Fire',
-        results: [{ id: 'fire-potion', componentId: 'potion-fire-id', quantity: 1 }]
-      },
-      {
-        id: 'invisibility-result',
-        name: 'Invisibility',
-        results: [{ id: 'invis-potion', componentId: 'potion-invisibility-id', quantity: 1 }]
-      }
-    ]
-  });
-
-  await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-});
-```
-
-## Setting Up the Roll Table
-
-In FoundryVTT, create a Roll Table whose result names match your result group names exactly (case-insensitive). You can also include entries named with reserved keywords (`fail`, `nothing`, etc.) to model chance-of-failure without a crafting check.
-
-1. Open **Roll Tables** in the sidebar
-2. Create a new table
-3. Add results whose **Text** values match your recipe's result group names
-4. Copy the table UUID from its sheet header (right-click the title)
-5. Paste the UUID into `resultSelection.rollTableUuid`
-
-## When to Use the Roll Table Provider
-
-The roll table provider is ideal when:
-- Crafting outcomes should feel random or mysterious
-- You want FoundryVTT's native probability weighting on roll tables
-- You do not need a player-facing skill check, but still want variable results
+A routed recipe has one or more ingredient sets and one or more result groups.
+You pick how the result is selected in one of three ways.
 
 ---
 
-## What's next?
+## Choosing the result
 
-- [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %}) -- a crafting check macro's named outcome selects the result group.
-- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}) -- the player's ingredient choice selects the result group.
-- [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.
+### By ingredient choice
+
+The player's choice of ingredients decides the result, with no crafting check involved.
+Each ingredient set is tied to a result, so changing the materials changes what is produced.
+
+Use this when different materials should make different things.
+For example, the same gold band could become a Ring of Fire Resistance with a ruby, or a Ring of Frost Resistance with a sapphire.
+
+### By skill-check outcome
+
+A crafting check reports a named outcome, and that outcome decides the result.
+A crafting check is required.
+
+Use this when the quality of the result should depend on a roll.
+For example, a forging recipe might give a Masterwork Longsword on a great roll, a plain Longsword on an average one, and a Bent Blade on a poor one.
+
+This feature is expected to be modified to add numerical ranges to the outcomes to allow a roll result to determine the outcome without a macro being required.
+
+### By roll table
+
+A Foundry roll table is drawn once per attempt, and the drawn entry decides the result, with no crafting check involved.
+
+Use this when the outcome should feel random and you want Foundry's own table weighting.
+For example, brewing an unstable potion might draw Healing, Fire Breath, or Invisibility from a table.
+To set it up, make a roll table whose entry names match your result names, then point the recipe at that table.
+
+This feature may be deprecated in favor of numerical range check outcome routing.
+
+---
+
+## How outcomes match results
+
+With the skill-check and roll-table options, the outcome name is matched to a result by name.
+Upper and lower case and surrounding spaces are ignored, so each result needs a name that is unique once case is ignored.
+
+A few names are reserved so a recipe can fail or come up empty without a separate check.
+
+| Reserved name | What happens |
+|:--------------|:-------------|
+| fail, failed, failure, f | The craft takes the failure path |
+| miss, missed, m, nothing, none, whiff, whiffed | The craft produces nothing |
+
+If an outcome is neither a reserved name nor one of your result names, the craft stops and reports a setup problem rather than treating it as a player failure.
+
+In a multi-step recipe, each step can use its own selection method and falls back to the recipe's setting when it has none.
+
+---
+
+## Choosing an option
+
+Pick **ingredient choice** when the materials a player brings should determine the output, with no roll.
+Pick **skill-check outcome** when result quality should depend on a roll and you want distinct named outcomes rather than just pass or fail.
+Pick **roll table** when you want randomness and Foundry's table weighting without a player-facing check.
+
+Recipes can be authored through the API only today.
+See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+
+---
+
+## See Also
+
+- [Simple Mode]({% link recipes/simple.md %}): one set of ingredients and one result, with an optional pass or fail check.
+- [Progressive Mode]({% link recipes/progressive.md %}): a skill-check value buys results in difficulty order.
+- [Crafting Checks]({% link crafting-checks.md %}): how crafting checks are configured.

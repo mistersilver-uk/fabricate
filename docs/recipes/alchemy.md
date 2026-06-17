@@ -2,184 +2,117 @@
 layout: default
 title: Alchemy Mode
 parent: Recipes
-nav_order: 6
+nav_order: 5
 ---
 
 # Alchemy Mode
 
-Alchemy mode turns recipe crafting into a discovery game. Players cannot see recipe names or ingredient lists up front. Instead, an integration or macro submits selected items to the alchemy engine. If the combination matches a recipe, the craft succeeds. If it does not match, the items may be silently consumed.
+Alchemy mode turns recipe crafting into a discovery game.
+Players cannot see recipe names or ingredient lists up front.
+Instead, a player submits a chosen combination of items to be tried.
+If the combination matches a recipe, the craft succeeds.
+If it does not match, the items may be silently consumed.
 
-Use alchemy mode for systems where recipes are secrets — a witch's grimoire, an experimental alchemist's bench, or any scenario where players are meant to experiment rather than follow a known formula.
+Use alchemy mode for systems where recipes are secrets, such as a witch's grimoire, an alchemist's bench, or any scenario where players are meant to experiment rather than follow a known formula.
 
 ---
 
-## Current API Surface
+## Current State
 
-Alchemy systems can be authored today in the GM **Manage Crafting Systems** app. The player-facing Alchemy tab in the unified Fabricate window is a planned UI surface; current play use is through macros or integrations that call the crafting engine.
+Alchemy recipes and systems can be authored through the API only today.
+There is no GM recipe-editor UI.
+A player-facing Alchemy tab is planned and not yet available.
+Alchemy crafting works through the API today.
 
-Use `game.fabricate.getCraftingEngine().craftAlchemy(...)` to submit a discovered combination:
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const actor = game.user.character;
-  const sourceActors = [actor];
-  const submittedItems = [
-    actor.items.getName('Nightshade'),
-    actor.items.getName('Moonwater')
-  ].filter(Boolean);
-
-  const result = await game.fabricate.getCraftingEngine().craftAlchemy(
-    actor,
-    sourceActors,
-    submittedItems,
-    { craftingSystemId: 'my-alchemy-system-id' }
-  );
-
-  if (!result.success) {
-    ui.notifications.warn(game.i18n.localize(result.message) || result.message);
-  }
-});
-```
-
-`submittedItems` should be real Foundry Item documents, or item-like objects that at least include a `uuid` and `name`. Fabricate uses those references to match component signatures and consume submitted inventory when configured to do so.
-
-## Planned Alchemy UI
-
-The planned player Alchemy tab will provide:
-
-- a system selector for worlds with more than one alchemy system
-- a component palette showing available inventory
-- a workbench for staging submitted components
-- discovered recipe recall when `learnOnCraft` is enabled
-- auto-fill for already-discovered recipes
-- attempt feedback and failed-combination handling
-
-Until that UI lands, treat this page as API and authoring documentation rather than player workflow documentation.
+A submitted combination is a set of items chosen by the player for a crafting character.
+Fabricate uses those items to match recipes and to consume the submitted inventory when the system is set up to do so.
+See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) for the API used to submit a combination.
 
 ---
 
 ## How It Works
 
-1. The GM creates a crafting system and sets its **Resolution Mode** to `alchemy`.
-2. A macro or integration calls `game.fabricate.getCraftingEngine().craftAlchemy(...)` with the crafting actor, source actors, submitted items, and alchemy system ID.
-3. Fabricate matches the submitted components against all enabled recipes in the system.
+1. A crafting system is created with its resolution mode set to Alchemy.
+2. A player submits a chosen combination of items for their crafting character.
+3. Fabricate matches the submitted items against all enabled recipes in the system.
 4. If a matching recipe is found, the normal crafting flow runs (ingredients consumed, results created).
-5. If no recipe matches, the attempt ends. Depending on system configuration, the submitted items may or may not be consumed.
+5. If no recipe matches, the attempt ends.
+   Depending on system configuration, the submitted items may or may not be consumed.
 
 ---
 
-## Signature Matching
+## How Combinations Are Matched
 
-Fabricate identifies a recipe match by comparing the staged components against the **component signatures** of each recipe in the system. A signature is the set of components that satisfy a recipe's ingredient groups.
+Fabricate finds a recipe match by comparing the submitted items against the ingredient groups of each recipe in the system.
 
-- Each ingredient group must be satisfied by at least one staged component whose source-reference chain overlaps a component in that group.
-- Fabricate checks the staged item's live UUID, canonical source UUID, and the component's `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
-- If all groups in an ingredient set are satisfied, the recipe is considered a match and crafting proceeds using that ingredient set.
-- Recipes are checked in order; the first match is used.
+- Each ingredient group must be satisfied by at least one submitted item that the system recognises as one of that group's components.
+- An item is recognised whether it is the original world or compendium item, a copy of it, or an item that was duplicated from it.
+- If every group in an ingredient set is satisfied, the recipe is a match and crafting proceeds using that ingredient set.
+- Recipes are checked in order, and the first match is used.
 
 {: .note }
-> Alchemy matching is not limited to a single UUID field. A component can still match when its live `sourceUuid` changed, as long as the staged item overlaps the component's canonical `sourceItemUuid` or any recorded fallback UUID.
+> A submitted item still matches a component even if the item it was copied from has since changed, as long as Fabricate can trace it back to that component.
 
 ---
 
 ## Consume on Fail
 
-By default, when no recipe matches, Fabricate removes the submitted items from the component source actors. You can change this by setting `system.alchemy.consumeOnFail` to `false`.
+By default, when no recipe matches, Fabricate removes the submitted items from the characters that supplied them.
+You can change this with the system's Consume on Fail setting.
 
-| `consumeOnFail` value | Behaviour on no-match |
+| Consume on Fail | Behaviour on no-match |
 |:----------------------|:----------------------|
-| `true` (default) | Submitted items are deleted from actor inventory |
-| `false` | Submitted items are left intact; no items are consumed |
+| On (default) | Submitted items are removed from the character's inventory |
+| Off | Submitted items are left intact, no items are consumed |
 
-To configure via the API:
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  // Disable consume-on-fail for an alchemy system
-  await mgr.updateSystem('my-alchemy-system-id', {
-    alchemy: { consumeOnFail: false }
-  });
-});
-```
+This setting lives under the system's Alchemy options.
+See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
 
 ---
 
 ## Learn on Craft
 
-When `system.alchemy.learnOnCraft` is `true`, a player who successfully discovers a recipe has that recipe added to their learned-recipes flag. API consumers can read that learned state through the visibility service; the planned Alchemy UI will use it to show discovered recipes and help players reproduce known combinations.
+When the system's Learn on Craft setting is on, a player who successfully discovers a recipe has that recipe marked as learned for their character.
+That learned state can be read to show discovered recipes and help players reproduce known combinations.
 
-| `learnOnCraft` value | Behaviour on success |
+| Learn on Craft | Behaviour on success |
 |:---------------------|:---------------------|
-| `false` (default) | Every attempt is anonymous; players never see recipe names |
-| `true` | Discovered recipes are written to `actor.flags.fabricate.learnedRecipes`; integrations and the planned UI can surface them in future sessions |
+| Off (default) | Every attempt is anonymous, players never see recipe names |
+| On | Discovered recipes are remembered for the character and can be surfaced in future sessions |
 
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('my-alchemy-system-id', {
-    alchemy: { learnOnCraft: true }
-  });
-});
-```
+This setting also lives under the system's Alchemy options.
+See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
 
 ---
 
 ## Setting Up an Alchemy System
 
-### In the GM Admin Panel
-
-1. Open **Manage Crafting Systems** from the Items sidebar.
-2. Click **Create System** and give it a name (e.g. "Witch's Alchemy").
-3. In the **System Settings** card, set **Resolution Mode** to `alchemy`.
-4. Add your managed components (ingredients) in the **Components** tab using drag-and-drop from the Items sidebar.
-5. Create recipes in the normal recipe editor. Ingredient sets define the hidden signatures that players must discover by experiment. Result groups define what is produced on a successful match.
-6. Enable each recipe. Disabled recipes are never matched.
+To set up an alchemy system, create a crafting system with its resolution mode set to Alchemy, add the managed components that act as ingredients, then author recipes whose ingredient sets define the hidden combinations players must discover by experiment and whose result groups define what is produced on a successful match.
+Enable each recipe, because disabled recipes are never matched.
+The system's Alchemy options carry the Consume on Fail and Learn on Craft settings.
+Recipes and systems can be authored through the API only.
+See the [System Manager API reference]({% link api/system-manager.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure systems and recipes.
 
 {: .warning }
-> Changing the resolution mode on an existing system that has recipes will delete those recipes, because their configuration may be incompatible with the new mode. You will be asked to confirm.
-
-### Configuring the alchemy sub-object via API
-
-```javascript
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('my-alchemy-system-id', {
-    alchemy: {
-      consumeOnFail: true,   // consume items when no recipe matches
-      learnOnCraft: true     // write discovered recipes to actor flags
-    }
-  });
-});
-```
+> Changing the resolution mode on an existing system that has recipes will delete those recipes, because their configuration may be incompatible with the new mode.
 
 ---
 
 ## Visibility Rules
 
-In alchemy mode, recipe visibility follows special rules regardless of the system's `recipeVisibility.listMode`:
+In alchemy mode, recipe visibility follows special rules no matter how the system's recipe list visibility is set:
 
 | Viewer | Visibility result |
 |:-------|:---------------------------------------|
-| GM | All recipes visible (for authoring and debugging) |
-| Player (`learnOnCraft: false`) | No recipes visible |
-| Player (`learnOnCraft: true`, recipe not yet discovered) | Recipe not visible |
-| Player (`learnOnCraft: true`, recipe previously discovered) | Recipe visible to API consumers and planned discovered-recipe UI |
+| GM | All recipes visible (for authoring and checking your work) |
+| Player, when Learn on Craft is off | No recipes visible |
+| Player, when Learn on Craft is on and the recipe has not been discovered | Recipe not visible |
+| Player, when Learn on Craft is on and the recipe was discovered earlier | Recipe visible |
 
 ---
 
-## Data Persistence
+## See Also
 
-Fabricate registers a client setting for the planned Alchemy tab:
-
-| Setting key | Scope | Description |
-|:------------|:------|:------------|
-| `fabricate.lastAlchemySystem` | Client | ID of the last alchemy system selected by the planned Alchemy UI |
-
----
-
-## What's Next?
-
-- [Simple Mode]({% link recipes/simple.md %}) — standard A + B = C crafting without hidden signatures
-- [Visibility & Knowledge]({% link visibility.md %}) — the full recipe knowledge system (learn by item, learn by flag)
-- [Crafting Systems]({% link crafting-systems.md %}) — all system-level settings and feature toggles
+- [Simple Mode]({% link recipes/simple.md %}): standard A + B = C crafting without hidden combinations
+- [Visibility & Knowledge]({% link visibility.md %}): the full recipe knowledge system (learning recipes by owning an item or by learning them directly)
+- [Crafting Systems]({% link crafting-systems.md %}): all system-level settings and feature toggles

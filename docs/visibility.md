@@ -6,184 +6,184 @@ nav_order: 7
 
 # Visibility & Knowledge
 
-Fabricate supports four approaches to controlling which recipes players can see and craft: **global**, **player lists**, **knowledge gating**, and **teaser mode**. The approach is configured per crafting system via the `listMode` setting.
+Fabricate supports four approaches to controlling which recipes players can see and craft: **global**, **player lists**, **knowledge gating**, and **teaser mode**.
+You choose the approach for each crafting system.
 
 ---
 
-Picture a campaign where novice adventurers know only basic recipes -- a healing salve and a simple torch -- while a master artificer has unlocked legendary weapon blueprints through months of questing. Fabricate's visibility system lets you control exactly this: which recipes each player can see and when new ones become available. You might make every recipe visible from the start for a casual game, hand-pick recipes per player for tighter narrative control, or gate discovery behind owning an in-world "recipe scroll" that a player finds in a dragon's hoard. The [list modes below](#list-modes) walk through each approach, starting with the four modes you can set on a crafting system.
+Picture a campaign where novice adventurers know only basic recipes, such as a healing salve and a simple torch, while a master artificer has unlocked legendary weapon blueprints through months of questing.
+Fabricate's visibility system lets you control which recipes each player can see and when new ones become available.
+You might make every recipe visible from the start for a casual game, hand-pick recipes per player for tighter narrative control, or gate discovery behind owning an in-world "recipe scroll" that a player finds in a dragon's hoard.
+The [list modes below](#list-modes) walk through each approach, starting with the four modes you can set on a crafting system.
 
 ## List Modes
 
-Set `recipeVisibility.listMode` on your crafting system — either through the **Recipe Visibility** card in the Crafting Admin panel or via the API — to choose the approach.
+Choose a visibility approach for your crafting system in the **Recipe Visibility** card in the Crafting Admin panel, or through the API.
 
-### Global Mode (`listMode: "global"`)
+### Global Mode
 
 All recipes in the system are visible to all users.
 
 - No per-recipe restrictions are applied.
 - The recipe editor does not show visibility controls because they have no effect in this mode.
-- This is the default for all new systems and for any existing system that has not had an explicit `listMode` saved.
+- This is the default for all new systems and for any existing system that has not had a visibility approach chosen.
 
-Use global mode when recipe discovery is not part of your game design — for example, a simple crafting system where players just need to know what they can make.
+Use global mode when recipe discovery is not part of your game design.
+For example, a simple crafting system where players just need to know what they can make.
 
-### Player Mode (`listMode: "player"`)
+### Player Mode
 
-The GM directly controls who sees each recipe via a per-recipe allow-list.
+The GM directly controls who sees each recipe through a per-recipe list of allowed users.
 
-- Each recipe has a `visibility.restricted` flag.
-- When a recipe is restricted, only users whose IDs appear in `visibility.allowedUserIds` can see it.
+- Each recipe can be marked as restricted.
+- When a recipe is restricted, only the users you have allowed can see it.
 - GMs always see all recipes.
-- A restricted recipe with an empty `allowedUserIds` list is hidden from all players. This is useful while you are drafting a recipe before assigning it to specific users — it is a valid configuration and saves without error.
+- A restricted recipe with no allowed users is hidden from all players.
+  This is useful while you are drafting a recipe before assigning it to specific users.
+  It is a valid configuration and saves without error.
 - The recipe list in the Crafting Admin panel shows a **Visibility** column summarising each recipe's access level.
 
-**In the recipe editor.** When the system is in player mode, the recipe editor shows a "Restrict visibility to specific users" checkbox. When checked, a list of users appears so you can tick the ones who should have access. Leaving the user list empty is allowed.
+**In the recipe editor.** When the system is in player mode, the recipe editor shows a "Restrict visibility to specific users" checkbox.
+When checked, a list of users appears so you can tick the ones who should have access.
+Leaving the user list empty is allowed.
 
 **Simple and explicit.** Good for smaller recipe sets where you want direct control over who can see what.
 
-### Knowledge Mode (`listMode: "knowledge"`)
+### Knowledge Mode
 
 Recipes are discovered through gameplay.
 
 - Players must "know" a recipe before it appears in their list.
-- Knowledge can come from **owning a recipe item**, **learning the recipe**, or **both**, depending on your `knowledge.mode` setting.
+- Knowledge can come from **owning a recipe item**, **learning the recipe**, or **both**, depending on how you set up knowledge for the system.
 - Encourages exploration and discovery.
-- The restriction UI in the recipe editor is hidden in this mode because access is always evaluated through the knowledge model, not an allow-list.
+- The restriction controls in the recipe editor are hidden in this mode because access is always worked out from what the player knows, not from a list of allowed users.
 
-### Teaser Mode (`listMode: "teaser"`)
+### Teaser Mode
 
-Recipes are partially visible to players before they are discovered. Players can see that a recipe exists — its name, category, and an optional teaser description — but hidden fields (ingredients, results, or description) are concealed until the player accumulates enough discovery progress.
+Recipes are partially visible to players before they are discovered.
+Players can see that a recipe exists, including its name, category, and an optional teaser description.
+Other details, such as the ingredients, results, or description, stay hidden until the player builds up enough discovery progress.
 
-- Each recipe defines which fields to hide and a `revealThreshold` (the amount of discovery progress required to fully unlock it).
-- Progress accumulates via **fragments** (items linked to a UUID that grant progress automatically on acquisition) or **manual GM assignment**, or both.
-- API consumers can read progress toward unlocking a teaser recipe; the planned Crafting UI will show that progress to players.
-- When progress meets the threshold the recipe transitions to fully visible and craftable.
+- Each recipe decides which details to hide and how much discovery progress is needed to fully unlock it.
+- Progress builds up through **fragments** (in-world items that grant progress automatically when a player acquires them), through **manual GM assignment**, or through both.
+- The planned Crafting UI will show players their progress toward unlocking a teaser recipe.
+- When progress reaches the required amount the recipe becomes fully visible and craftable.
 
 See [Teaser Mode]({% link visibility-teaser.md %}) for full configuration details.
 
 ## Knowledge Modes
 
-When using `listMode: "knowledge"`, the `knowledge.mode` setting determines how access is evaluated:
+When you use knowledge mode, you decide how a player gains access to a recipe.
 
-| Mode | Access Granted When |
-|:-----|:-------------------|
-| `item` | Player owns a matching recipe item |
-| `learned` | Recipe has been explicitly learned |
-| `itemOrLearned` | Either condition is met |
+| A player gains access when | Meaning |
+|:---------------------------|:--------|
+| They own a matching recipe item | Holding the recipe scroll or manual is enough |
+| They have learned the recipe | The recipe must be explicitly learned |
+| Either of the above | Owning the item or learning the recipe both work |
 
 ## Recipe Items
 
-A **recipe item** is a regular Foundry item linked to a recipe via `linkedRecipeItemUuid`. Think of it as a "recipe scroll" or "crafting manual".
+A **recipe item** is a regular Foundry item linked to a recipe.
+Think of it as a "recipe scroll" or "crafting manual".
 
 ### Linking a Recipe Item in the Editor
 
-When a crafting system uses knowledge-mode visibility, the recipe editor shows a **Linked Recipe Item** section. There are two ways to link an item:
+When a crafting system uses knowledge-mode visibility, the recipe editor shows a **Linked Recipe Item** section.
+There are two ways to link an item:
 
-- **Browse Items** — opens a picker so you can select any existing world item or compendium item by UUID.
-- **Create Recipe Item** — creates a new world item named `Recipe: <recipeName>` with type `loot` and automatically links it to this recipe. Use this when you want a fresh scroll or manual for the recipe without leaving the editor.
+- **Browse Items** opens a picker so you can select any existing world item or compendium item.
+- **Create Recipe Item** creates a new loot item named after the recipe and automatically links it to this recipe.
+  Use this when you want a fresh scroll or manual for the recipe without leaving the editor.
 
-Once a UUID resolves to an item, the editor displays the item's image, name, and UUID alongside a **Clear** button. Click **Clear** to unlink the item and enter a different UUID.
+Once an item is linked, the editor displays its image and name alongside a **Clear** button.
+Click **Clear** to unlink the item and choose a different one.
 
-If a linked item UUID is required by the system's visibility mode but has not been set, the editor shows a validation warning before you save.
+If the system's visibility mode needs a linked item but none has been set, the editor shows a warning before you save.
 
 ### How Matching Works
 
-An owned item matches a recipe's `linkedRecipeItemUuid` when any of the following is true:
+An item a player owns counts as the recipe's linked item when it is the linked item itself, or when it is a copy of that item.
+When a player drags an item out of a compendium onto a sheet, Foundry makes a fresh copy and remembers where it came from.
+Fabricate recognises both the original item and any copy made from it, across all supported Foundry versions.
+This means recipe scrolls work whether a player picks up the item directly or copies it out of a compendium.
 
-1. The owned item's UUID exactly equals `linkedRecipeItemUuid`
-2. The owned item's `_stats.compendiumSource` equals `linkedRecipeItemUuid` (Foundry v12+)
-3. The owned item's `flags.core.sourceId` equals `linkedRecipeItemUuid` (Foundry v11 and earlier, legacy fallback)
-
-When an item is dragged from a compendium to a character sheet, Foundry creates a copy with a new UUID and records the original compendium UUID as the item's source. On Foundry v12 and later this is stored in `_stats.compendiumSource`; on earlier versions it was stored in `flags.core.sourceId`. Fabricate reads both fields so that recipe scrolls work correctly regardless of which Foundry version created the owned copy.
-
-> **Foundry v12+ note:** If a player owns a recipe scroll that was duplicated from a compendium but the recipe still shows as unknown, check that the item's `_stats.compendiumSource` field matches the `linkedRecipeItemUuid` stored on the recipe. Open the browser console and inspect `item._stats.compendiumSource` alongside `item.flags?.core?.sourceId`. If only the legacy `sourceId` field is populated (for example, on an item created on Foundry v11 that was not re-imported), the legacy fallback will still match correctly. If neither field matches, re-import the recipe item from the compendium.
+> **Tip:** If a player owns a recipe scroll that was copied from a compendium but the recipe still shows as unknown, the copy may have lost track of the item it came from. Re-importing the recipe item from the compendium restores the link.
 
 ### Limited Uses
 
-Recipe items can have limited uses:
+Recipe items can have limited uses.
 
-| Setting | Description |
-|:--------|:------------|
-| `knowledge.item.limitUses` | Enable use tracking |
-| `knowledge.item.maxUses` | Maximum number of times the item grants access |
-| `knowledge.item.destroyWhenExhausted` | Delete the item when uses run out |
+- You can turn on use tracking for the item.
+- You can set the maximum number of times the item grants access.
+- You can have the item be deleted once its uses run out.
 
-Usage is tracked per owned item instance:
+Each owned copy keeps its own count of how many times it has been used.
+Once an item reaches its maximum number of uses, it no longer grants access to the recipe.
 
-```
-Item.flags.fabricate.recipeItemUsage = {
-  timesUsed: <number>
-}
-```
+### Which Item Is Used
 
-When `timesUsed >= maxUses`, the item no longer grants knowledge access.
-
-### Deterministic Selection
-
-When multiple owned items match the same recipe, Fabricate selects deterministically:
-1. Prefer the item with the highest `timesUsed` (consolidate usage)
-2. Break ties by actor order (crafting actor first, then source actors)
-3. Break further ties by item order within the actor
+When a player owns more than one item that matches the same recipe, Fabricate always picks the same one in a predictable order.
+It prefers the item that has already been used the most, so usage stays consolidated on a single item.
+If items are still tied, it favours the crafting actor's own items before items held by other actors, and then uses the order the items appear on the actor.
 
 ## Learning Recipes
 
-When `knowledge.mode` is `learned` or `itemOrLearned`, players can explicitly learn recipes:
+When a system grants access through learning, players can explicitly learn recipes.
 
 ### Learn Flow
 
-1. An owned recipe item is evaluated by `RecipeVisibilityService.learnRecipesFromOwnedItem(...)`, or an integration calls `learnRecipe(...)`.
-2. Preconditions: recipe has a `linkedRecipeItemUuid`, player owns a matching item, recipe not yet learned.
-3. The service records the recipe in the actor's flags.
-4. The planned Crafting UI will expose this flow as a player "Learn" action.
+Learning happens from an owned recipe item.
+A recipe can be learned when it has a linked recipe item, the player owns a matching item, and the recipe has not already been learned.
+When a recipe is learned, Fabricate records it on the actor along with when it was learned and which item taught it.
 
-```
-Actor.flags.fabricate.learnedRecipes = {
-  "<recipeId>": {
-    learnedAt: <timestamp>,
-    sourceItemUuid: "<the item that taught it>"
-  }
-}
-```
+A player-facing "Learn" action surfaced by the Crafting UI, along with a "Locked" badge for locked recipes, is planned and not yet available.
 
 ### Consume on Learn
 
-When `knowledge.learn.consumeOnLearn` is `true` (the default), the recipe item is consumed (deleted) when the player learns the recipe. This creates one-time-use "recipe scrolls".
+By default, the recipe item is consumed (deleted) when the player learns the recipe.
+This creates one-time-use "recipe scrolls".
 
-Set `consumeOnLearn` to `false` if you want the item to persist after learning — for example, a spellbook that teaches recipes but is not destroyed in the process.
+You can choose to keep the item after learning instead.
+For example, a spellbook that teaches recipes but is not destroyed in the process.
 
-You configure `consumeOnLearn` in the **Recipe Visibility** card on the System tab of the Crafting Admin panel. The option is only shown when `listMode` is `"knowledge"`.
+You set this in the **Recipe Visibility** card on the System tab of the Crafting Admin panel.
+The option only appears when the system is in knowledge mode.
 
 ### Drag-and-Drop Learning
 
-Dragging a recipe item onto a crafting actor's sheet is a required learning pathway. When a valid recipe item is dropped onto an actor, Fabricate automatically learns every matched recipe whose own crafting system has auto-learn enabled (`knowledge.learn.dragDropEnabled: true`) — no button click required for that auto-learning subset.
+Dragging a recipe item onto a crafting actor's sheet is one of the ways players learn recipes.
+When a valid recipe item is dropped onto an actor, Fabricate automatically learns every matched recipe whose own crafting system has auto-learn turned on.
+No button click is required for that auto-learning subset.
 
-Only actor-bound drop targets are considered for learning. If the drop target cannot be resolved to an actor, or the current user lacks permission to update that actor, the learning path is skipped silently.
+Only actor-bound drop targets are considered for learning.
+If the drop target cannot be resolved to an actor, or the current user lacks permission to update that actor, the learning path is skipped silently.
 
 #### How Matching Works for Dropped Items
 
-A dropped item is matched against all recipes in the crafting system. A recipe matches when any of the following is true:
-
-1. The dropped item's UUID equals `recipe.linkedRecipeItemUuid`
-2. The dropped item's `_stats.compendiumSource` equals `recipe.linkedRecipeItemUuid` (Foundry v12+)
-3. The dropped item's `flags.core.sourceId` equals `recipe.linkedRecipeItemUuid` (Foundry v11 and earlier, legacy fallback)
-
-All three fields are always evaluated. A match on any one is sufficient. This means items dragged directly from the world and items originally copied from a compendium are both recognised, across all supported Foundry versions.
+A dropped item is matched against all recipes in the crafting system.
+A recipe matches when the dropped item is its linked recipe item, or a copy of that item.
+This means items dragged directly from the world and items originally copied from a compendium are both recognised, across all supported Foundry versions.
 
 #### Recipe Book Items
 
-A single dropped item can match more than one recipe. When this happens, the actor learns every matched recipe in a single operation. This makes it straightforward to create "recipe book" items — one Alchemist's Compendium, for example, might unlock Healing Salve, Antitoxin, and Smokestick all at once.
+A single dropped item can match more than one recipe.
+When this happens, the actor learns every matched recipe in a single operation.
+This makes it straightforward to create "recipe book" items.
+One Alchemist's Compendium, for example, might unlock Healing Salve, Antitoxin, and Smokestick all at once.
 
 #### Mixed-System Behavior
 
-Recipe-item learning is evaluated per matched recipe, not once for the item as a whole. In a world with multiple crafting systems:
+Learning from a recipe item is decided one recipe at a time, not once for the item as a whole.
+In a world with multiple crafting systems:
 
-- Recipes from systems where `knowledge.learn.dragDropEnabled` is `true` auto-learn when the item is dropped onto the actor.
-- Recipes from systems where `knowledge.learn.dragDropEnabled` is `false` are excluded from auto-learning, even if the same owned item matches them.
+- Recipes from systems with auto-learn turned on are learned when the item is dropped onto the actor.
+- Recipes from systems with auto-learn turned off are left out of auto-learning, even if the same owned item matches them.
 
 This means the same owned item can auto-learn some recipes immediately and still offer manual learning for other matched recipes from differently configured systems.
 
 ### Manual Learning On Owned Item Sheets
 
-When a matched recipe belongs to a system where auto-learn is disabled (`knowledge.learn.dragDropEnabled: false`), Fabricate adds a **Learn Recipe** action to the actor-owned item sheet instead of auto-learning on drop.
+When a matched recipe belongs to a system where auto-learn is turned off, Fabricate adds a **Learn Recipe** action to the actor-owned item sheet instead of auto-learning on drop.
 
 - The action appears only on actor-owned item sheets.
 - It appears only when the current user can update the owning actor and at least one matched recipe is manually learnable.
@@ -201,14 +201,15 @@ After a drag-and-drop learn attempt, Fabricate shows notifications for successfu
 | **Success** | Lists each recipe learned and the actor that learned them. |
 | **Partial success** | When some matched recipes were already known, only the newly learned recipes are listed. If all matches were already known, the player is notified that nothing new was learned. |
 | **No match** | The drop is silently ignored for learning purposes. No notification is shown. The item is still added to the actor's inventory as normal. |
-| **Precondition failure** | When the system's knowledge mode does not support learning (i.e., mode is `item` only), no learn operation occurs and no notification is shown. |
+| **Precondition failure** | When the system's knowledge mode does not support learning (for example, when access comes only from owning the item), nothing is learned and no notification is shown. |
 
 ## Locked Recipes
 
-Any recipe can be `locked` regardless of visibility mode. Locked recipes:
-- Are visible to all players (so they know it exists)
-- Cannot be crafted by non-GM users
-- Return locked state through the visibility guard; the planned Crafting UI will show a "Locked" badge
+Any recipe can be locked, regardless of visibility mode.
+Locked recipes:
+- Are visible to all players, so they know the recipe exists
+- Cannot be crafted by anyone other than the GM
+- Are reported as locked to the rest of Fabricate (the planned "Locked" badge is noted above)
 
 ## Crafting Guards
 
@@ -221,40 +222,15 @@ If any guard fails, the action is blocked with a notification explaining why.
 
 ## Configuring via the API
 
-You can set visibility programmatically through the `CraftingSystemManager`:
-
-```javascript
-// Switch an Alchemy system to player-specific visibility
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    recipeVisibility: { listMode: 'player' }
-  });
-});
-```
-
-```javascript
-// Switch to knowledge mode: players must own a recipe scroll to see the recipe,
-// and the scroll is consumed when they learn it.
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'itemOrLearned',
-        learn: { consumeOnLearn: true }
-      }
-    }
-  });
-});
-```
+You can set visibility programmatically.
+For example, you can switch a system to player mode, or to knowledge mode where access comes from owning the item or learning the recipe and the recipe scroll is consumed when learned.
+See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
 
 ---
 
-## What's next?
+## See Also
 
-- [Teaser Mode]({% link visibility-teaser.md %}) -- reveal recipes gradually with fragment-based or threshold-based discovery.
-- [Recipes overview]({% link recipes/index.md %}) -- create and edit recipes, including visibility configuration in the recipe editor.
-- [Crafting Systems]({% link crafting-systems.md %}) -- configure system-level visibility settings and feature toggles.
-- [Macros & Examples]({% link macros/index.md %}) -- automate visibility and knowledge workflows with macros.
+- [Teaser Mode]({% link visibility-teaser.md %}). Reveal recipes gradually with fragment-based or threshold-based discovery.
+- [Recipes overview]({% link recipes/index.md %}). Create and edit recipes, including visibility configuration in the recipe editor.
+- [Crafting Systems]({% link crafting-systems.md %}). Configure system-level visibility settings and feature toggles.
+- [Recipe Visibility Service API]({% link api/visibility-service.md %}). Automate visibility and knowledge workflows programmatically.

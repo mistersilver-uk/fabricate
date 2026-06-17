@@ -26,71 +26,11 @@ A basic alchemy recipe:
 | 2x Moonpetal Herb | 1x Healing Potion |
 | 1x Empty Vial | |
 
-### Creating via the GM Admin
+### Creating the recipe
 
-1. Create a recipe in the Recipes tab
-2. Add one ingredient set with two groups:
-   - Group "Herbs": 2x Moonpetal Herb (by componentId)
-   - Group "Container": 1x Empty Vial (by componentId)
-3. Add one result group with one result:
-   - 1x Healing Potion (by componentId)
-
-### Creating via Macro
-
-```javascript
-// Quick helper for simple recipes
-await fabricate.createSimpleRecipe('Healing Potion', [
-  { itemUuid: 'Item.moonpetalHerb', quantity: 2 },
-  { itemUuid: 'Item.emptyVial', quantity: 1 }
-], {
-  itemUuid: 'Item.healingPotion',
-  quantity: 1
-});
-```
-
-### Creating with the full API
-
-```javascript
-const { Recipe, Ingredient, IngredientGroup, IngredientSet } = game.fabricate.api;
-
-const recipe = new Recipe({
-  name: 'Healing Potion',
-  craftingSystemId: 'my-alchemy-system-id',
-  ingredientSets: [
-    IngredientSet.fromJSON({
-      id: 'potion-ingredients',
-      name: 'Potion Ingredients',
-      ingredientGroups: [
-        {
-          id: 'herbs',
-          name: 'Herbs',
-          options: [
-            { quantity: 2, match: { type: 'component', componentId: 'moonpetal-herb-id' } }
-          ]
-        },
-        {
-          id: 'container',
-          name: 'Container',
-          options: [
-            { quantity: 1, match: { type: 'component', componentId: 'empty-vial-id' } }
-          ]
-        }
-      ]
-    })
-  ],
-  resultGroups: [
-    {
-      id: 'potion-result',
-      name: 'Potion Result',
-      results: [
-        { id: 'healing-potion', componentId: 'healing-potion-id', quantity: 1 }
-      ]
-    }
-  ]
-});
-
-await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-```
+This recipe has one ingredient set with two groups, a "Herbs" group (2x Moonpetal Herb) and a "Container" group (1x Empty Vial), and one result group producing 1x Healing Potion.
+Recipes can be authored through the API only.
+See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## With an Optional Check
 
@@ -99,11 +39,12 @@ If crafting checks are enabled on the system, simple mode uses pass/fail:
 - **Pass**: ingredients are consumed and results are created
 - **Fail**: behaviour depends on your consumption-on-failure settings
 
-The crafting check macro must return `{ success: true/false }`. See [Macros]({% link macros/index.md %}) for the contract.
+The crafting check decides whether the attempt passes or fails.
+See [Crafting Checks]({% link crafting-checks.md %}) for how checks work.
 
 ---
 
-## What's next?
+## See Also
 
-- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}) -- ingredient choices determine which result is produced.
-- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Routed Mode]({% link recipes/routed.md %}): produce different results from one recipe, chosen by ingredients, a skill check, or a roll table.
+- [Crafting Checks]({% link crafting-checks.md %}): how crafting checks are configured.

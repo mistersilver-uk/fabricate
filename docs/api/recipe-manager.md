@@ -17,7 +17,8 @@ Handles recipe CRUD operations, filtering, and craftability checks.
 
 ### createRecipe(recipeData, options)
 
-Creates a new recipe. GM only.
+Creates a new recipe.
+GM only.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -39,7 +40,9 @@ console.log(`Created: ${recipe.id}`);
 
 ### updateRecipe(recipeId, updates, options)
 
-Updates an existing recipe. GM only. Merges `updates` into the current recipe data.
+Updates an existing recipe.
+GM only.
+Merges `updates` into the current recipe data.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -51,7 +54,9 @@ Updates an existing recipe. GM only. Merges `updates` into the current recipe da
 
 ### deleteRecipe(recipeId, options)
 
-Deletes a recipe. GM only. Also cleans up associated runs and learned entries.
+Deletes a recipe.
+GM only.
+Also cleans up associated runs and learned entries.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -113,11 +118,12 @@ Checks if a recipe can be crafted and reports what's missing.
 **Returns:** `{ canCraft: boolean, satisfiableSet: IngredientSet | null, missing: object }`
 
 The `missing` object contains:
-- `missing.ingredients` -- array of `{ ingredient, need, have }`
-- `missing.tools` -- array of unmet required Tool objects (resolved from `toolIds`)
-- `missing.essences` -- array of `{ essenceId, need, have }`
+- `missing.ingredients` is an array of `{ ingredient, need, have }`.
+- `missing.tools` is an array of unmet required Tool objects (resolved from `toolIds`).
+- `missing.essences` is an array of `{ essenceId, need, have }`.
 
-Use `resolveComponentName(recipe, ingredient.match.componentId)` to get a human-readable component name from a missing ingredient entry. `ingredient.getDescription()` returns generic text describing the ingredient match type (e.g. "component" or "specific item") and is not suitable for display.
+Use `resolveComponentName(recipe, ingredient.match.componentId)` to get a human-readable component name from a missing ingredient entry.
+`ingredient.getDescription()` returns generic text describing the ingredient match type (e.g. "component" or "specific item") and is not suitable for display.
 
 ```javascript
 const rm = game.fabricate.getRecipeManager();
@@ -134,9 +140,12 @@ if (!check.canCraft) {
 
 Resolves a human-readable display name for a component referenced by a recipe.
 
-Looks up `componentId` in the recipe's owning crafting system. Returns the component's `name` field if found. Falls back to the localised string `FABRICATE.Labels.UnknownComponent` ("Unknown Component") when the component does not exist or `componentId` is null.
+Looks up `componentId` in the recipe's owning crafting system.
+Returns the component's `name` field if found.
+Falls back to the localised string `FABRICATE.Labels.UnknownComponent` ("Unknown Component") when the component does not exist or `componentId` is null.
 
-This is a synchronous method and does not fetch from Foundry's item database. Use `resolveComponentNameAsync` when the component has a `sourceUuid` and you need the linked item's name.
+This is a synchronous method and does not fetch from Foundry's item database.
+Use `resolveComponentNameAsync` when the component has a `sourceUuid` and you need the linked item's name.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -153,7 +162,9 @@ console.log(name); // e.g. "Iron Ingot"
 
 ### resolveComponentNameAsync(recipe, componentId)
 
-Async variant of `resolveComponentName`. Attempts to resolve the component's `sourceUuid` via `fromUuid()` first and returns the linked item's name when found. Falls back to the component's stored `name`, then to "Unknown Component" on broken references.
+Async variant of `resolveComponentName`.
+Attempts to resolve the component's `sourceUuid` via `fromUuid()` first and returns the linked item's name when found.
+Falls back to the component's stored `name`, then to "Unknown Component" on broken references.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -164,7 +175,8 @@ Async variant of `resolveComponentName`. Attempts to resolve the component's `so
 
 ### resolveComponentImg(recipe, componentId)
 
-Returns the image path for a component referenced by a recipe. Falls back to a default component icon when the component is not found or has no image set.
+Returns the image path for a component referenced by a recipe.
+Falls back to a default component icon when the component is not found or has no image set.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -175,7 +187,8 @@ Returns the image path for a component referenced by a recipe. Falls back to a d
 
 ### resolveResultDescription(recipe, componentId, quantity)
 
-Returns a formatted result description in the form `Nx Name`, where `N` is the quantity and `Name` is resolved via `resolveComponentName`. Falls back to "Unknown Component" when the component is not found.
+Returns a formatted result description in the form `Nx Name`, where `N` is the quantity and `Name` is resolved via `resolveComponentName`.
+Falls back to "Unknown Component" when the component is not found.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
@@ -251,4 +264,5 @@ Imports recipes from JSON. GM only.
 
 **Returns:** `Promise<{ imported: number, skipped: number, total: number }>`
 
-The import emits one aggregate success notification. It does not emit per-recipe create/update notifications.
+The import emits one aggregate success notification.
+It does not emit per-recipe create/update notifications.

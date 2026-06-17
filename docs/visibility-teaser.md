@@ -7,160 +7,112 @@ parent: Visibility & Knowledge
 
 # Teaser Mode
 
-Teaser mode is an optional layer on top of the standard [visibility modes]({% link visibility.md %}). When enabled on a crafting system, the visibility service can return undiscovered recipes as **teasers** — players may be allowed to know a recipe exists, while full ingredients, results, or details remain hidden. As players gather fragments or reach discovery thresholds, hidden fields are progressively revealed until the recipe is fully unlocked.
+Teaser mode is an optional layer on top of the standard [visibility modes]({% link visibility.md %}).
+When enabled on a crafting system, the visibility service can return undiscovered recipes as **teasers**.
+Players may be allowed to know a recipe exists, while full ingredients, results, or details remain hidden.
+As players gather fragments or reach discovery thresholds, hidden fields are progressively revealed until the recipe is fully unlocked.
 
-Use teaser mode when you want discovery to be gradual: players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragments away from learning it, but cannot yet see what it requires.
+Use teaser mode when you want discovery to be gradual.
+Players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragments away from learning it, but cannot yet see what it requires.
 
 {: .note }
-> Teaser mode requires setting `recipeVisibility.listMode` to `"teaser"` on the crafting system. The existing `global`, `player`, and `knowledge` modes continue to work unchanged when teaser mode is off.
+> Teaser mode requires setting the crafting system to teaser mode. The existing global, player, and knowledge modes continue to work unchanged when teaser mode is off.
 
 ---
 
 ## How Teaser Mode Works
 
-1. The GM sets the crafting system's `listMode` to `"teaser"` in the **Recipe Visibility** card of the Crafting Admin panel.
-2. For each recipe, the GM configures a `teaser` block: which fields to hide, a `revealThreshold` (the discovery progress required to unlock the recipe fully), and an optional `teaserDescription` shown to players before unlock.
-3. API consumers receive teaser visibility state with only the permitted fields visible. The planned Crafting UI will use this state for teaser cards and progress bars.
-4. When a player's discovery progress for a recipe reaches or exceeds `revealThreshold`, the recipe transitions to fully visible and craftable through the visibility guard.
+1. The GM sets the crafting system to teaser mode in the **Recipe Visibility** card of the Crafting Admin panel.
+2. For each recipe, the GM chooses which details to hide, how much discovery progress is needed to unlock the recipe fully, and an optional teaser description shown to players before unlock.
+3. Players see the recipe with only the permitted details revealed.
+4. When a player's discovery progress for a recipe reaches the required amount, the recipe becomes fully visible and craftable.
 
 ---
 
 ## Discovery Modes
 
-The system-level `teaserConfig.discoveryMode` controls how players accumulate discovery progress:
+You choose how players build up discovery progress for the system.
 
-| Mode | Description |
-|:-----|:------------|
-| `threshold` | The GM manually sets a numeric progress value per actor per recipe. Progress increases when the GM edits it via the **Teaser Progress Editor**. |
-| `fragments` | Players acquire discovery progress by obtaining specific in-world items called **fragments**. Each fragment is linked to an item UUID and grants a defined amount of progress when the player adds it to their inventory. |
-| `both` | Manual threshold progress and fragment progress are additive. Both pathways contribute to the same counter. |
+| Discovery method | Description |
+|:-----------------|:------------|
+| Manual | The GM sets a progress value for each player and recipe. Progress changes when the GM edits it in the **Teaser Progress Editor**. |
+| Fragments | Players gain discovery progress by acquiring specific in-world items called **fragments**. Each fragment grants a set amount of progress when the player adds it to their inventory. |
+| Both | Manual progress and fragment progress add together. Both pathways contribute to the same total. |
 
 ---
 
 ## System Configuration
 
-Open the **Recipe Visibility** card in the Crafting Admin panel and set `listMode` to `teaser`. This reveals a **Teaser Config** section:
+Open the **Recipe Visibility** card in the Crafting Admin panel and set the system to teaser mode.
+This reveals a **Teaser Config** section where you can:
 
-| Field | Description |
-|:------|:------------|
-| `teaserConfig.enabled` | Master toggle for teaser mode. Must be `true` for teaser recipes to render as teasers rather than hidden. |
-| `teaserConfig.discoveryMode` | `threshold`, `fragments`, or `both` (see table above). |
-| `teaserConfig.fragments` | Array of fragment definitions (only used when `discoveryMode` is `fragments` or `both`). |
+- Turn teaser mode on, which must be on for teaser recipes to appear as teasers rather than being hidden.
+- Choose the discovery method: manual, fragments, or both (see the table above).
+- Define the fragments players can find, when you are using the fragments or both methods.
 
 ### Fragment Definitions
 
-Each fragment definition has:
+Each fragment you define has:
 
-| Field | Description |
-|:------|:------------|
-| `id` | Stable fragment ID. |
-| `name` | Optional GM-facing name. |
-| `linkedItemUuid` | UUID of the world or compendium item whose acquisition triggers discovery. |
-| `recipeIds` | Recipe IDs that receive progress when this fragment is found. |
-| `progressValue` | How much discovery progress this fragment grants (default: `1`). |
-| `description` | Optional label shown to the GM in the fragment editor. |
+- An optional name shown to the GM.
+- The in-world item that triggers discovery when a player acquires it.
+- The recipes that gain progress when this fragment is found.
+- How much discovery progress the fragment grants, which defaults to one.
+- An optional label shown to the GM in the fragment editor.
 
 ---
 
 ## Recipe Configuration
 
-For each recipe, the GM configures a `teaser` block in the recipe editor's **Teaser** tab (visible when the system is in teaser mode):
+For each recipe, the GM uses the recipe editor's **Teaser** tab, which appears when the system is in teaser mode, to set:
 
-| Field | Description |
-|:------|:------------|
-| `teaser.hiddenFields` | Array of field names hidden from players until the recipe is unlocked. Supported values: `"ingredients"`, `"results"`, `"description"`, `"tools"`, `"essences"` (any other value is dropped on load). |
-| `teaser.revealThreshold` | Numeric progress value required for full discovery. When a player's progress reaches this value, all `hiddenFields` are shown and the recipe becomes craftable. |
-| `teaser.teaserDescription` | Flavour text shown to players in place of the real description while the recipe is still locked. |
+- Which details are hidden from players until the recipe is unlocked. You can hide the ingredients, the results, the description, the tools, and the essences.
+- How much discovery progress is required for full discovery. When a player reaches this amount, every hidden detail is shown and the recipe becomes craftable.
+- A teaser description shown to players in place of the real description while the recipe is still locked.
 
-**Example:** A recipe with `hiddenFields: ["ingredients", "results"]` and `revealThreshold: 3` shows the recipe name and teaser description to players, but hides the ingredient list and result list until they accumulate 3 discovery progress points.
+**Example:** A recipe that hides its ingredients and results and needs three points of progress shows the recipe name and teaser description to players, but hides the ingredient list and result list until they build up three discovery progress points.
 
 ---
 
 ## Fragment Discovery (Automatic)
 
-When `discoveryMode` is `fragments` or `both`, Fabricate hooks into Foundry's `createItem` event via `FragmentDiscoveryHook`. When an actor receives an item whose UUID (or `_stats.compendiumSource` / `flags.core.sourceId` for compendium copies) matches a fragment definition's `linkedItemUuid`, discovery progress is automatically incremented for that actor on every recipe that references that fragment.
+When the discovery method is fragments or both, Fabricate watches for items being added to actors.
+When an actor receives a fragment item, or a copy of one, discovery progress goes up automatically for that actor on every recipe that fragment feeds.
 
-Players do not need to take any additional action — simply receiving the item is enough to trigger discovery.
+Players do not need to take any additional action.
+Simply receiving the item is enough to trigger discovery.
 
 ---
 
 ## GM: Managing Progress Manually
 
-When `discoveryMode` is `threshold` or `both`, GMs can set discovery progress per actor per recipe using the **Teaser Progress Editor**:
+When the discovery method is manual or both, GMs can set discovery progress for each player and recipe using the **Teaser Progress Editor**:
 
 1. Open the **Recipe Visibility** card in the Crafting Admin panel.
 2. Select a recipe in teaser mode and click **Manage Progress**.
 3. The Teaser Progress Editor shows a list of actors with their current discovery progress.
 4. Edit the progress value and save.
 
-Progress is stored in actor flags:
-
-```
-Actor.flags.fabricate.discoveryProgress = {
-  "<recipeId>": <number>
-}
-```
+Each actor remembers its own discovery progress for each recipe.
 
 ---
 
 ## Planned Player Experience
 
-The planned Crafting tab will show teaser recipes in a distinct visual style:
-
-- **Recipe name** and **category** are always shown.
-- **Teaser description** replaces the normal description (if set).
-- **Hidden fields** (ingredients, results, etc.) are replaced with a placeholder.
-- A **progress bar** overlay will show current progress versus `revealThreshold`.
-- When progress reaches the threshold, the progress bar will be replaced by normal recipe content and the recipe becomes craftable.
+A player-facing presentation of teaser recipes is planned and not yet available.
+It will use teaser cards with progress bars that show how close a player is to the amount needed for full discovery, before switching to the full recipe content on unlock.
 
 ---
 
 ## Configuring via the API
 
-```javascript
-// Enable teaser mode on a system with fragment-based discovery
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('my-alchemy-system-id', {
-    recipeVisibility: {
-      listMode: 'teaser',
-      teaserConfig: {
-        enabled: true,
-        discoveryMode: 'fragments',
-        fragments: [
-          {
-            id: 'ancient-scroll-fragment',
-            name: 'Ancient Alchemical Scroll',
-            linkedItemUuid: 'Item.abc123',  // UUID of "Ancient Alchemical Scroll"
-            recipeIds: ['philosophers-stone-recipe-id'],
-            progressValue: 1,
-            description: 'Ancient Alchemical Scroll'
-          }
-        ]
-      }
-    }
-  });
-});
-```
-
-```javascript
-// Set manual discovery progress for a player actor
-Hooks.once('fabricate.ready', async () => {
-  const visibilityService = game.fabricate.getRecipeVisibilityService();
-  const actor = game.user.character;
-  // Grant 2 progress points toward "philosophers-stone-recipe-id"
-  await visibilityService.setDiscoveryProgress(
-    actor,
-    'philosophers-stone-recipe-id',
-    2
-  );
-});
-```
+Teaser mode can also be configured through the API: set a system to teaser mode along with its teaser settings (whether teaser mode is on, the discovery method, and the fragment definitions), and set each player's discovery progress through the visibility service.
+See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
 
 ---
 
-## What's Next?
+## See Also
 
-- [Visibility & Knowledge]({% link visibility.md %}) — the full visibility system including global, player, and knowledge modes.
-- [Recipes]({% link recipes/index.md %}) — configure recipe fields controlled by teaser mode.
-- [Crafting Systems]({% link crafting-systems.md %}) — all system-level settings and feature toggles.
+- [Visibility & Knowledge]({% link visibility.md %}). The full visibility system including global, player, and knowledge modes.
+- [Recipes]({% link recipes/index.md %}). Configure recipe fields controlled by teaser mode.
+- [Crafting Systems]({% link crafting-systems.md %}). All system-level settings and feature toggles.

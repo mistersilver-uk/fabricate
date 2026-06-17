@@ -78,7 +78,7 @@ The smoke test executes 6 phases:
 | Phase | Name | What It Does |
 |---|---|---|
 | A | Setup | Navigates to Foundry, accepts license, authenticates, launches the world, and joins as Gamemaster |
-| B | Create Actors & Items | Cleans stale data, creates every raster actor under `assets/img/actors/` and 7 items, then seeds inventories on the actors used by current flows |
+| B | Create Actors & Items | Cleans stale data, imports the dnd5e **Starter Heroes** pack (`dnd5e.heroes`) as the demo actors and creates the world items, then seeds inventories on the crafter + travel-party hero |
 | C | Create Crafting System | Creates "Arcane Forge" system, registers 7 components, creates 3 recipes |
 | D | Screenshot Recipe Manager | Opens Recipe Manager, selects system, screenshots all 5 tabs |
 | E | Craft an Item | Opens Crafting App, crafts a Healing Potion, verifies inventory |
@@ -95,10 +95,10 @@ stable part of each filename is the trailing label, not the numeric prefix.
 | `join-ready` | Join form with the Gamemaster selection confirmed before submission |
 | `world-loaded` | Foundry canvas after joining the game session |
 | `items-sidebar` | Items sidebar with 7 crafting items (`.webp` icons) |
-| `actor-sheet-*` | Actor sheets for every `assets/img/actors/` portrait fixture; current flow actors include embedded test items |
+| `actor-sheet-*` | Actor sheets for every imported dnd5e Starter Hero; the crafter + travel-party hero also carry embedded test items |
 | `recipe-manager-default`, `recipe-manager-systems`, `recipe-manager-items`, `recipe-manager-recipes`, `recipe-manager-rules`, `recipe-manager-graph` | Recipe Manager checkpoints across the admin tabs |
 | `recipe-manager-environments`, `gm-environments-*` | GM Environments tab and responsive validation/authoring checkpoints |
-| `crafting-app-opened`, `post-craft`, `alara-post-craft-inventory` | Crafting flow checkpoints after opening the app and completing the craft |
+| `crafting-app-opened`, `post-craft`, `crafter-post-craft-inventory` | Crafting flow checkpoints after opening the app and completing the craft |
 | `join-selection-failed`, `join-submit-failed`, `craft-failure`, `screenshot-failure.png` | Failure diagnostics captured when the harness aborts |
 
 ### Test Data
@@ -106,13 +106,12 @@ stable part of each filename is the trailing label, not the numeric prefix.
 The smoke test creates the following Foundry documents:
 
 **Actors:**
-- Alara the Alchemist (inventory: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale)
-- Barek The Hunter (portrait fixture only)
-- Bromm the Blacksmith (inventory: 3x Iron Ore, 1x Dragon Scale)
-- Mirelle the Herbalist (portrait fixture only)
-- Samira the Enchanter (portrait fixture only)
-- Tomas The Cook (portrait fixture only)
-- Zahra the Jeweller (portrait fixture only)
+
+All actors are imported from the dnd5e **Starter Heroes** compendium (`dnd5e.heroes`) and
+tagged `flags.fabricate.smokeSeed` for idempotent cleanup. Sorted by name, the first two are
+used by current flows; the rest fill the gathering actor-selection bar:
+- crafter — first hero alphabetically (inventory: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale); owned by the Fabricate Gatherer user and remembered as the default gathering actor
+- travel-party member — second hero alphabetically (inventory: 3x Iron Ore, 1x Dragon Scale)
 
 **World Items (7):**
 Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dragon Scale Armor

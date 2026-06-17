@@ -9,11 +9,14 @@ nav_order: 7
 
 Validates that the ingredient signatures of all recipes in a crafting system are unambiguous.
 
-A **signature** is the set of components that can satisfy a given ingredient set. If two ingredient sets — whether from different recipes or from alternate sets within the same recipe — share at least one component that could satisfy both, the runtime cannot determine which recipe a player intends to craft. `SignatureValidator` detects these conflicts before a recipe is saved, preventing ambiguous crafting situations.
+A **signature** is the set of components that can satisfy a given ingredient set.
+If two ingredient sets (whether from different recipes or from alternate sets within the same recipe) share at least one component that could satisfy both, the runtime cannot determine which recipe a player intends to craft.
+`SignatureValidator` detects these conflicts before a recipe is saved, preventing ambiguous crafting situations.
 
 **Access:** `game.fabricate.api.SignatureValidator` (constructor)
 
-The validator is not a singleton service. You instantiate it with a crafting system manager:
+The validator is not a singleton service.
+You instantiate it with a crafting system manager:
 
 ```javascript
 Hooks.once('fabricate.ready', () => {
@@ -31,7 +34,8 @@ Hooks.once('fabricate.ready', () => {
 
 Expands a single ingredient to the set of component IDs that can satisfy it.
 
-For `component`-type ingredients the result is a single-element set containing the ingredient's `componentId`. For `tags`-type ingredients the result is the set of all managed component IDs whose tags satisfy the ingredient's tag match rule.
+For `component`-type ingredients the result is a single-element set containing the ingredient's `componentId`.
+For `tags`-type ingredients the result is the set of all managed component IDs whose tags satisfy the ingredient's tag match rule.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -71,7 +75,8 @@ Hooks.once('fabricate.ready', () => {
 
 Expands an ingredient group to the union of component IDs that can satisfy any of its options.
 
-An ingredient group is satisfied when one of its options is satisfied. This method returns the full set of components that could satisfy the group through any option.
+An ingredient group is satisfied when one of its options is satisfied.
+This method returns the full set of components that could satisfy the group through any option.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -86,7 +91,9 @@ An ingredient group is satisfied when one of its options is satisfied. This meth
 
 Computes the signature for an ingredient set.
 
-The signature is an array of sets — one per ingredient group. Each set contains the component IDs that could satisfy that group. The array represents all required groups (AND semantics across groups).
+The signature is an array of sets, one per ingredient group.
+Each set contains the component IDs that could satisfy that group.
+The array represents all required groups (AND semantics across groups).
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -101,7 +108,9 @@ The signature is an array of sets — one per ingredient group. Each set contain
 
 Returns `true` if two signatures share at least one component ID across all their groups.
 
-This is a conservative check: if any component appears in both signatures (regardless of which group it belongs to), the signatures are considered overlapping. This avoids false negatives at the cost of occasional false positives for complex multi-group recipes whose groups are disjoint in practice.
+This is a conservative check.
+If any component appears in both signatures (regardless of which group it belongs to), the signatures are considered overlapping.
+This avoids false negatives at the cost of occasional false positives for complex multi-group recipes whose groups are disjoint in practice.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -116,7 +125,8 @@ This is a conservative check: if any component appears in both signatures (regar
 
 Validates all recipes in a crafting system for ingredient signature conflicts.
 
-Computes the signature for every ingredient set in every recipe, then performs pairwise overlap detection. An ingredient set is never compared with itself (same recipe ID and same set ID), but alternate ingredient sets within the same recipe are compared against each other and against sets from other recipes.
+Computes the signature for every ingredient set in every recipe, then performs pairwise overlap detection.
+An ingredient set is never compared with itself (same recipe ID and same set ID), but alternate ingredient sets within the same recipe are compared against each other and against sets from other recipes.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -159,7 +169,8 @@ Hooks.once('fabricate.ready', () => {
 
 Validates a single recipe against all others in its system.
 
-Runs a full `validateSystem` call and filters the conflicts list to only those involving the given recipe. Use this in the recipe editor before saving to catch conflicts introduced by a new or updated recipe.
+Runs a full `validateSystem` call and filters the conflicts list to only those involving the given recipe.
+Use this in the recipe editor before saving to catch conflicts introduced by a new or updated recipe.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -190,7 +201,8 @@ Hooks.once('fabricate.ready', () => {
 
 ## When Conflicts Are Reported
 
-The recipe editor calls `validateRecipe` automatically when you save a recipe and blocks the save when any conflicts are found. The validation banner in the editor identifies which other recipe's ingredient set overlaps with yours so you can resolve the ambiguity.
+The recipe editor calls `validateRecipe` automatically when you save a recipe and blocks the save when any conflicts are found.
+The validation banner in the editor identifies which other recipe's ingredient set overlaps with yours so you can resolve the ambiguity.
 
 Common causes of signature conflicts:
 
@@ -200,5 +212,7 @@ Common causes of signature conflicts:
 
 ## See Also
 
-- [ResolutionModeService]({% link api/resolution-service.md %}) -- recipe structure validation (mode rules, cardinality)
-- [RecipeManager]({% link api/recipe-manager.md %}) -- recipe CRUD and craftability checks
+- [ResolutionModeService]({% link api/resolution-service.md %}).
+  Recipe structure validation (mode rules, cardinality).
+- [RecipeManager]({% link api/recipe-manager.md %}).
+  Recipe CRUD and craftability checks.
