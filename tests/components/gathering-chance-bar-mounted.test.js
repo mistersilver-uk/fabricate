@@ -95,28 +95,28 @@ describe('ChanceBar (mounted)', () => {
 
   it('renders a success meter with the success data-attribute and no tier', () => {
     const root = mountBar({ value: 1, scale: 'success' });
-    const meter = root.querySelector('.success-bar');
-    assert.ok(meter, 'expected a .success-bar root');
+    const meter = root.querySelector('.chance-bar');
+    assert.ok(meter, 'expected a .chance-bar root (success)');
     assert.equal(meter.getAttribute('data-gathering-success-value'), '100');
     assert.equal(meter.getAttribute('aria-valuenow'), '100');
     assert.equal(meter.getAttribute('aria-valuemin'), '0');
     assert.equal(meter.getAttribute('aria-valuemax'), '100');
     assert.equal(meter.getAttribute('data-gathering-event-value'), null);
-    assert.equal(root.querySelector('.success-bar-caption') !== null, true);
-    assert.match(root.querySelector('.success-bar-fill').getAttribute('style'), /^width: 100%;?$/);
-    assert.equal(root.querySelector('.success-bar-percent').textContent, '100%');
+    assert.equal(root.querySelector('.chance-bar-caption') !== null, true);
+    assert.match(root.querySelector('.chance-bar-fill').getAttribute('style'), /^width: 100%;?$/);
+    assert.equal(root.querySelector('.chance-bar-percent').textContent, '100%');
   });
 
   it('hides the caption when showCaption is false', () => {
     const root = mountBar({ value: 0.5, scale: 'success', showCaption: false });
-    assert.equal(root.querySelector('.success-bar-caption'), null);
-    assert.ok(root.querySelector('.success-bar'));
+    assert.equal(root.querySelector('.chance-bar-caption'), null);
+    assert.ok(root.querySelector('.chance-bar'));
   });
 
   it('renders an event meter with the event data-attributes', () => {
     const root = mountBar({ value: 0.5, scale: 'event' });
-    const meter = root.querySelector('.event-bar');
-    assert.ok(meter, 'expected an .event-bar root');
+    const meter = root.querySelector('.chance-bar');
+    assert.ok(meter, 'expected a .chance-bar root (event)');
     assert.equal(meter.getAttribute('data-gathering-event-value'), '50');
     assert.equal(meter.getAttribute('data-gathering-success-value'), null);
     assert.equal(meter.getAttribute('aria-valuenow'), '50');
@@ -131,7 +131,7 @@ describe('ChanceBar (mounted)', () => {
     ];
     for (const [value, tier] of cases) {
       const root = mountBar({ value, scale: 'event' });
-      const meter = root.querySelector('.event-bar');
+      const meter = root.querySelector('.chance-bar');
       assert.ok(meter.classList.contains(`tier-${tier}`), `value ${value} should be tier-${tier}`);
       assert.equal(meter.getAttribute('data-gathering-event-tier'), tier);
       unmount(mounted);
