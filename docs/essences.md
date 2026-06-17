@@ -7,7 +7,7 @@ nav_order: 6
 # Essences
 
 {: .gm }
-> Requires the `essences` feature to be enabled on the crafting system.
+> Requires the **Essences** feature to be enabled on the crafting system.
 
 Essences are abstract properties that can be assigned to components.
 They provide a flexible way to categorise ingredients beyond simple tags.
@@ -26,25 +26,24 @@ Below you will find the fields that [define an essence](#defining-essences) and 
 Essences are defined at the crafting system level.
 Each essence definition has the following fields:
 
-| Property | Type | Description |
-|:---------|:-----|:------------|
-| `id` | `string` | Unique identifier, derived from the name on creation |
-| `name` | `string` | Display name (e.g. "Fire", "Arcane", "Nature") |
-| `icon` | `string` | FontAwesome icon class. Defaults to `fas fa-mortar-pestle`. Empty or whitespace values also fall back to the default. |
-| `description` | `string` | Flavour text |
-| `sourceItemUuid` | `string\|null` | The authoritative field. UUID of the component (by its `componentId`) whose active effects represent this essence. `null` if not linked. |
+| Field | Description |
+|:------|:------------|
+| Name | Display name, for example "Fire", "Arcane", or "Nature" |
+| Icon | A FontAwesome icon class. Leave it blank to use the default mortar-and-pestle icon. |
+| Description | Flavour text |
+| Source item | The component whose active effects represent this essence, used for effect transfer. Leave it unset if the essence is not linked to an item. |
 
-When Fabricate normalises an essence definition it resolves `sourceItemUuid` against the system's current component IDs.
-If the referenced component no longer exists, `sourceItemUuid` is set to `null`.
+When you link an essence to a source item, Fabricate checks that the component still exists.
+If the linked component is later removed, the link is cleared.
 
 ### Example Essences
 
-| Essence | Icon | Description |
-|:--------|:-----|:------------|
-| Fire | `fas fa-fire` | The raw energy of flame |
-| Frost | `fas fa-snowflake` | The biting cold of winter |
-| Arcane | `fas fa-hat-wizard` | Pure magical energy |
-| Nature | `fas fa-leaf` | The vitality of the natural world |
+| Essence | Description |
+|:--------|:------------|
+| Fire | The raw energy of flame |
+| Frost | The biting cold of winter |
+| Arcane | Pure magical energy |
+| Nature | The vitality of the natural world |
 
 ## Assigning Essences to Items
 
@@ -67,10 +66,10 @@ For example, an ingredient set requiring "3 Fire essence and 2 Arcane essence" c
 
 ## Effect Transfer via Essences
 
-When `transferEffects` is enabled on a recipe and essences are active, the engine can transfer active effects from essence source items to crafted results:
+When effect transfer is enabled on a recipe and essences are active, Fabricate can transfer active effects from essence source items to crafted results:
 
-1. The engine determines which essence IDs contribute to the resolved ingredients
-2. For each essence with a `sourceItemUuid`, it collects active effects from that source item
+1. Fabricate works out which essences are contributed by the ingredients that were used
+2. For each essence linked to a source item, it collects that item's active effects
 3. Those effects are applied to the created result items
 
 This lets you create systems where crafting with fire-essence ingredients automatically gives the result fire-related properties.
@@ -78,18 +77,18 @@ This lets you create systems where crafting with fire-essence ingredients automa
 ## Managing Essences in the GM Admin
 
 Essence definitions are configured from the **Systems** tab of the GM admin, inside the **Essences** feature card.
-The card is visible only when advanced options are enabled and the `essences` feature toggle is on.
+The card is visible only when advanced options are enabled and the **Essences** feature toggle is on.
 
 1. Open **Manage Crafting Systems**
 2. Select your system in the sidebar
 3. Enable **Show advanced options**
 4. Enable the **Essences** feature toggle
-5. In the Essences card, fill in the name, description, icon class, and optional source item, then click **Add**
+5. In the Essences card, fill in the name, description, icon, and optional source item, then click **Add**
 6. Existing essence definitions are shown in a list below the form.
    Click the trash icon to remove one
 
-The icon field accepts any FontAwesome class string (e.g. `fas fa-fire`, `fas fa-snowflake`).
-If you leave it blank, the default `fas fa-mortar-pestle` icon is used.
+The icon field accepts any FontAwesome icon class.
+If you leave it blank, a default mortar-and-pestle icon is used.
 
 The source item dropdown lists components already added to this crafting system.
 Selecting one links the essence to that component for effect transfer purposes.

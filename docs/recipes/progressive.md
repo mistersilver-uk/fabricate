@@ -15,22 +15,22 @@ A crafting check returns a numeric **value** that is spent to "buy" results in o
 
 - Exactly **one** ingredient set
 - Exactly **one** result group with **ordered** results
-- Crafting check is **required**
-- The check macro must return `{ success: true, value: <number> }` or `{ success: false }`
-- Each result references a managed component with a `difficulty >= 1`
-- Results are evaluated in order, and the check value is spent against each result's difficulty
+- A crafting check is **required**
+- The check reports either a success with a numeric value or a failure
+- Each result points to a managed component with a difficulty of at least 1
+- Results are taken in order, and the check value is spent against each result's difficulty
 
 ## Award Modes
 
-The system's `progressive.awardMode` setting controls how the check value is spent:
+The system's award mode setting controls how the check value is spent:
 
 | Mode | Rule | Partial Credit |
 |:-----|:-----|:---------------|
-| `equal` | Award when `remaining >= difficulty` | No |
-| `exceed` | Award when `remaining > difficulty` (strict) | No |
-| `partial` | Award when `remaining >= difficulty`, last result gets partial credit if `remaining > 0` | Yes |
+| Equal | Award when the value left is at least the difficulty | No |
+| Exceed | Award only when the value left is greater than the difficulty | No |
+| Partial | Award when the value left is at least the difficulty, and the last result gets partial credit if any value is left over | Yes |
 
-### Example with `equal` mode
+### Example with Equal mode
 
 Check value: **15**.
 Results in order:
@@ -44,28 +44,28 @@ Results in order:
 
 The player receives Iron Filings, Steel Ingot, and Fine Steel Ingot.
 
-## The Check Macro
+## The Check
 
-A progressive check macro rolls a skill check and returns a numeric `value` (the total of the roll) on success, or a failure result.
+A progressive check rolls a skill check and reports a numeric value (the total of the roll) on success, or a failure.
 That value is spent against the ordered results.
-See [Crafting Checks]({% link crafting-checks.md %}) for the macro context and return contract.
+See [Crafting Checks]({% link crafting-checks.md %}) for how checks work and what they report.
 
 ## Player Reorder
 
-When `progressive.allowPlayerReorder` is `true` on the crafting system, players can reorder the results before the check.
+When the crafting system allows it, players can reorder the results before the check.
 This lets them prioritise which items they want to attempt first.
 
-Reorder preferences are persisted per-recipe in client settings.
+Each player's chosen order is remembered per recipe on their own device.
 
 ## Creating a Progressive Recipe
 
-A progressive recipe has one ingredient set and one result group whose `results` are listed in difficulty order.
+A progressive recipe has one ingredient set and one result group whose results are listed in difficulty order.
 For example, this means Iron Filings, then Steel Ingot, then Fine Steel Ingot, then Masterwork Ingot.
 Recipes can be authored through the API only.
 See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 {: .note }
-> Each result's `componentId` must reference a managed component with a `difficulty` value of at least `1`.
+> Each result must point to a managed component with a difficulty of at least 1.
 
 ## When to Use Progressive Mode
 

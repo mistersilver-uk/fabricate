@@ -25,25 +25,25 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 |:--------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Name**            | Display name shown in the UI                                                                                                                       |
 | **Description**     | Optional flavour text                                                                                                                              |
-| **Resolution Mode** | How recipes produce results: `simple`, `routed`, `progressive`, or `alchemy`. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| **Resolution Mode** | How recipes produce results: Simple, Routed, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
 
 ### Tags And Categories
 
 Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching.
-The reserved `General` recipe category is always present and is not stored in the custom category list.
+The reserved **General** recipe category is always present and is not stored in the custom category list.
 
 ### Feature Toggles
 
 Each system can independently enable or disable optional features.
-Most optional features default to `false` and must be explicitly enabled by a GM.
+Most optional features are off by default and must be explicitly enabled by a GM.
 
-| Feature            | Default | Description                                                                                                                                               |
-|:-------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `essences`         | `false` | Enable the essences system for abstract ingredient properties                                                                                             |
-| `propertyMacros`   | `false` | Allow result items to have their properties set by a macro                                                                                                |
-| `effectTransfer`   | `false` | Transfer active effects from essence source items to crafted results                                                                                      |
-| `multiStepRecipes` | `false` | Allow recipes with multiple sequential steps                                                                                                              |
-| `gathering`        | `false` | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
+| Feature             | Default | Description                                                                                                                                               |
+|:--------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Essences            | Off     | Enable the essences system for abstract ingredient properties                                                                                             |
+| Property macros     | Off     | Allow result items to have their properties set by a macro                                                                                                |
+| Effect transfer     | Off     | Transfer active effects from essence source items to crafted results                                                                                      |
+| Multi-step recipes  | Off     | Allow recipes with multiple sequential steps                                                                                                              |
+| Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
 
 Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel. 
 Each toggle takes effect immediately for all future crafting attempts in that system.
@@ -78,13 +78,13 @@ These failures include a missing actor, missing ingredients, missing or unsatisf
 
 ### Crafting Checks
 
-If your system uses routed mode with the `macroOutcome` provider, or progressive mode, you must configure a crafting check to gate outcomes on a player roll.
-See [Crafting Checks]({% link crafting-checks.md %}) for configuration fields, consumption-on-failure policies, and worked examples.
+If your system uses Routed mode with a macro-driven outcome, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
+See [Crafting Checks]({% link crafting-checks.md %}) for the settings, consumption-on-failure policies, and worked examples.
 
 ### Effect Transfer
 
-When both the essences and effectTransfer features are enabled, Fabricate can copy active effects from essence source items to crafted results.
-See [Effect Transfer]({% link effect-transfer.md %}) for the triple-flag pipeline, API configuration, and worked examples.
+When both the Essences and Effect transfer features are enabled, Fabricate can copy active effects from essence source items to crafted results.
+See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enabled, configured, and used, with worked examples.
 
 ### Recipe Visibility
 
@@ -93,21 +93,21 @@ You configure this per crafting system in the **Recipe Visibility** feature card
 
 Fabricate supports three list modes:
 
-| `listMode` value     | Description                                                      |
-|:---------------------|:-----------------------------------------------------------------|
-| `"global"` (default) | All recipes visible to all users                                 |
-| `"player"`           | GM restricts individual recipes to named players                 |
-| `"knowledge"`        | Recipes discovered through gameplay via recipe items or learning |
+| List mode           | Description                                                      |
+|:--------------------|:-----------------------------------------------------------------|
+| Global (default)    | All recipes visible to all users                                 |
+| Player              | GM restricts individual recipes to named players                 |
+| Knowledge           | Recipes discovered through gameplay via recipe items or learning |
 
-For full details on each mode, knowledge sub-options, recipe items, the learn flow, and API configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
+For full details on each mode, knowledge sub-options, recipe items, the learn flow, and configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
 
 ### Alchemy Mode
 
 Alchemy mode is a special resolution mode where recipe names and ingredient lists are hidden from players.
 Macros and integrations can submit selected items to the alchemy engine.
 Fabricate matches the combination against known recipe signatures. 
-Set the resolution mode of a system to `alchemy` to enable this. 
-See [Alchemy Mode]({% link recipes/alchemy.md %}) for current API usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
+Set the resolution mode of a system to Alchemy to enable this. 
+See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
 
 ---
 
@@ -140,32 +140,32 @@ See [Gathering Environments]({% link gathering-environments.md %}) for the curre
 
 ## Startup and Preferences Cleanup
 
-Each time the module loads, Fabricate automatically cleans up stale client preferences that reference crafting systems or recipes that no longer exist.
+Each time the module loads, Fabricate automatically cleans up stale saved preferences that point to crafting systems or recipes that no longer exist.
 You do not need to trigger this manually.
-It runs during module initialisation before the `fabricate.ready` hook fires.
+It runs while Fabricate starts up, before the module is ready for use.
 
 ### What is cleaned up
 
-| Preference                           | Setting key                           | Cleanup behaviour                                                                                           |
-|:-------------------------------------|:--------------------------------------|:------------------------------------------------------------------------------------------------------------|
-| Last viewed system in GM admin       | `fabricate.lastManagedCraftingSystem` | Cleared to `""` if the stored system ID is not present in the current set of crafting systems               |
-| Last selected gathering actor        | `fabricate.lastGatheringActor`        | Cleared to `""` when the remembered actor no longer resolves or is no longer selectable by the current user |
-| Progressive result order preferences | `fabricate.progressiveResultOrder`    | Any entry whose recipe ID no longer exists is removed from the stored object                                |
+| Preference                           | Cleanup behaviour                                                                                           |
+|:-------------------------------------|:------------------------------------------------------------------------------------------------------------|
+| Last viewed system in GM admin       | Cleared if the remembered system is no longer one of the current crafting systems                           |
+| Last selected gathering actor        | Cleared when the remembered actor no longer exists or is no longer selectable by the current user           |
+| Progressive result order preferences | Any entry for a recipe that no longer exists is removed                                                      |
 
 ### Why this matters
 
-If you delete a crafting system or recipe while a player has a client session open in another browser tab, their browser may still hold preferences pointing to IDs that no longer exist.
+If you delete a crafting system or recipe while a player has a session open in another browser tab, their browser may still hold preferences pointing to things that no longer exist.
 The same can happen after restoring a world from a backup.
-The cleanup pass on the next load prevents stale IDs from causing unexpected behaviour in the crafting UI.
+The cleanup pass on the next load prevents stale references from causing unexpected behaviour in the crafting UI.
 
-The cleanup is **idempotent**: if no stale entries exist, nothing is written to settings.
+The cleanup leaves things alone when nothing is stale, so nothing is written unless a stale entry needs clearing.
 
 ---
 
 ## Components
 
 Components are the building blocks of recipes. 
-Instead of referencing world items directly by UUID, recipes reference components by their `componentId`.
+Instead of pointing at a single specific world item, recipes refer to a component, and any matching item can satisfy it.
 This means:
 
 - Recipes work regardless of which specific world item instances exist
@@ -185,10 +185,10 @@ Drag any Item document from the **Items sidebar** or from an open **compendium b
 2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
 3. The item appears in the list of components
 
-If the item is already registered in the system by either its live UUID or its canonical source UUID, the drop reuses the existing component instead of creating a duplicate.
-If the stored name, image, or item UUID is stale, Fabricate updates the component in place and records any previous item UUID in `fallbackItemIds` to preserve matching existing items in actor's inventories.
+If the item is already registered in the system, whether by the item you dropped or by the original it was copied from, the drop reuses the existing component instead of creating a duplicate.
+If the stored name, image, or linked item is out of date, Fabricate updates the component in place and remembers the previous link so items already in characters' inventories still match.
 
-If Foundry reports an original compendium/source UUID but that source no longer resolves, Fabricate stores the live dropped item UUID instead, keeps the broken source UUID in `fallbackItemIds`, and warns the GM.
+If Foundry reports an original compendium source but that source no longer exists, Fabricate links to the item you dropped instead, remembers the broken source link as a fallback, and warns the GM.
 
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
 When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
@@ -202,11 +202,11 @@ To import all Item documents from a compendium pack at once, drag the **compendi
 Fabricate iterates over every Item document in the pack and adds each one.
 
 - Items not yet in the system are added as new components.
-- Items already registered by the same UUID or canonical source UUID are updated in place rather than duplicated.
+- Items already registered, whether by the item itself or the original it was copied from, are updated in place rather than duplicated.
 - Items already registered and already up to date are skipped.
-- A single crafting system cannot contain two components that claim the same source item UUID.
+- A single crafting system cannot contain two components that claim the same source item.
 - A summary notification reports how many items were added, updated, and skipped.
-- If an item's recorded original source link is broken, Fabricate stores the imported item UUID instead, keeps the broken UUID as fallback evidence, and warns once for the bulk import.
+- If an item's recorded original source link is broken, Fabricate links to the imported item instead, remembers the broken link as a fallback, and warns once for the bulk import.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
 
 #### Folder drop
@@ -217,7 +217,7 @@ If any imported item has a broken original source link, Fabricate warns once wit
 If the folder contains no Item documents, a notification says so and nothing is written.
 
 {: .note }
-> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops or the `addItemsFromPack()` API method instead.
+> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
 
 ---
 
@@ -227,13 +227,13 @@ Systems can optionally require time or currency for crafting.
 
 ### Time Requirements
 
-When enabled, individual recipe steps can specify time or currency requirements using duration fields (`minutes`, `hours`, `days`, `months`, `years`). 
-The step blocks until world time advances past the required duration.
+When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years. 
+The step is blocked until world time advances past the required duration.
 
 Time gates are checked:
 
 - When a player tries to advance a step
-- Automatically when world time changes (`updateWorldTime` hook)
+- Automatically when world time changes
 - On module startup
 
 ### Currency Requirements

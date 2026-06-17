@@ -6,18 +6,21 @@ nav_order: 3.1
 
 # Crafting Checks
 
-Crafting checks are not yet implemented in the UI.
-Once they are, they will let you gate recipe outcomes on a player roll. 
-Until then, you can use the API to define a custom check.
+Crafting checks let you gate recipe outcomes on a player roll.
 
-When a crafting system uses routed mode with the `macroOutcome` provider, or progressive resolution mode, a check is required to determine which result the crafter receives.
-Configure the check at the system level.
+For D&D 5e, built-in checks can be configured directly in the UI.
+For other game systems, a crafting check needs a macro or a custom adapter, which a developer sets up.
+
+When a crafting system uses the Routed resolution mode with the macro-outcome option, or the Progressive resolution mode, a check is required to determine which result the crafter receives.
+The check is configured at the system level.
 Each attempt runs the check automatically, before any materials are consumed.
+
+Developers configuring a custom check for a non-D&D-5e system should refer to the API reference for the expected setup.
 
 ---
 
 ## See Also
 
 - [Crafting Systems]({% link crafting-systems.md %}). Configure resolution mode, feature toggles, and system-level settings.
-- [Salvage]({% link salvage.md %}). Configure salvage checks, which use a separate check pipeline to gate salvage outcomes.
-- [Recipes]({% link recipes/index.md %}). Understand routed and progressive resolution modes that require a crafting check.
+- [Salvage]({% link salvage.md %}). Configure salvage checks, which use a separate check to gate salvage outcomes.
+- [Recipes]({% link recipes/index.md %}). Understand the Routed and Progressive resolution modes that require a crafting check.

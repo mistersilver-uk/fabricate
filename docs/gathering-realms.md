@@ -17,10 +17,10 @@ Token-driven realm sensing from the travel actor's placed token, and realm modif
 
 {: .note }
 > A **Gathering Realm** is the Fabricate gathering-geography concept.
-> It is **not** a Foundry "Region" (`RegionDocument` / Region Behaviour).
-> That is the distinct Foundry Scene object a realm maps onto.
-> The concept was renamed from *Gathering Region* to *Gathering Realm* precisely to remove that collision.
-> A Foundry Scene Region maps **many-to-one** onto a Realm through the realm's scene mappings (`sceneRegionUuid`).
+> It is **not** a Foundry scene region drawn on the canvas.
+> That is the distinct Foundry object a realm maps onto.
+> The concept was renamed from *Gathering Region* to *Gathering Realm* to remove that confusion.
+> Several Foundry scene regions can map onto one realm through the realm's scene mappings, so a single realm can span several drawn map areas.
 > A realm is geography only.
 > There is no separate "region vocabulary" or geography match tag any more.
 > A realm **never** decides which tasks or events belong to an environment (that is biome, plus danger for events).
@@ -32,26 +32,25 @@ Token-driven realm sensing from the travel actor's placed token, and realm modif
 | Concept | What it is |
 |:--------|:-----------|
 | **Realm** | Named geography (such as *The Verdant Expanse*) scoped to one crafting system. The single Fabricate geography concept, geography only. Distinct from a Foundry Scene Region |
-| **Biome** | A descriptive terrain/ecology trait carried by a realm, such as `forest`, `swamp`, or `coastal` |
+| **Biome** | A descriptive terrain or ecology trait carried by a realm, such as forest, swamp, or coastal |
 | **Environment** | A reusable gathering place that can belong to one or more realms and declare location-availability rules |
 | **Party** | A world-level Fabricate record with actor members and exactly one travel actor |
 
 Realms are geography, not environment containers.
-Environments declare which realms they belong to (`includedRealmIds`) and keep owning their own availability rules.
+Environments declare which realms they belong to and keep owning their own availability rules.
 
 ## Enabling Travel & Realms
 
 The realm/travel/availability subsystem is **disabled by default** for every crafting system.
 Enable it per system with the **Enable Travel & Realms** toggle on the Gathering **Settings** tab in the Crafting System Manager.
-The toggle reads and writes the per-system `gatheringRealmSettings.enabled` flag.
 
 While the toggle is **off**, the system behaves as a non-location-aware system:
 
-- The **Travel** nav item is hidden, and a stale `travel` active tab falls back to **Environments**.
+- The **Travel** nav item is hidden, and if Travel was the open tab it falls back to **Environments**.
 - The environment editor shows no realm selectors.
-- No current-realm, availability, party, or discovery surfaces appear, and the location API is inert (returns `null` / `false` / no-ops).
+- No current-realm, availability, party, or discovery surfaces appear.
 - Every environment is available.
-  Composition (biome + danger) is unaffected.
+  Composition (biome and danger) is unaffected.
 
 The **Settings** tab itself stays visible while disabled, since it hosts the toggle.
 Turning the toggle on reveals the **Travel** tab (where realms are authored), the environment editor's multi-realm selector, and the rest of the location-aware surfaces described below.
@@ -76,22 +75,20 @@ Each realm belongs to one crafting system and stores:
 | **Description** | Free text shown to the GM |
 | **Image** | Optional realm image |
 | **Enabled** | Disabled realms are flagged in the UI. A manual override that includes a disabled realm still resolves it (marked **Disabled**) so GMs can preview or diagnose |
-| **Secret** | A secret realm is never disclosed to players (not even its name or id) until the actor discovers it (see [Secret realms and discovery](#secret-realms-and-discovery)) |
-| **Biomes** | Lowercase biome tags (from the system biome vocabulary) used by environment biome availability rules |
-| **Scene mappings** | Foundry Scene / Scene Region UUID pairs reserved for the scene-automation phase. These are the bridge to Foundry's own Scene Regions (`sceneRegionUuid`), and stale UUIDs are preserved for repair |
-| **Modifiers** | Realm modifiers (`eventChance`, `dropRate`, `yield`, `difficulty`, `staminaCost`, `attemptLimit`, `custom` with `add`/`multiply`/`set`/`min`/`max` operations) are stored and validated now, and applied to gathering calculations in a later phase |
+| **Secret** | A secret realm is never disclosed to players (not even its name) until the actor discovers it (see [Secret realms and discovery](#secret-realms-and-discovery)) |
+| **Biomes** | Biome tags (from the system's biome list) used by environment biome availability rules |
+| **Scene mappings** | Links from the realm to one or more Foundry scene regions, reserved for the scene-automation phase |
+| **Modifiers** | Adjustments to event chance, drop rate, yield, difficulty, stamina cost, and attempt limit (plus custom adjustments) are stored and checked now, and applied to gathering calculations in a later phase |
 
 ### Realms vs Foundry Regions
 
 A **Gathering Realm** is the Fabricate concept.
-A **Foundry Region** (`RegionDocument` / Region Behaviour) is a distinct canvas object that Foundry itself owns.
+A **Foundry region** is a distinct canvas object that Foundry itself owns.
 The two are bridged but not the same:
 
-- A realm's **scene mappings** point a realm at one or more Foundry Scene Regions via `sceneRegionUuid`.
-  The mapping is intentionally **many-to-one**.
-  Several scene regions can map onto one realm (so a single realm can span multiple drawn map areas).
-- The `sceneRegionUuid` / `sceneUuid` field names are kept verbatim because they name Foundry objects.
-- Scene Region automation (sensing which realm a travel marker is in from the Foundry Scene Regions it occupies) is planned, not yet available.
+- A realm's **scene mappings** point a realm at one or more Foundry scene regions.
+  Several scene regions can map onto one realm, so a single realm can span multiple drawn map areas.
+- Scene region automation (sensing which realm a travel marker is in from the scene regions it occupies) is planned, not yet available.
 
 ### Authoring realms (Travel tab)
 
@@ -107,15 +104,15 @@ Scene mappings and modifiers are planned, not yet available: they normalize, val
 
 ### Realm settings (per system)
 
-Each crafting system stores realm behavior settings.
-The **Enable Travel & Realms** toggle (`enabled`, default `false`) is set from the Settings tab.
-The remaining settings are set through the API (`game.fabricate.getGatheringRealmStore().updateRealmSettings(systemId, { ... })`):
+Each crafting system stores a few realm behavior settings.
+The **Enable Travel & Realms** toggle (off by default) is set from the Settings tab.
+The remaining settings are set through the API (see [API](#api)):
 
 | Setting | Values | Effect |
 |:--------|:-------|:-------|
-| `enabled` | `false` (default), `true` | Gates the whole realm/travel/availability subsystem for the system. Set from the Settings tab **Enable Travel & Realms** toggle (see [Enabling Travel & Realms](#enabling-travel--realms)) |
-| `revealMode` | `manual` (default), `onPartyTokenEntry`, `alwaysVisible` | `alwaysVisible` discloses realm names to players even when secret and undiscovered. `onPartyTokenEntry` is reserved for the scene-automation phase |
-| `modifierVisibility` | `visible` (default), `gmOnly` | Default disclosure for realm modifiers once modifiers apply at runtime |
+| Travel & Realms | off (default), on | Gates the whole realm, travel, and availability subsystem for the system. Set from the Settings tab **Enable Travel & Realms** toggle (see [Enabling Travel & Realms](#enabling-travel--realms)) |
+| Reveal mode | manual (default), on party token entry, always visible | "Always visible" discloses realm names to players even when secret and undiscovered. "On party token entry" is reserved for the scene-automation phase |
+| Modifier visibility | visible (default), GM only | Default disclosure for realm modifiers once modifiers apply during play |
 
 ## Parties
 
@@ -161,39 +158,38 @@ The inspector echoes the resulting evidence: the resolution source (**GM overrid
 
 Geography is **not** a composition axis.
 Which reusable tasks and events belong to an environment is decided by **biome** (and, for events, **danger**) only, never by realm.
-Tasks and events no longer carry a `region` / `regions` match tag.
-Geography lives entirely in the `GatheringRealm`.
+Tasks and events no longer carry a geography match tag.
+Geography lives entirely in the realm.
 See [Gathering Environments]({% link gathering-environments.md %}#composition) for how composition matching works.
 
 ## Environment Realm Membership
 
-An environment declares which realms it belongs to through `includedRealmIds`, a list of `GatheringRealm` ids.
-An environment can belong to **multiple** realms.
-When **Enable Travel & Realms** is on, the environment editor shows a multi-select chip control (mirroring the biome selector) bound to `includedRealmIds`, with options sourced from the system's realms.
+An environment declares which realms it belongs to, and it can belong to **multiple** realms.
+When **Enable Travel & Realms** is on, the environment editor shows a multi-select chip control (like the biome selector) listing the system's realms.
 When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to the **Travel** tab to create realms first.
 The selector is hidden while the toggle is off.
 
 ## Environment Location Rules
 
 On top of realm membership, environments can declare explicit location availability rules.
-All four fields are optional id/tag lists.
-Empty (or absent) lists mean "no rule":
+All four are optional lists.
+An empty (or absent) list means "no rule":
 
-| Field | Effect |
+| Rule | Effect |
 |:------|:-------|
-| `includedRealmIds` | Realm membership: available only when a current realm is one of these realms |
-| `excludedRealmIds` | Blocked while any current realm is one of these realms |
-| `includedBiomeIds` | Available when any current realm carries one of these biomes |
-| `excludedBiomeIds` | Blocked when any current realm carries one of these biomes |
+| Included realms | Available only when a current realm is one of these realms |
+| Excluded realms | Blocked while any current realm is one of these realms |
+| Included biomes | Available when any current realm carries one of these biomes |
+| Excluded biomes | Blocked when any current realm carries one of these biomes |
 
 {: .note }
-> `includedRealmIds` is authored in the environment editor's multi-realm selector (toggle on).
-> The biome and exclusion fields are authored through the gathering environment store API or system import/export.
-> Saving validates that included/excluded realm ids exist on the owning crafting system.
-> These fields gate **location availability** only.
-> The legacy single `environment.region` free-text string is **inert**.
-> It is not a composition or availability input and is no longer surfaced in the editor.
-> The migration moves it into `includedRealmIds`.
+> Included realms are chosen in the environment editor's multi-realm selector (toggle on).
+> The biome and exclusion rules are authored through the API or by system import and export.
+> Saving checks that the chosen realms exist on the owning crafting system.
+> These rules gate **location availability** only.
+> The old single free-text region on an environment is **inert**.
+> It is not a composition or availability input and is no longer shown in the editor.
+> The migration moves it into the environment's included realms.
 
 Availability is only evaluated when **Enable Travel & Realms** is on.
 While the toggle is off, every environment is available regardless of these fields.
@@ -217,17 +213,17 @@ Location-gated environments stay listed but blocked, with a localized reason:
 - *"Not available in the party's current realm."* when the environment is excluded or no inclusion matches.
 - *"No party realm is set. Ask the GM to set the party's current realm."* when the environment requires a realm and none is resolved.
 
-The listing payload also carries a redaction-safe `location` field per environment (whether it is gated, available, the resolution source, and disclosure-safe current-realm labels) and, on blocked rows, travel guidance data.
-That guidance covers the destination realms whose identity the viewer is allowed to see (non-secret or already discovered), plus a count of secret undiscovered destinations.
-Macros and future player UI can use this to render travel goals such as "Travel to Ashen March" without leaking secret geography.
+Each listed environment also carries redaction-safe location information (whether it is gated, whether it is available, why, and disclosure-safe current-realm labels) and, on blocked rows, travel guidance.
+That guidance covers the destination realms the viewer is allowed to see (non-secret or already discovered), plus a count of secret undiscovered destinations.
+Macros and future player UI can use this to show travel goals such as "Travel to Ashen March" without leaking secret geography.
 
 ![Fabricate player realm-locked gathering](img/screenshots/fabricate-player-gathering-realm-locked.webp)
 
 ### The actor bar's current-realm chip
 
 The gathering app's actor selection bar carries a **current-realm chip** alongside the weather and time-of-day context.
-The chip's current realm is a property of the **party/system**, not of any one environment, so it is sourced from a single listing-level realm context resolved by the engine for the selected actor's active realm-enabled gathering system, independent of whether an environment is selected.
-The chip therefore appears whenever the realm subsystem is enabled, **including the all-environments-locked state** where no environment is selectable.
+The chip's current realm belongs to the **party and system**, not to any one environment, so it is shown for the selected actor's active realm-enabled gathering system whether or not an environment is selected.
+The chip therefore appears whenever the realm subsystem is enabled, **including when every environment is locked** and none is selectable.
 It shows **"No current realm"** when the party has no resolved current realm, giving the player a diagnostic signal explaining why every environment is locked.
 When a current realm is resolved, the chip shows the realm name(s) with the same redaction behavior as everywhere else.
 A secret, undiscovered realm reads as **Undiscovered realm**, and the chip never fabricates a realm name.
@@ -237,51 +233,43 @@ Its absence in that ambiguous case is intended.
 
 ### Secret realms and discovery
 
-Realm knowledge is **actor-scoped** (it follows the character across party changes) and is stored on the actor as a Fabricate flag.
-For a non-GM viewer, a *secret, undiscovered* realm never exposes its name or id anywhere.
+Realm knowledge is **actor-scoped**: it follows the character across party changes and is stored on the actor.
+For a non-GM viewer, a *secret, undiscovered* realm never exposes its name anywhere.
 It reads as **Undiscovered realm**.
-GMs always see real names, non-secret realms are always disclosed, and the `alwaysVisible` reveal mode discloses every realm name.
+GMs always see real names, non-secret realms are always disclosed, and the "always visible" reveal mode discloses every realm name.
 
 GMs reveal or hide a realm for an actor through the API (see below).
-Reveal writes validate that the realm belongs to the referenced crafting system, and each discovery entry records when and from what source (`manual`, `partyToken`, `import`, or `api`) it was learned.
+Revealing a realm checks that it belongs to the right crafting system, and each discovery records when and how it was learned.
 
 ## API
 
-All methods are available on `game.fabricate` after the `fabricate.ready` hook, with shorter aliases on the `game.fabricate.gathering` facade.
-The pre-rename `*Region*` method names are retained as deprecated aliases that warn once and forward to the realm method, so existing macros keep working.
+Most realm and travel work is done in the UI described above.
+For macro authors, Fabricate also exposes the same capabilities programmatically.
+GM-facing entry points cover party management (members, travel actor, current-realm overrides) and per-system realm management and settings, including the few realm settings not surfaced in the UI.
+A player-callable lookup returns a redaction-safe current-realm summary for an actor: a non-GM caller never receives a secret undiscovered realm's name.
+GM-only calls set or clear a party's current-realm override and reveal or hide a realm's discovery for an actor.
+Older macros that used the pre-rename names keep working.
 
-| Method | Alias on `game.fabricate.gathering` | Access | Purpose |
-|:-------|:------------------------------------|:-------|:--------|
-| `getGatheringPartyStore()` | `getPartyStore()` | GM-facing store | Party CRUD, members, travel actor, overrides |
-| `getGatheringRealmStore()` | `getRealmStore()` | GM-facing store | Per-system realm CRUD and realm settings |
-| `getGatheringLocationService()` | `getLocationService()` | Service | Current-realm resolution for a party or actor |
-| `getGatheringLocationForActor({ actorId or actor, systemId })` | `getLocationForActor(options)` | **Player-callable** | Redaction-safe current-realm summary for an actor |
-| `setGatheringPartyRealmOverride({ partyId, systemId, realmIds })` | `setPartyRealmOverride(options)` | GM-only | Set the manual current-realm override |
-| `clearGatheringPartyRealmOverride({ partyId, systemId })` | `clearPartyRealmOverride(options)` | GM-only | Clear the override (stamped, explicit none) |
-| `revealGatheringRealmForActor({ actorId or actor, systemId, realmId, source?, partyId? })` | `revealRealmForActor(options)` | GM-only | Record realm discovery on an actor |
-| `hideGatheringRealmForActor({ actorId or actor, systemId, realmId })` | `hideRealmForActor(options)` | GM-only | Remove a realm discovery entry |
-
-`getGatheringLocationForActor` resolves the actor's enabled party, then routes every realm through the disclosure policy: a non-GM caller never receives a secret undiscovered realm's id or name, and the raw `realmIds` / `staleRealmIds` arrays are returned empty for non-GM callers.
+See the [API Reference]({% link api/index.md %}) for exact signatures.
 
 ## Migrating From The Legacy Region Vocabulary
 
 Earlier versions modeled geography two ways.
 The first was a per-system **region vocabulary** (a match tag on tasks, events, and environments).
 The second was the first-class realm record (then called *Gathering Region*).
-These are now unified, and the `GatheringRealm` is the only geography concept.
-A one-time, idempotent startup migration upgrades existing worlds automatically:
+These are now unified, and the realm is the only geography concept.
+When you open an existing world, Fabricate upgrades it automatically, once:
 
-- Each legacy region-vocabulary entry becomes a `GatheringRealm` record on its crafting system (keyed by the vocabulary id, where distinct ids with duplicate labels stay distinct realms).
-- Each environment's legacy single `region` is mapped to `includedRealmIds` when a matching realm exists.
-  A free-text region with no match is left inert (no data loss, no stale reference).
-- The `region` / `regions` match tags are stripped from tasks and events.
+- Each old region-vocabulary entry becomes a realm on its crafting system (entries with the same label but distinct identities stay distinct realms).
+- Each environment's old single region becomes one of its included realms when a matching realm exists.
+  A free-text region with no match is left inert, with no data loss and no broken reference.
+- The geography match tags are removed from tasks and events.
 - The per-system region vocabulary is cleared.
-- `gatheringRealmSettings.enabled` is left off, so migrated systems keep the subsystem **disabled by default**.
+- Travel & Realms is left off, so migrated systems keep the subsystem **disabled by default**.
   Re-enable it per system with the **Enable Travel & Realms** toggle.
 
-A subsequent versioned (`1.1.0`) **Gathering Region → Gathering Realm** key-rename migration runs after that and rewrites the persisted keys (`gatheringRegions` → `gatheringRealms`, `gatheringRegionSettings` → `gatheringRealmSettings`, `includedRegionIds`/`excludedRegionIds` → `includedRealmIds`/`excludedRealmIds`, `currentRegionOverrides` → `currentRealmOverrides`) to their realm equivalents.
-The Foundry-bridge `sceneRegionUuid`/`sceneUuid` fields are left untouched.
-The actor discovery flag (`discoveredGatheringRegions` → `discoveredGatheringRealms`) is upgraded lazily on read instead, so each character migrates on its next discovery write.
+A later, versioned upgrade renames the *Gathering Region* concept to *Gathering Realm* throughout, leaving the Foundry scene-region links untouched.
+Each character's stored realm knowledge is upgraded the next time it changes.
 
 A one-time GM notice names the systems that had geography.
 Because geography is no longer a composition axis, **geography-scoped tasks and events may now appear in more environments**: a record that was previously narrowed only by a region tag (with no biome) now matches any biome.
@@ -289,11 +277,11 @@ Review composition on affected environments after upgrading, and add biome (or d
 
 ## Data Persistence
 
-| Location | Key | Contents |
+| What | Where it lives | Contents |
 |:---------|:----|:---------|
-| World setting | `fabricate.craftingSystems` | Realms and realm settings live on each crafting system (`gatheringRealms[]`, `gatheringRealmSettings`) |
-| World setting | `fabricate.gatheringParties` | Fabricate-managed parties, members, travel actors, and per-system overrides |
-| Actor flag | `fabricate.discoveredGatheringRealms` | Per-system realm discovery entries for the actor (legacy `discoveredGatheringRegions` flag read as a fallback) |
+| Realms and realm settings | On each crafting system | The realms and realm behavior settings for that system |
+| Parties | At the world level | Fabricate-managed parties, members, travel actors, and per-system overrides |
+| Realm discovery | On each actor | Which realms that character has discovered, per system |
 
-Because realms live on the crafting system, they ride along with crafting system export and import (`game.fabricate.exportSystem(systemId)` and the import dialog) automatically.
-Import validates that `gatheringRealms` is an array (warning on unnamed realms) and falls back to a pre-rename `gatheringRegions` export, and each imported realm's owning system id is self-healed to the importing system.
+Because realms live on the crafting system, they travel with the system when you export and import it (through the import dialog and the export API), automatically.
+Import checks the realm data, warns about unnamed realms, accepts older exports, and re-homes each imported realm to the system you are importing into.

@@ -16,12 +16,11 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 **Likely causes:**
 
-- Recipe `enabled` is `false`.
+- The recipe is disabled.
   Disabled recipes do not appear in the player crafting app (they remain in the GM admin panel with a grey "Disabled" badge).
-- Visibility list mode is `"player"` and the recipe is restricted to specific users.
-  If the current user is not in `allowedUserIds`, they cannot see it.
-- Visibility list mode is `"knowledge"` and the player has not learned the recipe or does not own a matching recipe item.
-- The recipe's `craftingSystemId` references a crafting system that no longer exists.
+- The recipe is restricted to specific users and the current player is not on the allow-list.
+- The system uses knowledge mode and the player has not learned the recipe or does not own a matching recipe item.
+- The recipe belongs to a crafting system that no longer exists.
 
 **Step-by-step checks:**
 
@@ -31,11 +30,12 @@ This guide covers common issues GMs and players encounter when setting up or usi
 2. Check the **Visibility** column in the recipe list.
    Does it show "Restricted" with a user count?
    If so, make sure the affected player is in the allow-list.
-3. Check the system's `recipeVisibility.listMode` in the **Recipe Visibility** card on the Systems tab.
-   If set to `"knowledge"`:
-   - Does the player's actor own an item matching the recipe's `linkedRecipeItemUuid`?
-   - Has the player learned the recipe? Check `Actor.flags.fabricate.learnedRecipes` in the browser console.
-4. Open the browser console (F12) and look for `Fabricate |` error messages referencing missing system IDs.
+3. Check the **Recipe Visibility** card on the Systems tab.
+   If the system is set to knowledge mode:
+   - Does the player's actor own the item linked to the recipe?
+   - Has the player learned the recipe? Confirm this in the player's knowledge list.
+4. Confirm the recipe still belongs to an existing crafting system.
+   If its system was deleted, the recipe will not show for players.
 
 **See also:** [Recipes]({% link recipes/index.md %}) for enabling and disabling recipes.
 [Visibility & Knowledge]({% link visibility.md %}) for list modes and knowledge access.
@@ -46,44 +46,39 @@ This guide covers common issues GMs and players encounter when setting up or usi
 ### Crafting Check Macro Not Running
 
 **Symptom:** The crafting check macro never fires.
-Recipes resolve immediately with no skill check, even though routed mode (macroOutcome provider) or progressive mode is configured.
+Recipes resolve immediately with no skill check, even though the Routed mode (with the macro-outcome option) or Progressive mode is configured.
 
 **Likely causes:**
 
-- `craftingCheck.enabled` is `false` and no `macroUuid` is set.
-  The engine skips the check entirely when both are absent.
-- `craftingCheck.macroUuid` is `null` or points to a macro that has been deleted.
-- The resolution mode is `simple`, or routed with the `ingredientSet` or `rollTableOutcome` provider.
-  In these configurations, crafting checks are **optional**.
+- The crafting check is turned off and no macro is set.
+  When both are absent, the check is skipped entirely.
+- The configured macro has been deleted or no longer exists.
+- The resolution mode is Simple, or Routed with the ingredient-set or roll-table option.
+  In these configurations a crafting check is **optional**.
   The check runs if configured but is not required for success.
-- The macro returns a value that does not match the expected shape for the current mode.
-  Routed macroOutcome provider requires `{ success, outcome }` where `outcome` is a non-empty string.
-  Progressive mode requires `{ success, value }` where `value` is a finite number.
+- The macro returns something the current mode does not understand (for example, no named outcome for the macro-outcome option, or a missing numeric value for Progressive mode).
 
 **Step-by-step checks:**
 
 1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section.
-   Is `craftingCheck.enabled` turned on?
-2. Is `craftingCheck.macroUuid` populated?
-   Open Foundry's macro directory and confirm the macro with that UUID still exists.
+   Is the crafting check turned on?
+2. Is a macro selected?
+   Open Foundry's macro directory and confirm that macro still exists.
 3. Check the system's **Resolution Mode**.
-   If the resolution mode is **Routed** with the `macroOutcome` provider, or **Progressive**, a crafting check is required.
-   The engine will report a validation error if one is missing.
-   For **Simple** mode or routed with `ingredientSet`/`rollTableOutcome` providers, the check is optional and will silently not run if unconfigured.
-4. Open the browser console (F12), attempt a craft, and look for `Fabricate |` prefixed error or warning messages about macro execution.
-5. Verify the macro's return shape matches the mode:
-   - **Simple / Routed (ingredientSet or rollTableOutcome):** `{ success: boolean }`
-   - **Routed (macroOutcome):** `{ success: boolean, outcome: string }` (outcome is matched case-insensitively to a result group name)
-   - **Progressive:** `{ success: boolean, value: number }` (value must be a finite number)
+   If the resolution mode is **Routed** with the macro-outcome option, or **Progressive**, a crafting check is required.
+   Fabricate reports a validation error if one is missing.
+   For **Simple** mode or Routed with the ingredient-set or roll-table options, the check is optional and simply does not run if unconfigured.
+4. Attempt a craft and watch for any error or warning notifications from Fabricate about the macro.
+5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the macro-outcome option, or a numeric value for Progressive mode). See the API reference for the expected setup.
 
-**See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration, macro contract, and return shapes.
+**See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration.
 
 ---
 
 ### Tools Not Breaking or Tracking Usage
 
 {: .note }
-> The standalone **Catalyst** concept was retired in `0.6.0`.
+> The standalone **Catalyst** concept was retired in version 0.6.0.
 > Required-but-reusable equipment is now modelled by [Tools]({% link tools.md %}).
 > Existing catalyst data migrates to Tools automatically.
 
@@ -91,27 +86,25 @@ Recipes resolve immediately with no skill check, even though routed mode (macroO
 
 **Likely causes:**
 
-- The tool's breakage mode is **not** `limitedUses`.
-  Only `limitedUses` tools track per-item usage.
-  The `breakageChance` and `diceExpression` tools never write a usage flag (they roll for breakage each attempt and write nothing otherwise).
-- `maxUses` is blank (unlimited).
-  A `limitedUses` tool still increments its counter but never breaks because there is no maximum.
-- The tool's on-break action is `flagBroken` (the default for migrated non-degrading catalysts), so it is marked broken rather than destroyed.
-  This may be intentional (e.g. a forge that needs repair rather than replacement).
+- The tool's breakage mode is **not** limited uses.
+  Only limited-uses tools track per-item usage.
+  Tools that roll a chance to break each attempt do not keep a usage count.
+- The maximum number of uses is blank (unlimited).
+  A limited-uses tool still increments its counter but never breaks because there is no maximum.
+- The tool's on-break action is set to flag the tool as broken (the default for migrated tools), so it is marked broken rather than destroyed.
+  This may be intentional (for example, a forge that needs repair rather than replacement).
 - On a failed crafting or salvage check, tools are **not** broken or degraded by default.
-  The setting `craftingCheck.consumption.consumeCatalystsOnFail` (field name retained for backward compatibility) defaults to `false`.
 
 **Step-by-step checks:**
 
 1. Open the system's **Tools** page and select the tool.
-   Is the breakage mode `limitedUses`?
-2. If so, is **Max uses** set to a positive integer (rather than left blank)?
-3. Check the owned item's tracking flag in the browser console: `item.getFlag('fabricate', 'toolUsage')`.
-   Is `timesUsed` incrementing after each use?
-   (Items migrated from a catalyst may still carry the legacy `catalystItemUsage` flag, which is read as a fallback until the first post-migration use writes `toolUsage`.)
+   Is the breakage mode set to limited uses?
+2. If so, is **Max uses** set to a positive number (rather than left blank)?
+3. Use the tool a few times and confirm its usage count goes up on the owned item.
+   If it never increases, the breakage mode is not limited uses.
 4. If a broken tool should be removed instead of flagged, set its on-break action to **Destroy item** (or **Replace with...**).
-   A tool marked broken (`flags.fabricate.toolBroken === true`) fails its presence gate until a GM clears the flag.
-5. If tools should break even on a failed check, open the system settings and enable `craftingCheck.consumption.consumeCatalystsOnFail` (recipes) or `salvageCraftingCheck.consumption.consumeCatalystsOnFail` (salvage).
+   A tool that has been flagged as broken cannot be used again until a GM clears that broken state.
+5. If tools should break even on a failed check, open the system settings and enable the option to consume tools on failure (there are separate options for recipes and for salvage).
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.
 [Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) covers consumption on failure settings.
@@ -124,25 +117,22 @@ Recipes resolve immediately with no skill check, even though routed mode (macroO
 
 **Likely causes:**
 
-Effect transfer is an **opt-in, triple-flag feature**.
-All three of the following must be `true` before any effects are transferred:
+Effect transfer is an **opt-in feature with three separate switches**.
+All three of the following must be turned on before any effects are transferred:
 
-1. `system.features.essences` is `true`.
-   The essences feature must be enabled on the crafting system.
-2. `system.features.effectTransfer` is `true`.
-   The effect transfer feature must be enabled on the crafting system.
-3. `recipe.transferEffects` is `true`.
-   The individual recipe must opt in to effect transfer.
+1. The **Essences** feature must be enabled on the crafting system.
+2. The **Effect Transfer** feature must be enabled on the crafting system.
+3. The individual recipe must opt in to effect transfer.
 
-If any one of these flags is `false`, effect transfer is silently skipped.
+If any one of these is off, effect transfer is silently skipped.
 
 Additional causes:
 
-- The essence definition's `sourceItemUuid` is `null` or points to an item that no longer exists.
+- An essence has no source item selected, or its source item no longer exists.
   Essences without a valid source item are silently skipped.
 - The source item has no active effects defined on it (nothing to transfer).
 - The consumed ingredients do not contribute any essence quantities.
-  If no essences are contributed, the transfer pipeline has nothing to process.
+  If no essences are contributed, there is nothing to transfer.
 
 **Step-by-step checks:**
 
@@ -151,14 +141,12 @@ Additional causes:
 2. Open the recipe in the recipe editor.
    Is **Transfer Effects** checked?
 3. In the system settings, open the **Essences** feature card.
-   Does each essence definition have a **Source item** selected?
-4. Open the source item linked to the essence definition.
+   Does each essence have a **Source item** selected?
+4. Open the source item linked to the essence.
    Does it have active effects defined?
    (Check the item sheet's Effects tab.)
 5. Check the components used as ingredients in the recipe.
    Do they have non-zero essence quantities assigned for the relevant essence?
-6. Open the browser console (F12) and attempt a craft.
-   Effect transfer issues are logged as `Fabricate |` messages.
 
 **See also:** [Effect Transfer]({% link effect-transfer.md %}) covers effect transfer configuration and the triple-flag pipeline.
 [Essences]({% link essences.md %}) covers essence definitions and source items.
@@ -171,32 +159,31 @@ Additional causes:
 
 **Likely causes:**
 
-- `salvageResolutionMode` is set to `"mapped"` or `"alchemy"`.
-  Those modes are **not valid** for salvage and are explicitly rejected.
-  Use `"simple"`, `"routed"`, or `"progressive"` instead.
+- The salvage resolution mode is set to a mode that is not valid for salvage.
+  Only Simple, Routed, and Progressive are valid.
 - **Routed salvage mode** requires:
-  - `salvageCraftingCheck.enabled` is `true` (or `salvageCraftingCheck.macroUuid` is set)
-  - `salvageCraftingCheck.outcomes` contains at least one declared outcome label (e.g. `["critical", "pass", "fail"]`)
-  - The component's `salvage.outcomeRouting` maps every declared outcome to an existing result group ID in `salvage.resultGroups`
+  - a salvage check is configured (turned on or with a macro set)
+  - at least one outcome is declared (such as critical, pass, and fail)
+  - the component maps every declared outcome to an existing result group
 - **Progressive salvage mode** requires:
-  - `salvageCraftingCheck.progressive` configuration is present
-  - All result components have a valid positive `difficulty` value on their component definition
-- **Simple salvage mode** requires exactly 1 result group per component.
-  Having 0 or 2+ result groups is rejected.
-- The component's `salvage.enabled` is `false`.
+  - a progressive salvage check is configured
+  - every result component has a valid positive difficulty value
+- **Simple salvage mode** requires exactly one result group per component.
+  Having none, or two or more, is rejected.
+- Salvage is disabled on the component.
 
 **Step-by-step checks:**
 
-1. Check the system's `salvageResolutionMode`.
-   If it is `"mapped"` or `"alchemy"`, change it to `"simple"`, `"routed"`, or `"progressive"`.
-2. For **routed** mode:
-   - Is `salvageCraftingCheck.macroUuid` set to a valid macro UUID?
-   - Are `salvageCraftingCheck.outcomes` defined (e.g. `["critical", "pass", "fail"]`)?
-   - Does the component's `salvage.outcomeRouting` map every declared outcome to an existing result group ID?
-3. For **simple** mode: does the component have exactly one salvage result group?
-4. For **progressive** mode: does each result component reference a component with a valid positive `difficulty` value?
-5. Is `salvage.enabled` set to `true` on the component you are trying to salvage?
-6. Is the `salvage` feature toggle enabled on the crafting system?
+1. Check the system's salvage resolution mode.
+   If it is not Simple, Routed, or Progressive, change it to one of those.
+2. For **Routed** mode:
+   - Is a salvage check macro selected?
+   - Are the outcomes defined (such as critical, pass, and fail)?
+   - Does the component map every declared outcome to an existing result group?
+3. For **Simple** mode: does the component have exactly one salvage result group?
+4. For **Progressive** mode: does each result component have a valid positive difficulty value?
+5. Is salvage enabled on the component you are trying to salvage?
+6. Is the salvage feature enabled on the crafting system?
 
 **See also:** [Salvage]({% link salvage.md %}) covers salvage configuration, salvage resolution modes, and salvage crafting checks.
 
@@ -209,94 +196,46 @@ This is most common after upgrading to Foundry v12 or after importing items from
 
 **Likely causes:**
 
-- On Foundry v12+, the compendium source UUID of an item is stored in `_stats.compendiumSource`.
-  Older versions of Fabricate only checked `flags.core.sourceId` (the Foundry v11 field).
-  If the module has not been updated to use the new field, owned copies of compendium items will not match, even though the items are correct.
-- The owned item was created on Foundry v11 and later migrated.
-  Items that were never re-imported from the compendium after upgrading to v12 may only have `flags.core.sourceId` set and no `_stats.compendiumSource`.
-  The source UUID resolver handles this with a fallback, but very old items may have neither field populated if the compendium link was never established.
-- The linked recipe item UUID stored on the recipe (`linkedRecipeItemUuid`) points to the compendium entry, but the owned item's source fields do not match because the item was duplicated from a world item rather than dragged directly from the compendium.
+- The owned item was duplicated from a world item rather than dragged directly from the compendium, so Fabricate cannot link it back to the recipe's linked item.
+- The owned item is a very old copy with no link to its original compendium entry.
+- Fabricate is out of date.
+  Recent versions recognise the compendium link recorded by both Foundry v11 and Foundry v12 and later, but older versions may only recognise the v11 link.
 
 **Step-by-step checks:**
 
-1. Open the browser console (F12) and locate the owned recipe item or component on the actor's sheet.
-   Run the following to inspect the source fields:
-   ```javascript
-   const actor = game.actors.getName("Aldric the Alchemist"); // replace with actor name
-   const item = actor.items.getName("Healing Salve Recipe");  // replace with item name
-   console.log("uuid:", item.uuid);
-   console.log("_stats.compendiumSource:", item._stats?.compendiumSource);
-   console.log("flags.core.sourceId:", item.flags?.core?.sourceId);
-   ```
-2. Compare the output with the `linkedRecipeItemUuid` stored on the recipe.
-   Open the Crafting Admin panel, find the recipe, open the editor, and check the **Linked Recipe Item** field.
-   The UUID shown there must match either `_stats.compendiumSource` or `flags.core.sourceId` on the owned item.
-3. If neither source field on the owned item matches the linked UUID, the item was not created from the correct compendium entry.
-   Delete the owned copy and re-import it by dragging it directly from the compendium browser to the actor's sheet.
-4. If the owned item was created on Foundry v11 and only has `flags.core.sourceId`, check that Fabricate is running version 0.9.0 or later, which added the `_stats.compendiumSource`-first resolver with `flags.core.sourceId` as a legacy fallback.
-   Older versions of Fabricate do not read `_stats.compendiumSource`.
-5. If the issue only affects the **"Craftable only"** filter and not recipe visibility, verify that the component matching paths are also using the source UUID resolver.
-   Open the browser console and look for `Fabricate | Cannot resolve component` warnings when attempting to craft.
-6. After confirming the source fields are correct, reload the Foundry page (F5) and re-open the crafting app.
-   Source UUID resolution is evaluated live on each visibility check, so a reload is sufficient.
+1. Open the Crafting Admin panel, find the recipe, open the editor, and check the **Linked Recipe Item** field.
+   Note which compendium item it points to.
+2. On the actor's sheet, confirm the owned copy of that recipe item (and the required components) came from the same compendium entry.
+   The most reliable way to be sure is to delete the owned copy and drag a fresh one directly from the compendium browser onto the actor's sheet.
+3. Make sure Fabricate is up to date.
+   Recent versions recognise copies made under both Foundry v11 and Foundry v12 and later.
+4. Reload the Foundry page (F5) and re-open the crafting app.
+   Craftability is re-evaluated each time, so a reload is enough.
    No data migration is required.
 
-**Expected behaviour after the fix:** A player who owns an actor-copy of a compendium item will have that item recognised by Fabricate's recipe matching, regardless of whether the Foundry version that created the copy stored the source UUID in `_stats.compendiumSource` (v12+) or `flags.core.sourceId` (v11).
+**Expected behaviour after the fix:** A player who owns an actor copy of a compendium item will have that item recognised by Fabricate's recipe matching, whether the copy was made under Foundry v11 or Foundry v12 and later.
 The "Craftable only" filter will include the recipe once all required items are matched.
 
-**Manual verification steps (for maintainers confirming the fix):**
-
-1. Open a Foundry v12+ world with Fabricate installed and at least one knowledge-mode crafting system configured.
-2. Find the recipe's linked item in the compendium browser and drag it directly onto an actor's sheet.
-   This creates an owned copy whose `_stats.compendiumSource` is set to the compendium item's UUID.
-3. Open the crafting app for that actor.
-   The recipe should now appear in the recipe list and show as craftable (assuming all required components are also present).
-4. Enable the **Craftable only** filter in the crafting app.
-   The recipe must remain visible.
-   If it disappears, the `_stats.compendiumSource` matching path is not working.
-5. Repeat steps 2 to 4 using an item that was originally created on Foundry v11 (i.e., one that has `flags.core.sourceId` but not `_stats.compendiumSource`).
-   The recipe must also remain craftable and visible under the filter, confirming the legacy fallback path.
-
-**See also:** [Visibility & Knowledge]({% link visibility.md %}#how-matching-works) covers source UUID matching rules and Foundry v12+ behaviour.
+**See also:** [Visibility & Knowledge]({% link visibility.md %}#how-matching-works) covers how owned compendium copies are matched on Foundry v12 and later.
 [Recipes]({% link recipes/index.md %}) covers linking recipe items in the editor.
 
 ---
 
-### Crafting App Fails to Open (`each_key_duplicate` Error)
+### Crafting App Fails to Open
 
 **Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes.
-The browser console (F12) shows a Svelte error similar to `each_key_duplicate` or `Error: Cannot have duplicate keys in an each block`.
 
 **Cause:**
 
-This error was caused by two related bugs in the Crafting App's run display logic:
+This was caused by corrupted crafting-run history on the actor, which could make the same run appear twice in the app's run list and prevent the list from rendering.
 
-1. If the actor's stored crafting run data contained duplicate run IDs (for example, after a data-corruption event or a race condition that wrote the same run twice), the `RunSummary` component received multiple runs with the same `id`.
-   Svelte's `{#each}` block requires unique keys and throws immediately when it encounters duplicates.
-2. Even without corrupted data, runs from the active-runs list and runs from the run-history list shared the same key space.
-   A run ID that appeared in both lists (e.g., a run that was simultaneously active and in history during a transition) caused a cross-list key collision.
+**Fix:** This is resolved in the current version, which guards against duplicate runs.
+Make sure Fabricate is up to date.
 
-**Fix:** This is resolved in the current version.
-`craftingStore.js` now deduplicates `activeRuns` and `runHistory` independently using a Set before passing them to the component.
-The `RunSummary` component also uses composite keys (`active-${run.id}` and `history-${run.id}`) so the two lists can never collide even if a run ID appears in both.
+**If you are still seeing this after updating:**
 
-**If you are still seeing this error after updating:**
-
-1. Open the browser console (F12) and run the following to inspect your actor's stored run data:
-   ```javascript
-   const actor = game.actors.getName("Aldric the Alchemist"); // replace with actor name
-   const runs = actor.getFlag("fabricate", "craftingRuns") || {};
-   console.log("active:", runs.active);
-   console.log("history:", runs.history);
-   ```
-2. If the output shows the same run ID appearing more than once in `active` or `history`, the stored data is corrupted.
-   You can clear the runs for this actor with:
-   ```javascript
-   await actor.unsetFlag("fabricate", "craftingRuns");
-   ```
-   This removes all run history for the actor.
-   Recipes and crafting systems are not affected.
-3. Reload the page (F5) and re-open the Crafting App.
+The actor's stored crafting-run history may be corrupted.
+Ask your GM to clear that actor's crafting run history (this removes the run history only, not your recipes or crafting systems), then reload the page (F5) and re-open the Crafting App.
 
 **See also:** [Quickstart]({% link quickstart.md %}) covers opening the Crafting App for the first time.
 
@@ -309,32 +248,16 @@ Reloading the page clears the stale state, but it reappears on the next craft.
 
 **Cause:**
 
-This was caused by a race between `CraftingRunManager` writing the completed run to Foundry actor flags and the Crafting App reading the run list back from those flags.
-Because Foundry flag writes are asynchronous and not immediately visible to subsequent synchronous reads in the same client, the UI received stale data and continued to show the run as active.
+This was caused by a timing issue where the Crafting App could read the actor's run list before the completed run had finished saving, so it kept showing the run as active.
 
-**Fix:** This is resolved in the current version.
-`CraftingRunManager` now maintains an in-memory cache keyed by actor ID.
-`_persist()` writes to both the cache and Foundry flags at the same time, so any subsequent `_getContainer()` call in the same session returns the committed state immediately without waiting for the flag round-trip.
+**Fix:** This is resolved in the current version, which keeps the displayed run list in step with the saved state.
+Make sure Fabricate is up to date.
 
 **If you are still seeing this after updating:**
 
-1. Open the browser console (F12) and inspect the actor's stored run data:
-   ```javascript
-   const actor = game.actors.getName("Aldric the Alchemist"); // replace with actor name
-   const runs = actor.getFlag("fabricate", "craftingRuns") || {};
-   console.log("active:", runs.active);
-   console.log("history:", runs.history);
-   ```
-2. If the completed run appears in `active` rather than `history`, the flag was not written correctly.
-   Clear it with:
-   ```javascript
-   await actor.unsetFlag("fabricate", "craftingRuns");
-   ```
-   This removes all run history for the actor.
-   Recipes and crafting systems are not affected.
-3. If your code calls `CraftingRunManager` methods directly and writes to actor flags externally, call `runMgr.invalidateCache(actor.id)` after your write so the manager re-reads from flags on the next access.
+Ask your GM to clear that actor's crafting run history (this removes the run history only, not your recipes or crafting systems), then reload the page (F5) and re-open the Crafting App.
 
-**See also:** [CraftingRunManager API]({% link api/run-manager.md %}) provides the `invalidateCache()` reference.
+**See also:** [Quickstart]({% link quickstart.md %}) covers opening the Crafting App for the first time.
 
 ---
 
@@ -370,7 +293,6 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
 3. If you dropped a compendium pack header and received no items, verify the compendium type.
    Only **Items** compendiums contain importable components.
    **Actor** or **Journal Entry** compendiums are silently filtered.
-4. Open the browser console (F12) and look for `Fabricate |` prefixed messages for additional detail.
 
 **See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) covers adding components via drag-and-drop.
 
@@ -383,40 +305,19 @@ The item is not added, no error or notification appears from Fabricate, and in s
 
 **Cause:**
 
-Fabricate's Svelte UI reads drag data using `foundry.applications.ux.TextEditor.implementation.getDragEventData`.
-In some Foundry versions and environments this API path is absent at the time of the drop, causing Fabricate's drag handler to receive `null` and silently skip the drop callback entirely.
-Control returns to Foundry's own ApplicationV2 drop handler, which produces the generic error message.
+In some Foundry versions and environments, Fabricate could not read the drag-and-drop data at the moment of the drop, so it silently ignored the dropped item.
+Control then returned to Foundry, which produced the generic error message.
 
-**Fix:** This is resolved in the current version.
-`getDragEventData` in `foundryBridge.js` now uses a two-strategy approach:
-
-1. If `foundry.applications.ux.TextEditor.implementation.getDragEventData` is available, it is used as before.
-2. Otherwise, the drag data is read directly from `event.dataTransfer.getData('text/plain')` and parsed as JSON.
-   This is the universal drag data format used by Foundry across all versions.
-
-The same fix is applied to `foundryCompat.js` (the legacy Handlebars path).
-In addition, `foundryCompat.js` now evaluates the `TextEditor` API path at the moment of each drop rather than once at module load time, so it correctly handles cases where the API becomes available after the module first imports.
+**Fix:** This is resolved in the current version, which reads the drag data more robustly across Foundry versions.
+Make sure Fabricate is up to date.
 
 **If you are still seeing silent drop failures after updating:**
 
-1. Open the browser console (F12) and attempt a drag-and-drop.
-   Look for any `Fabricate |` prefixed error messages.
-2. Confirm the drag source is a world item or compendium item.
+1. Confirm the drag source is a world item or compendium item.
    Fabricate drop zones only accept Item documents.
-   Other document types (Actors, Journal Entries, etc.) are rejected.
-3. If you are dragging from a compendium, confirm the compendium is not locked or from a module that restricts programmatic access.
-4. Run the following in the browser console to verify the drag data format.
-   First, add a temporary drop listener to the body:
-   ```javascript
-   document.body.addEventListener('drop', e => {
-     e.preventDefault();
-     console.log('text/plain:', e.dataTransfer.getData('text/plain'));
-   }, { once: true });
-   ```
-   Then drag an item onto the page.
-   The console should print a JSON object like `{"type":"Item","uuid":"Item.abc123"}`.
-   If it prints an empty string, the drag source is not sending standard Foundry drag data.
-5. If the above confirms valid drag data but drops still fail, update Fabricate to the latest version which includes the `text/plain` fallback.
+   Other document types (Actors, Journal Entries, and so on) are rejected.
+2. If you are dragging from a compendium, confirm the compendium is not locked or from a module that restricts access.
+3. Make sure Fabricate is updated to the latest version, which includes the more robust drag-data handling.
 
 **See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) explains adding components via drag-and-drop.
 
@@ -427,20 +328,17 @@ In addition, `foundryCompat.js` now evaluates the `TextEditor` API path at the m
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:
 
 1. Is the Fabricate module enabled in the world? (Setup > Add-on Modules > Fabricate should be checked.)
-2. Is Fabricate initialising?
-   Open the browser console (F12) and run: `Hooks.once('fabricate.ready', () => console.log('Fabricate is ready'))`.
-   If the message does not appear after a reload, the module may not be loading.
-3. Is the crafting system saved without errors?
+2. Is the crafting system saved without errors?
    Open the Crafting Admin panel and check for red validation warnings.
-4. Are components properly linked?
-   Each component should have a valid `sourceItemUuid` pointing to an existing world or compendium item.
-5. Does the recipe pass validation?
+3. Are components properly linked?
+   Each component should link to an existing world or compendium item.
+   Open the component in the editor and confirm its linked item is still present.
+4. Does the recipe pass validation?
    Open the recipe in the editor and click Save.
    Check for validation error messages.
-6. Is the correct actor selected in the crafting app?
+5. Is the correct actor selected in the crafting app?
    The crafting app uses the selected actor for ingredient checks and result delivery.
-7. Are component source actors configured?
+6. Are component source actors configured?
    If ingredients should come from multiple actors, make sure they are all selected in the crafting app.
-8. Check the browser console (F12) for any lines starting with `Fabricate |` -- these are the module's own diagnostic messages.
-9. Try refreshing the browser (F5) and re-opening the crafting app.
-   Some state is cached client-side and a refresh clears it.
+7. Try refreshing the browser (F5) and re-opening the crafting app.
+   Some state is cached and a refresh clears it.

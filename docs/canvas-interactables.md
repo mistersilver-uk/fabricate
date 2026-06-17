@@ -14,24 +14,23 @@ There are two kinds of interactable:
 - **Tool station** is a placed [Tool]({% link tools.md %}).
   Activating it opens the Fabricate **Crafting** tab with that station's Tool **present as a virtual tool**, so a player can use the Tool without owning a copy of the item (think of the forge belonging to the smithy, not the smith).
 - **Gathering-task shortcut** is a placed [Gathering Task]({% link gathering-environments.md %}).
-  Activating it opens the gathering UI **scoped to, and auto-selecting, a specific (environment, task) pair**.
+  Activating it opens the gathering UI scoped to, and auto-selecting, a specific environment and task.
   It is a pure shortcut.
-  It reads and decrements the **environment's own node state** (`nodeRuntime[taskId]`), exactly as if the player had opened gathering and picked that environment and task by hand.
-  A placed shortcut has **no node pool of its own**.
-  Two shortcuts pointing at the same (environment, task) draw down the same shared environment node.
+  It reads and draws down that **environment's own gathering supply**, exactly as if the player had opened gathering and picked that environment and task by hand.
+  A placed shortcut has **no supply of its own**.
+  Two shortcuts pointing at the same environment and task draw down the same shared supply.
 
 {: .note }
-> **A canvas interactable is a Scene Region**, not a Token or an actor.
-> The authoritative state lives on a custom **`fabricate.interactable` Region Behaviour** attached to that region.
-> An optional **linked visual** (a Tile by default) gives the interactable a marker on the map.
-> It owns no authoritative state but **reflects** the behaviour's state (its visibility tracks lock/disable, and a Tile's image tracks the environment node's depletion).
-> There are **no synthetic actors or tokens** anywhere in this feature.
+> **A canvas interactable is a region you draw on the map**, not a token or an actor.
+> An optional marker (a tile by default) gives the interactable something to see on the map.
+> The marker mirrors the interactable: it is hidden when the interactable is hidden or disabled, and its image can change when a gathering supply runs out.
+> Deleting the marker never destroys the interactable.
 
 {: .note }
-> **Tile double-click is retired.**
-> Earlier builds modelled interactables as Tiles you double-clicked.
+> **Double-clicking a tile is retired.**
+> Earlier builds modelled interactables as tiles you double-clicked.
 > That model is gone.
-> Players now activate by **token presence** (walking into the region), described under [Using interactables (players)](#using-interactables-players).
+> Players now activate by **walking a token into the region**, described under [Using interactables (players)](#using-interactables-players).
 
 ---
 
@@ -39,25 +38,16 @@ There are two kinds of interactable:
 
 Every canvas interactable is:
 
-1. **A Scene Region**, a small rectangle (one grid square by default) placed on the scene, snapped to the grid.
-2. **A `fabricate.interactable` Region Behaviour** nested in that region.
-   This behaviour owns all the authoritative state:
-   - `interactableType` (`tool` | `gatheringTask`), `sourceUuid`, `systemId`,
-     `toolId` | `taskId`, `environmentId`, `name`
-   - `presentation`: `{ promptText, hidden }`
-   - `linkedVisual`: `{ uuid, documentName (Tile|Drawing|Token), mode (marker|none), missingPolicy }`
-   - `state`: `{ enabled, consumed, locked, uses, cooldown }`
-   - `activation`: `{ trigger: regionEnter, audience }`
+1. **A region on the map**, a small rectangle (one grid square by default) placed on the scene and snapped to the grid.
+2. **The interactable settings attached to that region.**
+   An interactable remembers what it points at (a tool station or a gathering-task shortcut), whether it is enabled or locked, how many uses or cooldown it has, the prompt text shown to players, and how its marker behaves.
+   A gathering-task interactable only remembers which environment and task it is a shortcut for.
+   When a gathering supply runs out or comes back, that happens on the environment, never on the interactable.
+3. **An optional marker**, a **tile** (default), a **drawing**, or an existing **GM-owned token**.
+   Deleting the marker never destroys the interactable.
+   The marker mirrors the interactable: a tile is hidden from players when the interactable is disabled or hidden, and its image can change when the gathering supply runs out (see [Marker variants](#marker-variants)).
 
-   There is **no `node` field** on the behaviour.
-   A gathering-task interactable carries only the `(environmentId, taskId)` pointer.
-   Depletion and respawn live entirely on the environment's node runtime, never on the interactable.
-3. **An optional linked visual**, a **Tile** (default), a **Drawing**, or an existing **GM Token**.
-   It owns no authoritative state and carries reverse flags back to the region/behaviour, so deleting it never destroys the interactable.
-   It does **reflect** that state, though.
-   A Tile is hidden from players when the interactable is disabled/hidden, and its image swaps when the environment node depletes (see [Marker variants](#marker-variants)).
-
-Because the region behaviour is the source of truth, a **region-only** interactable (no marker at all) works perfectly.
+Because the region itself is what matters, a **region-only** interactable (no marker at all) works perfectly.
 Players still walk into the region and get the prompt.
 
 ---
@@ -67,89 +57,83 @@ Players still walk into the region and get the prompt.
 Placing interactables is **GM-only**.
 There are three ways to place one:
 
-1. **Interactable browser.** A GM-only **Fabricate** button in the scene controls (its own top-level mortar-and-pestle control group) opens the **Interactable browser** app.
-   It lists the active crafting system's draggable Tools and Gathering Tasks.
+1. **Interactable browser.** A GM-only **Fabricate** button in the scene controls (its own mortar-and-pestle control group) opens the **Interactable browser**.
+   It lists the active crafting system's tools and gathering tasks that can be dragged out.
    Each row offers:
-   - **Drag onto the canvas** drops a region (plus a linked Tile marker) at the drop point.
-   - **Place on current scene** is a keyboard/no-pointer fallback that drops at the current view centre.
-     It runs the exact same spawn pipeline as a drag (including the gathering-task environment resolution below), so it is not a divergent path.
-   - **Region only** places the interactable as a **region with no marker** (a hidden, presence-only interactable).
-2. **Item drag.** Dragging a world/compendium or Items-directory **Item that is linked to a Tool component** onto the canvas also spawns a Tool station, by matching the dropped item against each crafting system's Tools library.
-3. **Manage Interactables panel, Promote region.** The browser drag always spawns a **1-grid-square rectangle** region, so an interactable that needs an **arbitrary or odd-shaped** region has no first-class authoring path through the browser.
+   - **Drag onto the canvas** drops a region (plus a tile marker) at the drop point.
+   - **Place on current scene** is a no-pointer fallback that drops at the current view centre.
+     It places exactly as a drag does, including resolving the gathering-task environment described below.
+   - **Region only** places the interactable as a region with no marker (a hidden, presence-only interactable).
+2. **Item drag.** Dragging an item that is linked to a tool (from the world, a compendium, or the Items directory) onto the canvas also places a tool station, by matching the dropped item against each crafting system's tools.
+3. **Manage Interactables panel, Promote region.** A browser drag always places a one-grid-square rectangle, so an interactable that needs an arbitrary or odd shape has no path through the browser.
    The **Manage Interactables** panel (below) closes that gap.
-   Draw a region of any shape with Foundry's native region tools, then **promote** it into a working interactable bound to a chosen Tool or Gathering Task source.
+   Draw a region of any shape with Foundry's own region tools, then **promote** it into a working interactable bound to a chosen tool or gathering task.
 
 A dropped interactable snaps to the scene grid.
-When it has a marker, the linked Tile takes its image from the Tool component's icon (or the task's image), falling back to a generic bag icon.
-A Tile renders **centred** on its stored point while a Region rectangle renders from its **top-left**, so the spawn deliberately offsets the region to **overlay** the marker on the drop point.
-A player walking onto the visible marker is reliably inside the region.
-Spawning is **transaction-like**.
-If the marker fails to create after the region exists, the orphan region is cleaned up (and vice-versa).
+When it has a marker, the tile takes its image from the tool's icon (or the task's image), falling back to a generic bag icon.
+The region is offset so the marker sits over the drop point, so a player walking onto the visible marker is reliably inside the region.
+Placement is all-or-nothing: if the marker cannot be created after the region exists, the leftover region is cleaned up, and the other way round.
 
 If a non-GM attempts to drop an interactable, the drop is rejected with a notification.
 Only a GM can place them.
 
 ### Marker variants
 
-A marker **owns no authoritative state** in any variant.
-The source of truth is always the region behaviour, and the interactable keeps working even with no marker at all.
-What a marker *does* do is **reflect** that state.
-Its visibility tracks the interactable's lock/disable state, and a Tile marker's image tracks the shared environment node's depletion (see below).
+A marker is only the visible face of the interactable.
+The interactable keeps working even with no marker at all.
+What a marker does is mirror the interactable: it is hidden when the interactable is locked or disabled, and a tile marker's image can change when the shared gathering supply runs out (see below).
 
 | Variant | What it is | Notes |
 |:--------|:-----------|:------|
-| **Tile marker** (default) | A Foundry Tile linked to the behaviour | Created and centred on the drop point. Takes its image from the Tool/task icon. Hidden from players when the interactable is disabled or hidden. Image swaps when the environment node depletes (gathering tasks). |
-| **Drawing marker** | A Foundry Drawing linked to the behaviour | A labelled translucent rectangle "zone" marker. |
-| **Token marker** | An *existing* GM Token you relink to the behaviour | **Never mutated or deleted**. It is the GM's own document (e.g. a merchant NPC). |
-| **Region only** | No marker at all | The region itself is the interactable. `presentation.hidden = true`, `linkedVisual.mode = 'none'`. |
+| **Tile marker** (default) | A Foundry tile placed on the map | Created and centred on the drop point. Takes its image from the tool or task icon. Hidden from players when the interactable is disabled or hidden. Image can change when the gathering supply runs out (gathering tasks). |
+| **Drawing marker** | A Foundry drawing | A labelled translucent rectangle "zone" marker. |
+| **Token marker** | An *existing* GM-owned token you relink | **Never changed or deleted**. It is the GM's own token (e.g. a merchant NPC). |
+| **Region only** | No marker at all | The region itself is the interactable, hidden, presence-only. |
 
 #### Depleted-marker image swap (gathering tasks)
 
-A Tile marker on a **gathering-task** interactable reflects its environment node's depletion.
-When the environment's node for that task runs out (`environment.nodeRuntime[taskId].current <= 0`) **and** the task configures a `depletedBehavior.swapImage`, every linked Tile marker for that `(environment, task)` swaps to the depleted image.
-When the node recharges (respawns above 0) the markers flip back.
-The available image is **stashed** on the first swap and restored on recharge, so the restore target is the GM's actual marker texture.
+A tile marker on a **gathering-task** interactable reflects whether its environment's supply is exhausted.
+When the environment's supply for that task runs out **and** the task is set up to change image when depleted, every tile marker for that environment and task swaps to the depleted image.
+When the supply comes back, the markers flip back to their original image.
 
-This is driven by the **shared** environment node, not a per-marker pool.
-Two markers pointing at the same `(environment, task)` deplete and recharge together.
-The active GM applies the Tile writes (idempotently, on the `gatheringEnvironments` setting change and on `canvasReady`) and every client sees them through Foundry document sync.
-Markers with no configured `swapImage`, non-Tile markers, and tool stations are left untouched.
+This is driven by the **shared** environment supply, not a per-marker pool.
+Two markers pointing at the same environment and task deplete and recharge together.
+Markers with no configured depleted image, non-tile markers, and tool stations are left untouched.
 
 #### Lock vs Disable (marker visibility + prompt)
 
 Lock and Disable are **distinct**.
 They are not synonyms:
 
-- **Disabled** (`state.enabled = false`) or **"Hidden from players"** (`presentation.hidden = true`) conceals the interactable.
-  The linked marker Tile is hidden from players (`tile.hidden = true`, and the GM still sees it) and no on-enter prompt fires.
-- **Locked** (`state.locked = true`) keeps the interactable **visible**.
+- **Disabled**, or **"Hidden from players"**, conceals the interactable.
+  The marker tile is hidden from players (the GM still sees it) and no prompt fires when a token enters.
+- **Locked** keeps the interactable **visible**.
   The marker is shown and the prompt fires, but pressing **Interact** is denied with "This is locked."
 
-Eligibility still gates activation independently.
-A locked, consumed, uses-exhausted, or cooling-down interactable that is *visible* shows the prompt, then the Interact-time validation denies the activation with the specific reason.
-The marker-visibility reconcile runs on the active GM (on the setting change and `canvasReady`), so a disabled/hidden interactable loads concealed for players.
+Eligibility still gates activation on its own.
+A locked, used-up, uses-exhausted, or cooling-down interactable that is *visible* still shows the prompt, then the activation is denied with the specific reason.
+A disabled or hidden interactable loads already concealed for players.
 
-A **missing** linked visual (e.g. the GM deleted the Tile) is governed by the behaviour's `linkedVisual.missingPolicy` and is otherwise a clean no-op.
-The interactable keeps working region-only until the GM recreates or relinks a marker from the config panel.
+If the marker is **missing** (for example the GM deleted the tile), the interactable keeps working region-only until the GM recreates or relinks a marker from the config panel.
 
 ### Manage Interactables panel (GM)
 
 The **Manage Interactables** panel is a GM-only, scene-level window launched from a second button in the same **Fabricate** scene-control group (alongside *Place interactables*).
-It is the single place to see and manage every interactable on the current scene, and the supported authoring path for **arbitrary-shaped** interactables.
+It is the single place to see and manage every interactable on the current scene, and the supported way to author **arbitrary-shaped** interactables.
 
-**List.** The panel lists every `fabricate.interactable` on the current scene with its **name**, **type** (tool / gathering task), **source label**, **state** (enabled / locked / consumed), and **marker status** (Tile / Drawing / Token / region-only / missing).
+**List.** The panel lists every interactable on the current scene with its **name**, **type** (tool or gathering task), **source**, **state** (enabled, locked, or used up), and **marker status** (tile, drawing, token, region-only, or missing).
 Each row offers:
 
-- **Open configuration** opens the rich config panel for that interactable (the list is the entry point that was previously only reachable from a linked marker's HUD).
-- **Jump to region** pans the canvas to the interactable's region centre.
-- **Delete** removes the interactable region (and its behaviour) after a confirmation dialog.
-  The linked marker, if any, is left on the scene.
+- **Open configuration** opens the config panel for that interactable.
+- **Jump to region** pans the canvas to the interactable's region.
+- **Delete** removes the interactable region after a confirmation dialog.
+  The marker, if any, is left on the scene.
 
-**Promote region to interactable.** Pick an existing drawn region of **any shape** and a Tool or Gathering Task source from the active crafting system, then promote it.
-The behaviour `system` is built with the **same** `buildInteractableBehaviorSystem()` builder every other placement path uses (so a promoted interactable is identical to a dragged one), and the behaviour is attached to the region you already drew, so promotion **never re-shapes geometry**.
-You can promote with a visible **Tile or Drawing marker** over the region centre, or as **region-only** (no marker).
-Promoting a **gathering task** runs the same environment-resolution precedence as a canvas drop (region auto-detect → task default → GM dialog).
-The browser drag remains the 1-grid-square fast path.
+**Promote region to interactable.** Pick an existing drawn region of **any shape** and a tool or gathering task from the active crafting system, then promote it.
+A promoted interactable behaves identically to a dragged one, and it is attached to the region you already drew, so promotion **never re-shapes it**.
+You can promote with a visible **tile or drawing marker** over the region centre, or as **region-only** (no marker).
+Promoting a **gathering task** resolves its environment exactly the way a canvas drop does (auto-detect from the region, then the task default, then a GM dialog).
+A browser drag remains the one-grid-square fast path.
 The panel is the path for everything that needs a custom shape.
 
 The panel is **GM-only**.
@@ -164,109 +148,106 @@ Players activate an interactable by **walking a controlled token into its region
 1. When the token enters a region the interactable does not **conceal** (it is not disabled and not "Hidden from players"), a small **non-blocking prompt** appears on the controlling player's client (bottom-centre), showing the interactable's name and an optional prompt line.
    A **locked** interactable still prompts here.
    The denial happens at Interact time (see step 2), not by suppressing the prompt.
-2. Clicking **Interact** routes an activation request to the **active GM**, who validates it (actor control, source still exists, environment exists, token still inside) and, on success, grants it by opening the Fabricate UI **on the player's client**:
-   - **Tool station** → the **Crafting** tab with the station Tool present as a virtual tool (and the active station-tool chip in the header).
-   - **Gathering-task shortcut** → the gathering UI scoped to, and auto-selecting, the interactable's `(environmentId, taskId)`.
-     It reads and decrements that **environment's** node state.
-     There is no per-interactable node override.
+2. Clicking **Interact** sends the request to the GM, who checks it (the player controls the actor, the source still exists, the environment still exists, the token is still inside) and, on success, opens the Fabricate UI on the player's screen:
+   - **Tool station** opens the **Crafting** tab with the station's tool available to use (and the active station-tool chip in the header).
+   - **Gathering-task shortcut** opens the gathering UI scoped to, and auto-selecting, the interactable's environment and task.
+     It reads and draws down that **environment's** supply.
+     There is no per-interactable supply.
 3. Leaving the region dismisses the prompt.
 
 {: .note }
-> Only the controlling player's client shows the prompt (so a region-enter never fires N prompts across the table), and only the **active GM** ever mutates state (so connected clients never double-apply).
+> Only the controlling player sees the prompt, so a single token entering a region never fires a prompt for everyone at the table.
 
 ### Tokens already inside on load
 
-Foundry's region-enter event does **not** fire for a token that is already standing in a region when the scene loads.
+Foundry does not raise the region-enter event for a token that is already standing in a region when the scene loads.
 Fabricate covers this two ways:
 
-- **Control re-trigger** means taking control of a token that is already inside a region the interactable does not conceal re-raises the prompt (a locked interactable still re-prompts, and Interact-time validation enforces the lock).
-- **Keybinding** means a client keybinding *Fabricate: interact here* (default **E**) re-raises the prompt for the controlled token's current region.
+- **Control re-trigger** means taking control of a token that is already inside a region the interactable does not conceal re-raises the prompt (a locked interactable still re-prompts, and the lock is still enforced at Interact time).
+- **Keybinding** means the client keybinding *Fabricate: interact here* (default **E**) re-raises the prompt for the controlled token's current region.
 
 ### A GM must be online
 
-Activation and every other interactable state write are routed through the **active GM**.
-If a player tries to activate while **no GM is connected**, the attempt is blocked cleanly with a message rather than hanging.
-A GM is their own applier and always passes.
+Activation needs a GM to be connected.
+If a player tries to activate while **no GM is online**, the attempt is blocked cleanly with a message rather than hanging.
+A GM activating their own interactable always passes.
 
 ### Virtual-present (station) tools
 
-The station Tool a player gets from a Tool-station activation is **virtual-present**.
-It satisfies the Tool's presence requirement without the actor owning the item, and it is **excluded from breakage and usage** (it is the station's tool, not the actor's).
-Matching is scoped to the station's own crafting system.
-A station Tool from one system never satisfies a same-id Tool required by a different system.
+The tool a player gets from a tool-station activation is borrowed from the station.
+It satisfies the requirement to have that tool present without the actor owning a copy, and it is **never worn down or used up** (it belongs to the station, not the actor).
+This only works within the station's own crafting system.
+A station tool from one system never satisfies the same tool required by a different system.
 
-When the Crafting tab ships, a Tool-station activation will surface its crafting actions there directly.
-The injected station Tool is already tab-agnostic.
+When the Crafting tab ships, a tool-station activation will surface its crafting actions there directly.
 
 ---
 
 ## Gathering-task shortcuts
 
-A placed gathering-task interactable is a **pure (environment, task) shortcut**.
-It does **not** carry a node pool of its own and it does **not** snapshot the task's node config at placement time.
-Activating it opens the gathering UI scoped to, and auto-selecting, its `(environmentId, taskId)`, then reads and decrements the **environment's** own node runtime (`nodeRuntime[taskId]`), exactly as if the player had opened gathering and selected that environment and task manually.
+A placed gathering-task interactable is a **pure shortcut** to one environment and task.
+It does **not** carry a supply of its own and it does **not** take a snapshot of the task at placement time.
+Activating it opens the gathering UI scoped to, and auto-selecting, that environment and task, then reads and draws down the **environment's** own supply, exactly as if the player had opened gathering and selected that environment and task manually.
 
-The consequences follow directly from there being a single source of truth:
+Because there is a single source of truth, this follows:
 
-- Two interactables that point at the **same (environment, task)** draw down the **same** shared environment node.
+- Two interactables that point at the **same** environment and task draw down the **same** shared supply.
   They do not deplete independently.
 - Gathering through an interactable is an ordinary gather.
-  It does not change the environment's node availability beyond what a normal gather of that task would.
-- Editing the task, its required tools, or its node config in the library propagates to every placed shortcut automatically, because nothing is snapshotted onto the interactable.
+  It does not change the environment's supply beyond what a normal gather of that task would.
+- Editing the task, its required tools, or its supply in the library reaches every placed shortcut automatically, because nothing is copied onto the interactable.
 
 ### Depletion and respawn
 
-Node depletion (when the environment node runs out) and respawn (as world time advances) are owned **entirely by the environment's node runtime**.
+Running out of supply, and having it come back as time advances, are owned **entirely by the environment**.
 See [Gathering Environments]({% link gathering-environments.md %}).
-The interactable carries no node pool of its own.
-There is no per-interactable depletion and no per-behaviour respawn pass.
+The interactable carries no supply of its own.
 
-The marker, however, **reflects** that shared environment node.
-When the node depletes and the task configures a `depletedBehavior.swapImage`, every linked **Tile** marker for that `(environment, task)` swaps to the depleted image.
-When the node recharges the markers flip back (see [Depleted-marker image swap](#depleted-marker-image-swap-gathering-tasks)).
-Because the swap reads the shared environment node rather than a per-marker pool, all markers for the same `(environment, task)` change together.
-Drawing and Token markers are not image-swapped.
+The marker, however, reflects that shared supply.
+When the supply runs out and the task is set up to change image when depleted, every **tile** marker for that environment and task swaps to the depleted image.
+When the supply comes back the markers flip back (see [Depleted-marker image swap](#depleted-marker-image-swap-gathering-tasks)).
+Because the swap reads the shared supply rather than a per-marker pool, all markers for the same environment and task change together.
+Drawing and token markers are not image-swapped.
 
 ### Environment resolution on placement
 
-A Tool station carries no environment, so it spawns immediately.
-A **gathering-task** shortcut must resolve which environment it belongs to.
-Placement uses this precedence:
+A tool station carries no environment, so it is placed immediately.
+A **gathering-task** shortcut must work out which environment it belongs to.
+Placement tries these in order:
 
-1. **Scene Region auto-detect.** If the drop point falls inside a single Scene Region flagged `flags.fabricate.environmentId`, that environment wins and a notification names it.
-   Multiple matching regions are ambiguous and fall through to the dialog.
-2. **Task default.** Otherwise, the task's optional `defaultEnvironmentId` field is used.
-3. **GM dialog.** If neither resolves (or the resolved id is stale), the GM is prompted to pick an environment.
+1. **Auto-detect from the region.** If the drop point falls inside a single environment region on the scene, that environment wins and a notification names it.
+   Two or more matching regions are ambiguous and fall through to the dialog.
+2. **Task default.** Otherwise, the task's optional default environment is used.
+3. **GM dialog.** If neither resolves, the GM is prompted to pick an environment.
    **Cancelling the dialog aborts the placement**, so nothing is created.
 
-**Alt override.** Holding **Alt** during the drop always forces the GM dialog, skipping tiers 1 and 2.
+**Alt override.** Holding **Alt** during the drop always forces the GM dialog, skipping the first two steps.
 This is useful when auto-detect or the task default would pick the wrong environment.
 
-The resolved environment is stamped onto the behaviour at placement time, so a later activation uses it directly.
+The chosen environment is recorded on the interactable when it is placed, so a later activation uses it directly.
 
 ---
 
 ## The config panel (GM)
 
 Each interactable has a GM **config panel**.
-It is the registered sheet for the `fabricate.interactable` behaviour, and it can also be opened from a **Tile** or **Token** HUD button on a linked marker.
-The panel is a thin view over the behaviour, and every write routes through the active-GM socket.
+It can be opened from the Manage Interactables panel, or from a button on a linked tile or token marker.
 From it a GM can:
 
-- **Test as Player** runs the activation pipeline as if a player had walked in.
+- **Test as Player** activates the interactable as if a player had walked in.
 - **Jump** pans the camera to the interactable's region.
-- **Relink** points the behaviour at a different existing visual (Tile / Drawing / Token).
-- **Create / Recreate marker** makes a fresh linked Tile or Drawing (e.g. after the original was deleted, or to add a marker to a region-only interactable).
-- **Remove** drops the linked visual but keeps the interactable region-only.
-- **Enable / Lock** toggles the behaviour's `state.enabled` / `state.locked`.
+- **Relink** points the interactable at a different existing marker (tile, drawing, or token).
+- **Create / Recreate marker** makes a fresh tile or drawing marker (for example after the original was deleted, or to add a marker to a region-only interactable).
+- **Remove** drops the marker but keeps the interactable working region-only.
+- **Enable / Lock** toggles the interactable's enabled and locked state.
   These are **distinct**.
-  **Disabling** (or setting "Hidden from players") conceals the interactable, so the marker Tile is hidden from players and no prompt fires, while **locking** keeps the marker visible and the prompt firing, but denies Interact with "This is locked."
-  The activation-gate summary line reflects the first blocking gate (disabled → locked → consumed → uses-exhausted → cooldown).
-- **Delete** removes the interactable (region + behaviour).
-- **Missing-visual recovery** means that when the linked visual is gone, a status banner offers recreate / relink.
+  **Disabling** (or setting "Hidden from players") conceals the interactable, so the marker is hidden from players and no prompt fires, while **locking** keeps the marker visible and the prompt firing, but denies Interact with "This is locked."
+  A summary line shows the first reason that would block activation, in order: disabled, then locked, then used up, then uses exhausted, then cooling down.
+- **Delete** removes the interactable region.
+- **Missing-marker recovery** means that when the marker is gone, a status banner offers to recreate or relink it.
 
-The panel has **no node or restock controls**.
-A gathering-task shortcut has no node pool of its own, so node availability is managed on the **environment** (in the Crafting System Manager), not on the interactable.
+The panel has **no supply or restock controls**.
+A gathering-task shortcut has no supply of its own, so supply is managed on the **environment** (in the Crafting System Manager), not on the interactable.
 
 ---
 

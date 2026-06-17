@@ -13,38 +13,34 @@ They can currently only be authored through the API.
 
 ---
 
-## Recipe Structure
+## What a Recipe Contains
 
-Every recipe has:
+Every recipe brings together a few things.
 
-| Field                  | Description                                                                                                                                                   |
-|:-----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `name`                 | Display name                                                                                                                                                  |
-| `description`          | Flavour text                                                                                                                                                  |
-| `category`             | Organisational category (if `recipeCategories` is enabled)                                                                                                    |
-| `enabled`              | Whether the recipe can be crafted                                                                                                                             |
-| `locked`               | Prevents non-GM users from crafting                                                                                                                           |
-| `craftingSystemId`     | The system this recipe belongs to                                                                                                                             |
-| `ingredientSets`       | One or more sets of required ingredients (single-step recipes only, multi-step recipes define these per step)                                                 |
-| `resultGroups`         | One or more groups of produced items (single-step recipes only, multi-step recipes define these per step)                                                     |
-| `toolIds`              | Library Tool ids required for crafting. For multi-step recipes, recipe-level tools apply to every step (step and ingredient-set `toolIds` also apply)         |
-| `transferEffects`      | Whether to copy active effects from ingredients to results                                                                                                    |
-| `visibility`           | Access control (restricted, allowedUserIds)                                                                                                                   |
-| `linkedRecipeItemUuid` | Item that teaches this recipe (for knowledge mode)                                                                                                            |
-| `resultSelection`      | How a result group is chosen in routed mode. Contains `provider` (`"ingredientSet"`, `"macroOutcome"`, or `"rollTableOutcome"`) and provider-specific fields. |
+- A name and a piece of flavour text that describe it.
+- An optional category that helps you organise recipes, when your crafting system groups recipes by category.
+- The ingredients it needs, made up of one or more sets of required materials.
+- The results it produces, made up of one or more groups of items.
+- Any tools it requires, such as a forge or a cauldron, which are needed but not consumed.
+- Whether active effects carried by the ingredients are copied onto the results.
+- Whether the recipe is enabled, which controls if it can be crafted.
+- Whether the recipe is locked, which lets players see it exists but stops anyone other than the GM from crafting it.
+- Who can see it, which is set by the crafting system's visibility settings.
+- For a recipe that teaches itself through an in-world item, the item that unlocks it for knowledge-based visibility.
+- For a routed recipe, how the result is chosen when more than one outcome is possible.
 
 {: .note }
-> For multi-step recipes (when `multiStepRecipes` is enabled and the recipe has a `steps` array), `ingredientSets` and `resultGroups` are defined on each individual step, not on the recipe itself. Recipe-level `ingredientSets` and `resultGroups` are not required and may be empty. See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
+> For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole. See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
 ## Enabling and Disabling Recipes
 
-The `enabled` field controls whether a recipe can be crafted.
-A disabled recipe is hidden from player-facing visibility checks, but it remains accessible to API consumers.
+Whether a recipe is enabled controls whether it can be crafted.
+A disabled recipe is hidden from players, but it remains available through the API.
 
 **Why disable rather than delete?** Disabling is non-destructive.
 You can hide a recipe from players while you are still configuring it, or temporarily remove it from circulation without losing its ingredient and result configuration.
 
-**Programmatically.** You can toggle the enabled state via the API.
+**Programmatically.** You can switch a recipe between enabled and disabled through the API.
 See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the method that updates a recipe.
 
 ## Ingredient Semantics
@@ -69,12 +65,10 @@ The recipe is craftable if the player has materials to satisfy all groups in at 
 
 ### Ingredient Matching
 
-Each ingredient option specifies how to match against the player's inventory:
+Each ingredient option decides how it is matched against the items a player is carrying.
 
-| Match Type  | Description                                                                 |
-|:------------|:----------------------------------------------------------------------------|
-| `component` | Match by `componentId`, the managed component's ID in the crafting system   |
-| `tags`      | Match by tags on the item                                                   |
+- Match a specific component managed by the crafting system.
+- Match any item that carries a given set of tags.
 
 ## Resolution Modes
 
@@ -89,18 +83,19 @@ The resolution mode determines how ingredients map to results:
 
 ### Routed Mode Providers
 
-In routed mode, the `resultSelection.provider` field on a recipe controls how the result group is chosen:
+In routed mode, a recipe chooses how the result is selected.
+There are three ways to do this.
 
-| Provider           | Check Required | How it works                                                                                         |
-|:-------------------|:---------------|:-----------------------------------------------------------------------------------------------------|
-| `ingredientSet`    | No             | The player's chosen ingredient set determines the result via `IngredientSet.resultGroupId`           |
-| `macroOutcome`     | **Yes**        | A crafting check macro returns a named `outcome` and the engine matches it to a result group by name |
-| `rollTableOutcome` | No             | The engine draws from a roll table. the drawn result name is matched to a result group               |
+| Result chosen by | Check Required | How it works                                                                          |
+|:-----------------|:---------------|:--------------------------------------------------------------------------------------|
+| Ingredient set   | No             | The ingredient set the player uses determines which result they receive               |
+| Macro outcome    | **Yes**        | A crafting check returns a named outcome, and the matching result is produced          |
+| Roll table       | No             | A roll table is drawn, and the result matching the drawn entry is produced            |
 
 ## Multi-Step Recipes
 
-When the `multiStepRecipes` feature is enabled, recipes can have multiple sequential steps.
-Each step has its own ingredient sets, result groups, tool references (`toolIds`), and optional time/currency requirements.
+When multi-step recipes are enabled, recipes can have several sequential steps.
+Each step has its own ingredients, results, required tools, and optional time and currency requirements.
 Conceptually, each step is a separate recipe that is part of a larger recipe.
 You could achieve the same outcome using multiple recipes.
 
@@ -109,9 +104,9 @@ See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 ## Tools
 
 Tools are items required for crafting but not consumed, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
-A recipe requires Tools by referencing library Tool ids via `toolIds` at recipe, step, or ingredient-set granularity.
+A recipe can require tools for the whole recipe, for a single step, or for a particular ingredient set.
 
-See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in `0.6.0`.)
+See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in version 0.6.0.)
 
 ## Current Crafting Surface
 

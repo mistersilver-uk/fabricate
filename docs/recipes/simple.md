@@ -39,8 +39,8 @@ If crafting checks are enabled on the system, simple mode uses pass/fail:
 - **Pass**: ingredients are consumed and results are created
 - **Fail**: behaviour depends on your consumption-on-failure settings
 
-The crafting check macro must return a success flag.
-See [Crafting Checks]({% link crafting-checks.md %}) for the contract.
+The crafting check decides whether the attempt passes or fails.
+See [Crafting Checks]({% link crafting-checks.md %}) for how checks work.
 
 ---
 
