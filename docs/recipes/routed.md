@@ -13,10 +13,6 @@ Use it whenever a single crafting process can lead to more than one outcome.
 A routed recipe has one or more ingredient sets and one or more result groups.
 You pick how the result is selected in one of three ways.
 
-{: .note }
-> Routed mode replaces the older Mapped and Tiered modes.
-> Existing recipes convert automatically when they load.
-
 ---
 
 ## Choosing the result
@@ -37,6 +33,8 @@ A crafting check is required.
 Use this when the quality of the result should depend on a roll.
 For example, a forging recipe might give a Masterwork Longsword on a great roll, a plain Longsword on an average one, and a Bent Blade on a poor one.
 
+This feature is expected to be modified to add numerical ranges to the outcomes to allow a roll result to determine the outcome without a macro being required.
+
 ### By roll table
 
 A Foundry roll table is drawn once per attempt, and the drawn entry decides the result, with no crafting check involved.
@@ -44,6 +42,8 @@ A Foundry roll table is drawn once per attempt, and the drawn entry decides the 
 Use this when the outcome should feel random and you want Foundry's own table weighting.
 For example, brewing an unstable potion might draw Healing, Fire Breath, or Invisibility from a table.
 To set it up, make a roll table whose entry names match your result names, then point the recipe at that table.
+
+This feature may be deprecated in favor of numerical range check outcome routing.
 
 ---
 

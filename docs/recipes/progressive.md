@@ -70,7 +70,8 @@ See the [API reference]({% link api/recipe-manager.md %}) for the methods that c
 ## When to Use Progressive Mode
 
 Progressive mode is ideal when:
-- Higher skill checks should yield more or better results
+
+- Higher skill checks should yield more and better results
 - You want a "spend your roll" mechanic
 - Crafting should feel like a graduated outcome, not just pass/fail
 
