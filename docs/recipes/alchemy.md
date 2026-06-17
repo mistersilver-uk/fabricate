@@ -2,7 +2,7 @@
 layout: default
 title: Alchemy Mode
 parent: Recipes
-nav_order: 6
+nav_order: 5
 ---
 
 # Alchemy Mode

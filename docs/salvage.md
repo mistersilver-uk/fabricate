@@ -28,9 +28,6 @@ It is set at the system level.
 | Routed      | Awards a result group based on the outcome of a salvage check. Each outcome (such as critical, pass, or fail) is mapped to a result group on the component. |
 | Progressive | Awards results sequentially as the check value exceeds each result's difficulty threshold.                                           |
 
-{: .warning }
-> Only Simple, Routed, and Progressive are valid salvage resolution modes. Choose Routed if you need outcome-based routing.
-
 The salvage resolution mode is set through the API today.
 See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 

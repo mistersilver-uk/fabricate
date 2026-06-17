@@ -32,9 +32,6 @@ When all three are turned on, after a successful craft Fabricate:
 
 Essences with no linked source item, or whose linked item no longer exists, are skipped without comment.
 
-{: .warning }
-> The old per-ingredient effect-extraction approach has been removed and no longer does anything. Effect transfer is now controlled entirely through essence definitions and the source item linked to each essence. See [Essences]({% link essences.md %}) for how to configure essence definitions.
-
 **Enabling via the UI.**
 Open the Crafting Admin panel, select your system, and look for the **Essences** toggle and the **Effect transfer** toggle in the Features card.
 Both must be enabled.

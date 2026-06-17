@@ -2,7 +2,7 @@
 layout: default
 title: Progressive Mode
 parent: Recipes
-nav_order: 4
+nav_order: 3
 ---
 
 # Progressive Mode

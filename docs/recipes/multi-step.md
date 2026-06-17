@@ -2,7 +2,7 @@
 layout: default
 title: Multi-Step Recipes
 parent: Recipes
-nav_order: 5
+nav_order: 4
 ---
 
 # Multi-Step Recipes
