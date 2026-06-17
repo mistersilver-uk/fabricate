@@ -132,8 +132,15 @@ export class GatheringListingBuilder {
     this._blockedReason = blockedReason;
   }
 
-  async listForActor({ viewer = null, actor = null, rememberedActorId = null, presentTools = null } = {}) {
-    const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
+  async listForActor({
+    viewer = null,
+    actor = null,
+    rememberedActorId = null,
+    presentTools = null,
+  } = {}) {
+    const selectableActors = normalizeActorList(
+      await callMaybe(this.getSelectableActors, { viewer })
+    );
     if (selectableActors.length === 0) {
       return this._emptyListing({
         viewer,
@@ -253,7 +260,12 @@ export class GatheringListingBuilder {
    * @param {object|null} [options.viewer]
    * @returns {Promise<object>}
    */
-  async getTaskDropBreakdown({ environmentId, taskId, rememberedActorId = null, viewer = null } = {}) {
+  async getTaskDropBreakdown({
+    environmentId,
+    taskId,
+    rememberedActorId = null,
+    viewer = null,
+  } = {}) {
     const empty = {
       resolutionMode: null,
       awardMode: null,
@@ -264,7 +276,9 @@ export class GatheringListingBuilder {
     if (!environmentId || !taskId || typeof this.richState?.previewDropBreakdown !== 'function')
       return empty;
 
-    const selectableActors = normalizeActorList(await callMaybe(this.getSelectableActors, { viewer }));
+    const selectableActors = normalizeActorList(
+      await callMaybe(this.getSelectableActors, { viewer })
+    );
     if (selectableActors.length === 0) return empty;
     const selected = this._resolveSelectedActor({
       actor: null,
@@ -294,8 +308,9 @@ export class GatheringListingBuilder {
     if (!visibleIds.has(String(taskId))) return empty;
 
     const task =
-      normalizeList(environment.tasks).find((entry) => stringOrNull(entry?.id) === String(taskId)) ??
-      null;
+      normalizeList(environment.tasks).find(
+        (entry) => stringOrNull(entry?.id) === String(taskId)
+      ) ?? null;
     if (!task || task.resolutionMode !== 'd100')
       return { ...empty, resolutionMode: stringOrNull(task?.resolutionMode) };
 
@@ -738,7 +753,13 @@ export class GatheringListingBuilder {
    * identity fields only — no tasks, weights, or composition internals — plus
    * the existing ENVIRONMENT_DISABLED reason.
    */
-  _lockedEnvironmentListing({ environment, system, actor = null, blockedReasons = null, location = null }) {
+  _lockedEnvironmentListing({
+    environment,
+    system,
+    actor = null,
+    blockedReasons = null,
+    location = null,
+  }) {
     const biomes = normalizeStringList(environment.biomes ?? environment.biome);
     const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
     return {
@@ -975,7 +996,9 @@ export class GatheringListingBuilder {
           id,
           name:
             stringOrEmpty(system?.name) ||
-            stringOrEmpty(models.find((model) => model?.craftingSystemId === id)?.craftingSystemName) ||
+            stringOrEmpty(
+              models.find((model) => model?.craftingSystemId === id)?.craftingSystemName
+            ) ||
             id,
         };
       })
