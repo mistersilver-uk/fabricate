@@ -42,7 +42,9 @@ export class GatheringWorldTimeProcessor {
     this.getActors = typeof getActors === 'function' ? getActors : () => [];
     this.scenes = typeof scenes === 'function' ? scenes : () => null;
     this.applyInteractableBehaviorUpdate =
-      typeof applyInteractableBehaviorUpdate === 'function' ? applyInteractableBehaviorUpdate : null;
+      typeof applyInteractableBehaviorUpdate === 'function'
+        ? applyInteractableBehaviorUpdate
+        : null;
     this.enabledGatheringSystems =
       typeof enabledGatheringSystems === 'function' ? enabledGatheringSystems : () => new Map();
   }
