@@ -14,6 +14,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { toPercent as pct } from '../../util/gatheringFormat.js';
 
   let { breakdown = null, loading = false } = $props();
 
@@ -51,9 +52,6 @@
     }
   }
 
-  function pct(value) {
-    return Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100);
-  }
   function signedPercent(value) {
     const magnitude = Math.abs(Math.trunc(Number(value) || 0));
     return `${Number(value) < 0 ? '-' : '+'}${magnitude}%`;

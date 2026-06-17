@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
 
   let {
@@ -110,12 +111,6 @@
     const colorToken = typeof option === 'object' && option?.colorToken ? String(option.colorToken) : '';
     const customColor = typeof option === 'object' && option?.customColor ? String(option.customColor) : '';
     return { id: String(id || ''), label, icon, colorToken, customColor };
-  }
-
-  function biomeChipStyle(entry) {
-    const hex = /^#[0-9a-fA-F]{6}$/.test(entry?.customColor || '') ? entry.customColor : '';
-    const token = String(entry?.colorToken || 'sage').replace(/^--fab-tag-/, '');
-    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
   }
 
   function conditionEntry(kind, id) {

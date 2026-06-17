@@ -235,7 +235,13 @@ describe('EnvironmentCard markup contracts', () => {
   });
 
   it('renders biome chips with per-chip color tokens and color-mix base styling', () => {
-    assert.ok(cardSource.includes('--fab-chip-color:'), 'each chip sets --fab-chip-color');
+    // The per-chip --fab-chip-color declaration now comes from the shared
+    // gatheringFormat.biomeChipStyle helper rather than an inline copy.
+    assert.ok(
+      cardSource.includes("import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js'"),
+      'card imports the shared biomeChipStyle helper'
+    );
+    assert.ok(cardSource.includes('style={biomeChipStyle(tag)}'), 'each chip sets its style via biomeChipStyle');
     assert.ok(
       cardSource.includes('color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-surface-raised))'),
       'chip background uses color-mix'

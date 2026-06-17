@@ -15,6 +15,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { descriptionOrDefault } from '../../util/gatheringFormat.js';
   import SuccessChanceBar from './SuccessChanceBar.svelte';
 
   let {
@@ -30,7 +31,7 @@
   // task carries none, so the underneath section stays present and aligned.
   const hasDescription = $derived(description !== '');
   const descriptionText = $derived(
-    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoTaskDescription')
+    descriptionOrDefault(description, 'FABRICATE.App.Gathering.Detail.NoTaskDescription', localize)
   );
   const img = $derived(String(task?.img ?? ''));
   const attemptable = $derived(task?.attemptable === true);

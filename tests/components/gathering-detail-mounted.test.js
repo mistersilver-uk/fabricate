@@ -194,6 +194,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
+    // The gathering presentation helpers (risk/biome/percent/description) shared
+    // across the player + manager gathering components.
+    const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
+    writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');

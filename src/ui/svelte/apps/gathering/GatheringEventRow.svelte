@@ -12,6 +12,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
   import EventChanceBar from './EventChanceBar.svelte';
 
   let {
@@ -25,7 +26,7 @@
   const description = $derived(String(event?.description ?? ''));
   const hasDescription = $derived(description !== '');
   const descriptionText = $derived(
-    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoEventDescription')
+    descriptionOrDefault(description, 'FABRICATE.App.Gathering.Detail.NoEventDescription', localize)
   );
   const img = $derived(String(event?.img ?? ''));
   const chance = $derived(event?.chance ?? null);
@@ -33,13 +34,8 @@
   // Localize the danger value to match the GM editor's risk labels, mirroring
   // GatheringDetail; fall back to the raw value for any unmapped level.
   const danger = $derived(String(event?.risk ?? (Array.isArray(event?.dangerTags) ? event.dangerTags[0] : '') ?? ''));
-  const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
-  const dangerLabel = $derived(
-    danger === ''
-      ? ''
-      : (KNOWN_RISKS.has(danger) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${danger}`) : danger)
-  );
-  const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
+  const dangerLabel = $derived(riskLabel(danger, localize));
+  const dangerRiskClass = $derived(riskClass(danger));
 
   function select() {
     onSelect?.(id);
