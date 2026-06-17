@@ -32,7 +32,7 @@
   import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
   import GatheringEventRow from './GatheringEventRow.svelte';
-  import EventChanceBar from './EventChanceBar.svelte';
+  import ChanceBar from './ChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
 
   let {
@@ -266,7 +266,7 @@
           </div>
 
           {#if hasEvent}
-            <EventChanceBar value={eventChance} />
+            <ChanceBar value={eventChance} scale="event" />
             <p class="gathering-detail-event-hint">{localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}</p>
           {:else}
             <p class="gathering-detail-event-hint" data-gathering-safe-hint>
@@ -335,7 +335,7 @@
         {:else if eventVisibility === 'encounterChance'}
           <div class="gathering-detail-event" data-gathering-event-summary>
             {#if hasEvent}
-              <EventChanceBar value={eventChance} />
+              <ChanceBar value={eventChance} scale="event" />
             {:else}
               <p class="gathering-detail-event-hint" data-gathering-safe-hint>
                 {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}

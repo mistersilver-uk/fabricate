@@ -8,12 +8,12 @@
 
   Layout mirrors the task row's visual language for consistency: a thumbnail, the
   event name with a danger pip (its icon escalates in colour with the risk
-  tier), an optional per-event EventChanceBar, and a short clamped description.
+  tier), an optional per-event ChanceBar (event scale), and a short clamped description.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
-  import EventChanceBar from './EventChanceBar.svelte';
+  import ChanceBar from './ChanceBar.svelte';
 
   let {
     event = null,
@@ -80,7 +80,7 @@
 
       {#if chance != null}
         <span class="gathering-event-chance" data-gathering-event-chance>
-          <EventChanceBar value={chance} showCaption={false} />
+          <ChanceBar value={chance} scale="event" showCaption={false} />
         </span>
       {/if}
     </div>
