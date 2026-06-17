@@ -14,7 +14,7 @@ Fabricate exposes its API through two Foundry globals:
 - **`globalThis.fabricate`** (alias: `fabricate`).
   Convenience functions for macros.
 - **`game.fabricate.api`**.
-  Constructor references for all public classes.
+  Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names).
 
 All APIs are available after the `fabricate.ready` hook fires:
 
@@ -216,6 +216,57 @@ Hooks.once('fabricate.ready', async () => {
 
 See [Gathering Realms & Travel]({% link gathering-realms.md %}) for the full feature guide, including the GM Travel route, environment location rules, and the disclosure policy.
 
+## Subscribing To Gathering Hooks
+
+Fabricate publishes Foundry hooks when a gathering attempt resolves, so other modules can react to gathering outcomes (successes, failures, and triggered encounters) without depending on Fabricate internals.
+Publication is always on — no setting gates it, and it is harmless when nobody subscribes.
+The hook names are also exposed on `game.fabricate.api.HOOKS.gathering` so you do not have to hard-code the strings.
+
+| Hook | Fires |
+|:-----|:------|
+| `fabricate.gathering.attemptCompleted` | Once for every terminal attempt (success **or** failure, immediate **or** matured timed run), after all side effects are committed. |
+| `fabricate.gathering.eventTriggered` | Once per encounter/event the attempt triggered. |
+
+The `attemptCompleted` payload is a cloned, JSON-serializable object:
+
+| Field | Description |
+|:------|:------------|
+| `schemaVersion` | Payload contract version (currently `1`). |
+| `status` | `'succeeded'` or `'failed'`. |
+| `initiatedBy` | `'immediate'` for direct attempts, `'timed'` for matured timed runs. |
+| `worldTime` | Foundry world time at completion. |
+| `userId`, `viewerId` | Initiating user and viewing user ids. |
+| `actorId`, `actorUuid`, `actorName` | The gathering actor. |
+| `craftingSystemId`, `craftingSystemName` | The owning crafting system. |
+| `environmentId`, `environmentName` | The gathering environment. |
+| `taskId`, `taskName` | The resolved task. |
+| `runId`, `runStatus` | The persisted gathering run. |
+| `riskLevel`, `conditions` | Risk and the weather/time-of-day snapshot (`null` for non-rich tasks). |
+| `gatheredItems` | `[{ actorUuid, itemUuid, componentId, quantity }]` created on success. `componentId` is `null` when the resolution does not expose it. |
+| `usedTools` | `[{ componentId, actorUuid, itemUuid, quantity, broken }]` consumed by the attempt (breakage internals are not exposed). |
+| `events` | The triggered encounters (also emitted individually as `eventTriggered`). |
+| `checkResult` | The normalized resolution detail. |
+
+**Where it fires.** The hook fires on the client that resolved the attempt. Immediate attempts fire on the acting user's client; matured timed runs fire once, on the primary GM client (so the `updateWorldTime` broadcast does not duplicate them across clients).
+
+For a **blind** task viewed by a non-GM, the payload is redacted to match what that client may see: `taskId`/`taskName`, `gatheredItems`, `usedTools`, `events`, and `checkResult` are omitted, and no `eventTriggered` hook fires.
+A subscriber that throws is caught and logged — it never breaks the gathering flow.
+
+```javascript
+Hooks.once('fabricate.ready', () => {
+  const { ATTEMPT_COMPLETED, EVENT_TRIGGERED } = game.fabricate.api.HOOKS.gathering;
+
+  Hooks.on(ATTEMPT_COMPLETED, (result) => {
+    if (result.status !== 'succeeded') return;
+    console.log(`${result.actorName} gathered`, result.gatheredItems, `in ${result.environmentName}`);
+  });
+
+  Hooks.on(EVENT_TRIGGERED, ({ actorUuid, event }) => {
+    console.log(`Encounter for ${actorUuid}:`, event.name);
+  });
+});
+```
+
 ## Data Persistence
 
 Fabricate stores data in Foundry's settings and flags:
@@ -253,6 +304,8 @@ Fabricate stores data in Foundry's settings and flags:
 | Hook | When | Payload |
 |:-----|:-----|:--------|
 | `fabricate.ready` | After module initialisation and guarded startup world-time processing complete | None |
+| `fabricate.gathering.attemptCompleted` | Once per terminal gathering attempt (success/failure, immediate/timed), after side effects commit | See [Subscribing To Gathering Hooks](#subscribing-to-gathering-hooks) |
+| `fabricate.gathering.eventTriggered` | Once per encounter an attempt triggers | See [Subscribing To Gathering Hooks](#subscribing-to-gathering-hooks) |
 
 Startup world-time processing awaits crafting, salvage, and gathering settlement before `fabricate.ready` fires.
 Later Foundry `updateWorldTime` events dispatch the same processors without blocking the hook.

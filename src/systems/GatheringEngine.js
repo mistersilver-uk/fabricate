@@ -112,6 +112,7 @@ export class GatheringEngine {
     toolBreakage = null,
     failureFeedback = null,
     eventSceneTrigger = null,
+    hookPublisher = null,
     getRunViewer = null,
     locationResolver = null,
     random = Math.random,
@@ -148,6 +149,10 @@ export class GatheringEngine {
     this.toolBreakage = toolBreakage;
     this.failureFeedback = failureFeedback;
     this.eventSceneTrigger = eventSceneTrigger;
+    // Public hook publisher (GatheringHookPublisher): emits the documented
+    // `fabricate.gathering.*` integration hooks on terminal completion. Optional;
+    // when absent no public hooks fire (the default in unit tests).
+    this.hookPublisher = hookPublisher;
     this.getRunViewer = getRunViewer;
     // Constructor-injected current-realm resolver (GatheringLocationService),
     // NOT a module import — keeps the engine system-agnostic and testable.
@@ -722,6 +727,7 @@ export class GatheringEngine {
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      initiatedBy: 'timed',
     });
   }
 
@@ -3404,6 +3410,7 @@ export class GatheringEngine {
     createdResults,
     usedTools = [],
     checkResult,
+    initiatedBy = 'immediate',
   }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
@@ -3444,6 +3451,33 @@ export class GatheringEngine {
         usedTools,
         checkResult,
         run,
+      });
+    }
+
+    // Publish the documented public completion hook(s) for other module authors,
+    // after side effects (item creation, tool breakage, chat) are committed so
+    // subscribers observe the final state. No-op when no publisher is injected.
+    //
+    // The timed path runs inside `processWorldTime`, which fires on EVERY client
+    // via Foundry's synced `updateWorldTime` hook, so publishing there would
+    // duplicate the broadcast across clients. Gate timed completions to the
+    // primary GM (same rationale as the stamina/node-respawn guard) so they fire
+    // exactly once; immediate completions resolve on the single acting client.
+    const timedOnNonPrimaryGM = initiatedBy === 'timed' && this.isPrimaryGM() !== true;
+    if (!timedOnNonPrimaryGM) {
+      this.hookPublisher?.publishAttemptCompleted({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        status,
+        run,
+        createdResults,
+        usedTools,
+        checkResult,
+        opaqueBlind,
+        initiatedBy,
       });
     }
 
