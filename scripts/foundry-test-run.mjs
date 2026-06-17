@@ -888,8 +888,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         ])),
         {
           id: 'smoke-forage-library',
-          name: 'Smoke Reusable Forage',
-          description: 'Reusable library task for Manager gathering composition screenshots.',
+          name: 'Forage Wild Herbs',
+          description: 'Forage the wayside for common herbs and roots.',
           img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
           enabled: true,
           region: 'northreach',
@@ -916,21 +916,21 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         // progressive/check/catalyst/failure task resolution no longer exists.
         {
           id: 'smoke-meadow-herbs', name: 'Gather Meadow Herbs',
-          description: 'Immediate successful gather for the player Gathering tab.',
+          description: 'Pick fresh herbs from the open meadow.',
           img: 'icons/consumables/plants/fern-sprig-stem-leaf-herb-green.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-meadow-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 90, enabled: true }]
         },
         {
           id: 'smoke-sunken-survey', name: 'Survey Sunken Reagents',
-          description: 'Visible task gated by its linked scene at the environment level.',
+          description: 'Wade the flooded ruins for reagents settled in the silt.',
           img: 'icons/environment/wilderness/wall-ruins.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-sunken-drop', componentId: componentMap['Iron Ore'], quantity: 1, dropRate: 70, enabled: true }]
         },
         {
           id: 'smoke-crystal-dew', name: 'Bottle Crystal Dew',
-          description: 'Requires the Herbalist Sickle tool, demonstrating a blocked task.',
+          description: "Cut dew-laden crystal fronds with a herbalist's sickle.",
           img: 'icons/consumables/potions/flask-corked-blue.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           toolIds: ['smoke-herbalist-sickle'],
@@ -938,7 +938,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         },
         {
           id: 'smoke-slow-bloom', name: 'Tend Slow Bloom',
-          description: 'A timed gather that creates an active run before completion.',
+          description: 'Tend the slow bloom until it ripens.',
           img: 'icons/commodities/flowers/lily-bloom.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           timeRequirement: { minutes: 1, hours: 0, days: 0, months: 0, years: 0 },
@@ -946,14 +946,14 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         },
         {
           id: 'smoke-withered-search', name: 'Search Withered Patch',
-          description: 'An exhausted patch whose only drop never lands (empty-result feedback).',
+          description: 'Pick over a blighted patch for anything still growing.',
           img: 'icons/consumables/plants/dried-herb-bundle-brown.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-withered-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 0, enabled: true }]
         },
         {
           id: 'smoke-moonpetal', name: 'Secret Moonpetal Harvest',
-          description: 'Real task name that must stay GM-only in player blind views.',
+          description: 'Harvest moonpetals that open only by night.',
           img: 'icons/commodities/flowers/lotus-white.webp',
           enabled: true, region: 'meadowlands', itemSelectionMode: 'highestRankedDrop',
           dropRows: [{ id: 'smoke-moonpetal-drop', componentId: componentMap['Mystic Herb'], quantity: 1, dropRate: 70, enabled: true }]
@@ -975,8 +975,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         ...withoutIds(systemConfig.events, new Set(['smoke-bramble-event'])),
         {
           id: 'smoke-bramble-event',
-          name: 'Smoke Bramble Snare',
-          description: 'Reusable event for Manager gathering composition screenshots.',
+          name: 'Bramble Snare',
+          description: 'Thorned brambles snare the careless gatherer.',
           img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
           enabled: true,
           dangerTags: ['hazardous'],
@@ -1020,8 +1020,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         await environmentStore.create({
           id: 'smoke-blind-grove',
           craftingSystemId: sysId,
-          name: 'Smoke Blind Grove',
-          description: 'Blind gathering site for the player Gathering tab screenshot (mask chip + discovered suffix).',
+          name: 'Shrouded Grove',
+          description: 'A fog-veiled grove where the harvest is never certain until tried.',
           img: 'icons/magic/nature/tree-spirit-green.webp',
           enabled: true,
           selectionMode: 'blind',
@@ -1034,8 +1034,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
         await environmentStore.create({
           id: 'smoke-locked-hollow',
           craftingSystemId: sysId,
-          name: 'Smoke Sealed Hollow',
-          description: 'Disabled environment for the player Gathering tab screenshot (locked teaser for non-GM viewers).',
+          name: 'Sealed Barrow',
+          description: 'A hollow sealed against trespass, not yet open to gatherers.',
           img: 'icons/environment/wilderness/mine-interior-dungeon-door.webp',
           enabled: false,
           selectionMode: 'targeted',
@@ -2070,7 +2070,7 @@ async function main() {
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Azure Grove',
-          description: 'A compact validation fixture for GM gathering environment authoring.',
+          description: 'A tranquil grove of blue-leaved trees, rich with reagents.',
           img: 'icons/magic/nature/tree-spirit-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
@@ -2088,38 +2088,38 @@ async function main() {
         const playerFixtureDefinitions = [
           {
             name: 'Verdant Meadow',
-            description: 'A clear player-facing gathering site with an immediate successful task.',
+            description: 'Open grassland thick with common herbs, easy to harvest.',
             img: 'icons/consumables/plants/grass-leaves-green.webp',
             forcedTaskIds: ['smoke-meadow-herbs']
           },
           {
             name: 'Sunken Ruins',
-            description: 'A scene-linked site that stays visible while blocked.',
+            description: 'Half-drowned ruins where forgotten reagents still linger.',
             img: 'icons/environment/wilderness/wall-ruins.webp',
             sceneUuid: 'Scene.fabricateMissingGatheringScene',
             forcedTaskIds: ['smoke-sunken-survey']
           },
           {
             name: 'Crystal Thicket',
-            description: 'Requires the Herbalist Sickle tool so Bromm demonstrates a blocked task.',
+            description: 'A thicket of glittering crystal fronds, perilous to harvest by hand.',
             img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
             forcedTaskIds: ['smoke-crystal-dew']
           },
           {
             name: 'Timed Orchard',
-            description: 'A timed gathering site that creates an active run before completion.',
+            description: 'An orchard whose slow blooms ripen only with patience.',
             img: 'icons/consumables/fruit/apple-red-tree-green.webp',
             forcedTaskIds: ['smoke-slow-bloom']
           },
           {
             name: 'Withered Patch',
-            description: 'An exhausted patch whose only drop never lands, for empty-result feedback.',
+            description: 'A blighted patch picked all but bare.',
             img: 'icons/magic/fire/flame-burning-tree-stump.webp',
             forcedTaskIds: ['smoke-withered-search']
           },
           {
             name: 'Moonlit Blind Grove',
-            description: 'A blind environment that must hide task details from non-GM users.',
+            description: 'A moonlit grove where harvests reveal themselves only once attempted.',
             img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
             selectionMode: 'blind',
             forcedTaskIds: ['smoke-moonpetal']
@@ -2146,8 +2146,8 @@ async function main() {
               },
               tasks: [{
                 id: 'smoke-forage-library',
-                name: 'Smoke Reusable Forage',
-                description: 'Reusable library task for Manager gathering composition screenshots.',
+                name: 'Forage Wild Herbs',
+                description: 'Forage the wayside for common herbs and roots.',
                 img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
                 enabled: true,
                 region: 'northreach',
@@ -2174,8 +2174,8 @@ async function main() {
               }],
               events: [{
                 id: 'smoke-bramble-event',
-                name: 'Smoke Bramble Snare',
-                description: 'Reusable event for Manager gathering composition screenshots.',
+                name: 'Bramble Snare',
+                description: 'Thorned brambles snare the careless gatherer.',
                 img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
                 enabled: true,
                 dangerTags: ['hazardous'],
@@ -2207,7 +2207,7 @@ async function main() {
         // in the scene, so Phase F's scene cleanup removes it — no extra cleanup.
         const interactableTaskId = 'smoke-forage-library';
         const [interactableRegion] = await azureGroveScene.createEmbeddedDocuments('Region', [{
-          name: 'Fabricate Smoke Node',
+          name: 'Fabricate Forage Node',
           shapes: [{ type: 'rectangle', x: 1000, y: 1000, width: 400, height: 400 }],
           behaviors: [{
             type: 'fabricate.interactable',
@@ -2558,7 +2558,7 @@ async function main() {
             .find(realm => realm.name === 'Northreach Vale');
           const realm = existingRealm
             || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
-          const party = await partyStore.create({ name: 'The Smoke Wardens' });
+          const party = await partyStore.create({ name: 'The Vale Wardens' });
           await partyStore.addMember(party.id, alara.uuid);
           if (bromm) await partyStore.addMember(party.id, bromm.uuid);
           await partyStore.setTravelActor(party.id, alara.uuid);
@@ -2772,8 +2772,8 @@ async function main() {
           throw new Error(`Manager smoke gathering library disappeared before task screenshot: ${JSON.stringify(preTaskLibraryCounts)}`);
         }
         await page.locator('.fabricate-manager #manager-gathering-nav-tasks').first().click();
-        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Forage Wild Herbs")').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Forage Wild Herbs") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // "Selected Drop Rule" only renders when a drop row is selected
         // (CraftingSystemManagerRoot.svelte:2957 `{#if selectedGatheringDrop}`)
@@ -2852,13 +2852,13 @@ async function main() {
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager #manager-gathering-nav-encounters').first().click();
-        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Smoke Bramble Snare")').first()
+        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Bramble Snare")').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertManagerLayoutStable(page, 'gathering events normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-events-normal');
 
-        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Smoke Bramble Snare") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager .manager-gathering-event-row:has-text("Bramble Snare") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="gathering-event-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         for (const expected of ['Event Identity', 'Event Matching']) {
           if (await page.locator('.fabricate-manager').filter({ hasText: expected }).count() === 0) {
