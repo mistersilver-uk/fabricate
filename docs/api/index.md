@@ -14,7 +14,7 @@ Fabricate exposes its API through two Foundry globals:
 - **`globalThis.fabricate`** (alias: `fabricate`).
   Convenience functions for macros.
 - **`game.fabricate.api`**.
-  Constructor references for all public classes.
+  Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names).
 
 All APIs are available after the `fabricate.ready` hook fires:
 
@@ -241,25 +241,29 @@ The `attemptCompleted` payload is a cloned, JSON-serializable object:
 | `environmentId`, `environmentName` | The gathering environment. |
 | `taskId`, `taskName` | The resolved task. |
 | `runId`, `runStatus` | The persisted gathering run. |
-| `riskLevel`, `conditions` | Risk and the weather/time-of-day snapshot. |
-| `gatheredItems` | `[{ actorUuid, itemUuid, componentId, quantity }]` created on success. |
-| `usedTools` | `[{ actorUuid, itemUuid, quantity, broken }]` consumed by the attempt. |
+| `riskLevel`, `conditions` | Risk and the weather/time-of-day snapshot (`null` for non-rich tasks). |
+| `gatheredItems` | `[{ actorUuid, itemUuid, componentId, quantity }]` created on success. `componentId` is `null` when the resolution does not expose it. |
+| `usedTools` | `[{ componentId, actorUuid, itemUuid, quantity, broken }]` consumed by the attempt (breakage internals are not exposed). |
 | `events` | The triggered encounters (also emitted individually as `eventTriggered`). |
 | `checkResult` | The normalized resolution detail. |
 
-For a **blind** task viewed by a non-GM, the payload is redacted to match what that client may see: `taskId`/`taskName`, `gatheredItems`, `usedTools`, and `events` are omitted, and no `eventTriggered` hook fires.
+**Where it fires.** The hook fires on the client that resolved the attempt. Immediate attempts fire on the acting user's client; matured timed runs fire once, on the primary GM client (so the `updateWorldTime` broadcast does not duplicate them across clients).
+
+For a **blind** task viewed by a non-GM, the payload is redacted to match what that client may see: `taskId`/`taskName`, `gatheredItems`, `usedTools`, `events`, and `checkResult` are omitted, and no `eventTriggered` hook fires.
 A subscriber that throws is caught and logged — it never breaks the gathering flow.
 
 ```javascript
-const { ATTEMPT_COMPLETED, EVENT_TRIGGERED } = game.fabricate.api.HOOKS.gathering;
+Hooks.once('fabricate.ready', () => {
+  const { ATTEMPT_COMPLETED, EVENT_TRIGGERED } = game.fabricate.api.HOOKS.gathering;
 
-Hooks.on(ATTEMPT_COMPLETED, (result) => {
-  if (result.status !== 'succeeded') return;
-  console.log(`${result.actorName} gathered`, result.gatheredItems, `in ${result.environmentName}`);
-});
+  Hooks.on(ATTEMPT_COMPLETED, (result) => {
+    if (result.status !== 'succeeded') return;
+    console.log(`${result.actorName} gathered`, result.gatheredItems, `in ${result.environmentName}`);
+  });
 
-Hooks.on(EVENT_TRIGGERED, ({ actorUuid, event }) => {
-  console.log(`Encounter for ${actorUuid}:`, event.name);
+  Hooks.on(EVENT_TRIGGERED, ({ actorUuid, event }) => {
+    console.log(`Encounter for ${actorUuid}:`, event.name);
+  });
 });
 ```
 
@@ -300,6 +304,8 @@ Fabricate stores data in Foundry's settings and flags:
 | Hook | When | Payload |
 |:-----|:-----|:--------|
 | `fabricate.ready` | After module initialisation and guarded startup world-time processing complete | None |
+| `fabricate.gathering.attemptCompleted` | Once per terminal gathering attempt (success/failure, immediate/timed), after side effects commit | See [Subscribing To Gathering Hooks](#subscribing-to-gathering-hooks) |
+| `fabricate.gathering.eventTriggered` | Once per encounter an attempt triggers | See [Subscribing To Gathering Hooks](#subscribing-to-gathering-hooks) |
 
 Startup world-time processing awaits crafting, salvage, and gathering settlement before `fabricate.ready` fires.
 Later Foundry `updateWorldTime` events dispatch the same processors without blocking the hook.

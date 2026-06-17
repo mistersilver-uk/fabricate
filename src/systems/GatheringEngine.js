@@ -3457,20 +3457,29 @@ export class GatheringEngine {
     // Publish the documented public completion hook(s) for other module authors,
     // after side effects (item creation, tool breakage, chat) are committed so
     // subscribers observe the final state. No-op when no publisher is injected.
-    this.hookPublisher?.publishAttemptCompleted({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      status,
-      run,
-      createdResults,
-      usedTools,
-      checkResult,
-      opaqueBlind,
-      initiatedBy,
-    });
+    //
+    // The timed path runs inside `processWorldTime`, which fires on EVERY client
+    // via Foundry's synced `updateWorldTime` hook, so publishing there would
+    // duplicate the broadcast across clients. Gate timed completions to the
+    // primary GM (same rationale as the stamina/node-respawn guard) so they fire
+    // exactly once; immediate completions resolve on the single acting client.
+    const timedOnNonPrimaryGM = initiatedBy === 'timed' && this.isPrimaryGM() !== true;
+    if (!timedOnNonPrimaryGM) {
+      this.hookPublisher?.publishAttemptCompleted({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        status,
+        run,
+        createdResults,
+        usedTools,
+        checkResult,
+        opaqueBlind,
+        initiatedBy,
+      });
+    }
 
     return response;
   }
