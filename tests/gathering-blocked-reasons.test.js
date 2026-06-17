@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   BLOCK_LABEL_KEYS,
   localizeBlockedReasons,
-  describeBlockedReasons
+  describeBlockedReasons,
+  calloutFor
 } from '../src/ui/svelte/apps/gathering/gatheringBlockedReasons.js';
 
 // An echo `localize` so assertions read against the resolved keys/formatting.
@@ -61,5 +62,34 @@ describe('gatheringBlockedReasons', () => {
   it('describeBlockedReasons returns the generic label for an empty/garbage list', () => {
     assert.equal(describeBlockedReasons([], localize), 'FABRICATE.App.Gathering.Detail.Blocked');
     assert.equal(describeBlockedReasons(null, localize), 'FABRICATE.App.Gathering.Detail.Blocked');
+  });
+
+  it('calloutFor pairs a known warning code with its icon, tone and label', () => {
+    assert.deepEqual(calloutFor('STAMINA_BLOCKED', {}, localize), {
+      code: 'STAMINA_BLOCKED',
+      icon: 'fa-bolt',
+      tone: 'warning',
+      label: BLOCK_LABEL_KEYS.STAMINA_BLOCKED
+    });
+  });
+
+  it('calloutFor preserves the neutral tone for paused / duplicate-run chips', () => {
+    assert.equal(calloutFor('GAME_PAUSED', {}, localize).tone, 'neutral');
+    assert.equal(calloutFor('DUPLICATE_ACTIVE_RUN', {}, localize).tone, 'neutral');
+  });
+
+  it('calloutFor falls back to a generic warning chip for unknown codes', () => {
+    assert.deepEqual(calloutFor('WEIRD_CODE', { message: 'Custom reason' }, localize), {
+      code: 'WEIRD_CODE',
+      icon: 'fa-triangle-exclamation',
+      tone: 'warning',
+      label: 'Custom reason'
+    });
+    assert.deepEqual(calloutFor('WEIRD_CODE', {}, localize), {
+      code: 'WEIRD_CODE',
+      icon: 'fa-triangle-exclamation',
+      tone: 'warning',
+      label: 'FABRICATE.App.Gathering.Detail.Blocked'
+    });
   });
 });
