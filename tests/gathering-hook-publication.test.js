@@ -417,12 +417,14 @@ function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM })
   });
 }
 
-test('processWorldTime publishes the completion hook with initiatedBy: timed on the primary GM', async () => {
+// Build a matured timed-run scenario and run it through the real
+// `processWorldTime` path, returning the recorded hooks and the result.
+async function runMaturedTimedAttempt({ isPrimaryGM }) {
   const timedActor = new FakeActor();
-  let worldTime = 1000;
+  const state = { worldTime: 1000 };
   const runManager = new GatheringRunManager({
     randomID: () => 'run-1',
-    nowWorldTime: () => worldTime,
+    nowWorldTime: () => state.worldTime,
     getUserId: () => 'user-1',
     getActors: () => [timedActor],
   });
@@ -431,17 +433,22 @@ test('processWorldTime publishes the completion hook with initiatedBy: timed on 
     { craftingSystemId: 'system-a', environmentId: 'env-a', taskId: 'task-a' },
     { minutes: 1 }
   );
-  worldTime = 1060;
+  state.worldTime = 1060;
 
   const hooks = recordingHooks();
   const engine = makeTimedEngine({
     timedActor,
     runManager,
-    hookPublisher: new GatheringHookPublisher({ hooks, nowWorldTime: () => worldTime }),
-    isPrimaryGM: () => true,
+    hookPublisher: new GatheringHookPublisher({ hooks, nowWorldTime: () => state.worldTime }),
+    isPrimaryGM,
   });
 
-  const result = await engine.processWorldTime(worldTime);
+  const result = await engine.processWorldTime(state.worldTime);
+  return { hooks, result };
+}
+
+test('processWorldTime publishes the completion hook with initiatedBy: timed on the primary GM', async () => {
+  const { hooks, result } = await runMaturedTimedAttempt({ isPrimaryGM: () => true });
 
   assert.equal(result.completed.length, 1);
   const payload = completionOf(hooks);
@@ -454,30 +461,7 @@ test('processWorldTime publishes the completion hook with initiatedBy: timed on 
 });
 
 test('processWorldTime does not publish a timed completion on a non-primary-GM client', async () => {
-  const timedActor = new FakeActor();
-  let worldTime = 1000;
-  const runManager = new GatheringRunManager({
-    randomID: () => 'run-1',
-    nowWorldTime: () => worldTime,
-    getUserId: () => 'user-1',
-    getActors: () => [timedActor],
-  });
-  await runManager.createWaitingRun(
-    timedActor,
-    { craftingSystemId: 'system-a', environmentId: 'env-a', taskId: 'task-a' },
-    { minutes: 1 }
-  );
-  worldTime = 1060;
-
-  const hooks = recordingHooks();
-  const engine = makeTimedEngine({
-    timedActor,
-    runManager,
-    hookPublisher: new GatheringHookPublisher({ hooks, nowWorldTime: () => worldTime }),
-    isPrimaryGM: () => false,
-  });
-
-  const result = await engine.processWorldTime(worldTime);
+  const { hooks, result } = await runMaturedTimedAttempt({ isPrimaryGM: () => false });
 
   assert.equal(result.completed.length, 1, 'the run still completes on this client');
   assert.equal(completionOf(hooks), undefined, 'but no public hook is published');
