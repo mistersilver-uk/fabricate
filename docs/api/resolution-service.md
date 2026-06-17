@@ -19,16 +19,19 @@ Validates recipes against their resolution mode rules and resolves which result 
 
 Returns the resolution mode for a recipe (derived from its crafting system).
 
-**Returns:** `string` -- "simple", "routed", or "progressive"
+**Returns:** `string`.
+One of "simple", "routed", or "progressive".
 
 {: .note }
-> The legacy modes "mapped" and "tiered" are normalised to "routed" on load. `getMode()` always returns "routed" for recipes that were previously "mapped" or "tiered".
+> The legacy modes "mapped" and "tiered" are normalised to "routed" on load.
+> `getMode()` always returns "routed" for recipes that were previously "mapped" or "tiered".
 
 ### getProvider(recipe)
 
 Returns the result-selection provider for a routed recipe.
 
-**Returns:** `string` -- "ingredientSet", "macroOutcome", or "rollTableOutcome", or `null` for non-routed recipes.
+**Returns:** `string`.
+One of "ingredientSet", "macroOutcome", or "rollTableOutcome", or `null` for non-routed recipes.
 
 ### validateRecipe(recipe)
 
@@ -51,7 +54,7 @@ Hooks.once('fabricate.ready', () => {
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 ingredient set, exactly 1 result group |
-| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid; result group names must be unique (case-insensitive) |
+| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid, and result group names must be unique (case-insensitive) |
 | Routed (`macroOutcome`) | 1+ ingredient sets, 1+ result groups, checks enabled, `resultSelection.macroUuid` present or system fallback set, result group names are unique and do not use reserved keywords |
 | Routed (`rollTableOutcome`) | 1+ ingredient sets, 1+ result groups, `resultSelection.rollTableUuid` present, result group names are unique and do not use reserved keywords |
 | Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
@@ -108,7 +111,7 @@ Hooks.once('fabricate.ready', () => {
 ### resolveResultGroups(params)
 
 Determines which result groups to create based on the resolution mode and crafting check result.
-For routed recipes, dispatches on `recipe.resultSelection.provider`.
+For routed recipes, this dispatches on `recipe.resultSelection.provider`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|

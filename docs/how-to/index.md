@@ -7,7 +7,8 @@ has_children: true
 
 # How-To Guides
 
-Short, answer-first guides for common Fabricate tasks. Each page gives you the direct answer, the minimal steps, and links to deeper reference material.
+Short, answer-first guides for common Fabricate tasks.
+Each page gives you the direct answer, the minimal steps, and links to deeper reference material.
 
 | Guide                                                             | Question                                                            |
 |:------------------------------------------------------------------|:--------------------------------------------------------------------|

@@ -28,7 +28,9 @@ A basic alchemy recipe:
 
 ### Creating the recipe
 
-This recipe has one ingredient set with two groups — a "Herbs" group (2x Moonpetal Herb) and a "Container" group (1x Empty Vial) — and one result group producing 1x Healing Potion. Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+This recipe has one ingredient set with two groups, a "Herbs" group (2x Moonpetal Herb) and a "Container" group (1x Empty Vial), and one result group producing 1x Healing Potion.
+Recipes can be authored through the API only.
+See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## With an Optional Check
 
@@ -37,11 +39,12 @@ If crafting checks are enabled on the system, simple mode uses pass/fail:
 - **Pass**: ingredients are consumed and results are created
 - **Fail**: behaviour depends on your consumption-on-failure settings
 
-The crafting check macro must return a success flag. See [Crafting Checks]({% link crafting-checks.md %}) for the contract.
+The crafting check macro must return a success flag.
+See [Crafting Checks]({% link crafting-checks.md %}) for the contract.
 
 ---
 
-## What's next?
+## See Also
 
-- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}) -- ingredient choices determine which result is produced.
-- [Crafting Checks]({% link crafting-checks.md %}) -- crafting check macro contracts.
+- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}): ingredient choices determine which result is produced.
+- [Crafting Checks]({% link crafting-checks.md %}): crafting check macro contracts.

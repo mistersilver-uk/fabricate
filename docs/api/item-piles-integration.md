@@ -7,7 +7,9 @@ nav_order: 6
 
 # ItemPilesIntegration
 
-Wraps the Item Piles public API (`game.itempiles.API`) to provide currency affordability checks, currency deduction, merchant stock reading, and container contents reading. Fabricate uses this service internally during crafting; you can also call it directly for custom workflows.
+Wraps the Item Piles public API (`game.itempiles.API`) to provide currency affordability checks, currency deduction, merchant stock reading, and container contents reading.
+Fabricate uses this service internally during crafting.
+You can also call it directly for custom workflows.
 
 **Minimum Item Piles version:** `ITEM_PILES_MINIMUM_VERSION` = `'3.1.0'`
 
@@ -33,7 +35,9 @@ Hooks.once('fabricate.ready', () => {
 const integration = game.fabricate.getItemPilesIntegration();
 ```
 
-Returns the singleton `ItemPilesIntegration` instance. This is always safe to call after the `fabricate.ready` hook fires. If Item Piles is not installed, `integration.available` will be `false` and all API calls will throw.
+Returns the singleton `ItemPilesIntegration` instance.
+This is always safe to call after the `fabricate.ready` hook fires.
+If Item Piles is not installed, `integration.available` will be `false` and all API calls will throw.
 
 ---
 
@@ -50,7 +54,9 @@ Returns the singleton `ItemPilesIntegration` instance. This is always safe to ca
 
 ### detect()
 
-Called automatically during Fabricate initialisation. Reads the Item Piles module version and sets `available` and `detectedVersion`. You do not need to call this manually.
+Called automatically during Fabricate initialisation.
+Reads the Item Piles module version and sets `available` and `detectedVersion`.
+You do not need to call this manually.
 
 ```javascript
 integration.detect();
@@ -64,7 +70,8 @@ If Item Piles is absent or below the minimum version, `available` is set to `fal
 
 ### isEnabled(system)
 
-Returns `true` when Item Piles is available **and** the crafting system has `features.itemPiles === true`. Use this to guard any custom integration logic.
+Returns `true` when Item Piles is available **and** the crafting system has `features.itemPiles === true`.
+Use this to guard any custom integration logic.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
@@ -97,7 +104,8 @@ Checks whether an actor holds at least the required amounts of each currency, us
 | `actor` | `Actor` | Yes | The Foundry actor to check. |
 | `currencies` | `Array<{abbreviation: string, amount: number}>` | Yes | Array of currency requirements. `abbreviation` must match the Item Piles denomination key (e.g. `'gp'`). |
 
-**Returns:** `Promise<boolean>` — `true` if all requirements are met; `false` otherwise or on error.
+**Returns:** `Promise<boolean>`.
+`true` if all requirements are met, `false` otherwise or on error.
 
 **Throws:** `Error` if Item Piles is not available (`available === false`).
 
@@ -120,7 +128,9 @@ Hooks.once('fabricate.ready', async () => {
 
 ### deductCurrency(actor, currencies)
 
-Removes currency from an actor using `game.itempiles.API.removeCurrencies`. Fabricate calls this automatically after a successful craft when the recipe has a `currencyCost`. You can also call it directly in custom workflows.
+Removes currency from an actor using `game.itempiles.API.removeCurrencies`.
+Fabricate calls this automatically after a successful craft when the recipe has a `currencyCost`.
+You can also call it directly in custom workflows.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
@@ -148,13 +158,15 @@ Hooks.once('fabricate.ready', async () => {
 
 ### getMerchantItems(merchantActor)
 
-Reads the current stock of a merchant actor via `game.itempiles.API.getMerchantItems`. Returns an empty array if the call fails or the merchant has no stock.
+Reads the current stock of a merchant actor via `game.itempiles.API.getMerchantItems`.
+Returns an empty array if the call fails or the merchant has no stock.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
 | `merchantActor` | `Actor` | Yes | An actor configured as a merchant in Item Piles. |
 
-**Returns:** `Promise<Item[]>` — Array of Foundry `Item` objects from the merchant's stock.
+**Returns:** `Promise<Item[]>`.
+Array of Foundry `Item` objects from the merchant's stock.
 
 **Throws:** `Error` if Item Piles is not available (`available === false`).
 
@@ -174,13 +186,16 @@ Hooks.once('fabricate.ready', async () => {
 
 ### getContainerContents(containerActor)
 
-Reads the contents of a container actor via `game.itempiles.API.getItemPileItems`. Useful for treating shared storage or crafting-station inventories as ingredient sources. Returns an empty array if the call fails or the container is empty.
+Reads the contents of a container actor via `game.itempiles.API.getItemPileItems`.
+Useful for treating shared storage or crafting-station inventories as ingredient sources.
+Returns an empty array if the call fails or the container is empty.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
 | `containerActor` | `Actor` | Yes | An actor configured as an Item Pile container. |
 
-**Returns:** `Promise<Item[]>` — Array of Foundry `Item` objects from the container.
+**Returns:** `Promise<Item[]>`.
+Array of Foundry `Item` objects from the container.
 
 **Throws:** `Error` if Item Piles is not available (`available === false`).
 
@@ -208,5 +223,7 @@ Hooks.once('fabricate.ready', async () => {
 
 ## See Also
 
-- [CraftingEngine]({% link api/crafting-engine.md %}) — where currency checks and deductions are called during the craft flow
-- [CraftingSystemManager]({% link api/system-manager.md %}) — `features.itemPiles` feature toggle
+- [CraftingEngine]({% link api/crafting-engine.md %}).
+  Where currency checks and deductions are called during the craft flow.
+- [CraftingSystemManager]({% link api/system-manager.md %}).
+  The `features.itemPiles` feature toggle.

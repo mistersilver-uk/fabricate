@@ -6,145 +6,18 @@ nav_order: 3.1
 
 # Crafting Checks
 
-Crafting checks let you gate recipe outcomes on a player roll. When a crafting system uses routed mode with the `macroOutcome` provider, or progressive resolution mode, a check is required to determine which result the crafter receives. Configure the check at the system level — each attempt runs the check automatically, before any materials are consumed.
+Crafting checks are not yet implemented in the UI.
+Once they are, they will let you gate recipe outcomes on a player roll. 
+Until then, you can use the API to define a custom check.
+
+When a crafting system uses routed mode with the `macroOutcome` provider, or progressive resolution mode, a check is required to determine which result the crafter receives.
+Configure the check at the system level.
+Each attempt runs the check automatically, before any materials are consumed.
 
 ---
 
-## Check Source
+## See Also
 
-Fabricate supports two ways to execute a crafting check, controlled by `craftingCheck.checkSource`:
-
-| Value | Description |
-|:------|:------------|
-| `"macro"` (default) | You write a JavaScript macro that rolls dice and returns a result object. Full control over any game system or custom dice mechanic. |
-| `"builtIn"` | Fabricate rolls using the current game system's built-in dice API. No macro required — configure the check using UI fields instead. |
-
-Existing systems that use `macroUuid` are unaffected. `checkSource` defaults to `"macro"` when not specified.
-
----
-
-## Built-In Check Mode
-
-When `checkSource` is `"builtIn"`, Fabricate uses a game-system adapter to execute the roll automatically. You configure the check through four fields instead of writing a macro.
-
-### Supported Game Systems
-
-| Game System | Adapter |
-|:------------|:--------|
-| D&D 5th Edition (`dnd5e`) | Built in. Supports ability checks and skill checks. |
-| Other systems | Not yet supported. Switch to macro mode or [register a custom adapter](#registering-a-custom-adapter). |
-
-When no adapter is available for the current game system, crafting fails with a clear error message and nothing is consumed.
-
-### Configuration Fields
-
-Configure the built-in check using the `craftingCheck.builtIn` sub-object:
-
-| Field | Type | Default | Description |
-|:------|:-----|:--------|:------------|
-| `ability` | `string` | `""` | The ability score key to roll (e.g. `"int"`, `"wis"`). Required unless `skill` is set. |
-| `skill` | `string` | `""` | The skill key to roll (e.g. `"arc"`, `"nat"`). When set, Fabricate calls `actor.rollSkill()` instead of `actor.rollAbilityCheck()`. |
-| `dc` | `number` | `15` | The difficulty class. The roll must meet or exceed this value to succeed. Must be a positive integer; invalid values fall back to `15`. |
-| `advantage` | `string` | `"normal"` | Roll advantage state. Accepts `"advantage"`, `"disadvantage"`, or `"normal"`. |
-
-When both `ability` and `skill` are set, `skill` takes precedence and Fabricate calls `actor.rollSkill()`.
-
-These check fields are configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
-
-### D&D 5e Ability Keys
-
-| Key | Ability |
-|:----|:--------|
-| `str` | Strength |
-| `dex` | Dexterity |
-| `con` | Constitution |
-| `int` | Intelligence |
-| `wis` | Wisdom |
-| `cha` | Charisma |
-
-### D&D 5e Skill Keys
-
-| Key | Skill |
-|:----|:------|
-| `acr` | Acrobatics |
-| `ani` | Animal Handling |
-| `arc` | Arcana |
-| `ath` | Athletics |
-| `dec` | Deception |
-| `his` | History |
-| `ins` | Insight |
-| `itm` | Intimidation |
-| `inv` | Investigation |
-| `med` | Medicine |
-| `nat` | Nature |
-| `prc` | Perception |
-| `prf` | Performance |
-| `per` | Persuasion |
-| `rel` | Religion |
-| `slt` | Sleight of Hand |
-| `ste` | Stealth |
-| `sur` | Survival |
-
-For example, an alchemy system using the `macroOutcome` provider might require an Intelligence (Arcana) check against DC 15 to determine the result, while a blacksmithing system might roll a Strength check at DC 12 with advantage to reward careful setup. Both are expressed through the `craftingCheck.builtIn` fields above. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
-
----
-
-## Macro Check Mode
-
-If your system uses routed mode with the `macroOutcome` provider, or progressive mode, and you need custom dice logic — for example a pool roll, a contested check, or a game system Fabricate does not yet have a built-in adapter for — use `checkSource: "macro"` (the default):
-
-| Setting | Description |
-|:--------|:------------|
-| `enabled` | Whether crafting checks are active |
-| `macroUuid` | UUID of the macro that performs the check |
-| `successMacroUuid` | Optional macro called after a successful step |
-| `failureMacroUuid` | Optional macro called after a failed step |
-
-Macro check mode is configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
-
----
-
-## Consumption on Failure
-
-When a crafting check fails, Fabricate can still consume some or all of the required materials — representing a failed attempt that uses up resources. You configure this per crafting system under `craftingCheck.consumption`.
-
-| Setting | Data path | Default | Description |
-|:--------|:----------|:--------|:------------|
-| `consumeIngredientsOnFail` | `system.craftingCheck.consumption.consumeIngredientsOnFail` | `true` | Remove ingredients from the actor's inventory even when the check fails |
-| `consumeCatalystsOnFail` | `system.craftingCheck.consumption.consumeCatalystsOnFail` | `false` | Apply tool breakage/usage (and possibly destroy a broken tool) even when the check fails |
-
-{: .note }
-> The field name still reads `consumeCatalystsOnFail` for backward compatibility, but it now governs **Tool** breakage. (The Catalyst concept was retired in `0.6.0` — see [Tools]({% link tools.md %}).)
-
-**When this applies.** These settings only take effect when a crafting check runs (whether built-in or macro) and that check returns a failure. They do not affect other failure paths such as missing ingredients, missing or unsatisfied tools, or an invalid recipe configuration — in those cases nothing is ever consumed.
-
-**Example: punishing failure.** An Alchemy system where botched potions destroy materials but spare the alchemist's mortar and pestle (a tool). Both defaults match this scenario — ingredients are used up while the tool survives — so no explicit configuration is needed.
-
-**Example: forgiving failure.** A Cooking system where a failed roll is just practice — set both `consumeIngredientsOnFail` and `consumeCatalystsOnFail` to `false` so nothing is lost.
-
-**Example: high-stakes ritual.** A system where both reagents and the ritual focus tool break or degrade regardless of outcome — set both consumption flags to `true`.
-
-Consumption-on-failure is configured through the API only. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
-
----
-
-## Registering a Custom Adapter
-
-If you are running a game system other than D&D 5e and want to use built-in check mode, you can register your own adapter through the API only. The adapter extends `CraftingCheckAdapter` and implements `getAbilities()`, `getSkills()`, and `executeCheck()`, then registers itself with the `CraftingCheckAdapterRegistry`. See the [CraftingSystemManager API]({% link api/system-manager.md %}).
-
-The `executeCheck()` return shape:
-
-| Field | Type | Description |
-|:------|:-----|:------------|
-| `success` | `boolean` | Whether the check passed |
-| `outcome` | `string \| null` | Named outcome label matched case-insensitively to a result group name (routed `macroOutcome` provider) |
-| `value` | `number \| null` | Numeric roll total, used by progressive mode to award results by difficulty |
-| `data` | `object` | Arbitrary extra data passed through to success/failure macros |
-
----
-
-## What's next?
-
-- [Crafting Systems]({% link crafting-systems.md %}) -- configure resolution mode, feature toggles, and system-level settings.
-- [Salvage]({% link salvage.md %}) -- configure salvage checks, which use a separate check pipeline to gate salvage outcomes.
-- [Recipes]({% link recipes/index.md %}) -- understand routed and progressive resolution modes that require a crafting check.
+- [Crafting Systems]({% link crafting-systems.md %}). Configure resolution mode, feature toggles, and system-level settings.
+- [Salvage]({% link salvage.md %}). Configure salvage checks, which use a separate check pipeline to gate salvage outcomes.
+- [Recipes]({% link recipes/index.md %}). Understand routed and progressive resolution modes that require a crafting check.

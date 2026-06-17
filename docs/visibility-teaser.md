@@ -7,9 +7,13 @@ parent: Visibility & Knowledge
 
 # Teaser Mode
 
-Teaser mode is an optional layer on top of the standard [visibility modes]({% link visibility.md %}). When enabled on a crafting system, the visibility service can return undiscovered recipes as **teasers** — players may be allowed to know a recipe exists, while full ingredients, results, or details remain hidden. As players gather fragments or reach discovery thresholds, hidden fields are progressively revealed until the recipe is fully unlocked.
+Teaser mode is an optional layer on top of the standard [visibility modes]({% link visibility.md %}).
+When enabled on a crafting system, the visibility service can return undiscovered recipes as **teasers**.
+Players may be allowed to know a recipe exists, while full ingredients, results, or details remain hidden.
+As players gather fragments or reach discovery thresholds, hidden fields are progressively revealed until the recipe is fully unlocked.
 
-Use teaser mode when you want discovery to be gradual: players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragments away from learning it, but cannot yet see what it requires.
+Use teaser mode when you want discovery to be gradual.
+Players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragments away from learning it, but cannot yet see what it requires.
 
 {: .note }
 > Teaser mode requires setting `recipeVisibility.listMode` to `"teaser"` on the crafting system. The existing `global`, `player`, and `knowledge` modes continue to work unchanged when teaser mode is off.
@@ -39,7 +43,8 @@ The system-level `teaserConfig.discoveryMode` controls how players accumulate di
 
 ## System Configuration
 
-Open the **Recipe Visibility** card in the Crafting Admin panel and set `listMode` to `teaser`. This reveals a **Teaser Config** section:
+Open the **Recipe Visibility** card in the Crafting Admin panel and set `listMode` to `teaser`.
+This reveals a **Teaser Config** section:
 
 | Field | Description |
 |:------|:------------|
@@ -78,9 +83,11 @@ For each recipe, the GM configures a `teaser` block in the recipe editor's **Tea
 
 ## Fragment Discovery (Automatic)
 
-When `discoveryMode` is `fragments` or `both`, Fabricate hooks into Foundry's `createItem` event via `FragmentDiscoveryHook`. When an actor receives an item whose UUID (or `_stats.compendiumSource` / `flags.core.sourceId` for compendium copies) matches a fragment definition's `linkedItemUuid`, discovery progress is automatically incremented for that actor on every recipe that references that fragment.
+When `discoveryMode` is `fragments` or `both`, Fabricate hooks into Foundry's `createItem` event via `FragmentDiscoveryHook`.
+When an actor receives an item whose UUID (or `_stats.compendiumSource` / `flags.core.sourceId` for compendium copies) matches a fragment definition's `linkedItemUuid`, discovery progress is automatically incremented for that actor on every recipe that references that fragment.
 
-Players do not need to take any additional action — simply receiving the item is enough to trigger discovery.
+Players do not need to take any additional action.
+Simply receiving the item is enough to trigger discovery.
 
 ---
 
@@ -99,18 +106,20 @@ Progress is stored in actor flags under `Actor.flags.fabricate.discoveryProgress
 
 ## Planned Player Experience
 
-A player-facing presentation of teaser recipes — teaser cards with progress bars that show current progress versus `revealThreshold` before transitioning to full recipe content on unlock — is planned and not yet available.
+A player-facing presentation of teaser recipes is planned and not yet available.
+It will use teaser cards with progress bars that show current progress versus `revealThreshold` before transitioning to full recipe content on unlock.
 
 ---
 
 ## Configuring via the API
 
-Teaser mode is configured through the API only: set a system's `recipeVisibility.listMode` to `teaser` with a `teaserConfig` block (master `enabled` toggle, `discoveryMode`, and fragment definitions), and set per-actor discovery progress through the visibility service. See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
+Teaser mode is configured through the API only: set a system's `recipeVisibility.listMode` to `teaser` with a `teaserConfig` block (master `enabled` toggle, `discoveryMode`, and fragment definitions), and set per-actor discovery progress through the visibility service.
+See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
 
 ---
 
-## What's Next?
+## See Also
 
-- [Visibility & Knowledge]({% link visibility.md %}) — the full visibility system including global, player, and knowledge modes.
-- [Recipes]({% link recipes/index.md %}) — configure recipe fields controlled by teaser mode.
-- [Crafting Systems]({% link crafting-systems.md %}) — all system-level settings and feature toggles.
+- [Visibility & Knowledge]({% link visibility.md %}). The full visibility system including global, player, and knowledge modes.
+- [Recipes]({% link recipes/index.md %}). Configure recipe fields controlled by teaser mode.
+- [Crafting Systems]({% link crafting-systems.md %}). All system-level settings and feature toggles.

@@ -6,16 +6,22 @@ nav_order: 8
 
 # Gathering Environments
 
-Gathering environments let a GM define places where actors can gather materials from a crafting system's component library. They are managed from the **Environments** tab in the Crafting Admin panel.
+Gathering environments let a GM define places where actors can gather materials from a crafting system's component library.
+They are managed from the **Environments** tab in the Crafting Admin panel.
 
 {: .gm }
 > Only GMs can create and edit gathering environments.
 
 ## Enable Gathering
 
-Gathering is opt-in per crafting system. Open the system in the Crafting Admin panel and enable the `gathering` feature. When this feature is enabled, the **Environments** tab appears for that system.
+Gathering is opt-in per crafting system.
+Open the system in the Crafting Admin panel and enable the `gathering` feature.
+When this feature is enabled, the **Environments** tab appears for that system.
 
-When at least one crafting system has gathering enabled, players also see a dedicated **Gathering** action in the Items Directory header. This action opens the player Gathering app; it is separate from the Crafting app route and does not reuse the crafting actor-selection store. Fabricate resyncs the header action when crafting systems change and when the Items Directory rerenders, so disabling gathering on every system removes the action.
+When at least one crafting system has gathering enabled, players also see a dedicated **Gathering** action in the Items Directory header.
+This action opens the player Gathering app.
+It is separate from the Crafting app route and does not reuse the crafting actor-selection store.
+Fabricate resyncs the header action when crafting systems change and when the Items Directory rerenders, so disabling gathering on every system removes the action.
 
 ![Fabricate gathering feature enabled](img/screenshots/fabricate-enable-gathering.webp)
 
@@ -25,21 +31,33 @@ Each crafting system decides how often its gathering tasks can be attempted thro
 
 | Limitation | Toggle | What it caps |
 |:-----------|:-------|:-------------|
-| **Stamina** | `Stamina` pill | A per-character stamina pool. Each attempt spends the task's stamina cost; a character can keep going only while they have stamina, which regenerates as world time passes. |
-| **Resource nodes** | `Resource nodes` pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node; once a pool is empty the task is blocked until its nodes respawn over world time. |
+| **Stamina** | `Stamina` pill | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
+| **Resource nodes** | `Resource nodes` pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node. Once a pool is empty the task is blocked until its nodes respawn over world time. |
 
-The two toggles are **independent, not a single choice** — each can be on or off on its own:
+The two toggles are **independent, not a single choice**.
+Each can be on or off on its own:
 
-- **Neither on** — no limit. Tasks can be attempted freely (subject only to tools, conditions, and any [time requirements]({% link gathering-environments.md %}#time-requirements), which are always orthogonal to the limitation toggles).
-- **One on** — only that limitation applies.
-- **Both on** — both limits apply at once. A single accepted attempt both depletes the node pool **and** spends the character's stamina. This is the **anti-dogpiling** combination: finite resource nodes cap the *total* pulls until they respawn, so a large, high-stamina party cannot strip a task in a single visit no matter how much collective stamina it has.
+- **Neither on** means no limit.
+  Tasks can be attempted freely (subject only to tools, conditions, and any [time requirements]({% link gathering-environments.md %}#time-requirements), which are always orthogonal to the limitation toggles).
+- **One on** means only that limitation applies.
+- **Both on** means both limits apply at once.
+  A single accepted attempt both depletes the node pool **and** spends the character's stamina.
+  This is the **anti-dogpiling** combination.
+  Finite resource nodes cap the *total* pulls until they respawn, so a large, high-stamina party cannot strip a task in a single visit no matter how much collective stamina it has.
 
-Stamina enforcement only kicks in once a character actually has a pool (a non-blank **Maximum stamina** rolled for them); a task with no stamina cost is never gated by stamina. Resource-node enforcement applies per task only where you author a node pool on that task. Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles — the toggles only decide whether each limitation is *active* for the system.
+Stamina enforcement only kicks in once a character actually has a pool (a non-blank **Maximum stamina** rolled for them).
+A task with no stamina cost is never gated by stamina.
+Resource-node enforcement applies per task only where you author a node pool on that task.
+Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles.
+The toggles only decide whether each limitation is *active* for the system.
 
 ![Fabricate gathering settings](img/screenshots/fabricate-gathering-settings.webp)
 
 {: .note }
-> Worlds created before `0.8.0` stored a single mutually-exclusive limitation `mode` (`none` / `stamina` / `nodes`). On upgrade, a versioned `0.8.0` migration rewrites that value into the two independent flags (`stamina` ⇒ Stamina on, `nodes` ⇒ Resource nodes on, otherwise both off) and drops the old field. The same mapping is applied on read, so un-migrated worlds keep working until the migration runs. There is no longer a value that turns both limits on at once except enabling both toggles.
+> Worlds created before `0.8.0` stored a single mutually-exclusive limitation `mode` (`none` / `stamina` / `nodes`).
+> On upgrade, a versioned `0.8.0` migration rewrites that value into the two independent flags (`stamina` ⇒ Stamina on, `nodes` ⇒ Resource nodes on, otherwise both off) and drops the old field.
+> The same mapping is applied on read, so un-migrated worlds keep working until the migration runs.
+> There is no longer a value that turns both limits on at once except enabling both toggles.
 
 ## Environment Fields
 
@@ -56,23 +74,40 @@ Each environment belongs to one crafting system and stores:
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
 {: .note }
-> **Biomes** and **Danger Level** above are the composition match tags — they decide which reusable tasks and events belong to the environment, not where players can gather. **Geography is no longer a composition tag**: it is the first-class `GatheringRealm`, and an environment declares membership in one or more realms through the editor's multi-realm selector when the per-system **Enable Travel & Realms** toggle is on. Realm membership and the optional location-availability rule fields (`includedRealmIds`, `excludedRealmIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only; see [Gathering Realms & Travel]({% link gathering-realms.md %}).
+> **Biomes** and **Danger Level** above are the composition match tags.
+> They decide which reusable tasks and events belong to the environment, not where players can gather.
+> **Geography is no longer a composition tag**.
+> It is the first-class `GatheringRealm`, and an environment declares membership in one or more realms through the editor's multi-realm selector when the per-system **Enable Travel & Realms** toggle is on.
+> Realm membership and the optional location-availability rule fields (`includedRealmIds`, `excludedRealmIds`, `includedBiomeIds`, `excludedBiomeIds`) drive location-aware availability only.
+> See [Gathering Realms & Travel]({% link gathering-realms.md %}).
 
-Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
+Scene UUIDs are kept as authored text.
+If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it.
+Players remain blocked by an unresolved scene gate until the reference is repaired.
 
 Deleting an environment also cleans active and historical gathering runs that reference it.
 
-The Scene UUID field has an assisted selector populated from the current world scene list plus a manual UUID input. Selecting a scene writes its UUID; typing directly remains supported for pasted or external references. If the saved UUID is no longer in the scene list, the editor shows the unresolved value as a preserved option until the GM changes it.
+The Scene UUID field has an assisted selector populated from the current world scene list plus a manual UUID input.
+Selecting a scene writes its UUID.
+Typing directly remains supported for pasted or external references.
+If the saved UUID is no longer in the scene list, the editor shows the unresolved value as a preserved option until the GM changes it.
 
 ## Global Conditions And Tags
 
-Gathering weather and time of day are global gathering conditions, not environment browse filters. GMs can set current weather and current time of day in the Manager V2 gathering library/settings panel. Setting conditions requires a GM user, validates values against the configured weather and time-of-day vocabularies, persists the gathering config setting, and refreshes gathering listings; players cannot mutate conditions.
+Gathering weather and time of day are global gathering conditions, not environment browse filters.
+GMs can set current weather and current time of day in the Manager V2 gathering library/settings panel.
+Setting conditions requires a GM user, validates values against the configured weather and time-of-day vocabularies, persists the gathering config setting, and refreshes gathering listings.
+Players cannot mutate conditions.
 
-When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. There is no longer a region vocabulary — geography is the first-class `GatheringRealm` authored in the Travel tab (see [Gathering Realms & Travel]({% link gathering-realms.md %})). Empty task or event match tags mean "matches any" for that dimension.
+When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day.
+There is no longer a region vocabulary.
+Geography is the first-class `GatheringRealm` authored in the Travel tab (see [Gathering Realms & Travel]({% link gathering-realms.md %})).
+Empty task or event match tags mean "matches any" for that dimension.
 
 ## Gathering Rules
 
-Manager V2 stores d100 gathering rules per selected crafting system under `gatheringConfig.systems[systemId].rules`. These settings are edited from the Gathering Settings tab and are authoritative for every d100 gathering environment in that system once authored.
+Manager V2 stores d100 gathering rules per selected crafting system under `gatheringConfig.systems[systemId].rules`.
+These settings are edited from the Gathering Settings tab and are authoritative for every d100 gathering environment in that system once authored.
 
 ![Fabricate gathering rules](img/screenshots/fabricate-gathering-settings.webp)
 
@@ -83,19 +118,32 @@ Manager V2 stores d100 gathering rules per selected crafting system under `gathe
 | **Events** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
 | **Event limit** | Positive integer used when Events is `limitedDrops` |
 | **Event outcome** | `successWithEvent` or `failureWithEvent` |
-| **Blind candidate gate** | `attemptableOnly` (default) or `allMatching` — see Blind Mode |
-| **Blind reveal** | `never` (default), `onSuccess`, or `onAttempt` — reveal default for blind tasks |
-| **Reveal scope** | `actor`, `user`, `party`, or `global` — who learns a revealed task |
+| **Blind candidate gate** | `attemptableOnly` (default) or `allMatching` (see Blind Mode) |
+| **Blind reveal** | `never` (default), `onSuccess`, or `onAttempt` (reveal default for blind tasks) |
+| **Reveal scope** | `actor`, `user`, `party`, or `global` (who learns a revealed task) |
 
-Legacy per-task item selection, per-environment event selection, and per-environment event policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
+Legacy per-task item selection, per-environment event selection, and per-environment event policy fields may still be read when an existing system has no `rules` object.
+Manager V2 no longer exposes those fields as authoring controls.
 
 ## Blind Mode
 
-A `blind` environment hides its tasks from players and presents a single generic gather action. On each attempt the runtime resolves one concrete task for the actor:
+A `blind` environment hides its tasks from players and presents a single generic gather action.
+On each attempt the runtime resolves one concrete task for the actor:
 
-1. **Candidate pool** — start from the environment's visible, enabled tasks. The system **Blind candidate gate** then decides eligibility: `attemptableOnly` (default) drops tasks the character cannot currently attempt (missing or broken tools, depleted nodes, exhausted attempts, failed gates) so the generic gather never resolves to a task that would immediately fail; `allMatching` keeps every matching task. If the gated pool is empty, the player gets an opaque "nothing you can gather here" response.
-2. **Selection** — a weighted random draw over the gated pool, using per-task **Weight** values set on the Tasks tab rows (default `1`; `0` excludes a task). There are no other strategies and no per-environment configuration — blind selection is always weighted random.
-3. **Reveal** — after the attempt resolves, the task may be revealed to the player so it can be recognised later. The **Blind reveal** policy (`never`/`onSuccess`/`onAttempt`) and **Reveal scope** are set at the system level only — environments cannot override them. `never` keeps the task hidden; `onSuccess` reveals only after a successful gather; `onAttempt` reveals after success or failure.
+1. **Candidate pool** starts from the environment's visible, enabled tasks.
+   The system **Blind candidate gate** then decides eligibility.
+   `attemptableOnly` (default) drops tasks the character cannot currently attempt (missing or broken tools, depleted nodes, exhausted attempts, failed gates) so the generic gather never resolves to a task that would immediately fail.
+   `allMatching` keeps every matching task.
+   If the gated pool is empty, the player gets an opaque "nothing you can gather here" response.
+2. **Selection** is a weighted random draw over the gated pool, using per-task **Weight** values set on the Tasks tab rows (default `1`, where `0` excludes a task).
+   There are no other strategies and no per-environment configuration.
+   Blind selection is always weighted random.
+3. **Reveal** happens after the attempt resolves, when the task may be revealed to the player so it can be recognised later.
+   The **Blind reveal** policy (`never`/`onSuccess`/`onAttempt`) and **Reveal scope** are set at the system level only.
+   Environments cannot override them.
+   `never` keeps the task hidden.
+   `onSuccess` reveals only after a successful gather.
+   `onAttempt` reveals after success or failure.
 
 The per-task **Weight** column only appears while the environment is in `blind` mode.
 
@@ -103,63 +151,93 @@ The per-task **Weight** column only appears while the environment is in `blind` 
 
 Every environment has a **composition mode** (Overview → Composition mode card) that decides which reusable library tasks and events apply:
 
-- **Automatic** — every matching, library-enabled record is available unless you explicitly exclude it. Stale `enabled*Ids` / `forced*Ids` lists left over from a previous manual pass are ignored, so automatic always means "all matching available unless excluded".
-- **Manual** — only records you explicitly **include** apply. On both the Tasks and Events tabs, manual mode shows **Included in this environment** and **Available to add** only. Available to add lists matching records first, then non-matching and library-disabled records; matching rows use **Add**, non-matching enabled rows use **Force add**, and library-disabled rows show an "enable in library first" note. Removing an included manual record clears its include/force state and returns it to Available to add according to normal candidate, non-matching, or library-disabled state; it does not create a local Excluded state.
+- **Automatic** means every matching, library-enabled record is available unless you explicitly exclude it.
+  Stale `enabled*Ids` / `forced*Ids` lists left over from a previous manual pass are ignored, so automatic always means "all matching available unless excluded".
+- **Manual** means only records you explicitly **include** apply.
+  On both the Tasks and Events tabs, manual mode shows **Included in this environment** and **Available to add** only.
+  Available to add lists matching records first, then non-matching and library-disabled records.
+  Matching rows use **Add**, non-matching enabled rows use **Force add**, and library-disabled rows show an "enable in library first" note.
+  Removing an included manual record clears its include/force state and returns it to Available to add according to normal candidate, non-matching, or library-disabled state.
+  It does not create a local Excluded state.
 
-Automatic composition can be fully library-backed. An automatic environment does not need a legacy inline placeholder Environment Task when matching library Gathering Tasks provide the gatherable records.
+Automatic composition can be fully library-backed.
+An automatic environment does not need a legacy inline placeholder Environment Task when matching library Gathering Tasks provide the gatherable records.
 
-In automatic mode, Excluded and Non-matching are separate sections. Non-matching is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records explicitly excluded through `disabledTaskIds` / `disabledEventIds`.
+In automatic mode, Excluded and Non-matching are separate sections.
+Non-matching is read-only and informational only, because automatic mode ignores the force list.
+Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records explicitly excluded through `disabledTaskIds` / `disabledEventIds`.
 
-**Weather and time-of-day are runtime gates, not matching criteria.** A task or event whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (biome, plus danger for events) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked event is skipped during the d100 event selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
+**Weather and time-of-day are runtime gates, not matching criteria.**
+A task or event whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (biome, plus danger for events) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn").
+At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked event is skipped during the d100 event selection.
+Flipping the current gathering conditions to one of the required values flips the row back to Available.
 
 ![Fabricate environment task composition](img/screenshots/fabricate-configure-environment-tasks.webp)
 ![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
 
 ## Gathering Tools Library
 
-Manager V2 exposes a per-system **Tools** page under Gathering. Tools are reusable gathering tools that Gathering Tasks can require by `toolIds`. The page is a draft-and-save surface: edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.
+Manager V2 exposes a per-system **Tools** page under Gathering.
+Tools are reusable gathering tools that Gathering Tasks can require by `toolIds`.
+The page is a draft-and-save surface.
+Edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.
 
 Each library tool record carries:
 
 | Field | Description |
 |:------|:------------|
 | **Component** | Required managed component the tool refers to |
-| **Display label** | Optional; falls back to the component name |
-| **Tool requirement** | Optional Foundry expression evaluated against the actor's roll data; see [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
+| **Display label** | Optional. Falls back to the component name |
+| **Tool requirement** | Optional Foundry expression evaluated against the actor's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
 | **Breakage mechanic** | One of `Limited uses` (counter on the item flag), `Breakage chance` (flat percent), or `Dice expression` (formula vs threshold) |
 | **On-break action** | One of `Destroy item`, `Mark as broken`, or `Replace with item` (replacement component must differ from the primary) |
 
-Tool authoring rejects entries with no component, with `replaceWith` and the same replacement as primary component, with out-of-range breakage chance, or with empty dice formulas. The Save button is disabled until every tool is valid; hovering it reveals the first failing reason.
+Tool authoring rejects entries with no component, with `replaceWith` and the same replacement as primary component, with out-of-range breakage chance, or with empty dice formulas.
+The Save button is disabled until every tool is valid.
+Hovering it reveals the first failing reason.
 
-Library tools are **system-owned** — they persist as `system.tools[]` on the crafting system (the `craftingSystems` setting), authored on the Manager's dedicated **Tools** page, and a gathering task only references them by id. (Worlds that authored tools under the gathering config before `0.7.0` are reconciled onto the system by that migration.) Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported. If a task references a missing or disabled library tool, the runtime blocks the attempt with `TOOL_BLOCKED` before actor inventory checks.
+Library tools are **system-owned**.
+They persist as `system.tools[]` on the crafting system (the `craftingSystems` setting), authored on the Manager's dedicated **Tools** page, and a gathering task only references them by id.
+(Worlds that authored tools under the gathering config before `0.7.0` are reconciled onto the system by that migration.)
+Legacy worlds without a `tools` array load as `[]`.
+Cross-system sharing is not supported.
+If a task references a missing or disabled library tool, the runtime blocks the attempt with `TOOL_BLOCKED` before actor inventory checks.
 
 ## Gathering Task And Event Libraries
 
-Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
+Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab.
+The task browser supports search, status/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries.
+The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
 
-Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only — geography (the `GatheringRealm`) is not a composition axis. Weather and time of day stay visible as current runtime condition context; they do not decide whether a task or event belongs to the environment. GMs can toggle matched task and event records on or off per environment. Reusable event authoring is not part of this slice.
+Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only.
+Geography (the `GatheringRealm`) is not a composition axis.
+Weather and time of day stay visible as current runtime condition context.
+They do not decide whether a task or event belongs to the environment.
+GMs can toggle matched task and event records on or off per environment.
+Reusable event authoring is not part of this slice.
 
 Gathering Task records support:
 
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored task identity and availability |
-| **Biomes** | Optional environment composition match tags; empty means any |
-| **Weather, time of day** | Optional runtime availability gates; empty means any |
+| **Biomes** | Optional environment composition match tags. Empty means any |
+| **Weather, time of day** | Optional runtime availability gates. Empty means any |
 | **Drop rows** | Ordered d100 item/component rows with quantity, `dropRate` from 0 to 100, and optional per-drop time/weather modifiers. Authored order is the rank used by system Gathering Rules. |
 | **Stamina and modifiers** | Optional stamina cost and gathering roll modifier expression |
 | **Required tools** | Optional references to the selected system's Gathering Tools library. All referenced tools are required. |
 
 {: .note }
-> Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more). See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
+> Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
+> See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
 
 Reusable event records support:
 
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored event identity and availability |
-| **Danger, biomes** | Optional environment composition match tags; empty means any. Environment danger uses the single `dangerLevel` ceiling; legacy `dangerTags` / `risk` values are fallback inputs for older data. |
-| **Weather, time of day** | Optional runtime availability gates; empty means any |
+| **Danger, biomes** | Optional environment composition match tags. Empty means any. Environment danger uses the single `dangerLevel` ceiling. Legacy `dangerTags` / `risk` values are fallback inputs for older data. |
+| **Weather, time of day** | Optional runtime availability gates. Empty means any |
 | **Drop rate** | d100 event trigger rate from 1 to 100 |
 | **Modifier** | Optional event roll modifier expression |
 
@@ -170,51 +248,76 @@ Disabled Gathering Tasks and events never match for player gathering.
 
 ## D100 Resolution
 
-Gathering Tasks use gathering-native d100 rows. Task-level weather and time-of-day availability gates decide whether the task can be attempted. For each enabled item row, Fabricate computes `finalDropRate = clamp(dropRate + environment adjustment + matching drop-level time/weather modifiers, 0, 100)`, rolls `d100 + gatheringModifier`, and drops the row when the effective roll is at least `101 - finalDropRate`. Gathering modifiers affect the d100 roll, not the final drop chance. Matched enabled events that pass runtime condition gates roll independently with `d100 + eventModifier` and their environment-adjusted event drop-rate threshold.
+Gathering Tasks use gathering-native d100 rows.
+Task-level weather and time-of-day availability gates decide whether the task can be attempted.
+For each enabled item row, Fabricate computes `finalDropRate = clamp(dropRate + environment adjustment + matching drop-level time/weather modifiers, 0, 100)`, rolls `d100 + gatheringModifier`, and drops the row when the effective roll is at least `101 - finalDropRate`.
+Gathering modifiers affect the d100 roll, not the final drop chance.
+Matched enabled events that pass runtime condition gates roll independently with `d100 + eventModifier` and their environment-adjusted event drop-rate threshold.
 
-Environment-local task and event drop-rate adjustments can be preserved while disabled by their apply toggles. Disabled adjustment toggles leave the saved values on the environment but compose them as zero at runtime.
+Environment-local task and event drop-rate adjustments can be preserved while disabled by their apply toggles.
+Disabled adjustment toggles leave the saved values on the environment but compose them as zero at runtime.
 
-Drop-level modifiers do not make an unavailable task available. They only adjust individual row chance after the task already matches. Multiple rows can reference the same component with different quantities and chances; each row rolls independently before the selected system's Gathering Rules choose awarded rows.
+Drop-level modifiers do not make an unavailable task available.
+They only adjust individual row chance after the task already matches.
+Multiple rows can reference the same component with different quantities and chances.
+Each row rolls independently before the selected system's Gathering Rules choose awarded rows.
 
-Saved, imported, or seeded drop rows must point at a real reward target. A `componentId` must exist in the selected crafting system's component library, and an `itemUuid` must resolve to a Foundry Item. Fabricate rejects stale component ids, unresolved item UUIDs, and rows with neither target before writing the gathering task.
+Saved, imported, or seeded drop rows must point at a real reward target.
+A `componentId` must exist in the selected crafting system's component library, and an `itemUuid` must resolve to a Foundry Item.
+Fabricate rejects stale component ids, unresolved item UUIDs, and rows with neither target before writing the gathering task.
 
-The selected crafting system's Gathering Rules choose reward and event rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithEvent` records selected events while the gathering still succeeds. `failureWithEvent` records selected events and makes the attempt fail, so no selected rewards are awarded. If no events are enabled or matched, the environment is mechanically safe even when a danger level is present.
+The selected crafting system's Gathering Rules choose reward and event rows after rolling.
+`highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order.
+`successWithEvent` records selected events while the gathering still succeeds.
+`failureWithEvent` records selected events and makes the attempt fail, so no selected rewards are awarded.
+If no events are enabled or matched, the environment is mechanically safe even when a danger level is present.
 
 ## Task Authoring
 
-An environment contains one or more Environment Tasks. The current GM editor supports selected Environment Task authoring for:
+An environment contains one or more Environment Tasks.
+The current GM editor supports selected Environment Task authoring for:
 
 | Area | Supported fields |
 |:-----|:-----------------|
 | Task basics | `name`, `description`, `img`, `enabled`, `resolutionMode` |
-| Visibility gate | Enable or clear task visibility; configure its `formula` and `threshold` |
+| Visibility gate | Enable or clear task visibility. Configure its `formula` and `threshold` |
 | Routed result selection | Configure `macroOutcome.macroUuid` or `rollTableOutcome.rollTableUuid` |
 | Progressive checks | Configure `awardMode` plus the check `formula` and optional `threshold` |
 | Time requirement | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years |
 | Failure outcome | Leave clear for Fabricate's default failure feedback, or configure custom text or macro handling |
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results with `componentId` and `quantity` |
-| Required tools | Reference the system's Tools library by id (`task.toolIds`). Tools themselves — `componentId`, the optional requirement, the breakage mechanic, and the on-break action — are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
+| Required tools | Reference the system's Tools library by id (`task.toolIds`). Tools themselves (`componentId`, the optional requirement, the breakage mechanic, and the on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
 
-Progressive task result difficulty comes from the selected managed component's `difficulty`; result rows do not store their own difficulty value.
+Progressive task result difficulty comes from the selected managed component's `difficulty`.
+Result rows do not store their own difficulty value.
 
-New environments are created as disabled draft shells. Library-backed automatic environments can be configured without an inline placeholder task; legacy inline task drafts may still use disabled placeholder tasks while a GM is authoring them. Disabled placeholders can be saved while disabled, even when routed result-selection targets or progressive check formulas are still blank. Once a task is enabled, save validation requires complete configuration for the chosen resolution mode.
+New environments are created as disabled draft shells.
+Library-backed automatic environments can be configured without an inline placeholder task.
+Legacy inline task drafts may still use disabled placeholder tasks while a GM is authoring them.
+Disabled placeholders can be saved while disabled, even when routed result-selection targets or progressive check formulas are still blank.
+Once a task is enabled, save validation requires complete configuration for the chosen resolution mode.
 
-Saved Script Macro UUIDs remain visible when the macro is no longer present in the current world macro list. The editor shows the unresolved UUID as the selected value, warns that it is missing, and preserves it until the GM changes the field.
+Saved Script Macro UUIDs remain visible when the macro is no longer present in the current world macro list.
+The editor shows the unresolved UUID as the selected value, warns that it is missing, and preserves it until the GM changes the field.
 
-Task images can be typed directly or selected with Foundry's image file picker when that picker is available. Cancelling or failing the picker leaves the current manual path unchanged.
+Task images can be typed directly or selected with Foundry's image file picker when that picker is available.
+Cancelling or failing the picker leaves the current manual path unchanged.
 
 ## Visibility Gates
 
 A visibility gate controls whether a gathering task is visible to a specific actor before an attempt starts.
-A gate is formula-only: it stores a `formula` (a Foundry roll expression) and a required `threshold`, with no provider field.
+A gate is formula-only.
+It stores a `formula` (a Foundry roll expression) and a required `threshold`, with no provider field.
 
 | Field | Notes |
 |:------|:------|
 | `formula` | A Foundry roll expression evaluated against the viewing actor's roll data. |
 | `threshold` | The required value the formula must meet for the task to be visible. |
 
-The editor keeps incomplete input local until both `formula` and `threshold` are present. For example, supplying a `formula` without a `threshold` does not mutate the stored task draft yet. Clearing visibility removes the stored gate only when the task already has committed visibility.
+The editor keeps incomplete input local until both `formula` and `threshold` are present.
+For example, supplying a `formula` without a `threshold` does not mutate the stored task draft yet.
+Clearing visibility removes the stored gate only when the task already has committed visibility.
 
 ## Routed Result Selection
 
@@ -227,7 +330,8 @@ Routed gathering tasks use `resultSelection` to choose which result group is awa
 
 Switching providers keeps only the fields for the selected provider, so stale macro UUIDs are not retained when switching to a roll table and stale roll table UUIDs are not retained when switching back to a macro.
 
-The roll table field has both an assisted selector populated from the current world RollTable list and a manual UUID input. If a saved RollTable UUID no longer appears in the current list, the editor shows a missing-reference warning and preserves the value until the GM clears or replaces it.
+The roll table field has both an assisted selector populated from the current world RollTable list and a manual UUID input.
+If a saved RollTable UUID no longer appears in the current list, the editor shows a missing-reference warning and preserves the value until the GM clears or replaces it.
 
 ## Progressive Checks
 
@@ -236,15 +340,18 @@ Progressive gathering tasks require a progressive award mode and a check formula
 | Field | Description |
 |:------|:------------|
 | `progressive.awardMode` | One of `equal`, `partial`, or `exceed` |
-| `check.formula` | Required; a Foundry roll expression evaluated against the acting actor's roll data |
-| `check.threshold` | Optional; when omitted the check resolves to a value-only result |
+| `check.formula` | Required. A Foundry roll expression evaluated against the acting actor's roll data |
+| `check.threshold` | Optional. When omitted the check resolves to a value-only result |
 
-A check is formula-only — there is no provider field.
-When a `threshold` is supplied the resolved value is compared against it for success or failure; when it is absent the check yields a value-only result.
+A check is formula-only.
+There is no provider field.
+When a `threshold` is supplied the resolved value is compared against it for success or failure.
+When it is absent the check yields a value-only result.
 
 ## Time Requirements
 
-Gathering tasks are immediate by default. To keep a task immediate, clear its `timeRequirement`.
+Gathering tasks are immediate by default.
+To keep a task immediate, clear its `timeRequirement`.
 
 To make a task take time, enter a positive duration across any of these fields:
 
@@ -256,20 +363,25 @@ To make a task take time, enter a positive duration across any of these fields:
 | `timeRequirement.months` | Months to wait |
 | `timeRequirement.years` | Years to wait |
 
-Save validation rejects negative, non-numeric, or all-zero time requirements. Clearing the time requirement removes the stored object and makes the task immediate again.
+Save validation rejects negative, non-numeric, or all-zero time requirements.
+Clearing the time requirement removes the stored object and makes the task immediate again.
 
 ## Failure Outcomes
 
-If a task has no `failureOutcome`, Fabricate uses its default localized failure feedback message. GMs can configure a custom failure outcome when a task should explain failure differently or run table-specific automation.
+If a task has no `failureOutcome`, Fabricate uses its default localized failure feedback message.
+GMs can configure a custom failure outcome when a task should explain failure differently or run table-specific automation.
 
 | Mode | Fields | Notes |
 |:-----|:-------|:------|
 | `text` | `text` | Shows custom failure text. |
 | `macro` | `macroUuid` | Runs the selected Foundry Script Macro for the failure outcome. |
 
-Switching failure outcome modes keeps only the selected mode's fields. Text is not retained on macro outcomes, and macro UUIDs are not retained on text outcomes. Clearing the failure outcome removes the stored object and returns the task to the default localized failure message.
+Switching failure outcome modes keeps only the selected mode's fields.
+Text is not retained on macro outcomes, and macro UUIDs are not retained on text outcomes.
+Clearing the failure outcome removes the stored object and returns the task to the default localized failure message.
 
-The player Gathering store does not add a second generic warning for terminal failed attempts. Failed attempts rely on the runtime/configured failure feedback above, including custom failure text or macro handling when configured.
+The player Gathering store does not add a second generic warning for terminal failed attempts.
+Failed attempts rely on the runtime/configured failure feedback above, including custom failure text or macro handling when configured.
 
 ## Player Gathering App
 
@@ -277,36 +389,67 @@ The player gathering experience opens from the Items Directory **Gathering** act
 
 ### Actor Selection Bar
 
-A shared **actor-selection bar** sits above all of the window's tabs. Its left side is a character portrait with a caret that opens a searchable popover listing the actors you can gather as; type to filter the list by name, then pick a character to select it. The bar persists your choice in the `lastGatheringActor` client preference and reuses it the next time the window opens.
+A shared **actor-selection bar** sits above all of the window's tabs.
+Its left side is a character portrait with a caret that opens a searchable popover listing the actors you can gather as.
+Type to filter the list by name, then pick a character to select it.
+The bar persists your choice in the `lastGatheringActor` client preference and reuses it the next time the window opens.
 
-The bar lists your selectable **player characters** — the actors a system designates as player characters (the current dnd5e/pf2e implementation is the `character` actor type), owned actors for players and all of them for GMs. This is a selection-list restriction only: it does **not** change which actors are authorized to gather. An owned non-player-character actor (such as an `npc`) can still be listed and attempted through the API, but it does not appear in the bar. If your remembered character is missing from the list, the bar falls back to the first available player character and remembers that instead.
+The bar lists your selectable **player characters**, the actors a system designates as player characters (the current dnd5e/pf2e implementation is the `character` actor type), owned actors for players and all of them for GMs.
+This is a selection-list restriction only.
+It does **not** change which actors are authorized to gather.
+An owned non-player-character actor (such as an `npc`) can still be listed and attempted through the API, but it does not appear in the bar.
+If your remembered character is missing from the list, the bar falls back to the first available player character and remembers that instead.
 
-The bar's right side carries gathering context: on the **Gathering** tab it shows the current **weather** and **time of day** (each an icon and label). On other tabs the right side is empty.
+The bar's right side carries gathering context.
+On the **Gathering** tab it shows the current **weather** and **time of day** (each an icon and label).
+On other tabs the right side is empty.
 
-The window lists gathering options through `game.fabricate.listGatheringForActor({ actor })` and starts attempts through `game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Those public runtime methods enforce the current Foundry user as the viewer before delegating to the internal gathering engine.
+The window lists gathering options through `game.fabricate.listGatheringForActor({ actor })` and starts attempts through `game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`.
+Those public runtime methods enforce the current Foundry user as the viewer before delegating to the internal gathering engine.
 
 ### Environments Column
 
-The player app's left column lists environments as cards. **Available** environments (enabled, with at least one visible task) sort first and are selectable; **locked** environments sort after them and are shown only as non-interactive teasers. A locked card is a disabled environment surfaced to non-GM players: it carries the environment identity (name, image, biome chips) and a visible lock indicator, but no tasks, weights, or composition internals leak through it.
+The player app's left column lists environments as cards.
+**Available** environments (enabled, with at least one visible task) sort first and are selectable.
+**Locked** environments sort after them and are shown only as non-interactive teasers.
+A locked card is a disabled environment surfaced to non-GM players.
+It carries the environment identity (name, image, biome chips) and a visible lock indicator, but no tasks, weights, or composition internals leak through it.
 
-Blind environments show a mask **blind** chip. When the system's effective reveal policy is not `never`, a blind card also shows a `(discovered/total)` discovered count: the numerator is the distinct tasks the selected actor has revealed at the system's reveal scope, and the denominator is the full composed task pool the actor could discover. Locked and `never`-policy cards show no discovered count. Biome chips on a card resolve to the same labels, icons, and colours used in the GM Environments editor.
+Blind environments show a mask **blind** chip.
+When the system's effective reveal policy is not `never`, a blind card also shows a `(discovered/total)` discovered count: the numerator is the distinct tasks the selected actor has revealed at the system's reveal scope, and the denominator is the full composed task pool the actor could discover.
+Locked and `never`-policy cards show no discovered count.
+Biome chips on a card resolve to the same labels, icons, and colours used in the GM Environments editor.
 
-Visible environments and tasks remain listed even when they are blocked by attemptability gates. Scene-linked entries stay visible when the selected actor is not on the linked scene or has no active token there, and the app shows the localized blocked reason returned by the runtime. Active timed runs, last-attempt feedback, and recent terminal history remain visible for the selected actor even when browsing is empty or blocked.
+Visible environments and tasks remain listed even when they are blocked by attemptability gates.
+Scene-linked entries stay visible when the selected actor is not on the linked scene or has no active token there, and the app shows the localized blocked reason returned by the runtime.
+Active timed runs, last-attempt feedback, and recent terminal history remain visible for the selected actor even when browsing is empty or blocked.
 
-Targeted task rows can show task labels, task descriptions, active-run timing, terminal status, result counts, required-tool counts, and check-derived history metadata returned by the runtime. For non-GM users, blind rows and missing-environment history remain redacted: the app uses a generic localized label and does not expose task IDs, result details, tool details, diagnostics, or check internals. GMs can inspect real blind task names through GM-facing surfaces.
+Targeted task rows can show task labels, task descriptions, active-run timing, terminal status, result counts, required-tool counts, and check-derived history metadata returned by the runtime.
+For non-GM users, blind rows and missing-environment history remain redacted: the app uses a generic localized label and does not expose task IDs, result details, tool details, diagnostics, or check internals.
+GMs can inspect real blind task names through GM-facing surfaces.
 
 ### Detail Column
 
-Selecting an environment fills the center **detail** column. It opens with an environment header — the name, a short description, and info pips for any present biome and danger level — plus a mode hint describing how that environment is gathered.
+Selecting an environment fills the center **detail** column.
+It opens with an environment header (the name, a short description, and info pips for any present biome and danger level) plus a mode hint describing how that environment is gathered.
 
 How the rest of the column reads depends on the selection mode:
 
-- **Targeted environments** show a list of task rows. Each row carries the task name, description, a **success-chance bar**, and an **Attempt** button. A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline and its Attempt button disabled.
-- **Blind environments** show a single **Attempt gathering** button that resolves one hidden task at random. When the system's reveal policy is not `never`, a **Discovered Tasks (x/y)** section lists the tasks this actor has already revealed as their own transparent rows — each with its own success-chance bar and Attempt button — where `x` is the discovered count and `y` is the full composed task pool. Before anything has been revealed the section reads as nothing discovered yet.
+- **Targeted environments** show a list of task rows.
+  Each row carries the task name, description, a **success-chance bar**, and an **Attempt** button.
+  A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline and its Attempt button disabled.
+- **Blind environments** show a single **Attempt gathering** button that resolves one hidden task at random.
+  When the system's reveal policy is not `never`, a **Discovered Tasks (x/y)** section lists the tasks this actor has already revealed as their own transparent rows (each with its own success-chance bar and Attempt button), where `x` is the discovered count and `y` is the full composed task pool.
+  Before anything has been revealed the section reads as nothing discovered yet.
 
-The success-chance bar reflects the listing's per-task `successChance` field: a static d100 drop-rate approximation (the chance at least one item drops), not a whole-attempt success probability, so it can read high while an attempt is still blocked or fails a skill check. Tasks that are not d100 (or have no enabled drop rows) carry no bar. The transparent blind rows come from the listing's `discoveredTasks` field; the opaque blind action never exposes per-task success chances.
+The success-chance bar reflects the listing's per-task `successChance` field.
+It is a static d100 drop-rate approximation (the chance at least one item drops), not a whole-attempt success probability, so it can read high while an attempt is still blocked or fails a skill check.
+Tasks that are not d100 (or have no enabled drop rows) carry no bar.
+The transparent blind rows come from the listing's `discoveredTasks` field.
+The opaque blind action never exposes per-task success chances.
 
-Current player-app scope covers actor selection, visible/blocked listing, blind task labels, runtime-backed starts, last-attempt feedback, active timed runs, recent terminal history, blind redaction, and one-column active/history layout when the app container narrows. Runtime integration coverage includes scene-linked gathering through the production environment store, run manager, evaluator, and a scene adapter, plus hook-driven timed completion and a regression guard confirming harvesting has no standalone runtime/app/store/settings path.
+Current player-app scope covers actor selection, visible/blocked listing, blind task labels, runtime-backed starts, last-attempt feedback, active timed runs, recent terminal history, blind redaction, and one-column active/history layout when the app container narrows.
+Runtime integration coverage includes scene-linked gathering through the production environment store, run manager, evaluator, and a scene adapter, plus hook-driven timed completion and a regression guard confirming harvesting has no standalone runtime/app/store/settings path.
 
 ![Fabricate player gathering task](img/screenshots/fabricate-player-gathering-task.webp)
 ![Fabricate player gathering events](img/screenshots/fabricate-player-gathering-events.webp)
@@ -316,48 +459,67 @@ Current player-app scope covers actor selection, visible/blocked listing, blind 
 
 ## Tools
 
-Gathering tasks declare their required equipment as **Tools**. There is no separate catalyst concept on gathering tasks — earlier builds carried a vestigial `task.catalysts` field that was never authored and is gone. A task simply references the **system's** [Tools]({% link tools.md %}) library by id (`task.toolIds`); the tools themselves are authored on the system's Tools page. All referenced tools must resolve to enabled library entries, and all resolved tools must be present in the actor's inventory and pass their requirement before the attempt may start.
+Gathering tasks declare their required equipment as **Tools**.
+There is no separate catalyst concept on gathering tasks.
+Earlier builds carried a vestigial `task.catalysts` field that was never authored and is gone.
+A task simply references the **system's** [Tools]({% link tools.md %}) library by id (`task.toolIds`).
+The tools themselves are authored on the system's Tools page.
+All referenced tools must resolve to enabled library entries, and all resolved tools must be present in the actor's inventory and pass their requirement before the attempt may start.
 
 | Field | Description |
 |:------|:------------|
-| `toolIds` | Required tool references stored on the task; each id points at the system-owned Tools library (`craftingSystemManager.getSystem(systemId).tools`) |
+| `toolIds` | Required tool references stored on the task. Each id points at the system-owned Tools library (`craftingSystemManager.getSystem(systemId).tools`) |
 | `componentId` | Required component from the current crafting system's managed item list on the library tool |
-| `requirement` | Optional `{ formula }`; a Foundry roll expression that must evaluate truthy for the actor to use the tool |
+| `requirement` | Optional `{ formula }`. A Foundry roll expression that must evaluate truthy for the actor to use the tool |
 | `breakage.mode` | One of `limitedUses`, `breakageChance`, or `diceExpression` |
-| `breakage.maxUses` | `limitedUses`: positive integer or blank (unlimited); tracked on the item via `flags.fabricate.toolUsage.timesUsed` |
+| `breakage.maxUses` | `limitedUses`: positive integer or blank (unlimited). Tracked on the item via `flags.fabricate.toolUsage.timesUsed` |
 | `breakage.breakageChance` | `breakageChance`: integer percent in `0..100` |
 | `breakage.formula` + `breakage.threshold` | `diceExpression`: Foundry roll formula and numeric threshold (broken when result < threshold) |
 | `onBreak.mode` | One of `destroy`, `flagBroken`, or `replaceWith` |
 | `onBreak.replacementComponentId` | `replaceWith`: a different managed component spawned on the actor when the tool breaks |
 
-The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks: `failureOnBreak` (default) overrides the attempt to `failed` and clears drops; `successDespiteBreak` preserves the success state. Either way, the on-break action always commits.
+The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks.
+`failureOnBreak` (default) overrides the attempt to `failed` and clears drops.
+`successDespiteBreak` preserves the success state.
+Either way, the on-break action always commits.
 
 Missing or disabled library references block with `TOOL_BLOCKED`, as do missing actor-owned tools, owned tools with `flags.fabricate.toolBroken === true`, and failed tool requirements.
 
-A tool (like an ingredient) is recognised whether the actor owns the tool component's source world item directly or owns a copy dragged or duplicated from it. Fabricate matches the owned item's live UUID, its compendium-source UUID, and its world-duplicate source UUID against the tool's component, so dropping a copy of the source item onto the actor still satisfies the requirement.
+A tool (like an ingredient) is recognised whether the actor owns the tool component's source world item directly or owns a copy dragged or duplicated from it.
+Fabricate matches the owned item's live UUID, its compendium-source UUID, and its world-duplicate source UUID against the tool's component, so dropping a copy of the source item onto the actor still satisfies the requirement.
 
-In the player app, a tool whose component is missing from inventory shows as **Missing**. A tool the actor holds but cannot use shows as **Broken** — this covers both an owned tool already flagged `flags.fabricate.toolBroken === true` and an owned `Replace with...` broken-variant component for that tool. The **Broken** state is display-only; the attempt stays blocked with `TOOL_BLOCKED` either way, and holding a working copy of the tool alongside a broken one still reads as available.
+In the player app, a tool whose component is missing from inventory shows as **Missing**.
+A tool the actor holds but cannot use shows as **Broken**.
+This covers both an owned tool already flagged `flags.fabricate.toolBroken === true` and an owned `Replace with...` broken-variant component for that tool.
+The **Broken** state is display-only.
+The attempt stays blocked with `TOOL_BLOCKED` either way, and holding a working copy of the tool alongside a broken one still reads as available.
 
 See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
 
 ## Save Validation
 
-The Environments tab is save-blocking. When environment or task validation fails, Fabricate does not write the setting, does not discard the draft, and keeps the draft marked dirty so the GM can repair the same in-progress edits.
+The Environments tab is save-blocking.
+When environment or task validation fails, Fabricate does not write the setting, does not discard the draft, and keeps the draft marked dirty so the GM can repair the same in-progress edits.
 
 Validation errors are presented in two places:
 
 - A validation summary at the top of the draft editor lists every save-blocking issue.
 - Field-addressable errors are also shown inline beside the matching input or collection.
 
-When a failed save produces a field-addressable error, the editor automatically jumps to and focuses the first invalid target. Summary entries with a target are clickable and jump back to the corresponding field.
+When a failed save produces a field-addressable error, the editor automatically jumps to and focuses the first invalid target.
+Summary entries with a target are clickable and jump back to the corresponding field.
 
-Some validation errors point at collections rather than a single input. Result-group errors can target the result groups collection, a specific result group name, or a specific group's results collection. Result row component errors target the affected result row.
+Some validation errors point at collections rather than a single input.
+Result-group errors can target the result groups collection, a specific result group name, or a specific group's results collection.
+Result row component errors target the affected result row.
 
-Disabled tasks skip routed and progressive completeness checks, which allows disabled placeholder tasks to be saved while a GM is still authoring them. Enabled runnable tasks must include complete configuration:
+Disabled tasks skip routed and progressive completeness checks, which allows disabled placeholder tasks to be saved while a GM is still authoring them.
+Enabled runnable tasks must include complete configuration:
 
 - Routed `macroOutcome` tasks require `macroUuid`.
 - Routed `rollTableOutcome` tasks require `rollTableUuid`.
-- Progressive tasks require `progressive.awardMode` and a check `formula`; `check.threshold` is optional.
+- Progressive tasks require `progressive.awardMode` and a check `formula`.
+  `check.threshold` is optional.
 
 If a disabled or enabled task includes `failureOutcome`, that failure outcome is still validated.
 
@@ -373,20 +535,34 @@ When a GM has unsaved environment draft changes, Fabricate asks for discard conf
 - disabling the current crafting system's `gathering` feature
 - closing or destroying the Crafting Admin app
 
-Choosing **Keep Editing** cancels the requested action and leaves the current draft and dirty state intact. Choosing **Discard Changes** lets the requested action continue; navigation reloads the persisted draft or selected target, new-draft creation replaces the current draft, disabling gathering hides the Environments tab, and app close proceeds with store destruction.
+Choosing **Keep Editing** cancels the requested action and leaves the current draft and dirty state intact.
+Choosing **Discard Changes** lets the requested action continue.
+Navigation reloads the persisted draft or selected target, new-draft creation replaces the current draft, disabling gathering hides the Environments tab, and app close proceeds with store destruction.
 
-Persisted environment deletion has a separate delete confirmation. It does not ask for the dirty-draft discard confirmation first. Unsaved new drafts have no persisted id to delete, so deleting one still uses the discard confirmation and then returns to the nearest persisted environment when accepted.
+Persisted environment deletion has a separate delete confirmation.
+It does not ask for the dirty-draft discard confirmation first.
+Unsaved new drafts have no persisted id to delete, so deleting one still uses the discard confirmation and then returns to the nearest persisted environment when accepted.
 
-Concurrent callers share one in-flight discard confirmation. If multiple navigation or close paths ask while the dialog is already open, they await the same GM decision instead of opening duplicate dialogs.
+Concurrent callers share one in-flight discard confirmation.
+If multiple navigation or close paths ask while the dialog is already open, they await the same GM decision instead of opening duplicate dialogs.
 
 ## Maintainer Notes
 
-The Environments tab currently delegates draft changes to the admin store and saves through the gathering environment store validation boundary. Store-owned callbacks preserve unrelated nested task configuration when editing task results, required tools, visibility, routed result selection, progressive award mode, checks, time requirements, or failure outcomes. Failed save attempts leave `environmentDraftDirty` set and populate a validation state with summary text, field paths, selectors, and a first-invalid target for the component to focus. The tab does not perform Foundry lookups; managed component, Script Macro, scene, and RollTable options are prepared by the admin store/root and passed into the component, and Foundry FilePicker access stays at the application service edge.
+The Environments tab currently delegates draft changes to the admin store and saves through the gathering environment store validation boundary.
+Store-owned callbacks preserve unrelated nested task configuration when editing task results, required tools, visibility, routed result selection, progressive award mode, checks, time requirements, or failure outcomes.
+Failed save attempts leave `environmentDraftDirty` set and populate a validation state with summary text, field paths, selectors, and a first-invalid target for the component to focus.
+The tab does not perform Foundry lookups.
+Managed component, Script Macro, scene, and RollTable options are prepared by the admin store/root and passed into the component, and Foundry FilePicker access stays at the application service edge.
 
-The player Gathering app is a dedicated `SvelteGatheringApp` registered through the app factory, not a branch of `SvelteCraftingApp`. Its store receives Foundry/runtime access through injected services so listing, start, feedback, active-run, and history behavior can be tested without Foundry globals. The Items Directory button helper is idempotent and removes stale duplicate Gathering buttons while syncing the feature-gated action.
+The player Gathering app is a dedicated `SvelteGatheringApp` registered through the app factory, not a branch of `SvelteCraftingApp`.
+Its store receives Foundry/runtime access through injected services so listing, start, feedback, active-run, and history behavior can be tested without Foundry globals.
+The Items Directory button helper is idempotent and removes stale duplicate Gathering buttons while syncing the feature-gated action.
 
-Responsive gathering layouts are keyed to Foundry app/container width rather than the browser viewport. The GM admin shell makes `.admin-main` the `fabricate-admin-main` inline-size container for stacked Environments panes, overflow-safe advanced controls, wrapped validation messages, and reachable sticky save actions. The player Gathering app makes `.fabricate-gathering-app` the `fabricate-gathering-app` inline-size container for one-column active/history rows, wrapped task labels, and aligned task icon tracks.
+Responsive gathering layouts are keyed to Foundry app/container width rather than the browser viewport.
+The GM admin shell makes `.admin-main` the `fabricate-admin-main` inline-size container for stacked Environments panes, overflow-safe advanced controls, wrapped validation messages, and reachable sticky save actions.
+The player Gathering app makes `.fabricate-gathering-app` the `fabricate-gathering-app` inline-size container for one-column active/history rows, wrapped task labels, and aligned task icon tracks.
 
 Delete confirmation content escapes GM-authored environment names before rendering dialog HTML.
 
-Live Foundry screenshot/runtime validation remains conditional for future runtime-specific or screenshot-required work; the #179 closeout relies on automated unit/component/integration coverage for the current validation, accessibility, responsive, scene-linked, and hook-driven timed-completion behavior.
+Live Foundry screenshot/runtime validation remains conditional for future runtime-specific or screenshot-required work.
+The #179 closeout relies on automated unit/component/integration coverage for the current validation, accessibility, responsive, scene-linked, and hook-driven timed-completion behavior.

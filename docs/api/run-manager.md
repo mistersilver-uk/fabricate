@@ -7,7 +7,8 @@ nav_order: 4
 
 # CraftingRunManager
 
-Manages multi-step crafting runs -- creating, advancing, and completing them.
+Manages multi-step crafting runs.
+It handles creating, advancing, and completing them.
 
 **Access:** `game.fabricate.getCraftingRunManager()`
 
@@ -77,7 +78,8 @@ Creates a new crafting run for a multi-step recipe.
 
 ### cancelRun(actor, runId)
 
-Cancels an active run. Consumed items from completed steps are not returned.
+Cancels an active run.
+Consumed items from completed steps are not returned.
 
 **Returns:** `Promise<object>`
 
@@ -93,7 +95,8 @@ Marks a step as in-progress.
 
 ### markStepWaitingForTime(actor, run, stepIndex, timeRequirement)
 
-Sets a time gate on a step. The step will auto-complete when world time advances past the requirement.
+Sets a time gate on a step.
+The step will auto-complete when world time advances past the requirement.
 
 **Returns:** `Promise<object>`
 
@@ -135,7 +138,8 @@ Checks if a time requirement has been satisfied.
 
 ### processWorldTime(worldTime)
 
-Processes time gates for all actors. Called automatically on `updateWorldTime` hook.
+Processes time gates for all actors.
+Called automatically on `updateWorldTime` hook.
 
 **Returns:** `Promise<void>`
 
@@ -147,7 +151,9 @@ Processes time gates for all actors. Called automatically on `updateWorldTime` h
 
 Evicts the in-memory run cache for one actor, or clears the entire cache when called with no argument.
 
-After a completed run is written to Foundry actor flags there is normally no need to call this method — `_persist()` keeps the cache and flags in sync automatically. Use `invalidateCache` only when external code has written directly to an actor's `fabricate.craftingRuns` flag and you want `CraftingRunManager` to re-read from flags on the next access.
+After a completed run is written to Foundry actor flags there is normally no need to call this method.
+`_persist()` keeps the cache and flags in sync automatically.
+Use `invalidateCache` only when external code has written directly to an actor's `fabricate.craftingRuns` flag and you want `CraftingRunManager` to re-read from flags on the next access.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|

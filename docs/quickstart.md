@@ -67,8 +67,9 @@ All crafting system editing requires the GM role.
 
 ## Step 3: Add Components
 
-Fabricate recipes reference *components* - items imported into your crafting system's library.
-So long as you use that same world or compendium item, or copies of it, to create new instances, Fabricate will recognize it as the original component. 
+Fabricate recipes reference *components*.
+These are items imported into your crafting system's library.
+So long as you use that same world or compendium item, or copies of it, to create new instances, Fabricate will recognize it as the original component.
 
 1. In the GM admin, switch to the **Components** tab
 2. Drag items from the Items sidebar or a compendium into the components drop zone
@@ -112,6 +113,7 @@ They are authored once and composed into environments.
 4. Optionally set a **Stamina** cost, a gathering roll **modifier**, **Weather**/**time of day** gates, and any **Required tools** from the system's Tools library
 
 ![Fabricate gathering task editor](img/screenshots/fabricate-create-gathering-task.webp)
+![Fabricate gathering rules and limitations](img/screenshots/fabricate-gathering-settings.webp)
 
 {: .note }
 Stamina costs, modifiers, and drop rates accept **formulas** (numbers, ability modifiers, dice).
@@ -132,8 +134,8 @@ They add flavour, complications, and can even cause a gathering attempt to fail.
 
 How a triggered event affects the attempt is controlled by the system's **Event outcome** rule:
 
-- "Gathering succeeds" will surface the event, whilst still awarding the task's gathering results (if it has any)
-- "Gathering fails" will surface the event, but no rewards are awarded, regardless of the task outcome
+- **Gathering succeeds** will surface the event, whilst still awarding the task's gathering results (if it has any)
+- **Gathering fails** will surface the event, but no rewards are awarded, regardless of the task outcome
 
 ## Step 7: Configure the Gathering Environment
 
@@ -147,7 +149,6 @@ Return to the **Environments** tab and select the environment from Step 4 to add
 
 ![Fabricate environment task composition](img/screenshots/fabricate-configure-environment-tasks.webp)
 ![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
-![Fabricate gathering rules and limitations](img/screenshots/fabricate-gathering-settings.webp)
 
 ## Step 8: Gather as a Player
 
@@ -168,9 +169,9 @@ Timed tasks stay visible while the active run is in progress, and blind environm
 
 The planned Crafting tab will provide recipe browsing, actor/source selection, craft buttons, favourites, recent recipes, and shopping-list planning in the UI.
 
-## What's next?
+## See Also
 
-- [Crafting Systems]({% link crafting-systems.md %}) -- resolution modes, features, and system configuration
-- [Recipes]({% link recipes/index.md %}) -- ingredient sets, result groups, current API usage, and planned player UI
-- [API Reference]({% link api/index.md %}) -- full developer documentation
-- [Troubleshooting]({% link troubleshooting.md %}) -- solutions for common setup issues
+- [Crafting Systems]({% link crafting-systems.md %}) covers resolution modes, features, and system configuration
+- [Recipes]({% link recipes/index.md %}) covers ingredient sets, result groups, current API usage, and planned player UI
+- [API Reference]({% link api/index.md %}) is the full developer documentation
+- [Troubleshooting]({% link troubleshooting.md %}) has solutions for common setup issues

@@ -16,15 +16,18 @@ Several gathering fields accept a **formula** instead of a plain number:
 Every one of these uses the **same syntax**, so an example that works in one field works in the others.
 
 {: .note }
-> Formulas are evaluated with your game system's dice engine, against the **selected character's** roll data — the same values you'd reference in an inline chat roll. So a formula that works in `/r` works here.
+> Formulas are evaluated with your game system's dice engine, against the **selected character's** roll data (the same values you'd reference in an inline chat roll).
+> So a formula that works in `/r` works here.
 
 ---
 
 ## How formulas are evaluated
 
 - The result is **rounded to a whole number**.
-- For **Maximum stamina**, **Starting stamina**, and **Amount per interval**, the result is **floored at 0** — a negative result becomes `0`. Starting stamina is also clamped to be no greater than the rolled maximum.
-- **Cost and character modifiers** may be **negative** to *reduce* a cost or chance; the final cost is floored at 0 after everything is summed.
+- For **Maximum stamina**, **Starting stamina**, and **Amount per interval**, the result is **floored at 0**, so a negative result becomes `0`.
+  Starting stamina is also clamped to be no greater than the rolled maximum.
+- **Cost and character modifiers** may be **negative** to *reduce* a cost or chance.
+  The final cost is floored at 0 after everything is summed.
 
 **When each field is evaluated matters for dice:**
 
@@ -39,10 +42,16 @@ Every one of these uses the **same syntax**, so an example that works in one fie
 
 ## Useful data paths
 
-Reference your character's stats with `@…` paths. A formula is evaluated against the selected character's roll data, so the exact paths are the ones your game system exposes — the same paths you would reference in an inline chat roll. The examples below use common paths such as `@abilities.con.mod` (an ability modifier), `@skills.sur.total` (a skill total), `@details.level` (character level), and `@prof` (proficiency bonus); substitute the paths your own system uses.
+Reference your character's stats with `@…` paths.
+A formula is evaluated against the selected character's roll data, so the exact paths are the ones your game system exposes (the same paths you would reference in an inline chat roll).
+The examples below use common paths such as `@abilities.con.mod` (an ability modifier), `@skills.sur.total` (a skill total), `@details.level` (character level), and `@prof` (proficiency bonus).
+Substitute the paths your own system uses.
 
 {: .tip }
-> Not sure of a path? Select a character and run `/r 1 + @abilities.con.mod` in chat. If it resolves, it works in a gathering field too. Swap the path for whichever value your game system exposes.
+> Not sure of a path?
+> Select a character and run `/r 1 + @abilities.con.mod` in chat.
+> If it resolves, it works in a gathering field too.
+> Swap the path for whichever value your game system exposes.
 
 ---
 
@@ -74,7 +83,9 @@ Combine a base value with an ability modifier or level.
 
 ### Negative
 
-Subtract to reduce a value. On stamina **max / starting / regen amount** a negative total is floored to `0`; on a **cost or chance modifier** a negative value *reduces* the total.
+Subtract to reduce a value.
+On stamina **max / starting / regen amount** a negative total is floored to `0`.
+On a **cost or chance modifier** a negative value *reduces* the total.
 
 | What it does | Formula |
 |:-------------|:--------|
@@ -84,7 +95,9 @@ Subtract to reduce a value. On stamina **max / starting / regen amount** a negat
 
 ### Dice
 
-Roll dice, optionally added to a fixed value or modifier. Remember: in **Maximum/Starting** these roll **once**; in **Amount per interval** they roll **each tick**.
+Roll dice, optionally added to a fixed value or modifier.
+Remember that in **Maximum/Starting** these roll **once**.
+In **Amount per interval** they roll **each tick**.
 
 | What it does | Formula |
 |:-------------|:--------|
@@ -105,7 +118,8 @@ Use a modifier as the **number of dice** by wrapping it in parentheses.
 | Roll d4 once per character level | `(@details.level)d4` |
 
 {: .warning }
-> The number of dice must resolve to a **non-negative whole number**. If a modifier can be 0 or negative, guard it with `max(1, …)` (as above) so the formula always rolls at least one die.
+> The number of dice must resolve to a **non-negative whole number**.
+> If a modifier can be 0 or negative, guard it with `max(1, …)` (as above) so the formula always rolls at least one die.
 
 ### Math functions
 
@@ -121,7 +135,10 @@ You can use `floor`, `ceil`, `round`, `abs`, `min`, and `max`.
 
 ## Tips
 
-- **Test first.** Select a character and run your formula in chat with `/r` before saving it. If it errors there, it will error in the gathering field.
-- **Use your system's paths.** A formula resolves against the selected character's roll data, so use whichever `@…` paths your game system exposes (for example `@abilities.con.mod`). If a path resolves in an inline `/r` chat roll, it resolves in a gathering field.
+- **Test first.** Select a character and run your formula in chat with `/r` before saving it.
+  If it errors there, it will error in the gathering field.
+- **Use your system's paths.** A formula resolves against the selected character's roll data, so use whichever `@…` paths your game system exposes (for example `@abilities.con.mod`).
+  If a path resolves in an inline `/r` chat roll, it resolves in a gathering field.
 - **Stamina rounds and floors.** Maximum, Starting, and Amount-per-interval results are rounded and never go below 0.
-- **Dice timing.** Dice in Maximum/Starting are rolled once per character (re-roll them with the GM **Roll/Reset** button). Dice in Amount-per-interval re-roll every time stamina regenerates.
+- **Dice timing.** Dice in Maximum/Starting are rolled once per character (re-roll them with the GM **Roll/Reset** button).
+  Dice in Amount-per-interval re-roll every time stamina regenerates.

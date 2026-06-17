@@ -5,9 +5,10 @@ parent: Recipes
 nav_order: 4
 ---
 
-# Routed Mode — Roll Table Provider
+# Routed Mode: Roll Table Provider
 
-A FoundryVTT roll table is drawn once per crafting attempt, and the drawn result's name determines which result group is produced. The outcome is matched case-insensitively against result group names, using the same reserved keyword rules as the macro outcome provider.
+A FoundryVTT roll table is drawn once per crafting attempt, and the drawn result's name determines which result group is produced.
+The outcome is matched case-insensitively against result group names, using the same reserved keyword rules as the macro outcome provider.
 
 ---
 
@@ -16,7 +17,7 @@ A FoundryVTT roll table is drawn once per crafting attempt, and the drawn result
 - **One or more** ingredient sets
 - **One or more** result groups
 - `resultSelection.provider` must be `"rollTableOutcome"`
-- `resultSelection.rollTableUuid` is required — the UUID of the FoundryVTT RollTable to draw from
+- `resultSelection.rollTableUuid` is required, the UUID of the FoundryVTT RollTable to draw from
 - The engine draws exactly once per attempt
 - The drawn result's name is trim-normalised and compared case-insensitively against result group names
 - Result group names must be unique under case-insensitive comparison
@@ -40,15 +41,18 @@ A routed system where brewing a potion draws from a roll table to determine whic
 | "Healing" | Healing result | 1x Potion of Healing |
 | "Fire" | Fire result | 1x Potion of Fire Breath |
 | "Invisibility" | Invisibility result | 1x Potion of Invisibility |
-| "fail" | (reserved) | Craft fails; ingredients consumed |
+| "fail" | (reserved) | Craft fails, ingredients consumed |
 
 ### Creating the Recipe
 
-The recipe sets `resultSelection.provider` to `"rollTableOutcome"` with a required `rollTableUuid`, one ingredient set, and one result group per drawable outcome (`Healing`, `Fire`, `Invisibility`). Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+The recipe sets `resultSelection.provider` to `"rollTableOutcome"` with a required `rollTableUuid`, one ingredient set, and one result group per drawable outcome (`Healing`, `Fire`, `Invisibility`).
+Recipes can be authored through the API only.
+See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## Setting Up the Roll Table
 
-In FoundryVTT, create a Roll Table whose result names match your result group names exactly (case-insensitive). You can also include entries named with reserved keywords (`fail`, `nothing`, etc.) to model chance-of-failure without a crafting check.
+In FoundryVTT, create a Roll Table whose result names match your result group names exactly (case-insensitive).
+You can also include entries named with reserved keywords (`fail`, `nothing`, etc.) to model chance-of-failure without a crafting check.
 
 1. Open **Roll Tables** in the sidebar
 2. Create a new table
@@ -65,8 +69,8 @@ The roll table provider is ideal when:
 
 ---
 
-## What's next?
+## See Also
 
-- [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %}) -- a crafting check macro's named outcome selects the result group.
-- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}) -- the player's ingredient choice selects the result group.
-- [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.
+- [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %}): a crafting check macro's named outcome selects the result group.
+- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}): the player's ingredient choice selects the result group.
+- [Progressive Mode]({% link recipes/progressive.md %}): check values are spent to buy results in difficulty order.

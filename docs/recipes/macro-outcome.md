@@ -5,12 +5,13 @@ parent: Recipes
 nav_order: 3
 ---
 
-# Routed Mode — Macro Outcome Provider
+# Routed Mode: Macro Outcome Provider
 
 {: .note }
 > This page documents the `macroOutcome` provider for routed mode. Legacy recipes still stored with `resolutionMode: "tiered"` are automatically normalised to `routed` + `macroOutcome` on load.
 
-A crafting check macro returns a named **outcome**, and the outcome determines which result group is produced. The outcome is matched case-insensitively against result group names.
+A crafting check macro returns a named **outcome**, and the outcome determines which result group is produced.
+The outcome is matched case-insensitively against result group names.
 
 ---
 
@@ -46,15 +47,21 @@ A blacksmithing recipe where the quality of the result depends on a skill check:
 
 ### The Check Macro
 
-Your crafting check macro receives context about the recipe and actors, and must return a named outcome — for example `masterwork`, `standard`, or `flawed` depending on the roll total, or a failure result when the roll is too low. The outcome name is matched against the recipe's result group names. See [Crafting Checks]({% link crafting-checks.md %}) for the macro context and return contract.
+Your crafting check macro receives context about the recipe and actors, and must return a named outcome.
+For example, it returns `masterwork`, `standard`, or `flawed` depending on the roll total, or a failure result when the roll is too low.
+The outcome name is matched against the recipe's result group names.
+See [Crafting Checks]({% link crafting-checks.md %}) for the macro context and return contract.
 
 ### Creating the Recipe
 
-The recipe sets `resultSelection.provider` to `"macroOutcome"` with an optional `macroUuid` (omit it to use the system fallback), one ingredient set, and one result group per named outcome (`Masterwork`, `Standard`, `Flawed`). Recipes can be authored through the API only. See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+The recipe sets `resultSelection.provider` to `"macroOutcome"` with an optional `macroUuid` (omit it to use the system fallback), one ingredient set, and one result group per named outcome (`Masterwork`, `Standard`, `Flawed`).
+Recipes can be authored through the API only.
+See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 ## Step-Level Routing Overrides
 
-In multi-step recipes, individual steps can override the recipe-level `resultSelection`. The engine checks `step.resultSelection` first, then falls back to `recipe.resultSelection`.
+In multi-step recipes, individual steps can override the recipe-level `resultSelection`.
+The engine checks `step.resultSelection` first, then falls back to `recipe.resultSelection`.
 
 ## When to Use the Macro Outcome Provider
 
@@ -65,8 +72,8 @@ The `macroOutcome` provider is ideal when:
 
 ---
 
-## What's next?
+## See Also
 
-- [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.
-- [Crafting Checks]({% link crafting-checks.md %}) -- crafting check macro contracts.
-- [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- chain multiple steps with per-step outcome routing.
+- [Progressive Mode]({% link recipes/progressive.md %}): check values are spent to buy results in difficulty order.
+- [Crafting Checks]({% link crafting-checks.md %}): crafting check macro contracts.
+- [Multi-Step Recipes]({% link recipes/multi-step.md %}): chain multiple steps with per-step outcome routing.
