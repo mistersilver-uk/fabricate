@@ -13,6 +13,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { riskClass, riskLabel, biomeChipStyle, descriptionOrDefault } from '../../util/gatheringFormat.js';
   import EventChanceBar from './EventChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
   import {
@@ -32,21 +33,14 @@
   const description = $derived(String(event?.description ?? ''));
   const hasDescription = $derived(description !== '');
   const descriptionText = $derived(
-    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoEventDescription')
+    descriptionOrDefault(description, 'FABRICATE.App.Gathering.Detail.NoEventDescription', localize)
   );
   const img = $derived(String(event?.img ?? ''));
   const chance = $derived(event?.chance ?? null);
   const sceneUuid = $derived(String(event?.linkedSceneUuid ?? ''));
 
   // All danger tags, each localized to the GM editor's risk labels when known.
-  const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
   const dangerTags = $derived(Array.isArray(event?.dangerTags) ? event.dangerTags : []);
-  function riskLabel(tag) {
-    return KNOWN_RISKS.has(tag) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${tag}`) : tag;
-  }
-  function riskClass(tag) {
-    return KNOWN_RISKS.has(tag) ? `risk-${tag}` : '';
-  }
 
   // Matching criteria (empty array = "any"); only non-empty groups are shown.
   // Weather and time-of-day chips reuse the shared condition icon/label helpers
@@ -69,12 +63,6 @@
   );
   const biomeChips = $derived(Array.isArray(event?.biomeTags) ? event.biomeTags : []);
   const regions = $derived(Array.isArray(event?.regions) ? event.regions : []);
-
-  function biomeChipStyle(tag) {
-    const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
-    const token = String(tag?.colorToken || 'sage').replace(/^--fab-tag-/, '');
-    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
-  }
 
   const hasDetails = $derived(
     weatherChips.length > 0 || timeOfDayChips.length > 0 || biomeChips.length > 0
@@ -112,7 +100,7 @@
             {#each dangerTags as tag (tag)}
               <li class={`gathering-event-detail-tag is-danger ${riskClass(tag)}`}>
                 <i class="fas fa-skull" aria-hidden="true"></i>
-                <span>{riskLabel(tag)}</span>
+                <span>{riskLabel(tag, localize)}</span>
               </li>
             {/each}
           </ul>

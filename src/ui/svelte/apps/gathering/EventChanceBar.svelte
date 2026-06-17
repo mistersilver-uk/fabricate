@@ -13,10 +13,11 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { toPercent } from '../../util/gatheringFormat.js';
 
   let { value = null, showCaption = true } = $props();
 
-  const pct = $derived(Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100));
+  const pct = $derived(toPercent(value));
   const tier = $derived(
     pct >= 75 ? 'red'
       : pct >= 50 ? 'amber'

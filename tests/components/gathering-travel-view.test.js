@@ -76,6 +76,7 @@ describe('GatheringTravelView mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    writeRawModule('src/ui/svelte/util/gatheringFormat.js');
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');

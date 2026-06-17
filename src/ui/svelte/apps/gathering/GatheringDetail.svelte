@@ -27,6 +27,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
@@ -80,16 +81,11 @@
   const danger = $derived(String(env?.risk ?? (Array.isArray(env?.dangerTags) ? env.dangerTags[0] : '') ?? ''));
   // Localize the danger value to match the GM editor's risk labels (Safe,
   // Hazardous, …); fall back to the raw value for any unmapped level.
-  const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
-  const dangerLabel = $derived(
-    danger === ''
-      ? ''
-      : (KNOWN_RISKS.has(danger) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${danger}`) : danger)
-  );
+  const dangerLabel = $derived(riskLabel(danger, localize));
   // Tier class so the danger pip's icon can escalate in colour with the risk
   // level (success -> warning -> danger); unmapped values fall back to the
   // base danger colour.
-  const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
+  const dangerRiskClass = $derived(riskClass(danger));
 
   // The GM-configured event visibility tier the engine resolved for this viewer:
   // 'dangerLevelOnly' shows only the danger pip + a risk note above the tasks,
@@ -163,12 +159,6 @@
   $effect(() => {
     if (eventPageIndex > 0 && eventPageIndex * eventPageSize >= filteredEvents.length) eventPageIndex = 0;
   });
-
-  function biomeChipStyle(tag) {
-    const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
-    const token = String(tag?.colorToken || 'sage').replace(/^--fab-tag-/, '');
-    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
-  }
 
   const titleId = 'gathering-detail-title';
 </script>

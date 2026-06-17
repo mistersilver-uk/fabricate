@@ -96,6 +96,11 @@ describe('GatheringView mounted behavior', () => {
     const conditionIconsDestination = join(tempRoot, 'src/ui/svelte/util/gatheringConditionIcons.js');
     writeFileSync(conditionIconsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringConditionIcons.js'), 'utf8'));
 
+    // EnvironmentCard / GatheringDetail / event + task components share the
+    // gathering presentation helpers (risk/biome/percent/description).
+    const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
+    writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
+
     // GatheringView imports the pure default-selection helper; copy it into the
     // temp module tree so the compiled component can resolve it at import time.
     const selectionDefaultDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js');
