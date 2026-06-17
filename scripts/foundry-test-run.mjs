@@ -1877,6 +1877,36 @@ async function main() {
     startPhase('phase-C');
     process.stdout.write('Phase C: Creating crafting system and recipes...\n');
     try {
+      // Quickstart Step 2 evidence (full profile): the GM System Library before
+      // any system exists — the "No crafting systems yet" onboarding card with the
+      // primary "Create system" button. This is the only point in the run with a
+      // genuinely empty library; every later manager phase has the smoke system
+      // present. Defensively clear any systems left over from an aborted prior run
+      // so the empty state is deterministic, open the manager, capture, and close
+      // it before the smoke system is created below. Gated to the full profile
+      // like the other documentation captures; rc/ci skips it via screenshot().
+      if (RUN_SCREENSHOT_PHASES) {
+        await page.evaluate(async () => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          for (const system of csm.getSystems()) {
+            await csm.deleteSystem(system.id);
+          }
+          await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
+          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        });
+        await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        // The empty-library onboarding card renders its own primary action; wait
+        // on it (not assertManagerLayoutStable, which requires table rows) so the
+        // frame shows the onboarding state with the Create system button.
+        await page.locator('.fabricate-manager .manager-empty .manager-button.is-primary')
+          .filter({ hasText: 'Create system' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-systems-empty');
+        await closeOpenApplications(page);
+      }
+
       const craftingSetup = await page.evaluate(async () => {
         const csm = game.fabricate.getCraftingSystemManager();
 

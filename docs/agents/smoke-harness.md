@@ -49,7 +49,7 @@ Do not link docs directly to `test-results/`; that directory is transient and is
 
 The current gathering docs source set includes these full-profile labels:
 
-- GM setup: `manager-system-edit-normal`, `manager-components-normal`, `manager-environments-browse-normal`, `manager-environment-edit-placeholder`
+- GM setup: `manager-systems-empty` (quickstart Step 2 "Create a Crafting System" — the empty System Library onboarding card with the Create system button, captured before the smoke system exists), `manager-components-normal`, `manager-environments-browse-normal`, `manager-environment-edit-placeholder`
 - GM gathering libraries: `manager-gathering-task-editor-normal`, `manager-gathering-event-editor-normal`
 - Environment composition: `manager-environment-edit-tasks`, `manager-environment-edit-events`, `manager-gathering-settings`
 - Player journey: `player-gathering-environments`, `player-gathering-events`, `player-gathering-task-ready`, `player-gathering-after-success`, `player-gathering-tool-blocked`, `player-gathering-timed-ready`, `player-gathering-timed-active`, `player-gathering-blind`, `player-gathering-realm-locked`, `player-gathering-stacked`
