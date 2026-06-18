@@ -278,7 +278,7 @@ Actions:
 - Duplicate
 - Delete
 
-In Manager, the recipe browse row `Edit` action opens a dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state. While the full recipe editor (the `## Recipe Editor` section below) is not yet implemented, the recipe-edit view is a placeholder that shows the recipe's image and name with deferred-editor copy and a back-to-recipes control; it carries no draft, dirty state, or save/cancel affordances, and its inspector aside is suppressed. The `recipe == null` form of this view shows a `Select a recipe` empty state.
+In Manager, the recipe browse row `Edit` action opens a dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state. The recipe-edit view is a two-column editor: a wider central column holds an identity card (name, description, image, and an `enabled` on/off toggle) editing a local draft, and a right context column holds a recipe-item link card. Identity edits track a dirty state surfaced by a header dirty chip with `Save`/`Cancel` controls, persist via `store.updateRecipe` → `RecipeManager.updateRecipe`, and a dirty draft prompts a discard confirmation on route exit. The right-column recipe-item card is the partial implementation of the `### Visibility Form` recipe-item selector (see below); the rest of the Visibility Form (restricted-visibility toggle, allowed-users multiselect) and the rest of `## Recipe Editor` (ingredients, catalysts, essences, steps, and results) remain deferred. The two-column workspace collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`, mirroring the environment editor), and the right-column recipe-item card is omitted (central column full-width) when the selected system's recipe knowledge mode does not consume an item (`knowledge.mode === 'learned'`). The view's inspector aside is suppressed. The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
 
@@ -423,12 +423,16 @@ A **GM-only scene-level Manage Interactables panel**, launched from the Fabricat
 
 Scoped to a single crafting system.
 
+The Manager recipe-edit view partially implements this editor: the identity surface from `### Base Form` (Name and Description, plus a player-facing image and an `enabled` on/off toggle, edited as a local draft with `Save`/`Cancel`, a dirty/route-exit guard) and the `recipeItemId` selector from `### Visibility Form` are implemented. The Locked toggle, Category, the rest of the Visibility Form (restricted-visibility toggle, allowed-users multiselect), the Step Structure UI, and the Step Editor remain deferred.
+
 ### Base Form
 
-- Name
-- Description
-- Category (if enabled; always includes reserved `General`)
-- Locked toggle
+- Name (implemented in Manager)
+- Description (implemented in Manager)
+- Category (if enabled; always includes reserved `General`) — deferred
+- Locked toggle — deferred
+
+In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
 
 ### Visibility Form
 
@@ -439,8 +443,8 @@ If `listMode === "global"`:
 
 If `listMode === "player"`:
 
-- Restricted visibility toggle
-- Allowed users multiselect
+- Restricted visibility toggle — deferred
+- Allowed users multiselect — deferred
 
 If knowledge mode includes item matching or learning:
 
@@ -448,6 +452,8 @@ If knowledge mode includes item matching or learning:
 - Preview of the selected system recipe item definition (name, image, and source status)
 - Clear action for removing the current recipe item reference
 - Helper text: owned copies match by UUID or resolved source UUID of the selected recipe item definition
+
+The recipe item selector is **partially implemented** by the Manager recipe-edit view's right-column recipe-item link card: a drop zone bound to `recipeItemId`, a preview of the linked definition's name/image/source status, a clear (unlink) action, and the drag/drop-first interaction with no manual UUID entry. Dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and sets `recipe.recipeItemId`; unlinking nulls `recipe.recipeItemId` and does **not** delete the shared definition; and when the linked definition's `sourceItemUuid` no longer resolves the card shows a missing/stale state and retains the link. The card is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and hidden for `learned`. The restricted-visibility toggle and allowed-users multiselect remain deferred.
 
 If the required linkage is missing, show a validation warning.
 

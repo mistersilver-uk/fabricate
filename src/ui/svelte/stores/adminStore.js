@@ -1117,6 +1117,10 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
 
   const prepared = recipes.map(recipe => {
     const display = _buildRecipeBrowserDisplay(recipe);
+    const recipeItemId = recipe.recipeItemId || '';
+    const recipeItemDefinition = recipeItemId
+      ? systemManager.getRecipeItemDefinition?.(selectedSystem.id, recipeItemId) || null
+      : null;
     return {
       id: recipe.id,
       name: recipe.name,
@@ -1126,6 +1130,11 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
+      // Canonical recipe-item linkage (never the legacy uuid alias).
+      recipeItemId,
+      recipeItemName: recipeItemDefinition?.name || '',
+      recipeItemImg: recipeItemDefinition?.img || '',
+      recipeItemSourceUuid: recipeItemDefinition?.sourceItemUuid || '',
       isSimple: display.isSimple,
       stepCount: display.stepCount,
       resultGroupCount: display.resultGroupCount,
@@ -1450,6 +1459,9 @@ function _buildSelectedSystemViewData(
       : null,
 
     recipeVisibility: selectedSystem.recipeVisibility || {},
+    recipeItemDefinitions: Array.isArray(selectedSystem.recipeItemDefinitions)
+      ? selectedSystem.recipeItemDefinitions
+      : [],
     teaserConfig: selectedSystem.teaserConfig || { enabled: false, discoveryMode: 'threshold', fragments: [] },
     showRecipeVisibilityKnowledgeOptions,
     showRecipeVisibilityPlayerNote,
@@ -5240,6 +5252,40 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  async function updateRecipe(recipeId, updates = {}) {
+    const recipeManager = services.getRecipeManager();
+    const sysId = get(selectedSystemId);
+    if (!recipeId || !sysId) return false;
+    if (!updates || typeof updates !== 'object') return false;
+    if (Object.keys(updates).length === 0) return true;
+
+    try {
+      await recipeManager.updateRecipe(recipeId, updates);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to update recipe:', err);
+      services.notify?.error?.(err?.message || 'Failed to update recipe');
+      return false;
+    }
+  }
+
+  async function addRecipeItemFromUuid(systemId, itemUuid) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = systemId || get(selectedSystemId);
+    if (!sysId || !itemUuid) return false;
+
+    try {
+      const result = await systemManager.addRecipeItemFromUuid(sysId, itemUuid);
+      await refresh();
+      return result;
+    } catch (err) {
+      console.error('Fabricate | Failed to add recipe item:', err);
+      services.notify?.error?.(err?.message || 'Failed to add recipe item');
+      return false;
+    }
+  }
+
   async function importRecipes() {
     await services.renderImportDialog(get(selectedSystemId));
   }
@@ -5486,6 +5532,8 @@ export function createAdminStore(services) {
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,
+    updateRecipe,
+    addRecipeItemFromUuid,
     importRecipes,
     exportRecipes,
     exportSystem,

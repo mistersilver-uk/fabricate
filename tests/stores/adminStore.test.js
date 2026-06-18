@@ -3710,7 +3710,7 @@ describe('createAdminStore', () => {
       for (const recipe of vs.recipes) {
         for (const field of [
           'id', 'name', 'img', 'description', 'category', 'enabled', 'locked',
-          'isSimple', 'visibilitySummary', 'stepCount', 'resultGroupCount',
+          'recipeItemId', 'isSimple', 'visibilitySummary', 'stepCount', 'resultGroupCount',
           'ingredientCount', 'toolCount', 'structureKey', 'structureLabel',
           'requirementsPreview', 'ingredients', 'tools'
         ]) {

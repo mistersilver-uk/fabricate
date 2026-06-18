@@ -38,6 +38,9 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
+  let recipeEditDirty = $state(false);
+  let recipeEditSaving = $state(false);
+  let recipeEditDraft = $state(null);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -442,6 +445,11 @@
     && essenceEditSaving !== true);
   const canSaveComponentEdit = $derived(componentEditDirty === true
     && componentEditSaving !== true);
+  const canSaveRecipeEdit = $derived(recipeEditDirty === true
+    && recipeEditDraft?.validName === true
+    && recipeEditSaving !== true);
+  const recipeKnowledgeMode = $derived(selectedSystem?.recipeVisibility?.knowledge?.mode || 'itemOrLearned');
+  const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
   const componentForEdit = $derived(currentView === 'component-edit'
     ? itemCards.find(item => item.id === selectedComponentId) || null
     : null);
@@ -1004,7 +1012,7 @@
 
   function viewSubtitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
-    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'The full recipe editor is coming soon.');
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'Edit identity and the linked recipe item for this recipe.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
@@ -1100,6 +1108,18 @@
     return true;
   }
 
+  async function finishRecipeRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      if (!recipeEditDraft || recipeEditDraft.validName !== true || !recipeEditDraft.id) return false;
+      const result = await saveRecipeEdit(recipeEditDraft.id, recipeEditDraft.updates);
+      return result !== false;
+    }
+    recipeEditDirty = false;
+    recipeEditDraft = null;
+    return true;
+  }
+
   async function finishComponentRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
@@ -1164,6 +1184,14 @@
     return finishEssenceRouteExit(confirmed);
   }
 
+  function confirmRecipeRouteExit(nextView) {
+    if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;
+    if (recipeEditDirty !== true) return true;
+    const message = text('FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent', 'The current recipe has unsaved changes. Discard them and continue?');
+    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    return finishRecipeRouteExit(confirmed);
+  }
+
   function confirmGatheringTaskRouteExit(nextView) {
     if (activeView !== 'gathering-task-edit') return true;
     if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
@@ -1196,6 +1224,15 @@
   }
 
   function continueRouteExitAfterEssence(nextView) {
+    const recipeResult = confirmRecipeRouteExit(nextView);
+    if (isPromise(recipeResult)) {
+      return recipeResult.then(value => value === false ? false : continueRouteExitAfterRecipe(nextView));
+    }
+    if (recipeResult === false) return false;
+    return continueRouteExitAfterRecipe(nextView);
+  }
+
+  function continueRouteExitAfterRecipe(nextView) {
     const componentResult = confirmComponentRouteExit(nextView);
     if (isPromise(componentResult)) {
       return componentResult.then(value => value === false ? false : continueRouteExitAfterComponent(nextView));
@@ -1336,6 +1373,8 @@
   function editRecipe(recipeId = selectedRecipe?.id) {
     afterTruthyResult(confirmRouteExit('recipe-edit'), () => {
       selectedRecipeId = recipeId;
+      recipeEditDirty = false;
+      recipeEditDraft = null;
       activeView = 'recipe-edit';
     });
   }
@@ -1344,6 +1383,48 @@
     afterTruthyResult(confirmRouteExit('recipes'), () => {
       activeView = 'recipes';
     });
+  }
+
+  async function saveRecipeEdit(recipeId, updates) {
+    if (recipeEditSaving) return false;
+    recipeEditSaving = true;
+    try {
+      const result = await store.updateRecipe?.(recipeId, updates);
+      if (result === false) return false;
+      recipeEditDirty = false;
+      recipeEditDraft = null;
+      activeView = 'recipes';
+      return result;
+    } catch (err) {
+      return false;
+    } finally {
+      recipeEditSaving = false;
+    }
+  }
+
+  function cancelRecipeEdit() {
+    afterTruthyResult(confirmRouteExit('recipes'), () => {
+      activeView = 'recipes';
+    });
+  }
+
+  function handleRecipeDraftChange(draft) {
+    recipeEditDraft = draft || null;
+    recipeEditDirty = draft?.dirty === true;
+  }
+
+  async function handleAddRecipeItem(itemUuid) {
+    return store.addRecipeItemFromUuid?.(selectedSystemId, itemUuid);
+  }
+
+  async function handleSetRecipeItem(recipeItemId) {
+    if (!selectedRecipeId) return false;
+    return store.updateRecipe?.(selectedRecipeId, { recipeItemId });
+  }
+
+  function recipeEditSaveLabel() {
+    if (recipeEditSaving) return text('FABRICATE.Admin.Manager.Recipe.Saving', 'Saving...');
+    return text('FABRICATE.Admin.Manager.Recipe.Save', 'Save recipe');
   }
 
   function selectComponent(componentId) {
@@ -2921,7 +3002,17 @@
           <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
         </button>
       {:else if currentView === 'recipe-edit'}
-        <!-- no header actions for the recipe-edit placeholder -->
+        {#if recipeEditDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button type="button" class="manager-button" onclick={cancelRecipeEdit} disabled={recipeEditSaving}>
+          <i class="fas fa-times" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Cancel', 'Cancel')}</span>
+        </button>
+        <button type="submit" form="manager-recipe-edit-form" class="manager-button is-primary" disabled={!canSaveRecipeEdit}>
+          <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{recipeEditSaveLabel()}</span>
+        </button>
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
@@ -3452,7 +3543,21 @@
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
-      <RecipeEditView recipe={selectedRecipeId ? selectedRecipe : null} onBack={backToRecipesBrowse} />
+      <RecipeEditView
+        recipe={selectedRecipeId ? selectedRecipe : null}
+        {recipeItemDefinitions}
+        knowledgeMode={recipeKnowledgeMode}
+        saving={recipeEditSaving}
+        onBack={cancelRecipeEdit}
+        onSave={saveRecipeEdit}
+        onDirtyChange={(dirty) => { recipeEditDirty = dirty; }}
+        onDraftChange={handleRecipeDraftChange}
+        onPickImagePath={services?.pickImagePath}
+        onAddRecipeItem={handleAddRecipeItem}
+        onSetRecipeItem={handleSetRecipeItem}
+        onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
+        onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
+      />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
         recipes={$viewState.recipes || []}

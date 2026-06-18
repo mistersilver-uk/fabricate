@@ -86,7 +86,7 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   it('imports and renders RecipeEditView', () => {
     assert.ok(rootSource.includes("import RecipeEditView from './RecipeEditView.svelte'"), 'RecipeEditView should be imported');
     assert.ok(rootSource.includes('<RecipeEditView'), 'RecipeEditView should be rendered');
-    assert.ok(rootSource.includes('onBack={backToRecipesBrowse}'), 'placeholder back button wired to backToRecipesBrowse');
+    assert.ok(rootSource.includes('onBack={cancelRecipeEdit}'), 'back button wired to the route-exit-aware cancelRecipeEdit');
   });
 
   it('defines editRecipe and backToRecipesBrowse navigation', () => {
@@ -132,28 +132,26 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   });
 });
 
-describe('RecipeEditView placeholder', () => {
+describe('RecipeEditView empty-state regression guards', () => {
   it('declares recipe and onBack props', () => {
     assert.ok(editSource.includes('recipe = null'), 'recipe prop defaults to null');
     assert.ok(editSource.includes('onBack = () => {}'), 'onBack prop is declared');
   });
 
-  it('renders the placeholder copy keys and back button when a recipe is present', () => {
-    assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.EditPlaceholderTitle'), 'placeholder title key present');
-    assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.EditPlaceholderHint'), 'placeholder hint key present');
-    assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.BackToBrowse'), 'back-to-recipes key present');
-    assert.ok(editSource.includes('onclick={() => onBack()}'), 'back button calls onBack');
-  });
-
   it('renders a null-recipe empty branch reusing SelectRecipe', () => {
-    assert.ok(editSource.includes('{#if recipe}'), 'placeholder branches on the recipe prop');
-    assert.ok(editSource.includes('{:else}'), 'placeholder has a null-recipe branch');
+    assert.ok(editSource.includes('{#if recipe}'), 'view branches on the recipe prop');
+    assert.ok(editSource.includes('{:else}'), 'view has a null-recipe branch');
     assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.SelectRecipe'), 'null branch reuses SelectRecipe');
     assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.EditMissingHint'), 'null branch uses EditMissingHint');
   });
 
-  it('reuses the manager-empty surface', () => {
-    assert.ok(editSource.includes('manager-empty'), 'placeholder reuses the manager-empty surface');
+  it('reuses the manager-empty surface for the null-recipe state', () => {
+    assert.ok(editSource.includes('manager-empty'), 'empty state reuses the manager-empty surface');
+  });
+
+  it('no longer references the removed placeholder copy', () => {
+    assert.equal(editSource.includes('EditPlaceholderTitle'), false, 'placeholder title key removed');
+    assert.equal(editSource.includes('EditPlaceholderHint'), false, 'placeholder hint key removed');
   });
 });
 
@@ -164,9 +162,15 @@ describe('recipe-edit localization keys', () => {
   });
 
   it('provides non-empty incidental copy', () => {
-    for (const key of ['EditPlaceholderHint', 'EditSubtitle', 'BackToBrowse', 'EditTitle', 'EditBreadcrumb', 'EditPlaceholderTitle', 'EditMissingHint']) {
+    for (const key of ['EditSubtitle', 'BackToBrowse', 'EditTitle', 'EditBreadcrumb', 'EditMissingHint']) {
       assert.ok(typeof recipeLang[key] === 'string' && recipeLang[key].trim().length > 0, `${key} should be a non-empty string`);
     }
+  });
+
+  it('drops the removed placeholder keys and stale coming-soon subtitle', () => {
+    assert.equal('EditPlaceholderTitle' in recipeLang, false, 'EditPlaceholderTitle removed');
+    assert.equal('EditPlaceholderHint' in recipeLang, false, 'EditPlaceholderHint removed');
+    assert.equal(recipeLang.EditSubtitle.includes('coming soon'), false, 'EditSubtitle no longer says coming soon');
   });
 
   it('reuses the existing SelectRecipe key', () => {
