@@ -232,26 +232,37 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
     assert.match(block[0], /min-height:\s*0/, 'min-height:0 so it can scroll within the grid');
   });
 
-  it('widens the recipe-edit global inspector to 340px to match the environment editor', () => {
+  it('keeps the recipe-edit inspector at the standard 300px width (no per-view override)', () => {
     assert.match(
       css,
-      /\[data-manager-view="recipe-edit"\]\s+\.manager-body\s*\{\s*grid-template-columns:\s*220px minmax\(0,\s*1fr\)\s*340px;\s*\}/,
-      'recipe-edit body inspector column is 340px'
+      /\.manager-body\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*220px minmax\(0,\s*1fr\)\s*300px;/,
+      'standard body inspector column is 300px'
     );
-    assert.match(
-      css,
-      /\[data-manager-view="recipe-edit"\]\s+\.manager-body\.is-rail-collapsed\s*\{\s*grid-template-columns:\s*56px minmax\(0,\s*1fr\)\s*340px;\s*\}/,
-      'recipe-edit rail-collapsed body inspector column is 340px'
+    assert.equal(
+      /\[data-manager-view="recipe-edit"\]\s+\.manager-body\s*\{/.test(css),
+      false,
+      'no recipe-edit-specific body width override — recipe-edit uses the standard 300px inspector'
     );
   });
 
-  it('collapses the recipe-edit body to a single column inside the narrow container query', () => {
+  it('keeps the environment workspace inspector consistent at the standard 300px', () => {
+    const block = css.match(/\.manager-environment-workspace\s*\{[^}]*\}/);
+    assert.ok(block, '.manager-environment-workspace rule exists');
+    assert.match(
+      block[0],
+      /grid-template-columns:\s*minmax\(0,\s*1fr\)\s*300px/,
+      'environment workspace inspector is 300px, matching the standard global inspector'
+    );
+    assert.equal(block[0].includes('340px'), false, 'environment workspace no longer uses the wider 340px column');
+  });
+
+  it('collapses the standard manager body to a single column at narrow widths', () => {
     const narrow = css.match(/@container fabricate-manager \(max-width: 1120px\) \{[\s\S]*?\n\}/);
     assert.ok(narrow, 'narrow body-grid container query exists');
     assert.match(
       narrow[0],
-      /\[data-manager-view="recipe-edit"\]\s+\.manager-body[\s\S]*?grid-template-columns:\s*1fr;/,
-      'recipe-edit body collapses to one column at narrow widths'
+      /\.manager-body[\s\S]*?grid-template-columns:\s*1fr;/,
+      'the standard body (used by recipe-edit) collapses to one column at narrow widths'
     );
   });
 });
