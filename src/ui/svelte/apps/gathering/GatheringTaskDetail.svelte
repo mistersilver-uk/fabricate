@@ -16,9 +16,10 @@
   import { localize } from '../../util/foundryBridge.js';
   import { formatRespawnDuration } from '../../util/formatDuration.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
+  import { descriptionOrDefault } from '../../util/gatheringFormat.js';
   import GatheringTaskRequirements from './GatheringTaskRequirements.svelte';
   import GatheringTaskDrops from './GatheringTaskDrops.svelte';
-  import SuccessChanceBar from './SuccessChanceBar.svelte';
+  import ChanceBar from './ChanceBar.svelte';
 
   let {
     task = null,
@@ -35,7 +36,7 @@
   const description = $derived(String(task?.description ?? ''));
   const hasDescription = $derived(description !== '');
   const descriptionText = $derived(
-    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoTaskDescription')
+    descriptionOrDefault(description, 'FABRICATE.App.Gathering.Detail.NoTaskDescription', localize)
   );
   const img = $derived(String(task?.img ?? ''));
   const attemptable = $derived(task?.attemptable === true);
@@ -227,7 +228,7 @@
 
     <div class="gathering-task-detail-action" class:has-chance={successChance != null}>
       {#if successChance != null}
-        <SuccessChanceBar value={successChance} />
+        <ChanceBar value={successChance} scale="success" />
       {/if}
       <span class="gathering-task-detail-attempt-wrap" title={blocked ? blockReason : null}>
         <button

@@ -23,6 +23,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
+  import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
 
   let {
     environment = null,
@@ -95,21 +96,12 @@
   // Danger pill: always shown, icon-only, coloured by the environment's risk
   // tier with the full danger level in a tooltip. The engine always provides a
   // risk (defaulting to 'safe'), so this renders for every card.
-  const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
   const risk = $derived(String(environment?.risk ?? 'safe') || 'safe');
-  const dangerLabel = $derived(
-    KNOWN_RISKS.has(risk) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${risk}`) : risk
-  );
-  const riskClass = $derived(KNOWN_RISKS.has(risk) ? `risk-${risk}` : '');
+  const dangerLabel = $derived(riskLabel(risk, localize));
+  const dangerRiskClass = $derived(riskClass(risk));
   const dangerAria = $derived(
     localize('FABRICATE.App.Gathering.Detail.Pips.Danger', { value: dangerLabel })
   );
-
-  function biomeChipStyle(tag) {
-    const hex = /^#[0-9a-fA-F]{6}$/.test(tag?.customColor || '') ? tag.customColor : '';
-    const token = String(tag?.colorToken || 'sage').replace(/^--fab-tag-/, '');
-    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
-  }
 
   function handleSelect() {
     if (locked) return;
@@ -131,7 +123,7 @@
         <span class="gathering-env-card-realm-label">{localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')}</span>
       </span>
     {/if}
-    <span class={`gathering-env-card-event ${riskClass}`} aria-label={dangerAria}>
+    <span class={`gathering-env-card-event ${dangerRiskClass}`} aria-label={dangerAria}>
       <i class="fas fa-skull" aria-hidden="true"></i>
       <span class="gathering-env-card-event-label">{dangerLabel}</span>
     </span>

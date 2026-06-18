@@ -122,6 +122,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     copyModule('src/ui/svelte/util/foundryBridge.js');
+    copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
@@ -136,15 +137,17 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/EventChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');

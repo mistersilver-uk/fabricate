@@ -31,6 +31,53 @@ const GENERIC_BLOCKED_KEY = 'FABRICATE.App.Gathering.Detail.Blocked';
 const CANNOT_ATTEMPT_KEY = 'FABRICATE.App.Gathering.Detail.CannotAttempt';
 
 /**
+ * Icon/tone presentation for the blocked-reason codes that surface as per-task
+ * header callout chips in GatheringTaskRow. The label vocabulary lives in
+ * BLOCK_LABEL_KEYS; this map co-locates the chip's icon and tone so the row
+ * stays a pure consumer. Codes absent here fall back to a generic warning chip.
+ *
+ * @type {Readonly<Record<string, {icon: string, tone: string}>>}
+ */
+const CALLOUT_PRESENTATION = Object.freeze({
+  TOOL_BLOCKED: { icon: 'fa-screwdriver-wrench', tone: 'warning' },
+  CONDITIONS_BLOCKED: { icon: 'fa-cloud-sun', tone: 'warning' },
+  GAME_PAUSED: { icon: 'fa-pause', tone: 'neutral' },
+  DUPLICATE_ACTIVE_RUN: { icon: 'fa-hourglass-half', tone: 'neutral' },
+  NODE_DEPLETED: { icon: 'fa-mountain', tone: 'warning' },
+  NODE_EXHAUSTED: { icon: 'fa-mountain', tone: 'warning' },
+  STAMINA_BLOCKED: { icon: 'fa-bolt', tone: 'warning' }
+});
+
+/**
+ * Build the icon/tone/label descriptor for a single blocked-reason callout chip.
+ * Known codes (present in CALLOUT_PRESENTATION) pair their icon/tone with the
+ * label key from BLOCK_LABEL_KEYS; unknown codes fall back to a generic warning
+ * chip using the reason's own `message`, then the generic blocked label.
+ *
+ * @param {string} code The blocked-reason code.
+ * @param {{message?: string}} [reason] The originating reason (for the fallback message).
+ * @param {(key: string, data?: object) => string} localize
+ * @returns {{code: string, icon: string, tone: string, label: string}}
+ */
+export function calloutFor(code, reason, localize) {
+  const presentation = CALLOUT_PRESENTATION[code];
+  if (presentation) {
+    return {
+      code,
+      icon: presentation.icon,
+      tone: presentation.tone,
+      label: localize(BLOCK_LABEL_KEYS[code])
+    };
+  }
+  return {
+    code,
+    icon: 'fa-triangle-exclamation',
+    tone: 'warning',
+    label: reason?.message || localize(GENERIC_BLOCKED_KEY)
+  };
+}
+
+/**
  * Resolve the deduplicated, localized label list for a set of blocked reasons.
  * Each distinct `code` contributes one label; unknown codes fall back to the
  * reason's `message`, then the generic blocked label.

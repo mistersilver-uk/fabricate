@@ -194,18 +194,25 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
+    // The gathering presentation helpers (risk/biome/percent/description) shared
+    // across the player + manager gathering components.
+    const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
+    writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/SuccessChanceBar.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/EventChanceBar.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
@@ -382,6 +389,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // Explanatory hint shown; the "safe" hint is not.
     assert.ok(section.textContent.includes('EventChanceHint'), 'explanatory event hint shown');
     assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
+    // Targeted (non-blind) environments never show the "events hidden" redaction
+    // hint — that is blind-only, even with chance > 0 and no individual events.
+    assert.equal(target.querySelector('[data-gathering-events-hidden]'), null, 'no "events hidden" hint for a targeted environment');
   });
 
   it('shows the "safe environment" hint (no bar) when event chance is zero', async () => {
