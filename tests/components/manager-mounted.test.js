@@ -94,13 +94,30 @@ function compileManagerRoot() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js', 'gatheringFormat.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js', 'gatheringFormat.js', 'recipeImageIcons.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
       utilDestination,
       readFileSync(resolve(repoRoot, `src/ui/svelte/util/${utilPath}`), 'utf8')
     );
+  }
+
+  // recipeImageIcons re-exports DEFAULT_RECIPE_IMAGE from the Recipe model (the
+  // single low-layer source of truth), so copy that module and its transitive
+  // model/util/config dependencies verbatim.
+  for (const rawPath of [
+    'src/models/Recipe.js',
+    'src/models/Ingredient.js',
+    'src/models/IngredientSet.js',
+    'src/models/IngredientGroup.js',
+    'src/models/Result.js',
+    'src/utils/recipeCategories.js',
+    'src/config/flags.js'
+  ]) {
+    const rawDestination = join(tempRoot, rawPath);
+    mkdirSync(dirname(rawDestination), { recursive: true });
+    writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawPath), 'utf8'));
   }
 
   for (const actionPath of ['dragDrop.js', 'dismissOnOutsideClick.js', 'portal.js']) {

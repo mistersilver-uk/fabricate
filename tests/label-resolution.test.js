@@ -50,7 +50,7 @@ globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 // ---------------------------------------------------------------------------
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { Recipe } = await import('../src/models/Recipe.js');
+const { Recipe, DEFAULT_RECIPE_IMAGE } = await import('../src/models/Recipe.js');
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { Ingredient } = await import('../src/models/Ingredient.js');
 
@@ -298,10 +298,10 @@ test('TC9: _resolveRecipeIcon returns custom recipe img unchanged', () => {
 // ---------------------------------------------------------------------------
 
 test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag', async () => {
-  // Recipe uses the default bag icon but has a linked item
+  // Recipe uses the default (blueprint) icon but has a linked item
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1', {
-    img: 'icons/svg/item-bag.svg',
+    img: DEFAULT_RECIPE_IMAGE,
     linkedRecipeItemUuid: 'World.Item.linked123'
   });
 
@@ -323,13 +323,13 @@ test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag
 test('TC11: _resolveRecipeIconAsync falls back to document icon when no linked item', async () => {
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1', {
-    img: 'icons/svg/item-bag.svg',
+    img: DEFAULT_RECIPE_IMAGE,
     linkedRecipeItemUuid: null
   });
 
   const icon = await manager.resolveRecipeIconAsync(recipe);
   assert.ok(typeof icon === 'string' && icon.length > 0);
-  assert.ok(icon !== 'icons/svg/item-bag.svg', 'Should not return default bag icon as final result');
+  assert.ok(icon !== DEFAULT_RECIPE_IMAGE, 'Should not return the default recipe image as final result');
 });
 
 // ---------------------------------------------------------------------------

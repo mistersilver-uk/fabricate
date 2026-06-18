@@ -2,6 +2,7 @@
 <script>
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
+  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -2343,7 +2344,7 @@
   }
 
   function recipeImage(recipe) {
-    return recipe?.img || 'icons/svg/item-bag.svg';
+    return recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
   }
 
   function componentImage(item) {
@@ -3559,6 +3560,7 @@
         onDirtyChange={(dirty) => { recipeEditDirty = dirty; }}
         onDraftChange={handleRecipeDraftChange}
         onPickImagePath={services?.pickImagePath}
+        linkedItemImage={selectedRecipe?.recipeItemImg || ''}
       />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView

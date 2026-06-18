@@ -3,6 +3,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
+  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
 
   let {
     recipe = null,
@@ -12,8 +13,6 @@
     onOpenItem = () => {},
     onCopyItemUuid = () => {}
   } = $props();
-
-  const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg';
 
   // The currently linked recipe-item id is projected onto the recipe row.
   const recipeItemId = $derived(String(recipe?.recipeItemId || ''));

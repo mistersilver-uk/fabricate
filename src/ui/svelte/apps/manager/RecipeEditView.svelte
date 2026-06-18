@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
 
   let {
     recipe = null,
@@ -9,10 +10,14 @@
     onSave = () => {},
     onDirtyChange = () => {},
     onDraftChange = () => {},
-    onPickImagePath = null
+    onPickImagePath = null,
+    linkedItemImage = ''
   } = $props();
 
-  const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg';
+  // When a recipe item is linked, the identity image mirrors the linked item's
+  // image and the picker is locked — exactly like the environment editor locks
+  // its image to a linked scene.
+  const isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId));
 
   let draftId = $state('');
   let name = $state('');
@@ -101,7 +106,7 @@
   }
 
   async function chooseImage() {
-    if (typeof onPickImagePath !== 'function') return;
+    if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
     if (value) img = value;
   }
@@ -132,17 +137,29 @@
         </div>
         <div class="manager-task-core-grid">
           <div class="manager-task-media-column">
-            <button
-              type="button"
-              class="manager-task-image-picker"
-              data-recipe-field="img"
-              aria-label={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
-              onclick={chooseImage}
-              disabled={typeof onPickImagePath !== 'function' || saving}
-            >
-              <img src={recipeImage(img)} alt="" />
-              <i class="fas fa-pen" aria-hidden="true"></i>
-            </button>
+            {#if isRecipeItemLinked}
+              <span
+                class="manager-task-image-picker is-recipe-item-linked"
+                data-recipe-item-locked-image
+                title={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip', "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.")}
+                aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage', 'Image provided by the linked recipe item')}
+              >
+                <img src={linkedItemImage || recipeImage(img)} alt="" />
+                <i class="fas fa-lock" aria-hidden="true"></i>
+              </span>
+            {:else}
+              <button
+                type="button"
+                class="manager-task-image-picker"
+                data-recipe-field="img"
+                aria-label={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
+                onclick={chooseImage}
+                disabled={typeof onPickImagePath !== 'function' || saving}
+              >
+                <img src={recipeImage(img)} alt="" />
+                <i class="fas fa-pen" aria-hidden="true"></i>
+              </button>
+            {/if}
             <div class="manager-task-core-status">
               <button
                 type="button"

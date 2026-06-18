@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
 
   let {
     recipes = [],
@@ -54,7 +55,7 @@
   }
 
   function recipeImage(recipe) {
-    return recipe?.img || 'icons/svg/item-bag.svg';
+    return recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
   }
 
   function ingredientCount(recipe) {

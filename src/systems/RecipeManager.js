@@ -1,13 +1,13 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools } from '../gatheringToolRuntime.js';
-import { Recipe } from '../models/Recipe.js';
+import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
 import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
 
 import { SignatureValidator } from './SignatureValidator.js';
 
-const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
+const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
 const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 

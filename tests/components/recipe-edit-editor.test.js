@@ -9,18 +9,29 @@ const repoRoot = resolve(__dirname, '../..');
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
 const storePath = resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js');
+const modelPath = resolve(repoRoot, 'src/models/Recipe.js');
+const managerPath = resolve(repoRoot, 'src/systems/RecipeManager.js');
+const graphPath = resolve(repoRoot, 'src/ui/svelte/util/recipeGraphBuilder.js');
+const iconsPath = resolve(repoRoot, 'src/ui/svelte/util/recipeImageIcons.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const editSource = readFileSync(editPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+const browserSource = readFileSync(browserPath, 'utf8');
 const storeSource = readFileSync(storePath, 'utf8');
+const modelSource = readFileSync(modelPath, 'utf8');
+const managerSource = readFileSync(managerPath, 'utf8');
+const graphSource = readFileSync(graphPath, 'utf8');
+const iconsSource = readFileSync(iconsPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
+const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 
 describe('RecipeEditView identity-only single column', () => {
   it('renders the identity card in the standard manager-main, with no bespoke workspace', () => {
@@ -53,8 +64,7 @@ describe('RecipeEditView identity-only single column', () => {
     assert.ok(editSource.includes('validName'), 'tracks name validity');
   });
 
-  it('carries no recipe-item state, props, or card in the view', () => {
-    assert.equal(editSource.includes('recipeItemId'), false, 'no recipeItemId draft field');
+  it('carries no recipe-item editing state, props, or card in the view', () => {
     assert.equal(editSource.includes('recipeItemDefinitions'), false, 'no recipeItemDefinitions prop');
     assert.equal(editSource.includes('knowledgeMode'), false, 'no knowledgeMode prop');
     assert.equal(editSource.includes('onAddRecipeItem'), false, 'no add-recipe-item prop');
@@ -82,7 +92,11 @@ describe('RecipeItemInspector recipe-item link card', () => {
   it('uses item iconography, not scene/map icons, and no scene-locked-image branch', () => {
     assert.ok(inspectorSource.includes('fa-box'), 'dropzone uses an item box icon');
     assert.ok(inspectorSource.includes('fa-suitcase'), 'missing thumb uses a suitcase icon');
-    assert.ok(inspectorSource.includes('icons/svg/item-bag.svg'), 'item-bag image fallback');
+    assert.ok(
+      inspectorSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
+      'image fallback uses the shared DEFAULT_RECIPE_IMAGE constant'
+    );
+    assert.equal(inspectorSource.includes("'icons/svg/item-bag.svg'"), false, 'no bag-SVG literal fallback');
     assert.equal(inspectorSource.includes('fa-map'), false, 'no map icon');
     assert.equal(inspectorSource.includes('data-scene-locked-image'), false, 'no scene-locked-image branch');
   });
@@ -308,5 +322,147 @@ describe('recipe-edit localization', () => {
     for (const absent of ['DraftState', 'SaveRecipe', 'DiscardConfirm', 'ActiveHint', 'DraftHint', 'LinkedItem', 'LinkedItemTitle']) {
       assert.equal(absent in recipeLang, false, `${absent} must not be added`);
     }
+  });
+
+  it('adds the recipe-item locked-image strings mirroring the scene-locked phrasing', () => {
+    assert.equal(recipeLang.RecipeItemLockedImage, 'Image provided by the linked recipe item');
+    assert.equal(
+      recipeLang.RecipeItemLockedImageTooltip,
+      "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image."
+    );
+  });
+});
+
+describe('recipe default image is the blueprint, sourced from one canonical literal', () => {
+  it('defines the canonical default in the lowest shared layer (the model)', () => {
+    assert.ok(
+      modelSource.includes(`export const DEFAULT_RECIPE_IMAGE = '${BLUEPRINT_DEFAULT}'`),
+      'Recipe.js exports the canonical DEFAULT_RECIPE_IMAGE'
+    );
+    assert.equal(modelSource.includes("data.img || 'icons/svg/item-bag.svg'"), false, 'constructor no longer defaults to the bag SVG');
+    assert.ok(modelSource.includes('this.img = data.img || DEFAULT_RECIPE_IMAGE'), 'constructor defaults via the constant');
+  });
+
+  it('keeps a single source-of-truth literal (no duplicated blueprint string in new code)', () => {
+    // The only places the literal path appears: the model definition, and the
+    // picker option filename list (a separate concern, not a default fallback).
+    const inModel = (modelSource.match(/blueprint-recipe-alchemical\.webp/g) || []).length;
+    assert.equal(inModel, 1, 'exactly one literal in the model');
+    // recipeImageIcons re-exports the constant rather than redeclaring the literal.
+    assert.ok(
+      iconsSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../../models/Recipe.js'")
+        && iconsSource.includes('export { DEFAULT_RECIPE_IMAGE }'),
+      'recipeImageIcons re-exports the model constant'
+    );
+    assert.equal(
+      iconsSource.includes(`= '${BLUEPRINT_DEFAULT}'`),
+      false,
+      'recipeImageIcons does not redeclare the literal default'
+    );
+  });
+
+  it('routes RecipeManager defaults through the imported constant', () => {
+    assert.ok(
+      managerSource.includes("import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js'"),
+      'RecipeManager imports the constant'
+    );
+    assert.ok(managerSource.includes('const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE'), 'DEFAULT_RECIPE_IMG uses the constant');
+    assert.equal(managerSource.includes("const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg'"), false, 'no bag-SVG recipe default');
+  });
+
+  it('uses the constant (not the bag SVG) in the recipe graph node fallback', () => {
+    assert.ok(graphSource.includes("import { DEFAULT_RECIPE_IMAGE } from './recipeImageIcons.js'"), 'graph builder imports the constant');
+    assert.ok(graphSource.includes('img: recipe.img || DEFAULT_RECIPE_IMAGE'), 'node img falls back to the constant');
+    assert.equal(graphSource.includes("recipe.img || 'icons/svg/item-bag.svg'"), false, 'no bag-SVG recipe-node fallback');
+  });
+
+  it('uses the constant in the recipe-edit view and inspector via import (no local literal)', () => {
+    assert.ok(
+      editSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
+      'RecipeEditView imports the constant'
+    );
+    assert.equal(editSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the view');
+    assert.ok(
+      inspectorSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
+      'RecipeItemInspector imports the constant'
+    );
+    assert.equal(inspectorSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the inspector');
+  });
+});
+
+describe('recipe image helpers prefer the linked recipe-item image', () => {
+  it('RecipesBrowserView row thumbnail prefers recipeItemImg, then img, then the default', () => {
+    assert.ok(
+      browserSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
+      'browser imports the constant'
+    );
+    assert.ok(
+      browserSource.includes('recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE'),
+      'row image prefers the linked item image'
+    );
+    assert.equal(browserSource.includes("recipe?.img || 'icons/svg/item-bag.svg'"), false, 'no bag-SVG row fallback');
+  });
+
+  it('CraftingSystemManagerRoot recipe preview prefers recipeItemImg, then img, then the default', () => {
+    assert.ok(
+      rootSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
+      'root imports the constant'
+    );
+    assert.ok(
+      rootSource.includes('recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE'),
+      'preview image prefers the linked item image'
+    );
+  });
+});
+
+describe('RecipeEditView locks the image picker to the linked recipe item', () => {
+  it('derives the linked state and accepts the linkedItemImage prop', () => {
+    assert.ok(editSource.includes('isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId))'), 'derives the linked state');
+    assert.ok(/linkedItemImage\s*=\s*''/.test(editSource), 'accepts the linkedItemImage prop with a default');
+  });
+
+  it('renders the locked is-recipe-item-linked span with a lock icon and locked-image marker', () => {
+    assert.ok(editSource.includes('{#if isRecipeItemLinked}'), 'branches on the linked state');
+    assert.ok(editSource.includes('is-recipe-item-linked'), 'uses the recipe-specific locked class');
+    assert.ok(editSource.includes('data-recipe-item-locked-image'), 'carries the locked-image marker attribute');
+    assert.ok(editSource.includes('fa-lock'), 'shows a lock icon when linked');
+    assert.ok(
+      editSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage')
+        && editSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip'),
+      'uses the locked-image lang keys'
+    );
+    assert.ok(editSource.includes('src={linkedItemImage || recipeImage(img)}'), 'shows the linked item image when locked');
+  });
+
+  it('guards chooseImage on the linked state so the picker is not editable', () => {
+    assert.ok(
+      editSource.includes("if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;"),
+      'chooseImage early-returns when the recipe item is linked'
+    );
+  });
+
+  it('does not persist the linked item image into the draft img', () => {
+    assert.equal(editSource.includes('img = linkedItemImage'), false, 'never writes the item image into the draft');
+  });
+
+  it('passes the linked recipe-item image into the view from the root', () => {
+    assert.ok(rootSource.includes("linkedItemImage={selectedRecipe?.recipeItemImg || ''}"), 'root passes recipeItemImg as linkedItemImage');
+  });
+});
+
+describe('recipe locked-image picker reuses the scene-locked visuals', () => {
+  it('groups is-recipe-item-linked into the existing locked-picker rules (no duplicated declarations, no raw colours)', () => {
+    assert.ok(
+      css.includes('.manager-task-image-picker.is-recipe-item-linked'),
+      'recipe locked class is styled'
+    );
+    assert.ok(
+      /\.is-scene-linked,\n[ \t]*\.fabricate-manager \.manager-task-image-picker\.is-recipe-item-linked \{/.test(css),
+      'recipe locked class is comma-joined into the cursor rule alongside the scene class'
+    );
+    assert.ok(
+      css.includes('.manager-task-image-picker.is-recipe-item-linked .fa-lock'),
+      'recipe lock icon shares the muted colour rule'
+    );
   });
 });

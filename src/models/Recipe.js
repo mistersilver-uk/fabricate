@@ -5,6 +5,14 @@ import { IngredientSet } from './IngredientSet.js';
 import { Result } from './Result.js';
 
 /**
+ * Canonical default/fallback image for a recipe with no custom image set.
+ * Defined in the model (the lowest shared layer) so systems and UI can import
+ * a single source of truth without a ui→model/systems layering violation.
+ * @type {string}
+ */
+export const DEFAULT_RECIPE_IMAGE = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
+
+/**
  * Represents a crafting recipe
  * Supports simple (A + B = C) and complex (multiple ingredient sets, variable output, essences) modes
  */
@@ -13,7 +21,7 @@ export class Recipe {
     this.id = data.id || foundry.utils.randomID();
     this.name = data.name || 'Unnamed Recipe';
     this.description = data.description || '';
-    this.img = data.img || 'icons/svg/item-bag.svg';
+    this.img = data.img || DEFAULT_RECIPE_IMAGE;
     this.category = normalizeRecipeCategory(data.category);
     this.craftingSystemId = data.craftingSystemId || null;
     this.system = data.system || 'all';

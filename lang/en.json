@@ -929,6 +929,8 @@
           "Name": "Name",
           "Description": "Description",
           "ChooseImage": "Choose recipe image",
+          "RecipeItemLockedImage": "Image provided by the linked recipe item",
+          "RecipeItemLockedImageTooltip": "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.",
           "EnabledHint": "Available to players while on.",
           "DisabledHint": "Hidden from players while off.",
           "RecipeItem": "Recipe item",
