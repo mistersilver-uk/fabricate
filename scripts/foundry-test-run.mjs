@@ -715,6 +715,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-edit-card',
       '.manager-toggle-row',
       '.manager-essence-edit-view',
+      '.manager-recipe-edit-main',
       '.environment-draft-editor',
       '.manager-environment-edit-view',
       '.manager-gathering-task-edit-view',
@@ -765,6 +766,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-task-edit-view'
       || metric.selector === '.manager-gathering-event-edit-view'
       || metric.selector === '.manager-essence-edit-view'
+      || metric.selector === '.manager-recipe-edit-main'
       || metric.selector === '.environment-draft-editor'
   ).length;
   if (rowCount === 0 && editFormCount === 0) {
@@ -2640,6 +2642,19 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipes normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipes-normal');
+
+        // Recipes → open the editor so the identity card (central column) and the
+        // knowledge-gated recipe-item inspector (right context panel) are captured (#387).
+        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-recipe-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-recipe-section="recipe-item"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'recipe edit normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-normal');
+        // Return to the recipes browser for the remaining navigation.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();

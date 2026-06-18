@@ -59,6 +59,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
@@ -136,6 +138,14 @@ function writeCompiledSvelte(sourcePath) {
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
+}
+
+// Inject a recipe knowledge mode onto a selected system so tests can exercise the
+// recipe-edit inspector gating. Kept out of createStore to hold that helper under
+// the cognitive-complexity budget.
+function applyRecipeKnowledgeMode(system, mode) {
+  if (!system || !mode) return system;
+  return { ...system, recipeVisibility: { knowledge: { mode } } };
 }
 
 function createStore(calls = [], options = {}) {
@@ -394,7 +404,8 @@ function createStore(calls = [], options = {}) {
       }]
     }
   ];
-  const selectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
+  const baseSelectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
+  const selectedSystem = applyRecipeKnowledgeMode(baseSelectedSystem, options.recipeKnowledgeMode);
   const essenceCardsBySystem = {
     alchemy: [
       {
@@ -1366,7 +1377,6 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('routes to the recipes browser with selected recipe inspector and actions', async () => {
     const calls = [];
-    const edited = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -1374,8 +1384,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         store: createStore(calls, { experimentalFeaturesEnabled: true }),
         services: {
-          openCurrentAdmin: () => {},
-          onEditRecipe: (id) => edited.push(id)
+          openCurrentAdmin: () => {}
         }
       }
     });
@@ -1442,14 +1451,15 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
-    // Row actions are now Duplicate (1) and Delete (2) — the Edit icon is gone.
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    // Row actions are now Edit (1), Duplicate (2), Delete (3). Duplicate and Delete drive
+    // store callbacks and keep the row mounted; the Edit click is exercised separately below
+    // because it navigates away from the browser to the recipe-edit route.
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
     // Header actions are now Import (1) and Export (2) — the Create button is gone.
     target.querySelector('.manager-header-actions .manager-button:nth-child(1)').click();
     target.querySelector('.manager-header-actions .manager-button:nth-child(2)').click();
 
-    assert.deepEqual(edited, [], 'recipe edit wiring should be removed');
     assert.deepEqual(calls.slice(-4), [
       ['duplicateRecipe', 'r2'],
       ['deleteRecipe', 'r2'],
@@ -1458,6 +1468,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     ]);
     assert.ok(calls.some(call => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
     assert.ok(calls.some(call => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true));
+
+    // The first row action is Edit (fa-edit) and it navigates to the in-manager
+    // recipe-edit route rather than calling a service callback.
+    const editButton = target.querySelector('[data-recipe-id="r2"] .manager-icon-button');
+    assert.ok(editButton.querySelector('.fa-edit'), 'first row action should be the Edit icon');
+    editButton.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Edit should navigate to the recipe-edit route');
+    assert.ok(target.querySelector('.manager-main [data-recipe-section="identity"]'), 'recipe-edit renders the identity card in the central main');
+    // The mock system carries no recipeVisibility.knowledge.mode, so the editor
+    // defaults to 'itemOrLearned' and the recipe-item card is shown in the global
+    // inspector aside (not a view-internal column).
+    assert.ok(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), 'recipe-item card shows in the global inspector for the default knowledge mode');
+    const recipeEditCancelButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(button => button.textContent.includes('Cancel'));
+    assert.ok(recipeEditCancelButton, 'recipe-edit header should offer a Cancel control');
+    recipeEditCancelButton.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'Cancel should return to the recipes browser');
+  });
+
+  it('suppresses the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true, recipeKnowledgeMode: 'learned' }),
+        services: {
+          openCurrentAdmin: () => {}
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Edit should navigate to the recipe-edit route');
+    assert.ok(target.querySelector('.manager-main [data-recipe-section="identity"]'), 'recipe-edit still renders the identity card in the central main');
+    // 'learned' recipes never consume an item, so the recipe-item card is hidden
+    // and the whole inspector aside is suppressed, leaving a full-width main.
+    assert.equal(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), null, 'recipe-item card is hidden for the learned knowledge mode');
+    assert.equal(target.querySelector('.manager-inspector'), null, 'the inspector aside is fully suppressed for the learned knowledge mode');
+    assert.ok(target.textContent.includes('Edit identity for this recipe.'), 'learned mode shows the identity-only subtitle');
   });
 
   it('routes to the components browser with filters, drop import, selected inspector, and actions', async () => {

@@ -88,17 +88,18 @@ Think of it as a "recipe scroll" or "crafting manual".
 
 ### Linking a Recipe Item in the Editor
 
-When a crafting system uses knowledge-mode visibility, the recipe editor shows a **Linked Recipe Item** section.
-There are two ways to link an item:
+When a crafting system uses knowledge-mode visibility, opening a recipe in the GM recipe editor shows a **Recipe item** card.
+Drag any world item or compendium item onto the card to link it to the recipe.
+Dropping a new item onto a card that already has a link replaces the link.
 
-- **Browse Items** opens a picker so you can select any existing world item or compendium item.
-- **Create Recipe Item** creates a new loot item named after the recipe and automatically links it to this recipe.
-  Use this when you want a fresh scroll or manual for the recipe without leaving the editor.
+Once an item is linked, the card displays its image and name.
+Click the name to open the item.
+Use the unlink button to clear the link, or right-click the linked item as a shortcut for the same action.
+Unlinking only removes the link from this recipe.
+It does not delete the item itself.
 
-Once an item is linked, the editor displays its image and name alongside a **Clear** button.
-Click **Clear** to unlink the item and choose a different one.
-
-If the system's visibility mode needs a linked item but none has been set, the editor shows a warning before you save.
+If the linked item can no longer be found, the card shows an unresolved state and keeps the link so you can repoint it.
+The Recipe item card is shown for knowledge modes that use an owned item (**Item** and **Item or Learned**) and is hidden for **Learned**, where no item is needed.
 
 ### How Matching Works
 

@@ -98,7 +98,7 @@ Selected-system navigation:
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
-- Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`. When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route. When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
+- Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`. When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route. When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented. When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page. Activating only the expand/collapse control toggles the submenu without navigation. While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed. The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The `Travel` submenu item shows the total party count as its badge. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`. It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
@@ -278,6 +278,10 @@ Actions:
 - Duplicate
 - Delete
 
+In Manager, the recipe browse row `Edit` action opens a dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state. The recipe-edit view holds a recipe identity card (name, description, image, and an `enabled` on/off toggle) editing a local draft in the central `manager-main`, and the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) holds the recipe-item link card. Identity edits track a dirty state surfaced by a header dirty chip with `Save`/`Cancel` controls, persist via `store.updateRecipe` → `RecipeManager.updateRecipe`, and a dirty draft prompts a discard confirmation on route exit. The recipe-item card is the partial implementation of the `### Visibility Form` recipe-item selector (see below); the rest of the Visibility Form (restricted-visibility toggle, allowed-users multiselect) and the rest of `## Recipe Editor` (ingredients, catalysts, essences, steps, and results) remain deferred. The inspector panel that carries the recipe-item card is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (central column full-width) when the selected system's recipe knowledge mode does not consume an item (`knowledge.mode === 'learned'`); the layout collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`), mirroring the environment editor. The `recipe == null` form of this view shows a `Select a recipe` empty state.
+
+Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
+
 ### Environments Tab
 
 Only shown when `features.gathering === true` for the selected crafting system.
@@ -419,12 +423,16 @@ A **GM-only scene-level Manage Interactables panel**, launched from the Fabricat
 
 Scoped to a single crafting system.
 
+The Manager recipe-edit view partially implements this editor: the identity surface from `### Base Form` (Name and Description, plus a player-facing image and an `enabled` on/off toggle, edited as a local draft with `Save`/`Cancel`, a dirty/route-exit guard) and the `recipeItemId` selector from `### Visibility Form` are implemented. The Locked toggle, Category, the rest of the Visibility Form (restricted-visibility toggle, allowed-users multiselect), the Step Structure UI, and the Step Editor remain deferred.
+
 ### Base Form
 
-- Name
-- Description
-- Category (if enabled; always includes reserved `General`)
-- Locked toggle
+- Name (implemented in Manager)
+- Description (implemented in Manager)
+- Category (if enabled; always includes reserved `General`) — deferred
+- Locked toggle — deferred
+
+In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
 
 ### Visibility Form
 
@@ -435,8 +443,8 @@ If `listMode === "global"`:
 
 If `listMode === "player"`:
 
-- Restricted visibility toggle
-- Allowed users multiselect
+- Restricted visibility toggle — deferred
+- Allowed users multiselect — deferred
 
 If knowledge mode includes item matching or learning:
 
@@ -444,6 +452,8 @@ If knowledge mode includes item matching or learning:
 - Preview of the selected system recipe item definition (name, image, and source status)
 - Clear action for removing the current recipe item reference
 - Helper text: owned copies match by UUID or resolved source UUID of the selected recipe item definition
+
+The recipe item selector is **partially implemented** by a recipe-item link card rendered in the GM manager's right-hand context inspector panel (the global `manager-inspector` aside), not a view-internal column: a drop zone bound to `recipeItemId`, a preview of the linked definition's name/image/source status, a clear (unlink) action, and the drag/drop-first interaction with no manual UUID entry. The central `manager-main` holds the recipe identity card; the recipe-item card sits beside it in the shared inspector panel. Linking or unlinking applies immediately and is independent of the identity Save draft. Dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and sets `recipe.recipeItemId`; unlinking nulls `recipe.recipeItemId` and does **not** delete the shared definition; and when the linked definition's `sourceItemUuid` no longer resolves the card shows a missing/stale state and retains the link. The inspector panel is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (full-width main) for `learned`. The restricted-visibility toggle and allowed-users multiselect remain deferred.
 
 If the required linkage is missing, show a validation warning.
 

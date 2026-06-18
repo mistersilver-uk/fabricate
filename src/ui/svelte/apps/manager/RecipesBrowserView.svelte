@@ -12,6 +12,7 @@
     selectedSystemName = '',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
+    onEditRecipe = () => {},
     onDuplicateRecipe = () => {},
     onDeleteRecipe = () => {},
     onToggleEnabled = () => {}
@@ -258,6 +259,9 @@
               </button>
             </span>
             <span role="cell" class="manager-action-group manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
+              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')} onclick={() => onEditRecipe(recipe.id)}>
+                <i class="fas fa-edit" aria-hidden="true"></i>
+              </button>
               <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.DuplicateNamed', 'Duplicate {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')} onclick={() => onDuplicateRecipe(recipe.id)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
               </button>

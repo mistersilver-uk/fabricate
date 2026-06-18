@@ -1282,8 +1282,8 @@ test('manager environments browser and edit route define compact responsive geom
     'environment details band should include a compact status/evidence card'
   );
   assert.ok(
-    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 340px;'),
-    'environment editor workspace should pair the main composition column with a fixed 340px inspector at normal widths'
+    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 300px;'),
+    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(

@@ -55,6 +55,8 @@ A candidate owned item matches a recipe's selected recipe item definition when a
 
 The second condition covers compendium-derived copies. On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it. The resolver handles both transparently.
 
+> Authoring note (no behavioural change): the GM recipe editor (Manager) authors `recipe.recipeItemId` directly — dropping a Foundry Item links or replaces it via `addRecipeItemFromUuid` (which synthesizes or dedups the `RecipeItemDefinition` and resolves its `sourceItemUuid`), and unlinking nulls `recipe.recipeItemId` without deleting the shared definition. When the linked definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the link. The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
+
 ## Visibility Evaluation
 
 ### Listing Algorithm

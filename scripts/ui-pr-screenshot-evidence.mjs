@@ -99,6 +99,15 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
   },
   {
+    id: 'manager-recipe-edit',
+    label: 'Manager recipe editor (identity card + recipe-item inspector)',
+    smokeLabels: ['manager-recipe-edit-normal'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+    ],
+  },
+  {
     id: 'player-gathering',
     label: 'Player gathering tab',
     smokeLabels: [
