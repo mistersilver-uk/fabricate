@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
 
   let {
@@ -92,9 +93,7 @@
   }
   function biomeColorStyle(id) {
     const option = biomeOptions.find(entry => optId(entry) === id);
-    const hex = /^#[0-9a-fA-F]{6}$/.test(option?.customColor || '') ? option.customColor : '';
-    const token = String(option?.colorToken || 'sage').replace(/^--fab-tag-/, '');
-    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
+    return biomeChipStyle(option);
   }
   function dangerLabel(id) {
     const option = renderedDangerOptions.find(option => option.id === id);

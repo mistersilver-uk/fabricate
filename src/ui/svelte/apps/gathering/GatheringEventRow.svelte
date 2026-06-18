@@ -8,11 +8,12 @@
 
   Layout mirrors the task row's visual language for consistency: a thumbnail, the
   event name with a danger pip (its icon escalates in colour with the risk
-  tier), an optional per-event EventChanceBar, and a short clamped description.
+  tier), an optional per-event ChanceBar (event scale), and a short clamped description.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import EventChanceBar from './EventChanceBar.svelte';
+  import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
+  import ChanceBar from './ChanceBar.svelte';
 
   let {
     event = null,
@@ -25,7 +26,7 @@
   const description = $derived(String(event?.description ?? ''));
   const hasDescription = $derived(description !== '');
   const descriptionText = $derived(
-    hasDescription ? description : localize('FABRICATE.App.Gathering.Detail.NoEventDescription')
+    descriptionOrDefault(description, 'FABRICATE.App.Gathering.Detail.NoEventDescription', localize)
   );
   const img = $derived(String(event?.img ?? ''));
   const chance = $derived(event?.chance ?? null);
@@ -33,13 +34,8 @@
   // Localize the danger value to match the GM editor's risk labels, mirroring
   // GatheringDetail; fall back to the raw value for any unmapped level.
   const danger = $derived(String(event?.risk ?? (Array.isArray(event?.dangerTags) ? event.dangerTags[0] : '') ?? ''));
-  const KNOWN_RISKS = new Set(['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']);
-  const dangerLabel = $derived(
-    danger === ''
-      ? ''
-      : (KNOWN_RISKS.has(danger) ? localize(`FABRICATE.App.Gathering.Detail.Risk.${danger}`) : danger)
-  );
-  const dangerRiskClass = $derived(KNOWN_RISKS.has(danger) ? `risk-${danger}` : '');
+  const dangerLabel = $derived(riskLabel(danger, localize));
+  const dangerRiskClass = $derived(riskClass(danger));
 
   function select() {
     onSelect?.(id);
@@ -84,7 +80,7 @@
 
       {#if chance != null}
         <span class="gathering-event-chance" data-gathering-event-chance>
-          <EventChanceBar value={chance} showCaption={false} />
+          <ChanceBar value={chance} scale="event" showCaption={false} />
         </span>
       {/if}
     </div>
