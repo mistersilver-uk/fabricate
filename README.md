@@ -12,7 +12,7 @@
 
 ![](/assets/img/fabricate-repo-preview.png)
 
-# Fabricate - Universal Crafting System
+# Fabricate - Universal Gathering & Crafting System
 
 A system-agnostic, flexible crafting and gathering module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.
 
@@ -34,7 +34,8 @@ A system-agnostic, flexible crafting and gathering module for Foundry Virtual Ta
 
 ### Official Module List
 
-Fabricate isn't on the official module list yet, but when it is, you only need to follow the steps below to install it:
+Fabricate is now on the official module list!
+You only need to follow the steps below to install it:
 
 1. In Foundry VTT, go to **Add-on Modules**
 2. Click **Install Module**

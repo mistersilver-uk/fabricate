@@ -87,6 +87,7 @@ jobs:
           echo "$NOTES" > /tmp/release-notes.md
 
       - name: Create release
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           # Bind the user-controlled input to an env var instead of interpolating
@@ -137,7 +138,17 @@ jobs:
               echo "::error::Dry run failed: one or more release assets are missing."
               exit 1
             fi
+            echo "state=dryrun" >> "$GITHUB_OUTPUT"
             echo "Dry run complete — assets validated, no release created."
+            exit 0
+          fi
+
+          # Idempotency: if the release tag already has a GitHub release, skip
+          # creating it. The downstream Foundry publish keys off state=exists and
+          # is skipped too, so re-running the promotion is safe.
+          if gh release view "v${BASE}" >/dev/null 2>&1; then
+            echo "::notice::Release v${BASE} already exists — skipping release creation and Foundry publish."
+            echo "state=exists" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -147,3 +158,89 @@ jobs:
             --title "v${BASE}" \
             --notes-file /tmp/release-notes.md \
             --latest
+          echo "state=created" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to Foundry VTT package release API
+        # Auto-publishes the freshly-created full (non-rc) release to Foundry's
+        # Package Release API (https://foundryvtt.com/article/package-release-api/).
+        # Skipped entirely when the GitHub release already existed (state=exists).
+        # Respects the workflow dry-run flag: on a dry run it previews the request
+        # instead of calling the API (no version-pinned manifest is published for
+        # Foundry to fetch during a dry run).
+        # `success()` keeps the implicit "prior steps passed" guard (a custom `if`
+        # would otherwise drop it and run even if release creation failed); the
+        # state check skips the publish when the release already existed.
+        if: success() && steps.release.outputs.state != 'exists'
+        env:
+          FOUNDRY_RELEASE_TOKEN: ${{ secrets.FVTT_PKG_RELEASE_TOKEN }}
+        run: |
+          BASE="${{ steps.version.outputs.base }}"
+          API="https://foundryvtt.com/_api/packages/release_version/"
+          NOTES="https://github.com/${{ github.repository }}/releases/tag/v${BASE}"
+
+          # All version-pinned values come straight from the built manifest:
+          # release.js (--version) pins .manifest/.download/.version/.compatibility
+          # to the v${BASE} tag and the uploaded release assets.
+          ID=$(jq -r '.id' dist/module.json)
+          VERSION=$(jq -r '.version' dist/module.json)
+          MANIFEST=$(jq -r '.manifest' dist/module.json)
+          MIN=$(jq -r '.compatibility.minimum // ""' dist/module.json)
+          VERIFIED=$(jq -r '.compatibility.verified // ""' dist/module.json)
+          MAX=$(jq -r '.compatibility.maximum // ""' dist/module.json)
+
+          PAYLOAD=$(jq -n \
+            --arg id "$ID" \
+            --arg version "$VERSION" \
+            --arg manifest "$MANIFEST" \
+            --arg notes "$NOTES" \
+            --arg min "$MIN" \
+            --arg verified "$VERIFIED" \
+            --arg max "$MAX" \
+            '{id: $id, "dry-run": false, release: {version: $version, manifest: $manifest, notes: $notes, compatibility: {minimum: $min, verified: $verified, maximum: $max}}}')
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "::notice::DRY RUN — not publishing to Foundry. Planned POST to ${API}:"
+            echo "$PAYLOAD"
+            {
+              echo "## Dry run: Foundry publish (skipped)"
+              echo ""
+              echo "Would POST to \`${API}\` (token sent only in the Authorization header):"
+              echo '```json'
+              echo "$PAYLOAD"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ -z "${FOUNDRY_RELEASE_TOKEN:-}" ]; then
+            echo "::error::FVTT_PKG_RELEASE_TOKEN secret is not configured."
+            exit 1
+          fi
+
+          echo "Publishing ${ID} v${VERSION} to the Foundry package release API…"
+          HTTP=$(curl -sS -o /tmp/fvtt-resp.json -w '%{http_code}' -X POST "$API" \
+            -H "Authorization: ${FOUNDRY_RELEASE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD")
+          echo "HTTP ${HTTP}"
+          cat /tmp/fvtt-resp.json 2>/dev/null || true
+          echo ""
+
+          STATUS=$(jq -r '.status // ""' /tmp/fvtt-resp.json 2>/dev/null || echo "")
+          if [ "$HTTP" = "200" ] && [ "$STATUS" = "success" ]; then
+            echo "::notice::Published ${ID} v${VERSION} to Foundry."
+            {
+              echo "## Foundry publish: success"
+              echo ""
+              echo "Published \`${ID}\` v${VERSION} to the Foundry package registry."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Foundry publish failed (HTTP ${HTTP})."
+            {
+              echo "## Foundry publish: FAILED (HTTP ${HTTP})"
+              echo '```json'
+              cat /tmp/fvtt-resp.json 2>/dev/null || echo "(no response body)"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
