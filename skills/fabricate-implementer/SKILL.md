@@ -31,7 +31,9 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 11. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`
-12. If either gate fails, fix the problem and rerun both gates.
+   - `npm run lint` (ESLint) and `npm run lint:css` (Stylelint) when the change touches files those globs cover — the `src/` JavaScript surface and `styles/**` respectively (`tests/`, `src/ui/**`, and `*.svelte` are out of scope today)
+   - `npm run format:check` (Prettier) — the CI `lint` job runs Prettier **in addition to** ESLint, so `npm run lint` passing locally is NOT sufficient; run `npm run format` to auto-fix before handoff
+12. If any gate fails, fix the problem and rerun all gates.
 13. Commit to the task branch, push it, and open or update the PR targeting `main`.
 14. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
 
@@ -43,6 +45,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - Use `javascript-mastery` as the default reference for JavaScript-specific correctness questions before inventing local style rules.
 - Prefer explicit collaborators over `context`, `container`, or `manager` grab bags.
 - Avoid exported utility buckets, hidden mutable singletons, and constructors that do real work when a local abstraction or injected dependency will do.
+- When splitting an oversized class/file, follow the repo's proven extraction recipe: move a cohesive cluster into a new collaborator; inject it through the existing constructor with default-construction (so test factories like `makeEngine`/`makeRichState` that never pass it keep working); keep the original public methods as thin delegators so external callers and `main.js` are unaffected; move file-private helpers shared by the moved and retained code into a shared `*Internals.js` module imported by both (never duplicate them — the Sonar duplication gate fails copies); and keep the dependency one-directional (parent → collaborator, no callback into the parent). `GatheringWorldTimeProcessor`/`GatheringListingBuilder` (extracted from `GatheringEngine`) and `GatheringStaminaService`/`GatheringNodeService` (extracted from `GatheringRichStateService`) are reference examples.
 - Do not import Foundry runtime globals such as `game`, `ui`, `Hooks`, or `CONFIG`.
 - Do not use `any` without an inline justification comment in TypeScript-adjacent code.
 - Keep the work single-task scoped.
@@ -53,6 +56,7 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - For Manager V2 feature routes, implement placeholder promotion as a complete route slice: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
 - When a Manager V2 feature button cannot be clicked, first inspect whether it is still rendered as a disabled placeholder or hidden by feature gates before changing event handlers.
 - In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
+- New mounted-component tests must use `createMountedComponentHarness` (`tests/helpers/svelte-component-harness.js`), not inlined compile/mount boilerplate (`writeCompiledSvelte`/`rewriteClientImports`/DOM + `game` setup). That boilerplate is identical across the mount tests, so a fresh copy adds new duplicated lines and fails the SonarCloud new-code duplication gate (>3% on new code).
 - When code hand-maintains a mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists), add a guard test that fails when they drift — e.g. assert every mapping entry resolves to a real tracked file or emitted symbol. These mirrors rot silently otherwise.
 - Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration or the user explicitly asks for live Foundry evidence. It is not the normal PR screenshot generator.
 - `npm run test:foundry` defaults to host port `30100` so it coexists with a developer's local Foundry on `30000`. If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOUNDRY_URL` (e.g. `FOUNDRY_HOST_PORT=30101 FOUNDRY_URL=http://localhost:30101`).
