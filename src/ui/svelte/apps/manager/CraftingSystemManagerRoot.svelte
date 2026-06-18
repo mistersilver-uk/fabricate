@@ -15,6 +15,7 @@
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
+  import RecipeEditView from './RecipeEditView.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
@@ -950,7 +951,7 @@
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
     if (!system) return 'systems';
-    if (view === 'recipes' && !recipesAvailable) return 'system-edit';
+    if ((view === 'recipes' || view === 'recipe-edit') && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -978,6 +979,7 @@
 
   function viewTitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes');
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
@@ -1002,6 +1004,7 @@
 
   function viewSubtitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'The full recipe editor is coming soon.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
@@ -1328,6 +1331,19 @@
 
   function selectRecipe(recipeId) {
     selectedRecipeId = recipeId;
+  }
+
+  function editRecipe(recipeId = selectedRecipe?.id) {
+    afterTruthyResult(confirmRouteExit('recipe-edit'), () => {
+      selectedRecipeId = recipeId;
+      activeView = 'recipe-edit';
+    });
+  }
+
+  function backToRecipesBrowse() {
+    afterTruthyResult(confirmRouteExit('recipes'), () => {
+      activeView = 'recipes';
+    });
   }
 
   function selectComponent(componentId) {
@@ -2834,6 +2850,12 @@
             ? text('FABRICATE.Admin.Manager.Essence.CreateBreadcrumb', 'Create essence')
             : text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span>
         {/if}
+        {#if currentView === 'recipe-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToRecipesBrowse}>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span>
+        {/if}
         {#if currentView === 'component-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToComponentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button>
@@ -2898,6 +2920,8 @@
           <i class="fas fa-file-export" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
         </button>
+      {:else if currentView === 'recipe-edit'}
+        <!-- no header actions for the recipe-edit placeholder -->
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
@@ -3097,7 +3121,7 @@
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System settings')}</span>
           </button>
           {#if recipesRouteEnabled}
-            <button type="button" class={`manager-nav-button ${currentView === 'recipes' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' ? 'page' : undefined} onclick={() => setView('recipes')}>
+            <button type="button" class={`manager-nav-button ${currentView === 'recipes' || currentView === 'recipe-edit' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' || currentView === 'recipe-edit' ? 'page' : undefined} onclick={() => setView('recipes')}>
               <i class="fas fa-scroll" aria-hidden="true"></i>
               <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
               <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
@@ -3427,6 +3451,8 @@
         onDeleteComponent={(id) => deleteComponent(id)}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
+    {:else if currentView === 'recipe-edit' && selectedSystem}
+      <RecipeEditView recipe={selectedRecipeId ? selectedRecipe : null} onBack={backToRecipesBrowse} />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
         recipes={$viewState.recipes || []}
@@ -3437,6 +3463,7 @@
         selectedSystemName={selectedSystem?.name || ''}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
+        onEditRecipe={(id) => editRecipe(id)}
         onDuplicateRecipe={(id) => duplicateRecipe(id)}
         onDeleteRecipe={(id) => deleteRecipe(id)}
         onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
@@ -3469,7 +3496,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'component-edit'}
+    {#if currentView !== 'environment-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">

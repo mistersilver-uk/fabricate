@@ -59,6 +59,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
@@ -1366,7 +1367,6 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('routes to the recipes browser with selected recipe inspector and actions', async () => {
     const calls = [];
-    const edited = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -1374,8 +1374,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         store: createStore(calls, { experimentalFeaturesEnabled: true }),
         services: {
-          openCurrentAdmin: () => {},
-          onEditRecipe: (id) => edited.push(id)
+          openCurrentAdmin: () => {}
         }
       }
     });
@@ -1442,14 +1441,15 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
-    // Row actions are now Duplicate (1) and Delete (2) — the Edit icon is gone.
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    // Row actions are now Edit (1), Duplicate (2), Delete (3). Duplicate and Delete drive
+    // store callbacks and keep the row mounted; the Edit click is exercised separately below
+    // because it navigates away from the browser to the recipe-edit placeholder route.
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
     // Header actions are now Import (1) and Export (2) — the Create button is gone.
     target.querySelector('.manager-header-actions .manager-button:nth-child(1)').click();
     target.querySelector('.manager-header-actions .manager-button:nth-child(2)').click();
 
-    assert.deepEqual(edited, [], 'recipe edit wiring should be removed');
     assert.deepEqual(calls.slice(-4), [
       ['duplicateRecipe', 'r2'],
       ['deleteRecipe', 'r2'],
@@ -1458,6 +1458,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     ]);
     assert.ok(calls.some(call => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
     assert.ok(calls.some(call => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true));
+
+    // The first row action is Edit (fa-edit) and it navigates to the in-manager
+    // recipe-edit placeholder rather than calling a service callback.
+    const editButton = target.querySelector('[data-recipe-id="r2"] .manager-icon-button');
+    assert.ok(editButton.querySelector('.fa-edit'), 'first row action should be the Edit icon');
+    editButton.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Edit should navigate to the recipe-edit route');
+    assert.ok(target.textContent.includes('Recipe editor coming soon'), 'recipe-edit placeholder copy should render');
+    const recipeEditBackButton = Array.from(target.querySelectorAll('.manager-button')).find(button => button.textContent.includes('Back to recipes'));
+    assert.ok(recipeEditBackButton, 'recipe-edit placeholder should offer a back-to-recipes control');
+    recipeEditBackButton.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'back control should return to the recipes browser');
   });
 
   it('routes to the components browser with filters, drop import, selected inspector, and actions', async () => {

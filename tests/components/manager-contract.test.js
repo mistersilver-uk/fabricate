@@ -306,7 +306,7 @@ describe('CraftingSystemManager source contract', () => {
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
     assert.ok(rootSource.includes('recipesRouteEnabled'), 'root should derive the recipes route from the experimental feature gate');
-    assert.ok(rootSource.includes("view === 'recipes' && !recipesAvailable"), 'route normalization should reject recipes while the experimental gate is disabled');
+    assert.ok(rootSource.includes("(view === 'recipes' || view === 'recipe-edit') && !recipesAvailable"), 'route normalization should reject recipes (and the recipe-edit subroute) while the experimental gate is disabled');
     assert.ok(rootSource.includes("if (view === 'recipes' && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes navigation while disabled');
     assert.ok(rootSource.includes("{#if recipesRouteEnabled}"), 'recipes should not be hard-wired as an always-active rail route');
     assert.ok(
@@ -507,10 +507,14 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }
-    // The standalone Recipe Editor was removed, so recipe create/edit (which
-    // only opened that window) are no longer wired from the manager.
+    // Recipe creation still opens nothing (the standalone create flow was removed),
+    // but the row Edit action now navigates to the in-manager recipe-edit placeholder
+    // route, so the editRecipe / backToRecipesBrowse / onEditRecipe wiring must be present.
     assert.ok(!rootSource.includes('store.createRecipe'), 'recipe creation wiring should be removed');
-    assert.ok(!rootSource.includes('onEditRecipe'), 'recipe edit wiring should be removed');
+    assert.ok(rootSource.includes('onEditRecipe'), 'recipe edit prop should be wired to RecipesBrowserView');
+    assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
+    assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
+    assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');
     assert.ok(!rootSource.includes('saveRecipe'), 'recipes browser should not introduce inline save behavior');
     assert.ok(!rootSource.includes('required station'), 'recipes browser should not introduce unsupported recipe fields');
   });

@@ -1192,6 +1192,10 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .fabricate-manager .manager-inspector {
   display: flex;
   flex-direction: column;
@@ -1980,6 +1984,11 @@
   align-items: center;
   align-content: center;
   min-width: 0;
+}
+
+.fabricate-manager .manager-recipes-table .manager-recipe-row .manager-action-group {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-component-table-head,
