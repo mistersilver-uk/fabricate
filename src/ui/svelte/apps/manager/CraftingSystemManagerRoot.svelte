@@ -1,5 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import {
+    DEFAULT_GATHERING_ENVIRONMENT_IMG,
+    DEFAULT_GATHERING_EVENT_IMG,
+    DEFAULT_GATHERING_TASK_IMG
+  } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
@@ -1006,11 +1011,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle', 'Travel and parties');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
-    if (currentView === 'environment-edit') {
-      const base = text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
-      const environmentName = String(environmentDraftForDisplay?.name || '').trim();
-      return environmentName ? `${base}: ${environmentName}` : base;
-    }
+    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
@@ -1033,10 +1034,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current realm for the selected crafting system.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
-    if (currentView === 'environment-edit') {
-      const environmentDescription = String(environmentDraftForDisplay?.description || '').trim();
-      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation in the workspace.');
-    }
+    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected event.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
@@ -2367,7 +2365,7 @@
     // `img` is kept as a fallback for when the scene is unlinked.
     const sceneImage = environmentSceneImage(environment);
     if (sceneImage) return sceneImage;
-    return String(environment?.img || '').trim() || 'icons/svg/item-bag.svg';
+    return String(environment?.img || '').trim() || DEFAULT_GATHERING_ENVIRONMENT_IMG;
   }
 
   function hasEnvironmentImage(environment) {
@@ -2456,7 +2454,7 @@
   }
 
   function gatheringTaskImage(task) {
-    return task?.img || 'icons/svg/item-bag.svg';
+    return task?.img || DEFAULT_GATHERING_TASK_IMG;
   }
 
   function gatheringTaskDropRows(task) {
@@ -2960,7 +2958,7 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{viewTitle()}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.EditBreadcrumb', 'Edit environment')}</span>
         {/if}
         {#if currentView === 'gathering-task-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -4198,7 +4196,7 @@
           {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
             <section class="manager-inspector-card" data-gathering-event-inspector>
               <div class="manager-inspector-title-row is-hero-large">
-                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || 'icons/svg/mystery-man.svg'} alt="" />
+                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
                 <div class="manager-inspector-copy">
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
                   <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>

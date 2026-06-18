@@ -9,8 +9,10 @@
  * happens in the caller (GatheringEngine); this module only formats.
  */
 
+import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
+
 const COMPONENT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
-const EVENT_FALLBACK_IMG = 'icons/svg/mystery-man.svg';
+const EVENT_FALLBACK_IMG = DEFAULT_GATHERING_EVENT_IMG;
 
 const CHAT_KEYS = Object.freeze({
   success: 'FABRICATE.Chat.GatherSuccess',

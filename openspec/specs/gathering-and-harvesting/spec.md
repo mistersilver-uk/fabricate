@@ -101,7 +101,7 @@ GatheringEnvironment = {
   craftingSystemId: string,
   name: string,
   description?: string,
-  img?: string,
+  img?: string,  // default is 'icons/environment/wilderness/terrain-forest-gray.webp'
   enabled: boolean,
   selectionMode: "targeted" | "blind",
   compositionMode?: "automatic" | "manual",
@@ -142,7 +142,7 @@ GatheringEnvironment = {
 2. `selectionMode` must be either `"targeted"` or `"blind"`.
 3. A gathering environment may be **saved** without any task source so a GM can persist a partially-authored place and return to it later. It may only be **enabled** when it has at least one composed task source (a matching library task in automatic mode, or an `enabledTaskIds` / `forcedTaskIds` entry in manual mode), in either `targeted` or `blind` selection mode. A disabled environment with no task source persists fine; enabling it (via the editor toggle or a save with `enabled: true`) is rejected until a task source exists. This gates enable, not save.
 4. If `selectionMode === "blind"`, the environment may define one or more hidden Environment Tasks. Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
-5. `img` is an optional player-facing environment image independent of any linked scene.
+5. `img` is an optional player-facing environment image independent of any linked scene. When absent, surfaces fall back to the shared default `'icons/environment/wilderness/terrain-forest-gray.webp'`.
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 7. Scene linkage is optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
 8. Disabled environments are never attemptable by non-GM users and surface no task content to them. Disabled environments are surfaced as **locked identity-only listings to all viewers** in the player listing (players and GMs alike): a **locked identity-only teaser** (`locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, and no `tasks` or composition internals); it must never expose task identity, weights, drop data, or other composition internals. See *Player Environment Listing*.
@@ -586,7 +586,7 @@ GatheringEventDefinition = {
   id: string,
   name: string,
   description?: string,
-  img?: string,
+  img?: string,  // default is 'icons/magic/time/day-night-sunset-sunrise.webp'
   enabled: boolean,
   dangerTags?: string[],
   biomes?: string[],
@@ -624,7 +624,7 @@ GatheringTask = {
   id: string,
   name: string,
   description?: string,
-  img?: string,  // default is 'icons/svg/item-bag.svg'
+  img?: string,  // default is 'icons/containers/bags/pouch-leather-brown-green.webp'
   enabled: boolean,
 
   resolutionMode: "progressive" | "routed" | "d100",

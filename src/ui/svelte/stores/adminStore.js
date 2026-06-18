@@ -45,6 +45,7 @@ import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js'
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
+import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 
 // ---------------------------------------------------------------------------
@@ -639,7 +640,7 @@ function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toS
     id: event.id ? String(event.id) : randomID(),
     name: String(event.name || 'Event'),
     description: String(event.description || ''),
-    img: String(event.img || 'icons/svg/mystery-man.svg'),
+    img: String(event.img || DEFAULT_GATHERING_EVENT_IMG),
     enabled: event.enabled !== false,
     dangerTags: _normalizeGatheringTagList(event.dangerTags),
     biomes: _normalizeGatheringTagList(event.biomes),

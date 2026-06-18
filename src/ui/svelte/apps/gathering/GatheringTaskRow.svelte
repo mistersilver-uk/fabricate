@@ -14,6 +14,7 @@
   the right-column inspector.
 -->
 <script>
+  import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';
   import { calloutFor } from './gatheringBlockedReasons.js';
@@ -106,7 +107,7 @@
 
     <div class="gathering-task-main">
       <span class="gathering-task-thumb-wrap">
-        <img class="gathering-task-thumb" class:is-fallback={!img} src={img || 'icons/svg/item-bag.svg'} alt="" />
+        <img class="gathering-task-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_TASK_IMG} alt="" />
         {#if blocked}
           <span class="gathering-task-lock-overlay" aria-hidden="true">
             <i class="fas fa-lock"></i>

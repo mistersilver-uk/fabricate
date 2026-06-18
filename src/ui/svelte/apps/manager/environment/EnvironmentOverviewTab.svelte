@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
@@ -122,12 +123,12 @@
                 title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip', "This image comes from the linked scene and can't be edited. Unlink the scene to choose a custom image.")}
                 aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage', 'Image provided by the linked scene')}
               >
-                <img src={linkedSceneImage || environment.img || 'icons/svg/direction.svg'} alt="" />
+                <img src={linkedSceneImage || environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG} alt="" />
                 <i class="fas fa-lock" aria-hidden="true"></i>
               </span>
             {:else}
               <button type="button" class="manager-task-image-picker" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage', 'Choose environment image')} onclick={chooseImage} disabled={typeof onPickImagePath !== 'function'}>
-                <img src={environment.img || 'icons/svg/direction.svg'} alt="" />
+                <img src={environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG} alt="" />
                 <i class="fas fa-pen" aria-hidden="true"></i>
               </button>
             {/if}

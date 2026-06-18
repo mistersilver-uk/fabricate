@@ -113,7 +113,8 @@ function compileManagerRoot() {
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
     'src/utils/recipeCategories.js',
-    'src/config/flags.js'
+    'src/config/flags.js',
+    'src/gatheringImageDefaults.js'
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -4749,9 +4750,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
-    // The mock-matching header puts the environment name in the shared chrome
-    // title and groups Back / Delete / Save there; pills render under the title.
-    assert.match(target.querySelector('.manager-title').textContent, /New Gathering Environment/);
+    // The environment editor matches the task/event convention: a STATIC title,
+    // breadcrumb crumb, and concise help-text subtitle — the environment NAME and
+    // DESCRIPTION are no longer injected into the chrome. Pills render under the title.
+    assert.equal(target.querySelector('.manager-title').textContent.trim(), 'Edit environment');
+    const envEditCrumbs = Array.from(target.querySelectorAll('.manager-breadcrumbs span'));
+    assert.equal(
+      envEditCrumbs[envEditCrumbs.length - 1].textContent.trim(),
+      'Edit environment',
+      'final breadcrumb crumb should be the static label, not the environment name'
+    );
+    assert.equal(
+      target.querySelector('.manager-subtitle').textContent.trim(),
+      'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.',
+      'subtitle should be the static help text, not the environment description'
+    );
     assert.ok(target.querySelector('[data-environment-status-pills]'), 'chrome header should render environment status pills');
     assert.ok(target.querySelector('[data-action="delete-environment"]'), 'chrome header should expose the delete action');
     // The v2 composition editor owns its own contextual inspector inside the

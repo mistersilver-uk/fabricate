@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -299,7 +300,7 @@
     const sceneImage = environmentSceneImage(environment);
     if (sceneImage) return sceneImage;
     const explicitImage = typeof environment?.img === 'string' ? environment.img.trim() : '';
-    return explicitImage || 'icons/svg/item-bag.svg';
+    return explicitImage || DEFAULT_GATHERING_ENVIRONMENT_IMG;
   }
 
   function hasEnvironmentImage(environment) {

@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -205,7 +206,7 @@
   }
 
   function eventImage(event) {
-    return event?.img || 'icons/svg/mystery-man.svg';
+    return event?.img || DEFAULT_GATHERING_EVENT_IMG;
   }
 
   function clearFilters() {

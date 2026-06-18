@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -163,7 +164,7 @@
   }
 
   function taskImage(task) {
-    return task?.img || 'icons/svg/item-bag.svg';
+    return task?.img || DEFAULT_GATHERING_TASK_IMG;
   }
 
   function dropRows(task) {

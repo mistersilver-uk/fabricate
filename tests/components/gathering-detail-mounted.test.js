@@ -157,6 +157,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(utilDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
 
+    const imageDefaultsDestination = join(tempRoot, 'src/gatheringImageDefaults.js');
+    mkdirSync(dirname(imageDefaultsDestination), { recursive: true });
+    writeFileSync(imageDefaultsDestination, readFileSync(resolve(repoRoot, 'src/gatheringImageDefaults.js'), 'utf8'));
+
     const conditionIconsDestination = join(tempRoot, 'src/ui/svelte/util/gatheringConditionIcons.js');
     writeFileSync(conditionIconsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringConditionIcons.js'), 'utf8'));
 

@@ -5,6 +5,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import {
+  DEFAULT_GATHERING_EVENT_IMG,
+  DEFAULT_GATHERING_TASK_IMG
+} from '../../src/gatheringImageDefaults.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -2111,6 +2115,8 @@ describe('createAdminStore', () => {
       });
       assert.equal(config.systems.sys1.events[0].name, 'Thorns');
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.events[0].dropRate, 30);
+      // An event with no custom image is stamped with the shared default.
+      assert.equal(config.systems.sys1.events[0].img, DEFAULT_GATHERING_EVENT_IMG);
     });
 
     it('auto-populates default task name and image when the first drop row receives a component', async () => {
@@ -2161,7 +2167,7 @@ describe('createAdminStore', () => {
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(persisted.name, 'Forage Roots');
-      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+      assert.equal(persisted.img, DEFAULT_GATHERING_TASK_IMG);
     });
 
     it('normalizes defaultEnvironmentId (trimmed string or null) and round-trips it', async () => {
@@ -2293,7 +2299,7 @@ describe('createAdminStore', () => {
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(persisted.name, 'New Gathering Task');
-      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+      assert.equal(persisted.img, DEFAULT_GATHERING_TASK_IMG);
     });
 
     it('duplicates gathering tasks with fresh task and drop ids', async () => {

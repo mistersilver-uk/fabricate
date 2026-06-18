@@ -11,6 +11,7 @@
   tier), an optional per-event ChanceBar (event scale), and a short clamped description.
 -->
 <script>
+  import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
@@ -65,7 +66,7 @@
   >
     <div class="gathering-event-main">
       <span class="gathering-event-thumb-wrap">
-        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || 'icons/svg/mystery-man.svg'} alt="" />
+        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
       </span>
 
       <span class="gathering-event-copy">
