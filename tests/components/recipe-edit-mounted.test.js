@@ -10,7 +10,18 @@ const repoRoot = resolve(__dirname, '../..');
 const RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/dropUtils.js',
-  'src/ui/svelte/actions/dragDrop.js'
+  'src/ui/svelte/actions/dragDrop.js',
+  // recipeImageIcons re-exports DEFAULT_RECIPE_IMAGE from the Recipe model
+  // (the single low-layer source of truth), so the harness must copy that
+  // module and its transitive model dependencies.
+  'src/ui/svelte/util/recipeImageIcons.js',
+  'src/models/Recipe.js',
+  'src/models/Ingredient.js',
+  'src/models/IngredientSet.js',
+  'src/models/IngredientGroup.js',
+  'src/models/Result.js',
+  'src/utils/recipeCategories.js',
+  'src/config/flags.js'
 ];
 
 const editHarness = createMountedComponentHarness({
@@ -106,6 +117,32 @@ describe('RecipeEditView (mounted)', () => {
     const lastDraft = draftCalls.at(-1);
     assert.equal(lastDraft.name, 'Greater Healing Draught', 'draft carries the edited name');
     assert.equal(lastDraft.dirty, true, 'draft is dirty');
+    editHarness.remount();
+  });
+
+  it('renders an editable image picker button when no recipe item is linked', async () => {
+    const target = await editHarness.mount(identityProps({ onPickImagePath: async () => '' }));
+    assert.ok(target.querySelector('button[data-recipe-field="img"]'), 'editable image picker button renders');
+    assert.equal(target.querySelector('[data-recipe-item-locked-image]'), null, 'no locked-image span when unlinked');
+    editHarness.remount();
+  });
+
+  it('locks the image picker to the linked recipe item image when recipeItemId is set', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, recipeItemId: 'ri1' },
+      linkedItemImage: 'icons/consumables/potions/potion-tube-corked-blue.webp',
+      onPickImagePath: async () => 'icons/should-not-be-used.webp'
+    }));
+    const locked = target.querySelector('[data-recipe-item-locked-image]');
+    assert.ok(locked, 'locked-image span renders when linked');
+    assert.ok(locked.classList.contains('is-recipe-item-linked'), 'uses the recipe-specific locked class');
+    assert.ok(locked.querySelector('.fa-lock'), 'shows a lock icon');
+    assert.equal(target.querySelector('button[data-recipe-field="img"]'), null, 'no editable picker button when locked');
+    const img = locked.querySelector('img');
+    assert.ok(
+      img.getAttribute('src').includes('potion-tube-corked-blue'),
+      'shows the linked item image'
+    );
     editHarness.remount();
   });
 

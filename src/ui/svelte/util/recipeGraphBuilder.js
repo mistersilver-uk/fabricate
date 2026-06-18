@@ -4,6 +4,8 @@
  * No Foundry or DOM dependencies. All inputs/outputs are plain objects.
  */
 
+import { DEFAULT_RECIPE_IMAGE } from './recipeImageIcons.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -80,7 +82,7 @@ export function buildRecipeGraph(recipes, components = []) {
     nodeMap.set(recipe.id, {
       id: recipe.id,
       name: recipe.name,
-      img: recipe.img || 'icons/svg/item-bag.svg',
+      img: recipe.img || DEFAULT_RECIPE_IMAGE,
       category: recipe.category || '',
       layer: 0,
       position: 0,

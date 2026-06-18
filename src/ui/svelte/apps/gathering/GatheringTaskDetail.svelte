@@ -13,6 +13,7 @@
   lazily-loaded "What you might find" section for the selected task.
 -->
 <script>
+  import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { formatRespawnDuration } from '../../util/formatDuration.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
@@ -156,7 +157,7 @@
   >
     <header class="gathering-task-detail-header">
       <span class="gathering-task-detail-thumb-wrap">
-        <img class="gathering-task-detail-thumb" class:is-fallback={!img} src={img || 'icons/svg/item-bag.svg'} alt="" />
+        <img class="gathering-task-detail-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_TASK_IMG} alt="" />
       </span>
       <span class="gathering-task-detail-heading">
         <h2 id={titleId} class="gathering-task-detail-title" title={name}>{name}</h2>

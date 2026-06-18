@@ -5,6 +5,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import {
+  DEFAULT_GATHERING_EVENT_IMG,
+  DEFAULT_GATHERING_TASK_IMG
+} from '../../src/gatheringImageDefaults.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -1382,6 +1386,42 @@ describe('createAdminStore', () => {
       assert.deepEqual(errors, ['recipe boom']);
     });
 
+    it('createRecipe requests an incomplete shell via the allowIncomplete option', async () => {
+      let createArgs = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        createRecipe: async (data, options) => {
+          createArgs = { data, options };
+          return origManager.createRecipe(data, options);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const created = await store.createRecipe();
+      assert.ok(created?.id, 'createRecipe should return the created shell id');
+      assert.equal(createArgs.options?.allowIncomplete, true, 'shell create must allow incomplete');
+      assert.equal(createArgs.data.craftingSystemId, 'sys1');
+    });
+
+    it('updateRecipe requests allowIncomplete so identity-only shell edits are not blocked', async () => {
+      let updateOptions = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateOptions = options;
+          await origManager.updateRecipe(id, updates, options);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateRecipe('r1', { name: 'Renamed Shell' });
+      assert.equal(updateOptions?.allowIncomplete, true, 'editor save must allow incomplete');
+    });
+
     it('addRecipeItemFromUuid passes through the manager result', async () => {
       const passthrough = { item: { id: 'item-x' }, action: 'created' };
       const services = createMockServices();
@@ -2111,6 +2151,8 @@ describe('createAdminStore', () => {
       });
       assert.equal(config.systems.sys1.events[0].name, 'Thorns');
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.events[0].dropRate, 30);
+      // An event with no custom image is stamped with the shared default.
+      assert.equal(config.systems.sys1.events[0].img, DEFAULT_GATHERING_EVENT_IMG);
     });
 
     it('auto-populates default task name and image when the first drop row receives a component', async () => {
@@ -2161,7 +2203,7 @@ describe('createAdminStore', () => {
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(persisted.name, 'Forage Roots');
-      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+      assert.equal(persisted.img, DEFAULT_GATHERING_TASK_IMG);
     });
 
     it('normalizes defaultEnvironmentId (trimmed string or null) and round-trips it', async () => {
@@ -2293,7 +2335,7 @@ describe('createAdminStore', () => {
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(persisted.name, 'New Gathering Task');
-      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+      assert.equal(persisted.img, DEFAULT_GATHERING_TASK_IMG);
     });
 
     it('duplicates gathering tasks with fresh task and drop ids', async () => {

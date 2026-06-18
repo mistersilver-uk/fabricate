@@ -1,3 +1,4 @@
+import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
 import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
@@ -2700,7 +2701,7 @@ export class GatheringEngine {
 
       const events = normalizeList(checkResult?.events).map((event) => ({
         name: stringOrEmpty(event?.name),
-        img: stringOrNull(event?.img) || 'icons/svg/mystery-man.svg',
+        img: stringOrNull(event?.img) || DEFAULT_GATHERING_EVENT_IMG,
       }));
 
       const brokenTools = normalizeList(usedTools)

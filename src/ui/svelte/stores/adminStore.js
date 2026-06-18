@@ -45,6 +45,7 @@ import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js'
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
+import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 
 // ---------------------------------------------------------------------------
@@ -231,6 +232,50 @@ function _recipeStructure(isSimple, stepCount) {
     return { structureKey: 'simple', structureLabel: 'Simple' };
   }
   return { structureKey: 'singleStep', structureLabel: 'Single step' };
+}
+
+/**
+ * Coarse fallback for {@link _isRecipeIncomplete} when a recipe model instance
+ * (with `validate()` / `validateStructure()`) is unavailable. Detects the common
+ * shell shapes — missing ingredient sets / result groups — but not the deeper
+ * completeness cases the validators reject.
+ * @param {object} recipe
+ * @returns {boolean}
+ */
+function _isRecipeIncompleteByCounts(recipe) {
+  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+  if (steps.length > 0) {
+    return steps.some(
+      step =>
+        !Array.isArray(step?.ingredientSets) ||
+        step.ingredientSets.length === 0 ||
+        !Array.isArray(step?.resultGroups) ||
+        step.resultGroups.length === 0
+    );
+  }
+  const ingredientSets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
+  const resultGroups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
+  return ingredientSets.length === 0 || resultGroups.length === 0;
+}
+
+/**
+ * Derive whether a recipe is an incomplete authoring shell — persistable but not craftable.
+ * Source of truth: a recipe is incomplete iff it is structurally sound but fails the
+ * full completeness contract, i.e. `validateStructure().valid === true` while
+ * `validate().valid === false`. This exactly matches the craftability/completeness
+ * notion (the engine gates craft on `Recipe.validate()`), so the chip never falsely
+ * reads "complete" for a recipe whose ingredient set has no groups/essences, whose
+ * result group is empty, whose resolution-mode cardinality is unmet, or — for explicit
+ * multi-step recipes — whose step is missing either side. The two validators are pure.
+ * Falls back to a coarse count-only check when a model instance is unavailable.
+ * @param {Recipe} recipe
+ * @returns {boolean}
+ */
+function _isRecipeIncomplete(recipe) {
+  if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
+    return recipe.validate().valid === false && recipe.validateStructure().valid === true;
+  }
+  return _isRecipeIncompleteByCounts(recipe);
 }
 
 function _buildRecipeBrowserDisplay(recipe) {
@@ -639,7 +684,7 @@ function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toS
     id: event.id ? String(event.id) : randomID(),
     name: String(event.name || 'Event'),
     description: String(event.description || ''),
-    img: String(event.img || 'icons/svg/mystery-man.svg'),
+    img: String(event.img || DEFAULT_GATHERING_EVENT_IMG),
     enabled: event.enabled !== false,
     dangerTags: _normalizeGatheringTagList(event.dangerTags),
     biomes: _normalizeGatheringTagList(event.biomes),
@@ -1130,6 +1175,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
+      // Derived (no stored flag): a shell missing ingredient sets / result groups is
+      // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
+      incomplete: _isRecipeIncomplete(recipe),
       // Canonical recipe-item linkage (never the legacy uuid alias).
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
@@ -5225,10 +5273,29 @@ export function createAdminStore(services) {
 
   // --- Recipe operations ---
 
+  async function createRecipe() {
+    const recipeManager = services.getRecipeManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return null;
+
+    try {
+      const created = await recipeManager.createRecipe(
+        { craftingSystemId: sysId },
+        { allowIncomplete: true }
+      );
+      await refresh();
+      return created?.id ? { id: created.id } : null;
+    } catch (err) {
+      console.error('Fabricate | Failed to create recipe:', err);
+      services.notify?.error?.(err?.message || 'Failed to create recipe');
+      return null;
+    }
+  }
+
   async function deleteRecipe(recipeId) {
     const recipeManager = services.getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
-    if (!recipe) return;
+    if (!recipe) return false;
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${recipe.name}?`,
@@ -5236,27 +5303,49 @@ export function createAdminStore(services) {
       yes: () => true,
       no: () => false
     });
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     await recipeManager.deleteRecipe(recipeId);
     await refresh();
+    return true;
   }
 
   async function duplicateRecipe(recipeId) {
     const recipeManager = services.getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
-    if (!recipe) return;
+    if (!recipe) return false;
     const data = recipe.toJSON();
     delete data.id;
     data.name = `${data.name} (Copy)`;
-    await recipeManager.createRecipe(data);
-    await refresh();
+
+    try {
+      // A persisted shell (no ingredient sets / result groups) must duplicate into
+      // another authoring shell, so allowIncomplete waives completeness here. A
+      // complete recipe still duplicates and persists unchanged under this flag.
+      await recipeManager.createRecipe(data, { allowIncomplete: true });
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to duplicate recipe:', err);
+      services.notify?.error?.(err?.message || 'Failed to duplicate recipe');
+      return false;
+    }
   }
 
   async function toggleRecipeEnabled(recipeId, enabled) {
     const recipeManager = services.getRecipeManager();
-    await recipeManager.updateRecipe(recipeId, { enabled });
-    await refresh();
+
+    try {
+      // Flipping the enabled flag is identity-level and must never be blocked by
+      // completeness, so a shell can be enabled/disabled like any other recipe.
+      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true });
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to toggle recipe enabled state:', err);
+      services.notify?.error?.(err?.message || 'Failed to update recipe');
+      return false;
+    }
   }
 
   async function updateRecipe(recipeId, updates = {}) {
@@ -5267,7 +5356,10 @@ export function createAdminStore(services) {
     if (Object.keys(updates).length === 0) return true;
 
     try {
-      await recipeManager.updateRecipe(recipeId, updates);
+      // The recipe editor only edits identity + the linked recipe item; a shell's
+      // ingredients/results may still be empty. allowIncomplete keeps those
+      // identity-only saves from being blocked by completeness validation.
+      await recipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true });
       await refresh();
       return true;
     } catch (err) {
@@ -5537,6 +5629,7 @@ export function createAdminStore(services) {
     saveAlchemyConfig,
     saveVisibilityConfig,
     saveTeaserConfig,
+    createRecipe,
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,

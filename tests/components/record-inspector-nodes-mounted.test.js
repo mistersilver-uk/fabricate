@@ -93,6 +93,7 @@ describe('RecordInspector available-node stepper', () => {
       writeCompiledSvelte(component);
     }
     copyModule('src/ui/svelte/util/foundryBridge.js');
+    copyModule('src/gatheringImageDefaults.js');
     Component = (await import(pathToFileURL(join(
       tempRoot,
       'src/ui/svelte/apps/manager/environment/RecordInspector.svelte.js'

@@ -1,13 +1,13 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools } from '../gatheringToolRuntime.js';
-import { Recipe } from '../models/Recipe.js';
+import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
 import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
 
 import { SignatureValidator } from './SignatureValidator.js';
 
-const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
+const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
 const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 
@@ -71,14 +71,19 @@ export class RecipeManager {
   /**
    * Create a new recipe
    * @param {Object} recipeData - Recipe configuration
-   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
+   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
+   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
+   *   valid but incomplete authoring shell (missing ingredient sets / result groups); such a
+   *   shell stays non-craftable because the engine gates on the full completeness contract.
    * @returns {Recipe}
    */
   async createRecipe(recipeData, options = {}) {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
-    const validation = this._validateRecipeForCreateOrUpdate(recipe);
+    const validation = this._validateRecipeForCreateOrUpdate(recipe, {
+      requireComplete: !options.allowIncomplete,
+    });
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe: ${validation.errors.join(', ')}`);
@@ -101,7 +106,10 @@ export class RecipeManager {
    * Update an existing recipe
    * @param {string} recipeId - Recipe ID to update
    * @param {Object} updates - Properties to update
-   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
+   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
+   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
+   *   valid but incomplete authoring shell (e.g. identity-only edits to a recipe whose
+   *   ingredients/results are still empty); such a shell stays non-craftable.
    * @returns {Recipe}
    */
   async updateRecipe(recipeId, updates, options = {}) {
@@ -118,7 +126,9 @@ export class RecipeManager {
       id: recipeId,
     };
     const updatedRecipe = Recipe.fromJSON(merged);
-    const validation = this._validateRecipeForCreateOrUpdate(updatedRecipe);
+    const validation = this._validateRecipeForCreateOrUpdate(updatedRecipe, {
+      requireComplete: !options.allowIncomplete,
+    });
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe update: ${validation.errors.join(', ')}`);
@@ -1027,15 +1037,15 @@ export class RecipeManager {
    * @returns {{valid: boolean, errors: string[]}}
    * @private
    */
-  _validateRecipeForCreateOrUpdate(recipe) {
-    const baseValidation = recipe.validate();
+  _validateRecipeForCreateOrUpdate(recipe, { requireComplete = true } = {}) {
+    const baseValidation = requireComplete ? recipe.validate() : recipe.validateStructure();
     const errors = [...(baseValidation.errors || [])];
 
     const systemValidation = this._validateEssenceReferences(recipe);
     errors.push(...systemValidation.errors);
     const tagValidation = this._validateTagPlaceholders(recipe);
     errors.push(...tagValidation.errors);
-    const modeValidation = this._validateResolutionMode(recipe);
+    const modeValidation = this._validateResolutionMode(recipe, { requireComplete });
     errors.push(...modeValidation.errors);
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
@@ -1138,12 +1148,12 @@ export class RecipeManager {
     };
   }
 
-  _validateResolutionMode(recipe) {
+  _validateResolutionMode(recipe, { requireComplete = true } = {}) {
     const modeService = game.fabricate?.getResolutionModeService?.();
     if (!modeService) {
       return { valid: true, errors: [] };
     }
-    return modeService.validateRecipe(recipe);
+    return modeService.validateRecipe(recipe, { requireComplete });
   }
 
   _validateTagPlaceholders(recipe) {

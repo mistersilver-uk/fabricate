@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_EVENT_IMG, DEFAULT_GATHERING_TASK_IMG } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
@@ -17,7 +18,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const defaultImg = $derived(kind === 'event' ? 'icons/svg/mystery-man.svg' : 'icons/svg/item-bag.svg');
+  const defaultImg = $derived(kind === 'event' ? DEFAULT_GATHERING_EVENT_IMG : DEFAULT_GATHERING_TASK_IMG);
   const record = $derived(entry?.record || null);
   const name = $derived(record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'));
 

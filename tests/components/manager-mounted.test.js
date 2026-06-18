@@ -94,13 +94,31 @@ function compileManagerRoot() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js', 'gatheringFormat.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js', 'gatheringFormat.js', 'recipeImageIcons.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
       utilDestination,
       readFileSync(resolve(repoRoot, `src/ui/svelte/util/${utilPath}`), 'utf8')
     );
+  }
+
+  // recipeImageIcons re-exports DEFAULT_RECIPE_IMAGE from the Recipe model (the
+  // single low-layer source of truth), so copy that module and its transitive
+  // model/util/config dependencies verbatim.
+  for (const rawPath of [
+    'src/models/Recipe.js',
+    'src/models/Ingredient.js',
+    'src/models/IngredientSet.js',
+    'src/models/IngredientGroup.js',
+    'src/models/Result.js',
+    'src/utils/recipeCategories.js',
+    'src/config/flags.js',
+    'src/gatheringImageDefaults.js'
+  ]) {
+    const rawDestination = join(tempRoot, rawPath);
+    mkdirSync(dirname(rawDestination), { recursive: true });
+    writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawPath), 'utf8'));
   }
 
   for (const actionPath of ['dragDrop.js', 'dismissOnOutsideClick.js', 'portal.js']) {
@@ -504,6 +522,7 @@ function createStore(calls = [], options = {}) {
         category: 'elixirs',
         enabled: false,
         locked: true,
+        incomplete: true,
         isSimple: false,
         structureLabel: 'Single step',
         stepCount: 1,
@@ -733,13 +752,19 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleFeature', feature, enabled]);
       return options.toggleFeatureResult ?? true;
     },
-    createRecipe: () => calls.push(['createRecipe']),
+    createRecipe: () => {
+      calls.push(['createRecipe']);
+      return options.createRecipeResult ?? { id: 'r-created' };
+    },
     importRecipes: () => calls.push(['importRecipes']),
     exportRecipes: () => calls.push(['exportRecipes']),
     setRecipeSearch: (term) => calls.push(['setRecipeSearch', term]),
     toggleRecipeEnabled: (id, enabled) => calls.push(['toggleRecipeEnabled', id, enabled]),
     duplicateRecipe: (id) => calls.push(['duplicateRecipe', id]),
-    deleteRecipe: (id) => calls.push(['deleteRecipe', id]),
+    deleteRecipe: (id) => {
+      calls.push(['deleteRecipe', id]);
+      return options.deleteRecipeResult ?? true;
+    },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
     updateComponent: (id, updates) => {
@@ -1417,6 +1442,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
+    const r2IncompleteChip = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-warning');
+    assert.ok(r2IncompleteChip, 'an incomplete recipe row should render the Incomplete warning chip');
+    assert.equal(r2IncompleteChip.textContent.trim(), 'Incomplete');
+    assert.equal(
+      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
+      null,
+      'a complete recipe row should not render the Incomplete chip'
+    );
 
     assert.equal(target.querySelector('.manager-pagination'), null, 'pagination should hide while filtered row count is below the page size');
 
@@ -1456,18 +1489,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     // because it navigates away from the browser to the recipe-edit route.
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
-    // Header actions are now Import (1) and Export (2) — the Create button is gone.
-    target.querySelector('.manager-header-actions .manager-button:nth-child(1)').click();
-    target.querySelector('.manager-header-actions .manager-button:nth-child(2)').click();
 
-    assert.deepEqual(calls.slice(-4), [
+    assert.deepEqual(calls.slice(-2), [
       ['duplicateRecipe', 'r2'],
-      ['deleteRecipe', 'r2'],
-      ['importRecipes'],
-      ['exportRecipes']
+      ['deleteRecipe', 'r2']
     ]);
     assert.ok(calls.some(call => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
     assert.ok(calls.some(call => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true));
+    // The recipes header no longer renders crafting-system import/export.
+    assert.ok(!calls.some(call => call[0] === 'importRecipes'), 'recipes header should not call importRecipes');
+    assert.ok(!calls.some(call => call[0] === 'exportRecipes'), 'recipes header should not call exportRecipes');
 
     // The first row action is Edit (fa-edit) and it navigates to the in-manager
     // recipe-edit route rather than calling a service callback.
@@ -1482,12 +1513,46 @@ describe('CraftingSystemManager mounted behavior', () => {
     // defaults to 'itemOrLearned' and the recipe-item card is shown in the global
     // inspector aside (not a view-internal column).
     assert.ok(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), 'recipe-item card shows in the global inspector for the default knowledge mode');
-    const recipeEditCancelButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(button => button.textContent.includes('Cancel'));
-    assert.ok(recipeEditCancelButton, 'recipe-edit header should offer a Cancel control');
-    recipeEditCancelButton.click();
+    // The recipe-edit header now follows the task/environment convention: Back to
+    // recipes + Delete recipe + Save (no Cancel).
+    const recipeEditButtons = Array.from(target.querySelectorAll('.manager-header-actions .manager-button'));
+    assert.ok(!recipeEditButtons.some(button => button.textContent.includes('Cancel')), 'recipe-edit header should not offer a Cancel control');
+    const backButton = recipeEditButtons.find(button => button.textContent.includes('Back to recipes'));
+    assert.ok(backButton, 'recipe-edit header should offer a Back to recipes control');
+    backButton.click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'Cancel should return to the recipes browser');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'Back to recipes should return to the recipes browser');
+  });
+
+  it('creates a recipe from the recipes header and opens the recipe-edit route', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
+        services: {
+          openCurrentAdmin: () => {}
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    const createButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Create recipe'));
+    assert.ok(createButton, 'recipes header should offer a Create recipe control');
+    createButton.click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'createRecipe'), 'Create recipe should call store.createRecipe');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Create recipe should open the recipe-edit route');
   });
 
   it('suppresses the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
@@ -4732,9 +4797,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
-    // The mock-matching header puts the environment name in the shared chrome
-    // title and groups Back / Delete / Save there; pills render under the title.
-    assert.match(target.querySelector('.manager-title').textContent, /New Gathering Environment/);
+    // The environment editor matches the task/event convention: a STATIC title,
+    // breadcrumb crumb, and concise help-text subtitle — the environment NAME and
+    // DESCRIPTION are no longer injected into the chrome. Pills render under the title.
+    assert.equal(target.querySelector('.manager-title').textContent.trim(), 'Edit environment');
+    const envEditCrumbs = Array.from(target.querySelectorAll('.manager-breadcrumbs span'));
+    assert.equal(
+      envEditCrumbs[envEditCrumbs.length - 1].textContent.trim(),
+      'Edit environment',
+      'final breadcrumb crumb should be the static label, not the environment name'
+    );
+    assert.equal(
+      target.querySelector('.manager-subtitle').textContent.trim(),
+      'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.',
+      'subtitle should be the static help text, not the environment description'
+    );
     assert.ok(target.querySelector('[data-environment-status-pills]'), 'chrome header should render environment status pills');
     assert.ok(target.querySelector('[data-action="delete-environment"]'), 'chrome header should expose the delete action');
     // The v2 composition editor owns its own contextual inspector inside the

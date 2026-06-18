@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize, viewScene } from '../../util/foundryBridge.js';
@@ -75,7 +76,7 @@
   }
 
   function eventImage() {
-    return event?.img || 'icons/svg/mystery-man.svg';
+    return event?.img || DEFAULT_GATHERING_EVENT_IMG;
   }
 
   function dangerLabel(tag) {

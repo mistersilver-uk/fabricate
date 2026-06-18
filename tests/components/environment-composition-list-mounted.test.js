@@ -127,7 +127,8 @@ describe('CompositionList mounted layout', () => {
     }
     for (const modulePath of [
       'src/ui/svelte/util/foundryBridge.js',
-      'src/ui/svelte/actions/dismissOnOutsideClick.js'
+      'src/ui/svelte/actions/dismissOnOutsideClick.js',
+      'src/gatheringImageDefaults.js'
     ]) {
       copyModule(modulePath);
     }

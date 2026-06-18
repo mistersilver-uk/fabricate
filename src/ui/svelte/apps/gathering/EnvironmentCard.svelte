@@ -24,6 +24,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
+  import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
 
   let {
     environment = null,
@@ -133,7 +134,7 @@
       <img
         class="gathering-env-card-thumb"
         class:is-fallback={!displayImg}
-        src={displayImg || 'icons/svg/door-closed.svg'}
+        src={displayImg || DEFAULT_GATHERING_ENVIRONMENT_IMG}
         alt=""
       />
       {#if locked}

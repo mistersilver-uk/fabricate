@@ -5218,20 +5218,25 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* When a scene is linked, the identity image mirrors the (muted) scene thumbnail and is
-   locked — it can't be edited until the scene is unlinked. */
-.fabricate-manager .manager-task-image-picker.is-scene-linked {
+/* When a scene (or recipe item) is linked, the identity image mirrors the
+   (muted) linked thumbnail and is locked — it can't be edited until the link
+   is removed. */
+.fabricate-manager .manager-task-image-picker.is-scene-linked,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked {
   cursor: default;
 }
 
-.fabricate-manager .manager-task-image-picker.is-scene-linked img {
+.fabricate-manager .manager-task-image-picker.is-scene-linked img,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked img {
   object-fit: cover;
   padding: 0;
   filter: saturate(0.65) brightness(0.85);
 }
 
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-pen,
-.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock {
+.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-pen,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-lock {
   color: var(--fab-mv2-text-muted);
 }
 
