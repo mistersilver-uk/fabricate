@@ -60,6 +60,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
@@ -1460,18 +1461,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true));
 
     // The first row action is Edit (fa-edit) and it navigates to the in-manager
-    // recipe-edit workspace rather than calling a service callback.
+    // recipe-edit route rather than calling a service callback.
     const editButton = target.querySelector('[data-recipe-id="r2"] .manager-icon-button');
     assert.ok(editButton.querySelector('.fa-edit'), 'first row action should be the Edit icon');
     editButton.click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Edit should navigate to the recipe-edit route');
-    assert.ok(target.querySelector('.manager-recipe-workspace'), 'recipe-edit renders the two-column workspace');
-    assert.ok(target.querySelector('[data-recipe-section="identity"]'), 'recipe-edit renders the identity card');
+    assert.ok(target.querySelector('.manager-main [data-recipe-section="identity"]'), 'recipe-edit renders the identity card in the central main');
     // The mock system carries no recipeVisibility.knowledge.mode, so the editor
-    // defaults to 'itemOrLearned' and the recipe-item card is shown.
-    assert.ok(target.querySelector('[data-recipe-section="recipe-item"]'), 'recipe-item card shows for the default knowledge mode');
+    // defaults to 'itemOrLearned' and the recipe-item card is shown in the global
+    // inspector aside (not a view-internal column).
+    assert.ok(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), 'recipe-item card shows in the global inspector for the default knowledge mode');
     const recipeEditCancelButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(button => button.textContent.includes('Cancel'));
     assert.ok(recipeEditCancelButton, 'recipe-edit header should offer a Cancel control');
     recipeEditCancelButton.click();

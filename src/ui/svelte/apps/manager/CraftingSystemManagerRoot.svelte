@@ -16,6 +16,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeEditView from './RecipeEditView.svelte';
+  import RecipeItemInspector from './RecipeItemInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
@@ -450,6 +451,11 @@
     && recipeEditSaving !== true);
   const recipeKnowledgeMode = $derived(selectedSystem?.recipeVisibility?.knowledge?.mode || 'itemOrLearned');
   const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
+  // The recipe-item card lives in the global inspector and is shown only when
+  // the system's knowledge mode consumes an item; for 'learned' the aside is
+  // suppressed (full-width main), matching the other suppressed edit views.
+  const recipeInspectorVisible = $derived(currentView === 'recipe-edit'
+    && (recipeKnowledgeMode === 'item' || recipeKnowledgeMode === 'itemOrLearned'));
   const componentForEdit = $derived(currentView === 'component-edit'
     ? itemCards.find(item => item.id === selectedComponentId) || null
     : null);
@@ -1074,6 +1080,7 @@
   }
 
   function inspectorLabel() {
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item');
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Inspector', 'Tags and categories inspector');
@@ -3545,18 +3552,12 @@
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
         recipe={selectedRecipeId ? selectedRecipe : null}
-        {recipeItemDefinitions}
-        knowledgeMode={recipeKnowledgeMode}
         saving={recipeEditSaving}
         onBack={cancelRecipeEdit}
         onSave={saveRecipeEdit}
         onDirtyChange={(dirty) => { recipeEditDirty = dirty; }}
         onDraftChange={handleRecipeDraftChange}
         onPickImagePath={services?.pickImagePath}
-        onAddRecipeItem={handleAddRecipeItem}
-        onSetRecipeItem={handleSetRecipeItem}
-        onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
-        onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
       />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
@@ -3601,7 +3602,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit'}
+    {#if currentView !== 'environment-edit' && currentView !== 'component-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
@@ -5239,6 +5240,15 @@
             </div>
           </div>
         {/if}
+      {:else if currentView === 'recipe-edit'}
+        <RecipeItemInspector
+          recipe={selectedRecipeId ? selectedRecipe : null}
+          {recipeItemDefinitions}
+          onAddRecipeItem={handleAddRecipeItem}
+          onSetRecipeItem={handleSetRecipeItem}
+          onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
+          onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
+        />
       {:else if currentView === 'system-edit' && selectedSystem}
         <section class="manager-inspector-card">
           <div class="manager-inspector-title-row is-hero-large">

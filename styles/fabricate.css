@@ -1196,26 +1196,6 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-.fabricate-manager .manager-recipe-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: var(--fab-space-3);
-  min-width: 0;
-  min-height: 0;
-}
-
-.fabricate-manager .manager-recipe-workspace.is-inspector-hidden {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.fabricate-manager .manager-recipe-edit-panel,
-.fabricate-manager .manager-recipe-inspector {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-inspector {
   display: flex;
   flex-direction: column;
@@ -9648,10 +9628,6 @@
 
 @container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-environment-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .fabricate-manager .manager-recipe-workspace {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -7,16 +7,26 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
-const harness = createMountedComponentHarness({
+const RAW_MODULES = [
+  'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/dropUtils.js',
+  'src/ui/svelte/actions/dragDrop.js'
+];
+
+const editHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-edit-',
-  rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
-    'src/ui/svelte/util/dropUtils.js',
-    'src/ui/svelte/actions/dragDrop.js'
-  ],
+  rawModules: RAW_MODULES,
   compiledModules: ['src/ui/svelte/apps/manager/RecipeEditView.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/RecipeEditView.svelte'
+});
+
+const inspectorHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-recipe-item-inspector-',
+  rawModules: RAW_MODULES,
+  compiledModules: ['src/ui/svelte/apps/manager/RecipeItemInspector.svelte'],
+  componentPath: 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte'
 });
 
 const RECIPE = Object.freeze({
@@ -28,17 +38,23 @@ const RECIPE = Object.freeze({
   recipeItemId: ''
 });
 
-function baseProps(overrides = {}) {
+function identityProps(overrides = {}) {
   return {
     recipe: RECIPE,
-    recipeItemDefinitions: [],
-    knowledgeMode: 'itemOrLearned',
     saving: false,
     onBack: () => {},
     onSave: () => true,
     onDirtyChange: () => {},
     onDraftChange: () => {},
     onPickImagePath: null,
+    ...overrides
+  };
+}
+
+function inspectorProps(overrides = {}) {
+  return {
+    recipe: RECIPE,
+    recipeItemDefinitions: [],
     onAddRecipeItem: () => false,
     onSetRecipeItem: () => {},
     onOpenItem: () => {},
@@ -57,50 +73,27 @@ function dispatchDrop(node, payload) {
 
 describe('RecipeEditView (mounted)', () => {
   before(async () => {
-    await harness.setup();
-    // The harness installs game.i18n but not fromUuid; provide a default stub.
-    globalThis.foundry = {};
-    globalThis.fromUuid = async () => null;
+    await editHarness.setup();
   });
 
   after(() => {
-    delete globalThis.fromUuid;
-    delete globalThis.foundry;
-    harness.teardown();
+    editHarness.teardown();
   });
 
-  beforeEach(() => {
-    globalThis.fromUuid = async () => null;
-  });
-
-  it('renders the identity inputs', async () => {
-    const target = await harness.mount(baseProps());
+  it('renders the identity inputs and no recipe-item card', async () => {
+    const target = await editHarness.mount(identityProps());
     assert.ok(target.querySelector('[data-recipe-field="name"]'), 'name input renders');
     assert.ok(target.querySelector('[data-recipe-field="description"]'), 'description textarea renders');
     assert.ok(target.querySelector('[data-recipe-field="enabled"]'), 'enabled toggle renders');
-    harness.remount();
-  });
-
-  it('shows the recipe-item card for itemOrLearned and hides it for learned', async () => {
-    let target = await harness.mount(baseProps({ knowledgeMode: 'itemOrLearned' }));
-    assert.ok(target.querySelector('[data-recipe-section="recipe-item"]'), 'card shown for itemOrLearned');
-    assert.equal(target.querySelector('.manager-recipe-workspace.is-inspector-hidden'), null, 'inspector not hidden');
-    harness.remount();
-
-    target = await harness.mount(baseProps({ knowledgeMode: 'item' }));
-    assert.ok(target.querySelector('[data-recipe-section="recipe-item"]'), 'card shown for item');
-    harness.remount();
-
-    target = await harness.mount(baseProps({ knowledgeMode: 'learned' }));
-    assert.equal(target.querySelector('[data-recipe-section="recipe-item"]'), null, 'card hidden for learned');
-    assert.ok(target.querySelector('.manager-recipe-workspace.is-inspector-hidden'), 'central column full width');
-    harness.remount();
+    assert.equal(target.querySelector('[data-recipe-section="recipe-item"]'), null, 'no recipe-item card in the view');
+    assert.equal(target.querySelector('.manager-recipe-workspace'), null, 'no bespoke workspace');
+    editHarness.remount();
   });
 
   it('marks the draft dirty and pushes a draft when the name changes', async () => {
     const dirtyCalls = [];
     const draftCalls = [];
-    const target = await harness.mount(baseProps({
+    const target = await editHarness.mount(identityProps({
       onDirtyChange: (dirty) => dirtyCalls.push(dirty),
       onDraftChange: (draft) => draftCalls.push(draft)
     }));
@@ -113,12 +106,12 @@ describe('RecipeEditView (mounted)', () => {
     const lastDraft = draftCalls.at(-1);
     assert.equal(lastDraft.name, 'Greater Healing Draught', 'draft carries the edited name');
     assert.equal(lastDraft.dirty, true, 'draft is dirty');
-    harness.remount();
+    editHarness.remount();
   });
 
-  it('invokes onSave with the draft updates on submit', async () => {
+  it('invokes onSave with identity-only draft updates on submit', async () => {
     const saved = [];
-    const target = await harness.mount(baseProps({ onSave: (id, updates) => { saved.push([id, updates]); return true; } }));
+    const target = await editHarness.mount(identityProps({ onSave: (id, updates) => { saved.push([id, updates]); return true; } }));
     const nameInput = target.querySelector('[data-recipe-field="name"]');
     nameInput.value = 'Renamed';
     nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
@@ -128,14 +121,40 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(saved.length, 1, 'onSave invoked once');
     assert.equal(saved[0][0], 'r1', 'passes the recipe id');
     assert.equal(saved[0][1].name, 'Renamed', 'passes the edited name');
-    assert.equal(saved[0][1].recipeItemId, null, 'unlinked recipe carries a null recipeItemId');
-    harness.remount();
+    assert.equal('recipeItemId' in saved[0][1], false, 'identity updates do not carry recipeItemId');
+    editHarness.remount();
+  });
+});
+
+describe('RecipeItemInspector (mounted)', () => {
+  before(async () => {
+    await inspectorHarness.setup();
+    // The harness installs game.i18n but not fromUuid; provide a default stub.
+    globalThis.foundry = {};
+    globalThis.fromUuid = async () => null;
+  });
+
+  after(() => {
+    delete globalThis.fromUuid;
+    delete globalThis.foundry;
+    inspectorHarness.teardown();
+  });
+
+  beforeEach(() => {
+    globalThis.fromUuid = async () => null;
+  });
+
+  it('renders the recipe-item card with an empty dropzone', async () => {
+    const target = await inspectorHarness.mount(inspectorProps());
+    assert.ok(target.querySelector('[data-recipe-section="recipe-item"]'), 'recipe-item card renders');
+    assert.ok(target.querySelector('[data-recipe-item-dropzone]'), 'empty dropzone present');
+    inspectorHarness.remount();
   });
 
   it('links an item on a valid Item drop and ignores a non-Item drop', async () => {
     const added = [];
     const set = [];
-    let target = await harness.mount(baseProps({
+    const target = await inspectorHarness.mount(inspectorProps({
       onAddRecipeItem: (uuid) => { added.push(uuid); return { item: { id: 'ri1' }, action: 'added' }; },
       onSetRecipeItem: (id) => set.push(id)
     }));
@@ -153,12 +172,12 @@ describe('RecipeEditView (mounted)', () => {
     await Promise.resolve();
     assert.deepEqual(added, ['Item.it1'], 'onAddRecipeItem called with the item uuid');
     assert.deepEqual(set, ['ri1'], 'onSetRecipeItem called with the new definition id');
-    harness.remount();
+    inspectorHarness.remount();
   });
 
   it('still links a deduped (skipped) drop', async () => {
     const set = [];
-    const target = await harness.mount(baseProps({
+    const target = await inspectorHarness.mount(inspectorProps({
       onAddRecipeItem: () => ({ item: { id: 'ri-existing' }, action: 'skipped' }),
       onSetRecipeItem: (id) => set.push(id)
     }));
@@ -166,12 +185,12 @@ describe('RecipeEditView (mounted)', () => {
     await Promise.resolve();
     await Promise.resolve();
     assert.deepEqual(set, ['ri-existing'], 'skipped action still sets the recipeItemId');
-    harness.remount();
+    inspectorHarness.remount();
   });
 
   it('renders the missing state when fromUuid resolves to null', async () => {
     globalThis.fromUuid = async () => null;
-    const target = await harness.mount(baseProps({
+    const target = await inspectorHarness.mount(inspectorProps({
       recipe: { ...RECIPE, recipeItemId: 'ri1' },
       recipeItemDefinitions: [{ id: 'ri1', name: 'Old Item', img: 'icons/svg/item-bag.svg', sourceItemUuid: 'Item.gone' }]
     }));
@@ -183,6 +202,6 @@ describe('RecipeEditView (mounted)', () => {
     );
     // The link is retained (the linked container, not the empty dropzone).
     assert.ok(target.querySelector('[data-recipe-item-linked]'), 'the link is retained in the missing state');
-    harness.remount();
+    inspectorHarness.remount();
   });
 });
