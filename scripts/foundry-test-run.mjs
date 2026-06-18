@@ -2813,9 +2813,19 @@ async function main() {
         // navigating away via the side nav.
         await page.locator('.fabricate-manager .manager-environment-edit-view[data-environment-editor]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
+        // The environment editor header now follows the task/event convention:
+        // a static "Edit environment" title (the environment name lives in the
+        // identity card, not the header). Confirm the static header rendered, then
+        // verify the correct environment loaded via the identity name field.
         await page.locator('.fabricate-manager .manager-title')
-          .filter({ hasText: 'Azure Grove' }).first()
+          .filter({ hasText: 'Edit environment' }).first()
           .waitFor({ state: 'visible', timeout: 5_000 });
+        const editedEnvNameField = page.locator('.fabricate-manager [data-environment-field="name"]').first();
+        await editedEnvNameField.waitFor({ state: 'visible', timeout: 5_000 });
+        const editedEnvName = await editedEnvNameField.inputValue();
+        if (editedEnvName !== 'Azure Grove') {
+          throw new Error(`Environment editor loaded the wrong environment: expected "Azure Grove", got "${editedEnvName}".`);
+        }
         if (await page.locator('.fabricate-manager .environment-draft-editor, .fabricate-manager .environment-foundation').count() > 0) {
           throw new Error('Manager environments edit route still rendered the legacy environment editor.');
         }
