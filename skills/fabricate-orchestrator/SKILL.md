@@ -56,6 +56,7 @@ The orchestrator role drives a `plan → plan-review → implement → review �
 
 - Do not edit `src/`, `tests/`, or production docs in this stage. Planning edits go to the issue's `openspec-delta` block (and, when needed, canonical `openspec/specs/` for durable contracts).
 - Do not allow mutable agent work to continue on `main`.
+- Prefer one issue per PR. When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`). Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
