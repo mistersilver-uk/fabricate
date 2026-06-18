@@ -16,6 +16,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';
+  import { calloutFor } from './gatheringBlockedReasons.js';
   import ChanceBar from './ChanceBar.svelte';
 
   let {
@@ -47,19 +48,10 @@
     ? `${richNodes.current}/${richNodes.max}` : null);
   const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
 
-  // Each blocking issue becomes a header callout chip. The linked-scene gate is
-  // an environment-level restriction, surfaced once above the task list by
-  // GatheringDetail — never as a per-task callout here.
-  const CALLOUTS = {
-    TOOL_BLOCKED: { icon: 'fa-screwdriver-wrench', key: 'FABRICATE.App.Gathering.Detail.Callout.MissingTools', tone: 'warning' },
-    CONDITIONS_BLOCKED: { icon: 'fa-cloud-sun', key: 'FABRICATE.App.Gathering.Detail.Callout.Conditions', tone: 'warning' },
-    GAME_PAUSED: { icon: 'fa-pause', key: 'FABRICATE.App.Gathering.Detail.Callout.Paused', tone: 'neutral' },
-    DUPLICATE_ACTIVE_RUN: { icon: 'fa-hourglass-half', key: 'FABRICATE.App.Gathering.Detail.Callout.DuplicateRun', tone: 'neutral' },
-    NODE_DEPLETED: { icon: 'fa-mountain', key: 'FABRICATE.App.Gathering.Detail.Callout.NodeDepleted', tone: 'warning' },
-    NODE_EXHAUSTED: { icon: 'fa-mountain', key: 'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted', tone: 'warning' },
-    STAMINA_BLOCKED: { icon: 'fa-bolt', key: 'FABRICATE.App.Gathering.Detail.Callout.StaminaBlocked', tone: 'warning' }
-  };
-
+  // Each blocking issue becomes a header callout chip. Icon/tone/label come from
+  // calloutFor in the shared gatheringBlockedReasons vocabulary. The linked-scene
+  // gate is an environment-level restriction, surfaced once above the task list
+  // by GatheringDetail — never as a per-task callout here, so it is skipped.
   const callouts = $derived.by(() => {
     const seen = new Set();
     const out = [];
@@ -67,10 +59,7 @@
       const code = reason?.code;
       if (!code || code === 'SCENE_TOKEN_BLOCKED' || seen.has(code)) continue;
       seen.add(code);
-      const def = CALLOUTS[code];
-      out.push(def
-        ? { code, icon: def.icon, tone: def.tone, label: localize(def.key) }
-        : { code, icon: 'fa-triangle-exclamation', tone: 'warning', label: reason?.message || localize('FABRICATE.App.Gathering.Detail.Blocked') });
+      out.push(calloutFor(code, reason, localize));
     }
     return out;
   });
