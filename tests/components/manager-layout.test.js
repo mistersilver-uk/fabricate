@@ -243,6 +243,17 @@ test('manager systems text and action cells are constrained at normal widths', (
 
   assert.ok(nameBlock.includes('-webkit-line-clamp: 2;'), 'row names should clamp instead of overflowing rows');
   assert.ok(descriptionBlock.includes('-webkit-line-clamp: 1;'), 'row descriptions should stay on one line inside compact rows');
+  const gatheringNameClampBlock = css.match(
+    /\.manager-environment-identity \.manager-system-name,[\s\S]*?\.manager-gathering-events-table \.manager-gathering-event-identity \.manager-system-name\s*\{[^}]*\}/
+  );
+  assert.ok(
+    gatheringNameClampBlock
+      && gatheringNameClampBlock[0].includes(
+        '.manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-name'
+      )
+      && gatheringNameClampBlock[0].includes('-webkit-line-clamp: 1;'),
+    'gathering identity rows (environments, tasks, and events) should clamp the name to one line so the 64px thumbnail drives row height and image + text stay centered'
+  );
   assert.ok(
     css.includes('.fabricate-manager .manager-inspector-name {\n  display: -webkit-box;')
       && css.includes('-webkit-line-clamp: 3;'),

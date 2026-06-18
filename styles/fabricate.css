@@ -2363,6 +2363,14 @@
   object-fit: cover;
 }
 
+/* Keep the identity text block no taller than the 64px thumbnail so the image drives the
+   row height and image + text stay vertically centered together. Full name stays on the title tooltip. */
+.fabricate-manager .manager-environment-identity .manager-system-name,
+.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-name,
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-system-name {
+  -webkit-line-clamp: 1;
+}
+
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-description {
   display: -webkit-box;
   -webkit-box-orient: vertical;
