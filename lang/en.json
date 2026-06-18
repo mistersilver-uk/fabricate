@@ -920,6 +920,7 @@
           "EditNamed": "Edit {name}",
           "EditTitle": "Edit recipe",
           "EditSubtitle": "Edit identity and the linked recipe item for this recipe.",
+          "EditIdentityOnlySubtitle": "Edit identity for this recipe.",
           "EditBreadcrumb": "Edit recipe",
           "EditMissingHint": "Pick a recipe from the browser to open its editor.",
           "BackToBrowse": "Back to recipes",

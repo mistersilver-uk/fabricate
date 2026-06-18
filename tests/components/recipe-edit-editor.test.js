@@ -184,10 +184,29 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.equal(block.includes('onSetRecipeItem'), false, 'no set-recipe-item prop on the view');
   });
 
-  it('wires confirmRecipeRouteExit into the route-exit chain', () => {
+  it('wires confirmRecipeRouteExit into the route-exit chain via the services discard seam', () => {
     assert.ok(/function confirmRecipeRouteExit\(/.test(rootSource), 'confirmRecipeRouteExit defined');
     assert.ok(rootSource.includes('confirmRecipeRouteExit(nextView)'), 'recipe route exit is part of the chain');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent'), 'discard prompt uses the DiscardDirty content key');
+    assert.ok(
+      rootSource.includes('store.confirmDiscardDirtyRecipeDraft?.()'),
+      'recipe route exit confirms through the services discard-dirty seam'
+    );
+    const guardStart = rootSource.indexOf('function confirmRecipeRouteExit(');
+    const guardEnd = rootSource.indexOf('\n  }', guardStart);
+    const guardBody = rootSource.slice(guardStart, guardEnd);
+    assert.equal(
+      guardBody.includes('globalThis.confirm'),
+      false,
+      'recipe route exit must not fall back to globalThis.confirm'
+    );
+    assert.ok(
+      /function confirmDiscardDirtyRecipeDraft\(/.test(storeSource),
+      'store exposes confirmDiscardDirtyRecipeDraft'
+    );
+    assert.ok(
+      storeSource.includes('FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent'),
+      'discard prompt uses the DiscardDirty content key'
+    );
   });
 });
 

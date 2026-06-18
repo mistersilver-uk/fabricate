@@ -1018,6 +1018,7 @@
 
   function viewSubtitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
+    if (currentView === 'recipe-edit' && !recipeInspectorVisible) return text('FABRICATE.Admin.Manager.Recipe.EditIdentityOnlySubtitle', 'Edit identity for this recipe.');
     if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'Edit identity and the linked recipe item for this recipe.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
@@ -1194,8 +1195,8 @@
   function confirmRecipeRouteExit(nextView) {
     if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;
     if (recipeEditDirty !== true) return true;
-    const message = text('FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent', 'The current recipe has unsaved changes. Discard them and continue?');
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    const confirmed = store.confirmDiscardDirtyRecipeDraft?.() ?? false;
+    if (isPromise(confirmed)) return confirmed.then(finishRecipeRouteExit);
     return finishRecipeRouteExit(confirmed);
   }
 

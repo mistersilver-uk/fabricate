@@ -1347,6 +1347,72 @@ describe('createAdminStore', () => {
       assert.equal(importSystemId, 'sys1', 'renderImportDialog should be called with the selected system id');
     });
 
+    it('updateRecipe persists updates, refreshes, and returns true', async () => {
+      let updateArgs = null;
+      let refreshed = false;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateRecipe(id, updates); },
+        getRecipes: (filter) => { refreshed = true; return origManager.getRecipes(filter); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.updateRecipe('r1', { name: 'Renamed' });
+      assert.equal(result, true);
+      assert.deepEqual(updateArgs, { id: 'r1', updates: { name: 'Renamed' } });
+      assert.ok(refreshed, 'updateRecipe should refresh projections');
+    });
+
+    it('updateRecipe returns false and notifies when recipeManager.updateRecipe rejects', async () => {
+      const errors = [];
+      const services = createMockServices({
+        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) }
+      });
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async () => { throw new Error('recipe boom'); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.updateRecipe('r1', { name: 'Renamed' });
+      assert.equal(result, false);
+      assert.deepEqual(errors, ['recipe boom']);
+    });
+
+    it('addRecipeItemFromUuid passes through the manager result', async () => {
+      const passthrough = { item: { id: 'item-x' }, action: 'created' };
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        addRecipeItemFromUuid: async () => passthrough
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.addRecipeItemFromUuid('sys1', 'Item.abc');
+      assert.deepEqual(result, passthrough);
+    });
+
+    it('addRecipeItemFromUuid returns false and notifies when the manager rejects', async () => {
+      const errors = [];
+      const services = createMockServices({
+        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) }
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        addRecipeItemFromUuid: async () => { throw new Error('link boom'); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.addRecipeItemFromUuid('sys1', 'Item.abc');
+      assert.equal(result, false);
+      assert.deepEqual(errors, ['link boom']);
+    });
+
   });
 
   // -------------------------------------------------------------------------

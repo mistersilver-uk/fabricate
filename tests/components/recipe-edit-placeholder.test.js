@@ -118,10 +118,10 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     );
   });
 
-  it('suppresses the inspector aside for recipe-edit', () => {
+  it('gates the inspector aside for recipe-edit on recipeInspectorVisible', () => {
     assert.ok(
-      rootSource.includes("currentView !== 'recipe-edit'"),
-      'inspector aside should be hidden for recipe-edit'
+      rootSource.includes("(currentView !== 'recipe-edit' || recipeInspectorVisible)"),
+      'inspector aside should render for recipe-edit only when recipeInspectorVisible'
     );
   });
 

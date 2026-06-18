@@ -396,7 +396,10 @@ function createStore(calls = [], options = {}) {
       }]
     }
   ];
-  const selectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
+  const baseSelectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
+  const selectedSystem = baseSelectedSystem && options.recipeKnowledgeMode
+    ? { ...baseSelectedSystem, recipeVisibility: { knowledge: { mode: options.recipeKnowledgeMode } } }
+    : baseSelectedSystem;
   const essenceCardsBySystem = {
     alchemy: [
       {
@@ -1444,7 +1447,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Row actions are now Edit (1), Duplicate (2), Delete (3). Duplicate and Delete drive
     // store callbacks and keep the row mounted; the Edit click is exercised separately below
-    // because it navigates away from the browser to the recipe-edit placeholder route.
+    // because it navigates away from the browser to the recipe-edit route.
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
     // Header actions are now Import (1) and Export (2) — the Create button is gone.
@@ -1479,6 +1482,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'Cancel should return to the recipes browser');
+  });
+
+  it('suppresses the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true, recipeKnowledgeMode: 'learned' }),
+        services: {
+          openCurrentAdmin: () => {}
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Edit should navigate to the recipe-edit route');
+    assert.ok(target.querySelector('.manager-main [data-recipe-section="identity"]'), 'recipe-edit still renders the identity card in the central main');
+    // 'learned' recipes never consume an item, so the recipe-item card is hidden
+    // and the whole inspector aside is suppressed, leaving a full-width main.
+    assert.equal(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), null, 'recipe-item card is hidden for the learned knowledge mode');
+    assert.equal(target.querySelector('.manager-inspector'), null, 'the inspector aside is fully suppressed for the learned knowledge mode');
+    assert.ok(target.textContent.includes('Edit identity for this recipe.'), 'learned mode shows the identity-only subtitle');
   });
 
   it('routes to the components browser with filters, drop import, selected inspector, and actions', async () => {

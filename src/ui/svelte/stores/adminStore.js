@@ -1963,6 +1963,13 @@ export function createAdminStore(services) {
     );
   }
 
+  function confirmDiscardDirtyRecipeDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent',
+      'The current recipe has unsaved changes. Discard them and continue?'
+    );
+  }
+
   function confirmDiscardDirtyGatheringTaskDraft() {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.Environment.Tasks.DiscardChangesPrompt',
@@ -5451,6 +5458,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtyRecipeDraft,
     confirmDiscardDirtyGatheringTaskDraft,
     confirmDiscardDirtyGatheringEventDraft,
     confirmGatheringLibraryTaskCompositionLoss,
