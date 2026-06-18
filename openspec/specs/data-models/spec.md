@@ -333,20 +333,20 @@ Recipe = {
 2. An authoring *incomplete shell* — a recipe with valid identity (a name; default name "Unnamed Recipe" and default image apply when omitted) that is structurally consistent but missing its ingredient sets and/or result groups — MAY be persisted via the GM authoring path (create-then-edit and identity-only saves).
    Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, rollTable UUID / reserved-name, variable result-mapping and outcome-routing integrity) still block persistence.
    Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
-4. Resolution-mode constraints are defined in `004-resolution-modes.md`.
-5. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
-6. `resultSelection.provider` value constraints:
+3. Resolution-mode constraints are defined in `004-resolution-modes.md`.
+4. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
+5. `resultSelection.provider` value constraints:
    - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
    - `macroOutcome`: a check macro must be resolvable (`Recipe.resultSelection.macroUuid` or fallback to `CraftingSystem.craftingCheck.macroUuid`).
    - `rollTableOutcome`: `Recipe.resultSelection.rollTableUuid` is required.
-7. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
-8. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
+6. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
+7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
-9. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
-10. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
-11. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
-12. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
-13. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
+8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
+9. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
+10. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
+11. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
+12. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
 
 ### Validation Guidance
 

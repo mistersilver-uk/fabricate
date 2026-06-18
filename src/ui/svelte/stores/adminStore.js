@@ -235,14 +235,14 @@ function _recipeStructure(isSimple, stepCount) {
 }
 
 /**
- * Derive whether a recipe is an incomplete authoring shell — persistable but not craftable.
- * Mirrors the completeness contract gated out of `Recipe.validateStructure()`:
- * an implicit recipe is incomplete when it has no ingredient sets or no result groups;
- * an explicit multi-step recipe is incomplete when any step is missing either.
- * @param {Recipe} recipe
+ * Coarse fallback for {@link _isRecipeIncomplete} when a recipe model instance
+ * (with `validate()` / `validateStructure()`) is unavailable. Detects the common
+ * shell shapes — missing ingredient sets / result groups — but not the deeper
+ * completeness cases the validators reject.
+ * @param {object} recipe
  * @returns {boolean}
  */
-function _isRecipeIncomplete(recipe) {
+function _isRecipeIncompleteByCounts(recipe) {
   const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
   if (steps.length > 0) {
     return steps.some(
@@ -256,6 +256,26 @@ function _isRecipeIncomplete(recipe) {
   const ingredientSets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
   const resultGroups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
   return ingredientSets.length === 0 || resultGroups.length === 0;
+}
+
+/**
+ * Derive whether a recipe is an incomplete authoring shell — persistable but not craftable.
+ * Source of truth: a recipe is incomplete iff it is structurally sound but fails the
+ * full completeness contract, i.e. `validateStructure().valid === true` while
+ * `validate().valid === false`. This exactly matches the craftability/completeness
+ * notion (the engine gates craft on `Recipe.validate()`), so the chip never falsely
+ * reads "complete" for a recipe whose ingredient set has no groups/essences, whose
+ * result group is empty, whose resolution-mode cardinality is unmet, or — for explicit
+ * multi-step recipes — whose step is missing either side. The two validators are pure.
+ * Falls back to a coarse count-only check when a model instance is unavailable.
+ * @param {Recipe} recipe
+ * @returns {boolean}
+ */
+function _isRecipeIncomplete(recipe) {
+  if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
+    return recipe.validate().valid === false && recipe.validateStructure().valid === true;
+  }
+  return _isRecipeIncompleteByCounts(recipe);
 }
 
 function _buildRecipeBrowserDisplay(recipe) {
@@ -5293,18 +5313,39 @@ export function createAdminStore(services) {
   async function duplicateRecipe(recipeId) {
     const recipeManager = services.getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
-    if (!recipe) return;
+    if (!recipe) return false;
     const data = recipe.toJSON();
     delete data.id;
     data.name = `${data.name} (Copy)`;
-    await recipeManager.createRecipe(data);
-    await refresh();
+
+    try {
+      // A persisted shell (no ingredient sets / result groups) must duplicate into
+      // another authoring shell, so allowIncomplete waives completeness here. A
+      // complete recipe still duplicates and persists unchanged under this flag.
+      await recipeManager.createRecipe(data, { allowIncomplete: true });
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to duplicate recipe:', err);
+      services.notify?.error?.(err?.message || 'Failed to duplicate recipe');
+      return false;
+    }
   }
 
   async function toggleRecipeEnabled(recipeId, enabled) {
     const recipeManager = services.getRecipeManager();
-    await recipeManager.updateRecipe(recipeId, { enabled });
-    await refresh();
+
+    try {
+      // Flipping the enabled flag is identity-level and must never be blocked by
+      // completeness, so a shell can be enabled/disabled like any other recipe.
+      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true });
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to toggle recipe enabled state:', err);
+      services.notify?.error?.(err?.message || 'Failed to update recipe');
+      return false;
+    }
   }
 
   async function updateRecipe(recipeId, updates = {}) {
