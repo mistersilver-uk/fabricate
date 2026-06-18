@@ -128,8 +128,8 @@ describe('adminStore recipe-item projections + API', () => {
   it('exports updateRecipe and addRecipeItemFromUuid', () => {
     assert.ok(/async function updateRecipe\(/.test(storeSource), 'updateRecipe defined');
     assert.ok(/async function addRecipeItemFromUuid\(/.test(storeSource), 'addRecipeItemFromUuid defined');
-    assert.ok(/\n\s*updateRecipe,/.test(storeSource), 'updateRecipe exported');
-    assert.ok(/\n\s*addRecipeItemFromUuid,/.test(storeSource), 'addRecipeItemFromUuid exported');
+    assert.ok(/\n[ \t]*updateRecipe,/.test(storeSource), 'updateRecipe exported');
+    assert.ok(/\n[ \t]*addRecipeItemFromUuid,/.test(storeSource), 'addRecipeItemFromUuid exported');
   });
 
   it('projects recipeItemId on recipes and recipeItemDefinitions on the selected system', () => {
