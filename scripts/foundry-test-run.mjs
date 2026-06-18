@@ -715,6 +715,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-edit-card',
       '.manager-toggle-row',
       '.manager-essence-edit-view',
+      '.manager-recipe-edit-main',
       '.environment-draft-editor',
       '.manager-environment-edit-view',
       '.manager-gathering-task-edit-view',
@@ -765,6 +766,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-task-edit-view'
       || metric.selector === '.manager-gathering-event-edit-view'
       || metric.selector === '.manager-essence-edit-view'
+      || metric.selector === '.manager-recipe-edit-main'
       || metric.selector === '.environment-draft-editor'
   ).length;
   if (rowCount === 0 && editFormCount === 0) {
