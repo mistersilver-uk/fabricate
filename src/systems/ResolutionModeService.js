@@ -116,7 +116,18 @@ export class ResolutionModeService {
     };
   }
 
-  validateRecipe(recipe) {
+  /**
+   * Validate a recipe against its system's resolution mode.
+   * @param {Recipe} recipe
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, mode CARDINALITY checks (e.g. "must have exactly/at least N
+   *   ingredient set/result group", progressive "requires ordered results") are
+   *   waived as completeness. Mode REFERENCE-INTEGRITY checks (mapped invalid
+   *   resultGroupId, routed invalid provider, tiered outcome→group mapping)
+   *   always apply.
+   * @returns {{valid: boolean, errors: string[]}}
+   */
+  validateRecipe(recipe, { requireComplete = true } = {}) {
     const errors = [];
     const system = this.getSystem(recipe);
     if (!system) return { valid: true, errors };
@@ -136,22 +147,22 @@ export class ResolutionModeService {
       const groups = Array.isArray(step?.resultGroups) ? step.resultGroups : [];
 
       if (mode === 'simple') {
-        if (sets.length !== 1)
+        if (requireComplete && sets.length !== 1)
           errors.push(
             `Step "${step.name || step.id}" must have exactly 1 ingredient set in simple mode`
           );
-        if (groups.length !== 1)
+        if (requireComplete && groups.length !== 1)
           errors.push(
             `Step "${step.name || step.id}" must have exactly 1 result group in simple mode`
           );
       }
 
       if (mode === 'mapped') {
-        if (sets.length === 0)
+        if (requireComplete && sets.length === 0)
           errors.push(
             `Step "${step.name || step.id}" must have at least 1 ingredient set in mapped mode`
           );
-        if (groups.length === 0)
+        if (requireComplete && groups.length === 0)
           errors.push(
             `Step "${step.name || step.id}" must have at least 1 result group in mapped mode`
           );
@@ -167,11 +178,11 @@ export class ResolutionModeService {
       }
 
       if (mode === 'tiered' || mode === 'routed') {
-        if (sets.length === 0)
+        if (requireComplete && sets.length === 0)
           errors.push(
             `Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`
           );
-        if (groups.length === 0)
+        if (requireComplete && groups.length === 0)
           errors.push(
             `Step "${step.name || step.id}" must have at least 1 result group in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`
           );
@@ -215,17 +226,17 @@ export class ResolutionModeService {
         if (!system?.craftingCheck?.progressive) {
           errors.push('Progressive mode requires craftingCheck.progressive configuration');
         }
-        if (sets.length !== 1)
+        if (requireComplete && sets.length !== 1)
           errors.push(
             `Step "${step.name || step.id}" must have exactly 1 ingredient set in progressive mode`
           );
-        if (groups.length !== 1)
+        if (requireComplete && groups.length !== 1)
           errors.push(
             `Step "${step.name || step.id}" must have exactly 1 result group in progressive mode`
           );
 
         const results = groups?.[0]?.results || [];
-        if (results.length === 0) {
+        if (requireComplete && results.length === 0) {
           errors.push(
             `Step "${step.name || step.id}" requires ordered results in progressive mode`
           );
@@ -248,8 +259,10 @@ export class ResolutionModeService {
       // Alchemy recipes cannot have explicit multi-step configuration
       const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
-      if (setsTop.length === 0) errors.push('Alchemy recipe must have at least 1 ingredient set');
-      if (groupsTop.length === 0) errors.push('Alchemy recipe must have at least 1 result group');
+      if (requireComplete && setsTop.length === 0)
+        errors.push('Alchemy recipe must have at least 1 ingredient set');
+      if (requireComplete && groupsTop.length === 0)
+        errors.push('Alchemy recipe must have at least 1 result group');
       // No explicit steps allowed
       const explicitSteps =
         typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];

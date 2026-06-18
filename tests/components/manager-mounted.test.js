@@ -522,6 +522,7 @@ function createStore(calls = [], options = {}) {
         category: 'elixirs',
         enabled: false,
         locked: true,
+        incomplete: true,
         isSimple: false,
         structureLabel: 'Single step',
         stepCount: 1,
@@ -1441,6 +1442,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
+    const r2IncompleteChip = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-warning');
+    assert.ok(r2IncompleteChip, 'an incomplete recipe row should render the Incomplete warning chip');
+    assert.equal(r2IncompleteChip.textContent.trim(), 'Incomplete');
+    assert.equal(
+      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
+      null,
+      'a complete recipe row should not render the Incomplete chip'
+    );
 
     assert.equal(target.querySelector('.manager-pagination'), null, 'pagination should hide while filtered row count is below the page size');
 

@@ -202,6 +202,18 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(recipesBrowserSource.includes(snippet), `RecipesBrowserView should include ${snippet}`);
     }
+    assert.ok(
+      recipesBrowserSource.includes('recipe.incomplete'),
+      'RecipesBrowserView should render the derived Incomplete chip'
+    );
+    assert.ok(
+      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
+      'RecipesBrowserView should use the localized Incomplete chip label'
+    );
+    assert.ok(
+      /recipe\.incomplete[\s\S]*?manager-chip is-warning/.test(recipesBrowserSource),
+      'Incomplete chip should use the is-warning tone to distinguish it from the locked chip'
+    );
   });
 
   it('keeps presentational Svelte free of direct Foundry globals', () => {

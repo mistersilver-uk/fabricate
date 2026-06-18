@@ -326,21 +326,27 @@ Recipe = {
 
 ### Requirements
 
-1. Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
-2. Resolution-mode constraints are defined in `004-resolution-modes.md`.
-3. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
-4. `resultSelection.provider` value constraints:
+1. A *craftable* Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
+   This is a *completeness* requirement: it gates crafting and craftable-visibility, not persistence.
+   `Recipe.validate()` enforces completeness and is the craftability contract; the crafting engine gates on it, so an incomplete recipe is never craftable.
+   `Recipe.validateStructure()` omits completeness (it waives the missing-ingredient-set / missing-result-group / missing-result errors) and is the persistence contract.
+2. An authoring *incomplete shell* — a recipe with valid identity (a name; default name "Unnamed Recipe" and default image apply when omitted) that is structurally consistent but missing its ingredient sets and/or result groups — MAY be persisted via the GM authoring path (create-then-edit and identity-only saves).
+   Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, rollTable UUID / reserved-name, variable result-mapping and outcome-routing integrity) still block persistence.
+   Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
+4. Resolution-mode constraints are defined in `004-resolution-modes.md`.
+5. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
+6. `resultSelection.provider` value constraints:
    - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
    - `macroOutcome`: a check macro must be resolvable (`Recipe.resultSelection.macroUuid` or fallback to `CraftingSystem.craftingCheck.macroUuid`).
    - `rollTableOutcome`: `Recipe.resultSelection.rollTableUuid` is required.
-5. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
-6. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
+7. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
+8. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
-7. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
-8. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
-9. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
-10. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
-11. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
+9. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
+10. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
+11. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
+12. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
+13. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
 
 ### Validation Guidance
 

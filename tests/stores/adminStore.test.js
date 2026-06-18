@@ -1386,6 +1386,42 @@ describe('createAdminStore', () => {
       assert.deepEqual(errors, ['recipe boom']);
     });
 
+    it('createRecipe requests an incomplete shell via the allowIncomplete option', async () => {
+      let createArgs = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        createRecipe: async (data, options) => {
+          createArgs = { data, options };
+          return origManager.createRecipe(data, options);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const created = await store.createRecipe();
+      assert.ok(created?.id, 'createRecipe should return the created shell id');
+      assert.equal(createArgs.options?.allowIncomplete, true, 'shell create must allow incomplete');
+      assert.equal(createArgs.data.craftingSystemId, 'sys1');
+    });
+
+    it('updateRecipe requests allowIncomplete so identity-only shell edits are not blocked', async () => {
+      let updateOptions = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateOptions = options;
+          await origManager.updateRecipe(id, updates, options);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateRecipe('r1', { name: 'Renamed Shell' });
+      assert.equal(updateOptions?.allowIncomplete, true, 'editor save must allow incomplete');
+    });
+
     it('addRecipeItemFromUuid passes through the manager result', async () => {
       const passthrough = { item: { id: 'item-x' }, action: 'created' };
       const services = createMockServices();

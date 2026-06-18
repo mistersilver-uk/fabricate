@@ -234,6 +234,30 @@ function _recipeStructure(isSimple, stepCount) {
   return { structureKey: 'singleStep', structureLabel: 'Single step' };
 }
 
+/**
+ * Derive whether a recipe is an incomplete authoring shell — persistable but not craftable.
+ * Mirrors the completeness contract gated out of `Recipe.validateStructure()`:
+ * an implicit recipe is incomplete when it has no ingredient sets or no result groups;
+ * an explicit multi-step recipe is incomplete when any step is missing either.
+ * @param {Recipe} recipe
+ * @returns {boolean}
+ */
+function _isRecipeIncomplete(recipe) {
+  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+  if (steps.length > 0) {
+    return steps.some(
+      step =>
+        !Array.isArray(step?.ingredientSets) ||
+        step.ingredientSets.length === 0 ||
+        !Array.isArray(step?.resultGroups) ||
+        step.resultGroups.length === 0
+    );
+  }
+  const ingredientSets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
+  const resultGroups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
+  return ingredientSets.length === 0 || resultGroups.length === 0;
+}
+
 function _buildRecipeBrowserDisplay(recipe) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
   const isSimple = typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true;
@@ -1131,6 +1155,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
+      // Derived (no stored flag): a shell missing ingredient sets / result groups is
+      // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
+      incomplete: _isRecipeIncomplete(recipe),
       // Canonical recipe-item linkage (never the legacy uuid alias).
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
@@ -5232,7 +5259,10 @@ export function createAdminStore(services) {
     if (!sysId) return null;
 
     try {
-      const created = await recipeManager.createRecipe({ craftingSystemId: sysId });
+      const created = await recipeManager.createRecipe(
+        { craftingSystemId: sysId },
+        { allowIncomplete: true }
+      );
       await refresh();
       return created?.id ? { id: created.id } : null;
     } catch (err) {
@@ -5285,7 +5315,10 @@ export function createAdminStore(services) {
     if (Object.keys(updates).length === 0) return true;
 
     try {
-      await recipeManager.updateRecipe(recipeId, updates);
+      // The recipe editor only edits identity + the linked recipe item; a shell's
+      // ingredients/results may still be empty. allowIncomplete keeps those
+      // identity-only saves from being blocked by completeness validation.
+      await recipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true });
       await refresh();
       return true;
     } catch (err) {

@@ -227,6 +227,9 @@
                 {#if recipe.locked}
                   <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Recipe.Locked', 'Locked')}</span>
                 {/if}
+                {#if recipe.incomplete}
+                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}</span>
+                {/if}
               </span>
             </button>
             {#if showRecipeCategories}

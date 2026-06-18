@@ -67,12 +67,19 @@ export class IngredientSet {
 
   /**
    * Validate that this ingredient set has all required data
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, the completeness check (must have at least one ingredient group or
+   *   essence requirement) is waived; structural checks still fire.
    * @returns {{valid: boolean, errors: string[]}}
    */
-  validate() {
+  validate({ requireComplete = true } = {}) {
     const errors = [];
 
-    if (this.ingredientGroups.length === 0 && Object.keys(this.essences).length === 0) {
+    if (
+      requireComplete &&
+      this.ingredientGroups.length === 0 &&
+      Object.keys(this.essences).length === 0
+    ) {
       errors.push('Ingredient set must have at least one ingredient group or essence requirement');
     }
 

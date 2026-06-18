@@ -37,6 +37,12 @@ Validation rules differ between single-step and explicit multi-step recipes:
 - Recipe-level `ingredientSets` and `resultGroups` are NOT validated and MAY be empty or absent.
 - Recipe-level `resultGroups` requirement is waived when explicit steps are present.
 
+**Authoring incomplete-shell contract** (GM authoring path):
+- The single-step and multi-step completeness rules above (at least one ingredient set / result group / ordered result) are the *craftability* contract enforced by `Recipe.validate()`.
+- The GM authoring path MAY persist a structurally consistent recipe that does not yet satisfy completeness — an *incomplete shell* (e.g. created by "+ Create recipe" then edited for identity only). Persistence gates on structural validity (`Recipe.validateStructure()`) only; structural-integrity errors still block persistence.
+- A shell is NOT craftable: `RecipeManager.evaluateCraftability` returns `canCraft: false` (the empty-ingredient-set guard) and `CraftingEngine.craft()` rejects with the completeness error from `Recipe.validate()`. Completing the recipe (adding the missing ingredient sets/result groups) is what makes it craftable.
+- Incompleteness is *derived* from the recipe's structure, not stored: an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
+
 ## Step Structure
 
 Each step can define:

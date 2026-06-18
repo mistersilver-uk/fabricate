@@ -908,6 +908,7 @@
           "StepRequirements": "{count} steps",
           "Locked": "Locked",
           "Unlocked": "Unlocked",
+          "Incomplete": "Incomplete",
           "General": "General",
           "Steps": "Steps",
           "ResultGroups": "Result groups",

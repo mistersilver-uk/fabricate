@@ -115,10 +115,37 @@ export class Recipe {
   }
 
   /**
-   * Validate that this recipe has all required data
+   * Validate that this recipe has all required data, including completeness
+   * (ingredient sets and result groups required to craft). This is the
+   * craftability contract and is unchanged: a recipe must satisfy it before it
+   * can be crafted or surfaced as craftable.
    * @returns {{valid: boolean, errors: string[]}}
    */
   validate() {
+    return this._validate({ requireComplete: true });
+  }
+
+  /**
+   * Validate this recipe's structural integrity only, waiving completeness
+   * (missing ingredient sets / result groups). This is the persistence
+   * contract: a GM authoring path may persist a structurally consistent but
+   * incomplete shell. Such a shell remains non-craftable because the engine
+   * still gates on the full {@link Recipe#validate} contract.
+   * @returns {{valid: boolean, errors: string[]}}
+   */
+  validateStructure() {
+    return this._validate({ requireComplete: false });
+  }
+
+  /**
+   * Internal validation implementation.
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, completeness errors (missing ingredient sets / result groups /
+   *   results) are waived while all structural integrity checks still fire.
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validate({ requireComplete = true } = {}) {
     const errors = [];
 
     // Basic validation
@@ -126,16 +153,22 @@ export class Recipe {
 
     // Ingredient set validation
     const hasSteps = this.steps.length > 0;
-    if (!hasSteps && this.ingredientSets.length === 0) {
+    if (requireComplete && !hasSteps && this.ingredientSets.length === 0) {
       errors.push('Recipe must have at least one ingredient set (or use explicit steps)');
     }
 
     if (hasSteps) {
       for (const step of this.steps) {
-        if (!Array.isArray(step.ingredientSets) || step.ingredientSets.length === 0) {
+        if (
+          requireComplete &&
+          (!Array.isArray(step.ingredientSets) || step.ingredientSets.length === 0)
+        ) {
           errors.push(`Step "${step.name || step.id}" must include at least one ingredient set`);
         }
-        if (!Array.isArray(step.resultGroups) || step.resultGroups.length === 0) {
+        if (
+          requireComplete &&
+          (!Array.isArray(step.resultGroups) || step.resultGroups.length === 0)
+        ) {
           errors.push(`Step "${step.name || step.id}" must include at least one result group`);
         }
         if (step.timeRequirement) {
@@ -161,7 +194,7 @@ export class Recipe {
       }
     } else {
       for (const ingredientSet of this.ingredientSets) {
-        const setValidation = ingredientSet.validate();
+        const setValidation = ingredientSet.validate({ requireComplete });
         if (!setValidation.valid) {
           errors.push(
             `Ingredient set "${ingredientSet.name || ingredientSet.id}": ${setValidation.errors.join(', ')}`
@@ -172,7 +205,7 @@ export class Recipe {
 
     // Result validation. Explicit multi-step recipes own their outputs on each step;
     // implicit recipes still use the top-level result groups.
-    if (!hasSteps && this.resultGroups.length === 0) {
+    if (requireComplete && !hasSteps && this.resultGroups.length === 0) {
       errors.push('Recipe must have at least one result group');
     }
 
@@ -191,7 +224,9 @@ export class Recipe {
         ];
 
     for (const container of resultContainers) {
-      this._validateResultGroups(container.resultGroups, container.label, errors);
+      this._validateResultGroups(container.resultGroups, container.label, errors, {
+        requireComplete,
+      });
       this._validateRollTableResultSelection(
         container.resultSelection,
         container.resultGroups,
@@ -237,7 +272,7 @@ export class Recipe {
     };
   }
 
-  _validateResultGroups(resultGroups, label, errors) {
+  _validateResultGroups(resultGroups, label, errors, { requireComplete = true } = {}) {
     const resultGroupIds = new Set();
     const resultIds = new Set();
     for (const group of resultGroups) {
@@ -246,7 +281,9 @@ export class Recipe {
       }
       resultGroupIds.add(group.id);
       if (!Array.isArray(group.results) || group.results.length === 0) {
-        errors.push(`${label} result group "${group.id}" must contain at least one result`);
+        if (requireComplete) {
+          errors.push(`${label} result group "${group.id}" must contain at least one result`);
+        }
         continue;
       }
 
