@@ -1,7 +1,7 @@
 /**
  * Unit coverage for the pure resource-node respawn math (`nodeRespawnMath.js`)
  * plus a DRIFT GUARD asserting the per-token math and the per-environment
- * `GatheringRichStateService._respawnNode` produce identical node results for a
+ * `GatheringNodeService._respawnNode` produce identical node results for a
  * shared fixture (the env path now delegates to this math; this pins them
  * together so a future edit to either can't silently diverge).
  *
@@ -19,8 +19,7 @@ import {
   respawnNodeOnce,
   nextRespawnEta
 } from '../../src/systems/nodeRespawnMath.js';
-import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
-import { SETTING_KEYS } from '../../src/config/settings.js';
+import { GatheringNodeService } from '../../src/systems/GatheringNodeService.js';
 
 const HOUR = 3600;
 const secondsPerHour = () => HOUR; // every unit resolves to one hour for the fakes
@@ -142,19 +141,18 @@ test('nonRegenerating: respawnNodeOnce never gains and nextRespawnEta is null', 
 
 // --- DRIFT GUARD: math vs _respawnNode on a shared fixture ------------------
 
+// `_respawnNode` moved to GatheringNodeService (issue 376) — construct it
+// directly here so the drift guard pins the node service's env-path arithmetic
+// against the pure math, with no rich-state parent in the loop.
 function driftService(rolls) {
-  const config = { systems: { sys: { economy: { mode: 'nodes' }, tasks: [] } } };
-  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
   let rollIdx = 0;
-  return new GatheringRichStateService({
-    getSetting: (k) => settings.get(k),
-    setSetting: async (k, v) => { settings.set(k, v); return v; },
-    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+  return new GatheringNodeService({
+    getConfig: () => ({ systems: { sys: { tasks: [] } } }),
     environmentStore: { get: () => null, update: async () => null },
     nowWorldTime: () => 0,
     rollD100: () => rolls[rollIdx++],
     secondsPerUnit: () => HOUR,
-    hooks: { callAll: () => {} }
+    callHook: () => {}
   });
 }
 

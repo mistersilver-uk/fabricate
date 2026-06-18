@@ -1,11 +1,17 @@
-import { readInteractableBehaviorSystem } from '../canvas/regions/interactableRegionFlags.js';
-
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { normalizeNodeConfig } from './gatheringNodeConfig.js';
-import { respawnNodeOnce } from './nodeRespawnMath.js';
+import { GatheringNodeService } from './GatheringNodeService.js';
+import {
+  cloneJson,
+  nonNegativeInteger,
+  nonNegativeNumber,
+  normalizeList,
+  numberOrNullStrict,
+  readState,
+  writeState,
+} from './gatheringRichStateInternals.js';
+import { GatheringStaminaService } from './GatheringStaminaService.js';
 
-const FLAG_NAMESPACE = 'fabricate';
-const STATE_FLAG_KEY = 'gatheringState';
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
   biomes: [
@@ -177,6 +183,11 @@ export class GatheringRichStateService {
     // absent (the default), every node path falls back to the environment scope.
     resolveRegionBehavior = null,
     writeInteractableBehavior = null,
+    // Extracted collaborators (issue 376). Default-constructed below from the
+    // parent's already-assigned seams so `makeRichState()` and main.js keep
+    // working unchanged. Injectable for focused tests.
+    staminaService = null,
+    nodeService = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.getSetting = getSetting;
@@ -199,22 +210,37 @@ export class GatheringRichStateService {
       typeof resolveRegionBehavior === 'function' ? resolveRegionBehavior : null;
     this.writeInteractableBehavior =
       typeof writeInteractableBehavior === 'function' ? writeInteractableBehavior : null;
-  }
 
-  /**
-   * Convert a count of whole world-time units into seconds via the
-   * `secondsPerUnit` seam, so day/week interval lengths follow the active
-   * calendar (`days`/`weeks` track the active world calendar; `minutes`/`hours`
-   * are fixed). Uses the injected `secondsPerUnit` seam.
-   *
-   * @param {number} count
-   * @param {string} unit One of minutes|hours|days|weeks.
-   * @returns {number} Non-negative seconds.
-   */
-  _durationToSeconds(count, unit) {
-    const seconds = Number(this.secondsPerUnit(unit));
-    const safe = seconds > 0 ? seconds : SECONDS_PER_UNIT.hours;
-    return Math.max(0, Number(count || 0) * safe);
+    // Stamina + node subsystems were extracted (issue 376). They are wired from
+    // the parent's OWN seams so there is a single economy/config/now/hook read
+    // path (no drift, no duplicated normalize logic): the stamina service reads
+    // the economy through `_systemEconomy`, the node service the config through
+    // `_config`, and both fire hooks / resolve world-time through the parent's
+    // `_callHook`/`_historyEvent`/`_now`. The parent retains its public economy
+    // booleans and the d100/listing core, delegating stamina/node methods here.
+    this.staminaService =
+      staminaService ??
+      new GatheringStaminaService({
+        getSystemEconomy: (id) => this._systemEconomy(id),
+        evaluateExpression: this.evaluateExpression,
+        secondsPerUnit: this.secondsPerUnit,
+        now: () => this._now(),
+        callHook: (name, payload) => this._callHook(name, payload),
+        historyEvent: (type, data) => this._historyEvent(type, data),
+      });
+    this.nodeService =
+      nodeService ??
+      new GatheringNodeService({
+        environmentStore: this.environmentStore,
+        getConfig: () => this._config(),
+        secondsPerUnit: this.secondsPerUnit,
+        rollD100: this.rollD100,
+        evaluateExpression: this.evaluateExpression,
+        callHook: (name, payload) => this._callHook(name, payload),
+        nowWorldTime: this.nowWorldTime,
+        resolveRegionBehavior: this.resolveRegionBehavior,
+        writeInteractableBehavior: this.writeInteractableBehavior,
+      });
   }
 
   getConditions() {
@@ -943,7 +969,9 @@ export class GatheringRichStateService {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
     const staminaEnabled = this.staminaEnabled(environment?.craftingSystemId);
     const nodesEnabled = this.nodesEnabled(environment?.craftingSystemId);
-    const displayNode = this._resolveNodeSource({ environment, task, interactableRef }).read();
+    const displayNode = this.nodeService
+      ._resolveNodeSource({ environment, task, interactableRef })
+      .read();
     const showNodeCounts =
       displayNode?.showCountsToPlayers === true || viewer?.isGM === true || !opaqueBlind;
     const nodes =
@@ -970,7 +998,7 @@ export class GatheringRichStateService {
       staminaEnabled && Number(task?.staminaCost || 0) > 0
         ? {
             cost: Number(task.staminaCost || 0),
-            state: this.getActorStamina(actor, environment?.craftingSystemId),
+            state: this.staminaService.getActorStamina(actor, environment?.craftingSystemId),
           }
         : null;
     return {
@@ -990,453 +1018,49 @@ export class GatheringRichStateService {
     };
   }
 
+  // Stamina public surface — delegated to GatheringStaminaService (issue 376).
+  // Engine + main.js call these on the parent; the behaviour and persisted
+  // shapes are unchanged.
+
   getActorStamina(actor, systemId = null) {
-    const state = readState(actor);
-    const key = systemId || 'default';
-    const stamina = state.stamina?.[key] || {};
-    // Pools are materialized per character at seed time (the system max/start
-    // expressions are rolled once into numbers), so this stays synchronous and
-    // simply reads the stored values. A character with no pool reads `null`.
-    // `max` is the rolled value; an optional GM `maxOverride` layers over it.
-    const rolledMax = numberOrNullStrict(stamina.max);
-    const maxOverride = numberOrNullStrict(stamina.maxOverride);
-    const max = maxOverride == null ? rolledMax : maxOverride; // effective cap
-    const storedCurrent = numberOrNullStrict(stamina.current);
-    const current = storedCurrent == null ? (max == null ? null : max) : storedCurrent;
-    return {
-      current,
-      max,
-      rolledMax,
-      maxOverride,
-      // Read-time compatibility: a never-rewritten legacy pool persisted with
-      // `provider: 'external'` reads back as a read-only max.
-      maxReadOnly: stamina.maxReadOnly === true || stamina.provider === 'external',
-      regenerationMode: stamina.regenerationMode || 'manual',
-    };
+    return this.staminaService.getActorStamina(actor, systemId);
+  }
+
+  async seedActorStaminaIfNeeded(payload = {}) {
+    return this.staminaService.seedActorStaminaIfNeeded(payload);
+  }
+
+  async setActorStamina(actor, payload = {}) {
+    return this.staminaService.setActorStamina(actor, payload);
+  }
+
+  async adjustActorStamina(actor, payload = {}) {
+    return this.staminaService.adjustActorStamina(actor, payload);
+  }
+
+  // Node public surface — delegated to GatheringNodeService (issue 376).
+
+  async restockNode(payload = {}) {
+    return this.nodeService.restockNode(payload);
   }
 
   /**
-   * Materialize a character's stamina pool from the system `max`/`start`
-   * expression templates, rolling them once and persisting the resulting
-   * numbers. Idempotent: a character that already has a pool keeps it unless
-   * `force` is set (the GM Roll/Reset path). No-ops when stamina is disabled or
-   * when the max template is blank/non-finite (⇒ no pool, stamina unenforced).
-   *
-   * @param {object} payload
-   * @returns {Promise<object|null>} The materialized pool, or null on no-op.
-   */
-  async seedActorStaminaIfNeeded({
-    actor,
-    systemId,
-    system = null,
-    environment = null,
-    force = false,
-  } = {}) {
-    const key = systemId || 'default';
-    const econ = this._systemEconomy(key);
-    if (econ.stamina?.enabled !== true) return null;
-
-    const state = readState(actor);
-    const existing = state.stamina?.[key];
-    if (!force && existing && numberOrNullStrict(existing.max) != null) {
-      return cloneJson(existing);
-    }
-
-    const maxValue = await this._evaluateStaminaExpression({
-      expression: econ.stamina?.max,
-      actor,
-      system,
-      environment,
-      kind: 'staminaMax',
-    });
-    if (maxValue == null) return null; // no max configured ⇒ leave unseeded (stamina unenforced)
-    const max = Math.max(0, Math.round(maxValue));
-
-    const startRaw = await this._evaluateStaminaExpression({
-      expression: econ.stamina?.start,
-      actor,
-      system,
-      environment,
-      kind: 'staminaStart',
-    });
-    const start = startRaw == null ? max : Math.max(0, Math.round(startRaw)); // blank start ⇒ full
-
-    const entry = {
-      maxReadOnly: false,
-      regenerationMode: econ.stamina?.regen?.policy === 'overTime' ? 'auto' : 'manual',
-      current: Math.min(start, max),
-      max,
-      lastRegenWorldTime: this._now(),
-    };
-    state.stamina = { ...state.stamina, [key]: entry };
-    state.history = [
-      this._historyEvent('stamina.seed', { systemId: key, current: entry.current, max }),
-      ...normalizeList(state.history),
-    ].slice(0, 50);
-    await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaSeeded', {
-      actor,
-      systemId: key,
-      stamina: cloneJson(entry),
-    });
-    return cloneJson(entry);
-  }
-
-  /**
-   * Evaluate a stamina expression template against an actor, returning a finite
-   * number or null when the template is blank/unresolvable. Reuses the same
-   * Roll-backed `evaluateExpression` seam regen uses.
-   */
-  async _evaluateStaminaExpression({
-    expression,
-    actor,
-    system = null,
-    environment = null,
-    kind = 'stamina',
-  } = {}) {
-    if (expression == null || expression === '') return null;
-    const value =
-      typeof this.evaluateExpression === 'function'
-        ? await this.evaluateExpression({
-            expression: String(expression),
-            provider: null,
-            actor,
-            kind,
-            system,
-            environment,
-          })
-        : Number(expression);
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
-  }
-
-  async setActorStamina(
-    actor,
-    {
-      systemId = 'default',
-      current = null,
-      max = null,
-      maxOverride,
-      maxReadOnly,
-      // Legacy API back-compat: a `provider: 'external'` argument maps to a
-      // read-only max. Any other legacy provider value is treated as writable.
-      provider,
-      regenerationMode = 'manual',
-    } = {}
-  ) {
-    const state = readState(actor);
-    const key = systemId || 'default';
-    const previous = state.stamina?.[key] || {};
-    // Resolve the read-only-max flag from the incoming arg (preferring the new
-    // boolean, falling back to a legacy `provider: 'external'`) and, when the
-    // arg is silent, from the prior entry (including its own legacy provider).
-    const argMaxReadOnly =
-      maxReadOnly === undefined
-        ? provider === undefined
-          ? undefined
-          : provider === 'external'
-        : maxReadOnly === true;
-    const priorMaxReadOnly = previous.maxReadOnly === true || previous.provider === 'external';
-    const effectiveMaxReadOnly = argMaxReadOnly === undefined ? priorMaxReadOnly : argMaxReadOnly;
-    const priorMax = numberOrNullStrict(previous.max);
-    const providedMax = numberOrNullStrict(max);
-    // `max` is the rolled cap. When omitted, the prior rolled max is preserved
-    // (the panel only edits current + override). When provided: writable pools
-    // accept it freely; a read-only-max pool's maximum is fixed once
-    // established, but an as-yet unset pool may still be initialized.
-    const rolledMax =
-      providedMax != null && (!effectiveMaxReadOnly || priorMax == null) ? providedMax : priorMax;
-    // `maxOverride`: undefined preserves the prior override; a finite number
-    // sets it; null/'' clears it. The effective cap is the override, else rolled.
-    const override =
-      maxOverride === undefined
-        ? numberOrNullStrict(previous.maxOverride)
-        : maxOverride === null || maxOverride === ''
-          ? null
-          : nonNegativeNumber(maxOverride, 0);
-    const effectiveMax = override == null ? rolledMax : override;
-    let currentValue = nonNegativeNumber(current, previous.current ?? 0);
-    if (Number.isFinite(Number(effectiveMax)))
-      currentValue = Math.min(currentValue, Number(effectiveMax));
-    const next = {
-      maxReadOnly: effectiveMaxReadOnly,
-      regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
-      current: currentValue,
-      max: rolledMax,
-      ...(override == null ? {} : { maxOverride: override }),
-      // Preserve the regen anchor so a manual GM set does not reset the clock.
-      ...(previous.lastRegenWorldTime === undefined
-        ? {}
-        : { lastRegenWorldTime: previous.lastRegenWorldTime }),
-    };
-    state.stamina = { ...state.stamina, [key]: next };
-    state.history = [
-      this._historyEvent('stamina.set', {
-        systemId: key,
-        current: next.current,
-        max: next.max,
-        maxOverride: override,
-      }),
-      ...normalizeList(state.history),
-    ].slice(0, 50);
-    await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaAdjusted', {
-      actor,
-      systemId: key,
-      stamina: cloneJson(next),
-    });
-    return cloneJson(next);
-  }
-
-  async adjustActorStamina(actor, { systemId = 'default', delta = 0 } = {}) {
-    const key = systemId || 'default';
-    const effective = this.getActorStamina(actor, key);
-    const next = Math.max(0, Number(effective.current || 0) + Number(delta || 0));
-    const clamped = effective.max === null ? next : Math.min(next, effective.max);
-    const state = readState(actor);
-    const previous = state.stamina?.[key] || {};
-    // Preserve the stored max verbatim (null stays null) so the system default
-    // max stays authoritative when no per-actor override exists.
-    const previousOverride = numberOrNullStrict(previous.maxOverride);
-    const entry = {
-      maxReadOnly: previous.maxReadOnly === true || previous.provider === 'external',
-      regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
-      current: clamped,
-      max: numberOrNullStrict(previous.max),
-      ...(previousOverride == null ? {} : { maxOverride: previousOverride }),
-      ...(previous.lastRegenWorldTime === undefined
-        ? {}
-        : { lastRegenWorldTime: previous.lastRegenWorldTime }),
-    };
-    state.stamina = { ...state.stamina, [key]: entry };
-    state.history = [
-      this._historyEvent('stamina.adjust', {
-        systemId: key,
-        delta: Number(delta || 0),
-        current: clamped,
-      }),
-      ...normalizeList(state.history),
-    ].slice(0, 50);
-    await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaAdjusted', {
-      actor,
-      systemId: key,
-      stamina: cloneJson(entry),
-    });
-    return cloneJson(entry);
-  }
-
-  async restockNode({ environmentId, taskId, current = null, max = null } = {}) {
-    const environment = this.environmentStore?.get?.(environmentId);
-    if (!environment) return null;
-    const existing = this._currentNodeState(environment, taskId);
-    if (!existing) return null;
-    // Resolve the EFFECTIVE policy from the library config ("config is
-    // authoritative", mirroring _mergeNodeConfigState) so a `nonRegenerating`
-    // pool can never be restocked even if a stale per-environment snapshot
-    // claims otherwise. A permanently depletable node is a no-op: return it
-    // unchanged without writing state or firing the nodeRestocked hook.
-    const effective = this._mergeNodeConfigState(
-      this._libraryNodeConfigs(environment.craftingSystemId).get(String(taskId)) || null,
-      existing
-    );
-    if (effective?.respawn?.policy === 'nonRegenerating') return existing;
-    // A null/undefined max keeps the existing cap (don't let Number(null)→0 wipe it).
-    const nextMax =
-      max === null || max === undefined
-        ? Number(existing.max || 0)
-        : nonNegativeInteger(max, existing.max);
-    const node = {
-      ...existing,
-      enabled: true,
-      max: nextMax,
-      current: Math.min(nonNegativeInteger(current, nextMax), nextMax),
-    };
-    const updated = await this._writeNodeState({ environmentId, taskId, node });
-    this._callHook('fabricate.gathering.nodeRestocked', { environmentId, taskId, current, max });
-    return updated;
-  }
-
-  /**
-   * The current node object for a task in an environment: the per-environment
-   * runtime pool if present, else a fresh full pool seeded from the library
-   * task's node config. Null when the task has no node config.
-   */
-  _currentNodeState(environment, taskId) {
-    const runtime = environment?.nodeRuntime?.[taskId];
-    if (runtime) return runtime;
-    const libraryTasks =
-      this._config().systems?.[String(environment?.craftingSystemId || '')]?.tasks || [];
-    const config = normalizeNodeConfig(
-      normalizeList(libraryTasks).find((task) => task?.id === taskId)?.nodes
-    );
-    return config ? { ...config, current: config.max } : null;
-  }
-
-  /**
-   * Resolve the node source for an attempt: either the ENVIRONMENT pool (default,
-   * unchanged) or an interactable's OWN scoped pool (issue 302), selected by the
-   * `interactableRef`. Returns a `{ kind, read(), write(node) }` handle so the
-   * gate / depletion / listing touchpoints stay scope-agnostic.
-   *
-   * - No `interactableRef` → `kind: 'environment'`. `read()` returns the task's
-   *   composed node (`task.nodes`); `write(node)` persists into the per-environment
-   *   `nodeRuntime[taskId]` via {@link _writeNodeState}. This is the UNCHANGED path
-   *   and never resolves a behaviour.
-   * - With an `interactableRef` whose behaviour resolves to `taskNodeLink:'unlinked'`
-   *   with a real `node` → `kind: 'interactable'`. `read()` returns that scoped node
-   *   verbatim (self-authoritative — NO library merge); `write(node)` patches the
-   *   behaviour `system.node` via the injected `writeInteractableBehavior` seam.
-   * - Any other ref (behaviour gone, environment scope, malformed node) falls back
-   *   to the environment branch — safe and never throws.
-   *
-   * @param {object} params
-   * @param {object} params.environment
-   * @param {object} params.task
-   * @param {{sceneId:string,regionId:string,behaviorId:string}|null} [params.interactableRef]
-   * @returns {{ kind: 'environment'|'interactable', read: () => (object|null), write: (node: object) => (void|Promise<void>) }}
-   */
-  _resolveNodeSource({ environment, task, interactableRef = null } = {}) {
-    const environmentSource = {
-      kind: 'environment',
-      read: () => task?.nodes ?? null,
-      write: (node) =>
-        this._writeNodeState({ environmentId: environment?.id, taskId: task?.id, node }),
-    };
-
-    if (!interactableRef || typeof this.resolveRegionBehavior !== 'function') {
-      return environmentSource;
-    }
-
-    let view = null;
-    try {
-      const behavior = this.resolveRegionBehavior(interactableRef);
-      view = behavior ? readInteractableBehaviorSystem(behavior) : null;
-    } catch {
-      view = null;
-    }
-    if (!view || view.taskNodeLink !== 'unlinked' || !view.node) {
-      return environmentSource;
-    }
-
-    return {
-      kind: 'interactable',
-      // Self-authoritative scoped pool — no library merge (it owns its own config).
-      read: () => view.node,
-      write: (node) => this.writeInteractableBehavior?.(interactableRef, { node }),
-    };
-  }
-
-  /**
-   * Persist a node object for a task into the per-environment `nodeRuntime` map
-   * (reading the raw stored environment so a composed/runtime environment is
-   * never written).
-   */
-  async _writeNodeState({ environmentId, taskId, node }) {
-    const stored = this.environmentStore?.get?.(environmentId);
-    if (!stored) return null;
-    return this.environmentStore.update(environmentId, {
-      nodeRuntime: { ...stored.nodeRuntime, [taskId]: node },
-    });
-  }
-
-  /**
-   * Regenerate one actor's stamina for a stamina-mode system as world time
-   * passes. Adds the configured per-interval amount once for each whole
-   * `regen.unit` elapsed since the last evaluation, clamps to the pool max, and
-   * advances the persisted anchor by exactly the consumed intervals so the
-   * fractional remainder accrues toward the next tick. No-ops when the system
-   * does not have stamina enabled, regen is off, the pool has no max, or world time
-   * has not advanced a full interval (re-anchoring on backwards jumps).
+   * Regenerate one actor's stamina as world time passes. Delegated to
+   * GatheringStaminaService (issue 376); GatheringEngine calls this on the
+   * parent.
    *
    * @param {object} payload
    * @returns {Promise<object|null>} The updated stamina entry, or null on no-op.
    */
-  async regenerateActorStamina({
-    actor,
-    systemId,
-    system = null,
-    environment = null,
-    worldTime,
-  } = {}) {
-    const key = systemId || 'default';
-    const econ = this._systemEconomy(key);
-    if (econ.stamina?.enabled !== true) return null;
-    const regen = econ.stamina?.regen || {};
-    if (regen.policy !== 'overTime') return null;
-    const interval = this._durationToSeconds(1, regen.unit);
-    if (!(interval > 0)) return null;
-
-    const state = readState(actor);
-    const entry = state.stamina?.[key];
-    if (!entry) return null; // regen only tops up materialized pools, never creates them
-    // Effective cap: the GM override if set, else the rolled max.
-    const max = numberOrNullStrict(entry.maxOverride) ?? numberOrNullStrict(entry.max);
-    if (max == null) return null;
-    const now = Number(worldTime);
-    if (!Number.isFinite(now)) return null;
-    const last = Number.isFinite(Number(entry.lastRegenWorldTime))
-      ? Number(entry.lastRegenWorldTime)
-      : now;
-
-    // World time stood still or ran backwards: re-anchor, never regenerate.
-    if (now <= last) {
-      if (entry.lastRegenWorldTime !== now) {
-        state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: now } };
-        await writeState(actor, state);
-      }
-      return null;
-    }
-
-    const intervals = Math.floor((now - last) / interval);
-    if (intervals <= 0) return null; // keep the anchor so the remainder accrues
-
-    const before = Number(entry.current || 0);
-    const advancedAnchor = last + intervals * interval;
-    if (before >= max) {
-      state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: advancedAnchor } };
-      await writeState(actor, state);
-      return null;
-    }
-
-    const perInterval = await this._regenAmountPerInterval({
-      actor,
-      systemId: key,
-      system,
-      environment,
-      regen,
-    });
-    const nextCurrent = perInterval > 0 ? Math.min(max, before + perInterval * intervals) : before;
-    const next = { ...entry, current: nextCurrent, lastRegenWorldTime: advancedAnchor };
-    state.stamina = { ...state.stamina, [key]: next };
-    state.history = [
-      this._historyEvent('stamina.regen', {
-        systemId: key,
-        amount: nextCurrent - before,
-        current: nextCurrent,
-        max,
-      }),
-      ...normalizeList(state.history),
-    ].slice(0, 50);
-    await writeState(actor, state);
-    this._callHook('fabricate.gathering.staminaRegenerated', {
-      actor,
-      systemId: key,
-      amount: nextCurrent - before,
-      stamina: cloneJson(next),
-    });
-    return cloneJson(next);
+  async regenerateActorStamina(payload = {}) {
+    return this.staminaService.regenerateActorStamina(payload);
   }
 
   /**
-   * Respawn finite resource nodes for one environment as world time passes
-   * (systems with `nodes.enabled` only). For each task with an `overTime` respawn policy,
-   * adds nodes per elapsed interval per the gain mode: `guaranteed` (+1),
-   * `chance` (a persisted d100 roll per interval), or `expression` (roll
-   * `amountExpression` per interval and add the rolled total), clamped to the
-   * task max. Advances each task's `respawn.lastEvaluatedWorldTime` with the
-   * consumed intervals (persisting `lastRoll`) so a same-tick refresh never
-   * rerolls. Writes the environment once when any task changed.
+   * Respawn finite resource nodes for one environment as world time passes.
+   * The parent owns the `nodes.enabled` gate (the canonical economy read path
+   * lives here); the per-node respawn arithmetic is delegated to
+   * GatheringNodeService (issue 376). GatheringEngine calls this on the parent.
    *
    * @param {object} payload
    * @returns {Promise<object|null>} The updated environment, or null on no-op.
@@ -1444,298 +1068,19 @@ export class GatheringRichStateService {
   async respawnNodes({ environment, worldTime } = {}) {
     if (!environment) return null;
     if (!this.nodesEnabled(environment.craftingSystemId)) return null;
-    const now = Number(worldTime);
-    if (!Number.isFinite(now)) return null;
-
-    // Per-environment `nodeRuntime` holds only runtime STATE (the `current` count
-    // and respawn timers); the respawn CONFIG is always sourced fresh from the
-    // current library task. Otherwise a `nodeRuntime` entry seeded under an older
-    // config (e.g. `manual` before the GM switched the task to `overTime`) would
-    // freeze that stale config and never respawn — and an emptied pool never
-    // re-depletes to pick up the new config. A sequential loop (not `.map`) so the
-    // `expression` gain mode can await.
-    let runtimeChanged = false;
-    const nodeRuntime = { ...environment.nodeRuntime };
-    // Resolve the library node configs once for this environment (not per node).
-    const libNodes = this._libraryNodeConfigs(environment.craftingSystemId);
-    for (const [taskId, node] of Object.entries(nodeRuntime)) {
-      const effective = this._mergeNodeConfigState(libNodes.get(String(taskId)) || null, node);
-
-      const result = await this._respawnNode(effective, {
-        now,
-        environment,
-        environmentId: environment.id,
-        taskId,
-      });
-      if (result.changed) {
-        runtimeChanged = true;
-        nodeRuntime[taskId] = result.node;
-      }
-    }
-
-    if (!runtimeChanged) return null;
-    return this.environmentStore.update(environment.id, { nodeRuntime });
+    return this.nodeService.respawnNodes({ environment, worldTime });
   }
 
   /**
-   * Index a system's library node configs by task id (`taskId → normalized
-   * task.nodes`). Read once from the canonical config so respawn always reflects
-   * the GM's current authoring rather than a per-environment snapshot, without
-   * re-normalizing the whole config per node.
-   *
-   * @param {string} systemId
-   * @returns {Map<string, object>}
-   */
-  _libraryNodeConfigs(systemId) {
-    const tasks = this._config().systems?.[String(systemId || '')]?.tasks;
-    const map = new Map();
-    if (Array.isArray(tasks)) {
-      for (const task of tasks) {
-        if (task?.id && task?.nodes) map.set(String(task.id), task.nodes);
-      }
-    }
-    return map;
-  }
-
-  /**
-   * Merge a per-environment runtime node (`stored`) onto the current library node
-   * CONFIG so respawn/listing always use the authoritative policy, gain mode,
-   * interval, depletion timing, AND capacity (`max`) from the library task, while
-   * preserving only the per-environment STATE: the `current` count (clamped to the
-   * library `max`) and the respawn anchor/roll. `max` is config, not state — a
-   * persisted snapshot (seeded on first depletion) must never shadow a later
-   * library edit, or raising a task's node count would have no effect in
-   * environments that had already gathered it. Falls back to `stored` when the
-   * library task has no node config (e.g. the task was deleted).
-   *
-   * @param {object|null} libNode Authoritative library node config.
-   * @param {object} stored The persisted per-environment node entry.
-   * @returns {object}
-   */
-  _mergeNodeConfigState(libNode, stored) {
-    if (!libNode) return stored;
-    const storedRespawn = stored?.respawn || {};
-    // Capacity is library config and authoritative — `...cloneJson(libNode)`
-    // already supplies `max`, so we never read a stale `stored.max`.
-    const max = Number(libNode.max);
-    const storedCurrent = Number(stored?.current);
-    const merged = {
-      ...cloneJson(libNode),
-      // STATE stays per-environment: the live count, clamped to the library cap so
-      // a lowered cap can't leave `current` above `max`.
-      current: Number.isFinite(storedCurrent)
-        ? Number.isFinite(max)
-          ? Math.min(storedCurrent, max)
-          : storedCurrent
-        : libNode.current,
-      respawn: {
-        ...cloneJson(libNode.respawn || { policy: 'manual' }),
-        lastEvaluatedWorldTime: numberOrNullStrict(storedRespawn.lastEvaluatedWorldTime),
-        nextEvaluationWorldTime: numberOrNullStrict(storedRespawn.nextEvaluationWorldTime),
-        lastRoll:
-          storedRespawn.lastRoll && typeof storedRespawn.lastRoll === 'object'
-            ? cloneJson(storedRespawn.lastRoll)
-            : null,
-      },
-    };
-    if (stored?.showCountsToPlayers === true) merged.showCountsToPlayers = true;
-    return merged;
-  }
-
-  /**
-   * Respawn one resource-node pool as world time passes (`overTime` policy
-   * only). Per elapsed interval, adds nodes per `respawn.gainMode`: `guaranteed`
-   * (+1), `chance` (a persisted d100 roll), or `expression` (roll
-   * `respawn.amountExpression` and add the rolled total). Clamped to max,
-   * advancing the `respawn.lastEvaluatedWorldTime` anchor so a same-tick refresh
-   * never rerolls.
-   *
-   * @param {object} nodes The node object (config + state).
-   * @param {{now:number, environment?:object, environmentId:string, taskId:string}} ctx
-   * @returns {Promise<{changed: boolean, node: object}>}
-   */
-  async _respawnNode(nodes, { now, environment = null, environmentId, taskId }) {
-    const respawn = nodes?.respawn;
-    if (!nodes || !respawn || respawn.policy !== 'overTime') {
-      return { changed: false, node: nodes };
-    }
-    // The respawn ARITHMETIC (interval resolution, gain per mode, anchor advance,
-    // backwards/stalled-time re-anchor, room===0 short-circuit, max-clamp early
-    // break) is the single pure implementation in `nodeRespawnMath`. This env
-    // path injects the SAME calendar/random seams the per-token adapter uses —
-    // `secondsPerUnit` (legacy `intervalSeconds` falls through inside the math),
-    // the `rollD100() <= chance*100` chance seam, and a SYNCHRONOUS expression
-    // roll backed by pre-rolled async amounts (so Roll/`evaluateExpression`
-    // evaluation still happens, while the math stays pure). Keeping one
-    // implementation removes the prior `_respawnNode`/`respawnNodeOnce` drift.
-
-    // Pre-roll expression amounts asynchronously (the math is sync). The needed
-    // count is bounded by the elapsed whole intervals capped by the restock room,
-    // mirroring the math's stochastic-loop bound; the math may consume fewer (the
-    // max-clamp early break) — surplus pre-rolls are simply unused.
-    let expressionRolls = null;
-    let expressionCursor = 0;
-    if ((respawn.gainMode || 'guaranteed') === 'expression') {
-      const interval = respawn.intervalUnit
-        ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
-        : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-        ? Number(respawn.lastEvaluatedWorldTime)
-        : now;
-      if (interval > 0 && now > last) {
-        const elapsedIntervals = Math.floor((now - last) / interval);
-        const room = Math.max(0, Number(nodes.max || 0) - Number(nodes.current || 0));
-        const needed = Math.min(Math.max(0, elapsedIntervals), room);
-        expressionRolls = [];
-        for (let i = 0; i < needed; i++) {
-          expressionRolls.push(
-            await this._respawnExpressionAmount({
-              expression: respawn.amountExpression,
-              environment,
-            })
-          );
-        }
-      }
-    }
-
-    const before = Number(nodes.current || 0);
-    const { changed, node } = respawnNodeOnce(nodes, {
-      now,
-      secondsPerUnit: (unit) => this._respawnIntervalSecondsSeam(respawn, unit),
-      // Raw 1..100 roll seam (the math hits on `roll <= chance*100` and persists
-      // the raw roll in `lastRoll.rolls`, identical to the prior env path).
-      rollChance: () => Number(this.rollD100()),
-      rollExpression: () =>
-        expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0,
-    });
-
-    if (changed) {
-      const nextCurrent = Number(node?.current ?? before);
-      const max = Number(node?.max ?? nodes.max ?? 0);
-      // Only emit the respawn hook when the count actually moved (a pure
-      // re-anchor changes the node but gains nothing).
-      if (nextCurrent !== before) {
-        this._callHook('fabricate.gathering.nodeRespawned', {
-          environmentId,
-          taskId,
-          amount: nextCurrent - before,
-          current: nextCurrent,
-          max,
-        });
-      }
-    }
-    return { changed, node };
-  }
-
-  /**
-   * Respawn one interactable-SCOPED node pool as world time passes (issue 302).
-   * The scoped node is self-authoritative — it carries its OWN config + state, so
-   * (unlike the per-environment path) there is no library merge. Applies the same
-   * pure respawn arithmetic ({@link respawnNodeOnce}) with the identical
-   * calendar/random seams the environment path injects: `overTime` pools regrow
-   * per the gain mode; `manual` / `nonRegenerating` pools never gain (the math
-   * short-circuits on policy). Returns `{ changed, node }`; the caller persists the
-   * changed node back onto the behaviour.
-   *
-   * @param {object} params
-   * @param {object} params.node The scoped node object (config + state).
-   * @param {number} params.worldTime Current world time (seconds).
-   * @returns {Promise<{ changed: boolean, node: object }>}
-   */
-  async respawnInteractableNode({ node, worldTime } = {}) {
-    const respawn = node?.respawn;
-    if (!node || !respawn || respawn.policy !== 'overTime') {
-      return { changed: false, node };
-    }
-    const now = Number(worldTime);
-    if (!Number.isFinite(now)) return { changed: false, node };
-
-    // Pre-roll expression amounts asynchronously (the math is sync), mirroring the
-    // env path's bound: elapsed whole intervals capped by the restock room.
-    let expressionRolls = null;
-    let expressionCursor = 0;
-    if ((respawn.gainMode || 'guaranteed') === 'expression') {
-      const interval = respawn.intervalUnit
-        ? this._durationToSeconds(respawn.intervalAmount, respawn.intervalUnit)
-        : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-        ? Number(respawn.lastEvaluatedWorldTime)
-        : now;
-      if (interval > 0 && now > last) {
-        const elapsedIntervals = Math.floor((now - last) / interval);
-        const room = Math.max(0, Number(node.max || 0) - Number(node.current || 0));
-        const needed = Math.min(Math.max(0, elapsedIntervals), room);
-        expressionRolls = [];
-        for (let i = 0; i < needed; i++) {
-          expressionRolls.push(
-            await this._respawnExpressionAmount({
-              expression: respawn.amountExpression,
-              environment: null,
-            })
-          );
-        }
-      }
-    }
-
-    return respawnNodeOnce(node, {
-      now,
-      secondsPerUnit: (unit) => this._respawnIntervalSecondsSeam(respawn, unit),
-      rollChance: () => Number(this.rollD100()),
-      rollExpression: () =>
-        expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0,
-    });
-  }
-
-  /**
-   * `secondsPerUnit` seam for `respawnNodeOnce` on the env path: resolve the
-   * interval unit through the calendar-aware `_durationToSeconds(1, unit)`, so
-   * day/week lengths follow the active world calendar exactly like the per-token
-   * adapter. The math's own legacy `intervalSeconds` fallback handles
-   * pre-unit-schema nodes (it only calls this seam when `respawn.intervalUnit`
-   * is set).
-   *
-   * @param {object} respawn The node's respawn block.
-   * @param {string} unit The interval unit passed by the math.
-   * @returns {number} Seconds for one unit.
-   */
-  _respawnIntervalSecondsSeam(respawn, unit) {
-    return this._durationToSeconds(1, unit);
-  }
-
-  /**
-   * Roll the per-interval node gain for an `expression` respawn. Respawn is
-   * environment-level with no actor, so the expression must be plain dice
-   * (e.g. `1d4`); any `@actor.*` reference resolves against an empty roll-data
-   * context and coerces to 0 (never throws). Floored at 0 and rounded.
+   * Respawn one interactable-scoped node pool as world time passes (issue 302).
+   * Delegated to GatheringNodeService (issue 376); GatheringEngine calls this on
+   * the parent.
    *
    * @param {object} payload
-   * @returns {Promise<number>} Non-negative integer node gain for one interval.
+   * @returns {Promise<{ changed: boolean, node: object }>}
    */
-  async _respawnExpressionAmount({ expression, environment = null } = {}) {
-    if (expression === null || expression === undefined || String(expression).trim() === '')
-      return 0;
-    let value;
-    try {
-      value =
-        typeof this.evaluateExpression === 'function'
-          ? await this.evaluateExpression({
-              expression: String(expression),
-              provider: null,
-              actor: null,
-              kind: 'nodeRespawn',
-              system: null,
-              environment,
-            })
-          : // No Roll available (e.g. headless): a plain number still resolves.
-            Number(expression);
-    } catch {
-      // A malformed dice string (e.g. `1d`, `(`) or an `@actor.*` reference with
-      // no actor must not abort respawn for the rest of the environment — treat
-      // this interval as no gain.
-      return 0;
-    }
-    const numeric = Number(value);
-    return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
+  async respawnInteractableNode(payload = {}) {
+    return this.nodeService.respawnInteractableNode(payload);
   }
 
   async updateConditions({ environmentId, conditions = {} } = {}) {
@@ -1883,7 +1228,7 @@ export class GatheringRichStateService {
     const staminaEnabled = this.staminaEnabled(systemId);
     const nodesEnabled = this.nodesEnabled(systemId);
 
-    const source = this._resolveNodeSource({ environment, task, interactableRef });
+    const source = this.nodeService._resolveNodeSource({ environment, task, interactableRef });
     const gateNode = source.read();
     if (nodesEnabled && gateNode && Number(gateNode.current || 0) <= 0) {
       // A `nonRegenerating` pool at 0 is permanently exhausted (it never
@@ -1895,9 +1240,9 @@ export class GatheringRichStateService {
     }
 
     if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {
-      await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
+      await this.staminaService.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
       const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
-      const stamina = this.getActorStamina(actor, systemId);
+      const stamina = this.staminaService.getActorStamina(actor, systemId);
       evidence.stamina = { cost, base: Number(task.staminaCost || 0), state: stamina };
       // Only enforce when a pool exists (max configured); no max ⇒ no stamina limit.
       if (cost > 0 && stamina.max != null && Number(stamina.current ?? 0) < cost) {
@@ -1939,7 +1284,7 @@ export class GatheringRichStateService {
     const staminaEnabled = this.staminaEnabled(systemId);
     const nodesEnabled = this.nodesEnabled(systemId);
 
-    const source = this._resolveNodeSource({ environment, task, interactableRef });
+    const source = this.nodeService._resolveNodeSource({ environment, task, interactableRef });
     const depletionSource = source.read();
     if (nodesEnabled && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
       // Persist the full node object (config + respawn timers) with one consumed,
@@ -1968,12 +1313,12 @@ export class GatheringRichStateService {
     }
 
     if (staminaEnabled && Number(task?.staminaCost || 0) > 0) {
-      await this.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
+      await this.staminaService.seedActorStaminaIfNeeded({ actor, systemId, system, environment });
       // Only spend when a pool exists (max configured); no max ⇒ no stamina limit.
-      if (this.getActorStamina(actor, systemId).max != null) {
+      if (this.staminaService.getActorStamina(actor, systemId).max != null) {
         const cost = await this._effectiveStaminaCost({ actor, system, environment, task, viewer });
         if (cost > 0) {
-          await this.adjustActorStamina(actor, { systemId, delta: -cost });
+          await this.staminaService.adjustActorStamina(actor, { systemId, delta: -cost });
           evidence.stamina = { spent: cost, base: Number(task.staminaCost || 0) };
         }
       }
@@ -2082,7 +1427,7 @@ export class GatheringRichStateService {
       // Library config is authoritative; the per-environment entry contributes
       // only runtime state (count + respawn anchor). A fresh pool starts full.
       runtimeTask.nodes = stored
-        ? this._mergeNodeConfigState(cloneJson(normalized.nodes), stored)
+        ? this.nodeService._mergeNodeConfigState(cloneJson(normalized.nodes), stored)
         : { ...cloneJson(normalized.nodes), current: Number(normalized.nodes.max || 0) };
     }
     return runtimeTask;
@@ -2309,40 +1654,6 @@ export class GatheringRichStateService {
     if (!this.staminaEnabled(environment?.craftingSystemId)) return null;
     if (!(Number(task?.staminaCost || 0) > 0)) return null;
     return this._effectiveStaminaCost({ actor, system, environment, task, viewer });
-  }
-
-  /**
-   * The stamina an actor regenerates per elapsed `regen.unit`: `regen.amount`
-   * evaluated per actor as a single expression (a plain number or a formula
-   * with character references, e.g. "1 + @abilities.con.mod"). Floored at 0 and
-   * rounded to an integer so multi-interval catch-up is deterministic.
-   *
-   * @param {object} payload
-   * @returns {Promise<number>} Non-negative integer amount per interval.
-   */
-  async _regenAmountPerInterval({
-    actor,
-    systemId: _systemId,
-    system = null,
-    environment = null,
-    regen,
-  } = {}) {
-    const expression = regen?.amount;
-    if (expression == null || expression === '') return 0;
-    const value =
-      typeof this.evaluateExpression === 'function'
-        ? await this.evaluateExpression({
-            expression: String(expression),
-            provider: null,
-            actor,
-            kind: 'staminaRegen',
-            system,
-            environment,
-          })
-        : // No Roll available (e.g. headless): a plain number still resolves.
-          Number(expression);
-    const numeric = Number(value);
-    return Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0));
   }
 
   _blockedReason(code, data = null) {
@@ -2773,12 +2084,6 @@ function normalizeCharacterModifierReference(ref, index) {
     max: numberOrNullStrict(ref.max),
     expressionOverride: stringOrFallback(ref.expressionOverride, ''),
   };
-}
-
-function numberOrNullStrict(value) {
-  if (value == null || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 function normalizeModifierProvider(provider = null) {
@@ -3396,23 +2701,6 @@ function revealKey({ environmentId, taskId, scope, actor, userId }) {
   return `actor:${actor?.uuid || actor?.id || 'unknown'}:${environmentId}:${taskId}`;
 }
 
-function readState(actor) {
-  try {
-    const state = actor?.getFlag?.(FLAG_NAMESPACE, STATE_FLAG_KEY);
-    return state && typeof state === 'object' ? cloneJson(state) : {};
-  } catch {
-    return {};
-  }
-}
-
-async function writeState(actor, state) {
-  return actor?.setFlag?.(FLAG_NAMESPACE, STATE_FLAG_KEY, cloneJson(state));
-}
-
-function normalizeList(value) {
-  return Array.isArray(value) ? value : [];
-}
-
 /**
  * Stable-sort records by an explicit order of ids. Records absent from the
  * order array keep their original (library) order after the listed ones.
@@ -3435,21 +2723,7 @@ function sortRecordsByOrder(records, order) {
     .map((entry) => entry.record);
 }
 
-function nonNegativeNumber(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : Number(fallback || 0);
-}
-
-function nonNegativeInteger(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isInteger(number) && number >= 0 ? number : Number(fallback || 0);
-}
-
 function positiveInteger(value, fallback = 1) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 1 ? Math.floor(number) : Number(fallback || 1);
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

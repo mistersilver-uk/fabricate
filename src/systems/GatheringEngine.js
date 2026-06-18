@@ -4,7 +4,24 @@ import {
 } from '../gatheringToolRuntime.js';
 
 import { buildGatheringChatContent } from './GatheringChatCard.js';
-import { idOf, normalizeList, stringOrNull } from './gatheringEngineInternals.js';
+import {
+  actorMatchesId,
+  callMaybe,
+  cloneJson,
+  idOf,
+  normalizeActorList,
+  normalizeInteractableRef,
+  normalizeList,
+  normalizeStringList,
+  plainObjectOrNull,
+  redactRichEvidence,
+  sameActor,
+  sameActorUuid,
+  stringOrEmpty,
+  stringOrNull,
+  stripRuntimeSnapshotFromRun,
+} from './gatheringEngineInternals.js';
+import { GatheringListingBuilder } from './GatheringListingBuilder.js';
 import {
   buildRealmDisclosure,
   buildTravelGuidance,
@@ -46,10 +63,6 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
-// Player-facing event visibility tiers. A GM always resolves to 'full'; a
-// non-GM viewer falls back to the more-restrictive 'encounterChance' when the
-// rule is missing, so absent rules never leak the full event list.
-const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const FAILURE_KEYWORDS = new Set([
   'f',
   'fail',
@@ -134,6 +147,12 @@ export class GatheringEngine {
     // engine's already-resolved fields when not injected. The engine's
     // `isPrimaryGM()` guard is the only gate — the processor carries none.
     worldTimeProcessor = null,
+    // Player-facing listing / view-model builder (issue 375): owns the bodies of
+    // listForActor + getTaskDropBreakdown and the environment/run/history/task/
+    // event model construction. Default-constructed below from the engine's
+    // collaborators + bound shared-helper callbacks when not injected. The engine
+    // keeps thin public delegators to it.
+    listingBuilder = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.runManager = runManager;
@@ -177,6 +196,39 @@ export class GatheringEngine {
         scenes: this.scenes,
         applyInteractableBehaviorUpdate: this.applyInteractableBehaviorUpdate,
         enabledGatheringSystems: () => this._enabledGatheringSystems(),
+      });
+    this.listingBuilder =
+      listingBuilder ??
+      new GatheringListingBuilder({
+        richState: this.richState,
+        runManager: this.runManager,
+        environmentStore: this.environmentStore,
+        getSelectableActors: this.getSelectableActors,
+        localize: this.localize,
+        resolveSelectedActor: (args) => this._resolveSelectedActor(args),
+        findEnvironment: (environmentId) => this._findEnvironment(environmentId),
+        enabledGatheringSystems: () => this._enabledGatheringSystems(),
+        allSystems: () => this._allSystems(),
+        composeEnvironment: (environment, system) => this._composeEnvironment(environment, system),
+        playerCandidateEnvironments: (systems, viewer) =>
+          this._playerCandidateEnvironments(systems, viewer),
+        isSelectableActor: (actor, viewer, selectableActors) =>
+          this._isSelectableActor(actor, viewer, selectableActors),
+        locationBlockedReasons: (args) => this._locationBlockedReasons(args),
+        currentRealmSummary: (args) => this._currentRealmSummary(args),
+        listingRealmContext: (args) => this._listingRealmContext(args),
+        resolveRealmContext: (args) => this._resolveRealmContext(args),
+        resolveTaskTools: (args) => this._resolveTaskTools(args),
+        resolveTaskToolStates: (args) => this._resolveTaskToolStates(args),
+        componentsById: (system) => this._componentsById(system),
+        richListingMetadata: (args) => this._richListingMetadata(args),
+        taskModel: (args) => this._taskModel(args),
+        taskBlockedReasons: (args) => this._taskBlockedReasons(args),
+        visibleTaskListings: (args) => this._visibleTaskListings(args),
+        environmentBlockedReasons: (args) => this._environmentBlockedReasons(args),
+        isOpaqueBlindTask: (args) => this._isOpaqueBlindTask(args),
+        resolveRevealPolicy: (environment) => this._resolveRevealPolicy(environment),
+        blockedReason: (code, options) => this._blockedReason(code, options),
       });
   }
 
@@ -696,289 +748,29 @@ export class GatheringEngine {
    * @param {string|null} [args.rememberedActorId] Previously selected actor id.
    * @returns {Promise<object>} The gathering listing model.
    */
-  async listForActor({
-    viewer = null,
-    actor = null,
-    rememberedActorId = null,
-    presentTools = null,
-  } = {}) {
-    const selectableActors = normalizeActorList(
-      await callMaybe(this.getSelectableActors, { viewer })
-    );
-    if (selectableActors.length === 0) {
-      return this._emptyListing({
-        viewer,
-        selectableActors,
-        reason: this._blockedReason('NO_SELECTABLE_ACTORS'),
-      });
-    }
-
-    const selected = this._resolveSelectedActor({
-      actor,
-      rememberedActorId,
-      selectableActors,
-      viewer,
-    });
-    if (selected.blockedReason) {
-      return this._emptyListing({
-        viewer,
-        selectableActors,
-        reason: selected.blockedReason,
-      });
-    }
-
-    const selectedActor = selected.actor;
-    const systems = this._enabledGatheringSystems();
-    const environments = this._playerCandidateEnvironments(systems, viewer);
-    if (environments.length === 0) {
-      return this._emptyListing({
-        viewer,
-        actor: selectedActor,
-        selectableActors,
-        reason: this._blockedReason('NO_ENVIRONMENTS_CONFIGURED'),
-      });
-    }
-
-    const hidden = { targeted: 0, blind: 0 };
-    const environmentModels = [];
-    // Resolve each system's current-realm context at most once per listing call.
-    const realmContextCache = new Map();
-    for (const environment of environments) {
-      const model = await this._buildEnvironmentListing({
-        environment,
-        system: systems.get(environment.craftingSystemId),
-        viewer,
-        actor: selectedActor,
-        presentTools,
-        realmContextCache,
-      });
-      if (model.visible) {
-        environmentModels.push(model);
-        continue;
-      }
-      if (model.hiddenReason === 'BLIND_SOLE_TASK_HIDDEN') hidden.blind += 1;
-      if (model.hiddenReason === 'NO_VISIBLE_TARGETED_TASKS') hidden.targeted += 1;
-    }
-
-    if (environmentModels.length === 0) {
-      return this._emptyListing({
-        viewer,
-        actor: selectedActor,
-        selectableActors,
-        reason: this._emptyVisibilityReason(hidden),
-      });
-    }
-
-    const attemptable = environmentModels.some((environment) => environment.attemptable);
-    const blockedReasons = attemptable
-      ? []
-      : uniqueReasons(environmentModels.flatMap((environment) => environment.blockedReasons));
-    const activeRuns = this._activeRunModels({ actor: selectedActor, viewer });
-    const history = this._historyModels({ actor: selectedActor, viewer });
-    const gatheringSystems = this._gatheringSystemOptions([
-      ...environmentModels,
-      ...activeRuns,
-      ...history,
-    ]);
-    const realmContext = this._listingRealmContext({
-      environmentModels,
-      environments,
-      systems,
-      viewer,
-      actor: selectedActor,
-      realmContextCache,
-    });
-
-    return {
-      visible: true,
-      attemptable,
-      blockedReasons,
-      state: attemptable ? 'ready' : 'blocked',
-      viewerId: idOf(viewer),
-      selectedActorId: idOf(selectedActor),
-      selectableActors: selectableActors.map(actorToOption),
-      environments: environmentModels,
-      activeRuns,
-      history,
-      gatheringSystems,
-      realmContext,
-    };
+  /**
+   * Public read API — delegates to the GatheringListingBuilder collaborator
+   * (issue 375). Kept on the engine as a thin delegator because external callers
+   * (e.g. `src/main.js`) dispatch by method name on the engine instance; the
+   * body moved into the builder.
+   *
+   * @param {object} [args]
+   * @returns {Promise<object>}
+   */
+  async listForActor(args = {}) {
+    return this.listingBuilder.listForActor(args);
   }
 
   /**
-   * Lazily compute the per-drop chance breakdown for ONE task the player has
-   * opened in the right-column inspector ("What you might find"). Resolves the
-   * selected actor like `listForActor`, recomposes the environment, gates the
-   * task to what the viewer may actually see (so a blind/undiscovered task's
-   * drops never leak), then delegates the per-drop math to
-   * `richState.previewDropBreakdown` and attaches each drop's component image.
+   * Public read API — delegates to the GatheringListingBuilder collaborator
+   * (issue 375). Thin delegator for the same method-name-dispatch reason as
+   * `listForActor`; the body moved into the builder.
    *
-   * Returns `{ resolutionMode, awardMode, awardLimit, eventPolicy, drops }`;
-   * `drops` is empty when not applicable (no richState, unknown/hidden task,
-   * non-d100 task, or no drops).
-   *
-   * @param {object} options
-   * @param {string} options.environmentId
-   * @param {string} options.taskId
-   * @param {string|null} [options.rememberedActorId]
-   * @param {object|null} [options.viewer]
+   * @param {object} [args]
    * @returns {Promise<object>}
    */
-  async getTaskDropBreakdown({
-    environmentId,
-    taskId,
-    rememberedActorId = null,
-    viewer = null,
-  } = {}) {
-    const empty = {
-      resolutionMode: null,
-      awardMode: null,
-      awardLimit: null,
-      eventPolicy: null,
-      drops: [],
-    };
-    if (!environmentId || !taskId || typeof this.richState?.previewDropBreakdown !== 'function')
-      return empty;
-
-    const selectableActors = normalizeActorList(
-      await callMaybe(this.getSelectableActors, { viewer })
-    );
-    if (selectableActors.length === 0) return empty;
-    const selected = this._resolveSelectedActor({
-      actor: null,
-      rememberedActorId,
-      selectableActors,
-      viewer,
-    });
-    if (selected.blockedReason) return empty;
-    const actor = selected.actor;
-
-    const systems = this._enabledGatheringSystems();
-    const environment = this._playerCandidateEnvironments(systems, viewer).find(
-      (candidate) => stringOrNull(candidate?.id) === String(environmentId)
-    );
-    if (!environment || environment.enabled === false) return empty;
-    const system = systems.get(environment.craftingSystemId);
-
-    // Gate to what the viewer can actually see: only task ids the player listing
-    // would render (targeted tasks, or revealed blind "discovered" tasks).
-    const model = await this._buildEnvironmentListing({ environment, system, viewer, actor });
-    if (model.visible !== true) return empty;
-    const visibleIds = new Set(
-      [...normalizeList(model.tasks), ...normalizeList(model.discoveredTasks)]
-        .map((taskModel) => stringOrNull(taskModel?.id))
-        .filter(Boolean)
-    );
-    if (!visibleIds.has(String(taskId))) return empty;
-
-    const task =
-      normalizeList(environment.tasks).find(
-        (entry) => stringOrNull(entry?.id) === String(taskId)
-      ) ?? null;
-    if (!task || task.resolutionMode !== 'd100')
-      return { ...empty, resolutionMode: stringOrNull(task?.resolutionMode) };
-
-    const preview = await this.richState.previewDropBreakdown({
-      environment,
-      task,
-      actor,
-      viewer,
-      system,
-    });
-    const componentsById = this._componentsById(system);
-    const drops = normalizeList(preview?.drops).map((drop) => ({
-      ...drop,
-      img:
-        stringOrNull(componentsById.get(stringOrNull(drop?.componentId))?.img) ||
-        'icons/svg/item-bag.svg',
-    }));
-    return {
-      resolutionMode: 'd100',
-      successChance: preview?.successChance ?? null,
-      awardMode: stringOrNull(preview?.awardMode),
-      awardLimit: Number(preview?.awardLimit ?? 1),
-      eventPolicy: stringOrNull(preview?.eventPolicy),
-      drops,
-    };
-  }
-
-  _activeRunModels({ actor, viewer }) {
-    return normalizeList(this.runManager?.getActiveRuns?.(actor))
-      .filter((run) => run?.status === 'waitingTime')
-      .map((run) => this._runModel({ run, viewer, terminal: false }))
-      .filter(Boolean);
-  }
-
-  _historyModels({ actor, viewer }) {
-    return normalizeList(this.runManager?.getRunHistory?.(actor, 10))
-      .map((run) => this._runModel({ run, viewer, terminal: true }))
-      .filter(Boolean);
-  }
-
-  _runModel({ run, viewer, terminal }) {
-    if (!run?.id) return null;
-    const environment = this._findEnvironment(run.environmentId);
-    const system = this._allSystems().get(String(run.craftingSystemId));
-    const task = environment
-      ? (normalizeList(environment.tasks).find((task) => task?.id === run.taskId) ?? null)
-      : null;
-    const opaqueBlind = this._isOpaqueBlindRun({ environment, run, viewer });
-    const status = stringOrNull(run.status);
-    const model = {
-      id: stringOrNull(run.id),
-      status,
-      craftingSystemId: stringOrNull(run.craftingSystemId),
-      craftingSystemName: stringOrEmpty(system?.name),
-      environmentId: stringOrNull(run.environmentId),
-      environmentName: stringOrEmpty(environment?.name),
-      selectionMode: environment?.selectionMode === 'blind' ? 'blind' : 'targeted',
-      blind: opaqueBlind,
-      label: opaqueBlind
-        ? this.localize(BLIND_TASK_LABEL_KEY)
-        : stringOrEmpty(task?.name) || stringOrEmpty(environment?.name) || status,
-      taskId: opaqueBlind ? null : stringOrNull(run.taskId),
-      startedAtWorldTime: numberOrNull(run.startedAtWorldTime),
-      updatedAtWorldTime: numberOrNull(run.updatedAtWorldTime),
-    };
-
-    const timeGate = plainObjectOrNull(run.timeGate);
-    if (timeGate) model.timeGate = timeGate;
-    if (run.economyEvidence && typeof run.economyEvidence === 'object') {
-      model.economyEvidence = opaqueBlind
-        ? redactRichEvidence(run.economyEvidence)
-        : stripRuntimeSnapshotFromRun({ economyEvidence: run.economyEvidence }).economyEvidence;
-    }
-    if (run.conditionSnapshot && typeof run.conditionSnapshot === 'object') {
-      model.conditions = cloneJson(run.conditionSnapshot);
-    }
-    if (run.riskLevel) {
-      model.risk = stringOrNull(run.riskLevel);
-    }
-    if (!opaqueBlind && Array.isArray(run.chatMessageIds)) {
-      model.chatMessageIds = cloneJson(run.chatMessageIds);
-    }
-
-    if (terminal) {
-      model.completedAtWorldTime = numberOrNull(run.completedAtWorldTime);
-      if (!opaqueBlind) {
-        const createdResults = normalizeList(run.createdResults);
-        const usedTools = normalizeList(run.usedTools);
-        model.createdResultCount = createdResults.length;
-        model.usedToolCount = usedTools.length;
-        model.createdResults = cloneJson(createdResults);
-        model.usedTools = cloneJson(usedTools);
-        if (run.checkResult && typeof run.checkResult === 'object') {
-          model.checkResult = cloneJson(run.checkResult);
-        }
-      }
-    }
-
-    return model;
-  }
-
-  _isOpaqueBlindRun({ environment, run, viewer }) {
-    if (viewer?.isGM === true) return false;
-    return !environment || environment.selectionMode === 'blind' || run?.taskId === 'blind';
+  async getTaskDropBreakdown(args = {}) {
+    return this.listingBuilder.getTaskDropBreakdown(args);
   }
 
   _resolveSelectedActor({ actor, rememberedActorId, selectableActors, viewer }) {
@@ -1128,447 +920,6 @@ export class GatheringEngine {
     return environment;
   }
 
-  async _buildEnvironmentListing({
-    environment,
-    system,
-    viewer,
-    actor,
-    presentTools = null,
-    realmContextCache = null,
-  }) {
-    // Disabled environments surface to every viewer (players and GMs alike) as
-    // non-interactive "locked" teasers. Build them before any task-visibility
-    // gating so they are never dropped as BLIND_SOLE_TASK_HIDDEN /
-    // NO_VISIBLE_TARGETED_TASKS, and carry identity fields only — no tasks,
-    // weights, or composition internals leak.
-    if (environment.enabled === false) {
-      return this._lockedEnvironmentListing({ environment, system });
-    }
-
-    // A location-gated environment the party is NOT in is itself the "thing" out
-    // of realm: surface it as a locked teaser (identity only, unselectable) with
-    // the location reason + travel guidance, rather than a selectable environment
-    // whose every task carries the realm block. Evaluated before task-visibility
-    // gating so it is never dropped, mirroring the disabled-teaser path above.
-    const locationGate = this._locationBlockedReasons({
-      environment,
-      system,
-      viewer,
-      actor,
-      realmContextCache,
-    });
-    if (locationGate.location?.gated === true && locationGate.location?.available === false) {
-      return this._lockedEnvironmentListing({
-        environment,
-        system,
-        actor,
-        blockedReasons: locationGate.blockedReasons,
-        location: locationGate.location,
-      });
-    }
-
-    // Auto-seed the acting character's stamina pool on first sight of a stamina
-    // system (e.g. opening the gathering tab), so the displayed pool reflects the
-    // rolled max/start. Idempotent — the dice roll persists once.
-    if (actor && this.richState?.staminaEnabled?.(environment.craftingSystemId) === true) {
-      try {
-        await this.richState?.seedActorStaminaIfNeeded?.({
-          actor,
-          systemId: environment.craftingSystemId,
-          system,
-        });
-      } catch {
-        /* display-only: never block the listing on a seed failure */
-      }
-    }
-
-    const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
-    if (visibleTasks.length === 0) {
-      return {
-        visible: false,
-        hiddenReason:
-          environment.selectionMode === 'blind'
-            ? 'BLIND_SOLE_TASK_HIDDEN'
-            : 'NO_VISIBLE_TARGETED_TASKS',
-      };
-    }
-
-    const environmentBlockedReasons = await this._environmentBlockedReasons({
-      environment,
-      system,
-      viewer,
-      actor,
-      realmContextCache,
-    });
-    // Redaction-safe location field — reuse the gate computed above (here the
-    // environment is realm-available, so this is the ungated/available shape).
-    const location = locationGate.location;
-    // Party current-realm summary for the header bar (regardless of this
-    // environment's gating), so the player app can show the current realm or
-    // "no realm selected" when the realm/travel subsystem is enabled.
-    const realmSummary = this._currentRealmSummary({
-      environment,
-      system,
-      viewer,
-      actor,
-      realmContextCache,
-    });
-    // Stash each visible task's blocked reasons so both the player task models
-    // and the blind "discovered tasks" list draw from one computation — no
-    // extra visibility pass that could surface unrevealed tasks.
-    const taskEntries = [];
-    for (const visibleTask of visibleTasks) {
-      const taskBlockedReasons = [
-        ...environmentBlockedReasons,
-        ...(await this._taskBlockedReasons({
-          environment,
-          system,
-          task: visibleTask.task,
-          actor,
-          viewer,
-          presentTools,
-        })),
-      ];
-      taskEntries.push({
-        task: visibleTask.task,
-        visibility: visibleTask.visibility,
-        blockedReasons: taskBlockedReasons,
-      });
-    }
-    const taskModels = taskEntries.map((entry) =>
-      this._taskModel({
-        task: entry.task,
-        environment,
-        actor,
-        viewer,
-        visibility: entry.visibility,
-        blockedReasons: entry.blockedReasons,
-        tools: this._resolveTaskToolStates({
-          actor,
-          system,
-          environment,
-          task: entry.task,
-          presentTools,
-        }),
-      })
-    );
-    // Refine the displayed stamina cost to the viewing character's effective
-    // cost (base + per-actor modifiers); the sync model carries the base.
-    for (const [i, taskModel] of taskModels.entries()) {
-      await this._applyListingStaminaCost(taskModel, {
-        system,
-        environment,
-        actor,
-        viewer,
-        task: taskEntries[i].task,
-      });
-    }
-
-    const attemptable = taskModels.some((task) => task.attemptable);
-    const blockedReasons =
-      environmentBlockedReasons.length > 0
-        ? environmentBlockedReasons
-        : attemptable
-          ? []
-          : uniqueReasons(taskModels.flatMap((task) => task.blockedReasons));
-
-    // A non-GM viewer of a blind environment sees one opaque "Attempt gathering"
-    // action (the collapsed task list) plus the transparent rows for tasks they
-    // have already discovered. Targeted environments and GM viewers expose the
-    // full task list and no separate discovered list.
-    const blindForViewer = environment.selectionMode === 'blind' && viewer?.isGM !== true;
-    const listedTasks = blindForViewer
-      ? taskModels.length > 0
-        ? [taskModels[0]]
-        : []
-      : taskModels;
-    const discoveredTasks = blindForViewer
-      ? await this._discoveredTaskModels({
-          environment,
-          system,
-          viewer,
-          actor,
-          taskEntries,
-          environmentBlockedReasons,
-          presentTools,
-        })
-      : [];
-
-    // The GM-configured event visibility tier further restricts what a non-GM
-    // viewer sees, independent of the blind/targeted redaction above: only
-    // 'full' exposes individual events, and 'dangerLevelOnly' also hides the
-    // environment encounter-chance bar (signalled by a null eventChance). A GM
-    // always resolves to 'full'.
-    const eventVisibility = this._resolveEventVisibility(environment, viewer);
-
-    // Individual events are read-only player-facing models. They are redacted
-    // for a non-GM viewer of a blind environment (mirroring the collapsed task
-    // list) or whenever the visibility tier is not 'full', and surfaced in full
-    // for targeted environments and GM viewers.
-    const listedEvents =
-      blindForViewer || eventVisibility !== 'full'
-        ? []
-        : normalizeList(environment.events)
-            .filter((event) => event?.enabled !== false)
-            .map((event) => this._eventModel(event, environment));
-
-    const biomes = normalizeStringList(environment.biomes ?? environment.biome);
-    const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
-    return {
-      id: stringOrNull(environment.id),
-      craftingSystemId: stringOrNull(environment.craftingSystemId),
-      craftingSystemName: stringOrEmpty(system?.name),
-      name: stringOrEmpty(environment.name),
-      description: stringOrEmpty(environment.description),
-      img: stringOrNull(environment.img),
-      region: stringOrEmpty(environment.region),
-      biome: stringOrEmpty(environment.biome) || biomes[0] || '',
-      biomes,
-      dangerTags,
-      risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
-      economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
-      staminaEnabled: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true,
-      nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
-      weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
-      timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
-      staminaPool:
-        this.richState?.staminaEnabled?.(environment.craftingSystemId) === true && actor
-          ? this.richState?.getActorStamina?.(actor, stringOrNull(environment.craftingSystemId)) ||
-            null
-          : null,
-      conditions: plainObjectOrNull(environment.conditions) || {},
-      realmsEnabled: realmSummary.realmsEnabled,
-      currentRealms: realmSummary.currentRealms,
-      selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
-      sceneUuid: stringOrNull(environment.sceneUuid),
-      visible: true,
-      attemptable,
-      eventChance:
-        eventVisibility === 'dangerLevelOnly' ? null : this._environmentEventChance(environment),
-      events: listedEvents,
-      eventVisibility,
-      blockedReasons,
-      location,
-      tasks: listedTasks,
-      discoveredTasks,
-      ...this._playerListingFields({ environment, actor, locked: false }),
-    };
-  }
-
-  /**
-   * Build transparent, individually-attemptable task models for the tasks a
-   * non-GM viewer has already revealed in a blind environment (the "Discovered
-   * Tasks" list). Returns `[]` when the effective reveal policy is `never` or
-   * nothing has been revealed.
-   *
-   * Models are built only from `taskEntries` — the already-computed visible
-   * tasks — intersected with the revealed task ids, so an unrevealed (or
-   * never-visible) task can never leak into the discovered list. Blocked reasons
-   * are recomputed with `transparent: true` so each row carries its real
-   * required weather/time and missing-tool details.
-   *
-   * @param {object} args
-   * @param {object} args.environment Composed blind environment.
-   * @param {object} args.system Owning crafting system.
-   * @param {object} args.viewer Foundry user requesting the listing.
-   * @param {object} args.actor Selected actor whose reveals are read.
-   * @param {Array<{task: object, visibility: object, blockedReasons: object[]}>} args.taskEntries
-   *   The environment's visible-task entries.
-   * @param {object[]} args.environmentBlockedReasons Shared environment-level reasons.
-   * @returns {Promise<object[]>} Transparent discovered task models (each with `discovered: true`).
-   */
-  async _discoveredTaskModels({
-    environment,
-    system,
-    viewer,
-    actor,
-    taskEntries,
-    environmentBlockedReasons,
-    presentTools = null,
-  }) {
-    const { policy, scope } = this._resolveRevealPolicy(environment);
-    if (policy === 'never') return [];
-    const revealedIds = new Set(
-      this._listRevealedTaskIds({ actor, environmentId: environment.id, scope })
-    );
-    if (revealedIds.size === 0) return [];
-
-    const discovered = [];
-    for (const entry of taskEntries) {
-      if (!revealedIds.has(stringOrNull(entry.task.id))) continue;
-      const blockedReasons = [
-        ...environmentBlockedReasons,
-        ...(await this._taskBlockedReasons({
-          environment,
-          system,
-          task: entry.task,
-          actor,
-          viewer,
-          transparent: true,
-          presentTools,
-        })),
-      ];
-      const model = this._taskModel({
-        task: entry.task,
-        environment,
-        actor,
-        viewer,
-        visibility: entry.visibility,
-        blockedReasons,
-        forceVisible: true,
-        tools: this._resolveTaskToolStates({
-          actor,
-          system,
-          environment,
-          task: entry.task,
-          presentTools,
-        }),
-      });
-      await this._applyListingStaminaCost(model, {
-        system,
-        environment,
-        actor,
-        viewer,
-        task: entry.task,
-      });
-      discovered.push({ ...model, discovered: true });
-    }
-    return discovered;
-  }
-
-  /**
-   * Replace a listing model's displayed stamina cost with the viewing
-   * character's effective cost (base + per-actor cost modifiers). No-ops without
-   * an actor, without a stamina block (e.g. opaque-blind collapsed models), or
-   * when the rich state cannot resolve a cost.
-   *
-   * @param {object} model The task listing model (mutated in place).
-   * @param {object} payload
-   * @returns {Promise<void>}
-   */
-  async _applyListingStaminaCost(model, { system, environment, actor, viewer, task }) {
-    if (!actor || !model?.rich?.stamina || typeof this.richState?.listingStaminaCost !== 'function')
-      return;
-    const cost = await this.richState.listingStaminaCost({
-      actor,
-      system,
-      environment,
-      task,
-      viewer,
-    });
-    if (cost != null) model.rich.stamina.cost = cost;
-  }
-
-  /**
-   * Build the lightweight locked listing for a disabled environment shown to
-   * every viewer (players and GMs alike) in the player listing. Carries
-   * identity fields only — no tasks, weights, or composition internals — plus
-   * the existing ENVIRONMENT_DISABLED reason.
-   */
-  _lockedEnvironmentListing({
-    environment,
-    system,
-    actor = null,
-    blockedReasons = null,
-    location = null,
-  }) {
-    const biomes = normalizeStringList(environment.biomes ?? environment.biome);
-    const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
-    return {
-      id: stringOrNull(environment.id),
-      craftingSystemId: stringOrNull(environment.craftingSystemId),
-      craftingSystemName: stringOrEmpty(system?.name),
-      name: stringOrEmpty(environment.name),
-      description: stringOrEmpty(environment.description),
-      img: stringOrNull(environment.img),
-      region: stringOrEmpty(environment.region),
-      biome: stringOrEmpty(environment.biome) || biomes[0] || '',
-      biomes,
-      dangerTags,
-      risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
-      economyMode: this.richState?.economyMode?.(environment.craftingSystemId) || 'none',
-      staminaEnabled: this.richState?.staminaEnabled?.(environment.craftingSystemId) === true,
-      nodesEnabled: this.richState?.nodesEnabled?.(environment.craftingSystemId) === true,
-      weatherEnabled: this.richState?.weatherEnabled?.(environment.craftingSystemId) !== false,
-      timeOfDayEnabled: this.richState?.timeOfDayEnabled?.(environment.craftingSystemId) !== false,
-      // A disabled teaser resolves no actor, so its current realm is empty ("no
-      // realm selected"); a location-lock teaser DOES have an actor + resolved
-      // location, so it carries the disclosed current realms. The flag mirrors
-      // the system so the header chip appears when the subsystem is enabled.
-      realmsEnabled: isGatheringRealmsEnabled(system),
-      currentRealms: Array.isArray(location?.currentRealms) ? location.currentRealms : [],
-      staminaPool: null,
-      conditions: plainObjectOrNull(environment.conditions) || {},
-      selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
-      sceneUuid: stringOrNull(environment.sceneUuid),
-      visible: true,
-      attemptable: false,
-      // Disabled teaser defaults to ENVIRONMENT_DISABLED; a location-lock passes
-      // its NO_CURRENT_REALM / LOCATION_BLOCKED reason (with travel guidance).
-      blockedReasons: blockedReasons ?? [this._blockedReason('ENVIRONMENT_DISABLED')],
-      // The redaction-safe location field is surfaced on the teaser so the card
-      // can show the "Not in current realm" alert and its guidance tooltip.
-      location: location ?? {
-        gated: false,
-        available: true,
-        source: 'unresolved',
-        currentRealms: [],
-        guidance: null,
-      },
-      tasks: [],
-      discoveredTasks: [],
-      events: [],
-      ...this._playerListingFields({ environment, actor, locked: true }),
-    };
-  }
-
-  /**
-   * The shared player-listing fields added to both locked and normal listings:
-   * `locked`, the effective system-level `revealPolicy`, the composed task pool
-   * size (`composedTaskCount`, the blind-reveal denominator), the actor's
-   * `discoveredTaskCount` at the same effective reveal scope, and resolved
-   * `biomeTags` display metadata.
-   */
-  _playerListingFields({ environment, actor, locked }) {
-    const { policy: revealPolicy, scope } = this._resolveRevealPolicy(environment);
-    const composedTaskCount = locked ? 0 : normalizeList(environment.tasks).length;
-    const discoveredTaskCount =
-      locked || revealPolicy === 'never'
-        ? 0
-        : this._countRevealedTasks({ actor, environmentId: environment.id, scope });
-    return {
-      locked: locked === true,
-      revealPolicy,
-      composedTaskCount,
-      discoveredTaskCount,
-      biomeTags: this._resolveBiomeTags(environment),
-    };
-  }
-
-  _countRevealedTasks({ actor, environmentId, scope }) {
-    if (typeof this.richState?.countRevealedTasks !== 'function') return 0;
-    try {
-      return this.richState.countRevealedTasks({ actor, environmentId, scope }) || 0;
-    } catch {
-      return 0;
-    }
-  }
-
-  /**
-   * Null-safe wrapper over {@link GatheringRichStateService#listRevealedTaskIds}.
-   * Returns the distinct task ids the actor has revealed for an environment at
-   * the given reveal scope, or `[]` when the service is absent or throws. Used
-   * to surface individually-discovered tasks in blind environments.
-   */
-  _listRevealedTaskIds({ actor, environmentId, scope }) {
-    if (typeof this.richState?.listRevealedTaskIds !== 'function') return [];
-    try {
-      return normalizeList(this.richState.listRevealedTaskIds({ actor, environmentId, scope }));
-    } catch {
-      return [];
-    }
-  }
-
   /**
    * A static, drop-rate-only approximation of the chance a d100 task yields at
    * least one item: `1 − ∏(1 − dropRate_i/100)` over enabled drop rows.
@@ -1591,92 +942,6 @@ export class GatheringEngine {
       return product * (1 - rate / 100);
     }, 1);
     return 1 - missAll;
-  }
-
-  /**
-   * Static "chance of encountering an event" for an environment: the probability
-   * that at least one eligible event triggers on an attempt, derived from the
-   * composed events' `dropRate`s as `1 - ∏(1 - dropRate/100)`.
-   *
-   * Like `_taskSuccessChance` this ignores actor/condition/character modifiers
-   * and event selection-mode/limit (those only affect which triggered events
-   * are applied, not whether any trigger). Returns `0` when the environment has
-   * no enabled events, so the player UI can show the "safe" hint instead of a
-   * bar.
-   *
-   * @param {object} environment A composed gathering environment.
-   * @returns {number} A 0–1 fraction (0 when there are no events).
-   */
-  _environmentEventChance(environment) {
-    const events = normalizeList(environment?.events).filter((event) => event?.enabled !== false);
-    if (events.length === 0) return 0;
-    const missAll = events.reduce((product, event) => {
-      const rate = Math.min(100, Math.max(0, Number(event?.dropRate) || 0));
-      return product * (1 - rate / 100);
-    }, 1);
-    return 1 - missAll;
-  }
-
-  /**
-   * A read-only, player-safe model for a single composed event, used to render
-   * the center column's events list and the right-column event inspector.
-   * Carries identity (`id`/`name`/`description`/`img`), the event's danger tags
-   * + a derived `risk` tier (the first tag, or `safe`), a static `chance`
-   * (`dropRate/100`, clamped to 0–1) so the UI can reuse the event-chance bar,
-   * and the event's matching criteria (`weather`/`timeOfDay`/`biomes`, each an
-   * empty array meaning "any"; region is no longer a composition axis) plus an
-   * optional `linkedSceneUuid` for the
-   * details view. Modifier internals (eventModifier/conditionModifiers/
-   * characterModifiers) are intentionally NOT surfaced. Like
-   * `_environmentEventChance`, `chance` ignores actor/condition/character
-   * modifiers — it is the static per-event trigger rate, not a resolved roll.
-   *
-   * @param {object} event A composed/normalized gathering event.
-   * @param {object} [environment] The owning environment (for biome-tag resolution).
-   * @returns {object} The player-facing event model.
-   */
-  _eventModel(event, environment = null) {
-    const dangerTags = normalizeStringList(event?.dangerTags);
-    const biomes = normalizeStringList(event?.biomes);
-    return {
-      id: stringOrNull(event?.id),
-      name: stringOrEmpty(event?.name),
-      description: stringOrEmpty(event?.description),
-      img: stringOrNull(event?.img),
-      dangerTags,
-      risk: dangerTags[0] || 'safe',
-      chance: Math.min(1, Math.max(0, (Number(event?.dropRate) || 0) / 100)),
-      weather: normalizeStringList(event?.weather),
-      timeOfDay: normalizeStringList(event?.timeOfDay),
-      biomes,
-      // Resolved biome display metadata ({ id, label, icon, colorToken,
-      // customColor }) so event biome chips render with icons/colours like the
-      // environment's biome pips. Empty when richState can't resolve them.
-      biomeTags: this._resolveBiomeTagList(biomes, environment),
-      linkedSceneUuid: stringOrNull(event?.linkedSceneUuid),
-    };
-  }
-
-  _resolveBiomeTags(environment) {
-    return this._resolveBiomeTagList(
-      normalizeStringList(environment.biomes ?? environment.biome),
-      environment
-    );
-  }
-
-  /**
-   * Null-safe resolution of a biome-id list to display metadata via
-   * {@link GatheringRichStateService#resolveBiomeTags}, scoped to the
-   * environment's crafting system. Returns `[]` when the service is absent or
-   * throws. Shared by environment and event biome-tag resolution.
-   */
-  _resolveBiomeTagList(biomes, environment) {
-    if (typeof this.richState?.resolveBiomeTags !== 'function') return [];
-    try {
-      return this.richState.resolveBiomeTags(biomes, environment?.craftingSystemId) || [];
-    } catch {
-      return [];
-    }
   }
 
   async _visibleTaskListings({ environment, system, viewer, actor }) {
@@ -3510,23 +2775,6 @@ export class GatheringEngine {
     };
   }
 
-  /**
-   * Resolve the effective player-facing event visibility tier for a viewer.
-   * GMs always see the full event information. For a non-GM viewer the tier is
-   * read from the environment's gathering rules, defaulting to the more
-   * restrictive `encounterChance` when absent or invalid so missing rules never
-   * leak the full event list.
-   *
-   * @param {object} environment Composed gathering environment (carries `rules`).
-   * @param {object} [viewer] Foundry user requesting the listing.
-   * @returns {'dangerLevelOnly'|'encounterChance'|'full'} The effective tier.
-   */
-  _resolveEventVisibility(environment, viewer) {
-    if (viewer?.isGM === true) return 'full';
-    const visibility = environment?.rules?.eventVisibility;
-    return GATHERING_EVENT_VISIBILITIES.has(visibility) ? visibility : 'encounterChance';
-  }
-
   async _clearMisconfiguredWaitingRun({
     viewer,
     actor,
@@ -3716,62 +2964,6 @@ export class GatheringEngine {
     const safeDiagnostics = sanitizeDiagnostics(diagnostics);
     if (safeDiagnostics.length > 0) data.diagnostics = safeDiagnostics;
     return data;
-  }
-
-  _emptyListing({ viewer, actor = null, selectableActors = [], reason }) {
-    const activeRuns = actor ? this._activeRunModels({ actor, viewer }) : [];
-    const history = actor ? this._historyModels({ actor, viewer }) : [];
-    return {
-      visible: true,
-      attemptable: false,
-      blockedReasons: [reason],
-      state: reason.code,
-      viewerId: idOf(viewer),
-      selectedActorId: actor ? idOf(actor) : null,
-      selectableActors: selectableActors.map(actorToOption),
-      environments: [],
-      activeRuns,
-      history,
-      gatheringSystems: this._gatheringSystemOptions([...activeRuns, ...history]),
-      // STORE contract keys (enabled/realms) so the View passes it straight
-      // through setRealmContext; no environments → no system context → chip off.
-      realmContext: { enabled: false, realms: [], systemId: null },
-    };
-  }
-
-  _gatheringSystemOptions(models = []) {
-    const systems = this._allSystems();
-    const ids = [
-      ...new Set(
-        normalizeList(models)
-          .map((model) => stringOrNull(model?.craftingSystemId))
-          .filter(Boolean)
-      ),
-    ];
-    return ids
-      .map((id) => {
-        const system = systems.get(id);
-        return {
-          id,
-          name:
-            stringOrEmpty(system?.name) ||
-            stringOrEmpty(
-              models.find((model) => model?.craftingSystemId === id)?.craftingSystemName
-            ) ||
-            id,
-        };
-      })
-      .sort((left, right) => left.name.localeCompare(right.name));
-  }
-
-  _emptyVisibilityReason(hidden) {
-    if (hidden.blind > 0 && hidden.targeted === 0) {
-      return this._blockedReason('BLIND_SOLE_TASK_HIDDEN');
-    }
-    if (hidden.targeted > 0 && hidden.blind === 0) {
-      return this._blockedReason('NO_VISIBLE_TARGETED_TASKS');
-    }
-    return this._blockedReason('NO_VISIBLE_TASKS');
   }
 
   _blockedReason(code, { messageKey = null, message = null, data = null } = {}) {
@@ -4237,15 +3429,6 @@ function redactBlindTerminalRun(run) {
   return redacted;
 }
 
-function stripRuntimeSnapshotFromRun(run) {
-  if (!run || typeof run !== 'object') return run;
-  const publicRun = cloneJson(run);
-  if (publicRun.economyEvidence && typeof publicRun.economyEvidence === 'object') {
-    delete publicRun.economyEvidence.runtimeSnapshot;
-  }
-  return publicRun;
-}
-
 function enrichPublicTerminalRun(run, { createdResults, usedTools = [], checkResult }) {
   if (!run || typeof run !== 'object') return run;
   const enriched = {
@@ -4281,46 +3464,6 @@ function redactCharacterModifierSnapshot(snapshot) {
   };
 }
 
-function redactRichEvidence(evidence = {}, _options = {}) {
-  const redacted = cloneJson(evidence) || {};
-  if (redacted.node) {
-    redacted.node = {
-      available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0,
-    };
-  }
-  if (Array.isArray(redacted.events)) {
-    redacted.events = redacted.events.map(() => ({ matched: true }));
-  }
-  if (
-    redacted.characterModifierSnapshot &&
-    typeof redacted.characterModifierSnapshot === 'object'
-  ) {
-    redacted.characterModifierSnapshot = {
-      rows: normalizeList(redacted.characterModifierSnapshot.rows).map((row) => ({
-        rowId: null,
-        contributions: normalizeList(row?.contributions).map((entry) => ({
-          contribution: Number(entry?.contribution ?? 0),
-        })),
-      })),
-      events: normalizeList(redacted.characterModifierSnapshot.events).map((event) => ({
-        eventId: null,
-        contributions: normalizeList(event?.contributions).map((entry) => ({
-          contribution: Number(entry?.contribution ?? 0),
-        })),
-      })),
-    };
-  }
-  delete redacted.items;
-  delete redacted.rolls;
-  delete redacted.dropRows;
-  delete redacted.selectedItems;
-  delete redacted.selectedEvents;
-  delete redacted.runtimeSnapshot;
-  delete redacted.encounterOutcome;
-  delete redacted.revealEvents;
-  return redacted;
-}
-
 function hasRichGatheringData(environment, task) {
   return Boolean(
     stringOrNull(environment?.img) ||
@@ -4337,59 +3480,6 @@ function hasRichGatheringData(environment, task) {
     task?.reveal ||
     task?.blindSelection
   );
-}
-
-async function callMaybe(fn, payload) {
-  return typeof fn === 'function' ? fn(payload) : [];
-}
-
-function normalizeActorList(value) {
-  return normalizeList(value).filter(Boolean);
-}
-
-function normalizeStringList(value) {
-  return [
-    ...new Set(
-      normalizeList(Array.isArray(value) ? value : value ? [value] : [])
-        .map((entry) => stringOrEmpty(entry))
-        .filter(Boolean)
-    ),
-  ];
-}
-
-function actorToOption(actor) {
-  return {
-    id: idOf(actor),
-    uuid: stringOrNull(actor?.uuid),
-    name: stringOrEmpty(actor?.name),
-    img: stringOrNull(actor?.img),
-  };
-}
-
-function actorMatchesId(actor, actorId) {
-  const id = String(actorId);
-  return actor?.id === id || actor?.uuid === id;
-}
-
-function sameActor(left, right) {
-  return Boolean(
-    left && right && (left === right || left.id === right.id || left.uuid === right.uuid)
-  );
-}
-
-function sameActorUuid(actor, actorUuid) {
-  const runActorUuid = stringOrNull(actorUuid);
-  if (!runActorUuid) return false;
-  return stringOrNull(actor?.uuid) === runActorUuid;
-}
-
-function uniqueReasons(reasons) {
-  const byCode = new Map();
-  for (const reason of reasons) {
-    if (!reason?.code || byCode.has(reason.code)) continue;
-    byCode.set(reason.code, reason);
-  }
-  return [...byCode.values()];
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
@@ -4414,42 +3504,6 @@ function normalizeOutcomeText(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase();
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
-
-function plainObjectOrNull(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return { ...value };
-}
-
-function numberOrNull(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-/**
- * Normalize a scene-interactable ref to `{sceneId, regionId, behaviorId}` (issue
- * 302), or null when any id is missing. Used to persist the ref on a waiting run
- * and resolve it back at maturity.
- *
- * @param {object|null} ref
- * @returns {{sceneId:string, regionId:string, behaviorId:string}|null}
- */
-function normalizeInteractableRef(ref) {
-  if (!ref || typeof ref !== 'object') return null;
-  const sceneId = stringOrNull(ref.sceneId);
-  const regionId = stringOrNull(ref.regionId);
-  const behaviorId = stringOrNull(ref.behaviorId);
-  if (!sceneId || !regionId || !behaviorId) return null;
-  return { sceneId, regionId, behaviorId };
 }
 
 function defaultLocalize(key) {
