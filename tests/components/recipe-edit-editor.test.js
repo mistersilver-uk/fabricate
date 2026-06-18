@@ -223,6 +223,60 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
     assert.equal(css.includes('.manager-recipe-edit-panel'), false, 'no recipe editing panel rule');
     assert.equal(css.includes('.manager-recipe-inspector'), false, 'no view-internal recipe inspector rule');
   });
+
+  it('gives the recipe-edit main comfortable scrolling whitespace around the identity card', () => {
+    const block = css.match(/\.manager-recipe-edit-main\s*\{[^}]*\}/);
+    assert.ok(block, '.manager-recipe-edit-main rule exists');
+    assert.match(block[0], /padding:\s*var\(--fab-space-4\)/, 'pads the recipe-edit content');
+    assert.match(block[0], /overflow-y:\s*auto/, 'a tall form scrolls');
+    assert.match(block[0], /min-height:\s*0/, 'min-height:0 so it can scroll within the grid');
+  });
+
+  it('widens the recipe-edit global inspector to 340px to match the environment editor', () => {
+    assert.match(
+      css,
+      /\[data-manager-view="recipe-edit"\]\s+\.manager-body\s*\{\s*grid-template-columns:\s*220px minmax\(0,\s*1fr\)\s*340px;\s*\}/,
+      'recipe-edit body inspector column is 340px'
+    );
+    assert.match(
+      css,
+      /\[data-manager-view="recipe-edit"\]\s+\.manager-body\.is-rail-collapsed\s*\{\s*grid-template-columns:\s*56px minmax\(0,\s*1fr\)\s*340px;\s*\}/,
+      'recipe-edit rail-collapsed body inspector column is 340px'
+    );
+  });
+
+  it('collapses the recipe-edit body to a single column inside the narrow container query', () => {
+    const narrow = css.match(/@container fabricate-manager \(max-width: 1120px\) \{[\s\S]*?\n\}/);
+    assert.ok(narrow, 'narrow body-grid container query exists');
+    assert.match(
+      narrow[0],
+      /\[data-manager-view="recipe-edit"\]\s+\.manager-body[\s\S]*?grid-template-columns:\s*1fr;/,
+      'recipe-edit body collapses to one column at narrow widths'
+    );
+  });
+});
+
+describe('linked scene/recipe-item name truncation (shared class)', () => {
+  it('lets the linked card shrink so the name can ellipsize', () => {
+    const block = css.match(/\.manager-environment-scene-linked\s*\{[^}]*\}/);
+    assert.ok(block, '.manager-environment-scene-linked rule exists');
+    assert.match(block[0], /min-width:\s*0/, 'linked container can shrink below content width');
+  });
+
+  it('forces the name to a block flex item that reliably truncates with an ellipsis', () => {
+    const block = css.match(/\.manager-environment-scene-name\s*\{[^}]*\}/);
+    assert.ok(block, '.manager-environment-scene-name rule exists');
+    assert.match(block[0], /display:\s*block/, 'block-level so text-overflow applies to the button');
+    assert.match(block[0], /min-width:\s*0/, 'can shrink for ellipsis');
+    assert.match(block[0], /max-width:\s*100%/, 'never exceeds the card width');
+    assert.match(block[0], /text-overflow:\s*ellipsis/, 'ellipsis on overflow');
+    assert.match(block[0], /white-space:\s*nowrap/, 'single line');
+    assert.match(block[0], /text-align:\s*left/, 'stays left-aligned');
+  });
+
+  it('is the shared class used by both the recipe-item and environment scene cards', () => {
+    assert.ok(inspectorSource.includes('class="manager-environment-scene-name'), 'recipe-item card uses the shared name class');
+  });
 });
 
 describe('recipe-edit localization', () => {

@@ -1083,6 +1083,14 @@
   grid-template-columns: 56px minmax(0, 1fr) 300px;
 }
 
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr) 340px;
+}
+
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr) 340px;
+}
+
 .fabricate-manager .manager-rail,
 .fabricate-manager .manager-main,
 .fabricate-manager .manager-inspector {
@@ -1194,6 +1202,12 @@
 
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-recipe-edit-main {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-inspector {
@@ -7602,7 +7616,9 @@
     overflow: visible;
   }
 
-  .fabricate-manager[data-manager-view="environment-edit"] .manager-body {
+  .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed {
     grid-template-columns: 1fr;
   }
 
@@ -8858,6 +8874,10 @@
   padding: var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 6px;
+
+  /* Allow the linked card to shrink below its content width inside the flex
+     inspector column so the name child can truncate instead of overflowing. */
+  min-width: 0;
 }
 
 .fabricate-manager .manager-environment-scene-linked.is-drop-active {
@@ -8880,8 +8900,14 @@
 }
 
 .fabricate-manager .manager-environment-scene-name {
-  flex: 1;
+  /* A flex item that is a `<button>` is inline-block by default; that intrinsic
+     min-content sizing defeats `text-overflow: ellipsis` for long unbroken
+     names (e.g. UUID fallbacks). Force block-level layout with a zero flex
+     basis and an explicit max so the name reliably shrinks and ellipsizes. */
+  display: block;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
   text-align: left;
   background: none;
   border: none;
