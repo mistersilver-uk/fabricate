@@ -19,8 +19,8 @@ Use alchemy mode for systems where recipes are secrets, such as a witch's grimoi
 
 ## Current State
 
-Alchemy recipes and systems can be authored through the API only today.
-There is no GM recipe-editor UI.
+Alchemy recipes and systems are authored mainly through the API today.
+An early GM recipe editor in the Crafting Admin panel can edit a recipe's identity and link a recipe item, but full recipe authoring is still in progress.
 A player-facing Alchemy tab is planned and not yet available.
 Alchemy crafting works through the API today.
 

@@ -99,9 +99,11 @@ See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage 
 
 ## Current Crafting Surface
 
-Recipes can be authored through the API only today.
-There is no GM recipe-editor UI.
-Runtime crafting is likewise available through the public API.
+Recipes are authored mainly through the API today.
+An early GM recipe editor is also available in the Crafting Admin panel.
+It can edit a recipe's identity (name, description, image, and whether it is on or off) and link a recipe item to it.
+Full recipe authoring through the editor, including ingredients, steps, results, and visibility controls, is still in progress.
+Runtime crafting is available through the public API.
 See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
 {: .note }
