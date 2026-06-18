@@ -1,14 +1,10 @@
 import {
-  isInteractableRegionBehavior,
-  readInteractableBehaviorSystem,
-} from '../canvas/regions/interactableRegionFlags.js';
-import { identifyRegionBehaviorRef } from '../canvas/regions/interactableRegionNodeAdapter.js';
-import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
 
 import { buildGatheringChatContent } from './GatheringChatCard.js';
+import { idOf, normalizeList, stringOrNull } from './gatheringEngineInternals.js';
 import {
   buildRealmDisclosure,
   buildTravelGuidance,
@@ -18,6 +14,7 @@ import {
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
 import { isGatheringRealmsEnabled } from './gatheringRealms.js';
+import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -132,6 +129,11 @@ export class GatheringEngine {
     // injected by main.js (fake in tests); absent → no scoped respawn pass.
     scenes = () => globalThis.game?.scenes ?? null,
     applyInteractableBehaviorUpdate = null,
+    // GM-gated world-time maintenance collaborator (issue 374): stamina regen +
+    // environment/interactable node respawn. Default-constructed below from the
+    // engine's already-resolved fields when not injected. The engine's
+    // `isPrimaryGM()` guard is the only gate — the processor carries none.
+    worldTimeProcessor = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.runManager = runManager;
@@ -166,6 +168,16 @@ export class GatheringEngine {
       typeof applyInteractableBehaviorUpdate === 'function'
         ? applyInteractableBehaviorUpdate
         : null;
+    this.worldTimeProcessor =
+      worldTimeProcessor ??
+      new GatheringWorldTimeProcessor({
+        richState: this.richState,
+        environmentStore: this.environmentStore,
+        getActors: this.getActors,
+        scenes: this.scenes,
+        applyInteractableBehaviorUpdate: this.applyInteractableBehaviorUpdate,
+        enabledGatheringSystems: () => this._enabledGatheringSystems(),
+      });
   }
 
   /**
@@ -214,9 +226,8 @@ export class GatheringEngine {
     let nodeRespawn = [];
     let interactableNodeRespawn = [];
     if (this.isPrimaryGM()) {
-      staminaRegen = await this._processStaminaRegen(worldTime);
-      nodeRespawn = await this._processNodeRespawn(worldTime);
-      interactableNodeRespawn = await this._processInteractableNodeRespawn(worldTime);
+      ({ staminaRegen, nodeRespawn, interactableNodeRespawn } =
+        await this.worldTimeProcessor.processRegenAndRespawn(worldTime));
     }
 
     return {
@@ -233,134 +244,15 @@ export class GatheringEngine {
   }
 
   /**
-   * Regenerate stamina for every actor that owns a pool in a stamina-enabled
-   * system. Per-actor failures are swallowed so one bad actor cannot abort the
-   * world-time tick. Returns the list of `{actorId, systemId}` actually changed.
-   */
-  async _processStaminaRegen(worldTime) {
-    if (typeof this.richState?.regenerateActorStamina !== 'function') return [];
-    const staminaSystems = [...this._enabledGatheringSystems().values()].filter(
-      (system) => this.richState.staminaEnabled?.(system.id) === true
-    );
-    if (staminaSystems.length === 0) return [];
-    const actors = normalizeList(this.getActors?.());
-    const changed = [];
-    for (const system of staminaSystems) {
-      for (const actor of actors) {
-        try {
-          const updated = await this.richState.regenerateActorStamina({
-            actor,
-            systemId: system.id,
-            system,
-            worldTime,
-          });
-          if (updated) changed.push({ actorId: idOf(actor), systemId: String(system.id) });
-        } catch (error) {
-          // Surface (don't silently swallow) so a broken regen is diagnosable.
-          console.warn(
-            `Fabricate | stamina regen failed for actor ${idOf(actor)} in system ${system.id}:`,
-            error
-          );
-
-          continue;
-        }
-      }
-    }
-    return changed;
-  }
-
-  /**
-   * Respawn nodes for every environment owned by a nodes-enabled system. Per-
-   * environment failures are swallowed. Returns the changed environment ids.
-   */
-  async _processNodeRespawn(worldTime) {
-    if (typeof this.richState?.respawnNodes !== 'function') return [];
-    const systems = this._enabledGatheringSystems();
-    const changed = [];
-    for (const environment of normalizeList(this.environmentStore?.list?.())) {
-      if (!systems.has(environment?.craftingSystemId)) continue;
-      if (!this.richState.nodesEnabled?.(environment.craftingSystemId)) continue;
-      try {
-        const updated = await this.richState.respawnNodes({ environment, worldTime });
-        if (updated) changed.push({ environmentId: String(environment.id) });
-      } catch (error) {
-        // Surface (don't silently swallow) so a broken respawn is diagnosable.
-        console.warn(`Fabricate | node respawn failed for environment ${environment?.id}:`, error);
-
-        continue;
-      }
-    }
-    return changed;
-  }
-
-  /**
-   * Respawn interactable-SCOPED resource nodes as world time passes (issue 302).
-   * Scans every scene region behaviour for `fabricate.interactable` gathering
-   * tasks that own their own node pool (`taskNodeLink === 'unlinked'`, with a
-   * real `node`) in a nodes-enabled system, advances each pool through the same
-   * calendar-aware respawn arithmetic the environment pass uses, and writes the
-   * changed `system.node` back via the active-GM routed seam. `nonRegenerating` /
-   * `manual` pools never gain (the math short-circuits). Per-behaviour failures
-   * are swallowed so one bad behaviour cannot abort the tick. Returns the list of
-   * changed `{sceneId, regionId, behaviorId}` refs.
+   * Thin delegate to the world-time processor's interactable-scoped node respawn
+   * pass (issue 374). Kept so callers that drive the pass directly — notably the
+   * interactable-scoped node enumeration test — stay green after the extraction.
    *
    * @param {number} worldTime
    * @returns {Promise<Array<{sceneId:string, regionId:string, behaviorId:string}>>}
    */
-  async _processInteractableNodeRespawn(worldTime) {
-    if (typeof this.richState?.respawnInteractableNode !== 'function') return [];
-    const sceneGraph = this.scenes?.();
-    if (!sceneGraph || typeof this.applyInteractableBehaviorUpdate !== 'function') return [];
-    const now = Number(worldTime);
-    if (!Number.isFinite(now)) return [];
-
-    const changed = [];
-    for (const scene of iterateCollection(sceneGraph)) {
-      for (const region of iterateCollection(scene?.regions)) {
-        for (const behavior of iterateCollection(region?.behaviors)) {
-          try {
-            if (!isInteractableRegionBehavior(behavior)) continue;
-            const view = readInteractableBehaviorSystem(behavior);
-            if (!view || view.taskNodeLink !== 'unlinked' || !view.node) continue;
-            if (this.richState.nodesEnabled?.(view.systemId) !== true) continue;
-
-            const ref = identifyRegionBehaviorRef(behavior);
-            if (!ref) continue;
-
-            const result = await this.richState.respawnInteractableNode({
-              node: view.node,
-              worldTime: now,
-            });
-            if (!result?.changed) continue;
-
-            await this.applyInteractableBehaviorUpdate(ref, {
-              system: { node: result.node },
-            });
-            this._callRespawnHook(ref, view, result.node);
-            changed.push(ref);
-          } catch (error) {
-            console.warn('Fabricate | interactable-scoped node respawn failed:', error);
-
-            continue;
-          }
-        }
-      }
-    }
-    return changed;
-  }
-
-  _callRespawnHook(ref, view, node) {
-    try {
-      globalThis.Hooks?.callAll?.('fabricate.gathering.nodeRespawned', {
-        interactableRef: ref,
-        systemId: view.systemId,
-        taskId: view.taskId,
-        current: Number(node?.current || 0),
-        max: Number(node?.max || 0),
-      });
-    } catch {
-      // A hook callback must never abort the respawn pass.
-    }
+  _processInteractableNodeRespawn(...args) {
+    return this.worldTimeProcessor._processInteractableNodeRespawn(...args);
   }
 
   async startAttempt({
@@ -4455,15 +4347,6 @@ function normalizeActorList(value) {
   return normalizeList(value).filter(Boolean);
 }
 
-function normalizeList(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  if (value instanceof Map) return [...value.values()];
-  if (typeof value.values === 'function') return [...value.values()];
-  if (typeof value[Symbol.iterator] === 'function') return [...value];
-  return [];
-}
-
 function normalizeStringList(value) {
   return [
     ...new Set(
@@ -4481,10 +4364,6 @@ function actorToOption(actor) {
     name: stringOrEmpty(actor?.name),
     img: stringOrNull(actor?.img),
   };
-}
-
-function idOf(document) {
-  return stringOrNull(document?.id) || stringOrNull(document?.uuid);
 }
 
 function actorMatchesId(actor, actorId) {
@@ -4551,12 +4430,6 @@ function numberOrNull(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
-}
-
 function stringOrEmpty(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
@@ -4570,22 +4443,6 @@ function stringOrEmpty(value) {
  * @param {object|null} ref
  * @returns {{sceneId:string, regionId:string, behaviorId:string}|null}
  */
-/**
- * Iterate a Foundry collection / array / EmbeddedCollection (scenes, regions,
- * behaviours) tolerantly, mirroring the scan in `interactableMarkerDepletion`.
- * Returns an empty array for nullish input so callers can `for...of` safely.
- *
- * @param {*} collection
- * @returns {Iterable<*>}
- */
-function iterateCollection(collection) {
-  if (!collection) return [];
-  if (typeof collection[Symbol.iterator] === 'function') return collection;
-  if (Array.isArray(collection?.contents)) return collection.contents;
-  if (typeof collection?.values === 'function') return collection.values();
-  return [];
-}
-
 function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;
   const sceneId = stringOrNull(ref.sceneId);
