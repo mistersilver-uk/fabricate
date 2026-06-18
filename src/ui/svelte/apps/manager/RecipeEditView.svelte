@@ -24,7 +24,7 @@
         <img class="manager-recipe-preview" src={recipeImage(recipe)} alt="" />
         <h3 title={recipe.name}>{recipe.name}</h3>
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Recipe.EditPlaceholderTitle', 'Recipe editor coming soon')}</p>
-        <p>{text('FABRICATE.Admin.Manager.Recipe.EditPlaceholderHint', 'The full recipe editor is on its way; for now use the existing recipe editor to make changes.')}</p>
+        <p>{text('FABRICATE.Admin.Manager.Recipe.EditPlaceholderHint', 'The full recipe editor is on its way; this preview shows the recipe you selected while the authoring workspace is built.')}</p>
         <button type="button" class="manager-button" onclick={() => onBack()}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
