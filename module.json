@@ -1,7 +1,7 @@
 {
   "id": "fabricate",
-  "title": "Fabricate - Universal Crafting System",
-  "description": "A system-agnostic, flexible crafting module that supports simple recipes, catalysts, variable outputs, and active effect transfer for any tabletop RPG system.",
+  "title": "Fabricate - Universal Gathering & Crafting System",
+  "description": "A system-agnostic, flexible gathering and crafting module that allows you to create any complete crafting systems you can imagine, and supports any tabletop RPG system.",
   "version": "0.1.0",
   "authors": [
     {
