@@ -86,7 +86,7 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   it('imports and renders RecipeEditView', () => {
     assert.ok(rootSource.includes("import RecipeEditView from './RecipeEditView.svelte'"), 'RecipeEditView should be imported');
     assert.ok(rootSource.includes('<RecipeEditView'), 'RecipeEditView should be rendered');
-    assert.ok(rootSource.includes('onBack={cancelRecipeEdit}'), 'back button wired to the route-exit-aware cancelRecipeEdit');
+    assert.ok(rootSource.includes('onBack={backToRecipesBrowse}'), 'back button wired to the route-exit-aware backToRecipesBrowse');
   });
 
   it('defines editRecipe and backToRecipesBrowse navigation', () => {

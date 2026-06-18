@@ -751,13 +751,19 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleFeature', feature, enabled]);
       return options.toggleFeatureResult ?? true;
     },
-    createRecipe: () => calls.push(['createRecipe']),
+    createRecipe: () => {
+      calls.push(['createRecipe']);
+      return options.createRecipeResult ?? { id: 'r-created' };
+    },
     importRecipes: () => calls.push(['importRecipes']),
     exportRecipes: () => calls.push(['exportRecipes']),
     setRecipeSearch: (term) => calls.push(['setRecipeSearch', term]),
     toggleRecipeEnabled: (id, enabled) => calls.push(['toggleRecipeEnabled', id, enabled]),
     duplicateRecipe: (id) => calls.push(['duplicateRecipe', id]),
-    deleteRecipe: (id) => calls.push(['deleteRecipe', id]),
+    deleteRecipe: (id) => {
+      calls.push(['deleteRecipe', id]);
+      return options.deleteRecipeResult ?? true;
+    },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
     updateComponent: (id, updates) => {
@@ -1474,18 +1480,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     // because it navigates away from the browser to the recipe-edit route.
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
-    // Header actions are now Import (1) and Export (2) — the Create button is gone.
-    target.querySelector('.manager-header-actions .manager-button:nth-child(1)').click();
-    target.querySelector('.manager-header-actions .manager-button:nth-child(2)').click();
 
-    assert.deepEqual(calls.slice(-4), [
+    assert.deepEqual(calls.slice(-2), [
       ['duplicateRecipe', 'r2'],
-      ['deleteRecipe', 'r2'],
-      ['importRecipes'],
-      ['exportRecipes']
+      ['deleteRecipe', 'r2']
     ]);
     assert.ok(calls.some(call => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
     assert.ok(calls.some(call => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true));
+    // The recipes header no longer renders crafting-system import/export.
+    assert.ok(!calls.some(call => call[0] === 'importRecipes'), 'recipes header should not call importRecipes');
+    assert.ok(!calls.some(call => call[0] === 'exportRecipes'), 'recipes header should not call exportRecipes');
 
     // The first row action is Edit (fa-edit) and it navigates to the in-manager
     // recipe-edit route rather than calling a service callback.
@@ -1500,12 +1504,46 @@ describe('CraftingSystemManager mounted behavior', () => {
     // defaults to 'itemOrLearned' and the recipe-item card is shown in the global
     // inspector aside (not a view-internal column).
     assert.ok(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), 'recipe-item card shows in the global inspector for the default knowledge mode');
-    const recipeEditCancelButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(button => button.textContent.includes('Cancel'));
-    assert.ok(recipeEditCancelButton, 'recipe-edit header should offer a Cancel control');
-    recipeEditCancelButton.click();
+    // The recipe-edit header now follows the task/environment convention: Back to
+    // recipes + Delete recipe + Save (no Cancel).
+    const recipeEditButtons = Array.from(target.querySelectorAll('.manager-header-actions .manager-button'));
+    assert.ok(!recipeEditButtons.some(button => button.textContent.includes('Cancel')), 'recipe-edit header should not offer a Cancel control');
+    const backButton = recipeEditButtons.find(button => button.textContent.includes('Back to recipes'));
+    assert.ok(backButton, 'recipe-edit header should offer a Back to recipes control');
+    backButton.click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'Cancel should return to the recipes browser');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'Back to recipes should return to the recipes browser');
+  });
+
+  it('creates a recipe from the recipes header and opens the recipe-edit route', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
+        services: {
+          openCurrentAdmin: () => {}
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    const createButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Create recipe'));
+    assert.ok(createButton, 'recipes header should offer a Create recipe control');
+    createButton.click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'createRecipe'), 'Create recipe should call store.createRecipe');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'Create recipe should open the recipe-edit route');
   });
 
   it('suppresses the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {

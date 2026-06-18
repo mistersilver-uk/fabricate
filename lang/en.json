@@ -871,6 +871,7 @@
           "Kicker": "Recipes View",
           "Title": "Recipes",
           "Subtitle": "Manage recipes for the selected crafting system.",
+          "Create": "Create recipe",
           "Actions": "Recipe actions",
           "Library": "Recipe library",
           "LibraryHint": "Browse recipes for the selected system and open the recipe editor for changes.",

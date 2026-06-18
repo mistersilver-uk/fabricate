@@ -156,7 +156,8 @@ describe('adminStore recipe-item projections + API', () => {
 describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
   it('owns recipe draft/save handlers and a knowledge-mode derived value', () => {
     assert.ok(/async function saveRecipeEdit\(/.test(rootSource), 'saveRecipeEdit defined');
-    assert.ok(/function cancelRecipeEdit\(/.test(rootSource), 'cancelRecipeEdit defined');
+    assert.ok(/function backToRecipesBrowse\(/.test(rootSource), 'backToRecipesBrowse defined');
+    assert.ok(/async function deleteRecipeFromEdit\(/.test(rootSource), 'deleteRecipeFromEdit defined');
     assert.ok(/function handleRecipeDraftChange\(/.test(rootSource), 'handleRecipeDraftChange defined');
     assert.ok(/async function handleAddRecipeItem\(/.test(rootSource), 'handleAddRecipeItem defined');
     assert.ok(/async function handleSetRecipeItem\(/.test(rootSource), 'handleSetRecipeItem defined');
@@ -164,10 +165,20 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(rootSource.includes('recipeKnowledgeMode'), 'recipeKnowledgeMode derived');
   });
 
-  it('wires the recipe-edit header chip + Save/Cancel and the slimmed view props', () => {
+  it('wires the recipe-edit header chip + Back/Delete/Save and the slimmed view props', () => {
     assert.ok(rootSource.includes('form="manager-recipe-edit-form"'), 'header Save submits the recipe-edit form');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.Dirty'), 'dirty chip uses Recipe.Dirty');
-    assert.ok(rootSource.includes('onclick={cancelRecipeEdit}'), 'header Cancel wired');
+    assert.ok(rootSource.includes('onclick={backToRecipesBrowse}'), 'header Back to recipes wired');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.BackToBrowse'), 'Back button uses Recipe.BackToBrowse');
+    assert.ok(rootSource.includes('onclick={deleteRecipeFromEdit}'), 'header Delete recipe wired');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.Delete'), 'Delete button uses Recipe.Delete');
+    // Scope the danger-class assertion to the recipe-edit header branch.
+    const recipeEditHeader = rootSource.slice(
+      rootSource.indexOf("{:else if currentView === 'recipe-edit'}"),
+      rootSource.indexOf("{:else if currentView === 'components'}")
+    );
+    assert.ok(recipeEditHeader.includes('is-danger'), 'Delete button carries the is-danger class');
+    assert.ok(!recipeEditHeader.includes('cancelRecipeEdit'), 'recipe-edit header no longer renders Cancel');
     assert.ok(rootSource.includes('onPickImagePath={services?.pickImagePath}'), 'passes onPickImagePath');
     assert.ok(rootSource.includes('onSave={saveRecipeEdit}'), 'passes onSave');
     assert.ok(rootSource.includes('onDraftChange={handleRecipeDraftChange}'), 'passes onDraftChange');

@@ -5226,10 +5226,26 @@ export function createAdminStore(services) {
 
   // --- Recipe operations ---
 
+  async function createRecipe() {
+    const recipeManager = services.getRecipeManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return null;
+
+    try {
+      const created = await recipeManager.createRecipe({ craftingSystemId: sysId });
+      await refresh();
+      return created?.id ? { id: created.id } : null;
+    } catch (err) {
+      console.error('Fabricate | Failed to create recipe:', err);
+      services.notify?.error?.(err?.message || 'Failed to create recipe');
+      return null;
+    }
+  }
+
   async function deleteRecipe(recipeId) {
     const recipeManager = services.getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
-    if (!recipe) return;
+    if (!recipe) return false;
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${recipe.name}?`,
@@ -5237,10 +5253,11 @@ export function createAdminStore(services) {
       yes: () => true,
       no: () => false
     });
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     await recipeManager.deleteRecipe(recipeId);
     await refresh();
+    return true;
   }
 
   async function duplicateRecipe(recipeId) {
@@ -5538,6 +5555,7 @@ export function createAdminStore(services) {
     saveAlchemyConfig,
     saveVisibilityConfig,
     saveTeaserConfig,
+    createRecipe,
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,

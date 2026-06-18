@@ -1409,10 +1409,19 @@
     }
   }
 
-  function cancelRecipeEdit() {
-    afterTruthyResult(confirmRouteExit('recipes'), () => {
-      activeView = 'recipes';
-    });
+  async function createRecipe() {
+    if (!selectedSystemId) return;
+    const created = await store.createRecipe?.();
+    if (created?.id) editRecipe(created.id);
+  }
+
+  async function deleteRecipeFromEdit() {
+    if (!selectedRecipeId || recipeEditSaving) return;
+    const result = await store.deleteRecipe?.(selectedRecipeId);
+    if (result === false) return; // cancelled or failed → stay in the editor
+    recipeEditDirty = false;
+    recipeEditDraft = null;
+    activeView = 'recipes';
   }
 
   function handleRecipeDraftChange(draft) {
@@ -1484,14 +1493,6 @@
   function deleteSystem(systemId = selectedSystemId) {
     if (!systemId) return;
     store.deleteSystem?.(systemId);
-  }
-
-  function importRecipes() {
-    store.importRecipes?.();
-  }
-
-  function exportRecipes() {
-    store.exportRecipes?.();
   }
 
   function duplicateRecipe(recipeId = selectedRecipe?.id) {
@@ -3000,21 +3001,21 @@
     {#if currentView !== 'tools'}
     <div class="manager-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
-        <button type="button" class="manager-button" onclick={importRecipes} disabled={!selectedSystemId}>
-          <i class="fas fa-file-import" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-        </button>
-        <button type="button" class="manager-button" onclick={exportRecipes} disabled={!selectedSystemId}>
-          <i class="fas fa-file-export" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
+        <button type="button" class="manager-button is-primary" onclick={createRecipe} disabled={!selectedSystemId}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
         </button>
       {:else if currentView === 'recipe-edit'}
         {#if recipeEditDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
         {/if}
-        <button type="button" class="manager-button" onclick={cancelRecipeEdit} disabled={recipeEditSaving}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Cancel', 'Cancel')}</span>
+        <button type="button" class="manager-button" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
+        </button>
+        <button type="button" class="manager-button is-danger" onclick={deleteRecipeFromEdit} disabled={!selectedRecipeId || recipeEditSaving} title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}>
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
         </button>
         <button type="submit" form="manager-recipe-edit-form" class="manager-button is-primary" disabled={!canSaveRecipeEdit}>
           <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
@@ -3553,7 +3554,7 @@
       <RecipeEditView
         recipe={selectedRecipeId ? selectedRecipe : null}
         saving={recipeEditSaving}
-        onBack={cancelRecipeEdit}
+        onBack={backToRecipesBrowse}
         onSave={saveRecipeEdit}
         onDirtyChange={(dirty) => { recipeEditDirty = dirty; }}
         onDraftChange={handleRecipeDraftChange}

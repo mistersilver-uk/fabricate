@@ -500,17 +500,20 @@ describe('CraftingSystemManager source contract', () => {
     for (const snippet of [
       'store.setRecipeSearch?.',
       'store.toggleRecipeEnabled?.',
-      'store.importRecipes?.()',
-      'store.exportRecipes?.()',
+      'store.createRecipe?.()',
       'store.duplicateRecipe?.(recipeId)',
       'store.deleteRecipe?.(recipeId)'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }
-    // Recipe creation still opens nothing (the standalone create flow was removed),
-    // but the row Edit action now navigates to the in-manager recipe-edit placeholder
-    // route, so the editRecipe / backToRecipesBrowse / onEditRecipe wiring must be present.
-    assert.ok(!rootSource.includes('store.createRecipe'), 'recipe creation wiring should be removed');
+    // The recipes header now offers a single primary "Create recipe" action
+    // (create-then-edit) instead of crafting-system import/export, which moved off
+    // the recipes header entirely.
+    assert.ok(rootSource.includes('function createRecipe('), 'createRecipe handler should be defined');
+    assert.ok(!rootSource.includes('onclick={importRecipes}'), 'recipes header should not render import');
+    assert.ok(!rootSource.includes('onclick={exportRecipes}'), 'recipes header should not render export');
+    // The row Edit action navigates to the in-manager recipe-edit route, so the
+    // editRecipe / backToRecipesBrowse / onEditRecipe wiring must be present.
     assert.ok(rootSource.includes('onEditRecipe'), 'recipe edit prop should be wired to RecipesBrowserView');
     assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
     assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
