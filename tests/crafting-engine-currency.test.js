@@ -51,7 +51,6 @@ function buildActor(name, currency) {
 
 test('CraftingEngine currency unit normalization and adapter bucket lookup', () => {
   const system = {
-    advancedOptionsEnabled: true,
     requirements: {
       currency: {
         enabled: true,
@@ -92,7 +91,6 @@ test('CraftingEngine currency unit normalization and adapter bucket lookup', () 
 
 test('CraftingEngine system currency requirement check and decrement', async () => {
   const system = {
-    advancedOptionsEnabled: true,
     requirements: {
       currency: {
         enabled: true,

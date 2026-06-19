@@ -11,7 +11,6 @@ import {
 
 function makeSystem(overrides = {}) {
   return {
-    advancedOptionsEnabled: true,
     features: {
       itemTags: false,
       essences: false,
@@ -124,10 +123,9 @@ test('buildComponentEditorState still refers to tags when legacy item tags flag 
   assert.deepEqual(state.tagOptions, [{ tag: 'water', checked: true }]);
 });
 
-test('buildComponentEditorState keeps tags editable when advanced options are disabled', () => {
+test('buildComponentEditorState keeps tags editable when the essences feature is disabled', () => {
   const system = makeSystem({
-    advancedOptionsEnabled: false,
-    features: { itemTags: true, essences: true },
+    features: { itemTags: true, essences: false },
     itemTags: ['fire'],
     essenceDefinitions: [{ id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' }]
   });

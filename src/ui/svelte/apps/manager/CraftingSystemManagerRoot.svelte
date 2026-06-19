@@ -3305,7 +3305,7 @@
             </div>
           {/if}
         {/if}
-        {#each visiblePlaceholderViews as view}
+        {#each visiblePlaceholderViews as view (view.labelKey)}
           <button type="button" class="manager-nav-button" disabled title={text('FABRICATE.Admin.Manager.PlannedView', '{view} is planned for a future release.').replace('{view}', text(view.labelKey, view.fallback))}>
             <i class={view.icon} aria-hidden="true"></i>
             <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
@@ -3588,9 +3588,8 @@
     {:else if currentView === 'system-edit' && selectedSystem}
       <SystemEditView
         {selectedSystem}
-        onSaveDetails={(name, description, advancedOptionsEnabled) => store.saveSystemDetails?.(name, description, advancedOptionsEnabled)}
+        onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
-        onToggleAdvancedOptions={(checked) => store.toggleAdvancedOptions?.(checked)}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}
@@ -4706,7 +4705,7 @@
           <section class="manager-inspector-card">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}</h3>
             <div class="manager-fact-grid">
-              {#each selectedEnvironmentFacts as fact}
+              {#each selectedEnvironmentFacts as fact (fact.id)}
                 <div class="manager-fact" data-environment-fact={fact.id}>
                   <span class="manager-fact-line"><strong>{fact.value}</strong> <span class="manager-fact-label">{fact.label}</span></span>
                 </div>
@@ -4933,7 +4932,7 @@
             <section class="manager-inspector-card" data-component-section="tags">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</h3>
               <div class="manager-feature-list">
-                {#each selectedComponent.tags || [] as tag}
+                {#each selectedComponent.tags || [] as tag (tag)}
                   <span class="manager-chip">{tag}</span>
                 {:else}
                   <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</span>
@@ -4946,7 +4945,7 @@
             <section class="manager-inspector-card" data-component-section="essences">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</h3>
               <div class="manager-feature-list">
-                {#each selectedComponent.essences || [] as essence}
+                {#each selectedComponent.essences || [] as essence (essence.id)}
                   <span class="manager-chip manager-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
                     <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
                   </span>
@@ -5066,7 +5065,7 @@
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Requirements', 'Requirements')}</h3>
             <p class="manager-muted">{requirementsSummary(selectedRecipe)}</p>
             <div class="manager-requirements-list">
-              {#each requirementsPreviewItems(selectedRecipe) as item}
+              {#each requirementsPreviewItems(selectedRecipe) as item (item.label)}
                 <div class="manager-requirement-row">
                   <span>{item.label}</span>
                   <strong>{item.value}</strong>
@@ -5271,11 +5270,6 @@
               <h2 class="manager-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
               <div class="manager-chip-row">
                 <span class="manager-chip is-active">{resolutionModeLabel(selectedSystem.resolutionMode)}</span>
-                <span class={`manager-chip ${selectedSystem.advancedOptionsEnabled === false ? 'is-disabled' : 'is-active'}`}>
-                  {selectedSystem.advancedOptionsEnabled === false
-                    ? text('FABRICATE.Admin.Manager.SystemEdit.AdvancedHidden', 'Advanced hidden')
-                    : text('FABRICATE.Admin.Manager.SystemEdit.AdvancedVisible', 'Advanced visible')}
-                </span>
               </div>
             </div>
           </div>
@@ -5325,7 +5319,7 @@
         <section class="manager-inspector-card">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
           <div class="manager-fact-grid">
-            {#each selectedCountFacts as fact}
+            {#each selectedCountFacts as fact (fact.id)}
               {@const labelParts = countLabelParts(fact.label)}
               <div class="manager-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
                 {#if fact.isOff}
@@ -5347,7 +5341,7 @@
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}</h3>
           {#if enabledFeatureLabels.length > 0}
             <div class="manager-feature-list">
-              {#each enabledFeatureLabels as feature}
+              {#each enabledFeatureLabels as feature (feature)}
                 <span class="manager-chip is-active">{feature}</span>
               {/each}
             </div>

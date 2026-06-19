@@ -124,7 +124,6 @@ export class CraftingSystemManager {
       categories: normalizeCustomRecipeCategories(system.categories),
       tags: this._normalizeStringList(system.tags ?? system.itemTags),
       essences: resolvedEssenceDefinitions.map((def) => def.id),
-      advancedOptionsEnabled: system.advancedOptionsEnabled !== false,
       enableTags: true,
       enableEssences: features.essences === true,
       enableCategories: true,

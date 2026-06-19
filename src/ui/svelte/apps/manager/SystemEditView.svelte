@@ -6,7 +6,6 @@
     selectedSystem = null,
     onSaveDetails = () => {},
     onSetResolutionMode = async () => true,
-    onToggleAdvancedOptions = async () => true,
     onToggleFeature = async () => true,
     characterModifierLibrary = [],
     characterModifierPresetsSupported = false,
@@ -75,11 +74,7 @@
 
   function handleSubmit(event) {
     event.preventDefault();
-    onSaveDetails(
-      systemNameValue,
-      systemDescriptionValue,
-      selectedSystem?.advancedOptionsEnabled ?? true
-    );
+    onSaveDetails(systemNameValue, systemDescriptionValue);
   }
 
   async function handleResolutionModeChange(event) {
@@ -91,20 +86,9 @@
     }
   }
 
-  async function handleToggleAdvancedOptions(event) {
-    const checkbox = event.currentTarget;
-    const didApply = await onToggleAdvancedOptions(checkbox.checked);
-    if (didApply === false) {
-      checkbox.checked = selectedSystem?.advancedOptionsEnabled !== false;
-    }
-  }
-
-  async function handleToggleFeature(feature, event) {
-    const checkbox = event.currentTarget;
-    const didApply = await onToggleFeature(feature.storeKey, checkbox.checked);
-    if (didApply === false) {
-      checkbox.checked = selectedSystem?.features?.[feature.systemKey] === true;
-    }
+  async function handleToggleFeature(feature) {
+    const next = !(selectedSystem?.features?.[feature.systemKey] === true);
+    await onToggleFeature(feature.storeKey, next);
   }
 </script>
 
@@ -139,7 +123,7 @@
           <label class="manager-field" for="manager-system-resolution-mode">
             <span>{text('FABRICATE.Admin.SystemSettings.ResolutionMode', 'Resolution mode')}</span>
             <select id="manager-system-resolution-mode" value={systemResolutionModeValue} onchange={handleResolutionModeChange}>
-              {#each resolutionModeOptions as option}
+              {#each resolutionModeOptions as option (option.value)}
                 <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
               {/each}
             </select>
@@ -149,32 +133,28 @@
       </section>
 
       <section class="manager-edit-card">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Visibility', 'Advanced visibility')}</h3>
-        <label class="manager-toggle-row" data-edit-control="advanced-options">
-          <input type="checkbox" checked={selectedSystem.advancedOptionsEnabled !== false} onchange={handleToggleAdvancedOptions} />
-          <span class="manager-toggle-copy">
-            <strong>{text('FABRICATE.Admin.SystemSettings.AdvancedOptions', 'Show advanced options')}</strong>
-            <small>{text('FABRICATE.Admin.SystemSettings.AdvancedOptionsHint', 'Show advanced configuration panels for the selected system.')}</small>
-          </span>
-        </label>
-      </section>
-
-      <section class="manager-edit-card">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.OptionalFeatures', 'Optional features')}</h3>
         {#if visibleFeatures.length > 0}
           <div class="manager-toggle-list">
-            {#each visibleFeatures as feature}
-              <label class="manager-toggle-row" data-feature-key={feature.systemKey}>
-                <input
-                  type="checkbox"
-                  checked={selectedSystem.features?.[feature.systemKey] === true}
-                  onchange={(event) => handleToggleFeature(feature, event)}
-                />
-                <span class="manager-toggle-copy">
+            {#each visibleFeatures as feature (feature.systemKey)}
+              <div class="manager-feature-tile" data-feature-key={feature.systemKey}>
+                <div class="manager-feature-tile-head">
                   <strong>{text(feature.labelKey, feature.fallback)}</strong>
-                  <small>{text(feature.hintKey, feature.hintFallback)}</small>
-                </span>
-              </label>
+                  <button
+                    type="button"
+                    class={`manager-status-toggle ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
+                    aria-pressed={selectedSystem.features?.[feature.systemKey] === true}
+                    aria-label={text(feature.labelKey, feature.fallback)}
+                    onclick={() => handleToggleFeature(feature)}
+                  >
+                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                    <span class="manager-status-toggle-label">{selectedSystem.features?.[feature.systemKey] === true
+                      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+                  </button>
+                </div>
+                <small>{text(feature.hintKey, feature.hintFallback)}</small>
+              </div>
             {/each}
           </div>
         {:else}
@@ -193,12 +173,12 @@
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Hint', 'Define reusable actor-driven modifiers for this system\'s d100 gathering rows and events.')}</p>
             </div>
             <div class="manager-character-modifier-card-header-actions">
-              <button type="button" class="manager-action" onclick={handleAddCharacterModifier}>
+              <button type="button" class="manager-button is-primary" onclick={handleAddCharacterModifier}>
                 <i class="fa-solid fa-plus" aria-hidden="true"></i>
                 {text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Add', 'Add character modifier')}
               </button>
               <button type="button"
-                      class="manager-action"
+                      class="manager-button"
                       disabled={!characterModifierPresetsSupported}
                       data-tooltip={!characterModifierPresetsSupported ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.SeedPresetsUnsupported', 'Preset seeding is only available for dnd5e or pf2e worlds.') : null}
                       onclick={onSeedCharacterModifierPresets}>
@@ -228,8 +208,8 @@
                         <input type="text" value={entry.expression} oninput={(event) => onUpdateCharacterModifier(entry.id, { expression: event.currentTarget.value })} />
                       </label>
                       <div class="manager-character-modifier-actions">
-                        <button type="button" class="manager-action" onclick={() => characterModifierEditingId = ''}>{text('FABRICATE.Admin.Manager.Done', 'Done')}</button>
-                        <button type="button" class="manager-action manager-action-danger" onclick={() => handleDeleteCharacterModifier(entry.id)}>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')}</button>
+                        <button type="button" class="manager-button" onclick={() => characterModifierEditingId = ''}>{text('FABRICATE.Admin.Manager.Done', 'Done')}</button>
+                        <button type="button" class="manager-button is-danger" onclick={() => handleDeleteCharacterModifier(entry.id)}>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')}</button>
                       </div>
                     </div>
                   {:else}

@@ -1724,7 +1724,8 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
   const fieldInputBlock = blockFor('.fabricate-manager .manager-field input,\n.fabricate-manager .manager-field select');
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
-  const toggleRowBlock = blockFor('.fabricate-manager .manager-toggle-row');
+  const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
+  const featureTileHeadBlock = blockFor('.fabricate-manager .manager-feature-tile-head');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrowQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
@@ -1733,7 +1734,8 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   assert.ok(gridBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'system edit fields should use a stable two-column grid');
   assert.ok(fieldInputBlock.includes('height: 36px;'), 'system edit inputs and selects should have stable control height');
   assert.ok(toggleListBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'feature toggles should use stable two-column rows');
-  assert.ok(toggleRowBlock.includes('grid-template-columns: 20px minmax(0, 1fr);'), 'toggle rows should reserve checkbox width');
+  assert.ok(featureTileBlock.includes('flex-direction: column;'), 'feature tiles should stack heading and hint vertically');
+  assert.ok(featureTileHeadBlock.includes('justify-content: space-between;'), 'feature tile heading should push the pill toggle to the trailing edge');
   assert.ok(
     mediumQuery.includes('.fabricate-manager .manager-toggle-list') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'medium edit layout should collapse feature toggles before text becomes cramped'

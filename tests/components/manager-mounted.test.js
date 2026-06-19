@@ -186,7 +186,6 @@ function createStore(calls = [], options = {}) {
       name: 'Alchemy',
       description: 'Potion and essence work',
       resolutionMode: options.alchemyResolutionMode || 'alchemy',
-      advancedOptionsEnabled: true,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
       // Tools are system-owned: the manager reads the library from
@@ -210,7 +209,6 @@ function createStore(calls = [], options = {}) {
       name: 'Smithing',
       description: 'Heavy equipment work',
       resolutionMode: 'routed',
-      advancedOptionsEnabled: false,
       features: {
         gathering: false,
         itemTags: false,
@@ -471,7 +469,6 @@ function createStore(calls = [], options = {}) {
         description: 'Potion and essence work',
         enabled: true,
         resolutionMode: 'alchemy',
-        advancedOptionsEnabled: true,
         features: selectedFeatures,
         featureCount: 3,
         componentCount: alchemyManagedItemOptions.length,
@@ -484,7 +481,6 @@ function createStore(calls = [], options = {}) {
         description: 'Heavy equipment work',
         enabled: false,
         resolutionMode: 'routed',
-        advancedOptionsEnabled: false,
         features: systemDetails.smithing.features,
         featureCount: 1,
         componentCount: 6,
@@ -739,14 +735,10 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleSystemEnabled', id, enabled]);
       applySystemEnabled(id, enabled);
     },
-    saveSystemDetails: (name, description, advancedOptionsEnabled) => calls.push(['saveSystemDetails', name, description, advancedOptionsEnabled]),
+    saveSystemDetails: (name, description) => calls.push(['saveSystemDetails', name, description]),
     setResolutionMode: async (mode) => {
       calls.push(['setResolutionMode', mode]);
       return options.resolutionModeResult ?? true;
-    },
-    toggleAdvancedOptions: (enabled) => {
-      calls.push(['toggleAdvancedOptions', enabled]);
-      return options.advancedOptionsResult ?? true;
     },
     toggleFeature: (feature, enabled) => {
       calls.push(['toggleFeature', feature, enabled]);
@@ -5463,20 +5455,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     resolution.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
 
-    const advanced = target.querySelector('[data-edit-control="advanced-options"] input');
-    advanced.checked = false;
-    advanced.dispatchEvent(new Event('change', { bubbles: true }));
-
-    const gathering = target.querySelector('[data-feature-key="gathering"] input');
-    gathering.checked = false;
-    gathering.dispatchEvent(new Event('change', { bubbles: true }));
+    target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
 
     assert.ok(calls.some(call => call[0] === 'saveSystemDetails'
       && call[1] === 'Greater Alchemy'
-      && call[2] === 'Updated potion work'
-      && call[3] === true));
+      && call[2] === 'Updated potion work'));
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'mapped'));
-    assert.ok(calls.some(call => call[0] === 'toggleAdvancedOptions' && call[1] === false));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
   });
 
@@ -5512,13 +5496,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(resolution.value, 'alchemy');
 
-    const gathering = target.querySelector('[data-feature-key="gathering"] input');
-    gathering.checked = false;
-    gathering.dispatchEvent(new Event('change', { bubbles: true }));
+    const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
+    assert.equal(gathering.getAttribute('aria-pressed'), 'true');
+    gathering.click();
     await Promise.resolve();
     await tick();
     flushSync();
-    assert.equal(gathering.checked, true);
+    assert.equal(gathering.getAttribute('aria-pressed'), 'true');
 
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'progressive'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));

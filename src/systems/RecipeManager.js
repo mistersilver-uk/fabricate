@@ -811,7 +811,7 @@ export class RecipeManager {
     const features = system?.features || {};
     return {
       enableTags: !!system,
-      enableEssences: system?.advancedOptionsEnabled !== false && features.essences === true,
+      enableEssences: features.essences === true,
     };
   }
 
@@ -1115,10 +1115,8 @@ export class RecipeManager {
       return { valid: true, errors };
     }
 
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
-    const essencesEnabled =
-      advancedEnabled && (features.essences === true || system.enableEssences === true);
+    const essencesEnabled = features.essences === true || system.enableEssences === true;
     if (!essencesEnabled) {
       return { valid: true, errors };
     }

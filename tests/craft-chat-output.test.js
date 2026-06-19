@@ -47,7 +47,6 @@ function resetChat() {
 function buildSystem(chatOutputEnabled = true) {
   return {
     id: 'sys-1',
-    advancedOptionsEnabled: true,
     features: {
       craftingChecks: false,
       chatOutput: chatOutputEnabled

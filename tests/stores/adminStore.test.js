@@ -25,7 +25,6 @@ function makeSystem(overrides = {}) {
     description: overrides.description || '',
     resolutionMode: overrides.resolutionMode || 'simple',
     features: overrides.features || {},
-    advancedOptionsEnabled: overrides.advancedOptionsEnabled !== undefined ? overrides.advancedOptionsEnabled : true,
     categories: overrides.categories || [],
     itemTags: overrides.itemTags || [],
     essenceDefinitions: overrides.essenceDefinitions || [],
@@ -498,7 +497,7 @@ describe('createAdminStore', () => {
       assert.ok(remaining.some(s => s.id === 'sys1'), 'sys1 should not be deleted when declined');
     });
 
-    it('saveSystemDetails calls systemManager.updateSystem with given name, description, advancedOptionsEnabled', async () => {
+    it('saveSystemDetails calls systemManager.updateSystem with given name and description', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -511,12 +510,11 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveSystemDetails('Updated Name', 'Updated Desc', false);
+      await store.saveSystemDetails('Updated Name', 'Updated Desc');
       assert.ok(updateArgs !== null, 'updateSystem should be called');
       assert.equal(updateArgs.id, 'sys1');
       assert.equal(updateArgs.updates.name, 'Updated Name');
       assert.equal(updateArgs.updates.description, 'Updated Desc');
-      assert.equal(updateArgs.updates.advancedOptionsEnabled, false);
     });
 
     it('saveSystemDetails does nothing when no system is selected', async () => {
@@ -530,7 +528,7 @@ describe('createAdminStore', () => {
         updateSystem: async () => { updateCalled = true; }
       });
       const store = createAdminStore(services);
-      await store.saveSystemDetails('Name', 'Desc', true);
+      await store.saveSystemDetails('Name', 'Desc');
       assert.ok(!updateCalled, 'updateSystem should not be called when no system is selected');
     });
 
@@ -650,24 +648,6 @@ describe('createAdminStore', () => {
         assert.ok(expectedKey in updateArgs.updates.features,
           `Expected key "${expectedKey}" in features update for "${featureName}"`);
       }
-    });
-
-    it('toggleAdvancedOptions(false) calls updateSystem with advancedOptionsEnabled: false', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.toggleAdvancedOptions(false);
-      assert.ok(updateArgs, 'updateSystem should be called');
-      assert.equal(updateArgs.updates.advancedOptionsEnabled, false);
     });
 
     it('toggleRequirement("currency", true) calls updateSystem with correct requirements shape', async () => {
@@ -1971,7 +1951,7 @@ describe('createAdminStore', () => {
         'viewState',
         'selectSystem', 'createSystem', 'deleteSystem', 'saveSystemDetails',
         'setTab',
-        'toggleSystemEnabled', 'toggleFeature', 'toggleAdvancedOptions', 'toggleRequirement',
+        'toggleSystemEnabled', 'toggleFeature', 'toggleRequirement',
         'addCategory', 'removeCategory',
         'addTag', 'removeTag',
         'addEssence', 'removeEssence',
@@ -2037,7 +2017,7 @@ describe('createAdminStore', () => {
       const sys = vs.selectedSystem;
       assert.ok(sys !== null, 'selectedSystem should not be null');
       const requiredKeys = [
-        'id', 'name', 'description', 'enabled', 'advancedOptionsEnabled', 'features',
+        'id', 'name', 'description', 'enabled', 'features',
         'categories', 'itemTags', 'essenceDefinitions', 'managedItemOptions',
         'requirements', 'craftingCheck', 'recipeVisibility',
         'showRecipeVisibilityKnowledgeOptions', 'showRecipeVisibilityPlayerNote',
@@ -3779,12 +3759,11 @@ describe('createAdminStore', () => {
       assert.deepEqual(selectedSystem?.rollTableOptions, rollTableOptions);
     });
 
-    it('viewState.selectedSystem.showTags and showEssences are true when features and advancedOptions are both enabled', async () => {
+    it('viewState.selectedSystem.showTags and showEssences are true when the essences feature is enabled', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.advancedOptionsEnabled = true;
         sys.features = { itemTags: true, essences: true };
       }
       const store = createAdminStore(services);
@@ -3794,13 +3773,12 @@ describe('createAdminStore', () => {
       assert.equal(vs.selectedSystem?.showEssences, true);
     });
 
-    it('viewState.selectedSystem.showTags remains true when advancedOptionsEnabled is false', async () => {
+    it('viewState.selectedSystem.showEssences is false when the essences feature is disabled', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.advancedOptionsEnabled = false;
-        sys.features = { itemTags: true, essences: true };
+        sys.features = { itemTags: true, essences: false };
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -4112,7 +4090,6 @@ describe('createAdminStore', () => {
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { salvage: true, itemTags: true, essences: true };
-        sys.advancedOptionsEnabled = true;
         sys.essenceDefinitions = [
           { id: 'ess-fire', name: 'Fire', description: '', icon: 'fas fa-fire', sourceItemUuid: null },
           { id: 'ess-shadow', name: 'Shadow', description: '', icon: '', sourceItemUuid: null }
@@ -4203,7 +4180,6 @@ describe('createAdminStore', () => {
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { essences: true };
-        sys.advancedOptionsEnabled = true;
         sys.components = [
           makeItem({
             id: 'comp-1',
@@ -4263,7 +4239,6 @@ describe('createAdminStore', () => {
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { essences: true };
-        sys.advancedOptionsEnabled = true;
         sys.components = [
           makeItem({
             id: 'comp-1',

@@ -65,7 +65,6 @@ function makeSystem(overrides = {}) {
     description: '',
     resolutionMode: 'simple',
     features: { gathering: true, ...(overrides.features || {}) },
-    advancedOptionsEnabled: true,
     categories: [],
     itemTags: [],
     essenceDefinitions: [],

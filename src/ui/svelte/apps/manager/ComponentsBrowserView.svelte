@@ -265,7 +265,7 @@
           </label>
           {#if normalizedTagSearchTerm.length > 0}
             <div id="manager-component-tag-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Component.TagSuggestions', 'Matching component tags')}>
-              {#each tagSearchSuggestions as tag}
+              {#each tagSearchSuggestions as tag (tag)}
                 <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" onclick={() => addTagFilter(tag)}>
                   <i class="fas fa-tag" aria-hidden="true"></i>
                   <span>{tag}</span>
@@ -282,7 +282,7 @@
           <span>{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</span>
           <select value={essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.Manager.Component.EssenceFilterLabel', 'Filter components by essence')}>
             <option value="all">{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option>
-            {#each componentEssenceOptions as essence}
+            {#each componentEssenceOptions as essence (essence)}
               <option value={essence}>{essence}</option>
             {/each}
           </select>
@@ -298,7 +298,7 @@
     </div>
     {#if selectedTagFilters.length > 0}
       <div class="manager-toolbar-pills manager-selected-tag-row" role="list" aria-label={text('FABRICATE.Admin.Manager.Component.SelectedTags', 'Selected component tags')}>
-        {#each selectedTagFilters as tag}
+        {#each selectedTagFilters as tag (tag)}
           <span class="manager-chip manager-selected-tag-pill" role="listitem" data-component-tag-pill={tag} oncontextmenu={(event) => removeTagFilterFromContext(event, tag)}>
             <span>{tag}</span>
             <button type="button" aria-label={text('FABRICATE.Admin.Manager.Component.RemoveTagNamed', 'Remove tag {name}').replace('{name}', tag)} title={text('FABRICATE.Admin.Manager.Component.RemoveTag', 'Remove tag')} onclick={() => removeTagFilter(tag)}>
@@ -360,7 +360,7 @@
             {#if showComponentTags}
               <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}>
                 <span class="manager-chip-row">
-                  {#each item.tags || [] as tag}
+                  {#each item.tags || [] as tag (tag)}
                     <span class="manager-chip">{tag}</span>
                   {:else}
                     <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</span>
@@ -371,7 +371,7 @@
             {#if showComponentEssences}
               <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}>
                 <span class="manager-chip-row">
-                  {#each item.essences || [] as essence}
+                  {#each item.essences || [] as essence (essence.id)}
                     <span class="manager-chip manager-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
                       <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
                     </span>

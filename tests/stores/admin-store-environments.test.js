@@ -23,7 +23,6 @@ function makeSystem(overrides = {}) {
     description: '',
     resolutionMode: 'simple',
     features: {},
-    advancedOptionsEnabled: true,
     categories: [],
     itemTags: [],
     essenceDefinitions: [],

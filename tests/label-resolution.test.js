@@ -61,7 +61,6 @@ const { Ingredient } = await import('../src/models/Ingredient.js');
 function makeSystem(components = [], tools = []) {
   return {
     id: 'sys-1',
-    advancedOptionsEnabled: false,
     features: {},
     components,
     tools

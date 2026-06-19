@@ -161,7 +161,7 @@ describe('CraftingSystemManager source contract', () => {
     }
     for (const snippet of [
       'manager-system-edit-form',
-      'manager-toggle-row'
+      'manager-feature-tile'
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
@@ -300,7 +300,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!managerSource.includes("value: 'routed'"), 'system edit should not offer unsupported routed persistence values before runtime support exists');
     assert.ok(managerSource.includes("value: 'mapped'"), 'system edit should retain the existing routed-by-ingredients persistence value');
     assert.ok(managerSource.includes("value: 'tiered'"), 'system edit should retain the existing routed-by-check persistence value');
-    assert.ok(rootSource.includes('store.toggleAdvancedOptions?.'), 'root should delegate advanced visibility changes to the admin store');
+    assert.ok(!rootSource.includes('store.toggleAdvancedOptions?.'), 'root should not retain the removed advanced visibility toggle wiring');
     assert.ok(rootSource.includes('store.toggleFeature?.'), 'root should delegate feature toggles to the admin store');
     assert.ok(!managerSource.includes("storeKey: 'complexRecipes'"), 'system edit should not reintroduce the legacy complex recipes toggle');
     assert.ok(!managerSource.includes("storeKey: 'craftingChecks'"), 'system edit should not reintroduce the legacy crafting checks toggle');

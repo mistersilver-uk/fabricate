@@ -77,7 +77,6 @@ function makeRecipe(overrides = {}) {
 /** Build a fake system with one managed component */
 function makeSystem(componentId, sourceUuid, name = 'Test Item') {
   return {
-    advancedOptionsEnabled: false,
     features: {},
     components: [{ id: componentId, sourceUuid, name }]
   };
@@ -85,7 +84,6 @@ function makeSystem(componentId, sourceUuid, name = 'Test Item') {
 
 function makeSystemWithComponent(component) {
   return {
-    advancedOptionsEnabled: false,
     features: {},
     components: [component]
   };
