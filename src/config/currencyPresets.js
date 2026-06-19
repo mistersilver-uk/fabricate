@@ -21,6 +21,36 @@ function freezePresetUnits(units) {
   );
 }
 
+// dnd5e reads/spends coins from a flat `system.currency.<denom>` actor property; pf2e maps the
+// same denomination ladder onto inventory treasure read via `actor.inventory`. The two presets
+// therefore share the same labels/abbreviations/ladder and differ only by how a coin is located,
+// so a single builder fills in either an `actorPath` (dnd5e) or a `denomination` (pf2e).
+function buildCoinLadderPreset(strategy) {
+  const coins = [
+    { id: 'cp', label: 'Copper', cpValue: 0 },
+    { id: 'sp', label: 'Silver', cpValue: 10 },
+    { id: 'ep', label: 'Electrum', cpValue: 50, dnd5eOnly: true },
+    { id: 'gp', label: 'Gold', cpValue: 100 },
+    { id: 'pp', label: 'Platinum', cpValue: 1000 },
+  ];
+  return freezePresetUnits(
+    coins
+      .filter((coin) => strategy === 'actorPath' || !coin.dnd5eOnly)
+      .map((coin) => {
+        const unit = {
+          id: coin.id,
+          label: coin.label,
+          abbreviation: coin.id,
+          icon: 'fa-solid fa-coins',
+          contains: coin.cpValue > 0 ? [{ unitId: 'cp', amount: coin.cpValue }] : [],
+        };
+        if (strategy === 'actorPath') unit.actorPath = `system.currency.${coin.id}`;
+        else unit.denomination = coin.id;
+        return unit;
+      })
+  );
+}
+
 /**
  * dnd5e and pf2e share the same denomination ladder, so the only difference between
  * the two presets is how a coin balance is read and spent. dnd5e coins live at a flat
@@ -31,83 +61,9 @@ function freezePresetUnits(units) {
  * uses the `actorInventory` spend strategy.
  */
 
-export const DND5E_CURRENCY_PRESETS = freezePresetUnits([
-  {
-    id: 'cp',
-    label: 'Copper',
-    abbreviation: 'cp',
-    icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.cp',
-    contains: [],
-  },
-  {
-    id: 'sp',
-    label: 'Silver',
-    abbreviation: 'sp',
-    icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.sp',
-    contains: [{ unitId: 'cp', amount: 10 }],
-  },
-  {
-    id: 'ep',
-    label: 'Electrum',
-    abbreviation: 'ep',
-    icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.ep',
-    contains: [{ unitId: 'cp', amount: 50 }],
-  },
-  {
-    id: 'gp',
-    label: 'Gold',
-    abbreviation: 'gp',
-    icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.gp',
-    contains: [{ unitId: 'cp', amount: 100 }],
-  },
-  {
-    id: 'pp',
-    label: 'Platinum',
-    abbreviation: 'pp',
-    icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.pp',
-    contains: [{ unitId: 'cp', amount: 1000 }],
-  },
-]);
+export const DND5E_CURRENCY_PRESETS = buildCoinLadderPreset('actorPath');
 
-export const PF2E_CURRENCY_PRESETS = freezePresetUnits([
-  {
-    id: 'cp',
-    label: 'Copper',
-    abbreviation: 'cp',
-    icon: 'fa-solid fa-coins',
-    denomination: 'cp',
-    contains: [],
-  },
-  {
-    id: 'sp',
-    label: 'Silver',
-    abbreviation: 'sp',
-    icon: 'fa-solid fa-coins',
-    denomination: 'sp',
-    contains: [{ unitId: 'cp', amount: 10 }],
-  },
-  {
-    id: 'gp',
-    label: 'Gold',
-    abbreviation: 'gp',
-    icon: 'fa-solid fa-coins',
-    denomination: 'gp',
-    contains: [{ unitId: 'cp', amount: 100 }],
-  },
-  {
-    id: 'pp',
-    label: 'Platinum',
-    abbreviation: 'pp',
-    icon: 'fa-solid fa-coins',
-    denomination: 'pp',
-    contains: [{ unitId: 'cp', amount: 1000 }],
-  },
-]);
+export const PF2E_CURRENCY_PRESETS = buildCoinLadderPreset('denomination');
 
 export function getCurrencyPresetsForFoundrySystem(foundrySystemId) {
   const id = String(foundrySystemId || '').trim();

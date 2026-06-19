@@ -158,6 +158,54 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
  * Generate a unique system name that does not collide with any existing system.
  * Mirrors RecipeManagerApp._nextSystemName().
  */
+// --- Currency unit mutation helpers (kept module-level and shallow so the
+// adminStore mutate callbacks stay readable and avoid deep callback nesting) ---
+
+function _stripSubUnit(unit, subUnitId) {
+  return {
+    ...unit,
+    contains: (unit.contains || []).filter((entry) => entry.unitId !== subUnitId)
+  };
+}
+
+function _deleteCurrencyUnitFromList(units, unitId) {
+  if (!unitId) return null;
+  const nextUnits = units
+    .filter((unit) => unit.id !== unitId)
+    .map((unit) => _stripSubUnit(unit, unitId));
+  return nextUnits.length === units.length ? null : nextUnits;
+}
+
+function _setSubUnitAmount(entry, subUnitId, numericAmount) {
+  if (entry.unitId !== subUnitId) return entry;
+  return { ...entry, amount: numericAmount };
+}
+
+function _updateSubUnitAmountInList(units, parentUnitId, subUnitId, numericAmount) {
+  let changed = false;
+  const nextUnits = units.map((unit) => {
+    if (unit.id !== parentUnitId) return unit;
+    const contains = (unit.contains || []).map((entry) => {
+      const updated = _setSubUnitAmount(entry, subUnitId, numericAmount);
+      if (updated !== entry) changed = true;
+      return updated;
+    });
+    return { ...unit, contains };
+  });
+  return { nextUnits, changed };
+}
+
+function _deleteSubUnitFromList(units, parentUnitId, subUnitId) {
+  let changed = false;
+  const nextUnits = units.map((unit) => {
+    if (unit.id !== parentUnitId) return unit;
+    const contains = (unit.contains || []).filter((entry) => entry.unitId !== subUnitId);
+    if (contains.length !== (unit.contains || []).length) changed = true;
+    return { ...unit, contains };
+  });
+  return { nextUnits, changed };
+}
+
 function _nextSystemName(systemManager) {
   const base = 'New Crafting System';
   const names = new Set(systemManager.getSystems().map(s => s.name));
@@ -5151,7 +5199,7 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function _updateCurrencyConfig(systemId = get(selectedSystemId), mutate) {
+  async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
     if (!sysId) return;
@@ -5171,7 +5219,7 @@ export function createAdminStore(services) {
     return result ?? true;
   }
 
-  async function addCurrencyUnit(systemId = get(selectedSystemId), partial = {}) {
+  async function addCurrencyUnit(systemId, partial = {}) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       const id = String(partial?.id || _randomID()).trim();
       if (!id || currency.units.some(unit => unit.id === id)) return null;
@@ -5189,7 +5237,7 @@ export function createAdminStore(services) {
     });
   }
 
-  async function updateCurrencyUnit(systemId = get(selectedSystemId), unitId, updates = {}) {
+  async function updateCurrencyUnit(systemId, unitId, updates = {}) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       if (!unitId) return false;
       let changed = false;
@@ -5202,22 +5250,16 @@ export function createAdminStore(services) {
     });
   }
 
-  async function deleteCurrencyUnit(systemId = get(selectedSystemId), unitId) {
+  async function deleteCurrencyUnit(systemId, unitId) {
     return await _updateCurrencyConfig(systemId, (currency) => {
-      if (!unitId) return false;
-      const nextUnits = currency.units
-        .filter(unit => unit.id !== unitId)
-        .map(unit => ({
-          ...unit,
-          contains: (unit.contains || []).filter(entry => entry.unitId !== unitId)
-        }));
-      if (nextUnits.length === currency.units.length) return false;
+      const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
+      if (!nextUnits) return false;
       currency.units = nextUnits;
       return true;
     });
   }
 
-  async function addCurrencySubUnit(systemId = get(selectedSystemId), parentUnitId, subUnitId, amount = 1) {
+  async function addCurrencySubUnit(systemId, parentUnitId, subUnitId, amount = 1) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
       const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
@@ -5231,32 +5273,28 @@ export function createAdminStore(services) {
     });
   }
 
-  async function updateCurrencySubUnit(systemId = get(selectedSystemId), parentUnitId, subUnitId, amount) {
+  async function updateCurrencySubUnit(systemId, parentUnitId, subUnitId, amount) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
-      let changed = false;
-      currency.units = currency.units.map(unit => {
-        if (unit.id !== parentUnitId) return unit;
-        const contains = (unit.contains || []).map(entry => {
-          if (entry.unitId !== subUnitId) return entry;
-          changed = true;
-          return { ...entry, amount: numericAmount };
-        });
-        return { ...unit, contains };
-      });
+      const { nextUnits, changed } = _updateSubUnitAmountInList(
+        currency.units,
+        parentUnitId,
+        subUnitId,
+        numericAmount
+      );
+      currency.units = nextUnits;
       return changed;
     });
   }
 
-  async function deleteCurrencySubUnit(systemId = get(selectedSystemId), parentUnitId, subUnitId) {
+  async function deleteCurrencySubUnit(systemId, parentUnitId, subUnitId) {
     return await _updateCurrencyConfig(systemId, (currency) => {
-      let changed = false;
-      currency.units = currency.units.map(unit => {
-        if (unit.id !== parentUnitId) return unit;
-        const contains = (unit.contains || []).filter(entry => entry.unitId !== subUnitId);
-        changed = contains.length !== (unit.contains || []).length;
-        return { ...unit, contains };
-      });
+      const { nextUnits, changed } = _deleteSubUnitFromList(
+        currency.units,
+        parentUnitId,
+        subUnitId
+      );
+      currency.units = nextUnits;
       return changed;
     });
   }

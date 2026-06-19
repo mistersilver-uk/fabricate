@@ -442,13 +442,9 @@ export class CraftingSystemManager {
     // through the actor inventory rather than a flat actor property; carry that intent forward
     // as the actorInventory spend strategy when no explicit strategy was persisted. A legacy
     // dnd5e adapter maps to the default actorProperty strategy.
+    const legacyAdapterSpendStrategy = { pf2e: 'actorInventory', dnd5e: 'actorProperty' };
     const spendStrategy =
-      currency?.spendStrategy ||
-      (legacyAdapter === 'pf2e'
-        ? 'actorInventory'
-        : legacyAdapter === 'dnd5e'
-          ? 'actorProperty'
-          : undefined);
+      currency?.spendStrategy || legacyAdapterSpendStrategy[legacyAdapter] || undefined;
     return normalizeCurrencyConfig(
       {
         enabled: currency?.enabled === true,

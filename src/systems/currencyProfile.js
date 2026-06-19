@@ -1,7 +1,11 @@
-export function normalizeCurrencyUnit(
-  entry = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function defaultRandomID() {
+  return (
+    globalThis.foundry?.utils?.randomID?.() ??
+    globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 10)
+  );
+}
+
+export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
   if (!entry || typeof entry !== 'object') return null;
   const id = String(entry.id || randomID()).trim();
   if (!id) return null;
@@ -90,6 +94,86 @@ function buildUnitMap(units) {
   return new Map((Array.isArray(units) ? units : []).map((unit) => [unit.id, unit]));
 }
 
+// Validate the raw, pre-sanitization sub-unit amounts so non-integer/non-positive
+// values surface as configuration errors rather than being silently truncated.
+function collectRawSubUnitErrors(rawUnits, errors) {
+  for (const rawUnit of rawUnits) {
+    if (!rawUnit || typeof rawUnit !== 'object' || !Array.isArray(rawUnit.contains)) continue;
+    const label = String(rawUnit.label || rawUnit.name || rawUnit.id || '').trim() || rawUnit.id;
+    for (const contained of rawUnit.contains) {
+      const rawAmount = Number(contained?.amount);
+      if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
+        errors.push(`Currency unit "${label}" has an invalid sub-unit amount.`);
+      }
+    }
+  }
+}
+
+function collectUnitErrors(unit, { spendStrategy, byId, errors }) {
+  if (spendStrategy === 'actorInventory') {
+    const denomination = unit.denomination || unit.id;
+    if (!PF2E_DENOMINATIONS.has(denomination)) {
+      errors.push(
+        `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
+      );
+    }
+  } else if (!unit.actorPath) {
+    errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
+  }
+  for (const contained of unit.contains) {
+    if (contained.unitId === unit.id) {
+      errors.push(`Currency unit "${unit.label}" cannot contain itself.`);
+    }
+    if (!byId.has(contained.unitId)) {
+      errors.push(`Currency unit "${unit.label}" contains unknown unit "${contained.unitId}".`);
+    }
+  }
+}
+
+function resolveUnitContents(unit, ancestry, { errors, resolveUnit }) {
+  let baseUnitId = null;
+  let baseValue = 0;
+  for (const contained of unit.contains) {
+    const child = resolveUnit(contained.unitId, [...ancestry, unit.id]);
+    if (!child) continue;
+    if (baseUnitId && child.baseUnitId !== baseUnitId) {
+      errors.push(`Currency unit "${unit.label}" mixes incompatible base units.`);
+      continue;
+    }
+    baseUnitId = child.baseUnitId;
+    baseValue += contained.amount * child.baseValue;
+  }
+  if (!baseUnitId || baseValue <= 0) {
+    errors.push(`Currency unit "${unit.label}" cannot resolve to a base unit.`);
+  }
+  return { baseUnitId, baseValue };
+}
+
+function buildUnitResolver(byId, errors) {
+  const resolving = new Set();
+  const resolved = new Map();
+  function resolveUnit(unitId, ancestry = []) {
+    if (resolved.has(unitId)) return resolved.get(unitId);
+    const unit = byId.get(unitId);
+    if (!unit) return null;
+    if (resolving.has(unitId)) {
+      errors.push(
+        `Currency units contain a circular reference: ${[...ancestry, unitId].join(' -> ')}.`
+      );
+      return null;
+    }
+    resolving.add(unitId);
+    const result =
+      unit.contains.length === 0
+        ? { baseUnitId: unit.id, baseValue: 1 }
+        : resolveUnitContents(unit, ancestry, { errors, resolveUnit });
+    resolving.delete(unitId);
+    resolved.set(unitId, result);
+    return result;
+  }
+  return { resolveUnit, resolved };
+}
+
 export function validateCurrencyProfile(units = [], options = {}) {
   const spendStrategy = SPEND_STRATEGIES.has(options?.spendStrategy)
     ? options.spendStrategy
@@ -104,81 +188,14 @@ export function validateCurrencyProfile(units = [], options = {}) {
   if (byId.size !== normalizedUnits.length) {
     errors.push('Currency unit IDs must be unique.');
   }
-  // Validate the raw, pre-sanitization sub-unit amounts so non-integer/non-positive
-  // values surface as configuration errors rather than being silently truncated.
-  for (const rawUnit of rawUnits) {
-    if (!rawUnit || typeof rawUnit !== 'object' || !Array.isArray(rawUnit.contains)) continue;
-    const label = String(rawUnit.label || rawUnit.name || rawUnit.id || '').trim() || rawUnit.id;
-    for (const contained of rawUnit.contains) {
-      const rawAmount = Number(contained?.amount);
-      if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
-        errors.push(`Currency unit "${label}" has an invalid sub-unit amount.`);
-      }
-    }
-  }
+  collectRawSubUnitErrors(rawUnits, errors);
   for (const unit of normalizedUnits) {
-    if (spendStrategy === 'actorInventory') {
-      const denomination = unit.denomination || unit.id;
-      if (!PF2E_DENOMINATIONS.has(denomination)) {
-        errors.push(
-          `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
-        );
-      }
-    } else if (!unit.actorPath) {
-      errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
-    }
-    for (const contained of unit.contains) {
-      if (contained.unitId === unit.id) {
-        errors.push(`Currency unit "${unit.label}" cannot contain itself.`);
-      }
-      if (!byId.has(contained.unitId)) {
-        errors.push(`Currency unit "${unit.label}" contains unknown unit "${contained.unitId}".`);
-      }
-    }
+    collectUnitErrors(unit, { spendStrategy, byId, errors });
   }
 
-  const resolving = new Set();
-  const resolved = new Map();
-
-  function resolve(unitId, ancestry = []) {
-    if (resolved.has(unitId)) return resolved.get(unitId);
-    const unit = byId.get(unitId);
-    if (!unit) return null;
-    if (resolving.has(unitId)) {
-      errors.push(
-        `Currency units contain a circular reference: ${[...ancestry, unitId].join(' -> ')}.`
-      );
-      return null;
-    }
-    resolving.add(unitId);
-    let result;
-    if (unit.contains.length === 0) {
-      result = { baseUnitId: unit.id, baseValue: 1 };
-    } else {
-      let baseUnitId = null;
-      let baseValue = 0;
-      for (const contained of unit.contains) {
-        const child = resolve(contained.unitId, [...ancestry, unitId]);
-        if (!child) continue;
-        if (baseUnitId && child.baseUnitId !== baseUnitId) {
-          errors.push(`Currency unit "${unit.label}" mixes incompatible base units.`);
-          continue;
-        }
-        baseUnitId = child.baseUnitId;
-        baseValue += contained.amount * child.baseValue;
-      }
-      if (!baseUnitId || baseValue <= 0) {
-        errors.push(`Currency unit "${unit.label}" cannot resolve to a base unit.`);
-      }
-      result = { baseUnitId, baseValue };
-    }
-    resolving.delete(unitId);
-    resolved.set(unitId, result);
-    return result;
-  }
-
+  const { resolveUnit, resolved } = buildUnitResolver(byId, errors);
   for (const unit of normalizedUnits) {
-    resolve(unit.id);
+    resolveUnit(unit.id);
   }
 
   return {
@@ -240,6 +257,70 @@ function distributeChange(balances, amount, unitsByValue) {
   return remaining === 0;
 }
 
+function buildSpendLadders(profile, requiredMeta) {
+  const relevantUnits = profile.units
+    .filter((unit) => profile.metadata.get(unit.id)?.baseUnitId === requiredMeta.baseUnitId)
+    .map((unit) => ({ unit, value: profile.metadata.get(unit.id).baseValue }));
+  const spendableLowerUnits = relevantUnits
+    .filter((entry) => entry.value <= requiredMeta.baseValue)
+    .sort((left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id));
+  const higherUnits = relevantUnits
+    .filter((entry) => entry.value > requiredMeta.baseValue)
+    .sort((left, right) => left.value - right.value || left.unit.id.localeCompare(right.unit.id));
+  return { spendableLowerUnits, higherUnits };
+}
+
+function spendLowerUnits(nextBalances, requiredBase, spendableLowerUnits) {
+  let remaining = requiredBase;
+  for (const { unit, value } of spendableLowerUnits) {
+    if (remaining <= 0) break;
+    const available = nextBalances.get(unit.id) || 0;
+    const count = Math.min(available, Math.floor(remaining / value));
+    if (count <= 0) continue;
+    nextBalances.set(unit.id, available - count);
+    remaining -= count * value;
+  }
+  return remaining;
+}
+
+// Change from breaking a higher coin is returned only in denominations at or below the
+// required unit, largest first. Returning change in a denomination LARGER than the
+// requirement unit (e.g. handing back electrum when spending silver on the dnd5e ladder)
+// is surprising and widely disliked, so the change target set is restricted to the same
+// and smaller denominations. This stays provably complete: the overpay is always less
+// than the broken higher coin's value, the required unit and every smaller unit are in
+// the set, and the value-1 base unit guarantees the remainder distributes fully.
+function breakHigherUnits(nextBalances, startingRemaining, higherUnits, changeUnits) {
+  let remaining = startingRemaining;
+  for (const { unit, value } of higherUnits) {
+    while (remaining > 0 && (nextBalances.get(unit.id) || 0) > 0) {
+      nextBalances.set(unit.id, (nextBalances.get(unit.id) || 0) - 1);
+      if (value >= remaining) {
+        const overpay = value - remaining;
+        remaining = 0;
+        if (overpay > 0) distributeChange(nextBalances, overpay, changeUnits);
+        break;
+      }
+      remaining -= value;
+    }
+    if (remaining <= 0) break;
+  }
+  return remaining;
+}
+
+function buildSpendUpdates(profile, requiredMeta, nextBalances, originalBalances) {
+  const updates = {};
+  for (const unit of profile.units) {
+    const meta = profile.metadata.get(unit.id);
+    if (meta?.baseUnitId !== requiredMeta.baseUnitId) continue;
+    const nextAmount = nextBalances.get(unit.id) || 0;
+    if (nextAmount !== originalBalances.get(unit.id)) {
+      updates[unit.actorPath] = nextAmount;
+    }
+  }
+  return updates;
+}
+
 export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   const profile = validateCurrencyProfile(units);
   if (!profile.valid) {
@@ -275,48 +356,10 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
     };
   }
 
-  const relevantUnits = profile.units
-    .filter((unit) => profile.metadata.get(unit.id)?.baseUnitId === requiredMeta.baseUnitId)
-    .map((unit) => ({ unit, value: profile.metadata.get(unit.id).baseValue }));
-  const spendableLowerUnits = relevantUnits
-    .filter((entry) => entry.value <= requiredMeta.baseValue)
-    .sort((left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id));
-  // Change from breaking a higher coin is returned only in denominations at or below the
-  // required unit, largest first. Returning change in a denomination LARGER than the
-  // requirement unit (e.g. handing back electrum when spending silver on the dnd5e ladder)
-  // is surprising and widely disliked, so the change target set is restricted to the same
-  // and smaller denominations. This stays provably complete: the overpay is always less
-  // than the broken higher coin's value, the required unit and every smaller unit are in
-  // the set, and the value-1 base unit guarantees the remainder distributes fully.
-  const changeUnits = spendableLowerUnits;
-  const higherUnits = relevantUnits
-    .filter((entry) => entry.value > requiredMeta.baseValue)
-    .sort((left, right) => left.value - right.value || left.unit.id.localeCompare(right.unit.id));
+  const { spendableLowerUnits, higherUnits } = buildSpendLadders(profile, requiredMeta);
   const nextBalances = new Map(balanceResult.balances);
-  let remaining = requiredBase;
-
-  for (const { unit, value } of spendableLowerUnits) {
-    if (remaining <= 0) break;
-    const available = nextBalances.get(unit.id) || 0;
-    const count = Math.min(available, Math.floor(remaining / value));
-    if (count <= 0) continue;
-    nextBalances.set(unit.id, available - count);
-    remaining -= count * value;
-  }
-
-  for (const { unit, value } of higherUnits) {
-    while (remaining > 0 && (nextBalances.get(unit.id) || 0) > 0) {
-      nextBalances.set(unit.id, (nextBalances.get(unit.id) || 0) - 1);
-      if (value >= remaining) {
-        const overpay = value - remaining;
-        remaining = 0;
-        if (overpay > 0) distributeChange(nextBalances, overpay, changeUnits);
-        break;
-      }
-      remaining -= value;
-    }
-    if (remaining <= 0) break;
-  }
+  let remaining = spendLowerUnits(nextBalances, requiredBase, spendableLowerUnits);
+  remaining = breakHigherUnits(nextBalances, remaining, higherUnits, spendableLowerUnits);
 
   if (remaining > 0) {
     return {
@@ -325,15 +368,7 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
     };
   }
 
-  const updates = {};
-  for (const unit of profile.units) {
-    const meta = profile.metadata.get(unit.id);
-    if (meta?.baseUnitId !== requiredMeta.baseUnitId) continue;
-    const nextAmount = nextBalances.get(unit.id) || 0;
-    if (nextAmount !== balanceResult.balances.get(unit.id)) {
-      updates[unit.actorPath] = nextAmount;
-    }
-  }
+  const updates = buildSpendUpdates(profile, requiredMeta, nextBalances, balanceResult.balances);
   return {
     valid: true,
     updates,
