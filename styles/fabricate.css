@@ -1330,8 +1330,42 @@
   align-items: end;
 }
 
+/* Warning callout shown in place of the add-sub-unit control when no unit is eligible. */
+.fabricate-manager .manager-currency-subunit-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-warning-border);
+  border-left: 3px solid var(--fab-warning);
+  border-radius: 6px;
+  background: var(--fab-warning-soft);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-currency-subunit-warning i {
+  margin-top: var(--fab-space-2xs);
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-currency-subunit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-subunit-heading {
+  margin: 0;
+}
+
 .fabricate-manager .manager-availability-pill.is-currency {
+  min-height: 34px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
+  border-radius: 5px;
   background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-mv2-surface-2));
 }
 
@@ -1342,7 +1376,7 @@
 .fabricate-manager .manager-availability-pill-amount {
   width: 56px;
   min-width: 0;
-  height: 22px;
+  height: 25px;
   padding: 0 var(--fab-space-2xs);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 4px;
@@ -4046,6 +4080,11 @@
 
 .fabricate-manager .manager-currency-edit-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fabricate-manager .manager-currency-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
 }
 
 .fabricate-manager .manager-field input,

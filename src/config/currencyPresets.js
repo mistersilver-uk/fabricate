@@ -26,12 +26,17 @@ function freezePresetUnits(units) {
 // therefore share the same labels/abbreviations/ladder and differ only by how a coin is located,
 // so a single builder fills in either an `actorPath` (dnd5e) or a `denomination` (pf2e).
 function buildCoinLadderPreset(strategy) {
+  // Each coin breaks down into its PARENT denomination by the ratio to that parent, forming the
+  // natural denomination DAG rather than flattening every coin to copper. The recursive resolver
+  // multiplies these ratios back to the same base values (cp=1, sp=10, ep=50, gp=100, pp=1000),
+  // so affordability and change-making are unaffected while the tree stays meaningful. Electrum is
+  // dnd5e-only and is a leaf branch off silver; pf2e has no electrum at all.
   const coins = [
-    { id: 'cp', label: 'Copper', cpValue: 0 },
-    { id: 'sp', label: 'Silver', cpValue: 10 },
-    { id: 'ep', label: 'Electrum', cpValue: 50, dnd5eOnly: true },
-    { id: 'gp', label: 'Gold', cpValue: 100 },
-    { id: 'pp', label: 'Platinum', cpValue: 1000 },
+    { id: 'cp', label: 'Copper', contains: [] },
+    { id: 'sp', label: 'Silver', contains: [{ unitId: 'cp', amount: 10 }] },
+    { id: 'ep', label: 'Electrum', contains: [{ unitId: 'sp', amount: 5 }], dnd5eOnly: true },
+    { id: 'gp', label: 'Gold', contains: [{ unitId: 'sp', amount: 10 }] },
+    { id: 'pp', label: 'Platinum', contains: [{ unitId: 'gp', amount: 10 }] },
   ];
   return freezePresetUnits(
     coins
@@ -42,7 +47,7 @@ function buildCoinLadderPreset(strategy) {
           label: coin.label,
           abbreviation: coin.id,
           icon: 'fa-solid fa-coins',
-          contains: coin.cpValue > 0 ? [{ unitId: 'cp', amount: coin.cpValue }] : [],
+          contains: coin.contains.map((entry) => ({ unitId: entry.unitId, amount: entry.amount })),
         };
         if (strategy === 'actorPath') unit.actorPath = `system.currency.${coin.id}`;
         else unit.denomination = coin.id;

@@ -630,6 +630,41 @@ test('seedCurrencyPresets preserves the pf2e denomination field', () => {
   assert.equal(second.added.length, 0);
 });
 
+function containsAmount(unit, unitId) {
+  return (unit.contains || []).find((entry) => entry.unitId === unitId)?.amount;
+}
+
+test('dnd5e presets break down hierarchically into the parent denomination', () => {
+  const byId = Object.fromEntries(DND5E_CURRENCY_PRESETS.map((unit) => [unit.id, unit]));
+  assert.deepEqual([...byId.cp.contains], []);
+  assert.equal(containsAmount(byId.sp, 'cp'), 10);
+  assert.equal(containsAmount(byId.ep, 'sp'), 5);
+  assert.equal(containsAmount(byId.gp, 'sp'), 10);
+  assert.equal(containsAmount(byId.pp, 'gp'), 10);
+  // No coin flattens straight to copper except silver itself.
+  assert.equal(containsAmount(byId.gp, 'cp'), undefined);
+  assert.equal(containsAmount(byId.pp, 'cp'), undefined);
+});
+
+test('pf2e presets break down hierarchically with no electrum', () => {
+  const byId = Object.fromEntries(PF2E_CURRENCY_PRESETS.map((unit) => [unit.id, unit]));
+  assert.equal(byId.ep, undefined);
+  assert.deepEqual([...byId.cp.contains], []);
+  assert.equal(containsAmount(byId.sp, 'cp'), 10);
+  assert.equal(containsAmount(byId.gp, 'sp'), 10);
+  assert.equal(containsAmount(byId.pp, 'gp'), 10);
+});
+
+test('hierarchical presets resolve to the same base values as the flat ladder', () => {
+  const profile = validateCurrencyProfile(DND5E_CURRENCY_PRESETS);
+  assert.equal(profile.valid, true);
+  assert.equal(profile.metadata.get('cp').baseValue, 1);
+  assert.equal(profile.metadata.get('sp').baseValue, 10);
+  assert.equal(profile.metadata.get('ep').baseValue, 50);
+  assert.equal(profile.metadata.get('gp').baseValue, 100);
+  assert.equal(profile.metadata.get('pp').baseValue, 1000);
+});
+
 test('buildCurrencySpendUpdates stays exact when paying with mixed denominations', () => {
   // gp x2 requirement (200 cp), actor has gp:1, sp:9, cp:10 -> exactly 200 cp.
   setupGlobals({});
