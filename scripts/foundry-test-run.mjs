@@ -249,6 +249,20 @@ async function acceptLicenseIfPresent(page, results) {
     'input[name="agree"], input[id*="agree" i], input[type="checkbox"]'
   );
   if (await checkboxCandidates.count() === 0) {
+    // No EULA checkbox usually means Foundry booted unlicensed and is showing the
+    // License Key Activation page (a license-key text field + Submit Key button)
+    // rather than the EULA. That is an activation/credentials problem, not an EULA
+    // one — surface it clearly. Fix: ensure FOUNDRY_LICENSE_KEY is set and forwarded
+    // to the container (docker-compose.foundry.yml) so felddy activates at boot.
+    const keyActivation = await page
+      .locator('input[name="licenseKey"], input[id*="license" i], button:has-text("Submit Key")')
+      .count();
+    if (keyActivation > 0) {
+      throw new Error(
+        'Foundry booted unlicensed (License Key Activation page shown, not the EULA). ' +
+          'Ensure FOUNDRY_LICENSE_KEY is configured and forwarded to the container.'
+      );
+    }
     throw new Error('License page detected, but agreement checkbox was not found.');
   }
 
