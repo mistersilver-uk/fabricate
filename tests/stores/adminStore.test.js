@@ -181,6 +181,32 @@ const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore
 const { DEFAULT_ESSENCE_ICON } = await import('../../src/ui/svelte/util/essenceIcons.js');
 const { PF2E_CURRENCY_PRESETS } = await import('../../src/config/currencyPresets.js');
 
+/**
+ * Spin up an adminStore whose `updateSystem` calls are captured, select `sys1`,
+ * and expose readers for the captured payload. The currency setter/seed tests
+ * all share this exact setup (capture `updateSystem` → drive setters → read back
+ * `requirements.currency`), so it lives here instead of being inlined per test.
+ *
+ * @param {object} [overrides] forwarded to `createMockServices`
+ * @returns {Promise<{ store: object, currency: () => object, updateArgs: () => object|null }>}
+ */
+async function setupCurrencyStore(overrides = {}) {
+  let updateArgs = null;
+  const services = createMockServices(overrides);
+  const origManager = services.getCraftingSystemManager();
+  services.getCraftingSystemManager = () => ({
+    ...origManager,
+    updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+  });
+  const store = createAdminStore(services);
+  await store.selectSystem('sys1');
+  return {
+    store,
+    currency: () => updateArgs.updates.requirements.currency,
+    updateArgs: () => updateArgs
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -1753,15 +1779,7 @@ describe('createAdminStore', () => {
     });
 
     it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency, updateArgs } = await setupCurrencyStore();
       const created = await store.addCurrencyUnit('sys1', {
         id: 'gp',
         label: 'Gold',
@@ -1771,259 +1789,153 @@ describe('createAdminStore', () => {
       });
       assert.equal(created.id, 'gp');
       await store.updateCurrencyUnit('sys1', 'gp', { label: 'Gold pieces', actorPath: 'system.currency.gp.value' });
-      assert.ok(updateArgs !== null);
-      const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.units[0].id, 'gp');
-      assert.equal(currency.units[0].label, 'Gold pieces');
-      assert.equal(currency.units[0].actorPath, 'system.currency.gp.value');
-      assert.equal('provider' in currency, false);
+      assert.ok(updateArgs() !== null);
+      assert.equal(currency().units[0].id, 'gp');
+      assert.equal(currency().units[0].label, 'Gold pieces');
+      assert.equal(currency().units[0].actorPath, 'system.currency.gp.value');
+      assert.equal('provider' in currency(), false);
     });
 
     it('currency sub-unit actions add, update, and remove denomination breakdowns', async () => {
-      let updateArgs = null;
-      const services = createMockServices({
+      const { store, currency, updateArgs } = await setupCurrencyStore({
         randomID: (() => {
           const ids = ['cp', 'sp'];
           let index = 0;
           return () => ids[index++] || `id-${index}`;
         })()
       });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
       await store.addCurrencyUnit('sys1', { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp' });
       await store.addCurrencyUnit('sys1', { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp' });
       await store.addCurrencySubUnit('sys1', 'sp', 'cp');
       await store.updateCurrencySubUnit('sys1', 'sp', 'cp', 10);
-      assert.ok(updateArgs !== null);
-      let silver = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'sp');
+      assert.ok(updateArgs() !== null);
+      let silver = currency().units.find(unit => unit.id === 'sp');
       assert.deepEqual(silver.contains, [{ unitId: 'cp', amount: 10 }]);
 
       await store.deleteCurrencySubUnit('sys1', 'sp', 'cp');
-      silver = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'sp');
+      silver = currency().units.find(unit => unit.id === 'sp');
       assert.deepEqual(silver.contains, []);
     });
 
     it('seedCurrencyUnitPresets adds dnd5e units idempotently', async () => {
-      let updateArgs = null;
-      const services = createMockServices({
-        getFoundrySystemId: () => 'dnd5e'
-      });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
       const first = await store.seedCurrencyUnitPresets('sys1');
       const second = await store.seedCurrencyUnitPresets('sys1');
       assert.equal(first.unsupported, false);
       assert.equal(first.added.length, 5);
       assert.equal(second.added.length, 0);
       assert.equal(second.skipped.length, 5);
-      assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'), true);
+      assert.equal(currency().units.some(unit => unit.id === 'gp'), true);
     });
 
     it('seedCurrencyUnitPresets sets actorInventory spend strategy for pf2e worlds', async () => {
-      let updateArgs = null;
-      const services = createMockServices({
-        getFoundrySystemId: () => 'pf2e'
-      });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       const result = await store.seedCurrencyUnitPresets('sys1');
       assert.equal(result.unsupported, false);
-      assert.equal(updateArgs.updates.requirements.currency.spendStrategy, 'actorInventory');
-      const gp = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'gp');
+      assert.equal(currency().spendStrategy, 'actorInventory');
+      const gp = currency().units.find(unit => unit.id === 'gp');
       assert.equal(gp.denomination, 'gp');
     });
 
     it('seedCurrencyUnitPresets seeds the provider inventory mode for pf2e worlds', async () => {
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.seedCurrencyUnitPresets('sys1');
-      const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.inventoryMode, 'provider');
-      assert.equal(currency.providerId, 'pf2e-inventory');
+      assert.equal(currency().inventoryMode, 'provider');
+      assert.equal(currency().providerId, 'pf2e-inventory');
       // Provider mode is provider-owned, so the seeded units are the provider canonical ladder.
-      assert.deepEqual(currency.units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
-      assert.deepEqual(currency.units.map(unit => unit.denomination), PF2E_CURRENCY_PRESETS.map(unit => unit.denomination));
+      assert.deepEqual(currency().units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
+      assert.deepEqual(currency().units.map(unit => unit.denomination), PF2E_CURRENCY_PRESETS.map(unit => unit.denomination));
     });
 
     it('setCurrencySpendStrategy persists and defaults providerId for pf2e actorInventory', async () => {
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.spendStrategy, 'actorInventory');
-      assert.equal(currency.providerId, 'pf2e-inventory');
+      assert.equal(currency().spendStrategy, 'actorInventory');
+      assert.equal(currency().providerId, 'pf2e-inventory');
     });
 
     it('setCurrencyInventoryMode and setCurrencyProvider persist their values', async () => {
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.setCurrencyInventoryMode('sys1', 'macro');
-      assert.equal(updateArgs.updates.requirements.currency.inventoryMode, 'macro');
+      assert.equal(currency().inventoryMode, 'macro');
       await store.setCurrencyProvider('sys1', 'pf2e-inventory');
-      assert.equal(updateArgs.updates.requirements.currency.providerId, 'pf2e-inventory');
+      assert.equal(currency().providerId, 'pf2e-inventory');
     });
 
     it('setCurrencyInventoryMode("provider") syncs units to the provider canonical ladder', async () => {
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       // Seed a user-managed unit first, then flipping to provider mode overwrites it.
       await store.addCurrencyUnit('sys1', { id: 'junk', label: 'Junk', actorPath: 'system.currency.junk' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
       await store.setCurrencyInventoryMode('sys1', 'provider');
-      const units = updateArgs.updates.requirements.currency.units;
+      const units = currency().units;
       assert.deepEqual(units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
       assert.deepEqual(units.map(unit => unit.denomination), PF2E_CURRENCY_PRESETS.map(unit => unit.denomination));
       assert.equal(units.some(unit => unit.id === 'junk'), false, 'user-managed unit should be overwritten by canonical ladder');
     });
 
     it('setCurrencyProvider syncs canonical units while in provider mode', async () => {
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
       await store.setCurrencyInventoryMode('sys1', 'provider');
       await store.setCurrencyProvider('sys1', 'pf2e-inventory');
-      const units = updateArgs.updates.requirements.currency.units;
-      assert.deepEqual(units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
+      assert.deepEqual(currency().units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
     });
 
     it('switching to actorProperty or macro leaves user-managed units untouched', async () => {
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.addCurrencyUnit('sys1', { id: 'mine', label: 'Mine', actorPath: 'system.currency.mine' });
       // macro mode keeps the user's units.
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
       await store.setCurrencyInventoryMode('sys1', 'macro');
-      assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'mine'), true);
+      assert.equal(currency().units.some(unit => unit.id === 'mine'), true);
       // actorProperty mode keeps the user's units too.
       await store.setCurrencySpendStrategy('sys1', 'actorProperty');
-      assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'mine'), true);
+      assert.equal(currency().units.some(unit => unit.id === 'mine'), true);
       // setCurrencyProvider outside provider mode does not touch the user's units.
       await store.setCurrencyProvider('sys1', 'pf2e-inventory');
-      assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'mine'), true);
+      assert.equal(currency().units.some(unit => unit.id === 'mine'), true);
     });
 
     it('provider mode in a no-provider system (dnd5e) leaves configured units untouched', async () => {
       // Regression: dnd5e has no registered provider, so getDefaultProviderId('dnd5e') === '' and
       // getProviderCanonicalUnits('') is empty. Entering provider mode must NOT wipe the GM's units.
-      let updateArgs = null;
-      const services = createMockServices({ getFoundrySystemId: () => 'dnd5e' });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
       await store.addCurrencyUnit('sys1', { id: 'gp', label: 'Gold', actorPath: 'system.currency.gp' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
       await store.setCurrencyInventoryMode('sys1', 'provider');
       assert.equal(
-        updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'),
+        currency().units.some(unit => unit.id === 'gp'),
         true,
         'no-provider system must not have its configured units wiped by provider mode'
       );
       // setCurrencyProvider with an empty/unknown provider id also preserves the units.
       await store.setCurrencyProvider('sys1', '');
       assert.equal(
-        updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'),
+        currency().units.some(unit => unit.id === 'gp'),
         true,
         'selecting an empty provider id must not wipe configured units'
       );
     });
 
     it('setCurrencyMacro and clearCurrencyMacro persist per-key macro UUIDs', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore();
       await store.setCurrencyMacro('sys1', 'canAfford', 'Macro.can');
-      assert.equal(updateArgs.updates.requirements.currency.macros.canAfford, 'Macro.can');
+      assert.equal(currency().macros.canAfford, 'Macro.can');
       await store.setCurrencyMacro('sys1', 'decrement', 'Macro.dec');
-      assert.equal(updateArgs.updates.requirements.currency.macros.decrement, 'Macro.dec');
+      assert.equal(currency().macros.decrement, 'Macro.dec');
       await store.clearCurrencyMacro('sys1', 'canAfford');
-      assert.equal(updateArgs.updates.requirements.currency.macros.canAfford, '');
-      assert.equal(updateArgs.updates.requirements.currency.macros.decrement, 'Macro.dec');
+      assert.equal(currency().macros.canAfford, '');
+      assert.equal(currency().macros.decrement, 'Macro.dec');
     });
 
     it('seedCurrencyUnitPresets does not overwrite a user-edited seeded unit', async () => {
-      let updateArgs = null;
-      const services = createMockServices({
-        getFoundrySystemId: () => 'dnd5e'
-      });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
       await store.seedCurrencyUnitPresets('sys1');
       await store.updateCurrencyUnit('sys1', 'gp', { label: 'Custom Gold', actorPath: 'system.currency.gp.value' });
       const second = await store.seedCurrencyUnitPresets('sys1');
       assert.equal(second.added.length, 0);
-      const units = updateArgs.updates.requirements.currency.units;
+      const units = currency().units;
       const gold = units.find(unit => unit.id === 'gp');
       assert.equal(gold.label, 'Custom Gold');
       assert.equal(gold.actorPath, 'system.currency.gp.value');
@@ -2032,20 +1944,12 @@ describe('createAdminStore', () => {
     });
 
     it('deleteCurrencyUnit removes the unit and strips it from other units\' sub-units', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
+      const { store, currency } = await setupCurrencyStore();
       await store.addCurrencyUnit('sys1', { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp' });
       await store.addCurrencyUnit('sys1', { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp' });
       await store.addCurrencySubUnit('sys1', 'sp', 'cp', 10);
       await store.deleteCurrencyUnit('sys1', 'cp');
-      const units = updateArgs.updates.requirements.currency.units;
+      const units = currency().units;
       assert.equal(units.some(unit => unit.id === 'cp'), false);
       const silver = units.find(unit => unit.id === 'sp');
       assert.deepEqual(silver.contains, []);

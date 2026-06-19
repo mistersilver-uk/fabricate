@@ -5481,14 +5481,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
   });
 
-  it('renders the currency spend-strategy control and routes its change to the store', async () => {
+  // Mount the manager, open the Alchemy system editor, and settle the DOM. The currency editor
+  // tests below all repeat this exact mount + "Edit Alchemy" + flush dance and differ only in the
+  // `createStore` options, so it lives here instead of being inlined per test. Assigns the shared
+  // `mounted`/`target` so the suite's `afterEach` tears them down. Returns the captured `calls`.
+  async function mountCurrencyEditor(storeOptions) {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', inventoryMode: 'provider', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } }),
+        store: createStore(calls, storeOptions),
         services: { openCurrentAdmin: () => {} }
       }
     });
@@ -5498,6 +5502,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await Promise.resolve();
     await tick();
     flushSync();
+    return { calls };
+  }
+
+  it('renders the currency spend-strategy control and routes its change to the store', async () => {
+    const { calls } = await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', inventoryMode: 'provider', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
     const strategy = target.querySelector('[data-system-currency-strategy-select]');
     assert.ok(strategy, 'spend-strategy select should render');
@@ -5509,22 +5518,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('mounts the macro inventory mode with three macro drop zones', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, { selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-    target.querySelector('[aria-label="Edit Alchemy"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
+    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
     const macroRow = target.querySelector('[data-system-currency-macros]');
     assert.ok(macroRow, 'macro zones container should render');
@@ -5545,22 +5539,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('gives each empty macro drop zone a field-specific accessible name', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, { selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-    target.querySelector('[aria-label="Edit Alchemy"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
+    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
     const dropzones = [...target.querySelectorAll('[data-system-currency-macro-dropzone]')];
     assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
@@ -5571,35 +5550,20 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('steers a no-provider system to the macro inventory branch even when config carries provider mode', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        // dnd5e has no registered provider; legacy config still says inventoryMode === 'provider'.
-        store: createStore(calls, {
-          foundrySystemId: 'dnd5e',
-          selectedCurrency: {
-            enabled: true,
-            spendStrategy: 'actorInventory',
-            inventoryMode: 'provider',
-            providerId: '',
-            macros: { canAfford: '', increment: '', decrement: '' },
-            units: [
-              { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [] }
-            ]
-          }
-        }),
-        services: { openCurrentAdmin: () => {} }
+    // dnd5e has no registered provider; legacy config still says inventoryMode === 'provider'.
+    await mountCurrencyEditor({
+      foundrySystemId: 'dnd5e',
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        inventoryMode: 'provider',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [] }
+        ]
       }
     });
-    flushSync();
-    target.querySelector('[aria-label="Edit Alchemy"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
 
     // No provider select is offered; the macro branch renders instead.
     assert.equal(
@@ -5630,34 +5594,19 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('removes the sub-unit section in macro inventory mode and shows the conversion hint', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, {
-          selectedCurrency: {
-            enabled: true,
-            spendStrategy: 'actorInventory',
-            inventoryMode: 'macro',
-            providerId: '',
-            macros: { canAfford: '', increment: '', decrement: '' },
-            units: [
-              { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [{ unitId: 'sp', amount: 10 }] },
-              { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
-            ]
-          }
-        }),
-        services: { openCurrentAdmin: () => {} }
+    await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        inventoryMode: 'macro',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [{ unitId: 'sp', amount: 10 }] },
+          { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
+        ]
       }
     });
-    flushSync();
-    target.querySelector('[aria-label="Edit Alchemy"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
 
     // Expand the gp unit's editor.
     const card = target.querySelector('.manager-currency-unit-card');
@@ -5674,35 +5623,20 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders provider inventory mode units as a read-only provider-managed list', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, {
-          foundrySystemId: 'pf2e',
-          selectedCurrency: {
-            enabled: true,
-            spendStrategy: 'actorInventory',
-            inventoryMode: 'provider',
-            providerId: 'pf2e-inventory',
-            macros: { canAfford: '', increment: '', decrement: '' },
-            units: [
-              { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [{ unitId: 'sp', amount: 10 }] },
-              { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', denomination: 'sp', contains: [] }
-            ]
-          }
-        }),
-        services: { openCurrentAdmin: () => {} }
+    await mountCurrencyEditor({
+      foundrySystemId: 'pf2e',
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        inventoryMode: 'provider',
+        providerId: 'pf2e-inventory',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [{ unitId: 'sp', amount: 10 }] },
+          { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', denomination: 'sp', contains: [] }
+        ]
       }
     });
-    flushSync();
-    target.querySelector('[aria-label="Edit Alchemy"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
 
     // The provider-managed callout renders and the Add/Seed header actions are hidden.
     assert.ok(target.querySelector('[data-system-currency-provider-managed]'), 'provider-managed callout should render');

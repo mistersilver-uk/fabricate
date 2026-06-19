@@ -21,6 +21,22 @@ function freezePresetUnits(units) {
   );
 }
 
+// Single constructor for a currency-unit object so the preset-ladder builder and the seed-cloner
+// emit the same shape (id/label/abbreviation/icon/contains, plus an optional actorPath and an
+// optional denomination) instead of repeating the literal at both call sites.
+function makeCurrencyUnit({ id, label, abbreviation, icon, contains, actorPath, denomination }) {
+  const unit = {
+    id,
+    label,
+    abbreviation,
+    icon: icon || 'fa-solid fa-coins',
+    contains: (contains || []).map((entry) => ({ unitId: entry.unitId, amount: entry.amount })),
+  };
+  if (actorPath !== undefined) unit.actorPath = actorPath;
+  if (denomination) unit.denomination = denomination;
+  return unit;
+}
+
 // dnd5e reads/spends coins from a flat `system.currency.<denom>` actor property; pf2e maps the
 // same denomination ladder onto inventory treasure read via `actor.inventory`. The two presets
 // therefore share the same labels/abbreviations/ladder and differ only by how a coin is located,
@@ -41,18 +57,16 @@ function buildCoinLadderPreset(strategy) {
   return freezePresetUnits(
     coins
       .filter((coin) => strategy === 'actorPath' || !coin.dnd5eOnly)
-      .map((coin) => {
-        const unit = {
+      .map((coin) =>
+        makeCurrencyUnit({
           id: coin.id,
           label: coin.label,
           abbreviation: coin.id,
-          icon: 'fa-solid fa-coins',
-          contains: coin.contains.map((entry) => ({ unitId: entry.unitId, amount: entry.amount })),
-        };
-        if (strategy === 'actorPath') unit.actorPath = `system.currency.${coin.id}`;
-        else unit.denomination = coin.id;
-        return unit;
-      })
+          contains: coin.contains,
+          actorPath: strategy === 'actorPath' ? `system.currency.${coin.id}` : undefined,
+          denomination: strategy === 'actorPath' ? undefined : coin.id,
+        })
+      )
   );
 }
 
@@ -97,21 +111,20 @@ export function seedCurrencyPresets({ presets = [], currentUnits = [] } = {}) {
       skipped.push(preset);
       continue;
     }
-    const cloned = {
+    const cloned = makeCurrencyUnit({
       id,
       label: String(preset.label || id),
       abbreviation: String(preset.abbreviation || id),
       icon: String(preset.icon || 'fa-solid fa-coins'),
       actorPath: String(preset.actorPath || ''),
+      denomination: String(preset.denomination || '').trim(),
       contains: Array.isArray(preset.contains)
         ? preset.contains.map((entry) => ({
             unitId: String(entry.unitId || ''),
             amount: Math.max(1, Math.trunc(Number(entry.amount) || 1)),
           }))
         : [],
-    };
-    const denomination = String(preset.denomination || '').trim();
-    if (denomination) cloned.denomination = denomination;
+    });
     seen.set(id, cloned);
     added.push(cloned);
   }
