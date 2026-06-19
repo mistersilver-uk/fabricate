@@ -242,9 +242,6 @@ describe('UI PR screenshot evidence', () => {
     for (const match of harness.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
-    for (const match of harness.matchAll(/screenshotElement\(\s*page\s*,\s*\w+\s*,\s*'([^']+)'/g)) {
-      emitted.add(match[1]);
-    }
     for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
       emitted.add(match[1]);
     }

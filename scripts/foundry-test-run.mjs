@@ -149,23 +149,6 @@ async function screenshot(page, label) {
 }
 
 /**
- * Capture a single element (its full bounding box, scrolled into view) using the
- * same `screenshot-NN-<label>.png` numbering as `screenshot()`. Useful for tall
- * cards that sit below the fold, where a viewport screenshot would crop them.
- * @param {import('playwright').Page} page
- * @param {import('playwright').Locator} locator
- * @param {string} label
- */
-async function screenshotElement(page, locator, label) {
-  if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
-  screenshotCounter++;
-  const num = String(screenshotCounter).padStart(2, '0');
-  const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
-  await locator.scrollIntoViewIfNeeded();
-  await locator.screenshot({ path });
-}
-
-/**
  * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
  * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
  * document element and every `.fabricate` root. This re-themes the real app via
@@ -2667,21 +2650,27 @@ async function main() {
           });
         }
         await currencyCard.locator('[data-system-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshotElement(page, currencyCard, 'currency-actor-property');
+        // Scroll the Currency Units card to the top of the manager's scroll area, then capture
+        // the WHOLE normal-sized GM window (nav rail, header, context panel + the card) so the
+        // feature is shown in context rather than as a cropped element.
+        const showCurrencyCard = async () => {
+          await currencyCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+          await page.waitForTimeout(250);
+          await assertNoScreenshotOverlays(page);
+        };
+        await showCurrencyCard();
+        await screenshot(page, 'currency-actor-property');
 
         const currencyStrategy = page.locator('.fabricate-manager [data-system-currency-strategy-select]').first();
         await currencyStrategy.selectOption('macro');
         await page.locator('.fabricate-manager [data-system-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.waitForTimeout(300);
-        await assertNoScreenshotOverlays(page);
-        await screenshotElement(page, currencyCard, 'currency-macro');
+        await showCurrencyCard();
+        await screenshot(page, 'currency-macro');
 
         await currencyStrategy.selectOption('actorInventory');
         await page.locator('.fabricate-manager [data-system-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.waitForTimeout(300);
-        await assertNoScreenshotOverlays(page);
-        await screenshotElement(page, currencyCard, 'currency-actor-inventory');
+        await showCurrencyCard();
+        await screenshot(page, 'currency-actor-inventory');
 
         // Leave the persisted smoke system on the default strategy.
         await currencyStrategy.selectOption('actorProperty');
