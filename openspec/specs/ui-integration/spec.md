@@ -157,6 +157,7 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 - Effect transfer toggle (`features.effectTransfer`)
 - Time requirements toggle (`requirements.time.enabled`)
 - Currency requirements toggle (`requirements.currency.enabled`)
+- Currency unit profile editor (`requirements.currency.units[]`)
 - Multi-step recipes toggle (`features.multiStepRecipes`)
 - Gathering toggle (`features.gathering`)
 
@@ -175,9 +176,14 @@ Mode semantics are defined in `004`.
 #### Requirements Controls
 
 - Time toggle
-- Currency toggle
-- Currency provider (`system` or `macro`)
-- Provider-specific fields
+- Currency toggle in the Optional features section, bound to `requirements.currency.enabled`. It renders always (independent of which optional feature flags exist on the system), so the section is never empty.
+- Currency units card under character modifiers, rendered only when `requirements.currency.enabled === true`. When currency is disabled the entire currency-units configuration block (spend strategy, provider, macros, and units) is hidden.
+- A config-level block above the unit list with a spend-strategy `<select>` offering the three peer strategies (`actorProperty` / `actorInventory` / `macro`; both dnd5e and pf2e), each with `<small>` hint text reflecting the selected strategy. When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the system has none). When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is reserved for a future refund flow. There is no nested inventory-mode `<select>` — macro is its own peer strategy.
+- Add currency unit and seed preset actions
+- Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)
+- Under `actorInventory` (with a provider) the GM-editable unit editors are replaced by a separate read-only, provider-managed denomination list (a "provider-managed denominations" callout plus per-unit label/abbreviation/coin-denomination shown as static values); the selected provider owns the denomination ladder, so the units are not GM-editable. The add-currency-unit, seed-preset, add-sub-unit, and sub-unit controls below are hidden while the provider branch is active.
+- Add-sub-unit dropdown with plus action
+- Sub-unit pills with editable amount and remove action
 
 If `features.gathering === false`:
 

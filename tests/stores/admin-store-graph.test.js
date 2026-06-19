@@ -22,7 +22,7 @@ function makeSystem(overrides = {}) {
     itemTags: [],
     essenceDefinitions: [],
     items: overrides.items || [],
-    requirements: { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
+    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
     craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
     recipeVisibility: { listMode: 'global' },
     ...overrides

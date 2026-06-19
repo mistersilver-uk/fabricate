@@ -2627,6 +2627,55 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-narrow');
 
+        // --- Currency configuration (#393) ---
+        // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)
+        // unit ladder, then capture each spend strategy. The smoke world is dnd5e, so the
+        // actorInventory branch shows the no-provider callout (the pf2e provider grid needs
+        // a pf2e world, which the e2e fixtures do not ship).
+        await setManagerWindowSize(page, { width: 1280, height: 900 });
+        const currencyToggle = page.locator('.fabricate-manager [data-system-currency-toggle]').first();
+        await currencyToggle.waitFor({ state: 'visible', timeout: 5_000 });
+        await currencyToggle.scrollIntoViewIfNeeded();
+        if (await page.locator('.fabricate-manager [data-system-currency-units]').count() === 0) {
+          await currencyToggle.click();
+        }
+        const currencyCard = page.locator('.fabricate-manager [data-system-currency-units]').first();
+        await currencyCard.waitFor({ state: 'visible', timeout: 5_000 });
+        const currencySeed = currencyCard.locator('button:has-text("Seed presets")').first();
+        if (await currencySeed.count() > 0) {
+          await currencySeed.click();
+          await page.waitForTimeout(600);
+          await page.evaluate(async () => {
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          });
+        }
+        await currencyCard.locator('[data-system-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        // Scroll the Currency Units card to the top of the manager's scroll area, then capture
+        // the WHOLE normal-sized GM window (nav rail, header, context panel + the card) so the
+        // feature is shown in context rather than as a cropped element.
+        const showCurrencyCard = async () => {
+          await currencyCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+          await page.waitForTimeout(250);
+          await assertNoScreenshotOverlays(page);
+        };
+        await showCurrencyCard();
+        await screenshot(page, 'currency-actor-property');
+
+        const currencyStrategy = page.locator('.fabricate-manager [data-system-currency-strategy-select]').first();
+        await currencyStrategy.selectOption('macro');
+        await page.locator('.fabricate-manager [data-system-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await showCurrencyCard();
+        await screenshot(page, 'currency-macro');
+
+        await currencyStrategy.selectOption('actorInventory');
+        await page.locator('.fabricate-manager [data-system-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await showCurrencyCard();
+        await screenshot(page, 'currency-actor-inventory');
+
+        // Leave the persisted smoke system on the default strategy.
+        await currencyStrategy.selectOption('actorProperty');
+        await page.waitForTimeout(300);
+
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const recipeApiCount = await page.evaluate((sysId) => {
           const rm = game.fabricate?.getRecipeManager?.();

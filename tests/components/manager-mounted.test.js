@@ -114,6 +114,9 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/utils/recipeCategories.js',
     'src/config/flags.js',
+    'src/config/currencyPresets.js',
+    'src/config/currencyProviders.js',
+    'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js'
   ]) {
     const rawDestination = join(tempRoot, rawPath);
@@ -164,6 +167,18 @@ function writeCompiledSvelte(sourcePath) {
 function applyRecipeKnowledgeMode(system, mode) {
   if (!system || !mode) return system;
   return { ...system, recipeVisibility: { knowledge: { mode } } };
+}
+
+// Merge a selected currency config onto the alchemy fixture so applySelectedSystem
+// (which re-reads systemDetails) preserves the currency config across an Edit click.
+// Mutates the passed systemDetails map. Kept out of createStore to hold that helper
+// under the cognitive-complexity budget.
+function applySelectedCurrency(systemDetails, selectedCurrency) {
+  if (!selectedCurrency) return;
+  systemDetails.alchemy = {
+    ...systemDetails.alchemy,
+    requirements: { ...systemDetails.alchemy.requirements, currency: selectedCurrency }
+  };
 }
 
 function createStore(calls = [], options = {}) {
@@ -420,6 +435,7 @@ function createStore(calls = [], options = {}) {
       }]
     }
   ];
+  applySelectedCurrency(systemDetails, options.selectedCurrency);
   const baseSelectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
   const selectedSystem = applyRecipeKnowledgeMode(baseSelectedSystem, options.recipeKnowledgeMode);
   const essenceCardsBySystem = {
@@ -677,7 +693,8 @@ function createStore(calls = [], options = {}) {
           tools: options.gatheringLibraryTools || []
         }
       }
-    }
+    },
+    foundrySystemId: options.foundrySystemId || ''
   });
 
   function applySelectedSystem(id) {
@@ -744,6 +761,13 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleFeature', feature, enabled]);
       return options.toggleFeatureResult ?? true;
     },
+    toggleRequirement: (requirement, enabled) => {
+      calls.push(['toggleRequirement', requirement, enabled]);
+    },
+    setCurrencySpendStrategy: async (id, strategy) => { calls.push(['setCurrencySpendStrategy', strategy, id]); },
+    setCurrencyProvider: async (id, providerId) => { calls.push(['setCurrencyProvider', providerId, id]); },
+    setCurrencyMacro: async (id, key, uuid) => { calls.push(['setCurrencyMacro', key, uuid, id]); },
+    clearCurrencyMacro: async (id, key) => { calls.push(['clearCurrencyMacro', key, id]); },
     createRecipe: () => {
       calls.push(['createRecipe']);
       return options.createRecipeResult ?? { id: 'r-created' };
@@ -972,6 +996,30 @@ function createStore(calls = [], options = {}) {
       return true;
     }
   };
+}
+
+// Mount the manager, open the Alchemy system editor, and settle the DOM. The currency editor
+// tests below all repeat this exact mount + "Edit Alchemy" + flush dance and differ only in the
+// `createStore` options, so it lives here instead of being inlined per test. Assigns the shared
+// `mounted`/`target` so the suite's `afterEach` tears them down. Returns the captured `calls`.
+async function mountCurrencyEditor(storeOptions) {
+  const calls = [];
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(Component, {
+    target,
+    props: {
+      store: createStore(calls, storeOptions),
+      services: { openCurrentAdmin: () => {} }
+    }
+  });
+  flushSync();
+  target.querySelector('[aria-label="Edit Alchemy"]').click();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+  flushSync();
+  return { calls };
 }
 
 describe('CraftingSystemManager mounted behavior', () => {
@@ -5462,6 +5510,267 @@ describe('CraftingSystemManager mounted behavior', () => {
       && call[2] === 'Updated potion work'));
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'mapped'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
+  });
+
+  it('renders the currency spend-strategy control with three options and routes its change', async () => {
+    const { calls } = await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
+
+    const strategy = target.querySelector('[data-system-currency-strategy-select]');
+    assert.ok(strategy, 'spend-strategy select should render');
+    const optionValues = [...strategy.querySelectorAll('option')].map(option => option.value);
+    assert.deepEqual(optionValues, ['actorProperty', 'actorInventory', 'macro'], 'three peer spend strategies should be offered');
+    // The single shared strategy hint reflects the selected strategy.
+    assert.ok(target.querySelector('[data-system-currency-strategy-hint]'), 'a strategy hint should render');
+    strategy.value = 'macro';
+    strategy.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'setCurrencySpendStrategy' && call[1] === 'macro'));
+  });
+
+  it('mounts the macro strategy with three macro drop zones and no inventory-mode select', async () => {
+    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
+
+    const macroRow = target.querySelector('[data-system-currency-macros]');
+    assert.ok(macroRow, 'macro zones container should render');
+    // The three drop zones share one single-row container.
+    assert.ok(
+      macroRow.classList.contains('manager-currency-macro-row'),
+      'the three macro drop zones should share the single-row container'
+    );
+    const dropzones = macroRow.querySelectorAll('[data-system-currency-macro-dropzone]');
+    assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
+    assert.equal(
+      target.querySelectorAll('[data-system-currency-macro-dropzone]').length,
+      3,
+      'all three drop zones live inside the single-row container'
+    );
+    // The removed nested inventory-mode select must not render.
+    assert.equal(target.querySelector('[data-system-currency-inventory-mode-select]'), null);
+  });
+
+  it('gives each empty macro drop zone a field-specific accessible name', async () => {
+    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
+
+    const dropzones = [...target.querySelectorAll('[data-system-currency-macro-dropzone]')];
+    assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
+    const labels = dropzones.map(zone => zone.getAttribute('aria-label'));
+    // Every empty drop zone must expose a non-empty, distinct accessible name (not the shared hint).
+    assert.ok(labels.every(label => label && label.length > 0), 'each drop zone should have an aria-label');
+    assert.equal(new Set(labels).size, 3, 'the three drop-zone aria-labels should be distinct');
+  });
+
+  it('shows a no-provider callout for actorInventory on a no-provider system and keeps units editable', async () => {
+    // dnd5e has no registered provider; selecting actorInventory must surface the steer-to-macro
+    // callout and keep the GM's units editable rather than wiping them.
+    await mountCurrencyEditor({
+      foundrySystemId: 'dnd5e',
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [] }
+        ]
+      }
+    });
+
+    // No provider select is offered; the no-provider callout renders instead.
+    assert.equal(
+      target.querySelector('[data-system-currency-provider-select]'),
+      null,
+      'no provider select should render for a no-provider system'
+    );
+    assert.ok(
+      target.querySelector('[data-system-currency-no-provider]'),
+      'the no-provider callout should appear, steering the GM to the macro strategy'
+    );
+    // The removed inventory-mode select must not render.
+    assert.equal(
+      target.querySelector('[data-system-currency-inventory-mode-select]'),
+      null,
+      'the nested inventory-mode select should be gone'
+    );
+    // Units stay GM-editable (not read-only) on a no-provider system.
+    assert.ok(
+      target.querySelector('.manager-currency-unit-card .manager-character-modifier-card-header-actions'),
+      'Add/Seed header actions should remain available for a no-provider system'
+    );
+  });
+
+  it('removes the sub-unit section under the macro strategy and shows the conversion hint', async () => {
+    await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'macro',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [{ unitId: 'sp', amount: 10 }] },
+          { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
+        ]
+      }
+    });
+
+    // Expand the gp unit's editor.
+    const card = target.querySelector('.manager-currency-unit-card');
+    card.querySelector('[data-system-currency-unit="gp"] [aria-label="Edit currency unit"]').click();
+    await tick();
+    flushSync();
+
+    // No sub-unit section renders (no heading, builder, chips, or warnings) and the macro-conversion
+    // hint is shown instead.
+    assert.equal(card.querySelector('.manager-currency-subunit-section'), null, 'no sub-unit section in macro mode');
+    assert.equal(card.querySelector('.manager-currency-subunit-builder'), null, 'no add-sub-unit builder in macro mode');
+    assert.equal(card.querySelectorAll('[data-system-currency-subunit]').length, 0, 'no sub-unit chips in macro mode');
+    assert.ok(card.querySelector('[data-system-currency-unit-macro-note]'), 'macro-conversion hint should render');
+  });
+
+  // Pins the SystemEditView mirror of canAddCurrencySubUnit (currencyCanAddSubUnit /
+  // currencyReachableUnitIds) that drives the add-sub-unit <select> options. The shared helper in
+  // src/systems/currencyProfile.js is unit-tested, but this UI mirror has no behavioral test, so it
+  // could silently drift. The dropdown only renders for the currently expanded unit, so each case
+  // mounts the editor in actorProperty mode (sub-unit section editable), expands the target unit via
+  // its edit pen, and asserts the actual rendered <option> values (each value is the unit id).
+  async function offeredSubUnitOptionIds(units, expandUnitId) {
+    if (mounted) unmount(mounted);
+    if (target?.parentNode) target.remove();
+    await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units
+      }
+    });
+    const card = target.querySelector('.manager-currency-unit-card');
+    card.querySelector(`[data-system-currency-unit="${expandUnitId}"] [aria-label="Edit currency unit"]`).click();
+    await tick();
+    flushSync();
+    const builder = card.querySelector('.manager-currency-subunit-builder');
+    if (!builder) return [];
+    return [...builder.querySelectorAll('select option')].map(option => option.value);
+  }
+
+  it('drives the add-sub-unit dropdown from disjoint reachable sets for chain, diamond, and cross-parent cases', async () => {
+    // Chain P->A->B->C: editing P must exclude C (deeper descendant), A (already contained), and B
+    // (deeper descendant) — none can be offered as a fresh sub-unit of P.
+    const chainUnits = [
+      { id: 'P', label: 'Platinum', abbreviation: 'P', actorPath: 'system.currency.p', contains: [{ unitId: 'A', amount: 10 }] },
+      { id: 'A', label: 'Gold', abbreviation: 'A', actorPath: 'system.currency.a', contains: [{ unitId: 'B', amount: 10 }] },
+      { id: 'B', label: 'Silver', abbreviation: 'B', actorPath: 'system.currency.b', contains: [{ unitId: 'C', amount: 10 }] },
+      { id: 'C', label: 'Copper', abbreviation: 'C', actorPath: 'system.currency.c', contains: [] }
+    ];
+    const chainOffered = await offeredSubUnitOptionIds(chainUnits, 'P');
+    assert.ok(!chainOffered.includes('C'), 'chain: C (deeper descendant of P) must not be offered when editing P');
+    assert.ok(!chainOffered.includes('A'), 'chain: A (already contained by P) must not be offered when editing P');
+    assert.ok(!chainOffered.includes('B'), 'chain: B (deeper descendant of P) must not be offered when editing P');
+
+    // Diamond: cp; sp->cp; gp->sp; ep->sp. Editing gp (already reaches gp->sp->cp) must exclude ep
+    // (adding ep would create a second gp->sp path) and cp (already reachable).
+    const diamondUnits = [
+      { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp', contains: [] },
+      { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [{ unitId: 'cp', amount: 10 }] },
+      { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [{ unitId: 'sp', amount: 10 }] },
+      { id: 'ep', label: 'Electrum', abbreviation: 'ep', actorPath: 'system.currency.ep', contains: [{ unitId: 'sp', amount: 5 }] }
+    ];
+    const diamondOffered = await offeredSubUnitOptionIds(diamondUnits, 'gp');
+    assert.ok(!diamondOffered.includes('ep'), 'diamond: ep must not be offered when editing gp (would create a second gp->sp path)');
+    assert.ok(!diamondOffered.includes('cp'), 'diamond: cp must not be offered when editing gp (already reachable gp->sp->cp)');
+
+    // Cross-parent (allowed): a fresh unrelated unit pp (no contains) SHOULD be offered sp, since a
+    // node legitimately shared by two DIFFERENT parents is fine — the rule must not over-restrict.
+    const crossParentUnits = [
+      ...diamondUnits,
+      { id: 'pp', label: 'Platinum', abbreviation: 'pp', actorPath: 'system.currency.pp', contains: [] }
+    ];
+    const crossParentOffered = await offeredSubUnitOptionIds(crossParentUnits, 'pp');
+    assert.ok(crossParentOffered.includes('sp'), 'cross-parent: sp SHOULD be offered when editing the unrelated pp (legitimate shared child)');
+  });
+
+  it('renders actorInventory provider units as a read-only provider-managed list', async () => {
+    await mountCurrencyEditor({
+      foundrySystemId: 'pf2e',
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        providerId: 'pf2e-inventory',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [{ unitId: 'sp', amount: 10 }] },
+          { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', denomination: 'sp', contains: [] }
+        ]
+      }
+    });
+
+    // The provider-managed callout renders and the Add/Seed header actions are hidden.
+    assert.ok(target.querySelector('[data-system-currency-provider-managed]'), 'provider-managed callout should render');
+    assert.equal(
+      target.querySelector('.manager-currency-unit-card .manager-character-modifier-card-header-actions'),
+      null,
+      'Add and Seed header actions should be hidden in provider mode'
+    );
+    // Units render read-only: no pen/edit, delete, or remove controls, no editable amount inputs.
+    const card = target.querySelector('.manager-currency-unit-card');
+    assert.ok(card.querySelector('[data-system-currency-unit="gp"]'), 'gp unit should render');
+    assert.equal(card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button').length, 0, 'no edit/delete icon buttons in read-only summary');
+    assert.equal(card.querySelectorAll('.manager-availability-pill-amount').length, 0, 'no editable amount inputs in read-only mode');
+    assert.equal(card.querySelectorAll('.manager-availability-remove').length, 0, 'no remove-cross controls in read-only mode');
+    // Provider read-only units present label / abbreviation / denomination as static field/value
+    // pairs and render NO sub-unit chips.
+    assert.equal(card.querySelectorAll('[data-system-currency-subunit]').length, 0, 'no sub-unit chips in provider read-only mode');
+    const gpUnit = card.querySelector('[data-system-currency-unit="gp"]');
+    assert.equal(gpUnit.querySelector('[data-system-currency-readonly-label]').textContent.trim(), 'Gold');
+    assert.equal(gpUnit.querySelector('[data-system-currency-abbreviation]').textContent.trim(), 'gp');
+    assert.equal(gpUnit.querySelector('[data-system-currency-denomination]').textContent.trim(), 'gp');
+  });
+
+  it('renders the currency feature toggle in Optional features and routes its change', async () => {
+    const { calls } = await mountCurrencyEditor({
+      selectedCurrency: { enabled: false, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
+    });
+
+    const tile = target.querySelector('[data-feature-key="currency"]');
+    assert.ok(tile, 'currency toggle tile should render in Optional features');
+    const toggle = tile.querySelector('[data-system-currency-toggle]');
+    assert.ok(toggle, 'currency toggle button should render');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle reflects disabled currency');
+    assert.ok(tile.querySelector('small'), 'currency tile should include a hint');
+
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(call => call[0] === 'toggleRequirement' && call[1] === 'currency' && call[2] === true),
+      'clicking the toggle should enable currency through toggleRequirement'
+    );
+  });
+
+  it('hides the Currency Units card when currency is disabled and shows it when enabled', async () => {
+    await mountCurrencyEditor({
+      selectedCurrency: { enabled: false, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
+    });
+    assert.equal(
+      target.querySelector('[data-system-currency-units]'),
+      null,
+      'Currency Units card should be hidden when currency is disabled'
+    );
+    // The toggle tile still renders even with the card hidden.
+    assert.ok(target.querySelector('[data-feature-key="currency"]'), 'currency toggle tile should still render');
+
+    // Tear down before re-mounting with currency enabled.
+    if (mounted) unmount(mounted);
+    if (target?.parentNode) target.remove();
+
+    await mountCurrencyEditor({
+      selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
+    });
+    assert.ok(
+      target.querySelector('[data-system-currency-units]'),
+      'Currency Units card should render when currency is enabled'
+    );
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {

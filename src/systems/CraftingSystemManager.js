@@ -1,6 +1,7 @@
 /**
  * Manages crafting systems and their item libraries
  */
+import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import {
   cleanupStalePreferences,
@@ -18,6 +19,7 @@ import {
   getItemSourceReferences,
 } from '../utils/sourceUuid.js';
 
+import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -425,17 +427,38 @@ export class CraftingSystemManager {
       time: {
         enabled: time.enabled === true,
       },
-      currency: {
-        enabled: currency.enabled === true,
-        provider: currency.provider === 'system' ? 'system' : 'macro',
-        systemAdapter: ['dnd5e', 'pf2e'].includes(currency.systemAdapter)
-          ? currency.systemAdapter
-          : undefined,
-        checkCurrencyMacroUuid: currency.checkCurrencyMacroUuid || null,
-        decrementCurrencyMacroUuid: currency.decrementCurrencyMacroUuid || null,
-        formatCurrencyMacroUuid: currency.formatCurrencyMacroUuid || null,
-      },
+      currency: this._normalizeCurrencyConfig(currency),
     };
+  }
+
+  _normalizeCurrencyConfig(currency = {}) {
+    const units = Array.isArray(currency?.units) ? currency.units : [];
+    const legacyAdapter =
+      currency?.provider === 'system' && ['dnd5e', 'pf2e'].includes(currency?.systemAdapter)
+        ? currency.systemAdapter
+        : '';
+    const seededUnits = units.length > 0 ? units : getCurrencyPresetsForAdapter(legacyAdapter);
+    // A legacy pf2e system-adapter config seeded fresh pf2e units, which read/spend coins
+    // through the actor inventory rather than a flat actor property; carry that intent forward
+    // as the actorInventory spend strategy when no explicit strategy was persisted. A legacy
+    // dnd5e adapter maps to the default actorProperty strategy.
+    const legacyAdapterSpendStrategy = { pf2e: 'actorInventory', dnd5e: 'actorProperty' };
+    const spendStrategy =
+      currency?.spendStrategy || legacyAdapterSpendStrategy[legacyAdapter] || undefined;
+    // `inventoryMode` is no longer part of the currency model. It is forwarded ONLY so
+    // normalizeCurrencyConfig's legacy shim can map a stored actorInventory + inventoryMode:
+    // 'macro' to the peer `macro` strategy; it is never re-emitted from the normalized output.
+    return normalizeCurrencyConfig(
+      {
+        enabled: currency?.enabled === true,
+        spendStrategy,
+        inventoryMode: currency?.inventoryMode,
+        providerId: currency?.providerId,
+        macros: currency?.macros,
+        units: seededUnits,
+      },
+      { randomID: () => foundry.utils.randomID() }
+    );
   }
 
   _normalizeStringList(value) {

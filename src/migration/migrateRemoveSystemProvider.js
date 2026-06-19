@@ -6,8 +6,9 @@
  * character modifiers each carried a `provider` discriminator (and, for the
  * `macro` provider, a `macroUuid`). Macro support is dropped from these surfaces
  * outright; the surfaces become formula-only. Result-selection providers
- * (`ingredientSet | macroOutcome | rollTableOutcome`) and currency providers
- * (`system | macro`) are real and untouched.
+ * (`ingredientSet | macroOutcome | rollTableOutcome`) are real and untouched.
+ * Currency provider compatibility is handled by currency-profile normalization,
+ * not by this migration.
  *
  * Transforms (across the runner's `systems`, `gatheringConfig`, `environments`):
  *

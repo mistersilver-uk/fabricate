@@ -847,7 +847,8 @@
             "CraftingChecks": "Enables system-level crafting check configuration in the current admin.",
             "OutcomeRouting": "Enables routed outcome configuration where supported.",
             "EffectTransfer": "Allows crafted results to inherit effects from source components.",
-            "ChatOutput": "Posts a summary chat card after crafting and gathering attempts."
+            "ChatOutput": "Posts a summary chat card after crafting and gathering attempts.",
+            "Currency": "Enables step currency requirements and the currency configuration for this system."
           }
         },
         "Nav": {
@@ -2118,6 +2119,57 @@
             "AddSearchLabel": "Search character modifiers to add"
           }
         },
+        "CurrencyUnits": {
+          "Title": "Currency units",
+          "Hint": "Define actor currency paths and denomination breakdowns for this crafting system.",
+          "Empty": "No currency units yet.",
+          "Add": "Add currency unit",
+          "Edit": "Edit currency unit",
+          "Delete": "Delete currency unit",
+          "NewLabel": "New currency unit",
+          "Label": "Label",
+          "Abbreviation": "Abbreviation",
+          "Icon": "Icon",
+          "ChangeIcon": "Change icon",
+          "ActorPath": "Actor data path",
+          "Denomination": "Denomination",
+          "SeedPresets": "Seed presets",
+          "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
+          "NoActorPath": "No actor path",
+          "SubUnitCount": "sub-units",
+          "AddSubUnit": "Add sub-unit",
+          "SubUnits": "Sub-units",
+          "SubUnitAmount": "Sub-unit amount",
+          "RemoveSubUnit": "Remove sub-unit",
+          "NoSubUnits": "This unit is a base denomination.",
+          "NoOtherUnits": "Add another currency unit before defining a breakdown.",
+          "NoEligibleSubUnits": "No eligible sub-units.",
+          "SpendStrategy": "Spend strategy",
+          "SpendStrategyHint": "Choose how this system reads and spends actor currency.",
+          "SpendStrategyActorProperty": "Actor data path",
+          "SpendStrategyActorPropertyHint": "Read and spend coins at a flat actor data path (e.g. dnd5e currency).",
+          "SpendStrategyActorInventory": "Actor inventory",
+          "SpendStrategyActorInventoryHint": "Use a preconfigured provider that reads and spends coins from the actor inventory (e.g. pf2e).",
+          "SpendStrategyMacro": "Macro",
+          "SpendStrategyMacroHint": "Drive currency with your own macros; the macro receives the actor and does whatever it needs.",
+          "Provider": "Provider",
+          "ProviderHint": "A preconfigured adapter that reads and spends coins from the actor inventory.",
+          "NoProviders": "No preconfigured providers for this system — use the Macro strategy instead.",
+          "MacroCanAfford": "Can afford macro",
+          "MacroCanAffordHint": "Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.",
+          "MacroIncrement": "Increment macro",
+          "MacroIncrementHint": "Reserved for a future refund flow — configured now but not yet invoked.",
+          "MacroDecrement": "Decrement macro",
+          "MacroDecrementHint": "Runs after a successful craft to spend the currency cost.",
+          "MacroDropHint": "Drag a macro here to link it.",
+          "MacroDropZoneLabel": "{field}: drag a macro here to link it.",
+          "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",
+          "MacroUnlink": "Unlink macro",
+          "MacroMissing": "Macro unresolved",
+          "MacroConversionHint": "Conversion between this unit and others is handled by your configured currency macros, matched by abbreviation.",
+          "ProviderManagedTitle": "Provider-managed denominations",
+          "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements."
+        },
         "Column": {
           "System": "System",
           "Resolution": "Resolution",
@@ -2137,7 +2189,8 @@
           "OutcomeRouting": "Outcome routing",
           "EffectTransfer": "Effect transfer",
           "PropertyMacros": "Property macros",
-          "ChatOutput": "Chat output"
+          "ChatOutput": "Chat output",
+          "Currency": "Currency"
         },
         "Travel": {
           "Title": "Travel",

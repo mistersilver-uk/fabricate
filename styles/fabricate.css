@@ -1317,6 +1317,144 @@
   justify-content: flex-end;
 }
 
+.fabricate-manager .manager-currency-unit-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-subunit-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--fab-space-2);
+  align-items: end;
+}
+
+/* Warning callout shown in place of the add-sub-unit control when no unit is eligible. */
+.fabricate-manager .manager-currency-subunit-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-warning-border);
+  border-left: 3px solid var(--fab-warning);
+  border-radius: 6px;
+  background: var(--fab-warning-soft);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-currency-subunit-warning i {
+  margin-top: var(--fab-space-2xs);
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-currency-subunit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-subunit-heading {
+  margin: 0;
+}
+
+.fabricate-manager .manager-availability-pill.is-currency {
+  min-height: 34px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-mv2-surface-2));
+}
+
+.fabricate-manager .manager-availability-pill.is-currency > i {
+  color: var(--fab-info);
+}
+
+.fabricate-manager .manager-availability-pill-amount {
+  width: 56px;
+  min-width: 0;
+  height: 25px;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 4px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Provider-managed (read-only) currency: the selected inventory provider owns the denomination
+   ladder, so units render as a compact static display with no edit/delete/add controls. */
+.fabricate-manager .manager-currency-provider-managed-callout {
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-provider-managed-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-currency-provider-managed-list {
+  gap: var(--fab-space-2);
+}
+
+/* Provider-managed denominations (e.g. pf2e cp/sp/gp/pp) read better as a compact
+   two-column grid that stacks into a couple of rows rather than a full-width single
+   column, collapsing to one column on narrow widths. */
+.fabricate-manager .manager-currency-provider-managed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-currency-provider-managed-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fabricate-manager .manager-currency-provider-managed-summary {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+}
+
+/* Read-only provider/macro units present label, abbreviation, and denomination as static
+   field/value pairs, mirroring how Label and Abbreviation are shown in the editable form. */
+.fabricate-manager .manager-currency-readonly-fields {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--fab-space-2) var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-label {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-currency-readonly-value {
+  color: var(--fab-mv2-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .fabricate-manager .manager-drop-inspector-stack {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -4006,6 +4144,52 @@
 
 .fabricate-manager .manager-field.is-wide {
   grid-column: 1 / -1;
+}
+
+.fabricate-manager .manager-currency-edit-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fabricate-manager .manager-currency-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+.fabricate-manager .manager-currency-strategy {
+  display: grid;
+  gap: var(--fab-space-3);
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-macro-zones {
+  display: grid;
+  gap: var(--fab-space-3);
+}
+
+/* The three custom-macro drop zones (canAfford / increment / decrement) sit side-by-side in a
+   single responsive row, collapsing to fewer columns on narrow widths. */
+.fabricate-manager .manager-currency-macro-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.fabricate-manager .manager-currency-macro-row .manager-currency-macro-field {
+  min-width: 0;
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-currency-macro-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fabricate-manager .manager-currency-macro-field {
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-macro-note {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
 }
 
 .fabricate-manager .manager-field input,
@@ -7974,6 +8158,14 @@
   border-color: var(--fab-mv2-accent);
   background: var(--fab-success-soft);
   color: var(--fab-mv2-text);
+}
+
+/* The empty currency-macro drop zone must match the height of the linked-macro card
+   (.manager-environment-scene-linked) so dropping or selecting a macro does not resize
+   the zone. The linked card is a 40px thumb plus var(--fab-space-3) padding and a 1px
+   border on each side; mirror that as a min-height (border-box) and centre the hint. */
+.fabricate-manager .manager-currency-macro-drop-zone {
+  min-height: calc(40px + (2 * var(--fab-space-3)) + 2px);
 }
 
 .fabricate-manager .manager-component-tag-grid {

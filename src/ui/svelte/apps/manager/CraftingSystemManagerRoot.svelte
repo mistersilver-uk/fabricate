@@ -8,6 +8,7 @@
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -140,8 +141,20 @@
       ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
       : []
   );
+  const selectedCurrencyUnits = $derived(
+    Array.isArray(selectedSystem?.requirements?.currency?.units)
+      ? selectedSystem.requirements.currency.units
+      : []
+  );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  const currencySpendStrategy = $derived(selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty');
+  const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
+  const currencyMacros = $derived(selectedSystem?.requirements?.currency?.macros || { canAfford: '', increment: '', decrement: '' });
+  const currencyProviderOptions = $derived(
+    getCurrencyProvidersForFoundrySystem(foundrySystemId).map(provider => ({ id: provider.id, label: provider.label }))
+  );
   async function onAddCharacterModifier() {
     if (!selectedSystemId) return null;
     return await store.addGatheringCharacterModifier(selectedSystemId);
@@ -157,6 +170,50 @@
   async function onDeleteCharacterModifier(modifierId) {
     if (!selectedSystemId) return;
     await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+  }
+  async function onAddCurrencyUnit() {
+    if (!selectedSystemId) return null;
+    return await store.addCurrencyUnit(selectedSystemId);
+  }
+  async function onUpdateCurrencyUnit(unitId, patch) {
+    if (!selectedSystemId) return;
+    await store.updateCurrencyUnit(selectedSystemId, unitId, patch);
+  }
+  async function onDeleteCurrencyUnit(unitId) {
+    if (!selectedSystemId) return;
+    await store.deleteCurrencyUnit(selectedSystemId, unitId);
+  }
+  async function onAddCurrencySubUnit(parentUnitId, subUnitId) {
+    if (!selectedSystemId) return;
+    await store.addCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+  }
+  async function onUpdateCurrencySubUnit(parentUnitId, subUnitId, amount) {
+    if (!selectedSystemId) return;
+    await store.updateCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId, amount);
+  }
+  async function onDeleteCurrencySubUnit(parentUnitId, subUnitId) {
+    if (!selectedSystemId) return;
+    await store.deleteCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+  }
+  async function onSeedCurrencyPresets() {
+    if (!selectedSystemId || !currencyPresetsSupported) return;
+    await store.seedCurrencyUnitPresets(selectedSystemId);
+  }
+  async function onSetCurrencySpendStrategy(spendStrategy) {
+    if (!selectedSystemId) return;
+    await store.setCurrencySpendStrategy(selectedSystemId, spendStrategy);
+  }
+  async function onSetCurrencyProvider(providerId) {
+    if (!selectedSystemId) return;
+    await store.setCurrencyProvider(selectedSystemId, providerId);
+  }
+  async function onSetCurrencyMacro(key, uuid) {
+    if (!selectedSystemId || !uuid) return;
+    await store.setCurrencyMacro(selectedSystemId, key, uuid);
+  }
+  async function onClearCurrencyMacro(key) {
+    if (!selectedSystemId) return;
+    await store.clearCurrencyMacro(selectedSystemId, key);
   }
 
   function characterModifierLibraryEntry(modifierId) {
@@ -3597,6 +3654,24 @@
         onUpdateCharacterModifier={onUpdateCharacterModifier}
         onDeleteCharacterModifier={onDeleteCharacterModifier}
         onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
+        currencyUnits={selectedCurrencyUnits}
+        {currencyPresetsSupported}
+        {currencySpendStrategy}
+        {currencyProviderId}
+        {currencyMacros}
+        {currencyProviderOptions}
+        onAddCurrencyUnit={onAddCurrencyUnit}
+        onUpdateCurrencyUnit={onUpdateCurrencyUnit}
+        onDeleteCurrencyUnit={onDeleteCurrencyUnit}
+        onAddCurrencySubUnit={onAddCurrencySubUnit}
+        onUpdateCurrencySubUnit={onUpdateCurrencySubUnit}
+        onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}
+        onSeedCurrencyPresets={onSeedCurrencyPresets}
+        onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}
+        onSetCurrencyProvider={onSetCurrencyProvider}
+        onSetCurrencyMacro={onSetCurrencyMacro}
+        onClearCurrencyMacro={onClearCurrencyMacro}
+        onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
       />
     {:else}
       <SystemsBrowserView

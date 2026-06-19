@@ -41,6 +41,20 @@ import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
+import {
+  getCurrencyPresetsForFoundrySystem,
+  seedCurrencyPresets
+} from '../../../config/currencyPresets.js';
+import {
+  getDefaultProviderId,
+  getProviderCanonicalUnits
+} from '../../../config/currencyProviders.js';
+import {
+  canAddCurrencySubUnit,
+  CURRENCY_MACRO_KEYS,
+  normalizeCurrencyConfig,
+  normalizeCurrencyUnit
+} from '../../../systems/currencyProfile.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -149,6 +163,54 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
  * Generate a unique system name that does not collide with any existing system.
  * Mirrors RecipeManagerApp._nextSystemName().
  */
+// --- Currency unit mutation helpers (kept module-level and shallow so the
+// adminStore mutate callbacks stay readable and avoid deep callback nesting) ---
+
+function _stripSubUnit(unit, subUnitId) {
+  return {
+    ...unit,
+    contains: (unit.contains || []).filter((entry) => entry.unitId !== subUnitId)
+  };
+}
+
+function _deleteCurrencyUnitFromList(units, unitId) {
+  if (!unitId) return null;
+  const nextUnits = units
+    .filter((unit) => unit.id !== unitId)
+    .map((unit) => _stripSubUnit(unit, unitId));
+  return nextUnits.length === units.length ? null : nextUnits;
+}
+
+function _setSubUnitAmount(entry, subUnitId, numericAmount) {
+  if (entry.unitId !== subUnitId) return entry;
+  return { ...entry, amount: numericAmount };
+}
+
+function _updateSubUnitAmountInList(units, parentUnitId, subUnitId, numericAmount) {
+  let changed = false;
+  const nextUnits = units.map((unit) => {
+    if (unit.id !== parentUnitId) return unit;
+    const contains = (unit.contains || []).map((entry) => {
+      const updated = _setSubUnitAmount(entry, subUnitId, numericAmount);
+      if (updated !== entry) changed = true;
+      return updated;
+    });
+    return { ...unit, contains };
+  });
+  return { nextUnits, changed };
+}
+
+function _deleteSubUnitFromList(units, parentUnitId, subUnitId) {
+  let changed = false;
+  const nextUnits = units.map((unit) => {
+    if (unit.id !== parentUnitId) return unit;
+    const contains = (unit.contains || []).filter((entry) => entry.unitId !== subUnitId);
+    if (contains.length !== (unit.contains || []).length) changed = true;
+    return { ...unit, contains };
+  });
+  return { nextUnits, changed };
+}
+
 function _nextSystemName(systemManager) {
   const base = 'New Crafting System';
   const names = new Set(systemManager.getSystems().map(s => s.name));
@@ -1484,7 +1546,7 @@ function _buildSelectedSystemViewData(
 
     requirements: selectedSystem.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, provider: 'macro' }
+      currency: { enabled: false, units: [] }
     },
 
     craftingCheck: {
@@ -4151,12 +4213,12 @@ export function createAdminStore(services) {
 
     const requirements = JSON.parse(JSON.stringify(system.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, provider: 'macro' }
+      currency: { enabled: false, units: [] }
     }));
     requirements[requirement] = requirements[requirement] || {};
     requirements[requirement].enabled = enabled;
     if (requirement === 'currency') {
-      requirements.currency.provider = requirements.currency.provider || 'macro';
+      requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
     }
 
     await systemManager.updateSystem(sysId, { requirements });
@@ -5142,30 +5204,202 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveCurrencyConfig(provider, systemAdapter, checkMacro, decrementMacro, formatMacro) {
+  async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
+    const sysId = systemId || get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
 
-    const resolvedProvider = provider === 'system' ? 'system' : 'macro';
     const requirements = JSON.parse(JSON.stringify(system.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, provider: 'macro' }
+      currency: { enabled: false, units: [] }
     }));
-    requirements.currency = {
-      ...(requirements.currency || {}),
-      enabled: requirements.currency?.enabled === true,
-      provider: resolvedProvider,
-      systemAdapter: resolvedProvider === 'system' ? systemAdapter || undefined : undefined,
-      checkCurrencyMacroUuid: resolvedProvider === 'macro' ? checkMacro || null : null,
-      decrementCurrencyMacroUuid: resolvedProvider === 'macro' ? decrementMacro || null : null,
-      formatCurrencyMacroUuid: resolvedProvider === 'macro' ? formatMacro || null : null
-    };
+    requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
+    const result = await mutate(requirements.currency, system);
+    if (result === false) return false;
 
     await systemManager.updateSystem(sysId, { requirements });
     await refresh();
+    return result ?? true;
+  }
+
+  async function addCurrencyUnit(systemId, partial = {}) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const id = String(partial?.id || _randomID()).trim();
+      if (!id || currency.units.some(unit => unit.id === id)) return null;
+      const unit = normalizeCurrencyUnit({
+        id,
+        label: partial?.label || services.localize?.('FABRICATE.Admin.Manager.CurrencyUnits.NewLabel') || 'Currency unit',
+        abbreviation: partial?.abbreviation || '',
+        icon: partial?.icon || 'fa-solid fa-coins',
+        actorPath: partial?.actorPath || '',
+        contains: partial?.contains || []
+      }, _randomID);
+      if (!unit) return null;
+      currency.units = [...currency.units, unit];
+      return unit;
+    });
+  }
+
+  async function updateCurrencyUnit(systemId, unitId, updates = {}) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      if (!unitId) return false;
+      let changed = false;
+      currency.units = currency.units.map(unit => {
+        if (unit.id !== unitId) return unit;
+        changed = true;
+        return normalizeCurrencyUnit({ ...unit, ...updates, id: unit.id }, _randomID) || unit;
+      });
+      return changed;
+    });
+  }
+
+  async function deleteCurrencyUnit(systemId, unitId) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
+      if (!nextUnits) return false;
+      currency.units = nextUnits;
+      return true;
+    });
+  }
+
+  async function addCurrencySubUnit(systemId, parentUnitId, subUnitId, amount = 1) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
+      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
+      currency.units = currency.units.map(unit => unit.id === parentUnitId
+        ? {
+          ...unit,
+          contains: [...(unit.contains || []), { unitId: subUnitId, amount: numericAmount }]
+        }
+        : unit);
+      return true;
+    });
+  }
+
+  async function updateCurrencySubUnit(systemId, parentUnitId, subUnitId, amount) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
+      const { nextUnits, changed } = _updateSubUnitAmountInList(
+        currency.units,
+        parentUnitId,
+        subUnitId,
+        numericAmount
+      );
+      currency.units = nextUnits;
+      return changed;
+    });
+  }
+
+  async function deleteCurrencySubUnit(systemId, parentUnitId, subUnitId) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const { nextUnits, changed } = _deleteSubUnitFromList(
+        currency.units,
+        parentUnitId,
+        subUnitId
+      );
+      currency.units = nextUnits;
+      return changed;
+    });
+  }
+
+  function _foundrySystemId() {
+    return typeof services.getFoundrySystemId === 'function'
+      ? String(services.getFoundrySystemId() || '')
+      : '';
+  }
+
+  // Provider inventory mode means "use the system's coins": the selected provider owns the
+  // denomination ladder, so overwrite config.units with the provider's canonical (frozen) units
+  // and re-normalize. This keeps the engine's affordability/baseValue math aligned with the
+  // system's real coin values regardless of any prior GM edits. When the resolved provider has no
+  // canonical ladder (e.g. a system with no registered provider, where getDefaultProviderId returns
+  // '' and getProviderCanonicalUnits('') is empty), leave the GM-entered units untouched rather than
+  // silently wiping them — a no-provider system should never enter provider mode (the editor steers
+  // it to macro), but guard here so any legacy/stale provider-mode state cannot destroy units.
+  function _applyProviderCanonicalUnits(currency) {
+    const normalizedCanonical = getProviderCanonicalUnits(currency.providerId)
+      .map((unit) => normalizeCurrencyUnit(unit, _randomID))
+      .filter(Boolean);
+    if (normalizedCanonical.length === 0) return;
+    currency.units = normalizedCanonical;
+  }
+
+  async function setCurrencySpendStrategy(systemId, spendStrategy) {
+    const nextStrategy = ['actorInventory', 'macro'].includes(spendStrategy)
+      ? spendStrategy
+      : 'actorProperty';
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.spendStrategy = nextStrategy;
+      // Switching to actorInventory seeds a sensible default providerId (when the system ships a
+      // provider) and syncs the provider's canonical, provider-owned units. The sync is guarded
+      // so a no-provider system never wipes the GM's units. Switching to macro leaves the user's
+      // units in place — macros own conversion by abbreviation. The normalizer preserves macros
+      // and providerId across strategy switches either way.
+      if (nextStrategy === 'actorInventory') {
+        if (!currency.providerId) {
+          currency.providerId = getDefaultProviderId(_foundrySystemId());
+        }
+        _applyProviderCanonicalUnits(currency);
+      }
+      return true;
+    });
+  }
+
+  async function setCurrencyProvider(systemId, providerId) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.providerId = String(providerId || '').trim();
+      // Selecting a provider adopts its canonical units under the actorInventory strategy; under
+      // other strategies the providerId is inert and user-managed units stay untouched.
+      if (currency.spendStrategy === 'actorInventory') {
+        _applyProviderCanonicalUnits(currency);
+      }
+      return true;
+    });
+  }
+
+  async function setCurrencyMacro(systemId, key, uuid) {
+    if (!CURRENCY_MACRO_KEYS.includes(key)) return false;
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.macros = { ...currency.macros, [key]: String(uuid || '').trim() };
+      return true;
+    });
+  }
+
+  async function clearCurrencyMacro(systemId, key) {
+    return await setCurrencyMacro(systemId, key, '');
+  }
+
+  async function seedCurrencyUnitPresets(systemId = get(selectedSystemId)) {
+    const foundrySystemId = typeof services.getFoundrySystemId === 'function'
+      ? String(services.getFoundrySystemId() || '')
+      : '';
+    const presets = getCurrencyPresetsForFoundrySystem(foundrySystemId);
+    if (!presets || presets.length === 0) {
+      return { added: [], skipped: [], unsupported: true, foundrySystemId };
+    }
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const result = seedCurrencyPresets({
+        presets,
+        currentUnits: currency.units || []
+      });
+      currency.units = result.next.map(unit => normalizeCurrencyUnit(unit, _randomID)).filter(Boolean);
+      // pf2e coins live in the actor inventory (read/spent via actor.inventory.removeCoins),
+      // not at a flat actor property, so the pf2e preset selects the actorInventory spend
+      // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
+      currency.spendStrategy = foundrySystemId === 'pf2e' ? 'actorInventory' : 'actorProperty';
+      // pf2e seeds the system's default provider; dnd5e stays on actorProperty where providerId is
+      // inert (but still normalized/persisted).
+      if (foundrySystemId === 'pf2e') {
+        currency.providerId = getDefaultProviderId(foundrySystemId);
+        // The actorInventory strategy is provider-owned, so overwrite the seeded units with the
+        // provider's canonical ladder (a clean overwrite of the same pf2e preset list) rather than
+        // the merge above, keeping the engine on canonical denominations.
+        _applyProviderCanonicalUnits(currency);
+      }
+      return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
+    });
   }
 
   async function saveAlchemyConfig(config = {}) {
@@ -5613,7 +5847,17 @@ export function createAdminStore(services) {
     updateGatheringEventCharacterModifier,
     deleteGatheringEventCharacterModifier,
     saveCraftingCheckConfig,
-    saveCurrencyConfig,
+    addCurrencyUnit,
+    updateCurrencyUnit,
+    deleteCurrencyUnit,
+    addCurrencySubUnit,
+    updateCurrencySubUnit,
+    deleteCurrencySubUnit,
+    setCurrencySpendStrategy,
+    setCurrencyProvider,
+    setCurrencyMacro,
+    clearCurrencyMacro,
+    seedCurrencyUnitPresets,
     saveAlchemyConfig,
     saveVisibilityConfig,
     saveTeaserConfig,

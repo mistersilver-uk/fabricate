@@ -238,7 +238,62 @@ Time gates are checked:
 
 ### Currency Requirements
 
-Currency can be handled by:
+When you enable currency requirements, a recipe step can cost an amount of a currency unit you define.
+Fabricate checks whether the crafting actor can afford the step before the craft begins, then spends the cost when the step is taken.
+If the actor cannot pay, the step is blocked and the craft is stopped before any ingredients are consumed.
 
-- **System adapter**. Uses the game system's built-in currency (e.g. D&D 5e gold)
-- **Custom macro**. A macro that checks and deducts currency however you define it
+You configure currency in the system settings editor, in the **Currency units** card.
+
+#### Choosing a spend strategy
+
+The **Spend strategy** selector decides how Fabricate reads and spends an actor's money.
+It offers three strategies, and you can pick any of them in any world, regardless of game system.
+A short hint under the selector describes the strategy you have chosen.
+
+- **Actor data path** reads each currency unit from a numeric field on the actor sheet, such as a Dungeons & Dragons 5e character's gold.
+  Fabricate makes its own change across the denominations you define, so a step priced in silver can be paid from gold and the difference returned in smaller coins.
+- **Actor inventory** treats coins as items the actor carries, read and spent through a preconfigured provider.
+  This is the right choice for game systems such as Pathfinder 2e, where coins live in the inventory rather than in a single sheet field.
+- **Macro** drives currency with macros you write, for any game system.
+  The macro receives the actor and does whatever it needs, so this strategy is not tied to the inventory.
+
+#### The provider (Actor inventory)
+
+When you choose **Actor inventory**, a **Provider** selector appears.
+
+A provider is a built-in adapter that already knows how to read and spend coins from your game system's inventory.
+Pathfinder 2e ships with one.
+When a provider is selected, it manages the denominations for you, so the unit list becomes a read-only **Provider-managed denominations** list.
+You can still reference those denominations by their abbreviation in a step's currency cost, but you cannot edit them here.
+In a world whose game system has no provider, Fabricate shows a note steering you to the **Macro** strategy instead, and leaves your own units untouched.
+
+#### The currency macros (Macro)
+
+The **Macro** strategy has three drop zones.
+You link each macro by dragging it from the Foundry macro directory onto a drop zone, and right-click a linked macro to unlink it.
+
+- **Can afford macro** runs before the craft to decide whether the actor can pay.
+  Return a success result to allow the craft, or a failure result to block it.
+- **Decrement macro** runs after a successful craft to spend the cost.
+- **Increment macro** is reserved for a future refund flow.
+  You can link it now, but Fabricate does not run it yet.
+
+Each macro receives the step's cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
+If a macro reports failure or stops with an error, Fabricate blocks the step and the craft is stopped before any ingredients are consumed.
+
+#### Defining currency units
+
+When you use the **Actor data path** or **Macro** strategy, you define your own currency units.
+Each unit has a label, an abbreviation, and an icon.
+
+- Under **Actor data path**, each unit also names the field on the actor sheet that holds its balance.
+- Under **Macro**, units have no path or denomination.
+  Your macros match coins by abbreviation, so a note reminds you that conversion between units is handled by your macros.
+
+You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.
+A unit with no breakdown is treated as a base denomination.
+
+To get started quickly, use **Seed presets** to add the standard coin ladder for your world.
+Seeding in a Dungeons & Dragons 5e world adds units on the actor data path strategy.
+Seeding in a Pathfinder 2e world adds inventory units and selects the Pathfinder 2e provider.
+Preset seeding is only available in Dungeons & Dragons 5e or Pathfinder 2e worlds.

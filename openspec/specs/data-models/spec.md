@@ -120,15 +120,10 @@ CraftingSystem = {
 
     currency: {
       enabled: boolean,
-      provider: "system" | "macro",
-
-      // provider = "system"
-      systemAdapter?: "dnd5e" | "pf2e",
-
-      // provider = "macro"
-      checkCurrencyMacroUuid?: string,     // (actor, requiredAmount) => boolean
-      decrementCurrencyMacroUuid?: string, // (actor, amount) => void
-      formatCurrencyMacroUuid?: string,    // (amount) => string
+      spendStrategy: "actorProperty" | "actorInventory" | "macro", // default "actorProperty"
+      providerId: string,                     // default ""; selected preconfigured provider (actorInventory)
+      macros: { canAfford: string, increment: string, decrement: string }, // default all ""; currency macro UUIDs (macro)
+      units: CurrencyUnit[],
     },
   },
 
@@ -159,6 +154,49 @@ CraftingSystem = {
 12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
 13. **`consumption.consumeCatalystsOnFail` is a legacy-named flag.** Following the Catalyst retirement, the persisted config key `consumption.consumeCatalystsOnFail` (on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`) was **retained by name** but now governs **Tool usage/breakage on a failed craft or salvage** (read it as "consume/break tools on fail"). It defaults to `false` (tools are not consumed/broken on failure unless enabled). The persisted key was deliberately **not** renamed because renaming a persisted setting key would require its own migration; the in-code semantics are tool-oriented while the wire key stays `consumeCatalystsOnFail`.
 14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in. A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour). Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed. The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids). A startup migration derives `GatheringRealm` records from the legacy per-system region vocabulary and maps `environment.region` → `includedRealmIds` (orphan free-text region strings are left inert). Realm records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import). A Realm maps to Foundry Scene Regions many-to-one through `sceneMappings[].sceneRegionUuid`; those Foundry-bridge fields keep their `sceneRegionUuid`/`sceneUuid` names. Record shapes and behavior are defined in `gathering-and-harvesting` (*Location-Aware Gathering*). Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (see *World Settings* below) and are excluded from system import/export.
+15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for step currency requirements.
+16. Currency unit profiles must be acyclic. Each connected conversion branch must resolve to exactly one terminal base unit.
+17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
+18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; normalized currency requirements do not emit them. (The new `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
+19. `requirements.currency.spendStrategy` selects how currency is read and spent. It is one of **three peer top-level strategies** — `"actorProperty"` (default), `"actorInventory"`, or `"macro"`; any other value normalizes to `"actorProperty"`. A legacy nested config (`"actorInventory"` with the retired `inventoryMode === "macro"`) maps forward to the peer `"macro"` strategy on normalization; `inventoryMode` is never re-emitted. The GM selects the strategy directly in both dnd5e and pf2e worlds (it is no longer derived solely from preset seeding). Each strategy is realized by a symmetric coin spender behind a common `{ check(actor, requirement, ctx), spend(actor, requirement, ctx) }` interface (the `actorProperty`/`actorInventory` spenders also retain `readCoins` as the affordability primitive their `check` wraps); `CraftingEngine` resolves the spender by `spendStrategy` and drives both the up-front affordability check and the deduction uniformly.
+    - `"actorProperty"` (the generic `ActorPropertyCoinSpender`) reads each unit's balance from its `actorPath` and spends through a single batched `actor.update(...)`, making its own change across configured sub-units. This is the dnd5e and general behavior.
+    - `"actorInventory"` uses a preconfigured provider. The generic `ActorInventoryCoinSpender` delegates the system-specific coin I/O to a per-system coin adapter resolved by `game.system.id`. Providers are registered in a pure, Foundry-free registry (`getCurrencyProvidersForFoundrySystem`, `getDefaultProviderId`, `resolveProvider`); the only registered provider is the pf2e inventory adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. `providerId` is stored and selectable but the runtime still resolves the adapter by `game.system.id` (one provider per system today). Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy. When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding.
+    - `"macro"` drives currency through GM-supplied macros. Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`. A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption. The `increment` macro is configured and validated but reserved for a future refund flow — it is never invoked. The macro strategy is GM-only config with no separate feature flag (matching success/failure macros).
+    - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
+20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`). Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set. Absent fields back-compat default to `""`/empty macros with no migration. The retired `inventoryMode` field is never emitted.
+
+## CurrencyUnit
+
+### Purpose
+
+Define one actor-backed currency denomination and its optional sub-unit breakdown.
+
+```ts
+type CurrencyUnit = {
+  id: string,           // stable internal reference used by CurrencyRequirement.unit
+  label: string,
+  abbreviation: string,
+  icon: string,
+  actorPath: string,    // Foundry actor data path containing the numeric balance (actorProperty strategy)
+  denomination?: string, // pf2e coin denomination (pp|gp|sp|cp); used by the actorInventory strategy
+  contains: Array<{
+    unitId: string,     // another CurrencyUnit.id
+    amount: number,     // positive integer count contained in one parent unit
+  }>,
+}
+```
+
+### Requirements
+
+1. `id` is stable after creation and is the value stored by recipe and salvage currency requirements.
+2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
+3. A unit must not contain itself directly or indirectly, and a single unit's decomposition must reach each descendant by exactly one path. A sub-unit `S` is eligible for parent `P` only when the set of units reachable from `P` (inclusive, through `contains[]`) and the set reachable from `S` are disjoint; this subsumes self-containment, an already-direct child, a cycle back to `P`, and the descendant/diamond cases where `P` would gain two conversion paths to the same node. A profile where any unit reaches the same descendant by more than one distinct path is a validation error (conflicting conversion paths). A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` and `ep -> sp`) is allowed, because each parent's reachable set is computed over its own subtree.
+4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
+5. A sub-unit reference must point at another configured currency unit.
+6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `requirements.currency.spendStrategy`:
+   - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
+   - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
+   - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required. Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
 
 ### Recipe Visibility Requirements
 
@@ -420,7 +458,7 @@ Step = {
     years?: number,
   },
   currencyRequirement?: {
-      unit: string // varies by game system
+      unit: string // configured CurrencyUnit.id
       amount: number,
   },
 }
