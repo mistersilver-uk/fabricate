@@ -5526,11 +5526,66 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.ok(target.querySelector('[data-system-currency-macros]'), 'macro zones container should render');
-    const dropzones = target.querySelectorAll('[data-system-currency-macro-dropzone]');
+    const macroRow = target.querySelector('[data-system-currency-macros]');
+    assert.ok(macroRow, 'macro zones container should render');
+    // The three drop zones share one single-row container.
+    assert.ok(
+      macroRow.classList.contains('manager-currency-macro-row'),
+      'the three macro drop zones should share the single-row container'
+    );
+    const dropzones = macroRow.querySelectorAll('[data-system-currency-macro-dropzone]');
     assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
+    assert.equal(
+      target.querySelectorAll('[data-system-currency-macro-dropzone]').length,
+      3,
+      'all three drop zones live inside the single-row container'
+    );
     // The inventory-mode select should also be present in actorInventory.
     assert.ok(target.querySelector('[data-system-currency-inventory-mode-select]'));
+  });
+
+  it('removes the sub-unit section in macro inventory mode and shows the conversion hint', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          selectedCurrency: {
+            enabled: true,
+            spendStrategy: 'actorInventory',
+            inventoryMode: 'macro',
+            providerId: '',
+            macros: { canAfford: '', increment: '', decrement: '' },
+            units: [
+              { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [{ unitId: 'sp', amount: 10 }] },
+              { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
+            ]
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    // Expand the gp unit's editor.
+    const card = target.querySelector('.manager-currency-unit-card');
+    card.querySelector('[data-system-currency-unit="gp"] [aria-label="Edit currency unit"]').click();
+    await tick();
+    flushSync();
+
+    // No sub-unit section renders (no heading, builder, chips, or warnings) and the macro-conversion
+    // hint is shown instead.
+    assert.equal(card.querySelector('.manager-currency-subunit-section'), null, 'no sub-unit section in macro mode');
+    assert.equal(card.querySelector('.manager-currency-subunit-builder'), null, 'no add-sub-unit builder in macro mode');
+    assert.equal(card.querySelectorAll('[data-system-currency-subunit]').length, 0, 'no sub-unit chips in macro mode');
+    assert.ok(card.querySelector('[data-system-currency-unit-macro-note]'), 'macro-conversion hint should render');
   });
 
   it('renders provider inventory mode units as a read-only provider-managed list', async () => {
@@ -5577,10 +5632,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button').length, 0, 'no edit/delete icon buttons in read-only summary');
     assert.equal(card.querySelectorAll('.manager-availability-pill-amount').length, 0, 'no editable amount inputs in read-only mode');
     assert.equal(card.querySelectorAll('.manager-availability-remove').length, 0, 'no remove-cross controls in read-only mode');
-    // Static sub-unit chip shows the amount as text.
-    const staticAmount = card.querySelector('.manager-availability-pill-amount-static');
-    assert.ok(staticAmount, 'static sub-unit amount chip should render');
-    assert.equal(staticAmount.textContent.trim(), '10');
+    // Provider read-only units present label / abbreviation / denomination as static field/value
+    // pairs and render NO sub-unit chips.
+    assert.equal(card.querySelectorAll('[data-system-currency-subunit]').length, 0, 'no sub-unit chips in provider read-only mode');
+    const gpUnit = card.querySelector('[data-system-currency-unit="gp"]');
+    assert.equal(gpUnit.querySelector('[data-system-currency-readonly-label]').textContent.trim(), 'Gold');
+    assert.equal(gpUnit.querySelector('[data-system-currency-abbreviation]').textContent.trim(), 'gp');
+    assert.equal(gpUnit.querySelector('[data-system-currency-denomination]').textContent.trim(), 'gp');
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {

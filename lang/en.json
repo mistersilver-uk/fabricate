@@ -2132,7 +2132,6 @@
           "ChangeIcon": "Change icon",
           "ActorPath": "Actor data path",
           "Denomination": "Coin denomination",
-          "SelectDenomination": "Select denomination",
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
           "NoActorPath": "No actor path",
@@ -2165,10 +2164,9 @@
           "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",
           "MacroUnlink": "Unlink macro",
           "MacroMissing": "Macro unresolved",
-          "MacroMatchHint": "Macros match this unit by abbreviation.",
+          "MacroConversionHint": "Conversion between this unit and others is handled by your configured currency macros, matched by abbreviation.",
           "ProviderManagedTitle": "Provider-managed denominations",
-          "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements.",
-          "ProviderManagedDenomination": "Denomination: {denomination}"
+          "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements."
         },
         "Column": {
           "System": "System",

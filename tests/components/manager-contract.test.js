@@ -223,10 +223,6 @@ describe('CraftingSystemManager source contract', () => {
       systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
       'currency editor should branch on the actorInventory spend strategy'
     );
-    assert.ok(
-      systemEditSource.includes('{ denomination:') && systemEditSource.includes('currencyDenominationOptions'),
-      'currency editor should bind a denomination field driven by the denomination options'
-    );
     // Currency spend-strategy / inventory-mode / provider / macro controls.
     for (const snippet of [
       'data-system-currency-strategy-select',
@@ -250,6 +246,35 @@ describe('CraftingSystemManager source contract', () => {
       systemEditSource.includes("currencyInventoryMode === 'macro'"),
       'currency editor should branch on the macro inventory mode'
     );
+    // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
+    // single responsive row via a namespaced container class.
+    assert.ok(
+      systemEditSource.includes('manager-currency-macro-zones manager-currency-macro-row'),
+      'macro drop zones should be wrapped in the single-row container'
+    );
+    // Sub-units only drive the engine in actorProperty mode, so the whole sub-unit section (heading,
+    // add control, chips, no-eligible callout) is gated behind a derived macro-mode flag — it must
+    // not render in provider (read-only) or macro modes.
+    assert.ok(
+      systemEditSource.includes('const currencyMacroMode = $derived('),
+      'currency editor should derive a macro-mode flag'
+    );
+    assert.ok(
+      systemEditSource.includes('{#if currencyMacroMode}'),
+      'currency editor should gate the per-unit editor body on the macro-mode flag'
+    );
+    // The sub-unit section markup (heading, add-sub-unit control, chips) lives only inside the
+    // non-macro branch, after the `{#if currencyMacroMode}` gate.
+    assert.ok(
+      systemEditSource.indexOf('{#if currencyMacroMode}') <
+        systemEditSource.indexOf('manager-currency-subunit-section'),
+      'sub-unit section should render only in the non-macro (actorProperty) branch'
+    );
+    // Macro mode shows a conversion hint instead of any sub-unit controls.
+    assert.ok(
+      systemEditSource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
+      'macro mode should include the macro-conversion hint'
+    );
     // Provider inventory mode makes the units provider-owned and read-only: the Add/Seed header
     // actions and the editable unit controls are gated behind a non-provider condition, and a
     // dedicated read-only branch with a provider-managed callout renders instead.
@@ -270,13 +295,27 @@ describe('CraftingSystemManager source contract', () => {
       'manager-currency-provider-managed-callout',
       'currencyProviderManagedHint()',
       'manager-currency-provider-managed-summary',
-      'manager-availability-pill is-currency is-readonly',
-      'manager-availability-pill-amount-static',
+      'manager-currency-readonly-fields',
+      'data-system-currency-readonly-label',
+      'data-system-currency-abbreviation',
       'data-system-currency-denomination',
       'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle'
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include read-only ${snippet}`);
     }
+    // Provider read-only units present label/abbreviation/denomination as static field/value pairs;
+    // they must NOT render sub-unit chips. The only `data-system-currency-subunit` occurrence lives
+    // in the editable (actorProperty) branch, after the provider-managed read-only branch.
+    assert.ok(
+      systemEditSource.indexOf('data-system-currency-provider-managed') <
+        systemEditSource.indexOf('data-system-currency-subunit'),
+      'provider-managed read-only branch should render before the editable sub-unit chips'
+    );
+    assert.equal(
+      systemEditSource.split('data-system-currency-subunit=').length - 1,
+      1,
+      'sub-unit chips should appear only once (in the editable actorProperty branch)'
+    );
     // The read-only branch precedes the editable branch, so the editable controls (editable amount
     // input, remove cross) live only after the provider-managed branch.
     assert.ok(
@@ -359,8 +398,8 @@ describe('CraftingSystemManager source contract', () => {
       'Provider', 'ProviderHint', 'NoProviders',
       'MacroCanAfford', 'MacroCanAffordHint', 'MacroIncrement', 'MacroIncrementHint',
       'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroReplaceHint',
-      'MacroUnlink', 'MacroMissing', 'MacroMatchHint',
-      'ProviderManagedTitle', 'ProviderManagedHint', 'ProviderManagedDenomination'
+      'MacroUnlink', 'MacroMissing', 'MacroConversionHint',
+      'ProviderManagedTitle', 'ProviderManagedHint'
     ]) {
       assert.ok(lang.FABRICATE.Admin.Manager.CurrencyUnits[key], `CurrencyUnits.${key} should be defined`);
     }

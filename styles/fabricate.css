@@ -1404,20 +1404,39 @@
 }
 
 .fabricate-manager .manager-currency-provider-managed-summary {
-  gap: var(--fab-space-2);
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
 }
 
-.fabricate-manager .manager-availability-pill.is-currency.is-readonly {
-  cursor: default;
+/* Read-only provider/macro units present label, abbreviation, and denomination as static
+   field/value pairs, mirroring how Label and Abbreviation are shown in the editable form. */
+.fabricate-manager .manager-currency-readonly-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2) var(--fab-space-4);
+  min-width: 0;
 }
 
-.fabricate-manager .manager-availability-pill-amount-static {
-  min-width: 24px;
-  padding: 0 var(--fab-space-2xs);
+.fabricate-manager .manager-currency-readonly-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-label {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fabricate-manager .manager-currency-readonly-value {
   color: var(--fab-mv2-text);
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-drop-inspector-stack {
@@ -4129,6 +4148,23 @@
 .fabricate-manager .manager-currency-macro-zones {
   display: grid;
   gap: var(--fab-space-3);
+}
+
+/* The three custom-macro drop zones (canAfford / increment / decrement) sit side-by-side in a
+   single responsive row, collapsing to fewer columns on narrow widths. */
+.fabricate-manager .manager-currency-macro-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.fabricate-manager .manager-currency-macro-row .manager-currency-macro-field {
+  min-width: 0;
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-currency-macro-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .fabricate-manager .manager-currency-macro-field {
