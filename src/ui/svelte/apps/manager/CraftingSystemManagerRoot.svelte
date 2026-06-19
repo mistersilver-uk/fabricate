@@ -8,7 +8,6 @@
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
-  import { getInventoryDenominationsForFoundrySystem } from '../../../../config/currencyPresets.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
@@ -154,7 +153,6 @@
   const currencyInventoryMode = $derived(selectedSystem?.requirements?.currency?.inventoryMode || 'provider');
   const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
   const currencyMacros = $derived(selectedSystem?.requirements?.currency?.macros || { canAfford: '', increment: '', decrement: '' });
-  const currencyDenominationOptions = $derived(getInventoryDenominationsForFoundrySystem(foundrySystemId));
   const currencyProviderOptions = $derived(
     getCurrencyProvidersForFoundrySystem(foundrySystemId).map(provider => ({ id: provider.id, label: provider.label }))
   );
@@ -3667,7 +3665,6 @@
         {currencyInventoryMode}
         {currencyProviderId}
         {currencyMacros}
-        {currencyDenominationOptions}
         {currencyProviderOptions}
         onAddCurrencyUnit={onAddCurrencyUnit}
         onUpdateCurrencyUnit={onUpdateCurrencyUnit}

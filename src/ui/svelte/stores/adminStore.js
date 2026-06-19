@@ -5313,14 +5313,17 @@ export function createAdminStore(services) {
   // Provider inventory mode means "use the system's coins": the selected provider owns the
   // denomination ladder, so overwrite config.units with the provider's canonical (frozen) units
   // and re-normalize. This keeps the engine's affordability/baseValue math aligned with the
-  // system's real coin values regardless of any prior GM edits. Clears the units when the
-  // provider has no canonical ladder (e.g. an unknown provider id) so stale user units cannot
-  // linger and desync the engine.
+  // system's real coin values regardless of any prior GM edits. When the resolved provider has no
+  // canonical ladder (e.g. a system with no registered provider, where getDefaultProviderId returns
+  // '' and getProviderCanonicalUnits('') is empty), leave the GM-entered units untouched rather than
+  // silently wiping them — a no-provider system should never enter provider mode (the editor steers
+  // it to macro), but guard here so any legacy/stale provider-mode state cannot destroy units.
   function _applyProviderCanonicalUnits(currency) {
-    const canonical = getProviderCanonicalUnits(currency.providerId);
-    currency.units = canonical
+    const normalizedCanonical = getProviderCanonicalUnits(currency.providerId)
       .map((unit) => normalizeCurrencyUnit(unit, _randomID))
       .filter(Boolean);
+    if (normalizedCanonical.length === 0) return;
+    currency.units = normalizedCanonical;
   }
 
   async function setCurrencySpendStrategy(systemId, spendStrategy) {

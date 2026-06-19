@@ -22,7 +22,6 @@
     currencyInventoryMode = 'provider',
     currencyProviderId = '',
     currencyMacros = { canAfford: '', increment: '', decrement: '' },
-    currencyDenominationOptions = [],
     currencyProviderOptions = [],
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
@@ -100,6 +99,20 @@
     return currencyMacroDocs[key] || null;
   }
 
+  // Each empty macro drop zone needs a field-specific accessible name; otherwise the three zones
+  // (canAfford/increment/decrement) expose an identical "Drag a macro here to link it." label and
+  // are indistinguishable to assistive tech. Compose the visible field label with the drop hint.
+  function currencyMacroDropZoneLabel(field) {
+    const fieldLabel = text(field.labelKey, field.labelFallback);
+    const composed = localize('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel', {
+      field: fieldLabel
+    });
+    if (composed && composed !== 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel') {
+      return composed;
+    }
+    return `${fieldLabel}: ${text('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropHint', 'Drag a macro here to link it.')}`;
+  }
+
   async function handleCurrencyMacroDrop(key, data) {
     const { uuid, type } = resolveDropData(data);
     if (type !== 'Macro' || !uuid) return;
@@ -113,11 +126,38 @@
 
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
 
+  // A system with no registered provider must not be offered (or steered into) provider mode:
+  // entering it resolves an empty provider id whose canonical ladder is empty. The store now
+  // guards against wiping units, but the editor should not surface the dead option either. Hide
+  // the `provider` choice when there are no providers so the only inventory source is `macro`.
+  const currencyHasProviders = $derived(currencyProviderOptions.length > 0);
+  const currencyInventoryModeOptions = $derived(
+    currencyHasProviders
+      ? CURRENCY_INVENTORY_MODE_OPTIONS
+      : CURRENCY_INVENTORY_MODE_OPTIONS.filter((option) => option.value !== 'provider')
+  );
+  // The mode the select renders. When the system has no providers, present `macro` regardless of any
+  // legacy `provider` value persisted in config so the control never shows an unselectable option.
+  const currencyInventoryModeSelected = $derived(
+    !currencyHasProviders && currencyInventoryMode === 'provider' ? 'macro' : currencyInventoryMode
+  );
+
+  // The effective inventory branch the GM is actually operating in. A no-provider system with a
+  // stale `provider` value behaves as macro mode everywhere (display, read-only, sub-unit collapse).
+  const currencyEffectiveInventoryMode = $derived(currencyInventoryModeSelected);
+
+  // No-provider systems never show the provider branch — even if config still carries
+  // inventoryMode === 'provider' from legacy state — so the GM sees the macro fields instead.
+  const currencyShowProviderBranch = $derived(
+    currencyEffectiveInventoryMode === 'provider' && currencyHasProviders
+  );
+
   // In provider inventory mode the selected provider owns the denomination ladder, so currency
   // units are provider-managed and read-only — editing them would desync the engine's
-  // affordability/baseValue math from the system's real coin values.
+  // affordability/baseValue math from the system's real coin values. A no-provider system is never
+  // read-only because its units stay GM-owned.
   const currencyUnitsReadOnly = $derived(
-    currencySpendStrategy === 'actorInventory' && currencyInventoryMode === 'provider'
+    currencySpendStrategy === 'actorInventory' && currencyShowProviderBranch
   );
 
   // In macro inventory mode the configured macros own all conversion via unit abbreviations, so a
@@ -127,7 +167,7 @@
   // change-making). In macro mode the configured macros own conversion via unit abbreviations, so
   // the per-unit editor collapses to label/abbreviation/icon and the whole sub-unit section is gone.
   const currencyMacroMode = $derived(
-    currencySpendStrategy === 'actorInventory' && currencyInventoryMode === 'macro'
+    currencySpendStrategy === 'actorInventory' && currencyEffectiveInventoryMode === 'macro'
   );
 
   function currencyProviderLabel() {
@@ -470,33 +510,33 @@
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.InventoryMode', 'Inventory source')}</span>
               <select
-                value={currencyInventoryMode}
+                value={currencyInventoryModeSelected}
                 data-system-currency-inventory-mode-select
                 onchange={(event) => onSetCurrencyInventoryMode(event.currentTarget.value)}
               >
-                {#each CURRENCY_INVENTORY_MODE_OPTIONS as option (option.value)}
+                {#each currencyInventoryModeOptions as option (option.value)}
                   <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
                 {/each}
               </select>
               <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeHint', 'Use a preconfigured provider for your system, or drive currency with custom macros.')}</small>
             </label>
 
-            {#if currencyInventoryMode === 'provider'}
-              {#if currencyProviderOptions.length > 0}
-                <label class="manager-field">
-                  <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
-                  <select
-                    value={currencyProviderId}
-                    data-system-currency-provider-select
-                    onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
-                  >
-                    {#each currencyProviderOptions as option (option.id)}
-                      <option value={option.id}>{option.label}</option>
-                    {/each}
-                  </select>
-                  <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint', 'A preconfigured adapter that reads and spends coins from the actor inventory.')}</small>
-                </label>
-              {:else}
+            {#if currencyShowProviderBranch}
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
+                <select
+                  value={currencyProviderId}
+                  data-system-currency-provider-select
+                  onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
+                >
+                  {#each currencyProviderOptions as option (option.id)}
+                    <option value={option.id}>{option.label}</option>
+                  {/each}
+                </select>
+                <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint', 'A preconfigured adapter that reads and spends coins from the actor inventory.')}</small>
+              </label>
+            {:else}
+              {#if !currencyHasProviders && currencyInventoryMode === 'provider'}
                 <div class="manager-field">
                   <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
                   <div class="manager-currency-subunit-warning manager-environment-comp-callout" role="note" data-system-currency-no-provider>
@@ -505,7 +545,6 @@
                   </div>
                 </div>
               {/if}
-            {:else}
               <div class="manager-currency-macro-zones manager-currency-macro-row" data-system-currency-macros>
                 {#each CURRENCY_MACRO_FIELDS as field (field.key)}
                   {@const macroDoc = currencyMacroDisplay(field.key)}
@@ -537,9 +576,12 @@
                         <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} title={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} onclick={(event) => { event.stopPropagation(); onClearCurrencyMacro(field.key); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
                       </div>
                     {:else}
+                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <div
                         class="manager-component-source-drop-zone"
                         data-system-currency-macro-dropzone={field.key}
+                        role="group"
+                        aria-label={currencyMacroDropZoneLabel(field)}
                         use:dragDrop={{ onDrop: (data) => handleCurrencyMacroDrop(field.key, data), activeClass: 'is-drop-active' }}
                       >
                         <i class="fas fa-scroll" aria-hidden="true"></i>

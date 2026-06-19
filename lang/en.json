@@ -2161,6 +2161,7 @@
           "MacroDecrement": "Decrement macro",
           "MacroDecrementHint": "Runs after a successful craft to spend the currency cost.",
           "MacroDropHint": "Drag a macro here to link it.",
+          "MacroDropZoneLabel": "{field}: drag a macro here to link it.",
           "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",
           "MacroUnlink": "Unlink macro",
           "MacroMissing": "Macro unresolved",

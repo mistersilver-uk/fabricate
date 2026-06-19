@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import {
   DND5E_CURRENCY_PRESETS,
   PF2E_CURRENCY_PRESETS,
-  getInventoryDenominationsForFoundrySystem,
   seedCurrencyPresets,
 } from '../src/config/currencyPresets.js';
 import { ActorInventoryCoinSpender } from '../src/systems/CoinSpenders.js';
@@ -633,6 +632,10 @@ test('macro mode runs canAfford then decrement with the agreed context', async (
   assert.ok(ctx.units.some((unit) => unit.abbreviation === 'gp'));
   assert.equal(ctx.requirement.unit, 'gp');
   assert.equal(ctx.craftingSystem.name, 'Macro System');
+  // The built macro context also carries the recipe alongside
+  // actor/cost/units/requirement/craftingSystem so macros can read what is being crafted.
+  assert.ok(ctx.recipe, 'macro context should include the recipe');
+  assert.equal(ctx.recipe.toJSON().id, 'recipe-1');
   // increment must never run.
   assert.ok(!received.some((entry) => entry.uuid === 'Macro.inc'));
 
@@ -810,14 +813,6 @@ test('seedCurrencyPresets preserves the pf2e denomination field', () => {
   assert.equal(second.added.length, 0);
 });
 
-test('getInventoryDenominationsForFoundrySystem returns the pf2e ladder and empties elsewhere', () => {
-  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('pf2e')], ['cp', 'sp', 'gp', 'pp']);
-  // dnd5e locates coins by actor path, so it exposes no denomination keys.
-  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('dnd5e')], []);
-  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('unknown')], []);
-  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('')], []);
-});
-
 function containsAmount(unit, unitId) {
   return (unit.contains || []).find((entry) => entry.unitId === unitId)?.amount;
 }
@@ -865,4 +860,150 @@ test('buildCurrencySpendUpdates stays exact when paying with mixed denominations
   assert.equal(result.updates['system.currency.cp'], 0);
   assert.equal(result.updates['system.currency.sp'], 0);
   assert.equal(result.updates['system.currency.gp'], 0);
+});
+
+// ---------------------------------------------------------------------------
+// End-to-end: the full craft() loop must abort the spend BEFORE consuming
+// ingredients when a macro-mode currency macro fails. This pins the
+// check/decrement-before-consumption ordering end-to-end, not just at the
+// _decrementCurrencyRequirement helper level.
+// ---------------------------------------------------------------------------
+
+function macroCraftSystem() {
+  return {
+    name: 'Macro Craft System',
+    // No crafting checks, so _runCraftingCheck passes through to the currency spend.
+    features: {},
+    requirements: {
+      currency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        inventoryMode: 'macro',
+        macros: { canAfford: 'Macro.can', increment: 'Macro.inc', decrement: 'Macro.dec' },
+        units: [
+          { id: 'gp', label: 'Gold', abbreviation: 'gp', contains: [] },
+          { id: 'sp', label: 'Silver', abbreviation: 'sp', contains: [] },
+        ],
+      },
+    },
+  };
+}
+
+function setupCraftGlobals(systemConfig) {
+  globalThis.foundry = {
+    utils: { getProperty, randomID: () => 'generated-id' },
+  };
+  globalThis.game = {
+    user: { id: 'user-1' },
+    time: { worldTime: 0 },
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => systemConfig }),
+      getResolutionModeService: () => null,
+    },
+  };
+  globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
+}
+
+function buildCraftIngredientItem() {
+  return {
+    id: 'ing-1',
+    uuid: 'Item.ing-1',
+    name: 'Iron Ingot',
+    parent: null,
+    system: { quantity: 3 },
+    deleteCalled: false,
+    updateCalled: false,
+    async delete() { this.deleteCalled = true; },
+    async update(payload) {
+      this.updateCalled = true;
+      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    },
+  };
+}
+
+function buildCraftRecipe(ingredientItem) {
+  const ingredient = {
+    systemItemId: ingredientItem.id,
+    quantity: 1,
+    getDescription: () => ingredientItem.name,
+  };
+  const ingredientSet = {
+    id: 'set-1',
+    matchIngredients(availableItems) {
+      const matched = availableItems.find((item) => item === ingredientItem);
+      return matched ? [{ item: matched, quantity: 1, ingredient }] : [];
+    },
+  };
+  return {
+    id: 'recipe-1',
+    name: 'Macro Currency Recipe',
+    craftingSystemId: 'sys-1',
+    ingredientSets: [ingredientSet],
+    // A single step that also carries the currency requirement (3 gp).
+    getExecutionSteps: () => [
+      {
+        id: 'step-1',
+        name: 'Step 1',
+        ingredientSets: [ingredientSet],
+        resultGroups: [],
+        toolIds: [],
+        timeRequirement: null,
+        currencyRequirement: { unit: 'gp', amount: 3 },
+        outcomeRouting: null,
+      },
+    ],
+    validate: () => ({ valid: true, errors: [] }),
+    toJSON: () => ({ id: 'recipe-1', name: 'Macro Currency Recipe' }),
+  };
+}
+
+function buildCraftEngine(ingredientItem) {
+  const recipeManager = {
+    canCraft() {
+      return { canCraft: true, satisfiableSet: null, missing: { ingredients: [], essences: [], tools: [] } };
+    },
+    getToolsForSet() { return []; },
+    toolMatchesItem() { return false; },
+    ingredientMatchesItem(recipe, ingredient, item) { return item === ingredientItem; },
+  };
+  return new CraftingEngine(recipeManager, null, null);
+}
+
+test('craft() aborts before consuming ingredients when the decrement macro returns success:false', async () => {
+  setupCraftGlobals(macroCraftSystem());
+  // canAfford passes the up-front gate; decrement fails the authoritative spend.
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Macro.can') return { name: uuid, command: 'return true;' };
+    if (uuid === 'Macro.dec') return { name: uuid, command: 'return { success: false, message: "Spend rejected" };' };
+    return null;
+  };
+
+  const ingredientItem = buildCraftIngredientItem();
+  const recipe = buildCraftRecipe(ingredientItem);
+  // The satisfiable set is the recipe's set so canCraft resolves an ingredient set to consume.
+  const engine = buildCraftEngine(ingredientItem);
+  engine.recipeManager.canCraft = () => ({
+    canCraft: true,
+    satisfiableSet: recipe.ingredientSets[0],
+    missing: { ingredients: [], essences: [], tools: [] },
+  });
+
+  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
+  const craftingActor = {
+    id: 'a1',
+    name: 'Crafter',
+    uuid: 'Actor.a1',
+    items: { contents: [] },
+    createEmbeddedDocuments: async () => [],
+  };
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'craft should fail when the decrement macro rejects the spend');
+  assert.equal(result.results, null, 'no result items should be created when the spend aborts');
+  assert.equal(ingredientItem.deleteCalled, false, 'ingredient must NOT be deleted when the spend aborts');
+  assert.equal(ingredientItem.updateCalled, false, 'ingredient must NOT be partially consumed when the spend aborts');
+  assert.equal(ingredientItem.system.quantity, 3, 'ingredient quantity must be untouched');
+
+  delete globalThis.fromUuid;
 });

@@ -1959,6 +1959,35 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'mine'), true);
     });
 
+    it('provider mode in a no-provider system (dnd5e) leaves configured units untouched', async () => {
+      // Regression: dnd5e has no registered provider, so getDefaultProviderId('dnd5e') === '' and
+      // getProviderCanonicalUnits('') is empty. Entering provider mode must NOT wipe the GM's units.
+      let updateArgs = null;
+      const services = createMockServices({ getFoundrySystemId: () => 'dnd5e' });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addCurrencyUnit('sys1', { id: 'gp', label: 'Gold', actorPath: 'system.currency.gp' });
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      await store.setCurrencyInventoryMode('sys1', 'provider');
+      assert.equal(
+        updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'),
+        true,
+        'no-provider system must not have its configured units wiped by provider mode'
+      );
+      // setCurrencyProvider with an empty/unknown provider id also preserves the units.
+      await store.setCurrencyProvider('sys1', '');
+      assert.equal(
+        updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'),
+        true,
+        'selecting an empty provider id must not wipe configured units'
+      );
+    });
+
     it('setCurrencyMacro and clearCurrencyMacro persist per-key macro UUIDs', async () => {
       let updateArgs = null;
       const services = createMockServices();

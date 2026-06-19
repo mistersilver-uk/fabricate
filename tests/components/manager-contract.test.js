@@ -212,12 +212,8 @@ describe('CraftingSystemManager source contract', () => {
       'root should pass currency sub-unit actions to SystemEditView'
     );
     assert.ok(
-      rootSource.includes('{currencySpendStrategy}') && rootSource.includes('{currencyDenominationOptions}'),
-      'root should thread the spend strategy and denomination options to SystemEditView'
-    );
-    assert.ok(
-      rootSource.includes('getInventoryDenominationsForFoundrySystem'),
-      'root should derive denomination options from the currency preset helper'
+      rootSource.includes('{currencySpendStrategy}'),
+      'root should thread the spend strategy to SystemEditView'
     );
     assert.ok(
       systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
@@ -238,13 +234,27 @@ describe('CraftingSystemManager source contract', () => {
       'use:dragDrop',
       'resolveDropData',
       "type !== 'Macro'",
-      'onClearCurrencyMacro(field.key)'
+      'onClearCurrencyMacro(field.key)',
+      // Each empty macro drop zone exposes a field-specific accessible name so the three zones are
+      // distinguishable to assistive tech (the linked-state group already has a field-specific label).
+      'aria-label={currencyMacroDropZoneLabel(field)}'
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
     assert.ok(
-      systemEditSource.includes("currencyInventoryMode === 'macro'"),
-      'currency editor should branch on the macro inventory mode'
+      systemEditSource.includes("currencyEffectiveInventoryMode === 'macro'"),
+      'currency editor should branch on the effective macro inventory mode'
+    );
+    // A system with no registered provider must not be offered (or steered into) provider mode: the
+    // inventory-mode select hides the provider option and presents the macro source instead.
+    assert.ok(
+      systemEditSource.includes('const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'),
+      'currency editor should derive whether the system has any providers'
+    );
+    assert.ok(
+      systemEditSource.includes('currencyInventoryModeOptions') &&
+        systemEditSource.includes("option.value !== 'provider'"),
+      'currency editor should drop the provider inventory-mode option when there are no providers'
     );
     // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
     // single responsive row via a namespaced container class.
@@ -279,8 +289,8 @@ describe('CraftingSystemManager source contract', () => {
     // actions and the editable unit controls are gated behind a non-provider condition, and a
     // dedicated read-only branch with a provider-managed callout renders instead.
     assert.ok(
-      systemEditSource.includes("currencySpendStrategy === 'actorInventory' && currencyInventoryMode === 'provider'"),
-      'currency editor should derive a read-only flag for provider inventory mode'
+      systemEditSource.includes("currencySpendStrategy === 'actorInventory' && currencyShowProviderBranch"),
+      'currency editor should derive a read-only flag for the active provider inventory branch'
     );
     assert.ok(
       systemEditSource.includes('{#if !currencyUnitsReadOnly}'),
@@ -397,7 +407,7 @@ describe('CraftingSystemManager source contract', () => {
       'InventoryMode', 'InventoryModeHint', 'InventoryModeProvider', 'InventoryModeMacro',
       'Provider', 'ProviderHint', 'NoProviders',
       'MacroCanAfford', 'MacroCanAffordHint', 'MacroIncrement', 'MacroIncrementHint',
-      'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroReplaceHint',
+      'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroDropZoneLabel', 'MacroReplaceHint',
       'MacroUnlink', 'MacroMissing', 'MacroConversionHint',
       'ProviderManagedTitle', 'ProviderManagedHint'
     ]) {

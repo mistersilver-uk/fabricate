@@ -5544,6 +5544,91 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-system-currency-inventory-mode-select]'));
   });
 
+  it('gives each empty macro drop zone a field-specific accessible name', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    const dropzones = [...target.querySelectorAll('[data-system-currency-macro-dropzone]')];
+    assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
+    const labels = dropzones.map(zone => zone.getAttribute('aria-label'));
+    // Every empty drop zone must expose a non-empty, distinct accessible name (not the shared hint).
+    assert.ok(labels.every(label => label && label.length > 0), 'each drop zone should have an aria-label');
+    assert.equal(new Set(labels).size, 3, 'the three drop-zone aria-labels should be distinct');
+  });
+
+  it('steers a no-provider system to the macro inventory branch even when config carries provider mode', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        // dnd5e has no registered provider; legacy config still says inventoryMode === 'provider'.
+        store: createStore(calls, {
+          foundrySystemId: 'dnd5e',
+          selectedCurrency: {
+            enabled: true,
+            spendStrategy: 'actorInventory',
+            inventoryMode: 'provider',
+            providerId: '',
+            macros: { canAfford: '', increment: '', decrement: '' },
+            units: [
+              { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [] }
+            ]
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    // No provider select is offered; the macro branch renders instead.
+    assert.equal(
+      target.querySelector('[data-system-currency-provider-select]'),
+      null,
+      'no provider select should render for a no-provider system'
+    );
+    assert.ok(
+      target.querySelector('[data-system-currency-macros]'),
+      'the macro branch should render for a no-provider system steered away from provider mode'
+    );
+    // The inventory-mode select presents macro (steered) and omits the provider option.
+    const modeSelect = target.querySelector('[data-system-currency-inventory-mode-select]');
+    assert.ok(modeSelect, 'inventory-mode select should render');
+    assert.equal(modeSelect.value, 'macro', 'the select should present the macro source when there are no providers');
+    const optionValues = [...modeSelect.querySelectorAll('option')].map(option => option.value);
+    assert.ok(!optionValues.includes('provider'), 'the provider option should be hidden when there are no providers');
+    // The legacy provider-mode callout still appears, steering the GM to macros.
+    assert.ok(
+      target.querySelector('[data-system-currency-no-provider]'),
+      'the no-provider callout should still appear for legacy provider-mode state'
+    );
+    // Units stay GM-editable (not read-only) on a no-provider system.
+    assert.ok(
+      target.querySelector('.manager-currency-unit-card .manager-character-modifier-card-header-actions'),
+      'Add/Seed header actions should remain available for a no-provider system'
+    );
+  });
+
   it('removes the sub-unit section in macro inventory mode and shows the conversion hint', async () => {
     const calls = [];
     target = document.createElement('div');
