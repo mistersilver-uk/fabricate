@@ -2143,7 +2143,7 @@
           "RemoveSubUnit": "Remove sub-unit",
           "NoSubUnits": "This unit is a base denomination.",
           "NoOtherUnits": "Add another currency unit before defining a breakdown.",
-          "NoEligibleSubUnits": "No eligible sub-units — every other unit already breaks down into this one.",
+          "NoEligibleSubUnits": "No eligible sub-units.",
           "SpendStrategy": "Spend strategy",
           "SpendStrategyHint": "Choose how this system reads and spends actor currency.",
           "SpendStrategyActorProperty": "Actor data path",
