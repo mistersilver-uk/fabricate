@@ -238,7 +238,14 @@ Time gates are checked:
 
 ### Currency Requirements
 
-Currency can be handled by:
+Currency is handled by currency units on the crafting system. Add units in the
+system settings editor, or seed the dnd5e/pf2e presets when they match your world.
 
-- **System adapter**. Uses the game system's built-in currency (e.g. D&D 5e gold)
-- **Custom macro**. A macro that checks and deducts currency however you define it
+Each unit defines:
+
+- a display label and abbreviation
+- the actor data path that stores that unit's numeric balance
+- any sub-units contained by one unit, such as `1 gp = 10 sp`
+
+Fabricate uses that profile to check whether the actor can afford a step and to
+deduct the cost, making change across configured denominations when needed.

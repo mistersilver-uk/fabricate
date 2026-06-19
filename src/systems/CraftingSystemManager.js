@@ -1,6 +1,7 @@
 /**
  * Manages crafting systems and their item libraries
  */
+import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import {
   cleanupStalePreferences,
@@ -18,6 +19,7 @@ import {
   getItemSourceReferences,
 } from '../utils/sourceUuid.js';
 
+import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -425,17 +427,24 @@ export class CraftingSystemManager {
       time: {
         enabled: time.enabled === true,
       },
-      currency: {
-        enabled: currency.enabled === true,
-        provider: currency.provider === 'system' ? 'system' : 'macro',
-        systemAdapter: ['dnd5e', 'pf2e'].includes(currency.systemAdapter)
-          ? currency.systemAdapter
-          : undefined,
-        checkCurrencyMacroUuid: currency.checkCurrencyMacroUuid || null,
-        decrementCurrencyMacroUuid: currency.decrementCurrencyMacroUuid || null,
-        formatCurrencyMacroUuid: currency.formatCurrencyMacroUuid || null,
-      },
+      currency: this._normalizeCurrencyConfig(currency),
     };
+  }
+
+  _normalizeCurrencyConfig(currency = {}) {
+    const units = Array.isArray(currency?.units) ? currency.units : [];
+    const legacyAdapter =
+      currency?.provider === 'system' && ['dnd5e', 'pf2e'].includes(currency?.systemAdapter)
+        ? currency.systemAdapter
+        : '';
+    const seededUnits = units.length > 0 ? units : getCurrencyPresetsForAdapter(legacyAdapter);
+    return normalizeCurrencyConfig(
+      {
+        enabled: currency?.enabled === true,
+        units: seededUnits,
+      },
+      { randomID: () => foundry.utils.randomID() }
+    );
   }
 
   _normalizeStringList(value) {

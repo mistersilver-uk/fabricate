@@ -140,8 +140,14 @@
       ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
       : []
   );
+  const selectedCurrencyUnits = $derived(
+    Array.isArray(selectedSystem?.requirements?.currency?.units)
+      ? selectedSystem.requirements.currency.units
+      : []
+  );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   async function onAddCharacterModifier() {
     if (!selectedSystemId) return null;
     return await store.addGatheringCharacterModifier(selectedSystemId);
@@ -157,6 +163,34 @@
   async function onDeleteCharacterModifier(modifierId) {
     if (!selectedSystemId) return;
     await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+  }
+  async function onAddCurrencyUnit() {
+    if (!selectedSystemId) return null;
+    return await store.addCurrencyUnit(selectedSystemId);
+  }
+  async function onUpdateCurrencyUnit(unitId, patch) {
+    if (!selectedSystemId) return;
+    await store.updateCurrencyUnit(selectedSystemId, unitId, patch);
+  }
+  async function onDeleteCurrencyUnit(unitId) {
+    if (!selectedSystemId) return;
+    await store.deleteCurrencyUnit(selectedSystemId, unitId);
+  }
+  async function onAddCurrencySubUnit(parentUnitId, subUnitId) {
+    if (!selectedSystemId) return;
+    await store.addCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+  }
+  async function onUpdateCurrencySubUnit(parentUnitId, subUnitId, amount) {
+    if (!selectedSystemId) return;
+    await store.updateCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId, amount);
+  }
+  async function onDeleteCurrencySubUnit(parentUnitId, subUnitId) {
+    if (!selectedSystemId) return;
+    await store.deleteCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+  }
+  async function onSeedCurrencyPresets() {
+    if (!selectedSystemId || !currencyPresetsSupported) return;
+    await store.seedCurrencyUnitPresets(selectedSystemId);
   }
 
   function characterModifierLibraryEntry(modifierId) {
@@ -3597,6 +3631,15 @@
         onUpdateCharacterModifier={onUpdateCharacterModifier}
         onDeleteCharacterModifier={onDeleteCharacterModifier}
         onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
+        currencyUnits={selectedCurrencyUnits}
+        {currencyPresetsSupported}
+        onAddCurrencyUnit={onAddCurrencyUnit}
+        onUpdateCurrencyUnit={onUpdateCurrencyUnit}
+        onDeleteCurrencyUnit={onDeleteCurrencyUnit}
+        onAddCurrencySubUnit={onAddCurrencySubUnit}
+        onUpdateCurrencySubUnit={onUpdateCurrencySubUnit}
+        onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}
+        onSeedCurrencyPresets={onSeedCurrencyPresets}
       />
     {:else}
       <SystemsBrowserView

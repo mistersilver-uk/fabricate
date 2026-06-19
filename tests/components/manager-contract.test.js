@@ -64,6 +64,7 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
   return key.startsWith('FABRICATE.Admin.Manager.Environment.')
     || key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.')
     || key.startsWith('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.')
+    || key.startsWith('FABRICATE.Admin.Manager.CurrencyUnits.')
     || key.startsWith('FABRICATE.Admin.Environments.')
     || [
       'FABRICATE.Admin.Manager.GlobalConditions',
@@ -161,6 +162,7 @@ describe('CraftingSystemManager source contract', () => {
     }
     for (const snippet of [
       'manager-system-edit-form',
+      'data-edit-control="advanced-options"',
       'manager-feature-tile'
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
@@ -186,6 +188,27 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       systemEditSource.includes("FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression"),
       'character-modifier editor should keep the localized Expression label'
+    );
+    for (const snippet of [
+      'data-system-currency-units',
+      'manager-currency-unit-card',
+      'handleAddCurrencyUnit',
+      'onSeedCurrencyPresets',
+      'manager-currency-unit-summary',
+      'manager-currency-subunit-builder',
+      'manager-currency-subunit-grid',
+      'onUpdateCurrencySubUnit(unit.id, contained.unitId, event.currentTarget.value)',
+      'onDeleteCurrencySubUnit(unit.id, contained.unitId)'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    assert.ok(
+      rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
+      'root should pass selected currency units to SystemEditView'
+    );
+    assert.ok(
+      rootSource.includes('onAddCurrencySubUnit={onAddCurrencySubUnit}'),
+      'root should pass currency sub-unit actions to SystemEditView'
     );
     for (const snippet of [
       'class="manager-systems-table"',
@@ -236,6 +259,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Title, 'System settings');
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.SaveDetails, 'Save details');
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.EditBadge, undefined);
+    assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Title, 'Currency units');
+    assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Add, 'Add currency unit');
+    assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit, 'Add sub-unit');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Title, 'Recipes');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EnableNamed, 'Enable {name}');

@@ -29,7 +29,7 @@ function makeSystem(overrides = {}) {
     itemTags: overrides.itemTags || [],
     essenceDefinitions: overrides.essenceDefinitions || [],
     items: overrides.items || [],
-    requirements: overrides.requirements || { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
+    requirements: overrides.requirements || { time: { enabled: false }, currency: { enabled: false, units: [] } },
     craftingCheck: overrides.craftingCheck || { mode: 'passFail', macroUuid: null, outcomes: [] },
     recipeVisibility: overrides.recipeVisibility || { listMode: 'global' },
     ...overrides
@@ -666,7 +666,8 @@ describe('createAdminStore', () => {
       await store.toggleRequirement('currency', true);
       assert.ok(updateArgs, 'updateSystem should be called');
       assert.equal(updateArgs.updates.requirements.currency.enabled, true);
-      assert.ok('provider' in updateArgs.updates.requirements.currency, 'should preserve provider field');
+      assert.deepEqual(updateArgs.updates.requirements.currency.units, []);
+      assert.equal('provider' in updateArgs.updates.requirements.currency, false, 'should not emit provider field');
     });
 
     it('toggleRequirement("time", true) calls updateSystem with time.enabled: true', async () => {
@@ -1750,7 +1751,7 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.craftingCheck.progressive.awardMode, 'partial');
     });
 
-    it('saveCurrencyConfig builds correct requirements object with macro provider', async () => {
+    it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -1760,18 +1761,32 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCurrencyConfig('macro', null, 'check-uuid', 'decrement-uuid', 'format-uuid');
+      const created = await store.addCurrencyUnit('sys1', {
+        id: 'gp',
+        label: 'Gold',
+        abbreviation: 'gp',
+        icon: 'fa-solid fa-coins',
+        actorPath: 'system.currency.gp'
+      });
+      assert.equal(created.id, 'gp');
+      await store.updateCurrencyUnit('sys1', 'gp', { label: 'Gold pieces', actorPath: 'system.currency.gp.value' });
       assert.ok(updateArgs !== null);
       const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.provider, 'macro');
-      assert.equal(currency.checkCurrencyMacroUuid, 'check-uuid');
-      assert.equal(currency.decrementCurrencyMacroUuid, 'decrement-uuid');
-      assert.equal(currency.formatCurrencyMacroUuid, 'format-uuid');
+      assert.equal(currency.units[0].id, 'gp');
+      assert.equal(currency.units[0].label, 'Gold pieces');
+      assert.equal(currency.units[0].actorPath, 'system.currency.gp.value');
+      assert.equal('provider' in currency, false);
     });
 
-    it('saveCurrencyConfig with system provider sets systemAdapter and nulls macro UUIDs', async () => {
+    it('currency sub-unit actions add, update, and remove denomination breakdowns', async () => {
       let updateArgs = null;
-      const services = createMockServices();
+      const services = createMockServices({
+        randomID: (() => {
+          const ids = ['cp', 'sp'];
+          let index = 0;
+          return () => ids[index++] || `id-${index}`;
+        })()
+      });
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -1779,12 +1794,38 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCurrencyConfig('system', 'dnd5e', null, null, null);
+      await store.addCurrencyUnit('sys1', { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp' });
+      await store.addCurrencyUnit('sys1', { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp' });
+      await store.addCurrencySubUnit('sys1', 'sp', 'cp');
+      await store.updateCurrencySubUnit('sys1', 'sp', 'cp', 10);
       assert.ok(updateArgs !== null);
-      const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.provider, 'system');
-      assert.equal(currency.systemAdapter, 'dnd5e');
-      assert.equal(currency.checkCurrencyMacroUuid, null, 'macro UUIDs should be null for system provider');
+      let silver = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'sp');
+      assert.deepEqual(silver.contains, [{ unitId: 'cp', amount: 10 }]);
+
+      await store.deleteCurrencySubUnit('sys1', 'sp', 'cp');
+      silver = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'sp');
+      assert.deepEqual(silver.contains, []);
+    });
+
+    it('seedCurrencyUnitPresets adds dnd5e units idempotently', async () => {
+      let updateArgs = null;
+      const services = createMockServices({
+        getFoundrySystemId: () => 'dnd5e'
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const first = await store.seedCurrencyUnitPresets('sys1');
+      const second = await store.seedCurrencyUnitPresets('sys1');
+      assert.equal(first.unsupported, false);
+      assert.equal(first.added.length, 5);
+      assert.equal(second.added.length, 0);
+      assert.equal(second.skipped.length, 5);
+      assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'), true);
     });
 
     it('saveAlchemyConfig persists canonical alchemy settings', async () => {
@@ -1955,7 +1996,11 @@ describe('createAdminStore', () => {
         'addCategory', 'removeCategory',
         'addTag', 'removeTag',
         'addEssence', 'removeEssence',
-        'saveCraftingCheckConfig', 'saveCurrencyConfig', 'saveVisibilityConfig', 'saveTeaserConfig',
+        'saveCraftingCheckConfig',
+        'addCurrencyUnit', 'updateCurrencyUnit', 'deleteCurrencyUnit',
+        'addCurrencySubUnit', 'updateCurrencySubUnit', 'deleteCurrencySubUnit',
+        'seedCurrencyUnitPresets',
+        'saveVisibilityConfig', 'saveTeaserConfig',
         'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
         'importRecipes', 'exportRecipes',
         'exportSystem', 'importSystem',

@@ -139,9 +139,11 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 - Runtime execution normalizes duration fields to a world-time target timestamp for gate checks.
 - A step with time gating is incomplete until world time reaches the target completion timestamp.
 - Fabricate listens to the `updateWorldTime` hook, and checks game time on startup, to mark recipes and steps with a time requirement as completed, and subsequently notify users.
-- Currency provider behaviour is configured by `CraftingSystem.requirements.currency`:
-  - `system`: use adapter.
-  - `macro`: use configured macros.
+- Currency behaviour is configured by `CraftingSystem.requirements.currency.units[]`:
+  - `currencyRequirement.unit` references a configured `CurrencyUnit.id`.
+  - checks convert held denominations and the required amount to the configured terminal base unit.
+  - decrements spend configured denominations deterministically and make change through the unit breakdown.
+  - invalid currency profiles, missing actor paths, stale unit references, and insufficient funds block the step with a GM-readable message.
 
 ## Effect Transfer Semantics
 

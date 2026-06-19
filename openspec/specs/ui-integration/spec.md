@@ -157,6 +157,7 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 - Effect transfer toggle (`features.effectTransfer`)
 - Time requirements toggle (`requirements.time.enabled`)
 - Currency requirements toggle (`requirements.currency.enabled`)
+- Currency unit profile editor (`requirements.currency.units[]`)
 - Multi-step recipes toggle (`features.multiStepRecipes`)
 - Gathering toggle (`features.gathering`)
 
@@ -176,8 +177,11 @@ Mode semantics are defined in `004`.
 
 - Time toggle
 - Currency toggle
-- Currency provider (`system` or `macro`)
-- Provider-specific fields
+- Currency units card under character modifiers
+- Add currency unit and seed preset actions
+- Selectable expandable currency unit editors for label, abbreviation, icon, and actor data path
+- Add-sub-unit dropdown with plus action
+- Sub-unit pills with editable amount and remove action
 
 If `features.gathering === false`:
 

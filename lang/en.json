@@ -2118,6 +2118,27 @@
             "AddSearchLabel": "Search character modifiers to add"
           }
         },
+        "CurrencyUnits": {
+          "Title": "Currency units",
+          "Hint": "Define actor currency paths and denomination breakdowns for this crafting system.",
+          "Empty": "No currency units yet.",
+          "Add": "Add currency unit",
+          "Delete": "Delete currency unit",
+          "NewLabel": "New currency unit",
+          "Label": "Label",
+          "Abbreviation": "Abbreviation",
+          "Icon": "Icon",
+          "ActorPath": "Actor data path",
+          "SeedPresets": "Seed presets",
+          "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
+          "NoActorPath": "No actor path",
+          "SubUnitCount": "sub-units",
+          "AddSubUnit": "Add sub-unit",
+          "SubUnits": "Sub-units",
+          "SubUnitAmount": "Sub-unit amount",
+          "RemoveSubUnit": "Remove sub-unit",
+          "NoSubUnits": "This unit is a base denomination."
+        },
         "Column": {
           "System": "System",
           "Resolution": "Resolution",

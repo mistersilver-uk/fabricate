@@ -120,15 +120,7 @@ CraftingSystem = {
 
     currency: {
       enabled: boolean,
-      provider: "system" | "macro",
-
-      // provider = "system"
-      systemAdapter?: "dnd5e" | "pf2e",
-
-      // provider = "macro"
-      checkCurrencyMacroUuid?: string,     // (actor, requiredAmount) => boolean
-      decrementCurrencyMacroUuid?: string, // (actor, amount) => void
-      formatCurrencyMacroUuid?: string,    // (amount) => string
+      units: CurrencyUnit[],
     },
   },
 
@@ -159,6 +151,38 @@ CraftingSystem = {
 12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
 13. **`consumption.consumeCatalystsOnFail` is a legacy-named flag.** Following the Catalyst retirement, the persisted config key `consumption.consumeCatalystsOnFail` (on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`) was **retained by name** but now governs **Tool usage/breakage on a failed craft or salvage** (read it as "consume/break tools on fail"). It defaults to `false` (tools are not consumed/broken on failure unless enabled). The persisted key was deliberately **not** renamed because renaming a persisted setting key would require its own migration; the in-code semantics are tool-oriented while the wire key stays `consumeCatalystsOnFail`.
 14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in. A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour). Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed. The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids). A startup migration derives `GatheringRealm` records from the legacy per-system region vocabulary and maps `environment.region` → `includedRealmIds` (orphan free-text region strings are left inert). Realm records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import). A Realm maps to Foundry Scene Regions many-to-one through `sceneMappings[].sceneRegionUuid`; those Foundry-bridge fields keep their `sceneRegionUuid`/`sceneUuid` names. Record shapes and behavior are defined in `gathering-and-harvesting` (*Location-Aware Gathering*). Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (see *World Settings* below) and are excluded from system import/export.
+15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for step currency requirements.
+16. Currency unit profiles must be acyclic. Each connected conversion branch must resolve to exactly one terminal base unit.
+17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
+18. Built-in currency provider selection, system adapter selection, and currency macro UUID fields are legacy inputs only; normalized currency requirements do not emit them.
+
+## CurrencyUnit
+
+### Purpose
+
+Define one actor-backed currency denomination and its optional sub-unit breakdown.
+
+```ts
+type CurrencyUnit = {
+  id: string,           // stable internal reference used by CurrencyRequirement.unit
+  label: string,
+  abbreviation: string,
+  icon: string,
+  actorPath: string,    // Foundry actor data path containing the numeric balance
+  contains: Array<{
+    unitId: string,     // another CurrencyUnit.id
+    amount: number,     // positive integer count contained in one parent unit
+  }>,
+}
+```
+
+### Requirements
+
+1. `id` is stable after creation and is the value stored by recipe and salvage currency requirements.
+2. `label`, `abbreviation`, `icon`, `actorPath`, and `contains[]` are GM-editable.
+3. A unit must not contain itself directly or indirectly.
+4. `contains[].amount` must be a positive integer.
+5. A sub-unit reference must point at another configured currency unit.
 
 ### Recipe Visibility Requirements
 
@@ -420,7 +444,7 @@ Step = {
     years?: number,
   },
   currencyRequirement?: {
-      unit: string // varies by game system
+      unit: string // configured CurrencyUnit.id
       amount: number,
   },
 }

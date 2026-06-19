@@ -41,6 +41,15 @@ import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
+import {
+  getCurrencyPresetsForFoundrySystem,
+  seedCurrencyPresets
+} from '../../../config/currencyPresets.js';
+import {
+  canAddCurrencySubUnit,
+  normalizeCurrencyConfig,
+  normalizeCurrencyUnit
+} from '../../../systems/currencyProfile.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -1484,7 +1493,7 @@ function _buildSelectedSystemViewData(
 
     requirements: selectedSystem.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, provider: 'macro' }
+      currency: { enabled: false, units: [] }
     },
 
     craftingCheck: {
@@ -4151,12 +4160,12 @@ export function createAdminStore(services) {
 
     const requirements = JSON.parse(JSON.stringify(system.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, provider: 'macro' }
+      currency: { enabled: false, units: [] }
     }));
     requirements[requirement] = requirements[requirement] || {};
     requirements[requirement].enabled = enabled;
     if (requirement === 'currency') {
-      requirements.currency.provider = requirements.currency.provider || 'macro';
+      requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
     }
 
     await systemManager.updateSystem(sysId, { requirements });
@@ -5142,30 +5151,132 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveCurrencyConfig(provider, systemAdapter, checkMacro, decrementMacro, formatMacro) {
+  async function _updateCurrencyConfig(systemId = get(selectedSystemId), mutate) {
     const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
+    const sysId = systemId || get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
 
-    const resolvedProvider = provider === 'system' ? 'system' : 'macro';
     const requirements = JSON.parse(JSON.stringify(system.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, provider: 'macro' }
+      currency: { enabled: false, units: [] }
     }));
-    requirements.currency = {
-      ...(requirements.currency || {}),
-      enabled: requirements.currency?.enabled === true,
-      provider: resolvedProvider,
-      systemAdapter: resolvedProvider === 'system' ? systemAdapter || undefined : undefined,
-      checkCurrencyMacroUuid: resolvedProvider === 'macro' ? checkMacro || null : null,
-      decrementCurrencyMacroUuid: resolvedProvider === 'macro' ? decrementMacro || null : null,
-      formatCurrencyMacroUuid: resolvedProvider === 'macro' ? formatMacro || null : null
-    };
+    requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
+    const result = await mutate(requirements.currency, system);
+    if (result === false) return false;
 
     await systemManager.updateSystem(sysId, { requirements });
     await refresh();
+    return result ?? true;
+  }
+
+  async function addCurrencyUnit(systemId = get(selectedSystemId), partial = {}) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const id = String(partial?.id || _randomID()).trim();
+      if (!id || currency.units.some(unit => unit.id === id)) return null;
+      const unit = normalizeCurrencyUnit({
+        id,
+        label: partial?.label || services.localize?.('FABRICATE.Admin.Manager.CurrencyUnits.NewLabel') || 'Currency unit',
+        abbreviation: partial?.abbreviation || '',
+        icon: partial?.icon || 'fa-solid fa-coins',
+        actorPath: partial?.actorPath || '',
+        contains: partial?.contains || []
+      }, _randomID);
+      if (!unit) return null;
+      currency.units = [...currency.units, unit];
+      return unit;
+    });
+  }
+
+  async function updateCurrencyUnit(systemId = get(selectedSystemId), unitId, updates = {}) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      if (!unitId) return false;
+      let changed = false;
+      currency.units = currency.units.map(unit => {
+        if (unit.id !== unitId) return unit;
+        changed = true;
+        return normalizeCurrencyUnit({ ...unit, ...updates, id: unit.id }, _randomID) || unit;
+      });
+      return changed;
+    });
+  }
+
+  async function deleteCurrencyUnit(systemId = get(selectedSystemId), unitId) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      if (!unitId) return false;
+      const nextUnits = currency.units
+        .filter(unit => unit.id !== unitId)
+        .map(unit => ({
+          ...unit,
+          contains: (unit.contains || []).filter(entry => entry.unitId !== unitId)
+        }));
+      if (nextUnits.length === currency.units.length) return false;
+      currency.units = nextUnits;
+      return true;
+    });
+  }
+
+  async function addCurrencySubUnit(systemId = get(selectedSystemId), parentUnitId, subUnitId, amount = 1) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
+      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
+      currency.units = currency.units.map(unit => unit.id === parentUnitId
+        ? {
+          ...unit,
+          contains: [...(unit.contains || []), { unitId: subUnitId, amount: numericAmount }]
+        }
+        : unit);
+      return true;
+    });
+  }
+
+  async function updateCurrencySubUnit(systemId = get(selectedSystemId), parentUnitId, subUnitId, amount) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
+      let changed = false;
+      currency.units = currency.units.map(unit => {
+        if (unit.id !== parentUnitId) return unit;
+        const contains = (unit.contains || []).map(entry => {
+          if (entry.unitId !== subUnitId) return entry;
+          changed = true;
+          return { ...entry, amount: numericAmount };
+        });
+        return { ...unit, contains };
+      });
+      return changed;
+    });
+  }
+
+  async function deleteCurrencySubUnit(systemId = get(selectedSystemId), parentUnitId, subUnitId) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      let changed = false;
+      currency.units = currency.units.map(unit => {
+        if (unit.id !== parentUnitId) return unit;
+        const contains = (unit.contains || []).filter(entry => entry.unitId !== subUnitId);
+        changed = contains.length !== (unit.contains || []).length;
+        return { ...unit, contains };
+      });
+      return changed;
+    });
+  }
+
+  async function seedCurrencyUnitPresets(systemId = get(selectedSystemId)) {
+    const foundrySystemId = typeof services.getFoundrySystemId === 'function'
+      ? String(services.getFoundrySystemId() || '')
+      : '';
+    const presets = getCurrencyPresetsForFoundrySystem(foundrySystemId);
+    if (!presets || presets.length === 0) {
+      return { added: [], skipped: [], unsupported: true, foundrySystemId };
+    }
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const result = seedCurrencyPresets({
+        presets,
+        currentUnits: currency.units || []
+      });
+      currency.units = result.next.map(unit => normalizeCurrencyUnit(unit, _randomID)).filter(Boolean);
+      return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
+    });
   }
 
   async function saveAlchemyConfig(config = {}) {
@@ -5613,7 +5724,13 @@ export function createAdminStore(services) {
     updateGatheringEventCharacterModifier,
     deleteGatheringEventCharacterModifier,
     saveCraftingCheckConfig,
-    saveCurrencyConfig,
+    addCurrencyUnit,
+    updateCurrencyUnit,
+    deleteCurrencyUnit,
+    addCurrencySubUnit,
+    updateCurrencySubUnit,
+    deleteCurrencySubUnit,
+    seedCurrencyUnitPresets,
     saveAlchemyConfig,
     saveVisibilityConfig,
     saveTeaserConfig,
