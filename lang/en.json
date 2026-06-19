@@ -847,7 +847,8 @@
             "CraftingChecks": "Enables system-level crafting check configuration in the current admin.",
             "OutcomeRouting": "Enables routed outcome configuration where supported.",
             "EffectTransfer": "Allows crafted results to inherit effects from source components.",
-            "ChatOutput": "Posts a summary chat card after crafting and gathering attempts."
+            "ChatOutput": "Posts a summary chat card after crafting and gathering attempts.",
+            "Currency": "Enables step currency requirements and the currency configuration for this system."
           }
         },
         "Nav": {
@@ -2131,7 +2132,7 @@
           "Icon": "Icon",
           "ChangeIcon": "Change icon",
           "ActorPath": "Actor data path",
-          "Denomination": "Coin denomination",
+          "Denomination": "Denomination",
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
           "NoActorPath": "No actor path",
@@ -2188,7 +2189,8 @@
           "OutcomeRouting": "Outcome routing",
           "EffectTransfer": "Effect transfer",
           "PropertyMacros": "Property macros",
-          "ChatOutput": "Chat output"
+          "ChatOutput": "Chat output",
+          "Currency": "Currency"
         },
         "Travel": {
           "Title": "Travel",

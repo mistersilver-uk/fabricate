@@ -222,6 +222,58 @@ function collectUnitErrors(unit, { spendStrategy, byId, errors }) {
   }
 }
 
+/**
+ * Collect every unit id reachable from `startId` (inclusive) by walking `contains[]`. Cycle-safe via
+ * a visited set so a circular graph terminates. The returned set always includes `startId` itself.
+ *
+ * @param {Map<string, object>} byId
+ * @param {string} startId
+ * @returns {Set<string>}
+ */
+function collectReachableUnitIds(byId, startId) {
+  const reachable = new Set();
+  const stack = [startId];
+  while (stack.length > 0) {
+    const currentId = stack.pop();
+    if (!currentId || reachable.has(currentId)) continue;
+    reachable.add(currentId);
+    const unit = byId.get(currentId);
+    for (const contained of unit?.contains || []) {
+      stack.push(contained.unitId);
+    }
+  }
+  return reachable;
+}
+
+// A single unit's decomposition must reach each descendant by exactly one path; two distinct paths
+// to the same node (e.g. P->C and P->A->B->C, or a P->sp + P->ep->sp diamond) let the resolver sum
+// the same node twice. This per-unit DFS flags the first descendant it re-enters via a second path.
+// It is intentionally scoped to one unit's subtree, so a node legitimately shared by two DIFFERENT
+// parents (gp->sp and ep->sp) is fine. Cycles are reported separately by the resolver, so this walk
+// short-circuits on the active path to stay terminating.
+function collectConflictingPathErrors(byId, unit, errors) {
+  const visited = new Set();
+  const onPath = new Set();
+  function walk(unitId) {
+    if (onPath.has(unitId)) return;
+    if (visited.has(unitId)) {
+      errors.push(`Currency unit "${unit.label}" has conflicting conversion paths to "${unitId}".`);
+      return;
+    }
+    visited.add(unitId);
+    onPath.add(unitId);
+    for (const contained of byId.get(unitId)?.contains || []) {
+      walk(contained.unitId);
+    }
+    onPath.delete(unitId);
+  }
+  visited.add(unit.id);
+  onPath.add(unit.id);
+  for (const contained of unit.contains) {
+    walk(contained.unitId);
+  }
+}
+
 function resolveUnitContents(unit, ancestry, { errors, resolveUnit }) {
   let baseUnitId = null;
   let baseValue = 0;
@@ -326,6 +378,7 @@ export function validateCurrencyProfile(units = [], options = {}) {
   collectRawSubUnitErrors(rawUnits, errors);
   for (const unit of normalizedUnits) {
     collectUnitErrors(unit, { spendStrategy, byId, errors });
+    collectConflictingPathErrors(byId, unit, errors);
   }
   if (spendStrategy === 'macro') {
     collectMacroConfigErrors(options?.macros, errors);
@@ -530,6 +583,21 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   };
 }
 
+/**
+ * Decide whether sub-unit `subUnitId` may be added as a direct child of `parentUnitId`.
+ *
+ * Eligibility rule: `reachable(parent) ∩ reachable(child) = ∅`, where `reachable(X)` is `X` plus
+ * everything transitively reachable through `contains[]`. A non-empty intersection means adding the
+ * edge would give the parent two distinct decomposition paths to some node (subsuming self,
+ * already-contained, cycle, and the descendant/diamond cases). It still allows a node legitimately
+ * shared by two different parents, because each parent's reachable set is computed over its own
+ * subtree.
+ *
+ * @param {object[]} [units]
+ * @param {string} [parentUnitId]
+ * @param {string} [subUnitId]
+ * @returns {boolean}
+ */
 export function canAddCurrencySubUnit(units = [], parentUnitId = '', subUnitId = '') {
   const parentId = String(parentUnitId || '').trim();
   const childId = String(subUnitId || '').trim();
@@ -538,21 +606,12 @@ export function canAddCurrencySubUnit(units = [], parentUnitId = '', subUnitId =
     .map((entry) => normalizeCurrencyUnit(entry))
     .filter(Boolean);
   const byId = buildUnitMap(normalizedUnits);
-  const parent = byId.get(parentId);
-  const child = byId.get(childId);
-  if (!parent || !child) return false;
-  if (parent.contains.some((entry) => entry.unitId === childId)) return false;
+  if (!byId.has(parentId) || !byId.has(childId)) return false;
 
-  const stack = [child];
-  const seen = new Set();
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current || seen.has(current.id)) continue;
-    if (current.id === parentId) return false;
-    seen.add(current.id);
-    for (const contained of current.contains) {
-      stack.push(byId.get(contained.unitId));
-    }
+  const parentReachable = collectReachableUnitIds(byId, parentId);
+  const childReachable = collectReachableUnitIds(byId, childId);
+  for (const id of childReachable) {
+    if (parentReachable.has(id)) return false;
   }
   return true;
 }

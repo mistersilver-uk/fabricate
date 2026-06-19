@@ -367,6 +367,34 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('getCurrencyProvidersForFoundrySystem'),
       'root should derive provider options from the currency provider registry'
     );
+    // The currency feature toggle lives in the Optional features section, reads
+    // requirements.currency.enabled, and calls onToggleCurrency. It renders always (so the section is
+    // never empty), and the Currency Units card is gated on the enabled flag.
+    for (const snippet of [
+      'const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true)',
+      'data-system-currency-toggle',
+      'onToggleCurrency',
+      'FABRICATE.Admin.Manager.Feature.Currency',
+      'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    // The currency toggle tile renders independently of visibleFeatures, so the toggle list is no
+    // longer hidden behind the empty-feature guard.
+    assert.ok(
+      systemEditSource.includes('data-feature-key="currency"'),
+      'currency toggle tile should always render in the Optional features section'
+    );
+    // The Currency Units card is gated on currencyEnabled.
+    assert.ok(
+      systemEditSource.indexOf('{#if currencyEnabled}') <
+        systemEditSource.indexOf('manager-currency-unit-card'),
+      'Currency Units card should be gated behind the currencyEnabled flag'
+    );
+    assert.ok(
+      rootSource.includes("store.toggleRequirement?.('currency', next)"),
+      'root should thread onToggleCurrency to store.toggleRequirement'
+    );
     for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',

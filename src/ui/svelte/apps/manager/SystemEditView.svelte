@@ -32,7 +32,8 @@
     onSetCurrencySpendStrategy = async () => {},
     onSetCurrencyProvider = async () => {},
     onSetCurrencyMacro = async () => {},
-    onClearCurrencyMacro = async () => {}
+    onClearCurrencyMacro = async () => {},
+    onToggleCurrency = async () => {}
   } = $props();
 
   const CURRENCY_SPEND_STRATEGY_OPTIONS = [
@@ -120,6 +121,11 @@
   const ROLL_EXPRESSION_PATTERN_UI = /\bd\d|[*/()]/;
 
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
+  const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true);
+
+  async function handleToggleCurrency() {
+    await onToggleCurrency(!currencyEnabled);
+  }
 
   // A system with no registered provider has nothing to drive the actorInventory strategy: the
   // resolved provider id is empty and its canonical ladder is empty. The store guards against
@@ -200,12 +206,22 @@
     return unit?.icon || 'fa-solid fa-coins';
   }
 
-  function currencyUnitCanReach(startUnitId, targetUnitId, seen = new Set()) {
-    if (!startUnitId || seen.has(startUnitId)) return false;
-    if (startUnitId === targetUnitId) return true;
-    seen.add(startUnitId);
-    const unit = currencyUnits.find(entry => entry.id === startUnitId);
-    return (unit?.contains || []).some(entry => currencyUnitCanReach(entry.unitId, targetUnitId, seen));
+  // Mirror of canAddCurrencySubUnit in src/systems/currencyProfile.js: a unit (plus everything it
+  // transitively contains) reachable from the parent and from the child must be disjoint, or adding
+  // the edge would give the parent two conversion paths to some node.
+  function currencyReachableUnitIds(startUnitId) {
+    const reachable = new Set();
+    const stack = [startUnitId];
+    while (stack.length > 0) {
+      const currentId = stack.pop();
+      if (!currentId || reachable.has(currentId)) continue;
+      reachable.add(currentId);
+      const unit = currencyUnits.find(entry => entry.id === currentId);
+      for (const contained of unit?.contains || []) {
+        stack.push(contained.unitId);
+      }
+    }
+    return reachable;
   }
 
   function currencyCanAddSubUnit(parentUnitId, subUnitId) {
@@ -213,8 +229,12 @@
     const parent = currencyUnits.find(entry => entry.id === parentUnitId);
     const child = currencyUnits.find(entry => entry.id === subUnitId);
     if (!parent || !child) return false;
-    if ((parent.contains || []).some(entry => entry.unitId === subUnitId)) return false;
-    return !currencyUnitCanReach(subUnitId, parentUnitId);
+    const parentReachable = currencyReachableUnitIds(parentUnitId);
+    const childReachable = currencyReachableUnitIds(subUnitId);
+    for (const id of childReachable) {
+      if (parentReachable.has(id)) return false;
+    }
+    return true;
   }
 
   function currencyUnitSubUnitOptions(unitId) {
@@ -346,32 +366,47 @@
 
       <section class="manager-edit-card" data-edit-control="advanced-options">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.OptionalFeatures', 'Optional features')}</h3>
-        {#if visibleFeatures.length > 0}
-          <div class="manager-toggle-list">
-            {#each visibleFeatures as feature (feature.systemKey)}
-              <div class="manager-feature-tile" data-feature-key={feature.systemKey}>
-                <div class="manager-feature-tile-head">
-                  <strong>{text(feature.labelKey, feature.fallback)}</strong>
-                  <button
-                    type="button"
-                    class={`manager-status-toggle ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
-                    aria-pressed={selectedSystem.features?.[feature.systemKey] === true}
-                    aria-label={text(feature.labelKey, feature.fallback)}
-                    onclick={() => handleToggleFeature(feature)}
-                  >
-                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                    <span class="manager-status-toggle-label">{selectedSystem.features?.[feature.systemKey] === true
-                      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
-                  </button>
-                </div>
-                <small>{text(feature.hintKey, feature.hintFallback)}</small>
+        <div class="manager-toggle-list">
+          {#each visibleFeatures as feature (feature.systemKey)}
+            <div class="manager-feature-tile" data-feature-key={feature.systemKey}>
+              <div class="manager-feature-tile-head">
+                <strong>{text(feature.labelKey, feature.fallback)}</strong>
+                <button
+                  type="button"
+                  class={`manager-status-toggle ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
+                  aria-pressed={selectedSystem.features?.[feature.systemKey] === true}
+                  aria-label={text(feature.labelKey, feature.fallback)}
+                  onclick={() => handleToggleFeature(feature)}
+                >
+                  <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                  <span class="manager-status-toggle-label">{selectedSystem.features?.[feature.systemKey] === true
+                    ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                    : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+                </button>
               </div>
-            {/each}
+              <small>{text(feature.hintKey, feature.hintFallback)}</small>
+            </div>
+          {/each}
+          <div class="manager-feature-tile" data-feature-key="currency">
+            <div class="manager-feature-tile-head">
+              <strong>{text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}</strong>
+              <button
+                type="button"
+                class={`manager-status-toggle ${currencyEnabled ? 'is-on' : 'is-off'}`}
+                aria-pressed={currencyEnabled}
+                aria-label={text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}
+                data-system-currency-toggle
+                onclick={handleToggleCurrency}
+              >
+                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                <span class="manager-status-toggle-label">{currencyEnabled
+                  ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                  : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+              </button>
+            </div>
+            <small>{text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency', 'Enables step currency requirements and the currency configuration for this system.')}</small>
           </div>
-        {:else}
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.SystemEdit.NoFeatureToggles', 'No optional feature toggles are present on this system.')}</p>
-        {/if}
+        </div>
       </section>
 
       {#if gatheringEnabled}
@@ -446,6 +481,7 @@
         </section>
       {/if}
 
+      {#if currencyEnabled}
       <section class="manager-edit-card manager-currency-unit-card" data-system-currency-units aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Title', 'Currency units')}>
         <header class="manager-character-modifier-card-header">
           <div class="manager-character-modifier-card-header-copy">
@@ -721,6 +757,7 @@
           </ul>
         {/if}
       </section>
+      {/if}
     </form>
   </main>
 {/if}

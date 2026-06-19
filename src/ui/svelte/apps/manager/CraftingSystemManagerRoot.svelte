@@ -3671,6 +3671,7 @@
         onSetCurrencyProvider={onSetCurrencyProvider}
         onSetCurrencyMacro={onSetCurrencyMacro}
         onClearCurrencyMacro={onClearCurrencyMacro}
+        onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
       />
     {:else}
       <SystemsBrowserView

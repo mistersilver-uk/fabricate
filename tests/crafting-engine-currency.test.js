@@ -12,6 +12,8 @@ import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { Pf2eInventoryCoinAdapter } from '../src/systems/Pf2eInventoryCoinAdapter.js';
 import {
   buildCurrencySpendUpdates,
+  canAddCurrencySubUnit,
+  currencySubUnitOptions,
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
   readCurrencyBalances,
@@ -90,6 +92,92 @@ test('currency profile validation rejects circular and stale sub-unit references
   ]);
   assert.equal(stale.valid, false);
   assert.match(stale.errors.join('; '), /unknown unit/i);
+});
+
+// Sub-unit eligibility and conflicting-conversion-path rule:
+// reachable(parent) ∩ reachable(child) must be empty.
+function ladderUnit(id, contains = []) {
+  return { id, label: id, abbreviation: id, actorPath: `system.currency.${id}`, contains };
+}
+
+test('canAddCurrencySubUnit rejects a descendant reachable through an existing chain', () => {
+  // Chain P -> A -> B -> C. Adding C directly to P would give P two paths to C.
+  const units = [
+    ladderUnit('p', [{ unitId: 'a', amount: 10 }]),
+    ladderUnit('a', [{ unitId: 'b', amount: 10 }]),
+    ladderUnit('b', [{ unitId: 'c', amount: 10 }]),
+    ladderUnit('c'),
+  ];
+  assert.equal(canAddCurrencySubUnit(units, 'p', 'c'), false);
+  assert.equal(canAddCurrencySubUnit(units, 'p', 'b'), false);
+  // A still legitimately reaches C and B; adding the next rung in a fresh chain is fine.
+  assert.equal(canAddCurrencySubUnit(units, 'c', 'p'), false); // cycle
+});
+
+test('validateCurrencyProfile rejects a unit with two paths to the same descendant', () => {
+  // P -> A -> B -> C and also P -> C: two distinct paths to C.
+  const chainConflict = validateCurrencyProfile([
+    ladderUnit('p', [
+      { unitId: 'a', amount: 10 },
+      { unitId: 'c', amount: 1000 },
+    ]),
+    ladderUnit('a', [{ unitId: 'b', amount: 10 }]),
+    ladderUnit('b', [{ unitId: 'c', amount: 10 }]),
+    ladderUnit('c'),
+  ]);
+  assert.equal(chainConflict.valid, false);
+  assert.match(chainConflict.errors.join('; '), /conflicting conversion paths to "c"/i);
+});
+
+test('canAddCurrencySubUnit rejects a diamond (shared child via the new edge)', () => {
+  // gp -> sp; ep -> sp. Adding ep to gp gives gp two paths to sp (gp->sp and gp->ep->sp).
+  const units = [
+    ladderUnit('gp', [{ unitId: 'sp', amount: 10 }]),
+    ladderUnit('ep', [{ unitId: 'sp', amount: 5 }]),
+    ladderUnit('sp'),
+  ];
+  assert.equal(canAddCurrencySubUnit(units, 'gp', 'ep'), false);
+});
+
+test('validateCurrencyProfile allows a node shared by two different parents', () => {
+  // The legitimate DAG: gp -> sp and ep -> sp built separately is valid (no single unit reaches sp
+  // twice). sp is still addable to a fresh parent.
+  const units = [
+    ladderUnit('gp', [{ unitId: 'sp', amount: 10 }]),
+    ladderUnit('ep', [{ unitId: 'sp', amount: 5 }]),
+    ladderUnit('sp', [{ unitId: 'cp', amount: 10 }]),
+    ladderUnit('cp'),
+    ladderUnit('pp'),
+  ];
+  const profile = validateCurrencyProfile(units);
+  assert.equal(profile.valid, true, profile.errors.join('; '));
+  // pp has nothing in common with sp's subtree, so sp remains addable to it.
+  assert.equal(canAddCurrencySubUnit(units, 'pp', 'sp'), true);
+});
+
+test('canAddCurrencySubUnit still excludes self, already-contained, and cycles', () => {
+  const units = [
+    ladderUnit('gp', [{ unitId: 'sp', amount: 10 }]),
+    ladderUnit('sp', [{ unitId: 'cp', amount: 10 }]),
+    ladderUnit('cp'),
+  ];
+  assert.equal(canAddCurrencySubUnit(units, 'gp', 'gp'), false); // self
+  assert.equal(canAddCurrencySubUnit(units, 'gp', 'sp'), false); // already contained
+  assert.equal(canAddCurrencySubUnit(units, 'gp', 'cp'), false); // descendant
+  assert.equal(canAddCurrencySubUnit(units, 'cp', 'gp'), false); // cycle
+  assert.equal(canAddCurrencySubUnit(units, 'sp', 'gp'), false); // cycle (sp reaches cp, gp reaches sp,cp)
+});
+
+test('currencySubUnitOptions only offers conflict-free sub-units', () => {
+  const units = [
+    ladderUnit('gp', [{ unitId: 'sp', amount: 10 }]),
+    ladderUnit('sp', [{ unitId: 'cp', amount: 10 }]),
+    ladderUnit('cp'),
+    ladderUnit('gem'),
+  ];
+  const options = currencySubUnitOptions(units, 'gp').map((option) => option.id);
+  // gp already reaches sp and cp; gem is unrelated and eligible.
+  assert.deepEqual(options, ['gem']);
 });
 
 test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMode field', () => {

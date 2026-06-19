@@ -756,6 +756,9 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleFeature', feature, enabled]);
       return options.toggleFeatureResult ?? true;
     },
+    toggleRequirement: (requirement, enabled) => {
+      calls.push(['toggleRequirement', requirement, enabled]);
+    },
     setCurrencySpendStrategy: async (id, strategy) => { calls.push(['setCurrencySpendStrategy', strategy, id]); },
     setCurrencyProvider: async (id, providerId) => { calls.push(['setCurrencyProvider', providerId, id]); },
     setCurrencyMacro: async (id, key, uuid) => { calls.push(['setCurrencyMacro', key, uuid, id]); },
@@ -5654,6 +5657,52 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gpUnit.querySelector('[data-system-currency-readonly-label]').textContent.trim(), 'Gold');
     assert.equal(gpUnit.querySelector('[data-system-currency-abbreviation]').textContent.trim(), 'gp');
     assert.equal(gpUnit.querySelector('[data-system-currency-denomination]').textContent.trim(), 'gp');
+  });
+
+  it('renders the currency feature toggle in Optional features and routes its change', async () => {
+    const { calls } = await mountCurrencyEditor({
+      selectedCurrency: { enabled: false, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
+    });
+
+    const tile = target.querySelector('[data-feature-key="currency"]');
+    assert.ok(tile, 'currency toggle tile should render in Optional features');
+    const toggle = tile.querySelector('[data-system-currency-toggle]');
+    assert.ok(toggle, 'currency toggle button should render');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle reflects disabled currency');
+    assert.ok(tile.querySelector('small'), 'currency tile should include a hint');
+
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(call => call[0] === 'toggleRequirement' && call[1] === 'currency' && call[2] === true),
+      'clicking the toggle should enable currency through toggleRequirement'
+    );
+  });
+
+  it('hides the Currency Units card when currency is disabled and shows it when enabled', async () => {
+    await mountCurrencyEditor({
+      selectedCurrency: { enabled: false, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
+    });
+    assert.equal(
+      target.querySelector('[data-system-currency-units]'),
+      null,
+      'Currency Units card should be hidden when currency is disabled'
+    );
+    // The toggle tile still renders even with the card hidden.
+    assert.ok(target.querySelector('[data-feature-key="currency"]'), 'currency toggle tile should still render');
+
+    // Tear down before re-mounting with currency enabled.
+    if (mounted) unmount(mounted);
+    if (target?.parentNode) target.parentNode.removeChild(target);
+
+    await mountCurrencyEditor({
+      selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
+    });
+    assert.ok(
+      target.querySelector('[data-system-currency-units]'),
+      'Currency Units card should render when currency is enabled'
+    );
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {

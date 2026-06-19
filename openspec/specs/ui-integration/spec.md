@@ -176,8 +176,8 @@ Mode semantics are defined in `004`.
 #### Requirements Controls
 
 - Time toggle
-- Currency toggle
-- Currency units card under character modifiers
+- Currency toggle in the Optional features section, bound to `requirements.currency.enabled`. It renders always (independent of which optional feature flags exist on the system), so the section is never empty.
+- Currency units card under character modifiers, rendered only when `requirements.currency.enabled === true`. When currency is disabled the entire currency-units configuration block (spend strategy, provider, macros, and units) is hidden.
 - A config-level block above the unit list with a spend-strategy `<select>` offering the three peer strategies (`actorProperty` / `actorInventory` / `macro`; both dnd5e and pf2e), each with `<small>` hint text reflecting the selected strategy. When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the system has none). When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is reserved for a future refund flow. There is no nested inventory-mode `<select>` — macro is its own peer strategy.
 - Add currency unit and seed preset actions
 - Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)

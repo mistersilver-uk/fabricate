@@ -190,7 +190,7 @@ type CurrencyUnit = {
 
 1. `id` is stable after creation and is the value stored by recipe and salvage currency requirements.
 2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
-3. A unit must not contain itself directly or indirectly.
+3. A unit must not contain itself directly or indirectly, and a single unit's decomposition must reach each descendant by exactly one path. A sub-unit `S` is eligible for parent `P` only when the set of units reachable from `P` (inclusive, through `contains[]`) and the set reachable from `S` are disjoint; this subsumes self-containment, an already-direct child, a cycle back to `P`, and the descendant/diamond cases where `P` would gain two conversion paths to the same node. A profile where any unit reaches the same descendant by more than one distinct path is a validation error (conflicting conversion paths). A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` and `ep -> sp`) is allowed, because each parent's reachable set is computed over its own subtree.
 4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
 6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `requirements.currency.spendStrategy`:
