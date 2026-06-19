@@ -42,6 +42,16 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   },
   {
+    id: 'manager-currency',
+    label: 'Manager currency configuration (spend strategy, units, macros)',
+    smokeLabels: ['currency-actor-property', 'currency-macro', 'currency-actor-inventory'],
+    matches: [
+      /^src\/systems\/currencyProfile\.js$/,
+      /^src\/systems\/CoinSpenders\.js$/,
+      /^src\/config\/currency(?:Presets|Providers)\.js$/,
+    ],
+  },
+  {
     id: 'manager-components',
     label: 'Manager components browser',
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],

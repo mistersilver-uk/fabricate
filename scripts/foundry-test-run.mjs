@@ -149,6 +149,23 @@ async function screenshot(page, label) {
 }
 
 /**
+ * Capture a single element (its full bounding box, scrolled into view) using the
+ * same `screenshot-NN-<label>.png` numbering as `screenshot()`. Useful for tall
+ * cards that sit below the fold, where a viewport screenshot would crop them.
+ * @param {import('playwright').Page} page
+ * @param {import('playwright').Locator} locator
+ * @param {string} label
+ */
+async function screenshotElement(page, locator, label) {
+  if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
+  screenshotCounter++;
+  const num = String(screenshotCounter).padStart(2, '0');
+  const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
+  await locator.scrollIntoViewIfNeeded();
+  await locator.screenshot({ path });
+}
+
+/**
  * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
  * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
  * document element and every `.fabricate` root. This re-themes the real app via
@@ -2626,6 +2643,49 @@ async function main() {
         await assertManagerLayoutStable(page, 'system edit narrow');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-narrow');
+
+        // --- Currency configuration (#393) ---
+        // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)
+        // unit ladder, then capture each spend strategy. The smoke world is dnd5e, so the
+        // actorInventory branch shows the no-provider callout (the pf2e provider grid needs
+        // a pf2e world, which the e2e fixtures do not ship).
+        await setManagerWindowSize(page, { width: 1280, height: 900 });
+        const currencyToggle = page.locator('.fabricate-manager [data-system-currency-toggle]').first();
+        await currencyToggle.waitFor({ state: 'visible', timeout: 5_000 });
+        await currencyToggle.scrollIntoViewIfNeeded();
+        if (await page.locator('.fabricate-manager [data-system-currency-units]').count() === 0) {
+          await currencyToggle.click();
+        }
+        const currencyCard = page.locator('.fabricate-manager [data-system-currency-units]').first();
+        await currencyCard.waitFor({ state: 'visible', timeout: 5_000 });
+        const currencySeed = currencyCard.locator('button:has-text("Seed presets")').first();
+        if (await currencySeed.count() > 0) {
+          await currencySeed.click();
+          await page.waitForTimeout(600);
+          await page.evaluate(async () => {
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          });
+        }
+        await currencyCard.locator('[data-system-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshotElement(page, currencyCard, 'currency-actor-property');
+
+        const currencyStrategy = page.locator('.fabricate-manager [data-system-currency-strategy-select]').first();
+        await currencyStrategy.selectOption('macro');
+        await page.locator('.fabricate-manager [data-system-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.waitForTimeout(300);
+        await assertNoScreenshotOverlays(page);
+        await screenshotElement(page, currencyCard, 'currency-macro');
+
+        await currencyStrategy.selectOption('actorInventory');
+        await page.locator('.fabricate-manager [data-system-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.waitForTimeout(300);
+        await assertNoScreenshotOverlays(page);
+        await screenshotElement(page, currencyCard, 'currency-actor-inventory');
+
+        // Leave the persisted smoke system on the default strategy.
+        await currencyStrategy.selectOption('actorProperty');
+        await page.waitForTimeout(300);
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const recipeApiCount = await page.evaluate((sysId) => {
