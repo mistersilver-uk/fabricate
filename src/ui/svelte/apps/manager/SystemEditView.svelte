@@ -294,7 +294,7 @@
                       <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Edit', 'Edit character modifier')} onclick={() => characterModifierEditingId = entry.id}>
                         <i class="fa-solid fa-pen" aria-hidden="true"></i>
                       </button>
-                      <button type="button" class="manager-icon-button manager-icon-button-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
+                      <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
                         <i class="fa-solid fa-trash" aria-hidden="true"></i>
                       </button>
                     </div>
@@ -403,10 +403,10 @@
                               min="1"
                               step="1"
                               value={contained.amount}
-                              aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitAmount', 'Sub-unit amount')}
+                              aria-label={`${currencyUnitLabel(contained.unitId)} ${text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitAmount', 'Sub-unit amount').toLowerCase()}`}
                               oninput={(event) => onUpdateCurrencySubUnit(unit.id, contained.unitId, event.currentTarget.value)}
                             />
-                            <button type="button" class="manager-icon-button manager-icon-button-danger" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} onclick={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}>
+                            <button type="button" class="manager-icon-button is-danger" aria-label={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`} onclick={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}>
                               <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                             </button>
                           </div>

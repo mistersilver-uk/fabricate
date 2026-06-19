@@ -21,6 +21,16 @@ function freezePresetUnits(units) {
   );
 }
 
+/**
+ * dnd5e and pf2e share the same denomination ladder, so the only difference between
+ * the two presets is how a coin balance is read and spent. dnd5e coins live at a flat
+ * `system.currency.<denom>` numeric path and are spent via `actor.update` (the
+ * `dataPath` strategy). Modern pf2e stores coins as inventory treasure Items read via
+ * `actor.inventory.coins` and mutated through `actor.inventory.removeCoins(...)`, so its
+ * preset units carry a `denomination` instead of an `actorPath` and the system config
+ * uses the `pf2eInventory` spend strategy.
+ */
+
 export const DND5E_CURRENCY_PRESETS = freezePresetUnits([
   {
     id: 'cp',
@@ -70,7 +80,7 @@ export const PF2E_CURRENCY_PRESETS = freezePresetUnits([
     label: 'Copper',
     abbreviation: 'cp',
     icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.cp.value',
+    denomination: 'cp',
     contains: [],
   },
   {
@@ -78,7 +88,7 @@ export const PF2E_CURRENCY_PRESETS = freezePresetUnits([
     label: 'Silver',
     abbreviation: 'sp',
     icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.sp.value',
+    denomination: 'sp',
     contains: [{ unitId: 'cp', amount: 10 }],
   },
   {
@@ -86,7 +96,7 @@ export const PF2E_CURRENCY_PRESETS = freezePresetUnits([
     label: 'Gold',
     abbreviation: 'gp',
     icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.gp.value',
+    denomination: 'gp',
     contains: [{ unitId: 'cp', amount: 100 }],
   },
   {
@@ -94,7 +104,7 @@ export const PF2E_CURRENCY_PRESETS = freezePresetUnits([
     label: 'Platinum',
     abbreviation: 'pp',
     icon: 'fa-solid fa-coins',
-    actorPath: 'system.currency.pp.value',
+    denomination: 'pp',
     contains: [{ unitId: 'cp', amount: 1000 }],
   },
 ]);
@@ -139,6 +149,8 @@ export function seedCurrencyPresets({ presets = [], currentUnits = [] } = {}) {
           }))
         : [],
     };
+    const denomination = String(preset.denomination || '').trim();
+    if (denomination) cloned.denomination = denomination;
     seen.set(id, cloned);
     added.push(cloned);
   }

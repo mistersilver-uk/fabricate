@@ -60,6 +60,7 @@ import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
+import { Pf2eCoinSpender } from './systems/Pf2eCoinSpender.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -490,6 +491,7 @@ class Fabricate {
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
     this.itemPilesIntegration = null;
+    this.coinSpender = null;
     this.compendiumImporter = null;
     this.ready = false;
     // Replay-safe readiness signal: resolves once `initialize()` completes and
@@ -534,13 +536,15 @@ class Fabricate {
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
+    this.coinSpender = new Pf2eCoinSpender();
     this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
       this.resolutionModeService,
       this.itemPilesIntegration,
-      this.salvageRunManager
+      this.salvageRunManager,
+      this.coinSpender
     );
 
     // Initialize recipe manager
@@ -1052,6 +1056,10 @@ class Fabricate {
 
   getItemPilesIntegration() {
     return this.itemPilesIntegration;
+  }
+
+  getCoinSpender() {
+    return this.coinSpender;
   }
 
   getCompendiumImporter() {

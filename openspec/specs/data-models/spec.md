@@ -120,6 +120,7 @@ CraftingSystem = {
 
     currency: {
       enabled: boolean,
+      spendStrategy: "dataPath" | "pf2eInventory", // default "dataPath"
       units: CurrencyUnit[],
     },
   },
@@ -155,6 +156,10 @@ CraftingSystem = {
 16. Currency unit profiles must be acyclic. Each connected conversion branch must resolve to exactly one terminal base unit.
 17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
 18. Built-in currency provider selection, system adapter selection, and currency macro UUID fields are legacy inputs only; normalized currency requirements do not emit them.
+19. `requirements.currency.spendStrategy` selects how currency is read and spent. It must be one of `"dataPath"` (default) or `"pf2eInventory"`; any other value normalizes to `"dataPath"`.
+    - `"dataPath"` reads each unit's balance from its `actorPath` and spends through `actor.update(...)`, making its own change across configured sub-units. This is the dnd5e and general behavior.
+    - `"pf2eInventory"` reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, which makes its own change and reports insufficient funds; Fabricate does not run its own change-making on this path.
+    - The pf2e currency preset seeds units with `denomination` set and selects the `"pf2eInventory"` spend strategy; the legacy pf2e system-adapter config normalizes to the same strategy.
 
 ## CurrencyUnit
 
@@ -168,7 +173,8 @@ type CurrencyUnit = {
   label: string,
   abbreviation: string,
   icon: string,
-  actorPath: string,    // Foundry actor data path containing the numeric balance
+  actorPath: string,    // Foundry actor data path containing the numeric balance (dataPath strategy)
+  denomination?: string, // pf2e coin denomination (pp|gp|sp|cp); used by the pf2eInventory strategy
   contains: Array<{
     unitId: string,     // another CurrencyUnit.id
     amount: number,     // positive integer count contained in one parent unit
@@ -179,10 +185,13 @@ type CurrencyUnit = {
 ### Requirements
 
 1. `id` is stable after creation and is the value stored by recipe and salvage currency requirements.
-2. `label`, `abbreviation`, `icon`, `actorPath`, and `contains[]` are GM-editable.
+2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
 3. A unit must not contain itself directly or indirectly.
-4. `contains[].amount` must be a positive integer.
+4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
+6. `actorPath` vs `denomination` validation is conditional on the owning `requirements.currency.spendStrategy`:
+   - Under `"dataPath"`, every unit must define an `actorPath`; `denomination` is ignored.
+   - Under `"pf2eInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
 
 ### Recipe Visibility Requirements
 

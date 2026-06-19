@@ -1828,6 +1828,69 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'), true);
     });
 
+    it('seedCurrencyUnitPresets sets pf2eInventory spend strategy for pf2e worlds', async () => {
+      let updateArgs = null;
+      const services = createMockServices({
+        getFoundrySystemId: () => 'pf2e'
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.seedCurrencyUnitPresets('sys1');
+      assert.equal(result.unsupported, false);
+      assert.equal(updateArgs.updates.requirements.currency.spendStrategy, 'pf2eInventory');
+      const gp = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'gp');
+      assert.equal(gp.denomination, 'gp');
+    });
+
+    it('seedCurrencyUnitPresets does not overwrite a user-edited seeded unit', async () => {
+      let updateArgs = null;
+      const services = createMockServices({
+        getFoundrySystemId: () => 'dnd5e'
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.seedCurrencyUnitPresets('sys1');
+      await store.updateCurrencyUnit('sys1', 'gp', { label: 'Custom Gold', actorPath: 'system.currency.gp.value' });
+      const second = await store.seedCurrencyUnitPresets('sys1');
+      assert.equal(second.added.length, 0);
+      const units = updateArgs.updates.requirements.currency.units;
+      const gold = units.find(unit => unit.id === 'gp');
+      assert.equal(gold.label, 'Custom Gold');
+      assert.equal(gold.actorPath, 'system.currency.gp.value');
+      // No duplicate gp unit was introduced by the second seed.
+      assert.equal(units.filter(unit => unit.id === 'gp').length, 1);
+    });
+
+    it('deleteCurrencyUnit removes the unit and strips it from other units\' sub-units', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addCurrencyUnit('sys1', { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp' });
+      await store.addCurrencyUnit('sys1', { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp' });
+      await store.addCurrencySubUnit('sys1', 'sp', 'cp', 10);
+      await store.deleteCurrencyUnit('sys1', 'cp');
+      const units = updateArgs.updates.requirements.currency.units;
+      assert.equal(units.some(unit => unit.id === 'cp'), false);
+      const silver = units.find(unit => unit.id === 'sp');
+      assert.deepEqual(silver.contains, []);
+    });
+
     it('saveAlchemyConfig persists canonical alchemy settings', async () => {
       let updateArgs = null;
       const services = createMockServices();

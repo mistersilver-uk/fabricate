@@ -438,9 +438,15 @@ export class CraftingSystemManager {
         ? currency.systemAdapter
         : '';
     const seededUnits = units.length > 0 ? units : getCurrencyPresetsForAdapter(legacyAdapter);
+    // A legacy pf2e system-adapter config seeded fresh pf2e units, which read/spend coins
+    // through the actor inventory rather than a flat data path; carry that intent forward as
+    // the pf2eInventory spend strategy when no explicit strategy was persisted.
+    const spendStrategy =
+      currency?.spendStrategy || (legacyAdapter === 'pf2e' ? 'pf2eInventory' : undefined);
     return normalizeCurrencyConfig(
       {
         enabled: currency?.enabled === true,
+        spendStrategy,
         units: seededUnits,
       },
       { randomID: () => foundry.utils.randomID() }

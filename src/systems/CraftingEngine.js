@@ -29,13 +29,15 @@ export class CraftingEngine {
     craftingRunManager = null,
     resolutionModeService = null,
     itemPilesIntegration = null,
-    salvageRunManager = null
+    salvageRunManager = null,
+    coinSpender = null
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
+    this.coinSpender = coinSpender;
   }
 
   /**
@@ -1230,8 +1232,10 @@ export class CraftingEngine {
     if (!system) return null;
 
     const currency = system?.requirements?.currency || {};
+    const spendStrategy = currency.spendStrategy === 'pf2eInventory' ? 'pf2eInventory' : 'dataPath';
     return {
       enabled: currency.enabled === true,
+      spendStrategy,
       units: Array.isArray(currency.units) ? currency.units : [],
       system,
     };
@@ -1351,6 +1355,10 @@ export class CraftingEngine {
     }
   }
 
+  _getCoinSpender() {
+    return this.coinSpender || game.fabricate?.getCoinSpender?.() || null;
+  }
+
   async _checkCurrencyRequirement(craftingActor, recipe, step) {
     const requirement = this._getStepCurrencyRequirement(step);
     if (!requirement) return { valid: true };
@@ -1358,7 +1366,9 @@ export class CraftingEngine {
     const config = this._getCurrencyRequirementConfig(recipe);
     if (!config?.enabled) return { valid: true };
 
-    const profile = validateCurrencyProfile(config.units || []);
+    const profile = validateCurrencyProfile(config.units || [], {
+      spendStrategy: config.spendStrategy,
+    });
     if (!profile.valid) {
       return {
         valid: false,
@@ -1368,10 +1378,35 @@ export class CraftingEngine {
     const unit = findCurrencyUnit(profile.units, requirement.unit);
     if (!unit)
       return { valid: false, message: `Currency unit "${requirement.unit}" is not configured.` };
+
+    if (config.spendStrategy === 'pf2eInventory') {
+      return this._checkPf2eCurrencyRequirement(craftingActor, requirement, profile, unit);
+    }
+
     const balances = readCurrencyBalances(craftingActor, profile.units);
     if (!balances.valid) return { valid: false, message: balances.message };
     const spend = buildCurrencySpendUpdates(craftingActor, requirement, profile.units);
     if (!spend.valid) return { valid: false, message: spend.message };
+    return { valid: true };
+  }
+
+  _checkPf2eCurrencyRequirement(craftingActor, requirement, profile, unit) {
+    const spender = this._getCoinSpender();
+    const coins = spender?.readCoins?.(craftingActor) ?? null;
+    if (!coins) {
+      return {
+        valid: false,
+        message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
+      };
+    }
+    const baseValue = Number(profile.metadata.get(unit.id)?.baseValue) || 0;
+    const requiredBase = requirement.amount * baseValue;
+    if (Number(coins.copperValue) < requiredBase) {
+      return {
+        valid: false,
+        message: `Insufficient currency. Requires ${formatCurrencyRequirement(requirement, profile.units)}.`,
+      };
+    }
     return { valid: true };
   }
 
@@ -1381,6 +1416,37 @@ export class CraftingEngine {
 
     const config = this._getCurrencyRequirementConfig(recipe);
     if (!config?.enabled) return { valid: true };
+
+    if (config.spendStrategy === 'pf2eInventory') {
+      const profile = validateCurrencyProfile(config.units || [], {
+        spendStrategy: config.spendStrategy,
+      });
+      if (!profile.valid) {
+        return {
+          valid: false,
+          message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
+        };
+      }
+      const unit = findCurrencyUnit(profile.units, requirement.unit);
+      if (!unit)
+        return { valid: false, message: `Currency unit "${requirement.unit}" is not configured.` };
+      const spender = this._getCoinSpender();
+      if (!spender?.spend) {
+        return {
+          valid: false,
+          message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
+        };
+      }
+      try {
+        return await spender.spend(craftingActor, { unit, amount: requirement.amount });
+      } catch (error) {
+        console.error('Fabricate | Failed to decrement pf2e currency', error);
+        return {
+          valid: false,
+          message: `Could not spend currency (${formatCurrencyRequirement(requirement, profile.units)}).`,
+        };
+      }
+    }
 
     const spend = buildCurrencySpendUpdates(craftingActor, requirement, config.units || []);
     if (!spend.valid) return { valid: false, message: spend.message };

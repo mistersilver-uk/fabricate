@@ -8,6 +8,7 @@ export function normalizeCurrencyUnit(
   const label = String(entry.label || entry.name || id).trim() || id;
   const abbreviation = String(entry.abbreviation || entry.abbr || id).trim() || id;
   const actorPath = String(entry.actorPath || entry.path || '').trim();
+  const denomination = String(entry.denomination || '').trim();
   const contains = Array.isArray(entry.contains)
     ? entry.contains
         .map((contained) => {
@@ -25,7 +26,7 @@ export function normalizeCurrencyUnit(
     seenUnitIds.add(contained.unitId);
     dedupedContains.push(contained);
   }
-  return {
+  const unit = {
     id,
     label,
     abbreviation,
@@ -33,15 +34,24 @@ export function normalizeCurrencyUnit(
     actorPath,
     contains: dedupedContains,
   };
+  if (denomination) unit.denomination = denomination;
+  return unit;
 }
+
+const SPEND_STRATEGIES = new Set(['dataPath', 'pf2eInventory']);
+const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const randomID = typeof options.randomID === 'function' ? options.randomID : undefined;
   const units = Array.isArray(currency?.units)
     ? currency.units.map((entry) => normalizeCurrencyUnit(entry, randomID)).filter(Boolean)
     : [];
+  const spendStrategy = SPEND_STRATEGIES.has(currency?.spendStrategy)
+    ? currency.spendStrategy
+    : 'dataPath';
   return {
     enabled: currency?.enabled === true,
+    spendStrategy,
     units,
   };
 }
@@ -80,10 +90,12 @@ function buildUnitMap(units) {
   return new Map((Array.isArray(units) ? units : []).map((unit) => [unit.id, unit]));
 }
 
-export function validateCurrencyProfile(units = []) {
-  const normalizedUnits = (Array.isArray(units) ? units : [])
-    .map((entry) => normalizeCurrencyUnit(entry))
-    .filter(Boolean);
+export function validateCurrencyProfile(units = [], options = {}) {
+  const spendStrategy = SPEND_STRATEGIES.has(options?.spendStrategy)
+    ? options.spendStrategy
+    : 'dataPath';
+  const rawUnits = Array.isArray(units) ? units : [];
+  const normalizedUnits = rawUnits.map((entry) => normalizeCurrencyUnit(entry)).filter(Boolean);
   const byId = buildUnitMap(normalizedUnits);
   const errors = [];
   if (normalizedUnits.length === 0) {
@@ -92,18 +104,35 @@ export function validateCurrencyProfile(units = []) {
   if (byId.size !== normalizedUnits.length) {
     errors.push('Currency unit IDs must be unique.');
   }
+  // Validate the raw, pre-sanitization sub-unit amounts so non-integer/non-positive
+  // values surface as configuration errors rather than being silently truncated.
+  for (const rawUnit of rawUnits) {
+    if (!rawUnit || typeof rawUnit !== 'object' || !Array.isArray(rawUnit.contains)) continue;
+    const label = String(rawUnit.label || rawUnit.name || rawUnit.id || '').trim() || rawUnit.id;
+    for (const contained of rawUnit.contains) {
+      const rawAmount = Number(contained?.amount);
+      if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
+        errors.push(`Currency unit "${label}" has an invalid sub-unit amount.`);
+      }
+    }
+  }
   for (const unit of normalizedUnits) {
-    if (!unit.actorPath)
+    if (spendStrategy === 'pf2eInventory') {
+      const denomination = unit.denomination || unit.id;
+      if (!PF2E_DENOMINATIONS.has(denomination)) {
+        errors.push(
+          `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
+        );
+      }
+    } else if (!unit.actorPath) {
       errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
+    }
     for (const contained of unit.contains) {
       if (contained.unitId === unit.id) {
         errors.push(`Currency unit "${unit.label}" cannot contain itself.`);
       }
       if (!byId.has(contained.unitId)) {
         errors.push(`Currency unit "${unit.label}" contains unknown unit "${contained.unitId}".`);
-      }
-      if (!Number.isInteger(contained.amount) || contained.amount <= 0) {
-        errors.push(`Currency unit "${unit.label}" has an invalid sub-unit amount.`);
       }
     }
   }
@@ -169,7 +198,16 @@ export function formatCurrencyRequirement(requirement, units = []) {
 export function readCurrencyBalances(actor, units = []) {
   const balances = new Map();
   for (const unit of Array.isArray(units) ? units : []) {
-    const value = Number(getByPath(actor, unit.actorPath));
+    const raw = getByPath(actor, unit.actorPath);
+    // A missing/undefined path means the actor simply has none of this denomination
+    // (e.g. an NPC or a custom denomination the actor never carries) and is read as 0,
+    // falling through to the normal insufficient-currency path. Only a value that is
+    // PRESENT but non-numeric (an object, an unparseable string) is a hard failure.
+    if (raw === undefined || raw === null) {
+      balances.set(unit.id, 0);
+      continue;
+    }
+    const value = Number(raw);
     if (!Number.isFinite(value)) {
       return {
         valid: false,
@@ -243,7 +281,13 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   const spendableLowerUnits = relevantUnits
     .filter((entry) => entry.value <= requiredMeta.baseValue)
     .sort((left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id));
-  const changeUnits = spendableLowerUnits;
+  // Change from breaking a higher coin can be returned in ANY smaller denomination,
+  // not just denominations at or below the required unit. Use every relevant unit,
+  // largest first; distributeChange's floor naturally skips coins larger than the
+  // overpay (the overpay is always less than the broken coin's value).
+  const changeUnits = [...relevantUnits].sort(
+    (left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id)
+  );
   const higherUnits = relevantUnits
     .filter((entry) => entry.value > requiredMeta.baseValue)
     .sort((left, right) => left.value - right.value || left.unit.id.localeCompare(right.unit.id));
@@ -262,9 +306,13 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   for (const { unit, value } of higherUnits) {
     while (remaining > 0 && (nextBalances.get(unit.id) || 0) > 0) {
       nextBalances.set(unit.id, (nextBalances.get(unit.id) || 0) - 1);
-      const overpay = value - remaining;
-      remaining = 0;
-      if (overpay > 0) distributeChange(nextBalances, overpay, changeUnits);
+      if (value >= remaining) {
+        const overpay = value - remaining;
+        remaining = 0;
+        if (overpay > 0) distributeChange(nextBalances, overpay, changeUnits);
+        break;
+      }
+      remaining -= value;
     }
     if (remaining <= 0) break;
   }
