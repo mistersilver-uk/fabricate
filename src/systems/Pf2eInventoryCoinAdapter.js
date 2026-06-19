@@ -1,10 +1,16 @@
 /**
- * Foundry-touching seam for spending pf2e currency through the inventory API.
+ * Foundry-touching coin adapter for spending pf2e currency through the inventory API.
+ *
+ * This is the pf2e entry behind the generic {@link ActorInventoryCoinSpender}: the
+ * spender resolves a per-system adapter by `game.system.id` and delegates `readCoins`
+ * and `spend` to it. The adapter isolates the unavoidable system-specific bit (pf2e's
+ * inventory API) so the spender, the engine, and the pure currency-profile helpers stay
+ * Foundry-free and unit-testable.
  *
  * Modern Pathfinder 2e does NOT store coins at a flat `system.currency.*` data path;
  * coins are inventory treasure Items aggregated on `actor.inventory.coins` (a
  * `CoinsPF2e`) and mutated through `actor.inventory.removeCoins(...)`. The flat
- * `actorPath` + `actor.update()` model used by the dnd5e/`dataPath` strategy therefore
+ * `actorPath` + `actor.update()` model used by the `actorProperty` strategy therefore
  * cannot spend pf2e coins.
  *
  * `actor.inventory.removeCoins(coins, { byValue = true })` makes its own change (it
@@ -12,17 +18,13 @@
  * and resolves to `false` when funds are insufficient. So Fabricate must NOT run its own
  * change-making on this path: pass a single denomination count and let `removeCoins`
  * handle the breakdown. The `false` return is the authoritative insufficient-funds signal.
- *
- * This class is the only Foundry-aware collaborator on the pf2e spend path; it is injected
- * into {@link CraftingEngine} so the engine and the pure currency profile helpers stay
- * Foundry-free and unit-testable.
  */
-export class Pf2eCoinSpender {
+export class Pf2eInventoryCoinAdapter {
   /**
    * Read the actor's coin aggregate.
    *
    * Fails loudly (returns `null`) when the actor has no pf2e inventory — a non-pf2e
-   * actor on the pf2e spend strategy is a misconfiguration, not a silent no-op.
+   * actor on the actorInventory spend strategy is a misconfiguration, not a silent no-op.
    *
    * @param {object} actor
    * @returns {{ copperValue: number, pp: number, gp: number, sp: number, cp: number } | null}

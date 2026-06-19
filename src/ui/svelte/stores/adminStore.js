@@ -5276,9 +5276,9 @@ export function createAdminStore(services) {
       });
       currency.units = result.next.map(unit => normalizeCurrencyUnit(unit, _randomID)).filter(Boolean);
       // pf2e coins live in the actor inventory (read/spent via actor.inventory.removeCoins),
-      // not at a flat data path, so the pf2e preset selects the pf2eInventory spend strategy.
-      // dnd5e (and every other system) stays on the default dataPath strategy.
-      currency.spendStrategy = foundrySystemId === 'pf2e' ? 'pf2eInventory' : 'dataPath';
+      // not at a flat actor property, so the pf2e preset selects the actorInventory spend
+      // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
+      currency.spendStrategy = foundrySystemId === 'pf2e' ? 'actorInventory' : 'actorProperty';
       return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
     });
   }

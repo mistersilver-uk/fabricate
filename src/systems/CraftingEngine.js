@@ -9,12 +9,11 @@ import {
   itemMatchesComponentSource,
 } from '../utils/sourceUuid.js';
 
+import { ActorPropertyCoinSpender } from './CoinSpenders.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import {
-  buildCurrencySpendUpdates,
   findCurrencyUnit,
   formatCurrencyRequirement,
-  readCurrencyBalances,
   validateCurrencyProfile,
 } from './currencyProfile.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -30,14 +29,19 @@ export class CraftingEngine {
     resolutionModeService = null,
     itemPilesIntegration = null,
     salvageRunManager = null,
-    coinSpender = null
+    actorInventoryCoinSpender = null,
+    actorPropertyCoinSpender = null
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
-    this.coinSpender = coinSpender;
+    // Stubbable spend seams: the actorInventory spender is injected by tests (and wired in
+    // main.js) so they can assert which path ran; the actorProperty spender defaults to the
+    // generic implementation and needs no system-specific wiring.
+    this.actorInventoryCoinSpender = actorInventoryCoinSpender;
+    this.actorPropertyCoinSpender = actorPropertyCoinSpender;
   }
 
   /**
@@ -1232,7 +1236,8 @@ export class CraftingEngine {
     if (!system) return null;
 
     const currency = system?.requirements?.currency || {};
-    const spendStrategy = currency.spendStrategy === 'pf2eInventory' ? 'pf2eInventory' : 'dataPath';
+    const spendStrategy =
+      currency.spendStrategy === 'actorInventory' ? 'actorInventory' : 'actorProperty';
     return {
       enabled: currency.enabled === true,
       spendStrategy,
@@ -1298,10 +1303,6 @@ export class CraftingEngine {
     return { unit, amount };
   }
 
-  _formatCurrencyRequirement(config, requirement) {
-    return formatCurrencyRequirement(requirement, config?.units || []);
-  }
-
   /**
    * Check Item Piles currency cost on a recipe, if the integration is enabled.
    * @private
@@ -1355,48 +1356,70 @@ export class CraftingEngine {
     }
   }
 
-  _getCoinSpender() {
-    return this.coinSpender || game.fabricate?.getCoinSpender?.() || null;
+  /**
+   * Resolve the coin spender for a spend strategy. The actorInventory spender is injected
+   * (tests / main.js) or read from the `game.fabricate` accessor; the actorProperty spender
+   * defaults to the generic implementation so the dnd5e path needs no system-specific wiring.
+   * @private
+   */
+  _resolveCoinSpender(spendStrategy) {
+    if (spendStrategy === 'actorInventory') {
+      return (
+        this.actorInventoryCoinSpender || game.fabricate?.getActorInventoryCoinSpender?.() || null
+      );
+    }
+    return (
+      this.actorPropertyCoinSpender ||
+      game.fabricate?.getActorPropertyCoinSpender?.() ||
+      new ActorPropertyCoinSpender()
+    );
   }
 
-  async _checkCurrencyRequirement(craftingActor, recipe, step) {
+  /**
+   * Validate the currency profile, resolve the requirement unit, and resolve the spender.
+   * @private
+   */
+  _resolveCurrencySpend(craftingActor, recipe, step) {
     const requirement = this._getStepCurrencyRequirement(step);
-    if (!requirement) return { valid: true };
+    if (!requirement) return { skip: true };
 
     const config = this._getCurrencyRequirementConfig(recipe);
-    if (!config?.enabled) return { valid: true };
+    if (!config?.enabled) return { skip: true };
 
     const profile = validateCurrencyProfile(config.units || [], {
       spendStrategy: config.spendStrategy,
     });
     if (!profile.valid) {
       return {
-        valid: false,
-        message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
+        error: {
+          valid: false,
+          message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
+        },
       };
     }
     const unit = findCurrencyUnit(profile.units, requirement.unit);
-    if (!unit)
-      return { valid: false, message: `Currency unit "${requirement.unit}" is not configured.` };
-
-    if (config.spendStrategy === 'pf2eInventory') {
-      return this._checkPf2eCurrencyRequirement(craftingActor, requirement, profile, unit);
+    if (!unit) {
+      return {
+        error: { valid: false, message: `Currency unit "${requirement.unit}" is not configured.` },
+      };
     }
-
-    const balances = readCurrencyBalances(craftingActor, profile.units);
-    if (!balances.valid) return { valid: false, message: balances.message };
-    const spend = buildCurrencySpendUpdates(craftingActor, requirement, profile.units);
-    if (!spend.valid) return { valid: false, message: spend.message };
-    return { valid: true };
+    const spender = this._resolveCoinSpender(config.spendStrategy);
+    return { requirement, config, profile, unit, spender };
   }
 
-  _checkPf2eCurrencyRequirement(craftingActor, requirement, profile, unit) {
-    const spender = this._getCoinSpender();
-    const coins = spender?.readCoins?.(craftingActor) ?? null;
-    if (!coins) {
+  async _checkCurrencyRequirement(craftingActor, recipe, step) {
+    const resolved = this._resolveCurrencySpend(craftingActor, recipe, step);
+    if (resolved.skip) return { valid: true };
+    if (resolved.error) return resolved.error;
+    const { requirement, profile, unit, spender } = resolved;
+
+    const coins = spender?.readCoins?.(craftingActor, { profile, unit, units: profile.units });
+    if (!coins || coins.valid === false) {
       return {
         valid: false,
-        message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
+        message:
+          coins?.message ||
+          `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
       };
     }
     const baseValue = Number(profile.metadata.get(unit.id)?.baseValue) || 0;
@@ -1411,57 +1434,39 @@ export class CraftingEngine {
   }
 
   async _decrementCurrencyRequirement(craftingActor, recipe, step) {
-    const requirement = this._getStepCurrencyRequirement(step);
-    if (!requirement) return { valid: true };
+    const resolved = this._resolveCurrencySpend(craftingActor, recipe, step);
+    if (resolved.skip) return { valid: true };
+    if (resolved.error) return resolved.error;
+    const { requirement, profile, unit, spender } = resolved;
 
-    const config = this._getCurrencyRequirementConfig(recipe);
-    if (!config?.enabled) return { valid: true };
-
-    if (config.spendStrategy === 'pf2eInventory') {
-      const profile = validateCurrencyProfile(config.units || [], {
-        spendStrategy: config.spendStrategy,
-      });
-      if (!profile.valid) {
-        return {
-          valid: false,
-          message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
-        };
-      }
-      const unit = findCurrencyUnit(profile.units, requirement.unit);
-      if (!unit)
-        return { valid: false, message: `Currency unit "${requirement.unit}" is not configured.` };
-      const spender = this._getCoinSpender();
-      if (!spender?.spend) {
-        return {
-          valid: false,
-          message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
-        };
-      }
-      try {
-        return await spender.spend(craftingActor, { unit, amount: requirement.amount });
-      } catch (error) {
-        console.error('Fabricate | Failed to decrement pf2e currency', error);
-        return {
-          valid: false,
-          message: `Could not spend currency (${formatCurrencyRequirement(requirement, profile.units)}).`,
-        };
-      }
+    if (!spender?.spend) {
+      return {
+        valid: false,
+        message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
+      };
     }
-
-    const spend = buildCurrencySpendUpdates(craftingActor, requirement, config.units || []);
-    if (!spend.valid) return { valid: false, message: spend.message };
     try {
-      if (Object.keys(spend.updates || {}).length > 0) {
-        await craftingActor.update(spend.updates);
+      const result = await spender.spend(
+        craftingActor,
+        { unit, amount: requirement.amount },
+        { profile, unit, units: profile.units }
+      );
+      if (!result?.valid) {
+        return {
+          valid: false,
+          message:
+            result?.message ||
+            `Could not spend currency (${formatCurrencyRequirement(requirement, profile.units)}).`,
+        };
       }
+      return { valid: true };
     } catch (error) {
       console.error('Fabricate | Failed to decrement currency', error);
       return {
         valid: false,
-        message: `Could not spend currency (${spend.formatted || this._formatCurrencyRequirement(config, requirement)}).`,
+        message: `Could not spend currency (${formatCurrencyRequirement(requirement, profile.units)}).`,
       };
     }
-    return { valid: true };
   }
 
   async _runCraftingCheck(

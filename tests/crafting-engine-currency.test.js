@@ -6,8 +6,10 @@ import {
   PF2E_CURRENCY_PRESETS,
   seedCurrencyPresets,
 } from '../src/config/currencyPresets.js';
+import { ActorInventoryCoinSpender } from '../src/systems/CoinSpenders.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import { Pf2eInventoryCoinAdapter } from '../src/systems/Pf2eInventoryCoinAdapter.js';
 import {
   buildCurrencySpendUpdates,
   normalizeCurrencyConfig,
@@ -305,12 +307,12 @@ function buildPf2eActor(coins, removeImpl) {
   return { name: 'PF2e Hero', inventory };
 }
 
-test('pf2e currency spend uses the coinSpender and never calls actor.update', async () => {
+test('actorInventory currency spend uses the inventory spender and never calls actor.update', async () => {
   const system = {
     requirements: {
       currency: {
         enabled: true,
-        spendStrategy: 'pf2eInventory',
+        spendStrategy: 'actorInventory',
         units: PF2E_CURRENCY_PRESETS,
       },
     },
@@ -318,14 +320,17 @@ test('pf2e currency spend uses the coinSpender and never calls actor.update', as
   setupGlobals(system);
 
   const spendCalls = [];
-  const coinSpender = {
-    readCoins: (actor) => (actor?.inventory?.coins ? { ...actor.inventory.coins } : null),
+  const inventorySpender = {
+    readCoins: (actor) =>
+      actor?.inventory?.coins
+        ? { valid: true, copperValue: Number(actor.inventory.coins.copperValue) || 0 }
+        : { valid: false, message: 'not available' },
     async spend(actor, payload) {
       spendCalls.push({ actor, payload });
       return { valid: true };
     },
   };
-  const engine = new CraftingEngine({}, null, null, null, null, coinSpender);
+  const engine = new CraftingEngine({}, null, null, null, null, inventorySpender);
   const { recipe, step } = recipeAndStep('gp', 3);
 
   let updateCalled = false;
@@ -346,25 +351,28 @@ test('pf2e currency spend uses the coinSpender and never calls actor.update', as
   assert.equal(spendCalls[0].payload.amount, 3);
 });
 
-test('pf2e currency spend returning {valid:false} aborts the craft', async () => {
+test('actorInventory currency spend returning {valid:false} aborts the craft', async () => {
   const system = {
     requirements: {
       currency: {
         enabled: true,
-        spendStrategy: 'pf2eInventory',
+        spendStrategy: 'actorInventory',
         units: PF2E_CURRENCY_PRESETS,
       },
     },
   };
   setupGlobals(system);
 
-  const coinSpender = {
-    readCoins: (actor) => (actor?.inventory?.coins ? { ...actor.inventory.coins } : null),
+  const inventorySpender = {
+    readCoins: (actor) =>
+      actor?.inventory?.coins
+        ? { valid: true, copperValue: Number(actor.inventory.coins.copperValue) || 0 }
+        : { valid: false, message: 'not available' },
     async spend() {
       return { valid: false, message: 'Insufficient currency.' };
     },
   };
-  const engine = new CraftingEngine({}, null, null, null, null, coinSpender);
+  const engine = new CraftingEngine({}, null, null, null, null, inventorySpender);
   const { recipe, step } = recipeAndStep('gp', 3);
   const actor = buildPf2eActor({ pp: 0, gp: 5, sp: 0, cp: 0 }, async () => false);
 
@@ -373,24 +381,27 @@ test('pf2e currency spend returning {valid:false} aborts the craft', async () =>
   assert.match(decrement.message, /Insufficient currency/i);
 });
 
-test('pf2e currency check rejects an actor with no pf2e inventory', async () => {
+test('actorInventory currency check rejects an actor with no inventory coins', async () => {
   const system = {
     requirements: {
       currency: {
         enabled: true,
-        spendStrategy: 'pf2eInventory',
+        spendStrategy: 'actorInventory',
         units: PF2E_CURRENCY_PRESETS,
       },
     },
   };
   setupGlobals(system);
-  const coinSpender = {
-    readCoins: (actor) => (actor?.inventory?.coins ? { ...actor.inventory.coins } : null),
+  const inventorySpender = {
+    readCoins: (actor) =>
+      actor?.inventory?.coins
+        ? { valid: true, copperValue: Number(actor.inventory.coins.copperValue) || 0 }
+        : { valid: false, message: 'Currency unit "Gold" is not available on Non-PF2e.' },
     async spend() {
       return { valid: true };
     },
   };
-  const engine = new CraftingEngine({}, null, null, null, null, coinSpender);
+  const engine = new CraftingEngine({}, null, null, null, null, inventorySpender);
   const { recipe, step } = recipeAndStep('gp', 1);
   const actor = buildActor('Non-PF2e', { cp: 0, sp: 0, gp: 0, pp: 0 });
 
@@ -399,28 +410,90 @@ test('pf2e currency check rejects an actor with no pf2e inventory', async () => 
   assert.match(check.message, /not available/i);
 });
 
-test('dnd5e currency spend calls actor.update and never the coinSpender', async () => {
+test('actorInventory currency on a system with no registered adapter fails loudly', async () => {
+  const system = {
+    requirements: {
+      currency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        units: PF2E_CURRENCY_PRESETS,
+      },
+    },
+  };
+  setupGlobals(system);
+  // Real generic spender with an empty adapter map for a system id with no entry.
+  const inventorySpender = new ActorInventoryCoinSpender({
+    adapters: new Map(),
+    getSystemId: () => 'mysterysystem',
+  });
+  const engine = new CraftingEngine({}, null, null, null, null, inventorySpender);
+  const { recipe, step } = recipeAndStep('gp', 1);
+  const actor = buildPf2eActor({ pp: 0, gp: 5, sp: 0, cp: 0 }, async () => true);
+
+  const check = await engine._checkCurrencyRequirement(actor, recipe, step);
+  assert.equal(check.valid, false);
+  assert.match(check.message, /no currency inventory adapter is registered/i);
+
+  const decrement = await engine._decrementCurrencyRequirement(actor, recipe, step);
+  assert.equal(decrement.valid, false);
+  assert.match(decrement.message, /no currency inventory adapter is registered/i);
+});
+
+test('Pf2eInventoryCoinAdapter spends through removeCoins and never makes its own change', async () => {
+  const removeCalls = [];
+  const adapter = new Pf2eInventoryCoinAdapter();
+  const actor = buildPf2eActor({ pp: 0, gp: 5, sp: 0, cp: 0 }, async (coins) => {
+    removeCalls.push(coins);
+    return true;
+  });
+  const result = await adapter.spend(actor, {
+    unit: { id: 'gp', denomination: 'gp', label: 'Gold' },
+    amount: 3,
+  });
+  assert.equal(result.valid, true);
+  assert.deepEqual(removeCalls, [{ gp: 3 }]);
+
+  const broke = buildPf2eActor({ pp: 0, gp: 0, sp: 0, cp: 0 }, async () => false);
+  const insufficient = await adapter.spend(broke, {
+    unit: { id: 'gp', denomination: 'gp', label: 'Gold' },
+    amount: 1,
+  });
+  assert.equal(insufficient.valid, false);
+  assert.match(insufficient.message, /insufficient currency/i);
+});
+
+test('actorProperty currency spend calls actor.update and never the inventory spender', async () => {
   const system = {
     requirements: {
       currency: { enabled: true, units: DND5E_CURRENCY_PRESETS },
     },
   };
   setupGlobals(system);
-  let spendCalled = false;
-  const coinSpender = {
-    readCoins: () => null,
+  let inventoryReadCalled = false;
+  let inventorySpendCalled = false;
+  const inventorySpender = {
+    readCoins: () => {
+      inventoryReadCalled = true;
+      return { valid: false };
+    },
     async spend() {
-      spendCalled = true;
+      inventorySpendCalled = true;
       return { valid: true };
     },
   };
-  const engine = new CraftingEngine({}, null, null, null, null, coinSpender);
+  // Inject the inventory spender in the 6th slot; the actorProperty path must use the
+  // default ActorPropertyCoinSpender and never touch the inventory spender.
+  const engine = new CraftingEngine({}, null, null, null, null, inventorySpender);
   const { recipe, step } = recipeAndStep('gp', 3);
   const actor = buildActor('Rich', { cp: 0, sp: 0, ep: 0, gp: 10, pp: 0 });
 
+  const check = await engine._checkCurrencyRequirement(actor, recipe, step);
+  assert.equal(check.valid, true);
+
   const decrement = await engine._decrementCurrencyRequirement(actor, recipe, step);
   assert.equal(decrement.valid, true);
-  assert.equal(spendCalled, false, 'dataPath path must not call coinSpender.spend');
+  assert.equal(inventoryReadCalled, false, 'actorProperty path must not read inventory coins');
+  assert.equal(inventorySpendCalled, false, 'actorProperty path must not call inventory spend');
   assert.equal(actor.system.currency.gp, 7);
 });
 
@@ -484,54 +557,54 @@ test('validateCurrencyProfile surfaces non-integer and non-positive sub-unit amo
 });
 
 test('validateCurrencyProfile applies the conditional actorPath vs denomination rule', () => {
-  // dataPath: actorPath required, missing one is invalid.
-  const dataPathMissing = validateCurrencyProfile(
+  // actorProperty: actorPath required, missing one is invalid.
+  const actorPropertyMissing = validateCurrencyProfile(
     [{ id: 'gp', label: 'Gold', abbreviation: 'gp', contains: [] }],
-    { spendStrategy: 'dataPath' }
+    { spendStrategy: 'actorProperty' }
   );
-  assert.equal(dataPathMissing.valid, false);
-  assert.match(dataPathMissing.errors.join('; '), /actor data path/i);
+  assert.equal(actorPropertyMissing.valid, false);
+  assert.match(actorPropertyMissing.errors.join('; '), /actor data path/i);
 
-  // pf2eInventory: actorPath not required; a valid denomination passes.
-  const pf2eValid = validateCurrencyProfile(
+  // actorInventory: actorPath not required; a valid denomination passes.
+  const inventoryValid = validateCurrencyProfile(
     [{ id: 'gp', label: 'Gold', abbreviation: 'gp', denomination: 'gp', contains: [] }],
-    { spendStrategy: 'pf2eInventory' }
+    { spendStrategy: 'actorInventory' }
   );
-  assert.equal(pf2eValid.valid, true);
+  assert.equal(inventoryValid.valid, true);
 
-  // pf2eInventory: a unit whose id/denomination is not a pf2e coin is invalid.
-  const pf2eInvalid = validateCurrencyProfile(
+  // actorInventory: a unit whose id/denomination is not a pf2e coin is invalid.
+  const inventoryInvalid = validateCurrencyProfile(
     [{ id: 'shards', label: 'Shards', abbreviation: 'sh', contains: [] }],
-    { spendStrategy: 'pf2eInventory' }
+    { spendStrategy: 'actorInventory' }
   );
-  assert.equal(pf2eInvalid.valid, false);
-  assert.match(pf2eInvalid.errors.join('; '), /pf2e denomination/i);
+  assert.equal(inventoryInvalid.valid, false);
+  assert.match(inventoryInvalid.errors.join('; '), /pf2e denomination/i);
 
-  // pf2eInventory: denomination defaults to the unit id (cp is valid).
-  const pf2eDefault = validateCurrencyProfile(
+  // actorInventory: denomination defaults to the unit id (cp is valid).
+  const inventoryDefault = validateCurrencyProfile(
     [{ id: 'cp', label: 'Copper', abbreviation: 'cp', contains: [] }],
-    { spendStrategy: 'pf2eInventory' }
+    { spendStrategy: 'actorInventory' }
   );
-  assert.equal(pf2eDefault.valid, true);
+  assert.equal(inventoryDefault.valid, true);
 });
 
 test('normalizeCurrencyConfig normalizes spendStrategy and unit denomination', () => {
   const normalized = normalizeCurrencyConfig({
     enabled: true,
-    spendStrategy: 'pf2eInventory',
+    spendStrategy: 'actorInventory',
     units: [{ id: 'gp', label: 'Gold', denomination: ' gp ', actorPath: '' }],
   });
-  assert.equal(normalized.spendStrategy, 'pf2eInventory');
+  assert.equal(normalized.spendStrategy, 'actorInventory');
   assert.equal(normalized.units[0].denomination, 'gp');
 
   const fallback = normalizeCurrencyConfig({ enabled: true, spendStrategy: 'bogus', units: [] });
-  assert.equal(fallback.spendStrategy, 'dataPath');
+  assert.equal(fallback.spendStrategy, 'actorProperty');
 
   const noDenom = normalizeCurrencyUnit({ id: 'gp', actorPath: 'system.currency.gp' });
   assert.equal('denomination' in noDenom, false);
 });
 
-test('CraftingSystemManager normalizes legacy pf2e adapter to pf2eInventory units', () => {
+test('CraftingSystemManager normalizes legacy pf2e adapter to actorInventory units', () => {
   setupGlobals({});
   const manager = new CraftingSystemManager({});
   const normalized = manager._normalizeRequirements({
@@ -542,7 +615,7 @@ test('CraftingSystemManager normalizes legacy pf2e adapter to pf2eInventory unit
     },
   });
   assert.equal(normalized.currency.enabled, true);
-  assert.equal(normalized.currency.spendStrategy, 'pf2eInventory');
+  assert.equal(normalized.currency.spendStrategy, 'actorInventory');
   assert.equal(normalized.currency.units.length, PF2E_CURRENCY_PRESETS.length);
   const gp = normalized.currency.units.find((unit) => unit.id === 'gp');
   assert.equal(gp.denomination, 'gp');

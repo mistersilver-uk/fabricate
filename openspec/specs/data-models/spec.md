@@ -120,7 +120,7 @@ CraftingSystem = {
 
     currency: {
       enabled: boolean,
-      spendStrategy: "dataPath" | "pf2eInventory", // default "dataPath"
+      spendStrategy: "actorProperty" | "actorInventory", // default "actorProperty"
       units: CurrencyUnit[],
     },
   },
@@ -156,10 +156,10 @@ CraftingSystem = {
 16. Currency unit profiles must be acyclic. Each connected conversion branch must resolve to exactly one terminal base unit.
 17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
 18. Built-in currency provider selection, system adapter selection, and currency macro UUID fields are legacy inputs only; normalized currency requirements do not emit them.
-19. `requirements.currency.spendStrategy` selects how currency is read and spent. It must be one of `"dataPath"` (default) or `"pf2eInventory"`; any other value normalizes to `"dataPath"`.
-    - `"dataPath"` reads each unit's balance from its `actorPath` and spends through `actor.update(...)`, making its own change across configured sub-units. This is the dnd5e and general behavior.
-    - `"pf2eInventory"` reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, which makes its own change and reports insufficient funds; Fabricate does not run its own change-making on this path.
-    - The pf2e currency preset seeds units with `denomination` set and selects the `"pf2eInventory"` spend strategy; the legacy pf2e system-adapter config normalizes to the same strategy.
+19. `requirements.currency.spendStrategy` selects how currency is read and spent. It must be one of `"actorProperty"` (default) or `"actorInventory"`; any other value normalizes to `"actorProperty"`. Each strategy is realized by a symmetric coin spender behind a common `{ readCoins(actor, profileContext), spend(actor, requirement, profileContext) }` interface; `CraftingEngine` resolves the spender by strategy and drives both the up-front affordability check and the deduction uniformly.
+    - `"actorProperty"` (the generic `ActorPropertyCoinSpender`) reads each unit's balance from its `actorPath` and spends through a single batched `actor.update(...)`, making its own change across configured sub-units. This is the dnd5e and general behavior.
+    - `"actorInventory"` (the generic `ActorInventoryCoinSpender`) delegates the system-specific coin I/O to a per-system coin adapter resolved by `game.system.id`. The only registered adapter is the pf2e adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding.
+    - The pf2e currency preset seeds units with `denomination` set and selects the `"actorInventory"` spend strategy; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
 
 ## CurrencyUnit
 
@@ -173,8 +173,8 @@ type CurrencyUnit = {
   label: string,
   abbreviation: string,
   icon: string,
-  actorPath: string,    // Foundry actor data path containing the numeric balance (dataPath strategy)
-  denomination?: string, // pf2e coin denomination (pp|gp|sp|cp); used by the pf2eInventory strategy
+  actorPath: string,    // Foundry actor data path containing the numeric balance (actorProperty strategy)
+  denomination?: string, // pf2e coin denomination (pp|gp|sp|cp); used by the actorInventory strategy
   contains: Array<{
     unitId: string,     // another CurrencyUnit.id
     amount: number,     // positive integer count contained in one parent unit
@@ -190,8 +190,8 @@ type CurrencyUnit = {
 4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
 6. `actorPath` vs `denomination` validation is conditional on the owning `requirements.currency.spendStrategy`:
-   - Under `"dataPath"`, every unit must define an `actorPath`; `denomination` is ignored.
-   - Under `"pf2eInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
+   - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
+   - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
 
 ### Recipe Visibility Requirements
 

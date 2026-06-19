@@ -24,11 +24,11 @@ function freezePresetUnits(units) {
 /**
  * dnd5e and pf2e share the same denomination ladder, so the only difference between
  * the two presets is how a coin balance is read and spent. dnd5e coins live at a flat
- * `system.currency.<denom>` numeric path and are spent via `actor.update` (the
- * `dataPath` strategy). Modern pf2e stores coins as inventory treasure Items read via
+ * `system.currency.<denom>` numeric actor property and are spent via `actor.update` (the
+ * `actorProperty` strategy). Modern pf2e stores coins as inventory treasure Items read via
  * `actor.inventory.coins` and mutated through `actor.inventory.removeCoins(...)`, so its
  * preset units carry a `denomination` instead of an `actorPath` and the system config
- * uses the `pf2eInventory` spend strategy.
+ * uses the `actorInventory` spend strategy.
  */
 
 export const DND5E_CURRENCY_PRESETS = freezePresetUnits([

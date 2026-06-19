@@ -1828,7 +1828,7 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.requirements.currency.units.some(unit => unit.id === 'gp'), true);
     });
 
-    it('seedCurrencyUnitPresets sets pf2eInventory spend strategy for pf2e worlds', async () => {
+    it('seedCurrencyUnitPresets sets actorInventory spend strategy for pf2e worlds', async () => {
       let updateArgs = null;
       const services = createMockServices({
         getFoundrySystemId: () => 'pf2e'
@@ -1842,7 +1842,7 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const result = await store.seedCurrencyUnitPresets('sys1');
       assert.equal(result.unsupported, false);
-      assert.equal(updateArgs.updates.requirements.currency.spendStrategy, 'pf2eInventory');
+      assert.equal(updateArgs.updates.requirements.currency.spendStrategy, 'actorInventory');
       const gp = updateArgs.updates.requirements.currency.units.find(unit => unit.id === 'gp');
       assert.equal(gp.denomination, 'gp');
     });

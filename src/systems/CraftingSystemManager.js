@@ -439,10 +439,16 @@ export class CraftingSystemManager {
         : '';
     const seededUnits = units.length > 0 ? units : getCurrencyPresetsForAdapter(legacyAdapter);
     // A legacy pf2e system-adapter config seeded fresh pf2e units, which read/spend coins
-    // through the actor inventory rather than a flat data path; carry that intent forward as
-    // the pf2eInventory spend strategy when no explicit strategy was persisted.
+    // through the actor inventory rather than a flat actor property; carry that intent forward
+    // as the actorInventory spend strategy when no explicit strategy was persisted. A legacy
+    // dnd5e adapter maps to the default actorProperty strategy.
     const spendStrategy =
-      currency?.spendStrategy || (legacyAdapter === 'pf2e' ? 'pf2eInventory' : undefined);
+      currency?.spendStrategy ||
+      (legacyAdapter === 'pf2e'
+        ? 'actorInventory'
+        : legacyAdapter === 'dnd5e'
+          ? 'actorProperty'
+          : undefined);
     return normalizeCurrencyConfig(
       {
         enabled: currency?.enabled === true,

@@ -38,7 +38,7 @@ export function normalizeCurrencyUnit(
   return unit;
 }
 
-const SPEND_STRATEGIES = new Set(['dataPath', 'pf2eInventory']);
+const SPEND_STRATEGIES = new Set(['actorProperty', 'actorInventory']);
 const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
@@ -48,7 +48,7 @@ export function normalizeCurrencyConfig(currency = {}, options = {}) {
     : [];
   const spendStrategy = SPEND_STRATEGIES.has(currency?.spendStrategy)
     ? currency.spendStrategy
-    : 'dataPath';
+    : 'actorProperty';
   return {
     enabled: currency?.enabled === true,
     spendStrategy,
@@ -93,7 +93,7 @@ function buildUnitMap(units) {
 export function validateCurrencyProfile(units = [], options = {}) {
   const spendStrategy = SPEND_STRATEGIES.has(options?.spendStrategy)
     ? options.spendStrategy
-    : 'dataPath';
+    : 'actorProperty';
   const rawUnits = Array.isArray(units) ? units : [];
   const normalizedUnits = rawUnits.map((entry) => normalizeCurrencyUnit(entry)).filter(Boolean);
   const byId = buildUnitMap(normalizedUnits);
@@ -117,7 +117,7 @@ export function validateCurrencyProfile(units = [], options = {}) {
     }
   }
   for (const unit of normalizedUnits) {
-    if (spendStrategy === 'pf2eInventory') {
+    if (spendStrategy === 'actorInventory') {
       const denomination = unit.denomination || unit.id;
       if (!PF2E_DENOMINATIONS.has(denomination)) {
         errors.push(
