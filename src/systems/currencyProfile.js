@@ -5,6 +5,20 @@ function defaultRandomID() {
   );
 }
 
+/**
+ * Normalize one raw currency-unit entry into the canonical
+ * `{ id, label, abbreviation, icon, actorPath, denomination?, contains[] }` shape.
+ *
+ * `actorPath` locates the numeric balance under the `actorProperty` strategy. `denomination` (a
+ * real coin key, e.g. pf2e `cp`/`sp`/`gp`/`pp`) locates the coin under the `actorInventory` +
+ * `provider` strategy and is only emitted when present. The `contains[]` sub-unit list is
+ * deduplicated by child id and drops any entry without a positive integer amount. Returns `null`
+ * for a non-object entry or one that resolves to an empty id.
+ *
+ * @param {object} [entry]
+ * @param {() => string} [randomID] - id factory used when the entry has no id.
+ * @returns {object|null}
+ */
 export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
   if (!entry || typeof entry !== 'object') return null;
   const id = String(entry.id || randomID()).trim();
@@ -45,6 +59,14 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
 const SPEND_STRATEGIES = new Set(['actorProperty', 'actorInventory']);
 const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 const INVENTORY_MODES = new Set(['provider', 'macro']);
+
+/**
+ * Ordered keys of the custom currency macro set (`requirements.currency.macros`). `canAfford` gates
+ * the craft and `decrement` performs the spend; `increment` is reserved for a future refund flow
+ * and is never invoked. Used by the normalizer and the macro spender to iterate the macro slots.
+ *
+ * @type {string[]}
+ */
 export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement'];
 
 // The provider/macro inventory settings only carry meaning while `spendStrategy` is
@@ -64,6 +86,21 @@ function normalizeInventorySettings(currency = {}) {
   return { inventoryMode, providerId, macros };
 }
 
+/**
+ * Normalize a crafting system's `requirements.currency` config block.
+ *
+ * `spendStrategy` is one of `actorProperty` (default) or `actorInventory`; any other value falls
+ * back to `actorProperty`. `inventoryMode` (`provider` default, or `macro`), `providerId`, and the
+ * `macros` set are always normalized and persisted but only carry meaning under `actorInventory`,
+ * so flipping the strategy never loses a previously configured provider or macro set. Legacy
+ * `provider`/`systemAdapter`/single-macro-UUID fields are read-compatible elsewhere but are never
+ * re-emitted from this shape.
+ *
+ * @param {object} [currency]
+ * @param {{ randomID?: () => string }} [options]
+ * @returns {{ enabled: boolean, spendStrategy: string, inventoryMode: string, providerId: string,
+ *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
+ */
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const randomID = typeof options.randomID === 'function' ? options.randomID : undefined;
   const units = Array.isArray(currency?.units)
@@ -188,6 +225,17 @@ function resolveUnitContents(unit, ancestry, { errors, resolveUnit }) {
   return { baseUnitId, baseValue };
 }
 
+/**
+ * Build the recursive base-value resolver for a unit map. A unit with no `contains[]` is a terminal
+ * base unit (`baseValue: 1`); a parent multiplies each child's amount by the child's base value, so
+ * the whole `contains[]` graph collapses to integer base values (e.g. cp=1, sp=10, gp=100). The
+ * resolver is memoized and detects cycles, pushing a circular-reference error and returning `null`
+ * for any unit on a cycle.
+ *
+ * @param {Map<string, object>} byId
+ * @param {string[]} errors - mutable error accumulator.
+ * @returns {{ resolveUnit: (unitId: string, ancestry?: string[]) => object|null, resolved: Map }}
+ */
 function buildUnitResolver(byId, errors) {
   const resolving = new Set();
   const resolved = new Map();
@@ -226,6 +274,26 @@ function collectMacroConfigErrors(macros, errors) {
   }
 }
 
+/**
+ * Validate a currency unit profile and resolve every unit's integer base value.
+ *
+ * Always-on checks: at least one unit, unique ids, positive-integer sub-unit amounts, no
+ * self-containment, every sub-unit reference resolves, the graph is acyclic, and every connected
+ * branch resolves to exactly one terminal base unit. The per-unit field requirement is conditional
+ * on `spendStrategy` (and, under `actorInventory`, `inventoryMode`):
+ *
+ * - `actorProperty`: each unit must define an `actorPath`.
+ * - `actorInventory` + `provider`: each unit's `denomination` (defaulting to its id) must be a pf2e
+ *   coin key (`pp`/`gp`/`sp`/`cp`).
+ * - `actorInventory` + `macro`: each unit must have a non-empty `abbreviation` (macros match coins
+ *   by abbreviation), and the config-level `canAfford` and `decrement` macros must be set
+ *   (`increment` optional).
+ *
+ * @param {object[]} [units]
+ * @param {{ spendStrategy?: string, inventoryMode?: string,
+ *   macros?: { canAfford?: string, increment?: string, decrement?: string } }} [options]
+ * @returns {{ valid: boolean, errors: string[], units: object[], metadata: Map }}
+ */
 export function validateCurrencyProfile(units = [], options = {}) {
   const spendStrategy = SPEND_STRATEGIES.has(options?.spendStrategy)
     ? options.spendStrategy
@@ -379,6 +447,22 @@ function buildSpendUpdates(profile, requiredMeta, nextBalances, originalBalances
   return updates;
 }
 
+/**
+ * Compute the batched `actor.update(...)` payload that spends a currency requirement under the
+ * `actorProperty` strategy, making change across configured denominations.
+ *
+ * Validates the profile, confirms the requirement unit exists, checks affordability against the
+ * actor's held balances (converted to the unit's terminal base value), then spends lower
+ * denominations first and breaks higher ones as needed, returning change only in denominations at
+ * or below the required unit. Returns `{ valid: false, message }` when the profile is invalid, the
+ * unit is unknown, or funds are insufficient; otherwise `{ valid: true, updates, formatted }` where
+ * `updates` maps each changed unit's `actorPath` to its new balance.
+ *
+ * @param {object} actor
+ * @param {{ unit: string, amount: number }} requirement
+ * @param {object[]} [units]
+ * @returns {{ valid: boolean, message?: string, updates?: object, formatted?: string }}
+ */
 export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   const profile = validateCurrencyProfile(units);
   if (!profile.valid) {

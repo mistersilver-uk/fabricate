@@ -84,6 +84,13 @@ export const DND5E_CURRENCY_PRESETS = buildCoinLadderPreset('actorPath');
 
 export const PF2E_CURRENCY_PRESETS = buildCoinLadderPreset('denomination');
 
+/**
+ * The frozen currency unit preset bundle for a Foundry system, or an empty frozen array for a
+ * system with no bundle. dnd5e units carry `actorPath`; pf2e units carry `denomination`.
+ *
+ * @param {string} foundrySystemId
+ * @returns {object[]}
+ */
 export function getCurrencyPresetsForFoundrySystem(foundrySystemId) {
   const id = String(foundrySystemId || '').trim();
   if (id === 'dnd5e') return DND5E_CURRENCY_PRESETS;
@@ -91,10 +98,24 @@ export function getCurrencyPresetsForFoundrySystem(foundrySystemId) {
   return Object.freeze([]);
 }
 
+/**
+ * Preset bundle keyed by adapter id. Adapter ids currently match Foundry system ids, so this
+ * delegates to {@link getCurrencyPresetsForFoundrySystem}.
+ *
+ * @param {string} adapterId
+ * @returns {object[]}
+ */
 export function getCurrencyPresetsForAdapter(adapterId) {
   return getCurrencyPresetsForFoundrySystem(adapterId);
 }
 
+/**
+ * Idempotently merge preset units into a system's current unit list. Existing units (matched by id)
+ * are left untouched and reported as `skipped`; presets with a new id are cloned and appended.
+ *
+ * @param {{ presets?: object[], currentUnits?: object[] }} [args]
+ * @returns {{ added: object[], skipped: object[], next: object[] }}
+ */
 export function seedCurrencyPresets({ presets = [], currentUnits = [] } = {}) {
   const safePresets = Array.isArray(presets) ? presets : [];
   const safeCurrent = Array.isArray(currentUnits) ? currentUnits : [];

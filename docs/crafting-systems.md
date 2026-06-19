@@ -238,14 +238,63 @@ Time gates are checked:
 
 ### Currency Requirements
 
-Currency is handled by currency units on the crafting system. Add units in the
-system settings editor, or seed the dnd5e/pf2e presets when they match your world.
+When you enable currency requirements, a recipe step can cost an amount of a currency unit you define.
+Fabricate checks whether the crafting actor can afford the step before the craft begins, then spends the cost when the step is taken.
+If the actor cannot pay, the step is blocked and the craft is stopped before any ingredients are consumed.
 
-Each unit defines:
+You configure currency in the system settings editor, in the **Currency units** card.
 
-- a display label and abbreviation
-- the actor data path that stores that unit's numeric balance
-- any sub-units contained by one unit, such as `1 gp = 10 sp`
+#### Choosing a spend strategy
 
-Fabricate uses that profile to check whether the actor can afford a step and to
-deduct the cost, making change across configured denominations when needed.
+The **Spend strategy** selector decides how Fabricate reads and spends an actor's money.
+You can pick either strategy in any world, regardless of game system.
+
+- **Actor data path** reads each currency unit from a numeric field on the actor sheet, such as a Dungeons & Dragons 5e character's gold.
+  Fabricate makes its own change across the denominations you define, so a step priced in silver can be paid from gold and the difference returned in smaller coins.
+- **Actor inventory** treats coins as items the actor carries.
+  This is the right choice for game systems such as Pathfinder 2e, where coins live in the inventory rather than in a single sheet field.
+
+When you choose **Actor inventory**, an **Inventory source** selector appears with two options.
+
+#### Provider or custom macros
+
+Under **Actor inventory**, the **Inventory source** can be a preconfigured provider or your own macros.
+
+- **Preconfigured provider** uses a built-in adapter that already knows how to read and spend coins from your game system's inventory.
+  Pathfinder 2e ships with one.
+  When a provider is selected, it manages the denominations for you, so the unit list becomes a read-only **Provider-managed denominations** list.
+  You can still reference those denominations by their abbreviation in a step's currency cost, but you cannot edit them here.
+  In a world whose game system has no provider, Fabricate shows a note steering you to custom macros instead.
+- **Custom macros** lets you drive currency with macros you write, for any game system.
+  You link each macro by dragging it from the Foundry macro directory onto a drop zone.
+  Right-click a linked macro to unlink it.
+
+#### The currency macros
+
+Custom macro mode has three drop zones.
+
+- **Can afford macro** runs before the craft to decide whether the actor can pay.
+  Return a success result to allow the craft, or a failure result to block it.
+- **Decrement macro** runs after a successful craft to spend the cost.
+- **Increment macro** is reserved for a future refund flow.
+  You can link it now, but Fabricate does not run it yet.
+
+Each macro receives the step's cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
+If a macro reports failure or stops with an error, Fabricate blocks the step and the craft is stopped before any ingredients are consumed.
+
+#### Defining currency units
+
+When you use the **Actor data path** strategy, or **Custom macros**, you define your own currency units.
+Each unit has a label, an abbreviation, and an icon.
+
+- Under **Actor data path**, each unit also names the field on the actor sheet that holds its balance.
+- Under **Custom macros**, units have no path or denomination.
+  Your macros match coins by abbreviation, so a note reminds you that conversion between units is handled by your macros.
+
+You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.
+A unit with no breakdown is treated as a base denomination.
+
+To get started quickly, use **Seed presets** to add the standard coin ladder for your world.
+Seeding in a Dungeons & Dragons 5e world adds units on the actor data path strategy.
+Seeding in a Pathfinder 2e world adds inventory units and selects the Pathfinder 2e provider.
+Preset seeding is only available in Dungeons & Dragons 5e or Pathfinder 2e worlds.
