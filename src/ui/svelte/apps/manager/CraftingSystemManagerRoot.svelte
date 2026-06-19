@@ -2350,6 +2350,15 @@
     return item?.img || 'icons/svg/item-bag.svg';
   }
 
+  const INSPECTOR_DESCRIPTION_LIMIT = 160;
+
+  function truncateDescription(description) {
+    if (typeof description !== 'string') return '';
+    const trimmed = description.trim();
+    if (trimmed.length <= INSPECTOR_DESCRIPTION_LIMIT) return trimmed;
+    return `${trimmed.slice(0, INSPECTOR_DESCRIPTION_LIMIT).trimEnd()}…`;
+  }
+
   function environmentName(environment) {
     const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
     if (explicitName) return explicitName;
@@ -3704,7 +3713,7 @@
               </div>
 
               <p class="manager-muted">
-                {selectedGatheringTask.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+                {truncateDescription(selectedGatheringTask.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
               </p>
             </section>
 
@@ -4213,7 +4222,7 @@
               </div>
 
               <p class="manager-muted">
-                {selectedGatheringEvent.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+                {truncateDescription(selectedGatheringEvent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
               </p>
             </section>
 
@@ -4690,7 +4699,7 @@
             </div>
 
             <p class="manager-muted">
-              {selectedEnvironment.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedEnvironment.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
@@ -4780,7 +4789,7 @@
               </div>
             </div>
             <p class="manager-muted">
-              {selectedEssenceForInspector.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedEssenceForInspector.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
@@ -4916,7 +4925,7 @@
             </div>
 
             <p class="manager-muted">
-              {selectedComponent.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedComponent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
@@ -5019,7 +5028,7 @@
             </div>
 
             <p class="manager-muted">
-              {selectedRecipe.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedRecipe.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
