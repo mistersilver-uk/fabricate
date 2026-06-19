@@ -169,6 +169,18 @@ function applyRecipeKnowledgeMode(system, mode) {
   return { ...system, recipeVisibility: { knowledge: { mode } } };
 }
 
+// Merge a selected currency config onto the alchemy fixture so applySelectedSystem
+// (which re-reads systemDetails) preserves the currency config across an Edit click.
+// Mutates the passed systemDetails map. Kept out of createStore to hold that helper
+// under the cognitive-complexity budget.
+function applySelectedCurrency(systemDetails, selectedCurrency) {
+  if (!selectedCurrency) return;
+  systemDetails.alchemy = {
+    ...systemDetails.alchemy,
+    requirements: { ...systemDetails.alchemy.requirements, currency: selectedCurrency }
+  };
+}
+
 function createStore(calls = [], options = {}) {
   const selectedFeatures = options.selectedFeatures || {
     essences: true,
@@ -423,14 +435,7 @@ function createStore(calls = [], options = {}) {
       }]
     }
   ];
-  if (options.selectedCurrency) {
-    // Merge onto the canonical fixture so applySelectedSystem (which re-reads systemDetails)
-    // preserves the currency config across an Edit click.
-    systemDetails.alchemy = {
-      ...systemDetails.alchemy,
-      requirements: { ...(systemDetails.alchemy.requirements || {}), currency: options.selectedCurrency }
-    };
-  }
+  applySelectedCurrency(systemDetails, options.selectedCurrency);
   const baseSelectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
   const selectedSystem = applyRecipeKnowledgeMode(baseSelectedSystem, options.recipeKnowledgeMode);
   const essenceCardsBySystem = {
@@ -991,6 +996,30 @@ function createStore(calls = [], options = {}) {
       return true;
     }
   };
+}
+
+// Mount the manager, open the Alchemy system editor, and settle the DOM. The currency editor
+// tests below all repeat this exact mount + "Edit Alchemy" + flush dance and differ only in the
+// `createStore` options, so it lives here instead of being inlined per test. Assigns the shared
+// `mounted`/`target` so the suite's `afterEach` tears them down. Returns the captured `calls`.
+async function mountCurrencyEditor(storeOptions) {
+  const calls = [];
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(Component, {
+    target,
+    props: {
+      store: createStore(calls, storeOptions),
+      services: { openCurrentAdmin: () => {} }
+    }
+  });
+  flushSync();
+  target.querySelector('[aria-label="Edit Alchemy"]').click();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+  flushSync();
+  return { calls };
 }
 
 describe('CraftingSystemManager mounted behavior', () => {
@@ -5483,30 +5512,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
   });
 
-  // Mount the manager, open the Alchemy system editor, and settle the DOM. The currency editor
-  // tests below all repeat this exact mount + "Edit Alchemy" + flush dance and differ only in the
-  // `createStore` options, so it lives here instead of being inlined per test. Assigns the shared
-  // `mounted`/`target` so the suite's `afterEach` tears them down. Returns the captured `calls`.
-  async function mountCurrencyEditor(storeOptions) {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, storeOptions),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-    target.querySelector('[aria-label="Edit Alchemy"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-    return { calls };
-  }
-
   it('renders the currency spend-strategy control with three options and routes its change', async () => {
     const { calls } = await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
@@ -5630,7 +5635,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // its edit pen, and asserts the actual rendered <option> values (each value is the unit id).
   async function offeredSubUnitOptionIds(units, expandUnitId) {
     if (mounted) unmount(mounted);
-    if (target?.parentNode) target.parentNode.removeChild(target);
+    if (target?.parentNode) target.remove();
     await mountCurrencyEditor({
       selectedCurrency: {
         enabled: true,
@@ -5757,7 +5762,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Tear down before re-mounting with currency enabled.
     if (mounted) unmount(mounted);
-    if (target?.parentNode) target.parentNode.removeChild(target);
+    if (target?.parentNode) target.remove();
 
     await mountCurrencyEditor({
       selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] }
