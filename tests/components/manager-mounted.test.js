@@ -114,6 +114,7 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/utils/recipeCategories.js',
     'src/config/flags.js',
+    'src/config/currencyPresets.js',
     'src/gatheringImageDefaults.js'
   ]) {
     const rawDestination = join(tempRoot, rawPath);

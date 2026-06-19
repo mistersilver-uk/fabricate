@@ -2131,6 +2131,8 @@
           "Icon": "Icon",
           "ChangeIcon": "Change icon",
           "ActorPath": "Actor data path",
+          "Denomination": "Coin denomination",
+          "SelectDenomination": "Select denomination",
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
           "NoActorPath": "No actor path",

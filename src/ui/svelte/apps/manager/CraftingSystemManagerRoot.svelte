@@ -8,6 +8,7 @@
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import { getInventoryDenominationsForFoundrySystem } from '../../../../config/currencyPresets.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -148,6 +149,8 @@
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  const currencySpendStrategy = $derived(selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty');
+  const currencyDenominationOptions = $derived(getInventoryDenominationsForFoundrySystem(foundrySystemId));
   async function onAddCharacterModifier() {
     if (!selectedSystemId) return null;
     return await store.addGatheringCharacterModifier(selectedSystemId);
@@ -3633,6 +3636,8 @@
         onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
         currencyUnits={selectedCurrencyUnits}
         {currencyPresetsSupported}
+        {currencySpendStrategy}
+        {currencyDenominationOptions}
         onAddCurrencyUnit={onAddCurrencyUnit}
         onUpdateCurrencyUnit={onUpdateCurrencyUnit}
         onDeleteCurrencyUnit={onDeleteCurrencyUnit}

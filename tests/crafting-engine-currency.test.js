@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DND5E_CURRENCY_PRESETS,
   PF2E_CURRENCY_PRESETS,
+  getInventoryDenominationsForFoundrySystem,
   seedCurrencyPresets,
 } from '../src/config/currencyPresets.js';
 import { ActorInventoryCoinSpender } from '../src/systems/CoinSpenders.js';
@@ -628,6 +629,14 @@ test('seedCurrencyPresets preserves the pf2e denomination field', () => {
   // Idempotent: re-seeding over existing units adds nothing and keeps user edits.
   const second = seedCurrencyPresets({ presets: PF2E_CURRENCY_PRESETS, currentUnits: added });
   assert.equal(second.added.length, 0);
+});
+
+test('getInventoryDenominationsForFoundrySystem returns the pf2e ladder and empties elsewhere', () => {
+  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('pf2e')], ['cp', 'sp', 'gp', 'pp']);
+  // dnd5e locates coins by actor path, so it exposes no denomination keys.
+  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('dnd5e')], []);
+  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('unknown')], []);
+  assert.deepEqual([...getInventoryDenominationsForFoundrySystem('')], []);
 });
 
 function containsAmount(unit, unitId) {

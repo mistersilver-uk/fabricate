@@ -81,6 +81,20 @@ export function getCurrencyPresetsForAdapter(adapterId) {
   return getCurrencyPresetsForFoundrySystem(adapterId);
 }
 
+/**
+ * The ordered coin denomination keys for inventory-strategy systems (pf2e), derived from the
+ * preset ladder so there is no parallel hardcoded list to drift. Systems that locate coins by an
+ * actor data path (dnd5e) or are otherwise unknown return an empty list, since they have no
+ * denomination keys to choose from.
+ */
+export function getInventoryDenominationsForFoundrySystem(foundrySystemId) {
+  return Object.freeze(
+    getCurrencyPresetsForFoundrySystem(foundrySystemId)
+      .map((unit) => String(unit?.denomination || '').trim())
+      .filter((denomination) => denomination.length > 0)
+  );
+}
+
 export function seedCurrencyPresets({ presets = [], currentUnits = [] } = {}) {
   const safePresets = Array.isArray(presets) ? presets : [];
   const safeCurrent = Array.isArray(currentUnits) ? currentUnits : [];

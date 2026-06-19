@@ -16,6 +16,8 @@
     onSeedCharacterModifierPresets = async () => {},
     currencyUnits = [],
     currencyPresetsSupported = false,
+    currencySpendStrategy = 'actorProperty',
+    currencyDenominationOptions = [],
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
     onDeleteCurrencyUnit = async () => {},
@@ -59,6 +61,11 @@
   function currencyUnitLabel(unitId) {
     const unit = currencyUnits.find(entry => entry.id === unitId);
     return unit?.label || unit?.abbreviation || unitId;
+  }
+
+  function currencyDenominationLabel(denomination) {
+    const match = currencyUnits.find(entry => entry.denomination === denomination || entry.id === denomination);
+    return match?.label || String(denomination || '').toUpperCase();
   }
 
   function currencyUnitIcon(unitId) {
@@ -367,10 +374,26 @@
                     </div>
 
                     <div class="manager-edit-grid manager-currency-detail-grid">
-                      <label class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.ActorPath', 'Actor data path')}</span>
-                        <input type="text" value={unit.actorPath} placeholder="system.currency.gp" oninput={(event) => onUpdateCurrencyUnit(unit.id, { actorPath: event.currentTarget.value })} />
-                      </label>
+                      {#if currencySpendStrategy === 'actorInventory'}
+                        <label class="manager-field">
+                          <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Denomination', 'Coin denomination')}</span>
+                          {#if currencyDenominationOptions.length > 0}
+                            <select value={unit.denomination || ''} onchange={(event) => onUpdateCurrencyUnit(unit.id, { denomination: event.currentTarget.value })}>
+                              <option value="" disabled={!!unit.denomination}>{text('FABRICATE.Admin.Manager.CurrencyUnits.SelectDenomination', 'Select denomination')}</option>
+                              {#each currencyDenominationOptions as denomination (denomination)}
+                                <option value={denomination}>{currencyDenominationLabel(denomination)}</option>
+                              {/each}
+                            </select>
+                          {:else}
+                            <input type="text" value={unit.denomination || ''} placeholder="gp" oninput={(event) => onUpdateCurrencyUnit(unit.id, { denomination: event.currentTarget.value })} />
+                          {/if}
+                        </label>
+                      {:else}
+                        <label class="manager-field">
+                          <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.ActorPath', 'Actor data path')}</span>
+                          <input type="text" value={unit.actorPath} placeholder="system.currency.gp" oninput={(event) => onUpdateCurrencyUnit(unit.id, { actorPath: event.currentTarget.value })} />
+                        </label>
+                      {/if}
                       {#if subUnitOptions.length > 0}
                         <div class="manager-currency-subunit-builder">
                           <label class="manager-field">

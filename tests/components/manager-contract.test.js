@@ -211,6 +211,22 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('onAddCurrencySubUnit={onAddCurrencySubUnit}'),
       'root should pass currency sub-unit actions to SystemEditView'
     );
+    assert.ok(
+      rootSource.includes('{currencySpendStrategy}') && rootSource.includes('{currencyDenominationOptions}'),
+      'root should thread the spend strategy and denomination options to SystemEditView'
+    );
+    assert.ok(
+      rootSource.includes('getInventoryDenominationsForFoundrySystem'),
+      'root should derive denomination options from the currency preset helper'
+    );
+    assert.ok(
+      systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
+      'currency editor should branch on the actorInventory spend strategy'
+    );
+    assert.ok(
+      systemEditSource.includes('{ denomination:') && systemEditSource.includes('currencyDenominationOptions'),
+      'currency editor should bind a denomination field driven by the denomination options'
+    );
     for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',
