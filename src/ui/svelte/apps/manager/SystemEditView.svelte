@@ -347,7 +347,7 @@
               <li class="manager-character-modifier-row" data-system-currency-unit={unit.id}>
                 {#if expanded}
                   <div class="manager-character-modifier-editor">
-                    <div class="manager-edit-grid">
+                    <div class="manager-edit-grid manager-currency-edit-grid">
                       <label class="manager-field">
                         <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Label', 'Label')}</span>
                         <input type="text" value={unit.label} oninput={(event) => onUpdateCurrencyUnit(unit.id, { label: event.currentTarget.value })} />

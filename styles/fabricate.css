@@ -4044,6 +4044,10 @@
   grid-column: 1 / -1;
 }
 
+.fabricate-manager .manager-currency-edit-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea {
