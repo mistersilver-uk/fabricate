@@ -1403,6 +1403,21 @@
   gap: var(--fab-space-2);
 }
 
+/* Provider-managed denominations (e.g. pf2e cp/sp/gp/pp) read better as a compact
+   two-column grid that stacks into a couple of rows rather than a full-width single
+   column, collapsing to one column on narrow widths. */
+.fabricate-manager .manager-currency-provider-managed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-currency-provider-managed-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .fabricate-manager .manager-currency-provider-managed-summary {
   display: flex;
   gap: var(--fab-space-3);
@@ -8142,6 +8157,14 @@
   border-color: var(--fab-mv2-accent);
   background: var(--fab-success-soft);
   color: var(--fab-mv2-text);
+}
+
+/* The empty currency-macro drop zone must match the height of the linked-macro card
+   (.manager-environment-scene-linked) so dropping or selecting a macro does not resize
+   the zone. The linked card is a 40px thumb plus var(--fab-space-3) padding and a 1px
+   border on each side; mirror that as a min-height (border-box) and centre the hint. */
+.fabricate-manager .manager-currency-macro-drop-zone {
+  min-height: calc(40px + (2 * var(--fab-space-3)) + 2px);
 }
 
 .fabricate-manager .manager-component-tag-grid {

@@ -578,7 +578,7 @@
                     {:else}
                       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <div
-                        class="manager-component-source-drop-zone"
+                        class="manager-component-source-drop-zone manager-currency-macro-drop-zone"
                         data-system-currency-macro-dropzone={field.key}
                         role="group"
                         aria-label={currencyMacroDropZoneLabel(field)}
@@ -611,7 +611,7 @@
           {#if currencyUnits.length === 0}
             <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
           {:else}
-            <ul class="manager-character-modifier-list manager-currency-provider-managed-list">
+            <ul class="manager-character-modifier-list manager-currency-provider-managed-list manager-currency-provider-managed-grid">
               {#each currencyUnits as unit (unit.id)}
                 <li class="manager-character-modifier-row" data-system-currency-unit={unit.id}>
                   <div class="manager-currency-provider-managed-summary">
