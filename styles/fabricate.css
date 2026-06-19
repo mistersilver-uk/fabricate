@@ -1428,7 +1428,7 @@
    field/value pairs, mirroring how Label and Abbreviation are shown in the editable form. */
 .fabricate-manager .manager-currency-readonly-fields {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--fab-space-2) var(--fab-space-4);
   min-width: 0;
 }
@@ -1446,6 +1446,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-currency-readonly-value {
