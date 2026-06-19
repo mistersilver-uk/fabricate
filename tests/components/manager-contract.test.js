@@ -250,6 +250,40 @@ describe('CraftingSystemManager source contract', () => {
       systemEditSource.includes("currencyInventoryMode === 'macro'"),
       'currency editor should branch on the macro inventory mode'
     );
+    // Provider inventory mode makes the units provider-owned and read-only: the Add/Seed header
+    // actions and the editable unit controls are gated behind a non-provider condition, and a
+    // dedicated read-only branch with a provider-managed callout renders instead.
+    assert.ok(
+      systemEditSource.includes("currencySpendStrategy === 'actorInventory' && currencyInventoryMode === 'provider'"),
+      'currency editor should derive a read-only flag for provider inventory mode'
+    );
+    assert.ok(
+      systemEditSource.includes('{#if !currencyUnitsReadOnly}'),
+      'currency editor should gate the Add/Seed header actions behind the non-provider (editable) condition'
+    );
+    assert.ok(
+      systemEditSource.includes('{#if currencyUnitsReadOnly}'),
+      'currency editor should render a dedicated read-only branch in provider mode'
+    );
+    for (const snippet of [
+      'data-system-currency-provider-managed',
+      'manager-currency-provider-managed-callout',
+      'currencyProviderManagedHint()',
+      'manager-currency-provider-managed-summary',
+      'manager-availability-pill is-currency is-readonly',
+      'manager-availability-pill-amount-static',
+      'data-system-currency-denomination',
+      'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include read-only ${snippet}`);
+    }
+    // The read-only branch precedes the editable branch, so the editable controls (editable amount
+    // input, remove cross) live only after the provider-managed branch.
+    assert.ok(
+      systemEditSource.indexOf('data-system-currency-provider-managed') <
+        systemEditSource.indexOf('class="manager-availability-pill-amount"'),
+      'provider-managed read-only branch should render before the editable unit list'
+    );
     for (const prop of [
       '{currencyInventoryMode}',
       '{currencyProviderId}',
@@ -325,7 +359,8 @@ describe('CraftingSystemManager source contract', () => {
       'Provider', 'ProviderHint', 'NoProviders',
       'MacroCanAfford', 'MacroCanAffordHint', 'MacroIncrement', 'MacroIncrementHint',
       'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroReplaceHint',
-      'MacroUnlink', 'MacroMissing', 'MacroMatchHint'
+      'MacroUnlink', 'MacroMissing', 'MacroMatchHint',
+      'ProviderManagedTitle', 'ProviderManagedHint', 'ProviderManagedDenomination'
     ]) {
       assert.ok(lang.FABRICATE.Admin.Manager.CurrencyUnits[key], `CurrencyUnits.${key} should be defined`);
     }

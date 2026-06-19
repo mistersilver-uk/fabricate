@@ -2165,7 +2165,10 @@
           "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",
           "MacroUnlink": "Unlink macro",
           "MacroMissing": "Macro unresolved",
-          "MacroMatchHint": "Macros match this unit by abbreviation."
+          "MacroMatchHint": "Macros match this unit by abbreviation.",
+          "ProviderManagedTitle": "Provider-managed denominations",
+          "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements.",
+          "ProviderManagedDenomination": "Denomination: {denomination}"
         },
         "Column": {
           "System": "System",

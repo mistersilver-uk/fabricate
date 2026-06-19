@@ -45,7 +45,10 @@ import {
   getCurrencyPresetsForFoundrySystem,
   seedCurrencyPresets
 } from '../../../config/currencyPresets.js';
-import { getDefaultProviderId } from '../../../config/currencyProviders.js';
+import {
+  getDefaultProviderId,
+  getProviderCanonicalUnits
+} from '../../../config/currencyProviders.js';
 import {
   canAddCurrencySubUnit,
   CURRENCY_MACRO_KEYS,
@@ -5307,6 +5310,19 @@ export function createAdminStore(services) {
       : '';
   }
 
+  // Provider inventory mode means "use the system's coins": the selected provider owns the
+  // denomination ladder, so overwrite config.units with the provider's canonical (frozen) units
+  // and re-normalize. This keeps the engine's affordability/baseValue math aligned with the
+  // system's real coin values regardless of any prior GM edits. Clears the units when the
+  // provider has no canonical ladder (e.g. an unknown provider id) so stale user units cannot
+  // linger and desync the engine.
+  function _applyProviderCanonicalUnits(currency) {
+    const canonical = getProviderCanonicalUnits(currency.providerId);
+    currency.units = canonical
+      .map((unit) => normalizeCurrencyUnit(unit, _randomID))
+      .filter(Boolean);
+  }
+
   async function setCurrencySpendStrategy(systemId, spendStrategy) {
     const nextStrategy = spendStrategy === 'actorInventory' ? 'actorInventory' : 'actorProperty';
     return await _updateCurrencyConfig(systemId, (currency) => {
@@ -5324,8 +5340,12 @@ export function createAdminStore(services) {
     const nextMode = inventoryMode === 'macro' ? 'macro' : 'provider';
     return await _updateCurrencyConfig(systemId, (currency) => {
       currency.inventoryMode = nextMode;
-      if (nextMode === 'provider' && !currency.providerId) {
-        currency.providerId = getDefaultProviderId(_foundrySystemId());
+      if (nextMode === 'provider') {
+        if (!currency.providerId) {
+          currency.providerId = getDefaultProviderId(_foundrySystemId());
+        }
+        // Provider mode is provider-owned: sync units to the resolved provider's canonical ladder.
+        _applyProviderCanonicalUnits(currency);
       }
       return true;
     });
@@ -5334,6 +5354,11 @@ export function createAdminStore(services) {
   async function setCurrencyProvider(systemId, providerId) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       currency.providerId = String(providerId || '').trim();
+      // Selecting a provider adopts its canonical units when provider mode is active; in other
+      // modes the providerId is inert and user-managed units stay untouched.
+      if (currency.spendStrategy === 'actorInventory' && currency.inventoryMode === 'provider') {
+        _applyProviderCanonicalUnits(currency);
+      }
       return true;
     });
   }
@@ -5373,6 +5398,10 @@ export function createAdminStore(services) {
       if (foundrySystemId === 'pf2e') {
         currency.inventoryMode = 'provider';
         currency.providerId = getDefaultProviderId(foundrySystemId);
+        // Provider mode is provider-owned, so overwrite the seeded units with the provider's
+        // canonical ladder (a clean overwrite of the same pf2e preset list) rather than the
+        // merge above, keeping the engine on canonical denominations.
+        _applyProviderCanonicalUnits(currency);
       }
       return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
     });

@@ -688,7 +688,8 @@ function createStore(calls = [], options = {}) {
           tools: options.gatheringLibraryTools || []
         }
       }
-    }
+    },
+    foundrySystemId: options.foundrySystemId || ''
   });
 
   function applySelectedSystem(id) {
@@ -5530,6 +5531,56 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
     // The inventory-mode select should also be present in actorInventory.
     assert.ok(target.querySelector('[data-system-currency-inventory-mode-select]'));
+  });
+
+  it('renders provider inventory mode units as a read-only provider-managed list', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          foundrySystemId: 'pf2e',
+          selectedCurrency: {
+            enabled: true,
+            spendStrategy: 'actorInventory',
+            inventoryMode: 'provider',
+            providerId: 'pf2e-inventory',
+            macros: { canAfford: '', increment: '', decrement: '' },
+            units: [
+              { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', denomination: 'gp', contains: [{ unitId: 'sp', amount: 10 }] },
+              { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', denomination: 'sp', contains: [] }
+            ]
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    // The provider-managed callout renders and the Add/Seed header actions are hidden.
+    assert.ok(target.querySelector('[data-system-currency-provider-managed]'), 'provider-managed callout should render');
+    assert.equal(
+      target.querySelector('.manager-currency-unit-card .manager-character-modifier-card-header-actions'),
+      null,
+      'Add and Seed header actions should be hidden in provider mode'
+    );
+    // Units render read-only: no pen/edit, delete, or remove controls, no editable amount inputs.
+    const card = target.querySelector('.manager-currency-unit-card');
+    assert.ok(card.querySelector('[data-system-currency-unit="gp"]'), 'gp unit should render');
+    assert.equal(card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button').length, 0, 'no edit/delete icon buttons in read-only summary');
+    assert.equal(card.querySelectorAll('.manager-availability-pill-amount').length, 0, 'no editable amount inputs in read-only mode');
+    assert.equal(card.querySelectorAll('.manager-availability-remove').length, 0, 'no remove-cross controls in read-only mode');
+    // Static sub-unit chip shows the amount as text.
+    const staticAmount = card.querySelector('.manager-availability-pill-amount-static');
+    assert.ok(staticAmount, 'static sub-unit amount chip should render');
+    assert.equal(staticAmount.textContent.trim(), '10');
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {

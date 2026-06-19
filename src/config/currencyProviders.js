@@ -16,9 +16,12 @@
  * @property {string} label
  * @property {string[]} systems - Foundry system ids this provider applies to.
  * @property {() => object} buildAdapter - factory for the coin adapter (readCoins/spend).
+ * @property {object[]} canonicalUnits - the provider-owned, frozen denomination ladder.
  */
 
 import { Pf2eInventoryCoinAdapter } from '../systems/Pf2eInventoryCoinAdapter.js';
+
+import { getCurrencyPresetsForFoundrySystem } from './currencyPresets.js';
 
 /** @type {CurrencyProvider[]} */
 const CURRENCY_PROVIDERS = Object.freeze([
@@ -27,6 +30,11 @@ const CURRENCY_PROVIDERS = Object.freeze([
     label: 'Pathfinder 2e inventory',
     systems: Object.freeze(['pf2e']),
     buildAdapter: () => new Pf2eInventoryCoinAdapter(),
+    // A provider owns its denomination ladder, so the engine's affordability/baseValue math
+    // always tracks the system's real coin values. pf2e reuses the existing pf2e preset ladder
+    // (the canonical pp/gp/sp/cp tree). The canonical units are frozen so callers cannot mutate
+    // them in place; the store overwrites `config.units` with this list under provider mode.
+    canonicalUnits: getCurrencyPresetsForFoundrySystem('pf2e'),
   }),
 ]);
 
@@ -70,3 +78,21 @@ export function resolveProvider(providerId, foundrySystemId) {
   const id = String(providerId || '').trim();
   return providers.find((provider) => provider.id === id) || providers[0];
 }
+
+/**
+ * The canonical, frozen currency unit ladder a provider owns by id. In provider inventory mode the
+ * selected provider dictates the denominations, coin keys, and conversion ladder, so these units —
+ * not GM-edited ones — drive the engine's affordability/baseValue math. Returns an empty (frozen)
+ * array for an unknown or empty provider id.
+ *
+ * @param {string} providerId
+ * @returns {object[]}
+ */
+export function getProviderCanonicalUnits(providerId) {
+  const id = String(providerId || '').trim();
+  if (!id) return EMPTY_CANONICAL_UNITS;
+  const provider = CURRENCY_PROVIDERS.find((entry) => entry.id === id);
+  return provider?.canonicalUnits || EMPTY_CANONICAL_UNITS;
+}
+
+const EMPTY_CANONICAL_UNITS = Object.freeze([]);

@@ -113,6 +113,33 @@
 
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
 
+  // In provider inventory mode the selected provider owns the denomination ladder, so currency
+  // units are provider-managed and read-only — editing them would desync the engine's
+  // affordability/baseValue math from the system's real coin values.
+  const currencyUnitsReadOnly = $derived(
+    currencySpendStrategy === 'actorInventory' && currencyInventoryMode === 'provider'
+  );
+
+  function currencyProviderLabel() {
+    const match = currencyProviderOptions.find((option) => option.id === currencyProviderId);
+    return (
+      match?.label ||
+      text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')
+    );
+  }
+
+  function currencyProviderManagedHint() {
+    return localize('FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedHint', {
+      provider: currencyProviderLabel()
+    });
+  }
+
+  function currencyProviderDenominationLabel(unit) {
+    return localize('FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedDenomination', {
+      denomination: unit?.denomination || unit?.id || ''
+    });
+  }
+
   function characterModifierIsRoll(entry) {
     return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
   }
@@ -407,20 +434,22 @@
             </h3>
             <p class="manager-muted">{text('FABRICATE.Admin.Manager.CurrencyUnits.Hint', 'Define actor currency paths and denomination breakdowns for this crafting system.')}</p>
           </div>
-          <div class="manager-character-modifier-card-header-actions">
-            <button type="button" class="manager-button is-primary" onclick={handleAddCurrencyUnit}>
-              <i class="fa-solid fa-plus" aria-hidden="true"></i>
-              {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
-            </button>
-            <button type="button"
-                    class="manager-button"
-                    disabled={!currencyPresetsSupported}
-                    data-tooltip={!currencyPresetsSupported ? text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresetsUnsupported', 'Preset seeding is only available for dnd5e or pf2e worlds.') : null}
-                    onclick={onSeedCurrencyPresets}>
-              <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-              {text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets', 'Seed presets')}
-            </button>
-          </div>
+          {#if !currencyUnitsReadOnly}
+            <div class="manager-character-modifier-card-header-actions">
+              <button type="button" class="manager-button is-primary" onclick={handleAddCurrencyUnit}>
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
+              </button>
+              <button type="button"
+                      class="manager-button"
+                      disabled={!currencyPresetsSupported}
+                      data-tooltip={!currencyPresetsSupported ? text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresetsUnsupported', 'Preset seeding is only available for dnd5e or pf2e worlds.') : null}
+                      onclick={onSeedCurrencyPresets}>
+                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                {text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets', 'Seed presets')}
+              </button>
+            </div>
+          {/if}
         </header>
 
         <div class="manager-currency-strategy" data-system-currency-strategy>
@@ -526,7 +555,48 @@
           {/if}
         </div>
 
-        {#if currencyUnits.length === 0}
+        {#if currencyUnitsReadOnly}
+          <div
+            class="manager-currency-subunit-warning manager-environment-comp-callout manager-currency-provider-managed-callout"
+            role="note"
+            data-system-currency-provider-managed
+          >
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <div class="manager-currency-provider-managed-copy">
+              <strong>{text('FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle', 'Provider-managed denominations')}</strong>
+              <span>{currencyProviderManagedHint()}</span>
+            </div>
+          </div>
+          {#if currencyUnits.length === 0}
+            <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
+          {:else}
+            <ul class="manager-character-modifier-list manager-currency-provider-managed-list">
+              {#each currencyUnits as unit (unit.id)}
+                <li class="manager-character-modifier-row" data-system-currency-unit={unit.id}>
+                  <div class="manager-character-modifier-summary manager-currency-provider-managed-summary">
+                    <span class="manager-character-modifier-icon"><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"></i></span>
+                    <span class="manager-character-modifier-label">{unit.label || unit.id}</span>
+                    {#if unit.abbreviation}
+                      <span class="manager-chip" data-system-currency-abbreviation>{unit.abbreviation}</span>
+                    {/if}
+                    <span class="manager-chip" data-system-currency-denomination>{currencyProviderDenominationLabel(unit)}</span>
+                  </div>
+                  {#if (unit.contains || []).length > 0}
+                    <div class="manager-availability-pill-row" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnits', 'Sub-units')}>
+                      {#each unit.contains as contained (contained.unitId)}
+                        <span class="manager-availability-pill is-currency is-readonly" data-system-currency-subunit={contained.unitId}>
+                          <i class={currencyUnitIcon(contained.unitId)} aria-hidden="true"></i>
+                          <span>{currencyUnitLabel(contained.unitId)}</span>
+                          <span class="manager-availability-pill-amount-static">{contained.amount}</span>
+                        </span>
+                      {/each}
+                    </div>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else if currencyUnits.length === 0}
           <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
         {:else}
           <ul class="manager-character-modifier-list">

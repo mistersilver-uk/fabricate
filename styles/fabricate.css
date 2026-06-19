@@ -1387,6 +1387,39 @@
   text-align: center;
 }
 
+/* Provider-managed (read-only) currency: the selected inventory provider owns the denomination
+   ladder, so units render as a compact static display with no edit/delete/add controls. */
+.fabricate-manager .manager-currency-provider-managed-callout {
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-provider-managed-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-currency-provider-managed-list {
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-provider-managed-summary {
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-availability-pill.is-currency.is-readonly {
+  cursor: default;
+}
+
+.fabricate-manager .manager-availability-pill-amount-static {
+  min-width: 24px;
+  padding: 0 var(--fab-space-2xs);
+  color: var(--fab-mv2-text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .fabricate-manager .manager-drop-inspector-stack {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
