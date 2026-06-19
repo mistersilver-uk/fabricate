@@ -2123,11 +2123,13 @@
           "Hint": "Define actor currency paths and denomination breakdowns for this crafting system.",
           "Empty": "No currency units yet.",
           "Add": "Add currency unit",
+          "Edit": "Edit currency unit",
           "Delete": "Delete currency unit",
           "NewLabel": "New currency unit",
           "Label": "Label",
           "Abbreviation": "Abbreviation",
           "Icon": "Icon",
+          "ChangeIcon": "Change icon",
           "ActorPath": "Actor data path",
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
@@ -2137,7 +2139,9 @@
           "SubUnits": "Sub-units",
           "SubUnitAmount": "Sub-unit amount",
           "RemoveSubUnit": "Remove sub-unit",
-          "NoSubUnits": "This unit is a base denomination."
+          "NoSubUnits": "This unit is a base denomination.",
+          "NoOtherUnits": "Add another currency unit before defining a breakdown.",
+          "NoEligibleSubUnits": "No eligible sub-units — every other unit already breaks down into this one."
         },
         "Column": {
           "System": "System",

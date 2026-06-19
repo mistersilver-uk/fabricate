@@ -281,13 +281,14 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   const spendableLowerUnits = relevantUnits
     .filter((entry) => entry.value <= requiredMeta.baseValue)
     .sort((left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id));
-  // Change from breaking a higher coin can be returned in ANY smaller denomination,
-  // not just denominations at or below the required unit. Use every relevant unit,
-  // largest first; distributeChange's floor naturally skips coins larger than the
-  // overpay (the overpay is always less than the broken coin's value).
-  const changeUnits = [...relevantUnits].sort(
-    (left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id)
-  );
+  // Change from breaking a higher coin is returned only in denominations at or below the
+  // required unit, largest first. Returning change in a denomination LARGER than the
+  // requirement unit (e.g. handing back electrum when spending silver on the dnd5e ladder)
+  // is surprising and widely disliked, so the change target set is restricted to the same
+  // and smaller denominations. This stays provably complete: the overpay is always less
+  // than the broken higher coin's value, the required unit and every smaller unit are in
+  // the set, and the value-1 base unit guarantees the remainder distributes fully.
+  const changeUnits = spendableLowerUnits;
   const higherUnits = relevantUnits
     .filter((entry) => entry.value > requiredMeta.baseValue)
     .sort((left, right) => left.value - right.value || left.unit.id.localeCompare(right.unit.id));

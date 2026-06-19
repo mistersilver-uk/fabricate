@@ -1323,62 +1323,6 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-currency-unit-empty {
-  font-style: italic;
-}
-
-.fabricate-manager .manager-currency-unit-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-currency-unit-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
-}
-
-.fabricate-manager .manager-currency-unit-summary {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--fab-space-2);
-  width: 100%;
-  min-height: 42px;
-  height: auto;
-  padding: var(--fab-space-2);
-  text-align: left;
-}
-
-.fabricate-manager .manager-currency-unit-summary-copy {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-currency-unit-summary-copy > strong,
-.fabricate-manager .manager-currency-unit-summary-copy > small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-currency-unit-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-2);
-}
-
 .fabricate-manager .manager-currency-subunit-builder {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1386,32 +1330,26 @@
   align-items: end;
 }
 
-.fabricate-manager .manager-currency-subunit-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--fab-space-chip);
+.fabricate-manager .manager-availability-pill.is-currency {
+  border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
+  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-mv2-surface-2));
 }
 
-.fabricate-manager .manager-currency-subunit-pill {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px auto;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  padding: var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  background: var(--fab-mv2-surface-2);
+.fabricate-manager .manager-availability-pill.is-currency > i {
+  color: var(--fab-info);
 }
 
-.fabricate-manager .manager-currency-subunit-pill > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.fabricate-manager .manager-currency-subunit-pill > input {
+.fabricate-manager .manager-availability-pill-amount {
+  width: 56px;
   min-width: 0;
+  height: 22px;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 4px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-size: 0.74rem;
+  font-weight: 700;
   text-align: center;
 }
 

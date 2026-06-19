@@ -194,9 +194,10 @@ describe('CraftingSystemManager source contract', () => {
       'manager-currency-unit-card',
       'handleAddCurrencyUnit',
       'onSeedCurrencyPresets',
-      'manager-currency-unit-summary',
+      'manager-character-modifier-summary',
       'manager-currency-subunit-builder',
-      'manager-currency-subunit-grid',
+      'manager-availability-pill is-currency',
+      'manager-availability-pill-amount',
       'onUpdateCurrencySubUnit(unit.id, contained.unitId, event.currentTarget.value)',
       'onDeleteCurrencySubUnit(unit.id, contained.unitId)'
     ]) {

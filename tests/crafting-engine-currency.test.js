@@ -142,9 +142,11 @@ test('CraftingEngine spends lower denominations for a higher-unit requirement', 
   assert.equal(actor.system.currency.gp, 0);
 });
 
-test('CraftingEngine makes minimal-coin change from a higher denomination', async () => {
-  // Change is returned across every smaller denomination, largest first (minimal-coin),
-  // so a 90 cp overpay from breaking a gp returns 1 ep + 4 sp on the dnd5e ladder.
+test('CraftingEngine makes change only in the required and smaller denominations', async () => {
+  // Change is returned across the required unit and smaller denominations only, largest
+  // first. Spending sp x1 from gp x1 overpays by 90 cp, which returns 9 sp rather than
+  // 1 ep + 4 sp: electrum is larger than the required silver unit and is excluded so the
+  // craft never hands back a coin nobody wants.
   const system = {
     requirements: {
       currency: { enabled: true, units: DND5E_CURRENCY_PRESETS },
@@ -158,8 +160,8 @@ test('CraftingEngine makes minimal-coin change from a higher denomination', asyn
   const decrement = await engine._decrementCurrencyRequirement(actor, recipe, step);
   assert.equal(decrement.valid, true);
   assert.equal(actor.system.currency.gp, 0);
-  assert.equal(actor.system.currency.ep, 1);
-  assert.equal(actor.system.currency.sp, 4);
+  assert.equal(actor.system.currency.ep, 0);
+  assert.equal(actor.system.currency.sp, 9);
   assert.equal(actor.system.currency.cp, 0);
 });
 
@@ -271,8 +273,9 @@ const GP_SP_CP_UNITS = [
   },
 ];
 
-test('spending one cp from one gp returns exact change across tiers', async () => {
-  // gp x1 (100 cp), spend cp x1 -> gp:0, sp:9, cp:9 (99 cp change distributed by tier).
+test('spending one cp from one gp returns change in the required unit only', async () => {
+  // gp x1 (100 cp), spend cp x1. Change is restricted to the required unit and smaller,
+  // so the 99 cp overpay is returned entirely in copper rather than rolled up into silver.
   const system = {
     requirements: {
       currency: { enabled: true, units: GP_SP_CP_UNITS },
@@ -286,8 +289,8 @@ test('spending one cp from one gp returns exact change across tiers', async () =
   const decrement = await engine._decrementCurrencyRequirement(actor, recipe, step);
   assert.equal(decrement.valid, true);
   assert.equal(actor.system.currency.gp, 0);
-  assert.equal(actor.system.currency.sp, 9);
-  assert.equal(actor.system.currency.cp, 9);
+  assert.equal(actor.system.currency.sp, 0);
+  assert.equal(actor.system.currency.cp, 99);
 });
 
 function buildPf2eActor(coins, removeImpl) {

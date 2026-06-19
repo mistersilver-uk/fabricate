@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import IconPicker from '../../components/IconPicker.svelte';
 
   let {
     selectedSystem = null,
@@ -58,6 +59,11 @@
   function currencyUnitLabel(unitId) {
     const unit = currencyUnits.find(entry => entry.id === unitId);
     return unit?.label || unit?.abbreviation || unitId;
+  }
+
+  function currencyUnitIcon(unitId) {
+    const unit = currencyUnits.find(entry => entry.id === unitId);
+    return unit?.icon || 'fa-solid fa-coins';
   }
 
   function currencyUnitCanReach(startUnitId, targetUnitId, seen = new Set()) {
@@ -332,30 +338,15 @@
         </header>
 
         {#if currencyUnits.length === 0}
-          <p class="manager-muted manager-currency-unit-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
+          <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
         {:else}
-          <ul class="manager-currency-unit-list">
+          <ul class="manager-character-modifier-list">
             {#each currencyUnits as unit (unit.id)}
               {@const expanded = currencyExpandedUnitId === unit.id}
               {@const subUnitOptions = currencyUnitSubUnitOptions(unit.id)}
-              <li class={`manager-currency-unit-row ${expanded ? 'is-expanded' : ''}`} data-system-currency-unit={unit.id}>
-                <button
-                  type="button"
-                  class="manager-currency-unit-summary"
-                  aria-expanded={expanded}
-                  onclick={() => currencyExpandedUnitId = expanded ? '' : unit.id}
-                >
-                  <span class="manager-character-modifier-icon"><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"></i></span>
-                  <span class="manager-currency-unit-summary-copy">
-                    <strong>{unit.label || unit.id}</strong>
-                    <small>{unit.abbreviation || unit.id} · {unit.actorPath || text('FABRICATE.Admin.Manager.CurrencyUnits.NoActorPath', 'No actor path')}</small>
-                  </span>
-                  <span class="manager-chip">{(unit.contains || []).length} {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</span>
-                  <i class={`fa-solid ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
-                </button>
-
+              <li class="manager-character-modifier-row" data-system-currency-unit={unit.id}>
                 {#if expanded}
-                  <div class="manager-currency-unit-editor">
+                  <div class="manager-character-modifier-editor">
                     <div class="manager-edit-grid">
                       <label class="manager-field">
                         <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Label', 'Label')}</span>
@@ -365,10 +356,14 @@
                         <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Abbreviation', 'Abbreviation')}</span>
                         <input type="text" value={unit.abbreviation} oninput={(event) => onUpdateCurrencyUnit(unit.id, { abbreviation: event.currentTarget.value })} />
                       </label>
-                      <label class="manager-field">
+                      <div class="manager-field">
                         <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Icon', 'Icon')}</span>
-                        <input type="text" value={unit.icon} oninput={(event) => onUpdateCurrencyUnit(unit.id, { icon: event.currentTarget.value })} />
-                      </label>
+                        <IconPicker
+                          value={unit.icon || 'fa-solid fa-coins'}
+                          buttonTitle={text('FABRICATE.Admin.Manager.CurrencyUnits.ChangeIcon', 'Change icon')}
+                          onChange={(iconClass) => onUpdateCurrencyUnit(unit.id, { icon: iconClass })}
+                        />
+                      </div>
                       <label class="manager-field is-wide">
                         <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.ActorPath', 'Actor data path')}</span>
                         <input type="text" value={unit.actorPath} placeholder="system.currency.gp" oninput={(event) => onUpdateCurrencyUnit(unit.id, { actorPath: event.currentTarget.value })} />
@@ -393,33 +388,55 @@
                       </button>
                     </div>
 
+                    {#if subUnitOptions.length === 0}
+                      {#if currencyUnits.length <= 1}
+                        <span class="manager-availability-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.NoOtherUnits', 'Add another currency unit before defining a breakdown.')}</span>
+                      {:else}
+                        <span class="manager-availability-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.NoEligibleSubUnits', 'No eligible sub-units — every other unit already breaks down into this one.')}</span>
+                      {/if}
+                    {/if}
+
                     {#if (unit.contains || []).length > 0}
-                      <div class="manager-currency-subunit-grid" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnits', 'Sub-units')}>
+                      <div class="manager-availability-pill-row" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnits', 'Sub-units')}>
                         {#each unit.contains as contained (contained.unitId)}
-                          <div class="manager-currency-subunit-pill">
+                          <span class="manager-availability-pill is-currency" data-system-currency-subunit={contained.unitId}>
+                            <i class={currencyUnitIcon(contained.unitId)} aria-hidden="true"></i>
                             <span>{currencyUnitLabel(contained.unitId)}</span>
                             <input
                               type="number"
                               min="1"
                               step="1"
+                              class="manager-availability-pill-amount"
                               value={contained.amount}
                               aria-label={`${currencyUnitLabel(contained.unitId)} ${text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitAmount', 'Sub-unit amount').toLowerCase()}`}
                               oninput={(event) => onUpdateCurrencySubUnit(unit.id, contained.unitId, event.currentTarget.value)}
                             />
-                            <button type="button" class="manager-icon-button is-danger" aria-label={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`} onclick={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}>
-                              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            <button type="button" class="manager-availability-remove" aria-label={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`} onclick={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}>
+                              <i class="fas fa-xmark" aria-hidden="true"></i>
                             </button>
-                          </div>
+                          </span>
                         {/each}
                       </div>
                     {:else}
-                      <p class="manager-muted manager-currency-unit-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits', 'This unit is a base denomination.')}</p>
+                      <p class="manager-muted">{text('FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits', 'This unit is a base denomination.')}</p>
                     {/if}
 
                     <div class="manager-character-modifier-actions">
                       <button type="button" class="manager-button" onclick={() => currencyExpandedUnitId = ''}>{text('FABRICATE.Admin.Manager.Done', 'Done')}</button>
                       <button type="button" class="manager-button is-danger" onclick={() => handleDeleteCurrencyUnit(unit.id)}>{text('FABRICATE.Admin.Manager.CurrencyUnits.Delete', 'Delete currency unit')}</button>
                     </div>
+                  </div>
+                {:else}
+                  <div class="manager-character-modifier-summary">
+                    <span class="manager-character-modifier-icon"><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"></i></span>
+                    <span class="manager-character-modifier-label">{unit.label || unit.id}</span>
+                    <span class="manager-chip">{(unit.contains || []).length} {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</span>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Edit', 'Edit currency unit')} onclick={() => currencyExpandedUnitId = unit.id}>
+                      <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Delete', 'Delete currency unit')} onclick={() => handleDeleteCurrencyUnit(unit.id)}>
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
                   </div>
                 {/if}
               </li>
