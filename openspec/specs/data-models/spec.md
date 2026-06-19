@@ -121,6 +121,9 @@ CraftingSystem = {
     currency: {
       enabled: boolean,
       spendStrategy: "actorProperty" | "actorInventory", // default "actorProperty"
+      inventoryMode: "provider" | "macro",   // default "provider"; meaningful only when spendStrategy === "actorInventory"
+      providerId: string,                     // default ""; selected preconfigured provider
+      macros: { canAfford: string, increment: string, decrement: string }, // default all ""; currency macro UUIDs
       units: CurrencyUnit[],
     },
   },
@@ -155,11 +158,14 @@ CraftingSystem = {
 15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for step currency requirements.
 16. Currency unit profiles must be acyclic. Each connected conversion branch must resolve to exactly one terminal base unit.
 17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
-18. Built-in currency provider selection, system adapter selection, and currency macro UUID fields are legacy inputs only; normalized currency requirements do not emit them.
-19. `requirements.currency.spendStrategy` selects how currency is read and spent. It must be one of `"actorProperty"` (default) or `"actorInventory"`; any other value normalizes to `"actorProperty"`. Each strategy is realized by a symmetric coin spender behind a common `{ readCoins(actor, profileContext), spend(actor, requirement, profileContext) }` interface; `CraftingEngine` resolves the spender by strategy and drives both the up-front affordability check and the deduction uniformly.
+18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; normalized currency requirements do not emit them. (The new `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
+19. `requirements.currency.spendStrategy` selects how currency is read and spent. It must be one of `"actorProperty"` (default) or `"actorInventory"`; any other value normalizes to `"actorProperty"`. The GM selects the strategy directly in both dnd5e and pf2e worlds (it is no longer derived solely from preset seeding). Each non-macro strategy is realized by a symmetric coin spender behind a common `{ check(actor, requirement, ctx), spend(actor, requirement, ctx) }` interface (the `actorProperty`/`actorInventory` spenders also retain `readCoins` as the affordability primitive their `check` wraps); `CraftingEngine` resolves the spender by `(spendStrategy, inventoryMode)` and drives both the up-front affordability check and the deduction uniformly.
     - `"actorProperty"` (the generic `ActorPropertyCoinSpender`) reads each unit's balance from its `actorPath` and spends through a single batched `actor.update(...)`, making its own change across configured sub-units. This is the dnd5e and general behavior.
-    - `"actorInventory"` (the generic `ActorInventoryCoinSpender`) delegates the system-specific coin I/O to a per-system coin adapter resolved by `game.system.id`. The only registered adapter is the pf2e adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding.
-    - The pf2e currency preset seeds units with `denomination` set and selects the `"actorInventory"` spend strategy; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
+    - `"actorInventory"` resolves further by `inventoryMode`:
+      - `"provider"` (default) uses a preconfigured provider. The generic `ActorInventoryCoinSpender` delegates the system-specific coin I/O to a per-system coin adapter resolved by `game.system.id`. Providers are registered in a pure, Foundry-free registry (`getCurrencyProvidersForFoundrySystem`, `getDefaultProviderId`, `resolveProvider`); the only registered provider is the pf2e inventory adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. `providerId` is stored and selectable but the runtime still resolves the adapter by `game.system.id` (one provider per system today). Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to macro mode. When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding.
+      - `"macro"` drives currency through GM-supplied macros. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`. A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption. The `increment` macro is configured and validated but reserved for a future refund flow — it is never invoked. Macro mode is GM-only config with no separate feature flag (matching success/failure macros).
+    - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and defaults `inventoryMode` to `"provider"` with the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
+20. `requirements.currency.inventoryMode` must be one of `"provider"` (default) or `"macro"`; any other value normalizes to `"provider"`. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`). All three are always persisted and normalized, but are only meaningful while `spendStrategy === "actorInventory"`; they remain inert (but preserved) under `"actorProperty"`. Absent fields back-compat default to `"provider"`/`""`/empty macros with no migration.
 
 ## CurrencyUnit
 
@@ -189,9 +195,10 @@ type CurrencyUnit = {
 3. A unit must not contain itself directly or indirectly.
 4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
-6. `actorPath` vs `denomination` validation is conditional on the owning `requirements.currency.spendStrategy`:
+6. `actorPath` vs `denomination` validation is conditional on the owning `requirements.currency.spendStrategy` (and, under `"actorInventory"`, the `inventoryMode`):
    - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
-   - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
+   - Under `"actorInventory"` + `"provider"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
+   - Under `"actorInventory"` + `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination` is not required. Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
 
 ### Recipe Visibility Requirements
 

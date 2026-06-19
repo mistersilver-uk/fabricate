@@ -93,6 +93,73 @@ test('currency profile validation rejects circular and stale sub-unit references
   assert.match(stale.errors.join('; '), /unknown unit/i);
 });
 
+test('normalizeCurrencyConfig defaults and trims the inventory/provider/macro fields', () => {
+  const defaults = normalizeCurrencyConfig({ enabled: true });
+  assert.equal(defaults.inventoryMode, 'provider');
+  assert.equal(defaults.providerId, '');
+  assert.deepEqual(defaults.macros, { canAfford: '', increment: '', decrement: '' });
+
+  const trimmed = normalizeCurrencyConfig({
+    enabled: true,
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'macro',
+    providerId: '  pf2e-inventory  ',
+    macros: { canAfford: '  Macro.a  ', increment: '', decrement: 'Macro.d', bogus: 'x' },
+  });
+  assert.equal(trimmed.inventoryMode, 'macro');
+  assert.equal(trimmed.providerId, 'pf2e-inventory');
+  assert.deepEqual(trimmed.macros, { canAfford: 'Macro.a', increment: '', decrement: 'Macro.d' });
+
+  // Unknown inventory mode falls back to provider; round-trips stably.
+  const fallback = normalizeCurrencyConfig({ inventoryMode: 'nonsense' });
+  assert.equal(fallback.inventoryMode, 'provider');
+  assert.deepEqual(normalizeCurrencyConfig(fallback), fallback);
+});
+
+test('validateCurrencyProfile enforces macro mode config and provider denominations', () => {
+  const units = [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }];
+
+  const missingMacros = validateCurrencyProfile(units, {
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'macro',
+    macros: {},
+  });
+  assert.equal(missingMacros.valid, false);
+  assert.match(missingMacros.errors.join('; '), /can afford/i);
+  assert.match(missingMacros.errors.join('; '), /decrement/i);
+
+  // increment stays optional.
+  const incrementOptional = validateCurrencyProfile(units, {
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'macro',
+    macros: { canAfford: 'Macro.a', decrement: 'Macro.d' },
+  });
+  assert.equal(incrementOptional.valid, true);
+
+  // provider mode still requires a pf2e denomination, not a macro set. The unit id "coins"
+  // is not a pf2e denomination and carries no explicit denomination, so it fails.
+  const providerUnits = [{ id: 'coins', label: 'Coins', abbreviation: 'c' }];
+  const providerMode = validateCurrencyProfile(providerUnits, {
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'provider',
+  });
+  assert.equal(providerMode.valid, false);
+  assert.match(providerMode.errors.join('; '), /denomination/i);
+
+  // The same unit is fine in macro mode (abbreviation present, macros configured).
+  const macroOk = validateCurrencyProfile(providerUnits, {
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'macro',
+    macros: { canAfford: 'Macro.a', decrement: 'Macro.d' },
+  });
+  assert.equal(macroOk.valid, true);
+
+  // actorProperty still requires an actor path.
+  const propertyMode = validateCurrencyProfile(units, { spendStrategy: 'actorProperty' });
+  assert.equal(propertyMode.valid, false);
+  assert.match(propertyMode.errors.join('; '), /actor data path/i);
+});
+
 test('CraftingSystemManager normalizes legacy system adapter currency to seeded units', () => {
   setupGlobals({});
   const manager = new CraftingSystemManager({});
@@ -326,6 +393,11 @@ test('actorInventory currency spend uses the inventory spender and never calls a
       actor?.inventory?.coins
         ? { valid: true, copperValue: Number(actor.inventory.coins.copperValue) || 0 }
         : { valid: false, message: 'not available' },
+    check(actor) {
+      return actor?.inventory?.coins
+        ? { valid: true }
+        : { valid: false, message: 'not available' };
+    },
     async spend(actor, payload) {
       spendCalls.push({ actor, payload });
       return { valid: true };
@@ -397,6 +469,10 @@ test('actorInventory currency check rejects an actor with no inventory coins', a
     readCoins: (actor) =>
       actor?.inventory?.coins
         ? { valid: true, copperValue: Number(actor.inventory.coins.copperValue) || 0 }
+        : { valid: false, message: 'Currency unit "Gold" is not available on Non-PF2e.' },
+    check: (actor) =>
+      actor?.inventory?.coins
+        ? { valid: true }
         : { valid: false, message: 'Currency unit "Gold" is not available on Non-PF2e.' },
     async spend() {
       return { valid: true };
@@ -496,6 +572,109 @@ test('actorProperty currency spend calls actor.update and never the inventory sp
   assert.equal(inventoryReadCalled, false, 'actorProperty path must not read inventory coins');
   assert.equal(inventorySpendCalled, false, 'actorProperty path must not call inventory spend');
   assert.equal(actor.system.currency.gp, 7);
+});
+
+// --- macro inventory mode -------------------------------------------------
+
+const MACRO_PRESETS = [
+  { id: 'gp', label: 'Gold', abbreviation: 'gp', contains: [{ unitId: 'sp', amount: 10 }] },
+  { id: 'sp', label: 'Silver', abbreviation: 'sp', contains: [] },
+];
+
+function macroSystem() {
+  return {
+    name: 'Macro System',
+    requirements: {
+      currency: {
+        enabled: true,
+        spendStrategy: 'actorInventory',
+        inventoryMode: 'macro',
+        macros: { canAfford: 'Macro.can', increment: 'Macro.inc', decrement: 'Macro.dec' },
+        units: MACRO_PRESETS,
+      },
+    },
+  };
+}
+
+function installMacroStub(commands) {
+  const calls = [];
+  globalThis.fromUuid = async (uuid) =>
+    commands[uuid] ? { name: uuid, command: commands[uuid] } : null;
+  return { calls };
+}
+
+test('macro mode runs canAfford then decrement with the agreed context', async () => {
+  setupGlobals(macroSystem());
+  const received = [];
+  // Record the context macros receive; canAfford and decrement both pass.
+  globalThis.fromUuid = async (uuid) => ({
+    name: uuid,
+    command: `received.push({ uuid: ${JSON.stringify(uuid)}, context }); return true;`,
+  });
+  globalThis.received = received;
+  globalThis.ui = {};
+
+  const engine = new CraftingEngine({});
+  const { recipe, step } = recipeAndStep('gp', 3);
+  const actor = { name: 'Hero' };
+
+  const check = await engine._checkCurrencyRequirement(actor, recipe, step);
+  assert.equal(check.valid, true);
+  const decrement = await engine._decrementCurrencyRequirement(actor, recipe, step);
+  assert.equal(decrement.valid, true);
+
+  assert.equal(received.length, 2);
+  assert.equal(received[0].uuid, 'Macro.can');
+  assert.equal(received[1].uuid, 'Macro.dec');
+  const ctx = received[0].context;
+  assert.equal(ctx.actor.name, 'Hero');
+  assert.deepEqual(ctx.cost, [{ abbreviation: 'gp', amount: 3 }]);
+  assert.equal(ctx.units.length, 2);
+  assert.ok(ctx.units.some((unit) => unit.abbreviation === 'gp'));
+  assert.equal(ctx.requirement.unit, 'gp');
+  assert.equal(ctx.craftingSystem.name, 'Macro System');
+  // increment must never run.
+  assert.ok(!received.some((entry) => entry.uuid === 'Macro.inc'));
+
+  delete globalThis.received;
+});
+
+test('macro mode canAfford failure aborts the check', async () => {
+  setupGlobals(macroSystem());
+  installMacroStub({
+    'Macro.can': 'return { canAfford: false, message: "Too poor" };',
+    'Macro.dec': 'return true;',
+  });
+  globalThis.ui = {};
+  const engine = new CraftingEngine({});
+  const { recipe, step } = recipeAndStep('gp', 3);
+
+  const check = await engine._checkCurrencyRequirement({ name: 'Hero' }, recipe, step);
+  assert.equal(check.valid, false);
+  assert.match(check.message, /Too poor/);
+});
+
+test('macro mode decrement failure aborts the spend', async () => {
+  setupGlobals(macroSystem());
+  installMacroStub({
+    'Macro.can': 'return true;',
+    'Macro.dec': 'return false;',
+  });
+  globalThis.ui = {};
+  const engine = new CraftingEngine({});
+  const { recipe, step } = recipeAndStep('gp', 3);
+
+  const decrement = await engine._decrementCurrencyRequirement({ name: 'Hero' }, recipe, step);
+  assert.equal(decrement.valid, false);
+});
+
+test('macro mode does not require a denomination on units', async () => {
+  const profile = validateCurrencyProfile(MACRO_PRESETS, {
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'macro',
+    macros: { canAfford: 'Macro.can', decrement: 'Macro.dec' },
+  });
+  assert.equal(profile.valid, true);
 });
 
 test('readCurrencyBalances treats missing paths as zero and present non-numeric as not available', () => {

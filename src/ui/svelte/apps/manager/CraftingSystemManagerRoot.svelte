@@ -9,6 +9,7 @@
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import { getInventoryDenominationsForFoundrySystem } from '../../../../config/currencyPresets.js';
+  import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -150,7 +151,13 @@
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencySpendStrategy = $derived(selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty');
+  const currencyInventoryMode = $derived(selectedSystem?.requirements?.currency?.inventoryMode || 'provider');
+  const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
+  const currencyMacros = $derived(selectedSystem?.requirements?.currency?.macros || { canAfford: '', increment: '', decrement: '' });
   const currencyDenominationOptions = $derived(getInventoryDenominationsForFoundrySystem(foundrySystemId));
+  const currencyProviderOptions = $derived(
+    getCurrencyProvidersForFoundrySystem(foundrySystemId).map(provider => ({ id: provider.id, label: provider.label }))
+  );
   async function onAddCharacterModifier() {
     if (!selectedSystemId) return null;
     return await store.addGatheringCharacterModifier(selectedSystemId);
@@ -194,6 +201,26 @@
   async function onSeedCurrencyPresets() {
     if (!selectedSystemId || !currencyPresetsSupported) return;
     await store.seedCurrencyUnitPresets(selectedSystemId);
+  }
+  async function onSetCurrencySpendStrategy(spendStrategy) {
+    if (!selectedSystemId) return;
+    await store.setCurrencySpendStrategy(selectedSystemId, spendStrategy);
+  }
+  async function onSetCurrencyInventoryMode(inventoryMode) {
+    if (!selectedSystemId) return;
+    await store.setCurrencyInventoryMode(selectedSystemId, inventoryMode);
+  }
+  async function onSetCurrencyProvider(providerId) {
+    if (!selectedSystemId) return;
+    await store.setCurrencyProvider(selectedSystemId, providerId);
+  }
+  async function onSetCurrencyMacro(key, uuid) {
+    if (!selectedSystemId || !uuid) return;
+    await store.setCurrencyMacro(selectedSystemId, key, uuid);
+  }
+  async function onClearCurrencyMacro(key) {
+    if (!selectedSystemId) return;
+    await store.clearCurrencyMacro(selectedSystemId, key);
   }
 
   function characterModifierLibraryEntry(modifierId) {
@@ -3637,7 +3664,11 @@
         currencyUnits={selectedCurrencyUnits}
         {currencyPresetsSupported}
         {currencySpendStrategy}
+        {currencyInventoryMode}
+        {currencyProviderId}
+        {currencyMacros}
         {currencyDenominationOptions}
+        {currencyProviderOptions}
         onAddCurrencyUnit={onAddCurrencyUnit}
         onUpdateCurrencyUnit={onUpdateCurrencyUnit}
         onDeleteCurrencyUnit={onDeleteCurrencyUnit}
@@ -3645,6 +3676,11 @@
         onUpdateCurrencySubUnit={onUpdateCurrencySubUnit}
         onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}
         onSeedCurrencyPresets={onSeedCurrencyPresets}
+        onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}
+        onSetCurrencyInventoryMode={onSetCurrencyInventoryMode}
+        onSetCurrencyProvider={onSetCurrencyProvider}
+        onSetCurrencyMacro={onSetCurrencyMacro}
+        onClearCurrencyMacro={onClearCurrencyMacro}
       />
     {:else}
       <SystemsBrowserView

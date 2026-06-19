@@ -1,6 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { dragDrop } from '../../actions/dragDrop.js';
+  import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
 
   let {
@@ -17,15 +19,92 @@
     currencyUnits = [],
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
+    currencyInventoryMode = 'provider',
+    currencyProviderId = '',
+    currencyMacros = { canAfford: '', increment: '', decrement: '' },
     currencyDenominationOptions = [],
+    currencyProviderOptions = [],
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
     onDeleteCurrencyUnit = async () => {},
     onAddCurrencySubUnit = async () => {},
     onUpdateCurrencySubUnit = async () => {},
     onDeleteCurrencySubUnit = async () => {},
-    onSeedCurrencyPresets = async () => {}
+    onSeedCurrencyPresets = async () => {},
+    onSetCurrencySpendStrategy = async () => {},
+    onSetCurrencyInventoryMode = async () => {},
+    onSetCurrencyProvider = async () => {},
+    onSetCurrencyMacro = async () => {},
+    onClearCurrencyMacro = async () => {}
   } = $props();
+
+  const CURRENCY_SPEND_STRATEGY_OPTIONS = [
+    { value: 'actorProperty', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorProperty', fallback: 'Actor data path' },
+    { value: 'actorInventory', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorInventory', fallback: 'Actor inventory' }
+  ];
+  const CURRENCY_INVENTORY_MODE_OPTIONS = [
+    { value: 'provider', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeProvider', fallback: 'Preconfigured provider' },
+    { value: 'macro', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeMacro', fallback: 'Custom macros' }
+  ];
+  const CURRENCY_MACRO_FIELDS = [
+    { key: 'canAfford', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroCanAfford', labelFallback: 'Can afford macro', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroCanAffordHint', hintFallback: 'Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.' },
+    { key: 'increment', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrement', labelFallback: 'Increment macro', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrementHint', hintFallback: 'Reserved for a future refund flow — configured now but not yet invoked.' },
+    { key: 'decrement', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrement', labelFallback: 'Decrement macro', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrementHint', hintFallback: 'Runs after a successful craft to spend the currency cost.' }
+  ];
+
+  // Resolve each configured macro UUID to a { name, img, missing } display, mirroring the
+  // RecipeItemInspector/EnvironmentSummaryInspector linked-document pattern.
+  let currencyMacroDocs = $state({});
+
+  function setCurrencyMacroDoc(key, doc) {
+    currencyMacroDocs = { ...currencyMacroDocs, [key]: doc };
+  }
+
+  // Kick off async resolution for one macro field; returns the synchronous placeholder. The
+  // async branches each live in their own callback so this helper stays shallow.
+  function resolveMacroFieldDoc(key, uuid, isCancelled) {
+    const placeholder = { uuid, name: '', img: '', missing: false };
+    if (typeof globalThis.fromUuid !== 'function') {
+      return { ...placeholder, missing: true };
+    }
+    Promise.resolve(globalThis.fromUuid(uuid))
+      .then(doc => {
+        if (isCancelled()) return;
+        setCurrencyMacroDoc(
+          key,
+          doc
+            ? { uuid, name: String(doc.name || ''), img: String(doc.img || ''), missing: false }
+            : { ...placeholder, missing: true }
+        );
+      })
+      .catch(() => {
+        if (!isCancelled()) setCurrencyMacroDoc(key, { ...placeholder, missing: true });
+      });
+    return placeholder;
+  }
+
+  $effect(() => {
+    const macros = currencyMacros || {};
+    const next = {};
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+    for (const field of CURRENCY_MACRO_FIELDS) {
+      const uuid = String(macros[field.key] || '').trim();
+      if (uuid) next[field.key] = resolveMacroFieldDoc(field.key, uuid, isCancelled);
+    }
+    currencyMacroDocs = next;
+    return () => { cancelled = true; };
+  });
+
+  function currencyMacroDisplay(key) {
+    return currencyMacroDocs[key] || null;
+  }
+
+  async function handleCurrencyMacroDrop(key, data) {
+    const { uuid, type } = resolveDropData(data);
+    if (type !== 'Macro' || !uuid) return;
+    await onSetCurrencyMacro(key, uuid);
+  }
 
   let characterModifierEditingId = $state('');
   let currencyExpandedUnitId = $state('');
@@ -344,6 +423,109 @@
           </div>
         </header>
 
+        <div class="manager-currency-strategy" data-system-currency-strategy>
+          <label class="manager-field">
+            <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy', 'Spend strategy')}</span>
+            <select
+              value={currencySpendStrategy}
+              data-system-currency-strategy-select
+              onchange={(event) => onSetCurrencySpendStrategy(event.currentTarget.value)}
+            >
+              {#each CURRENCY_SPEND_STRATEGY_OPTIONS as option (option.value)}
+                <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+              {/each}
+            </select>
+            <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyHint', 'Choose how this system reads and spends actor currency.')}</small>
+          </label>
+
+          {#if currencySpendStrategy === 'actorInventory'}
+            <label class="manager-field">
+              <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.InventoryMode', 'Inventory source')}</span>
+              <select
+                value={currencyInventoryMode}
+                data-system-currency-inventory-mode-select
+                onchange={(event) => onSetCurrencyInventoryMode(event.currentTarget.value)}
+              >
+                {#each CURRENCY_INVENTORY_MODE_OPTIONS as option (option.value)}
+                  <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+                {/each}
+              </select>
+              <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeHint', 'Use a preconfigured provider for your system, or drive currency with custom macros.')}</small>
+            </label>
+
+            {#if currencyInventoryMode === 'provider'}
+              {#if currencyProviderOptions.length > 0}
+                <label class="manager-field">
+                  <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
+                  <select
+                    value={currencyProviderId}
+                    data-system-currency-provider-select
+                    onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
+                  >
+                    {#each currencyProviderOptions as option (option.id)}
+                      <option value={option.id}>{option.label}</option>
+                    {/each}
+                  </select>
+                  <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint', 'A preconfigured adapter that reads and spends coins from the actor inventory.')}</small>
+                </label>
+              {:else}
+                <div class="manager-field">
+                  <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
+                  <div class="manager-currency-subunit-warning manager-environment-comp-callout" role="note" data-system-currency-no-provider>
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.NoProviders', 'No preconfigured providers for this system — use custom macros instead.')}</span>
+                  </div>
+                </div>
+              {/if}
+            {:else}
+              <div class="manager-currency-macro-zones" data-system-currency-macros>
+                {#each CURRENCY_MACRO_FIELDS as field (field.key)}
+                  {@const macroDoc = currencyMacroDisplay(field.key)}
+                  <div class="manager-field manager-currency-macro-field">
+                    <span>{text(field.labelKey, field.labelFallback)}</span>
+                    {#if macroDoc}
+                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                      <div
+                        class="manager-environment-scene-linked"
+                        data-system-currency-macro={field.key}
+                        role="group"
+                        aria-label={text(field.labelKey, field.labelFallback)}
+                        title={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroReplaceHint', 'Drop a macro to replace it, or right-click to unlink.')}
+                        use:dragDrop={{ onDrop: (data) => handleCurrencyMacroDrop(field.key, data), activeClass: 'is-drop-active' }}
+                        oncontextmenu={(event) => { event.preventDefault(); onClearCurrencyMacro(field.key); }}
+                        onmousedown={(event) => { if (event.button === 2) { event.preventDefault(); onClearCurrencyMacro(field.key); } }}
+                      >
+                        {#if macroDoc.missing}
+                          <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-triangle-exclamation"></i></span>
+                          <span class="manager-environment-scene-name manager-muted" data-system-currency-macro-missing>{text('FABRICATE.Admin.Manager.CurrencyUnits.MacroMissing', 'Macro unresolved')}</span>
+                        {:else}
+                          {#if macroDoc.img}
+                            <img class="manager-environment-scene-thumb" src={macroDoc.img} alt="" />
+                          {:else}
+                            <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-scroll"></i></span>
+                          {/if}
+                          <span class="manager-environment-scene-name">{macroDoc.name || macroDoc.uuid}</span>
+                        {/if}
+                        <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} title={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} onclick={(event) => { event.stopPropagation(); onClearCurrencyMacro(field.key); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
+                      </div>
+                    {:else}
+                      <div
+                        class="manager-component-source-drop-zone"
+                        data-system-currency-macro-dropzone={field.key}
+                        use:dragDrop={{ onDrop: (data) => handleCurrencyMacroDrop(field.key, data), activeClass: 'is-drop-active' }}
+                      >
+                        <i class="fas fa-scroll" aria-hidden="true"></i>
+                        <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropHint', 'Drag a macro here to link it.')}</span>
+                      </div>
+                    {/if}
+                    <small>{text(field.hintKey, field.hintFallback)}</small>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          {/if}
+        </div>
+
         {#if currencyUnits.length === 0}
           <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
         {:else}
@@ -374,7 +556,11 @@
                     </div>
 
                     <div class="manager-edit-grid manager-currency-detail-grid">
-                      {#if currencySpendStrategy === 'actorInventory'}
+                      {#if currencySpendStrategy === 'actorInventory' && currencyInventoryMode === 'macro'}
+                        <div class="manager-field manager-currency-macro-note" role="note" data-system-currency-unit-macro-note>
+                          <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.MacroMatchHint', 'Macros match this unit by abbreviation.')}</span>
+                        </div>
+                      {:else if currencySpendStrategy === 'actorInventory'}
                         <label class="manager-field">
                           <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Denomination', 'Coin denomination')}</span>
                           {#if currencyDenominationOptions.length > 0}

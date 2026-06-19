@@ -44,6 +44,25 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
 
 const SPEND_STRATEGIES = new Set(['actorProperty', 'actorInventory']);
 const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
+const INVENTORY_MODES = new Set(['provider', 'macro']);
+export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement'];
+
+// The provider/macro inventory settings only carry meaning while `spendStrategy` is
+// `actorInventory`, but they are always persisted so flipping the strategy never loses a
+// previously configured provider or macro set. Kept flat (single object literal) so the
+// normalizer's cognitive complexity stays low.
+function normalizeInventorySettings(currency = {}) {
+  const inventoryMode = INVENTORY_MODES.has(currency?.inventoryMode)
+    ? currency.inventoryMode
+    : 'provider';
+  const providerId = String(currency?.providerId || '').trim();
+  const rawMacros = currency?.macros && typeof currency.macros === 'object' ? currency.macros : {};
+  const macros = {};
+  for (const key of CURRENCY_MACRO_KEYS) {
+    macros[key] = String(rawMacros[key] || '').trim();
+  }
+  return { inventoryMode, providerId, macros };
+}
 
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const randomID = typeof options.randomID === 'function' ? options.randomID : undefined;
@@ -53,9 +72,13 @@ export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const spendStrategy = SPEND_STRATEGIES.has(currency?.spendStrategy)
     ? currency.spendStrategy
     : 'actorProperty';
+  const { inventoryMode, providerId, macros } = normalizeInventorySettings(currency);
   return {
     enabled: currency?.enabled === true,
     spendStrategy,
+    inventoryMode,
+    providerId,
+    macros,
     units,
   };
 }
@@ -109,17 +132,33 @@ function collectRawSubUnitErrors(rawUnits, errors) {
   }
 }
 
-function collectUnitErrors(unit, { spendStrategy, byId, errors }) {
-  if (spendStrategy === 'actorInventory') {
-    const denomination = unit.denomination || unit.id;
-    if (!PF2E_DENOMINATIONS.has(denomination)) {
-      errors.push(
-        `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
-      );
+// Per-unit strategy/mode requirement. Kept to a single shallow if/else-if ladder (one
+// branch per spend mode) so Sonar cognitive complexity stays low: actorProperty needs an
+// actor data path; provider-mode inventory needs a pf2e denomination; macro-mode inventory
+// matches the actor's coins by abbreviation, so it only needs a non-empty abbreviation.
+function collectUnitStrategyErrors(unit, { spendStrategy, inventoryMode, errors }) {
+  if (spendStrategy !== 'actorInventory') {
+    if (!unit.actorPath) {
+      errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
     }
-  } else if (!unit.actorPath) {
-    errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
+    return;
   }
+  if (inventoryMode === 'macro') {
+    if (!unit.abbreviation) {
+      errors.push(`Currency unit "${unit.label}" is missing an abbreviation.`);
+    }
+    return;
+  }
+  const denomination = unit.denomination || unit.id;
+  if (!PF2E_DENOMINATIONS.has(denomination)) {
+    errors.push(
+      `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
+    );
+  }
+}
+
+function collectUnitErrors(unit, { spendStrategy, inventoryMode, byId, errors }) {
+  collectUnitStrategyErrors(unit, { spendStrategy, inventoryMode, errors });
   for (const contained of unit.contains) {
     if (contained.unitId === unit.id) {
       errors.push(`Currency unit "${unit.label}" cannot contain itself.`);
@@ -174,10 +213,26 @@ function buildUnitResolver(byId, errors) {
   return { resolveUnit, resolved };
 }
 
+// Macro-mode inventory spending drives the craft through GM macros, so the engine must be
+// able to gate (canAfford) and deduct (decrement); both are required. `increment` is reserved
+// for a future refund flow and stays optional.
+function collectMacroConfigErrors(macros, errors) {
+  const safeMacros = macros && typeof macros === 'object' ? macros : {};
+  if (!String(safeMacros.canAfford || '').trim()) {
+    errors.push('A "can afford" currency macro is required for macro inventory spending.');
+  }
+  if (!String(safeMacros.decrement || '').trim()) {
+    errors.push('A "decrement" currency macro is required for macro inventory spending.');
+  }
+}
+
 export function validateCurrencyProfile(units = [], options = {}) {
   const spendStrategy = SPEND_STRATEGIES.has(options?.spendStrategy)
     ? options.spendStrategy
     : 'actorProperty';
+  const inventoryMode = INVENTORY_MODES.has(options?.inventoryMode)
+    ? options.inventoryMode
+    : 'provider';
   const rawUnits = Array.isArray(units) ? units : [];
   const normalizedUnits = rawUnits.map((entry) => normalizeCurrencyUnit(entry)).filter(Boolean);
   const byId = buildUnitMap(normalizedUnits);
@@ -190,7 +245,10 @@ export function validateCurrencyProfile(units = [], options = {}) {
   }
   collectRawSubUnitErrors(rawUnits, errors);
   for (const unit of normalizedUnits) {
-    collectUnitErrors(unit, { spendStrategy, byId, errors });
+    collectUnitErrors(unit, { spendStrategy, inventoryMode, byId, errors });
+  }
+  if (spendStrategy === 'actorInventory' && inventoryMode === 'macro') {
+    collectMacroConfigErrors(options?.macros, errors);
   }
 
   const { resolveUnit, resolved } = buildUnitResolver(byId, errors);

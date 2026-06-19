@@ -45,8 +45,10 @@ import {
   getCurrencyPresetsForFoundrySystem,
   seedCurrencyPresets
 } from '../../../config/currencyPresets.js';
+import { getDefaultProviderId } from '../../../config/currencyProviders.js';
 import {
   canAddCurrencySubUnit,
+  CURRENCY_MACRO_KEYS,
   normalizeCurrencyConfig,
   normalizeCurrencyUnit
 } from '../../../systems/currencyProfile.js';
@@ -5299,6 +5301,55 @@ export function createAdminStore(services) {
     });
   }
 
+  function _foundrySystemId() {
+    return typeof services.getFoundrySystemId === 'function'
+      ? String(services.getFoundrySystemId() || '')
+      : '';
+  }
+
+  async function setCurrencySpendStrategy(systemId, spendStrategy) {
+    const nextStrategy = spendStrategy === 'actorInventory' ? 'actorInventory' : 'actorProperty';
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.spendStrategy = nextStrategy;
+      // Switching to actorInventory on a system that ships a provider seeds a sensible
+      // default providerId; the normalizer preserves macros/inventoryMode either way.
+      if (nextStrategy === 'actorInventory' && !currency.providerId) {
+        currency.providerId = getDefaultProviderId(_foundrySystemId());
+      }
+      return true;
+    });
+  }
+
+  async function setCurrencyInventoryMode(systemId, inventoryMode) {
+    const nextMode = inventoryMode === 'macro' ? 'macro' : 'provider';
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.inventoryMode = nextMode;
+      if (nextMode === 'provider' && !currency.providerId) {
+        currency.providerId = getDefaultProviderId(_foundrySystemId());
+      }
+      return true;
+    });
+  }
+
+  async function setCurrencyProvider(systemId, providerId) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.providerId = String(providerId || '').trim();
+      return true;
+    });
+  }
+
+  async function setCurrencyMacro(systemId, key, uuid) {
+    if (!CURRENCY_MACRO_KEYS.includes(key)) return false;
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      currency.macros = { ...currency.macros, [key]: String(uuid || '').trim() };
+      return true;
+    });
+  }
+
+  async function clearCurrencyMacro(systemId, key) {
+    return await setCurrencyMacro(systemId, key, '');
+  }
+
   async function seedCurrencyUnitPresets(systemId = get(selectedSystemId)) {
     const foundrySystemId = typeof services.getFoundrySystemId === 'function'
       ? String(services.getFoundrySystemId() || '')
@@ -5317,6 +5368,12 @@ export function createAdminStore(services) {
       // not at a flat actor property, so the pf2e preset selects the actorInventory spend
       // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
       currency.spendStrategy = foundrySystemId === 'pf2e' ? 'actorInventory' : 'actorProperty';
+      // pf2e seeds the inventory provider mode with the system's default provider; dnd5e stays on
+      // actorProperty where inventoryMode/providerId are inert (but still normalized/persisted).
+      if (foundrySystemId === 'pf2e') {
+        currency.inventoryMode = 'provider';
+        currency.providerId = getDefaultProviderId(foundrySystemId);
+      }
       return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
     });
   }
@@ -5772,6 +5829,11 @@ export function createAdminStore(services) {
     addCurrencySubUnit,
     updateCurrencySubUnit,
     deleteCurrencySubUnit,
+    setCurrencySpendStrategy,
+    setCurrencyInventoryMode,
+    setCurrencyProvider,
+    setCurrencyMacro,
+    clearCurrencyMacro,
     seedCurrencyUnitPresets,
     saveAlchemyConfig,
     saveVisibilityConfig,

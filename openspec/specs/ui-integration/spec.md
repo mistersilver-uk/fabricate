@@ -178,8 +178,9 @@ Mode semantics are defined in `004`.
 - Time toggle
 - Currency toggle
 - Currency units card under character modifiers
+- A config-level block above the unit list with: a spend-strategy `<select>` (both dnd5e and pf2e); when `actorInventory`, an inventory-mode `<select>` (provider/macro); when provider mode, a provider `<select>` populated from the provider registry (or an empty-provider callout when the system has none); when macro mode, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs. Every control carries `<small>` hint text (the increment hint notes it is reserved for a future refund flow).
 - Add currency unit and seed preset actions
-- Selectable expandable currency unit editors for label, abbreviation, icon, and actor data path
+- Selectable expandable currency unit editors for label, abbreviation, icon; the per-unit detail field adapts to the strategy/mode — actor data path (actorProperty), coin denomination (actorInventory + provider), or no path/denomination field with a "macros match by abbreviation" note (actorInventory + macro)
 - Add-sub-unit dropdown with plus action
 - Sub-unit pills with editable amount and remove action
 

@@ -227,6 +227,46 @@ describe('CraftingSystemManager source contract', () => {
       systemEditSource.includes('{ denomination:') && systemEditSource.includes('currencyDenominationOptions'),
       'currency editor should bind a denomination field driven by the denomination options'
     );
+    // Currency spend-strategy / inventory-mode / provider / macro controls.
+    for (const snippet of [
+      'data-system-currency-strategy-select',
+      'onSetCurrencySpendStrategy(event.currentTarget.value)',
+      'data-system-currency-inventory-mode-select',
+      'onSetCurrencyInventoryMode(event.currentTarget.value)',
+      'data-system-currency-provider-select',
+      'onSetCurrencyProvider(event.currentTarget.value)',
+      'data-system-currency-no-provider',
+      'data-system-currency-macros',
+      'data-system-currency-macro-dropzone',
+      'manager-component-source-drop-zone',
+      'use:dragDrop',
+      'resolveDropData',
+      "type !== 'Macro'",
+      'onClearCurrencyMacro(field.key)'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    assert.ok(
+      systemEditSource.includes("currencyInventoryMode === 'macro'"),
+      'currency editor should branch on the macro inventory mode'
+    );
+    for (const prop of [
+      '{currencyInventoryMode}',
+      '{currencyProviderId}',
+      '{currencyMacros}',
+      '{currencyProviderOptions}',
+      'onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}',
+      'onSetCurrencyInventoryMode={onSetCurrencyInventoryMode}',
+      'onSetCurrencyProvider={onSetCurrencyProvider}',
+      'onSetCurrencyMacro={onSetCurrencyMacro}',
+      'onClearCurrencyMacro={onClearCurrencyMacro}'
+    ]) {
+      assert.ok(rootSource.includes(prop), `root should thread ${prop} to SystemEditView`);
+    }
+    assert.ok(
+      rootSource.includes('getCurrencyProvidersForFoundrySystem'),
+      'root should derive provider options from the currency provider registry'
+    );
     for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',
@@ -279,6 +319,16 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Title, 'Currency units');
     assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Add, 'Add currency unit');
     assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit, 'Add sub-unit');
+    for (const key of [
+      'SpendStrategy', 'SpendStrategyHint', 'SpendStrategyActorProperty', 'SpendStrategyActorInventory',
+      'InventoryMode', 'InventoryModeHint', 'InventoryModeProvider', 'InventoryModeMacro',
+      'Provider', 'ProviderHint', 'NoProviders',
+      'MacroCanAfford', 'MacroCanAffordHint', 'MacroIncrement', 'MacroIncrementHint',
+      'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroReplaceHint',
+      'MacroUnlink', 'MacroMissing', 'MacroMatchHint'
+    ]) {
+      assert.ok(lang.FABRICATE.Admin.Manager.CurrencyUnits[key], `CurrencyUnits.${key} should be defined`);
+    }
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Title, 'Recipes');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EnableNamed, 'Enable {name}');

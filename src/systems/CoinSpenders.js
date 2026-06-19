@@ -1,3 +1,5 @@
+import { MacroExecutor } from '../utils/MacroExecutor.js';
+
 import {
   buildCurrencySpendUpdates,
   currencyTotalForBase,
@@ -15,11 +17,67 @@ import {
  * `profileContext` carries the already-validated currency profile and the resolved unit:
  *   { profile, unit, units }
  *
- * `readCoins` reports affordability for the up-front check (the engine compares the actor's
- * available base value against the requirement); `spend` performs the deduction and is the
+ * `check` reports affordability for the up-front gate; `spend` performs the deduction and is the
  * authoritative insufficient-funds signal. The pure spend math and validation stay in
- * `currencyProfile.js`; the spenders own the actor I/O.
+ * `currencyProfile.js`; the spenders own the actor I/O. `readCoins` remains on the
+ * actor-property/inventory spenders as the shared affordability primitive that `check` wraps.
  */
+
+/**
+ * Shared affordability check for the actor-property and actor-inventory spenders: read the
+ * actor's coins, then compare the available base value against the requirement (amount × the
+ * unit's base value). Returns `{ valid: true }` when affordable, otherwise `{ valid: false,
+ * message }`. Reuses {@link formatCurrencyRequirement} for the shortfall message.
+ *
+ * @param {object} spender - a spender exposing `readCoins(actor, ctx)`.
+ * @param {object} actor
+ * @param {{ unit: object, amount: number }} requirement
+ * @param {{ profile: object, unit: object, units: object[] }} ctx
+ * @returns {{ valid: boolean, message?: string }}
+ */
+function checkAffordabilityViaReadCoins(spender, actor, requirement, ctx = {}) {
+  const { profile, unit, units } = ctx;
+  const coins = spender.readCoins(actor, { profile, unit, units: units || profile?.units || [] });
+  if (!coins || coins.valid === false) {
+    return {
+      valid: false,
+      message:
+        coins?.message ||
+        `Currency unit "${unit?.label || unit?.id || ''}" is not available on ${actor?.name || 'actor'}.`,
+    };
+  }
+  const baseValue = Number(profile?.metadata?.get(unit?.id)?.baseValue) || 0;
+  const requiredBase = Number(requirement?.amount || 0) * baseValue;
+  if (Number(coins.copperValue) < requiredBase) {
+    return {
+      valid: false,
+      message: `Insufficient currency. Requires ${formatCurrencyRequirement({ unit: unit?.id, amount: requirement?.amount }, profile?.units || [])}.`,
+    };
+  }
+  return { valid: true };
+}
+
+/**
+ * Interpret a currency macro's return value into a uniform `{ valid, message? }` result. Reuses
+ * the original currency-macro contract: a bare `true`, or an object with a truthy `success` or
+ * `canAfford`, means the gate/deduction passed; `false`, `null`, a thrown error, or an object
+ * with a falsy `success`/`canAfford` means it failed, surfacing the macro's `message` (or the
+ * provided fallback) to the player. Pure — no Foundry access — so it is unit-testable in isolation.
+ *
+ * @param {any} result - the macro's raw return value.
+ * @param {{ fallbackMessage?: string }} [options]
+ * @returns {{ valid: boolean, message?: string }}
+ */
+export function interpretMacroSpendResult(result, { fallbackMessage } = {}) {
+  const fallback = fallbackMessage || 'Currency macro reported failure.';
+  if (result === true) return { valid: true };
+  if (result && typeof result === 'object') {
+    const ok = Boolean(result.success) || Boolean(result.canAfford);
+    if (ok) return { valid: true };
+    return { valid: false, message: String(result.message || fallback) };
+  }
+  return { valid: false, message: fallback };
+}
 
 /**
  * Generic actor-property spender (the default, dnd5e and general behavior).
@@ -40,6 +98,17 @@ export class ActorPropertyCoinSpender {
     const baseUnitId = profile?.metadata?.get(unit?.id)?.baseUnitId;
     const copperValue = currencyTotalForBase(balances.balances, profile, baseUnitId);
     return { valid: true, copperValue };
+  }
+
+  /**
+   * Affordability gate. Wraps {@link readCoins} + base-value comparison.
+   * @param {object} actor
+   * @param {{ unit: object, amount: number }} requirement
+   * @param {{ profile: object, unit: object, units: object[] }} ctx
+   * @returns {{ valid: boolean, message?: string }}
+   */
+  check(actor, requirement, ctx = {}) {
+    return checkAffordabilityViaReadCoins(this, actor, requirement, ctx);
   }
 
   /**
@@ -119,6 +188,17 @@ export class ActorInventoryCoinSpender {
   }
 
   /**
+   * Affordability gate. Wraps {@link readCoins} + base-value comparison.
+   * @param {object} actor
+   * @param {{ unit: object, amount: number }} requirement
+   * @param {{ profile: object, unit: object, units: object[] }} ctx
+   * @returns {{ valid: boolean, message?: string }}
+   */
+  check(actor, requirement, ctx = {}) {
+    return checkAffordabilityViaReadCoins(this, actor, requirement, ctx);
+  }
+
+  /**
    * @param {object} actor
    * @param {{ unit: object, amount: number }} requirement
    * @param {{ profile: object }} profileContext
@@ -141,5 +221,62 @@ export class ActorInventoryCoinSpender {
         message: `Could not spend currency (${formatCurrencyRequirement(requirement, profile?.units || [])}).`,
       };
     }
+  }
+}
+
+/**
+ * Macro-backed actor-inventory spender. Under the `actorInventory` strategy's `macro` mode the
+ * GM supplies their own currency macros: `canAfford` gates the craft and `decrement` spends. The
+ * configured `increment` macro is stored for a future refund flow but is NEVER invoked here (no
+ * dead `refund()` method). Both `check` and `spend` build the agreed context (supplied by the
+ * engine via `ctx.macroContext`) and pass the macro's return value through the shared, pure
+ * {@link interpretMacroSpendResult}, so a `false`/`null`/throw aborts the craft loudly rather than
+ * granting a silent free craft.
+ */
+export class MacroCoinSpender {
+  /**
+   * @param {object} [options]
+   * @param {{ canAfford?: string, increment?: string, decrement?: string }} [options.macros]
+   * @param {(uuid: string, context: object) => Promise<any>} [options.runMacro]
+   */
+  constructor({ macros = {}, runMacro = MacroExecutor.run } = {}) {
+    this._macros = {
+      canAfford: String(macros?.canAfford || '').trim(),
+      increment: String(macros?.increment || '').trim(),
+      decrement: String(macros?.decrement || '').trim(),
+    };
+    this._runMacro = typeof runMacro === 'function' ? runMacro : MacroExecutor.run;
+  }
+
+  async _runMacroKey(key, actor, requirement, ctx) {
+    const macroUuid = this._macros[key];
+    const fallbackMessage = `Could not spend currency (${formatCurrencyRequirement(requirement, ctx?.profile?.units || [])}).`;
+    if (!macroUuid) {
+      return { valid: false, message: `No "${key}" currency macro is configured.` };
+    }
+    const context = ctx?.macroContext || {};
+    try {
+      const result = await this._runMacro(macroUuid, context);
+      return interpretMacroSpendResult(result, { fallbackMessage });
+    } catch (error) {
+      console.error(`Fabricate | Currency ${key} macro failed (${macroUuid}):`, error);
+      return { valid: false, message: fallbackMessage };
+    }
+  }
+
+  /**
+   * Affordability gate — runs the `canAfford` macro.
+   * @returns {Promise<{ valid: boolean, message?: string }>}
+   */
+  async check(actor, requirement, ctx = {}) {
+    return this._runMacroKey('canAfford', actor, requirement, ctx);
+  }
+
+  /**
+   * Deduction — runs the `decrement` macro.
+   * @returns {Promise<{ valid: boolean, message?: string }>}
+   */
+  async spend(actor, requirement, ctx = {}) {
+    return this._runMacroKey('decrement', actor, requirement, ctx);
   }
 }

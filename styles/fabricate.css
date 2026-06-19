@@ -4087,6 +4087,26 @@
   align-items: end;
 }
 
+.fabricate-manager .manager-currency-strategy {
+  display: grid;
+  gap: var(--fab-space-3);
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-macro-zones {
+  display: grid;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-macro-field {
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-macro-note {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
+}
+
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea {

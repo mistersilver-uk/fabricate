@@ -115,6 +115,8 @@ function compileManagerRoot() {
     'src/utils/recipeCategories.js',
     'src/config/flags.js',
     'src/config/currencyPresets.js',
+    'src/config/currencyProviders.js',
+    'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js'
   ]) {
     const rawDestination = join(tempRoot, rawPath);
@@ -421,6 +423,14 @@ function createStore(calls = [], options = {}) {
       }]
     }
   ];
+  if (options.selectedCurrency) {
+    // Merge onto the canonical fixture so applySelectedSystem (which re-reads systemDetails)
+    // preserves the currency config across an Edit click.
+    systemDetails.alchemy = {
+      ...systemDetails.alchemy,
+      requirements: { ...(systemDetails.alchemy.requirements || {}), currency: options.selectedCurrency }
+    };
+  }
   const baseSelectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
   const selectedSystem = applyRecipeKnowledgeMode(baseSelectedSystem, options.recipeKnowledgeMode);
   const essenceCardsBySystem = {
@@ -745,6 +755,11 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleFeature', feature, enabled]);
       return options.toggleFeatureResult ?? true;
     },
+    setCurrencySpendStrategy: async (id, strategy) => { calls.push(['setCurrencySpendStrategy', strategy, id]); },
+    setCurrencyInventoryMode: async (id, mode) => { calls.push(['setCurrencyInventoryMode', mode, id]); },
+    setCurrencyProvider: async (id, providerId) => { calls.push(['setCurrencyProvider', providerId, id]); },
+    setCurrencyMacro: async (id, key, uuid) => { calls.push(['setCurrencyMacro', key, uuid, id]); },
+    clearCurrencyMacro: async (id, key) => { calls.push(['clearCurrencyMacro', key, id]); },
     createRecipe: () => {
       calls.push(['createRecipe']);
       return options.createRecipeResult ?? { id: 'r-created' };
@@ -5463,6 +5478,58 @@ describe('CraftingSystemManager mounted behavior', () => {
       && call[2] === 'Updated potion work'));
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'mapped'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
+  });
+
+  it('renders the currency spend-strategy control and routes its change to the store', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', inventoryMode: 'provider', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    const strategy = target.querySelector('[data-system-currency-strategy-select]');
+    assert.ok(strategy, 'spend-strategy select should render');
+    strategy.value = 'actorInventory';
+    strategy.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'setCurrencySpendStrategy' && call[1] === 'actorInventory'));
+  });
+
+  it('mounts the macro inventory mode with three macro drop zones', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.ok(target.querySelector('[data-system-currency-macros]'), 'macro zones container should render');
+    const dropzones = target.querySelectorAll('[data-system-currency-macro-dropzone]');
+    assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
+    // The inventory-mode select should also be present in actorInventory.
+    assert.ok(target.querySelector('[data-system-currency-inventory-mode-select]'));
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {

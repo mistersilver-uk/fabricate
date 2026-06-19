@@ -449,6 +449,9 @@ export class CraftingSystemManager {
       {
         enabled: currency?.enabled === true,
         spendStrategy,
+        inventoryMode: currency?.inventoryMode,
+        providerId: currency?.providerId,
+        macros: currency?.macros,
         units: seededUnits,
       },
       { randomID: () => foundry.utils.randomID() }

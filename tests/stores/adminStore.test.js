@@ -1847,6 +1847,73 @@ describe('createAdminStore', () => {
       assert.equal(gp.denomination, 'gp');
     });
 
+    it('seedCurrencyUnitPresets seeds the provider inventory mode for pf2e worlds', async () => {
+      let updateArgs = null;
+      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.seedCurrencyUnitPresets('sys1');
+      const currency = updateArgs.updates.requirements.currency;
+      assert.equal(currency.inventoryMode, 'provider');
+      assert.equal(currency.providerId, 'pf2e-inventory');
+    });
+
+    it('setCurrencySpendStrategy persists and defaults providerId for pf2e actorInventory', async () => {
+      let updateArgs = null;
+      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      const currency = updateArgs.updates.requirements.currency;
+      assert.equal(currency.spendStrategy, 'actorInventory');
+      assert.equal(currency.providerId, 'pf2e-inventory');
+    });
+
+    it('setCurrencyInventoryMode and setCurrencyProvider persist their values', async () => {
+      let updateArgs = null;
+      const services = createMockServices({ getFoundrySystemId: () => 'pf2e' });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setCurrencyInventoryMode('sys1', 'macro');
+      assert.equal(updateArgs.updates.requirements.currency.inventoryMode, 'macro');
+      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
+      assert.equal(updateArgs.updates.requirements.currency.providerId, 'pf2e-inventory');
+    });
+
+    it('setCurrencyMacro and clearCurrencyMacro persist per-key macro UUIDs', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setCurrencyMacro('sys1', 'canAfford', 'Macro.can');
+      assert.equal(updateArgs.updates.requirements.currency.macros.canAfford, 'Macro.can');
+      await store.setCurrencyMacro('sys1', 'decrement', 'Macro.dec');
+      assert.equal(updateArgs.updates.requirements.currency.macros.decrement, 'Macro.dec');
+      await store.clearCurrencyMacro('sys1', 'canAfford');
+      assert.equal(updateArgs.updates.requirements.currency.macros.canAfford, '');
+      assert.equal(updateArgs.updates.requirements.currency.macros.decrement, 'Macro.dec');
+    });
+
     it('seedCurrencyUnitPresets does not overwrite a user-edited seeded unit', async () => {
       let updateArgs = null;
       const services = createMockServices({
@@ -2062,6 +2129,8 @@ describe('createAdminStore', () => {
         'saveCraftingCheckConfig',
         'addCurrencyUnit', 'updateCurrencyUnit', 'deleteCurrencyUnit',
         'addCurrencySubUnit', 'updateCurrencySubUnit', 'deleteCurrencySubUnit',
+        'setCurrencySpendStrategy', 'setCurrencyInventoryMode', 'setCurrencyProvider',
+        'setCurrencyMacro', 'clearCurrencyMacro',
         'seedCurrencyUnitPresets',
         'saveVisibilityConfig', 'saveTeaserConfig',
         'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
