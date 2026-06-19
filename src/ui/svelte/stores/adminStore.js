@@ -1445,9 +1445,8 @@ function _buildSelectedSystemViewData(
 ) {
   if (!selectedSystem) return null;
 
-  const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
   const showTags = true;
-  const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
+  const showEssences = selectedSystem.features?.essences === true;
 
   const listMode = selectedSystem.recipeVisibility?.listMode || 'global';
   const showRecipeVisibilityKnowledgeOptions = listMode === 'knowledge';
@@ -1459,7 +1458,6 @@ function _buildSelectedSystemViewData(
     description: selectedSystem.description,
     enabled: selectedSystem.enabled !== false,
     resolutionMode: selectedSystem.resolutionMode || 'simple',
-    advancedOptionsEnabled: advancedEnabled,
 
     features: {
       recipeCategories: true,
@@ -3395,9 +3393,8 @@ export function createAdminStore(services) {
 
     let itemCards = [];
     if (selectedSystem) {
-      const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
       const showTags = true;
-      const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
+      const showEssences = selectedSystem.features?.essences === true;
       const essenceDefinitionById = new Map((selectedSystemData?.essenceDefinitions || []).map(def => [def.id, def]));
 
       itemCards = await _buildItemCards(
@@ -3504,11 +3501,11 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveSystemDetails(name, description, advancedOptionsEnabled) {
+  async function saveSystemDetails(name, description) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
-    await systemManager.updateSystem(sysId, { name, description, advancedOptionsEnabled });
+    await systemManager.updateSystem(sysId, { name, description });
     await refresh();
   }
 
@@ -4133,14 +4130,6 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, { features: { [key]: enabled } });
     await refresh();
     return true;
-  }
-
-  async function toggleAdvancedOptions(enabled) {
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
-    if (!sysId) return;
-    await systemManager.updateSystem(sysId, { advancedOptionsEnabled: enabled });
-    await refresh();
   }
 
   async function toggleSystemEnabled(systemId, enabled) {
@@ -5565,7 +5554,6 @@ export function createAdminStore(services) {
     setEnvironmentRealmMembership,
     toggleSystemEnabled,
     toggleFeature,
-    toggleAdvancedOptions,
     toggleRequirement,
     addCategory,
     removeCategory,

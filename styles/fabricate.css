@@ -3456,8 +3456,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-field.span-2,
-.fabricate-manager .manager-toggle-row.span-2 {
+.fabricate-manager .manager-field.span-2 {
   grid-column: 1 / -1;
 }
 
@@ -4033,7 +4032,7 @@
 }
 
 .fabricate-manager .manager-field small,
-.fabricate-manager .manager-toggle-copy small {
+.fabricate-manager .manager-feature-tile small {
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
@@ -4047,33 +4046,26 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-toggle-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: flex-start;
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .manager-toggle-row input {
-  width: 18px;
-  height: 18px;
-  margin: 1px 0 0;
-  accent-color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-toggle-copy {
+.fabricate-manager .manager-feature-tile {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
 }
 
-.fabricate-manager .manager-toggle-copy strong {
+.fabricate-manager .manager-feature-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-feature-tile-head strong {
   min-width: 0;
   font-size: 0.82rem;
   line-height: 1.25;

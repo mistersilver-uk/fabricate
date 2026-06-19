@@ -147,7 +147,6 @@ function makeRecipeManager() {
 function makeRecipeManagerWithSystem(systemId, components, tools = []) {
   const system = {
     id: systemId,
-    advancedOptionsEnabled: false,
     features: { itemTags: false, essences: false },
     components,
     managedItems: components,
@@ -172,7 +171,6 @@ function makeRecipeManagerWithSystem(systemId, components, tools = []) {
 function makeRecipeManagerWithEssences(systemId, essenceDefinitions, components = []) {
   const system = {
     id: systemId,
-    advancedOptionsEnabled: true,
     features: { itemTags: false, essences: true },
     components,
     managedItems: [],

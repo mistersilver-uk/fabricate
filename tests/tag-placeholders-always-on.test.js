@@ -44,7 +44,6 @@ function makeRecipe(tag) {
 test('tag placeholders validate when legacy itemTags feature is disabled', () => {
   const manager = makeRecipeManager({
     id: 'sys-tags',
-    advancedOptionsEnabled: false,
     features: { itemTags: false },
     itemTags: ['herb']
   });

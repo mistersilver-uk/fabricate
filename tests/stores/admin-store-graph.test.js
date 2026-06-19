@@ -18,7 +18,6 @@ function makeSystem(overrides = {}) {
     name: overrides.name || `System ${id}`,
     description: '',
     features: {},
-    advancedOptionsEnabled: true,
     categories: [],
     itemTags: [],
     essenceDefinitions: [],

@@ -37,7 +37,6 @@ globalThis.ui = {
 function setupGame(craftingCheck = {}) {
   const system = {
     id: 'sys-1',
-    advancedOptionsEnabled: true,
     features: { craftingChecks: true },
     craftingCheck: {
       enabled: true,

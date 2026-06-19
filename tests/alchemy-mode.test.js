@@ -608,12 +608,10 @@ function buildSubmittedItem(uuid, essences = {}) {
 
 const essenceSystem = {
   features: { essences: true },
-  advancedOptionsEnabled: true
 };
 
 const noEssenceSystem = {
   features: { essences: false },
-  advancedOptionsEnabled: true
 };
 
 test('_matchAlchemySignature matches pure-essence recipe when submitted items satisfy essences', () => {

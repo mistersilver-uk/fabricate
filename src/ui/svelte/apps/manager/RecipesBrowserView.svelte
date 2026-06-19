@@ -168,7 +168,7 @@
         <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
         <select value={categoryFilter} onchange={(event) => categoryFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}>
           <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
-          {#each recipeCategories || [] as category}
+          {#each recipeCategories || [] as category (category.name)}
             <option value={category.name}>{category.name} ({category.count})</option>
           {/each}
         </select>

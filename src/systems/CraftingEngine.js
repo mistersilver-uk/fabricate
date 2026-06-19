@@ -723,8 +723,7 @@ export class CraftingEngine {
 
     // Check whether the system supports essences
     const system = options?.system;
-    const essencesEnabled =
-      system?.features?.essences === true && system?.advancedOptionsEnabled !== false;
+    const essencesEnabled = system?.features?.essences === true;
 
     // Accumulate essences from ALL submitted items (duplicates count multiple times)
     let submittedEssences = null;
@@ -1223,10 +1222,9 @@ export class CraftingEngine {
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
 
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
     const currency = system?.requirements?.currency || {};
     return {
-      enabled: advancedEnabled && currency.enabled === true,
+      enabled: currency.enabled === true,
       provider: currency.provider === 'system' ? 'system' : 'macro',
       systemAdapter: currency.systemAdapter || null,
       checkCurrencyMacroUuid: currency.checkCurrencyMacroUuid || null,
@@ -1632,11 +1630,9 @@ export class CraftingEngine {
       mode === 'tiered' ||
       mode === 'progressive' ||
       (mode === 'routed' && selection?.provider === 'macroOutcome');
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
     const checksEnabled =
-      advancedEnabled &&
-      (features.craftingChecks === true || system?.craftingCheck?.enabled === true);
+      features.craftingChecks === true || system?.craftingCheck?.enabled === true;
     if (!checksEnabled && !checkRequired) {
       return { success: true, outcome: null, data: {} };
     }
@@ -1892,9 +1888,8 @@ export class CraftingEngine {
     const craftingSystem = recipe?.craftingSystemId
       ? systemManager?.getSystem(recipe.craftingSystemId)
       : null;
-    const advancedEnabled = craftingSystem?.advancedOptionsEnabled !== false;
     const features = craftingSystem?.features || {};
-    const enabled = advancedEnabled && features.propertyMacros === true;
+    const enabled = features.propertyMacros === true;
     if (!enabled) return null;
 
     const essenceContext = this._buildEssenceContext(consumedItems, recipe);

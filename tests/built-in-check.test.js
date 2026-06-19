@@ -136,7 +136,6 @@ function makeEngine(systemOverride = {}) {
   const system = {
     id: 'sys-1',
     resolutionMode: 'tiered',
-    advancedOptionsEnabled: true,
     features: { craftingChecks: true },
     craftingCheck: {
       enabled: true,

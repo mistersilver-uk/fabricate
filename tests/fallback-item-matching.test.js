@@ -101,7 +101,6 @@ function setupGameFabricate(component) {
     getCraftingSystemManager: () => ({
       getSystem: (sysId) => ({
         id: sysId,
-        advancedOptionsEnabled: true,
         features: { itemTags: false, essences: false },
         components: [component],
         managedItems: [component],

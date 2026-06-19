@@ -39,7 +39,6 @@ globalThis.ui = {
  */
 function setupGame(consumptionPolicy = {}) {
   const system = {
-    advancedOptionsEnabled: true,
     craftingCheck: {
       enabled: true,
       macroUuid: 'macro:check-uuid',
