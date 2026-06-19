@@ -19,7 +19,6 @@
     currencyUnits = [],
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
-    currencyInventoryMode = 'provider',
     currencyProviderId = '',
     currencyMacros = { canAfford: '', increment: '', decrement: '' },
     currencyProviderOptions = [],
@@ -31,19 +30,15 @@
     onDeleteCurrencySubUnit = async () => {},
     onSeedCurrencyPresets = async () => {},
     onSetCurrencySpendStrategy = async () => {},
-    onSetCurrencyInventoryMode = async () => {},
     onSetCurrencyProvider = async () => {},
     onSetCurrencyMacro = async () => {},
     onClearCurrencyMacro = async () => {}
   } = $props();
 
   const CURRENCY_SPEND_STRATEGY_OPTIONS = [
-    { value: 'actorProperty', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorProperty', fallback: 'Actor data path' },
-    { value: 'actorInventory', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorInventory', fallback: 'Actor inventory' }
-  ];
-  const CURRENCY_INVENTORY_MODE_OPTIONS = [
-    { value: 'provider', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeProvider', fallback: 'Preconfigured provider' },
-    { value: 'macro', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeMacro', fallback: 'Custom macros' }
+    { value: 'actorProperty', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorProperty', fallback: 'Actor data path', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorPropertyHint', hintFallback: 'Read and spend coins at a flat actor data path (e.g. dnd5e currency).' },
+    { value: 'actorInventory', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorInventory', fallback: 'Actor inventory', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorInventoryHint', hintFallback: 'Use a preconfigured provider that reads and spends coins from the actor inventory (e.g. pf2e).' },
+    { value: 'macro', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyMacro', fallback: 'Macro', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyMacroHint', hintFallback: 'Drive currency with your own macros; the macro receives the actor and does whatever it needs.' }
   ];
   const CURRENCY_MACRO_FIELDS = [
     { key: 'canAfford', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroCanAfford', labelFallback: 'Can afford macro', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroCanAffordHint', hintFallback: 'Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.' },
@@ -126,49 +121,28 @@
 
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
 
-  // A system with no registered provider must not be offered (or steered into) provider mode:
-  // entering it resolves an empty provider id whose canonical ladder is empty. The store now
-  // guards against wiping units, but the editor should not surface the dead option either. Hide
-  // the `provider` choice when there are no providers so the only inventory source is `macro`.
+  // A system with no registered provider has nothing to drive the actorInventory strategy: the
+  // resolved provider id is empty and its canonical ladder is empty. The store guards against
+  // wiping the GM's units, and the editor surfaces a steer-to-macro callout in that case.
   const currencyHasProviders = $derived(currencyProviderOptions.length > 0);
-  const currencyInventoryModeOptions = $derived(
-    currencyHasProviders
-      ? CURRENCY_INVENTORY_MODE_OPTIONS
-      : CURRENCY_INVENTORY_MODE_OPTIONS.filter((option) => option.value !== 'provider')
-  );
-  // The mode the select renders. When the system has no providers, present `macro` regardless of any
-  // legacy `provider` value persisted in config so the control never shows an unselectable option.
-  const currencyInventoryModeSelected = $derived(
-    !currencyHasProviders && currencyInventoryMode === 'provider' ? 'macro' : currencyInventoryMode
-  );
 
-  // The effective inventory branch the GM is actually operating in. A no-provider system with a
-  // stale `provider` value behaves as macro mode everywhere (display, read-only, sub-unit collapse).
-  const currencyEffectiveInventoryMode = $derived(currencyInventoryModeSelected);
-
-  // No-provider systems never show the provider branch — even if config still carries
-  // inventoryMode === 'provider' from legacy state — so the GM sees the macro fields instead.
+  // Show the provider select only under the actorInventory strategy on a system that ships a
+  // provider; otherwise the actorInventory branch renders the no-provider callout.
   const currencyShowProviderBranch = $derived(
-    currencyEffectiveInventoryMode === 'provider' && currencyHasProviders
+    currencySpendStrategy === 'actorInventory' && currencyHasProviders
   );
 
-  // In provider inventory mode the selected provider owns the denomination ladder, so currency
-  // units are provider-managed and read-only — editing them would desync the engine's
+  // Under the actorInventory strategy the selected provider owns the denomination ladder, so
+  // currency units are provider-managed and read-only — editing them would desync the engine's
   // affordability/baseValue math from the system's real coin values. A no-provider system is never
   // read-only because its units stay GM-owned.
-  const currencyUnitsReadOnly = $derived(
-    currencySpendStrategy === 'actorInventory' && currencyShowProviderBranch
-  );
+  const currencyUnitsReadOnly = $derived(currencyShowProviderBranch);
 
-  // In macro inventory mode the configured macros own all conversion via unit abbreviations, so a
+  // Under the macro strategy the configured macros own all conversion via unit abbreviations, so a
   // unit's `contains` breakdown is unused. The per-unit editor collapses to label/abbreviation/icon
-  // and the whole sub-unit section (heading, add control, chips, warnings) is removed.
-  // Sub-units only drive the engine in actorProperty mode (their `contains` feeds base-value and
-  // change-making). In macro mode the configured macros own conversion via unit abbreviations, so
-  // the per-unit editor collapses to label/abbreviation/icon and the whole sub-unit section is gone.
-  const currencyMacroMode = $derived(
-    currencySpendStrategy === 'actorInventory' && currencyEffectiveInventoryMode === 'macro'
-  );
+  // and the whole sub-unit section (heading, add control, chips, warnings) is removed. Sub-units
+  // only drive the engine under actorProperty (their `contains` feeds base-value and change-making).
+  const currencyMacroMode = $derived(currencySpendStrategy === 'macro');
 
   function currencyProviderLabel() {
     const match = currencyProviderOptions.find((option) => option.id === currencyProviderId);
@@ -182,6 +156,14 @@
     return localize('FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedHint', {
       provider: currencyProviderLabel()
     });
+  }
+
+  // The strategy select renders one shared hint that reflects the selected strategy, so the GM
+  // sees the actor-data-path / actor-inventory / macro guidance inline as they switch.
+  function currencySpendStrategyHint() {
+    const option = CURRENCY_SPEND_STRATEGY_OPTIONS.find((entry) => entry.value === currencySpendStrategy)
+      || CURRENCY_SPEND_STRATEGY_OPTIONS[0];
+    return text(option.hintKey, option.hintFallback);
   }
 
   function characterModifierIsRoll(entry) {
@@ -503,49 +485,33 @@
                 <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
               {/each}
             </select>
-            <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyHint', 'Choose how this system reads and spends actor currency.')}</small>
+            <small data-system-currency-strategy-hint>{currencySpendStrategyHint()}</small>
           </label>
 
-          {#if currencySpendStrategy === 'actorInventory'}
+          {#if currencyShowProviderBranch}
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.InventoryMode', 'Inventory source')}</span>
+              <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
               <select
-                value={currencyInventoryModeSelected}
-                data-system-currency-inventory-mode-select
-                onchange={(event) => onSetCurrencyInventoryMode(event.currentTarget.value)}
+                value={currencyProviderId}
+                data-system-currency-provider-select
+                onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
               >
-                {#each currencyInventoryModeOptions as option (option.value)}
-                  <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+                {#each currencyProviderOptions as option (option.id)}
+                  <option value={option.id}>{option.label}</option>
                 {/each}
               </select>
-              <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.InventoryModeHint', 'Use a preconfigured provider for your system, or drive currency with custom macros.')}</small>
+              <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint', 'A preconfigured adapter that reads and spends coins from the actor inventory.')}</small>
             </label>
-
-            {#if currencyShowProviderBranch}
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
-                <select
-                  value={currencyProviderId}
-                  data-system-currency-provider-select
-                  onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
-                >
-                  {#each currencyProviderOptions as option (option.id)}
-                    <option value={option.id}>{option.label}</option>
-                  {/each}
-                </select>
-                <small>{text('FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint', 'A preconfigured adapter that reads and spends coins from the actor inventory.')}</small>
-              </label>
-            {:else}
-              {#if !currencyHasProviders && currencyInventoryMode === 'provider'}
-                <div class="manager-field">
-                  <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
-                  <div class="manager-currency-subunit-warning manager-environment-comp-callout" role="note" data-system-currency-no-provider>
-                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.NoProviders', 'No preconfigured providers for this system — use custom macros instead.')}</span>
-                  </div>
-                </div>
-              {/if}
-              <div class="manager-currency-macro-zones manager-currency-macro-row" data-system-currency-macros>
+          {:else if currencySpendStrategy === 'actorInventory'}
+            <div class="manager-field">
+              <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
+              <div class="manager-currency-subunit-warning manager-environment-comp-callout" role="note" data-system-currency-no-provider>
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.NoProviders', 'No preconfigured providers for this system — use the Macro strategy instead.')}</span>
+              </div>
+            </div>
+          {:else if currencyMacroMode}
+            <div class="manager-currency-macro-zones manager-currency-macro-row" data-system-currency-macros>
                 {#each CURRENCY_MACRO_FIELDS as field (field.key)}
                   {@const macroDoc = currencyMacroDisplay(field.key)}
                   <div class="manager-field manager-currency-macro-field">
@@ -592,7 +558,6 @@
                   </div>
                 {/each}
               </div>
-            {/if}
           {/if}
         </div>
 

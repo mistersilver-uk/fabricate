@@ -215,16 +215,25 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('{currencySpendStrategy}'),
       'root should thread the spend strategy to SystemEditView'
     );
+    // Three peer top-level spend strategies (actorProperty / actorInventory / macro). The strategy
+    // select renders all three options and the editor branches on each strategy.
     assert.ok(
       systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
       'currency editor should branch on the actorInventory spend strategy'
     );
-    // Currency spend-strategy / inventory-mode / provider / macro controls.
+    for (const value of ['actorProperty', 'actorInventory', 'macro']) {
+      assert.ok(
+        systemEditSource.includes(`value: '${value}'`),
+        `currency editor should offer the ${value} spend strategy option`
+      );
+    }
+    // Currency spend-strategy / provider / macro controls.
     for (const snippet of [
       'data-system-currency-strategy-select',
       'onSetCurrencySpendStrategy(event.currentTarget.value)',
-      'data-system-currency-inventory-mode-select',
-      'onSetCurrencyInventoryMode(event.currentTarget.value)',
+      // The single shared strategy hint reflects the selected strategy.
+      'data-system-currency-strategy-hint',
+      'currencySpendStrategyHint()',
       'data-system-currency-provider-select',
       'onSetCurrencyProvider(event.currentTarget.value)',
       'data-system-currency-no-provider',
@@ -241,20 +250,25 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
+    // The nested inventory-mode select is gone — macro is now a peer top-level strategy.
     assert.ok(
-      systemEditSource.includes("currencyEffectiveInventoryMode === 'macro'"),
-      'currency editor should branch on the effective macro inventory mode'
+      !systemEditSource.includes('data-system-currency-inventory-mode-select'),
+      'currency editor should not render the removed nested inventory-mode select'
     );
-    // A system with no registered provider must not be offered (or steered into) provider mode: the
-    // inventory-mode select hides the provider option and presents the macro source instead.
+    assert.ok(
+      !systemEditSource.includes('inventoryMode'),
+      'currency editor should not reference the removed inventoryMode model'
+    );
+    // The macro branch renders only under the peer macro strategy.
+    assert.ok(
+      systemEditSource.includes("currencySpendStrategy === 'macro'"),
+      'currency editor should branch on the macro spend strategy'
+    );
+    // A system with no registered provider can still select actorInventory but is steered to the
+    // macro strategy via a no-provider callout, and its units are never wiped.
     assert.ok(
       systemEditSource.includes('const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'),
       'currency editor should derive whether the system has any providers'
-    );
-    assert.ok(
-      systemEditSource.includes('currencyInventoryModeOptions') &&
-        systemEditSource.includes("option.value !== 'provider'"),
-      'currency editor should drop the provider inventory-mode option when there are no providers'
     );
     // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
     // single responsive row via a namespaced container class.
@@ -285,11 +299,11 @@ describe('CraftingSystemManager source contract', () => {
       systemEditSource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
       'macro mode should include the macro-conversion hint'
     );
-    // Provider inventory mode makes the units provider-owned and read-only: the Add/Seed header
-    // actions and the editable unit controls are gated behind a non-provider condition, and a
-    // dedicated read-only branch with a provider-managed callout renders instead.
+    // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
+    // the Add/Seed header actions and the editable unit controls are gated behind a non-read-only
+    // condition, and a dedicated read-only branch with a provider-managed callout renders instead.
     assert.ok(
-      systemEditSource.includes("currencySpendStrategy === 'actorInventory' && currencyShowProviderBranch"),
+      systemEditSource.includes('const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'),
       'currency editor should derive a read-only flag for the active provider inventory branch'
     );
     assert.ok(
@@ -334,18 +348,21 @@ describe('CraftingSystemManager source contract', () => {
       'provider-managed read-only branch should render before the editable unit list'
     );
     for (const prop of [
-      '{currencyInventoryMode}',
       '{currencyProviderId}',
       '{currencyMacros}',
       '{currencyProviderOptions}',
       'onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}',
-      'onSetCurrencyInventoryMode={onSetCurrencyInventoryMode}',
       'onSetCurrencyProvider={onSetCurrencyProvider}',
       'onSetCurrencyMacro={onSetCurrencyMacro}',
       'onClearCurrencyMacro={onClearCurrencyMacro}'
     ]) {
       assert.ok(rootSource.includes(prop), `root should thread ${prop} to SystemEditView`);
     }
+    // The removed nested inventory-mode setter must no longer be threaded.
+    assert.ok(
+      !rootSource.includes('onSetCurrencyInventoryMode'),
+      'root should not thread the removed inventory-mode setter'
+    );
     assert.ok(
       rootSource.includes('getCurrencyProvidersForFoundrySystem'),
       'root should derive provider options from the currency provider registry'
@@ -403,8 +420,10 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Add, 'Add currency unit');
     assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit, 'Add sub-unit');
     for (const key of [
-      'SpendStrategy', 'SpendStrategyHint', 'SpendStrategyActorProperty', 'SpendStrategyActorInventory',
-      'InventoryMode', 'InventoryModeHint', 'InventoryModeProvider', 'InventoryModeMacro',
+      'SpendStrategy', 'SpendStrategyHint',
+      'SpendStrategyActorProperty', 'SpendStrategyActorPropertyHint',
+      'SpendStrategyActorInventory', 'SpendStrategyActorInventoryHint',
+      'SpendStrategyMacro', 'SpendStrategyMacroHint',
       'Provider', 'ProviderHint', 'NoProviders',
       'MacroCanAfford', 'MacroCanAffordHint', 'MacroIncrement', 'MacroIncrementHint',
       'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroDropZoneLabel', 'MacroReplaceHint',
@@ -412,6 +431,14 @@ describe('CraftingSystemManager source contract', () => {
       'ProviderManagedTitle', 'ProviderManagedHint'
     ]) {
       assert.ok(lang.FABRICATE.Admin.Manager.CurrencyUnits[key], `CurrencyUnits.${key} should be defined`);
+    }
+    // The removed nested inventory-mode localization keys must be gone.
+    for (const key of ['InventoryMode', 'InventoryModeHint', 'InventoryModeProvider', 'InventoryModeMacro']) {
+      assert.equal(
+        lang.FABRICATE.Admin.Manager.CurrencyUnits[key],
+        undefined,
+        `CurrencyUnits.${key} should be removed`
+      );
     }
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Title, 'Recipes');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Requirements, 'Requirements');

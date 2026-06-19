@@ -1236,14 +1236,13 @@ export class CraftingEngine {
     if (!system) return null;
 
     const currency = system?.requirements?.currency || {};
-    const spendStrategy =
-      currency.spendStrategy === 'actorInventory' ? 'actorInventory' : 'actorProperty';
-    const inventoryMode = currency.inventoryMode === 'macro' ? 'macro' : 'provider';
+    const spendStrategy = ['actorInventory', 'macro'].includes(currency.spendStrategy)
+      ? currency.spendStrategy
+      : 'actorProperty';
     const macros = currency.macros && typeof currency.macros === 'object' ? currency.macros : {};
     return {
       enabled: currency.enabled === true,
       spendStrategy,
-      inventoryMode,
       providerId: String(currency.providerId || ''),
       macros,
       units: Array.isArray(currency.units) ? currency.units : [],
@@ -1362,27 +1361,27 @@ export class CraftingEngine {
   }
 
   /**
-   * Resolve the coin spender for a spend strategy and (for actorInventory) inventory mode.
-   * `actorProperty` → generic property spender; `actorInventory`+`macro` → a per-config
-   * {@link MacroCoinSpender}; `actorInventory`+`provider` → the injected inventory spender (it
-   * resolves a per-system adapter; `providerId` is reserved for a future multi-provider system).
+   * Resolve the coin spender for one of the three peer spend strategies.
+   * `actorInventory` → the injected inventory spender (it resolves a per-system adapter;
+   * `providerId` is reserved for a future multi-provider system); `macro` → a per-config
+   * {@link MacroCoinSpender}; `actorProperty` (default) → the generic property spender.
    * The actorInventory/property spenders are injected (tests / main.js) or read from the
    * `game.fabricate` accessor; the actorProperty spender defaults to the generic implementation.
    * @private
    */
   _resolveCoinSpender(config = {}) {
-    if (config.spendStrategy !== 'actorInventory') {
+    if (config.spendStrategy === 'actorInventory') {
       return (
-        this.actorPropertyCoinSpender ||
-        game.fabricate?.getActorPropertyCoinSpender?.() ||
-        new ActorPropertyCoinSpender()
+        this.actorInventoryCoinSpender || game.fabricate?.getActorInventoryCoinSpender?.() || null
       );
     }
-    if (config.inventoryMode === 'macro') {
+    if (config.spendStrategy === 'macro') {
       return new MacroCoinSpender({ macros: config.macros });
     }
     return (
-      this.actorInventoryCoinSpender || game.fabricate?.getActorInventoryCoinSpender?.() || null
+      this.actorPropertyCoinSpender ||
+      game.fabricate?.getActorPropertyCoinSpender?.() ||
+      new ActorPropertyCoinSpender()
     );
   }
 
@@ -1399,7 +1398,6 @@ export class CraftingEngine {
 
     const profile = validateCurrencyProfile(config.units || [], {
       spendStrategy: config.spendStrategy,
-      inventoryMode: config.inventoryMode,
       macros: config.macros,
     });
     if (!profile.valid) {

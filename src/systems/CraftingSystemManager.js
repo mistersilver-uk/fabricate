@@ -445,6 +445,9 @@ export class CraftingSystemManager {
     const legacyAdapterSpendStrategy = { pf2e: 'actorInventory', dnd5e: 'actorProperty' };
     const spendStrategy =
       currency?.spendStrategy || legacyAdapterSpendStrategy[legacyAdapter] || undefined;
+    // `inventoryMode` is no longer part of the currency model. It is forwarded ONLY so
+    // normalizeCurrencyConfig's legacy shim can map a stored actorInventory + inventoryMode:
+    // 'macro' to the peer `macro` strategy; it is never re-emitted from the normalized output.
     return normalizeCurrencyConfig(
       {
         enabled: currency?.enabled === true,

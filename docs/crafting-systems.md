@@ -247,31 +247,30 @@ You configure currency in the system settings editor, in the **Currency units** 
 #### Choosing a spend strategy
 
 The **Spend strategy** selector decides how Fabricate reads and spends an actor's money.
-You can pick either strategy in any world, regardless of game system.
+It offers three strategies, and you can pick any of them in any world, regardless of game system.
+A short hint under the selector describes the strategy you have chosen.
 
 - **Actor data path** reads each currency unit from a numeric field on the actor sheet, such as a Dungeons & Dragons 5e character's gold.
   Fabricate makes its own change across the denominations you define, so a step priced in silver can be paid from gold and the difference returned in smaller coins.
-- **Actor inventory** treats coins as items the actor carries.
+- **Actor inventory** treats coins as items the actor carries, read and spent through a preconfigured provider.
   This is the right choice for game systems such as Pathfinder 2e, where coins live in the inventory rather than in a single sheet field.
+- **Macro** drives currency with macros you write, for any game system.
+  The macro receives the actor and does whatever it needs, so this strategy is not tied to the inventory.
 
-When you choose **Actor inventory**, an **Inventory source** selector appears with two options.
+#### The provider (Actor inventory)
 
-#### Provider or custom macros
+When you choose **Actor inventory**, a **Provider** selector appears.
 
-Under **Actor inventory**, the **Inventory source** can be a preconfigured provider or your own macros.
+A provider is a built-in adapter that already knows how to read and spend coins from your game system's inventory.
+Pathfinder 2e ships with one.
+When a provider is selected, it manages the denominations for you, so the unit list becomes a read-only **Provider-managed denominations** list.
+You can still reference those denominations by their abbreviation in a step's currency cost, but you cannot edit them here.
+In a world whose game system has no provider, Fabricate shows a note steering you to the **Macro** strategy instead, and leaves your own units untouched.
 
-- **Preconfigured provider** uses a built-in adapter that already knows how to read and spend coins from your game system's inventory.
-  Pathfinder 2e ships with one.
-  When a provider is selected, it manages the denominations for you, so the unit list becomes a read-only **Provider-managed denominations** list.
-  You can still reference those denominations by their abbreviation in a step's currency cost, but you cannot edit them here.
-  In a world whose game system has no provider, Fabricate shows a note steering you to custom macros instead.
-- **Custom macros** lets you drive currency with macros you write, for any game system.
-  You link each macro by dragging it from the Foundry macro directory onto a drop zone.
-  Right-click a linked macro to unlink it.
+#### The currency macros (Macro)
 
-#### The currency macros
-
-Custom macro mode has three drop zones.
+The **Macro** strategy has three drop zones.
+You link each macro by dragging it from the Foundry macro directory onto a drop zone, and right-click a linked macro to unlink it.
 
 - **Can afford macro** runs before the craft to decide whether the actor can pay.
   Return a success result to allow the craft, or a failure result to block it.
@@ -284,11 +283,11 @@ If a macro reports failure or stops with an error, Fabricate blocks the step and
 
 #### Defining currency units
 
-When you use the **Actor data path** strategy, or **Custom macros**, you define your own currency units.
+When you use the **Actor data path** or **Macro** strategy, you define your own currency units.
 Each unit has a label, an abbreviation, and an icon.
 
 - Under **Actor data path**, each unit also names the field on the actor sheet that holds its balance.
-- Under **Custom macros**, units have no path or denomination.
+- Under **Macro**, units have no path or denomination.
   Your macros match coins by abbreviation, so a note reminds you that conversion between units is handled by your macros.
 
 You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.

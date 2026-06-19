@@ -1837,12 +1837,13 @@ describe('createAdminStore', () => {
       assert.equal(gp.denomination, 'gp');
     });
 
-    it('seedCurrencyUnitPresets seeds the provider inventory mode for pf2e worlds', async () => {
+    it('seedCurrencyUnitPresets seeds the actorInventory strategy for pf2e worlds', async () => {
       const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.seedCurrencyUnitPresets('sys1');
-      assert.equal(currency().inventoryMode, 'provider');
+      assert.equal('inventoryMode' in currency(), false);
+      assert.equal(currency().spendStrategy, 'actorInventory');
       assert.equal(currency().providerId, 'pf2e-inventory');
-      // Provider mode is provider-owned, so the seeded units are the provider canonical ladder.
+      // The actorInventory strategy is provider-owned, so the seeded units are the canonical ladder.
       assert.deepEqual(currency().units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
       assert.deepEqual(currency().units.map(unit => unit.denomination), PF2E_CURRENCY_PRESETS.map(unit => unit.denomination));
     });
@@ -1854,30 +1855,32 @@ describe('createAdminStore', () => {
       assert.equal(currency().providerId, 'pf2e-inventory');
     });
 
-    it('setCurrencyInventoryMode and setCurrencyProvider persist their values', async () => {
+    it('setCurrencySpendStrategy persists the macro strategy and preserves providerId', async () => {
       const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      await store.setCurrencyInventoryMode('sys1', 'macro');
-      assert.equal(currency().inventoryMode, 'macro');
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      await store.setCurrencySpendStrategy('sys1', 'macro');
+      assert.equal(currency().spendStrategy, 'macro');
+      assert.equal('inventoryMode' in currency(), false);
+      // providerId is inert under macro but is preserved across the switch.
+      assert.equal(currency().providerId, 'pf2e-inventory');
       await store.setCurrencyProvider('sys1', 'pf2e-inventory');
       assert.equal(currency().providerId, 'pf2e-inventory');
     });
 
-    it('setCurrencyInventoryMode("provider") syncs units to the provider canonical ladder', async () => {
+    it('setCurrencySpendStrategy("actorInventory") syncs units to the provider canonical ladder', async () => {
       const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      // Seed a user-managed unit first, then flipping to provider mode overwrites it.
+      // Seed a user-managed unit first, then switching to actorInventory overwrites it.
       await store.addCurrencyUnit('sys1', { id: 'junk', label: 'Junk', actorPath: 'system.currency.junk' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      await store.setCurrencyInventoryMode('sys1', 'provider');
       const units = currency().units;
       assert.deepEqual(units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
       assert.deepEqual(units.map(unit => unit.denomination), PF2E_CURRENCY_PRESETS.map(unit => unit.denomination));
       assert.equal(units.some(unit => unit.id === 'junk'), false, 'user-managed unit should be overwritten by canonical ladder');
     });
 
-    it('setCurrencyProvider syncs canonical units while in provider mode', async () => {
+    it('setCurrencyProvider syncs canonical units while under the actorInventory strategy', async () => {
       const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      await store.setCurrencyInventoryMode('sys1', 'provider');
       await store.setCurrencyProvider('sys1', 'pf2e-inventory');
       assert.deepEqual(currency().units.map(unit => unit.id), PF2E_CURRENCY_PRESETS.map(unit => unit.id));
     });
@@ -1885,29 +1888,28 @@ describe('createAdminStore', () => {
     it('switching to actorProperty or macro leaves user-managed units untouched', async () => {
       const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
       await store.addCurrencyUnit('sys1', { id: 'mine', label: 'Mine', actorPath: 'system.currency.mine' });
-      // macro mode keeps the user's units.
-      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      await store.setCurrencyInventoryMode('sys1', 'macro');
+      // macro strategy keeps the user's units.
+      await store.setCurrencySpendStrategy('sys1', 'macro');
       assert.equal(currency().units.some(unit => unit.id === 'mine'), true);
-      // actorProperty mode keeps the user's units too.
+      // actorProperty strategy keeps the user's units too.
       await store.setCurrencySpendStrategy('sys1', 'actorProperty');
       assert.equal(currency().units.some(unit => unit.id === 'mine'), true);
-      // setCurrencyProvider outside provider mode does not touch the user's units.
+      // setCurrencyProvider outside the actorInventory strategy does not touch the user's units.
       await store.setCurrencyProvider('sys1', 'pf2e-inventory');
       assert.equal(currency().units.some(unit => unit.id === 'mine'), true);
     });
 
-    it('provider mode in a no-provider system (dnd5e) leaves configured units untouched', async () => {
+    it('actorInventory in a no-provider system (dnd5e) leaves configured units untouched', async () => {
       // Regression: dnd5e has no registered provider, so getDefaultProviderId('dnd5e') === '' and
-      // getProviderCanonicalUnits('') is empty. Entering provider mode must NOT wipe the GM's units.
+      // getProviderCanonicalUnits('') is empty. The actorInventory strategy must NOT wipe the GM's
+      // units in that case.
       const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
       await store.addCurrencyUnit('sys1', { id: 'gp', label: 'Gold', actorPath: 'system.currency.gp' });
       await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      await store.setCurrencyInventoryMode('sys1', 'provider');
       assert.equal(
         currency().units.some(unit => unit.id === 'gp'),
         true,
-        'no-provider system must not have its configured units wiped by provider mode'
+        'no-provider system must not have its configured units wiped by the actorInventory strategy'
       );
       // setCurrencyProvider with an empty/unknown provider id also preserves the units.
       await store.setCurrencyProvider('sys1', '');
@@ -2126,7 +2128,7 @@ describe('createAdminStore', () => {
         'saveCraftingCheckConfig',
         'addCurrencyUnit', 'updateCurrencyUnit', 'deleteCurrencyUnit',
         'addCurrencySubUnit', 'updateCurrencySubUnit', 'deleteCurrencySubUnit',
-        'setCurrencySpendStrategy', 'setCurrencyInventoryMode', 'setCurrencyProvider',
+        'setCurrencySpendStrategy', 'setCurrencyProvider',
         'setCurrencyMacro', 'clearCurrencyMacro',
         'seedCurrencyUnitPresets',
         'saveVisibilityConfig', 'saveTeaserConfig',

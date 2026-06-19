@@ -46,7 +46,7 @@ test('ActorPropertyCoinSpender.check passes when affordable and fails when short
 test('ActorInventoryCoinSpender.check reports affordability and missing adapter', () => {
   const profile = validateCurrencyProfile(
     [{ id: 'gp', label: 'Gold', abbreviation: 'gp', denomination: 'gp' }],
-    { spendStrategy: 'actorInventory', inventoryMode: 'provider' }
+    { spendStrategy: 'actorInventory' }
   );
   assert.equal(profile.valid, true);
 

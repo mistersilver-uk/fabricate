@@ -150,7 +150,6 @@
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencySpendStrategy = $derived(selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty');
-  const currencyInventoryMode = $derived(selectedSystem?.requirements?.currency?.inventoryMode || 'provider');
   const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
   const currencyMacros = $derived(selectedSystem?.requirements?.currency?.macros || { canAfford: '', increment: '', decrement: '' });
   const currencyProviderOptions = $derived(
@@ -203,10 +202,6 @@
   async function onSetCurrencySpendStrategy(spendStrategy) {
     if (!selectedSystemId) return;
     await store.setCurrencySpendStrategy(selectedSystemId, spendStrategy);
-  }
-  async function onSetCurrencyInventoryMode(inventoryMode) {
-    if (!selectedSystemId) return;
-    await store.setCurrencyInventoryMode(selectedSystemId, inventoryMode);
   }
   async function onSetCurrencyProvider(providerId) {
     if (!selectedSystemId) return;
@@ -3662,7 +3657,6 @@
         currencyUnits={selectedCurrencyUnits}
         {currencyPresetsSupported}
         {currencySpendStrategy}
-        {currencyInventoryMode}
         {currencyProviderId}
         {currencyMacros}
         {currencyProviderOptions}
@@ -3674,7 +3668,6 @@
         onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}
         onSeedCurrencyPresets={onSeedCurrencyPresets}
         onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}
-        onSetCurrencyInventoryMode={onSetCurrencyInventoryMode}
         onSetCurrencyProvider={onSetCurrencyProvider}
         onSetCurrencyMacro={onSetCurrencyMacro}
         onClearCurrencyMacro={onClearCurrencyMacro}

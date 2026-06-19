@@ -92,35 +92,44 @@ test('currency profile validation rejects circular and stale sub-unit references
   assert.match(stale.errors.join('; '), /unknown unit/i);
 });
 
-test('normalizeCurrencyConfig defaults and trims the inventory/provider/macro fields', () => {
+test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMode field', () => {
   const defaults = normalizeCurrencyConfig({ enabled: true });
-  assert.equal(defaults.inventoryMode, 'provider');
+  assert.equal('inventoryMode' in defaults, false);
+  assert.equal(defaults.spendStrategy, 'actorProperty');
   assert.equal(defaults.providerId, '');
   assert.deepEqual(defaults.macros, { canAfford: '', increment: '', decrement: '' });
 
   const trimmed = normalizeCurrencyConfig({
     enabled: true,
-    spendStrategy: 'actorInventory',
-    inventoryMode: 'macro',
+    spendStrategy: 'macro',
     providerId: '  pf2e-inventory  ',
     macros: { canAfford: '  Macro.a  ', increment: '', decrement: 'Macro.d', bogus: 'x' },
   });
-  assert.equal(trimmed.inventoryMode, 'macro');
+  assert.equal(trimmed.spendStrategy, 'macro');
+  assert.equal('inventoryMode' in trimmed, false);
   assert.equal(trimmed.providerId, 'pf2e-inventory');
   assert.deepEqual(trimmed.macros, { canAfford: 'Macro.a', increment: '', decrement: 'Macro.d' });
 
-  // Unknown inventory mode falls back to provider; round-trips stably.
-  const fallback = normalizeCurrencyConfig({ inventoryMode: 'nonsense' });
-  assert.equal(fallback.inventoryMode, 'provider');
-  assert.deepEqual(normalizeCurrencyConfig(fallback), fallback);
+  // Legacy nested actorInventory + inventoryMode: 'macro' maps forward to the peer macro strategy
+  // and drops inventoryMode; round-trips stably.
+  const legacy = normalizeCurrencyConfig({
+    spendStrategy: 'actorInventory',
+    inventoryMode: 'macro',
+  });
+  assert.equal(legacy.spendStrategy, 'macro');
+  assert.equal('inventoryMode' in legacy, false);
+  assert.deepEqual(normalizeCurrencyConfig(legacy), legacy);
+
+  // An unknown spendStrategy falls back to actorProperty.
+  const fallback = normalizeCurrencyConfig({ spendStrategy: 'nonsense' });
+  assert.equal(fallback.spendStrategy, 'actorProperty');
 });
 
-test('validateCurrencyProfile enforces macro mode config and provider denominations', () => {
+test('validateCurrencyProfile enforces macro config and actorInventory denominations', () => {
   const units = [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }];
 
   const missingMacros = validateCurrencyProfile(units, {
-    spendStrategy: 'actorInventory',
-    inventoryMode: 'macro',
+    spendStrategy: 'macro',
     macros: {},
   });
   assert.equal(missingMacros.valid, false);
@@ -129,26 +138,23 @@ test('validateCurrencyProfile enforces macro mode config and provider denominati
 
   // increment stays optional.
   const incrementOptional = validateCurrencyProfile(units, {
-    spendStrategy: 'actorInventory',
-    inventoryMode: 'macro',
+    spendStrategy: 'macro',
     macros: { canAfford: 'Macro.a', decrement: 'Macro.d' },
   });
   assert.equal(incrementOptional.valid, true);
 
-  // provider mode still requires a pf2e denomination, not a macro set. The unit id "coins"
+  // actorInventory still requires a pf2e denomination, not a macro set. The unit id "coins"
   // is not a pf2e denomination and carries no explicit denomination, so it fails.
   const providerUnits = [{ id: 'coins', label: 'Coins', abbreviation: 'c' }];
-  const providerMode = validateCurrencyProfile(providerUnits, {
+  const inventoryMode = validateCurrencyProfile(providerUnits, {
     spendStrategy: 'actorInventory',
-    inventoryMode: 'provider',
   });
-  assert.equal(providerMode.valid, false);
-  assert.match(providerMode.errors.join('; '), /denomination/i);
+  assert.equal(inventoryMode.valid, false);
+  assert.match(inventoryMode.errors.join('; '), /denomination/i);
 
-  // The same unit is fine in macro mode (abbreviation present, macros configured).
+  // The same unit is fine under the macro strategy (abbreviation present, macros configured).
   const macroOk = validateCurrencyProfile(providerUnits, {
-    spendStrategy: 'actorInventory',
-    inventoryMode: 'macro',
+    spendStrategy: 'macro',
     macros: { canAfford: 'Macro.a', decrement: 'Macro.d' },
   });
   assert.equal(macroOk.valid, true);
@@ -586,8 +592,7 @@ function macroSystem() {
     requirements: {
       currency: {
         enabled: true,
-        spendStrategy: 'actorInventory',
-        inventoryMode: 'macro',
+        spendStrategy: 'macro',
         macros: { canAfford: 'Macro.can', increment: 'Macro.inc', decrement: 'Macro.dec' },
         units: MACRO_PRESETS,
       },
@@ -673,8 +678,7 @@ test('macro mode decrement failure aborts the spend', async () => {
 
 test('macro mode does not require a denomination on units', async () => {
   const profile = validateCurrencyProfile(MACRO_PRESETS, {
-    spendStrategy: 'actorInventory',
-    inventoryMode: 'macro',
+    spendStrategy: 'macro',
     macros: { canAfford: 'Macro.can', decrement: 'Macro.dec' },
   });
   assert.equal(profile.valid, true);
@@ -877,8 +881,7 @@ function macroCraftSystem() {
     requirements: {
       currency: {
         enabled: true,
-        spendStrategy: 'actorInventory',
-        inventoryMode: 'macro',
+        spendStrategy: 'macro',
         macros: { canAfford: 'Macro.can', increment: 'Macro.inc', decrement: 'Macro.dec' },
         units: [
           { id: 'gp', label: 'Gold', abbreviation: 'gp', contains: [] },

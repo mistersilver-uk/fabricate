@@ -141,10 +141,10 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 - Fabricate listens to the `updateWorldTime` hook, and checks game time on startup, to mark recipes and steps with a time requirement as completed, and subsequently notify users.
 - Currency behaviour is configured by `CraftingSystem.requirements.currency.units[]` and the configured `spendStrategy` (see `data-models` *Currency Spend Strategy*):
   - `currencyRequirement.unit` references a configured `CurrencyUnit.id`.
-  - the engine validates the currency profile, resolves the requirement unit, and resolves a coin spender by `(spendStrategy, inventoryMode)`, then drives an up-front affordability `check` followed by a `spend` deduction.
+  - the engine validates the currency profile, resolves the requirement unit, and resolves a coin spender by the peer `spendStrategy` (`actorProperty` | `actorInventory` | `macro`), then drives an up-front affordability `check` followed by a `spend` deduction.
   - under `actorProperty`: checks convert held denominations and the required amount to the configured terminal base unit; decrements spend configured denominations deterministically and make change through the unit breakdown.
-  - under `actorInventory` + `provider`: the per-system inventory adapter (pf2e) reads coins from the inventory aggregate and spends through the system's own coin API, which makes its own change; Fabricate does not run its own change-making.
-  - under `actorInventory` + `macro`: the GM's `canAfford` macro gates the craft and the `decrement` macro performs the deduction (the `increment` macro is reserved and never invoked); a `false`/`null`/thrown result fails loudly.
+  - under `actorInventory`: the per-system inventory adapter (pf2e) reads coins from the inventory aggregate and spends through the system's own coin API, which makes its own change; Fabricate does not run its own change-making.
+  - under `macro`: the GM's `canAfford` macro gates the craft and the `decrement` macro performs the deduction (the `increment` macro is reserved and never invoked); a `false`/`null`/thrown result fails loudly.
   - a failed affordability check or a failed deduction aborts the step **before** ingredient consumption.
   - invalid currency profiles, missing actor paths, stale unit references, an unresolvable spender/adapter, and insufficient funds block the step with a GM-readable message.
 

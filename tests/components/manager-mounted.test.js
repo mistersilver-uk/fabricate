@@ -757,7 +757,6 @@ function createStore(calls = [], options = {}) {
       return options.toggleFeatureResult ?? true;
     },
     setCurrencySpendStrategy: async (id, strategy) => { calls.push(['setCurrencySpendStrategy', strategy, id]); },
-    setCurrencyInventoryMode: async (id, mode) => { calls.push(['setCurrencyInventoryMode', mode, id]); },
     setCurrencyProvider: async (id, providerId) => { calls.push(['setCurrencyProvider', providerId, id]); },
     setCurrencyMacro: async (id, key, uuid) => { calls.push(['setCurrencyMacro', key, uuid, id]); },
     clearCurrencyMacro: async (id, key) => { calls.push(['clearCurrencyMacro', key, id]); },
@@ -5505,20 +5504,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     return { calls };
   }
 
-  it('renders the currency spend-strategy control and routes its change to the store', async () => {
-    const { calls } = await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', inventoryMode: 'provider', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
+  it('renders the currency spend-strategy control with three options and routes its change', async () => {
+    const { calls } = await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorProperty', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
     const strategy = target.querySelector('[data-system-currency-strategy-select]');
     assert.ok(strategy, 'spend-strategy select should render');
-    strategy.value = 'actorInventory';
+    const optionValues = [...strategy.querySelectorAll('option')].map(option => option.value);
+    assert.deepEqual(optionValues, ['actorProperty', 'actorInventory', 'macro'], 'three peer spend strategies should be offered');
+    // The single shared strategy hint reflects the selected strategy.
+    assert.ok(target.querySelector('[data-system-currency-strategy-hint]'), 'a strategy hint should render');
+    strategy.value = 'macro';
     strategy.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.ok(calls.some(call => call[0] === 'setCurrencySpendStrategy' && call[1] === 'actorInventory'));
+    assert.ok(calls.some(call => call[0] === 'setCurrencySpendStrategy' && call[1] === 'macro'));
   });
 
-  it('mounts the macro inventory mode with three macro drop zones', async () => {
-    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
+  it('mounts the macro strategy with three macro drop zones and no inventory-mode select', async () => {
+    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
     const macroRow = target.querySelector('[data-system-currency-macros]');
     assert.ok(macroRow, 'macro zones container should render');
@@ -5528,35 +5531,35 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the three macro drop zones should share the single-row container'
     );
     const dropzones = macroRow.querySelectorAll('[data-system-currency-macro-dropzone]');
-    assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
+    assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
     assert.equal(
       target.querySelectorAll('[data-system-currency-macro-dropzone]').length,
       3,
       'all three drop zones live inside the single-row container'
     );
-    // The inventory-mode select should also be present in actorInventory.
-    assert.ok(target.querySelector('[data-system-currency-inventory-mode-select]'));
+    // The removed nested inventory-mode select must not render.
+    assert.equal(target.querySelector('[data-system-currency-inventory-mode-select]'), null);
   });
 
   it('gives each empty macro drop zone a field-specific accessible name', async () => {
-    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'actorInventory', inventoryMode: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
+    await mountCurrencyEditor({ selectedCurrency: { enabled: true, spendStrategy: 'macro', providerId: '', macros: { canAfford: '', increment: '', decrement: '' }, units: [] } });
 
     const dropzones = [...target.querySelectorAll('[data-system-currency-macro-dropzone]')];
-    assert.equal(dropzones.length, 3, 'macro mode should show three drop zones');
+    assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
     const labels = dropzones.map(zone => zone.getAttribute('aria-label'));
     // Every empty drop zone must expose a non-empty, distinct accessible name (not the shared hint).
     assert.ok(labels.every(label => label && label.length > 0), 'each drop zone should have an aria-label');
     assert.equal(new Set(labels).size, 3, 'the three drop-zone aria-labels should be distinct');
   });
 
-  it('steers a no-provider system to the macro inventory branch even when config carries provider mode', async () => {
-    // dnd5e has no registered provider; legacy config still says inventoryMode === 'provider'.
+  it('shows a no-provider callout for actorInventory on a no-provider system and keeps units editable', async () => {
+    // dnd5e has no registered provider; selecting actorInventory must surface the steer-to-macro
+    // callout and keep the GM's units editable rather than wiping them.
     await mountCurrencyEditor({
       foundrySystemId: 'dnd5e',
       selectedCurrency: {
         enabled: true,
         spendStrategy: 'actorInventory',
-        inventoryMode: 'provider',
         providerId: '',
         macros: { canAfford: '', increment: '', decrement: '' },
         units: [
@@ -5565,26 +5568,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       }
     });
 
-    // No provider select is offered; the macro branch renders instead.
+    // No provider select is offered; the no-provider callout renders instead.
     assert.equal(
       target.querySelector('[data-system-currency-provider-select]'),
       null,
       'no provider select should render for a no-provider system'
     );
     assert.ok(
-      target.querySelector('[data-system-currency-macros]'),
-      'the macro branch should render for a no-provider system steered away from provider mode'
-    );
-    // The inventory-mode select presents macro (steered) and omits the provider option.
-    const modeSelect = target.querySelector('[data-system-currency-inventory-mode-select]');
-    assert.ok(modeSelect, 'inventory-mode select should render');
-    assert.equal(modeSelect.value, 'macro', 'the select should present the macro source when there are no providers');
-    const optionValues = [...modeSelect.querySelectorAll('option')].map(option => option.value);
-    assert.ok(!optionValues.includes('provider'), 'the provider option should be hidden when there are no providers');
-    // The legacy provider-mode callout still appears, steering the GM to macros.
-    assert.ok(
       target.querySelector('[data-system-currency-no-provider]'),
-      'the no-provider callout should still appear for legacy provider-mode state'
+      'the no-provider callout should appear, steering the GM to the macro strategy'
+    );
+    // The removed inventory-mode select must not render.
+    assert.equal(
+      target.querySelector('[data-system-currency-inventory-mode-select]'),
+      null,
+      'the nested inventory-mode select should be gone'
     );
     // Units stay GM-editable (not read-only) on a no-provider system.
     assert.ok(
@@ -5593,12 +5591,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('removes the sub-unit section in macro inventory mode and shows the conversion hint', async () => {
+  it('removes the sub-unit section under the macro strategy and shows the conversion hint', async () => {
     await mountCurrencyEditor({
       selectedCurrency: {
         enabled: true,
-        spendStrategy: 'actorInventory',
-        inventoryMode: 'macro',
+        spendStrategy: 'macro',
         providerId: '',
         macros: { canAfford: '', increment: '', decrement: '' },
         units: [
@@ -5622,13 +5619,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(card.querySelector('[data-system-currency-unit-macro-note]'), 'macro-conversion hint should render');
   });
 
-  it('renders provider inventory mode units as a read-only provider-managed list', async () => {
+  it('renders actorInventory provider units as a read-only provider-managed list', async () => {
     await mountCurrencyEditor({
       foundrySystemId: 'pf2e',
       selectedCurrency: {
         enabled: true,
         spendStrategy: 'actorInventory',
-        inventoryMode: 'provider',
         providerId: 'pf2e-inventory',
         macros: { canAfford: '', increment: '', decrement: '' },
         units: [

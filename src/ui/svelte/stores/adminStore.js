@@ -5327,27 +5327,20 @@ export function createAdminStore(services) {
   }
 
   async function setCurrencySpendStrategy(systemId, spendStrategy) {
-    const nextStrategy = spendStrategy === 'actorInventory' ? 'actorInventory' : 'actorProperty';
+    const nextStrategy = ['actorInventory', 'macro'].includes(spendStrategy)
+      ? spendStrategy
+      : 'actorProperty';
     return await _updateCurrencyConfig(systemId, (currency) => {
       currency.spendStrategy = nextStrategy;
-      // Switching to actorInventory on a system that ships a provider seeds a sensible
-      // default providerId; the normalizer preserves macros/inventoryMode either way.
-      if (nextStrategy === 'actorInventory' && !currency.providerId) {
-        currency.providerId = getDefaultProviderId(_foundrySystemId());
-      }
-      return true;
-    });
-  }
-
-  async function setCurrencyInventoryMode(systemId, inventoryMode) {
-    const nextMode = inventoryMode === 'macro' ? 'macro' : 'provider';
-    return await _updateCurrencyConfig(systemId, (currency) => {
-      currency.inventoryMode = nextMode;
-      if (nextMode === 'provider') {
+      // Switching to actorInventory seeds a sensible default providerId (when the system ships a
+      // provider) and syncs the provider's canonical, provider-owned units. The sync is guarded
+      // so a no-provider system never wipes the GM's units. Switching to macro leaves the user's
+      // units in place — macros own conversion by abbreviation. The normalizer preserves macros
+      // and providerId across strategy switches either way.
+      if (nextStrategy === 'actorInventory') {
         if (!currency.providerId) {
           currency.providerId = getDefaultProviderId(_foundrySystemId());
         }
-        // Provider mode is provider-owned: sync units to the resolved provider's canonical ladder.
         _applyProviderCanonicalUnits(currency);
       }
       return true;
@@ -5357,9 +5350,9 @@ export function createAdminStore(services) {
   async function setCurrencyProvider(systemId, providerId) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       currency.providerId = String(providerId || '').trim();
-      // Selecting a provider adopts its canonical units when provider mode is active; in other
-      // modes the providerId is inert and user-managed units stay untouched.
-      if (currency.spendStrategy === 'actorInventory' && currency.inventoryMode === 'provider') {
+      // Selecting a provider adopts its canonical units under the actorInventory strategy; under
+      // other strategies the providerId is inert and user-managed units stay untouched.
+      if (currency.spendStrategy === 'actorInventory') {
         _applyProviderCanonicalUnits(currency);
       }
       return true;
@@ -5396,14 +5389,13 @@ export function createAdminStore(services) {
       // not at a flat actor property, so the pf2e preset selects the actorInventory spend
       // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
       currency.spendStrategy = foundrySystemId === 'pf2e' ? 'actorInventory' : 'actorProperty';
-      // pf2e seeds the inventory provider mode with the system's default provider; dnd5e stays on
-      // actorProperty where inventoryMode/providerId are inert (but still normalized/persisted).
+      // pf2e seeds the system's default provider; dnd5e stays on actorProperty where providerId is
+      // inert (but still normalized/persisted).
       if (foundrySystemId === 'pf2e') {
-        currency.inventoryMode = 'provider';
         currency.providerId = getDefaultProviderId(foundrySystemId);
-        // Provider mode is provider-owned, so overwrite the seeded units with the provider's
-        // canonical ladder (a clean overwrite of the same pf2e preset list) rather than the
-        // merge above, keeping the engine on canonical denominations.
+        // The actorInventory strategy is provider-owned, so overwrite the seeded units with the
+        // provider's canonical ladder (a clean overwrite of the same pf2e preset list) rather than
+        // the merge above, keeping the engine on canonical denominations.
         _applyProviderCanonicalUnits(currency);
       }
       return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
@@ -5862,7 +5854,6 @@ export function createAdminStore(services) {
     updateCurrencySubUnit,
     deleteCurrencySubUnit,
     setCurrencySpendStrategy,
-    setCurrencyInventoryMode,
     setCurrencyProvider,
     setCurrencyMacro,
     clearCurrencyMacro,

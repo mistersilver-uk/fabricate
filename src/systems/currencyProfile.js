@@ -56,9 +56,19 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
   return unit;
 }
 
-const SPEND_STRATEGIES = new Set(['actorProperty', 'actorInventory']);
+/**
+ * The three peer top-level currency spend strategies (`requirements.currency.spendStrategy`):
+ *
+ * - `actorProperty` (default) — units located by `actorPath`, spent via `actor.update`.
+ * - `actorInventory` — a preconfigured provider (filtered by `game.system.id`) owns the
+ *   denomination ladder; units located by `denomination`.
+ * - `macro` — the GM supplies custom `canAfford`/`decrement` macros (the macro receives the actor
+ *   and does whatever it likes), with units keyed by `abbreviation`.
+ *
+ * @type {Set<string>}
+ */
+export const SPEND_STRATEGIES = new Set(['actorProperty', 'actorInventory', 'macro']);
 const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
-const INVENTORY_MODES = new Set(['provider', 'macro']);
 
 /**
  * Ordered keys of the custom currency macro set (`requirements.currency.macros`). `canAfford` gates
@@ -69,36 +79,45 @@ const INVENTORY_MODES = new Set(['provider', 'macro']);
  */
 export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement'];
 
-// The provider/macro inventory settings only carry meaning while `spendStrategy` is
-// `actorInventory`, but they are always persisted so flipping the strategy never loses a
-// previously configured provider or macro set. Kept flat (single object literal) so the
-// normalizer's cognitive complexity stays low.
+// The provider/macro settings only carry meaning under their owning strategy (`providerId` for
+// `actorInventory`, `macros` for `macro`), but they are always persisted so flipping the strategy
+// never loses a previously configured provider or macro set. Kept flat (single object literal) so
+// the normalizer's cognitive complexity stays low.
 function normalizeInventorySettings(currency = {}) {
-  const inventoryMode = INVENTORY_MODES.has(currency?.inventoryMode)
-    ? currency.inventoryMode
-    : 'provider';
   const providerId = String(currency?.providerId || '').trim();
   const rawMacros = currency?.macros && typeof currency.macros === 'object' ? currency.macros : {};
   const macros = {};
   for (const key of CURRENCY_MACRO_KEYS) {
     macros[key] = String(rawMacros[key] || '').trim();
   }
-  return { inventoryMode, providerId, macros };
+  return { providerId, macros };
+}
+
+// The macro spend behaviour used to live under `actorInventory` as `inventoryMode: 'macro'`. Macro
+// spending is not inventory-specific (the macro gets the actor and does whatever), so it is now a
+// peer top-level strategy. This shim maps the one legacy nesting forward; `inventoryMode` is never
+// re-emitted. The PR introducing the nested model was never released, so no broader migration is
+// needed.
+function resolveSpendStrategy(currency = {}) {
+  const raw = currency?.spendStrategy;
+  if (raw === 'actorInventory' && currency?.inventoryMode === 'macro') return 'macro';
+  return SPEND_STRATEGIES.has(raw) ? raw : 'actorProperty';
 }
 
 /**
  * Normalize a crafting system's `requirements.currency` config block.
  *
- * `spendStrategy` is one of `actorProperty` (default) or `actorInventory`; any other value falls
- * back to `actorProperty`. `inventoryMode` (`provider` default, or `macro`), `providerId`, and the
- * `macros` set are always normalized and persisted but only carry meaning under `actorInventory`,
- * so flipping the strategy never loses a previously configured provider or macro set. Legacy
- * `provider`/`systemAdapter`/single-macro-UUID fields are read-compatible elsewhere but are never
- * re-emitted from this shape.
+ * `spendStrategy` is one of `actorProperty` (default), `actorInventory`, or `macro`; any other
+ * value falls back to `actorProperty`. A legacy `actorInventory` + `inventoryMode: 'macro'` config
+ * is mapped forward to the peer `macro` strategy, and `inventoryMode` is dropped from the output.
+ * `providerId` and the `macros` set are always normalized and persisted but only carry meaning under
+ * their owning strategy (`actorInventory` and `macro` respectively), so flipping the strategy never
+ * loses a previously configured provider or macro set. Legacy `provider`/`systemAdapter`/
+ * single-macro-UUID fields are read-compatible elsewhere but are never re-emitted from this shape.
  *
  * @param {object} [currency]
  * @param {{ randomID?: () => string }} [options]
- * @returns {{ enabled: boolean, spendStrategy: string, inventoryMode: string, providerId: string,
+ * @returns {{ enabled: boolean, spendStrategy: string, providerId: string,
  *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
  */
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
@@ -106,14 +125,11 @@ export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const units = Array.isArray(currency?.units)
     ? currency.units.map((entry) => normalizeCurrencyUnit(entry, randomID)).filter(Boolean)
     : [];
-  const spendStrategy = SPEND_STRATEGIES.has(currency?.spendStrategy)
-    ? currency.spendStrategy
-    : 'actorProperty';
-  const { inventoryMode, providerId, macros } = normalizeInventorySettings(currency);
+  const spendStrategy = resolveSpendStrategy(currency);
+  const { providerId, macros } = normalizeInventorySettings(currency);
   return {
     enabled: currency?.enabled === true,
     spendStrategy,
-    inventoryMode,
     providerId,
     macros,
     units,
@@ -169,33 +185,33 @@ function collectRawSubUnitErrors(rawUnits, errors) {
   }
 }
 
-// Per-unit strategy/mode requirement. Kept to a single shallow if/else-if ladder (one
-// branch per spend mode) so Sonar cognitive complexity stays low: actorProperty needs an
-// actor data path; provider-mode inventory needs a pf2e denomination; macro-mode inventory
-// matches the actor's coins by abbreviation, so it only needs a non-empty abbreviation.
-function collectUnitStrategyErrors(unit, { spendStrategy, inventoryMode, errors }) {
-  if (spendStrategy !== 'actorInventory') {
-    if (!unit.actorPath) {
-      errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
-    }
-    return;
-  }
-  if (inventoryMode === 'macro') {
+// Per-unit strategy requirement. Kept to a single shallow if/else-if ladder (one branch per
+// spend strategy) so Sonar cognitive complexity stays low: macro spending matches the actor's
+// coins by abbreviation, so it only needs a non-empty abbreviation; actorInventory needs a pf2e
+// denomination; actorProperty needs an actor data path.
+function collectUnitStrategyErrors(unit, { spendStrategy, errors }) {
+  if (spendStrategy === 'macro') {
     if (!unit.abbreviation) {
       errors.push(`Currency unit "${unit.label}" is missing an abbreviation.`);
     }
     return;
   }
-  const denomination = unit.denomination || unit.id;
-  if (!PF2E_DENOMINATIONS.has(denomination)) {
-    errors.push(
-      `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
-    );
+  if (spendStrategy === 'actorInventory') {
+    const denomination = unit.denomination || unit.id;
+    if (!PF2E_DENOMINATIONS.has(denomination)) {
+      errors.push(
+        `Currency unit "${unit.label}" must map to a pf2e denomination (pp, gp, sp, or cp).`
+      );
+    }
+    return;
+  }
+  if (!unit.actorPath) {
+    errors.push(`Currency unit "${unit.label}" is missing an actor data path.`);
   }
 }
 
-function collectUnitErrors(unit, { spendStrategy, inventoryMode, byId, errors }) {
-  collectUnitStrategyErrors(unit, { spendStrategy, inventoryMode, errors });
+function collectUnitErrors(unit, { spendStrategy, byId, errors }) {
+  collectUnitStrategyErrors(unit, { spendStrategy, errors });
   for (const contained of unit.contains) {
     if (contained.unitId === unit.id) {
       errors.push(`Currency unit "${unit.label}" cannot contain itself.`);
@@ -261,16 +277,16 @@ function buildUnitResolver(byId, errors) {
   return { resolveUnit, resolved };
 }
 
-// Macro-mode inventory spending drives the craft through GM macros, so the engine must be
-// able to gate (canAfford) and deduct (decrement); both are required. `increment` is reserved
-// for a future refund flow and stays optional.
+// Macro spending drives the craft through GM macros, so the engine must be able to gate
+// (canAfford) and deduct (decrement); both are required. `increment` is reserved for a future
+// refund flow and stays optional.
 function collectMacroConfigErrors(macros, errors) {
   const safeMacros = macros && typeof macros === 'object' ? macros : {};
   if (!String(safeMacros.canAfford || '').trim()) {
-    errors.push('A "can afford" currency macro is required for macro inventory spending.');
+    errors.push('A "can afford" currency macro is required for macro spending.');
   }
   if (!String(safeMacros.decrement || '').trim()) {
-    errors.push('A "decrement" currency macro is required for macro inventory spending.');
+    errors.push('A "decrement" currency macro is required for macro spending.');
   }
 }
 
@@ -280,17 +296,16 @@ function collectMacroConfigErrors(macros, errors) {
  * Always-on checks: at least one unit, unique ids, positive-integer sub-unit amounts, no
  * self-containment, every sub-unit reference resolves, the graph is acyclic, and every connected
  * branch resolves to exactly one terminal base unit. The per-unit field requirement is conditional
- * on `spendStrategy` (and, under `actorInventory`, `inventoryMode`):
+ * on `spendStrategy`:
  *
  * - `actorProperty`: each unit must define an `actorPath`.
- * - `actorInventory` + `provider`: each unit's `denomination` (defaulting to its id) must be a pf2e
- *   coin key (`pp`/`gp`/`sp`/`cp`).
- * - `actorInventory` + `macro`: each unit must have a non-empty `abbreviation` (macros match coins
- *   by abbreviation), and the config-level `canAfford` and `decrement` macros must be set
- *   (`increment` optional).
+ * - `actorInventory`: each unit's `denomination` (defaulting to its id) must be a pf2e coin key
+ *   (`pp`/`gp`/`sp`/`cp`).
+ * - `macro`: each unit must have a non-empty `abbreviation` (macros match coins by abbreviation),
+ *   and the config-level `canAfford` and `decrement` macros must be set (`increment` optional).
  *
  * @param {object[]} [units]
- * @param {{ spendStrategy?: string, inventoryMode?: string,
+ * @param {{ spendStrategy?: string,
  *   macros?: { canAfford?: string, increment?: string, decrement?: string } }} [options]
  * @returns {{ valid: boolean, errors: string[], units: object[], metadata: Map }}
  */
@@ -298,9 +313,6 @@ export function validateCurrencyProfile(units = [], options = {}) {
   const spendStrategy = SPEND_STRATEGIES.has(options?.spendStrategy)
     ? options.spendStrategy
     : 'actorProperty';
-  const inventoryMode = INVENTORY_MODES.has(options?.inventoryMode)
-    ? options.inventoryMode
-    : 'provider';
   const rawUnits = Array.isArray(units) ? units : [];
   const normalizedUnits = rawUnits.map((entry) => normalizeCurrencyUnit(entry)).filter(Boolean);
   const byId = buildUnitMap(normalizedUnits);
@@ -313,9 +325,9 @@ export function validateCurrencyProfile(units = [], options = {}) {
   }
   collectRawSubUnitErrors(rawUnits, errors);
   for (const unit of normalizedUnits) {
-    collectUnitErrors(unit, { spendStrategy, inventoryMode, byId, errors });
+    collectUnitErrors(unit, { spendStrategy, byId, errors });
   }
-  if (spendStrategy === 'actorInventory' && inventoryMode === 'macro') {
+  if (spendStrategy === 'macro') {
     collectMacroConfigErrors(options?.macros, errors);
   }
 
