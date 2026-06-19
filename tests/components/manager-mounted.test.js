@@ -5622,6 +5622,69 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(card.querySelector('[data-system-currency-unit-macro-note]'), 'macro-conversion hint should render');
   });
 
+  // Pins the SystemEditView mirror of canAddCurrencySubUnit (currencyCanAddSubUnit /
+  // currencyReachableUnitIds) that drives the add-sub-unit <select> options. The shared helper in
+  // src/systems/currencyProfile.js is unit-tested, but this UI mirror has no behavioral test, so it
+  // could silently drift. The dropdown only renders for the currently expanded unit, so each case
+  // mounts the editor in actorProperty mode (sub-unit section editable), expands the target unit via
+  // its edit pen, and asserts the actual rendered <option> values (each value is the unit id).
+  async function offeredSubUnitOptionIds(units, expandUnitId) {
+    if (mounted) unmount(mounted);
+    if (target?.parentNode) target.parentNode.removeChild(target);
+    await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units
+      }
+    });
+    const card = target.querySelector('.manager-currency-unit-card');
+    card.querySelector(`[data-system-currency-unit="${expandUnitId}"] [aria-label="Edit currency unit"]`).click();
+    await tick();
+    flushSync();
+    const builder = card.querySelector('.manager-currency-subunit-builder');
+    if (!builder) return [];
+    return [...builder.querySelectorAll('select option')].map(option => option.value);
+  }
+
+  it('drives the add-sub-unit dropdown from disjoint reachable sets for chain, diamond, and cross-parent cases', async () => {
+    // Chain P->A->B->C: editing P must exclude C (deeper descendant), A (already contained), and B
+    // (deeper descendant) — none can be offered as a fresh sub-unit of P.
+    const chainUnits = [
+      { id: 'P', label: 'Platinum', abbreviation: 'P', actorPath: 'system.currency.p', contains: [{ unitId: 'A', amount: 10 }] },
+      { id: 'A', label: 'Gold', abbreviation: 'A', actorPath: 'system.currency.a', contains: [{ unitId: 'B', amount: 10 }] },
+      { id: 'B', label: 'Silver', abbreviation: 'B', actorPath: 'system.currency.b', contains: [{ unitId: 'C', amount: 10 }] },
+      { id: 'C', label: 'Copper', abbreviation: 'C', actorPath: 'system.currency.c', contains: [] }
+    ];
+    const chainOffered = await offeredSubUnitOptionIds(chainUnits, 'P');
+    assert.ok(!chainOffered.includes('C'), 'chain: C (deeper descendant of P) must not be offered when editing P');
+    assert.ok(!chainOffered.includes('A'), 'chain: A (already contained by P) must not be offered when editing P');
+    assert.ok(!chainOffered.includes('B'), 'chain: B (deeper descendant of P) must not be offered when editing P');
+
+    // Diamond: cp; sp->cp; gp->sp; ep->sp. Editing gp (already reaches gp->sp->cp) must exclude ep
+    // (adding ep would create a second gp->sp path) and cp (already reachable).
+    const diamondUnits = [
+      { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp', contains: [] },
+      { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [{ unitId: 'cp', amount: 10 }] },
+      { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [{ unitId: 'sp', amount: 10 }] },
+      { id: 'ep', label: 'Electrum', abbreviation: 'ep', actorPath: 'system.currency.ep', contains: [{ unitId: 'sp', amount: 5 }] }
+    ];
+    const diamondOffered = await offeredSubUnitOptionIds(diamondUnits, 'gp');
+    assert.ok(!diamondOffered.includes('ep'), 'diamond: ep must not be offered when editing gp (would create a second gp->sp path)');
+    assert.ok(!diamondOffered.includes('cp'), 'diamond: cp must not be offered when editing gp (already reachable gp->sp->cp)');
+
+    // Cross-parent (allowed): a fresh unrelated unit pp (no contains) SHOULD be offered sp, since a
+    // node legitimately shared by two DIFFERENT parents is fine — the rule must not over-restrict.
+    const crossParentUnits = [
+      ...diamondUnits,
+      { id: 'pp', label: 'Platinum', abbreviation: 'pp', actorPath: 'system.currency.pp', contains: [] }
+    ];
+    const crossParentOffered = await offeredSubUnitOptionIds(crossParentUnits, 'pp');
+    assert.ok(crossParentOffered.includes('sp'), 'cross-parent: sp SHOULD be offered when editing the unrelated pp (legitimate shared child)');
+  });
+
   it('renders actorInventory provider units as a read-only provider-managed list', async () => {
     await mountCurrencyEditor({
       foundrySystemId: 'pf2e',
