@@ -1497,6 +1497,65 @@
     return store.updateRecipe?.(selectedRecipeId, { recipeItemId });
   }
 
+  async function handleSetRecipeCategory(category) {
+    if (!selectedRecipeId) return false;
+    return store.updateRecipe?.(selectedRecipeId, { category });
+  }
+
+  // Enter multi-step: seed Step 1 from the recipe's current top-level ingredients /
+  // results / tools so an already-craftable recipe stays craftable (the engine only
+  // falls back to top-level fields when the steps array is empty). New/empty recipes
+  // simply start with one named, empty step.
+  async function handleEnterMultiStep() {
+    if (!selectedRecipeId || !selectedRecipe) return false;
+    const seeded = {
+      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} 1`,
+      description: '',
+      ingredientSets: selectedRecipe.ingredientSets || [],
+      resultGroups: selectedRecipe.resultGroups || [],
+      toolIds: selectedRecipe.toolIds || []
+    };
+    return store.updateRecipe?.(selectedRecipeId, { steps: [seeded] });
+  }
+
+  function handleRevertToSingleStep() {
+    if (!selectedRecipeId) return false;
+    return store.revertRecipeToSingleStep?.(selectedRecipeId);
+  }
+
+  function currentSteps() {
+    return Array.isArray(selectedRecipe?.steps) ? [...selectedRecipe.steps] : [];
+  }
+
+  async function handleAddStep() {
+    if (!selectedRecipeId) return false;
+    const steps = currentSteps();
+    steps.push({ name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`, description: '' });
+    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+  }
+
+  async function handleReorderSteps(from, to) {
+    if (!selectedRecipeId) return false;
+    const steps = currentSteps();
+    if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to) return false;
+    const [moved] = steps.splice(from, 1);
+    steps.splice(to, 0, moved);
+    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+  }
+
+  async function handleUpdateStep(stepId, patch) {
+    if (!selectedRecipeId || !patch) return false;
+    const steps = currentSteps().map(step => (step.id === stepId ? { ...step, ...patch } : step));
+    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+  }
+
+  async function handleDeleteStep(stepId) {
+    if (!selectedRecipeId) return false;
+    const steps = currentSteps().filter(step => step.id !== stepId);
+    // Removing the last step reverts to single-step (empty steps array → top-level fallback).
+    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+  }
+
   function recipeEditSaveLabel() {
     if (recipeEditSaving) return text('FABRICATE.Admin.Manager.Recipe.Saving', 'Saving...');
     return text('FABRICATE.Admin.Manager.Recipe.Save', 'Save recipe');
@@ -3623,6 +3682,11 @@
         onDraftChange={handleRecipeDraftChange}
         onPickImagePath={services?.pickImagePath}
         linkedItemImage={selectedRecipe?.recipeItemImg || ''}
+        currencyUnits={selectedCurrencyUnits}
+        onAddStep={handleAddStep}
+        onReorderSteps={handleReorderSteps}
+        onUpdateStep={handleUpdateStep}
+        onDeleteStep={handleDeleteStep}
       />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
@@ -5343,8 +5407,12 @@
         <RecipeItemInspector
           recipe={selectedRecipeId ? selectedRecipe : null}
           {recipeItemDefinitions}
+          categories={selectedSystem?.categories || []}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}
+          onSetCategory={handleSetRecipeCategory}
+          onEnterMultiStep={handleEnterMultiStep}
+          onRevertToSingleStep={handleRevertToSingleStep}
           onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
           onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
         />

@@ -1197,6 +1197,9 @@
 }
 
 .fabricate-manager .manager-recipe-edit-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
   min-height: 0;
   overflow-y: auto;
   padding: var(--fab-space-4);
@@ -4207,6 +4210,106 @@
 .fabricate-manager .manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
+}
+
+.fabricate-manager .manager-field select:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+  opacity: 0.62;
+}
+
+.fabricate-manager .manager-recipe-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-steps-row {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-recipe-steps-row.is-expanded {
+  border-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-recipe-steps-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  min-width: 0;
+  cursor: grab;
+}
+
+.fabricate-manager .manager-recipe-steps-row-head:active {
+  cursor: grabbing;
+}
+
+.fabricate-manager .manager-recipe-steps-row-main {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-steps-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-steps-requirements {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-steps-requirements .manager-chip {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+}
+
+.fabricate-manager .manager-recipe-steps-requirements .manager-chip.is-empty {
+  color: var(--fab-mv2-text-muted);
+  opacity: 0.75;
+}
+
+.fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
+  min-height: 46px;
+}
+
+.fabricate-manager .manager-recipe-steps-row-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-recipe-steps-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-steps-add {
+  list-style: none;
 }
 
 .fabricate-manager .manager-field textarea {
