@@ -1,29 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-let idSeq = 0;
-const notifications = [];
+import { installFoundryEnv } from './helpers/foundryEnv.js';
 
-globalThis.foundry = {
-  utils: {
-    randomID: () => `rid-${++idSeq}`,
-    getProperty: (obj, path) => String(path || '').split('.').reduce((value, key) => value?.[key], obj)
-  }
-};
-
-globalThis.game = {
-  user: { isGM: true },
-  actors: [],
-  fabricate: {}
-};
-
-globalThis.ui = {
-  notifications: {
-    info: message => notifications.push(message),
-    warn: () => {},
-    error: () => {}
-  }
-};
+const { notifications } = installFoundryEnv();
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
@@ -36,7 +16,7 @@ function makeRecipe(data) {
     ...data,
     toJSON() {
       const { toJSON, ...rest } = this;
-      return JSON.parse(JSON.stringify(rest));
+      return structuredClone(rest);
     }
   };
 }

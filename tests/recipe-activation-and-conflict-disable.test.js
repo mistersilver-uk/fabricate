@@ -6,8 +6,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-let idSeq = 0;
-const settingsStore = new Map();
+import { installFoundryEnv } from './helpers/foundryEnv.js';
 
 let resolutionMode = 'alchemy';
 const components = [
@@ -15,34 +14,11 @@ const components = [
   { id: 'comp-b', name: 'comp-b', tags: [] },
 ];
 
-globalThis.foundry = {
-  utils: {
-    randomID: () => `rid-${++idSeq}`,
-    getProperty: (obj, path) =>
-      String(path || '')
-        .split('.')
-        .reduce((value, key) => value?.[key], obj),
+const { settings: settingsStore } = installFoundryEnv({
+  craftingSystemManager: {
+    getSystem: (id) => (id === 'sys-1' ? { id, resolutionMode, components } : null),
   },
-};
-
-globalThis.game = {
-  user: { isGM: true },
-  actors: [],
-  fabricate: {
-    getCraftingSystemManager: () => ({
-      getSystem: (id) => (id === 'sys-1' ? { id, resolutionMode, components } : null),
-    }),
-  },
-  settings: {
-    get: (_namespace, key) => settingsStore.get(key),
-    set: async (_namespace, key, value) => {
-      settingsStore.set(key, value);
-      return value;
-    },
-  },
-};
-
-globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
+});
 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
@@ -150,7 +126,7 @@ describe('RecipeManager.disableSignatureConflicts', () => {
     const disabled = await manager.disableSignatureConflicts('sys-1');
 
     assert.deepEqual(
-      disabled.map((d) => d.name).sort(),
+      disabled.map((d) => d.name).sort((a, b) => a.localeCompare(b)),
       ['Forge Axe', 'Forge Spear'],
       'both conflicting recipes are disabled and reported'
     );

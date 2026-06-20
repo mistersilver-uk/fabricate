@@ -1913,7 +1913,7 @@ export class CraftingSystemManager {
    * {@link deleteItem}). Recipes left with no usable ingredient sets or results are disabled.
    * @param {string} systemId
    * @param {string} essenceId
-   * @returns {boolean} true if an essence definition was removed
+   * @returns {Promise<boolean>} true if an essence definition was removed
    */
   async deleteEssence(systemId, essenceId) {
     this._assertGM('delete essence');
@@ -2006,8 +2006,7 @@ export class CraftingSystemManager {
     for (const group of data.resultGroups || []) {
       if ((group.results || []).some(matchesId)) return true;
     }
-    if ((data.results || []).some(matchesId)) return true;
-    return false;
+    return (data.results || []).some(matchesId);
   }
 
   /**

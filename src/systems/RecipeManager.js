@@ -75,7 +75,7 @@ export class RecipeManager {
    *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
    *   valid but incomplete authoring shell (missing ingredient sets / result groups); such a
    *   shell stays non-craftable because the engine gates on the full completeness contract.
-   * @returns {Recipe}
+   * @returns {Promise<Recipe>}
    */
   async createRecipe(recipeData, options = {}) {
     this._assertGM('create recipe');
@@ -124,7 +124,7 @@ export class RecipeManager {
    *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
    *   valid but incomplete authoring shell (e.g. identity-only edits to a recipe whose
    *   ingredients/results are still empty); such a shell stays non-craftable.
-   * @returns {Recipe}
+   * @returns {Promise<Recipe>}
    */
   async updateRecipe(recipeId, updates, options = {}) {
     this._assertGM('update recipe');
@@ -1178,7 +1178,7 @@ export class RecipeManager {
     const disabled = [];
     for (const id of conflictIds) {
       const recipe = this.recipes.get(id);
-      if (recipe && recipe.enabled === true) {
+      if (recipe?.enabled === true) {
         recipe.enabled = false;
         disabled.push({ id, name: recipe.name });
       }
