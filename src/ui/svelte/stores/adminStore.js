@@ -4382,8 +4382,18 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const essenceDefinitions = (system.essenceDefinitions || []).filter(def => def.id !== essenceId);
-    await systemManager.updateSystem(sysId, { essenceDefinitions });
+    const essence = (system.essenceDefinitions || []).find(def => def.id === essenceId);
+    if (!essence) return;
+
+    const confirmed = await services.confirmDialog({
+      title: `Delete ${essence.name}?`,
+      content: `<p>Delete essence <strong>${essence.name}</strong> and remove it from recipes in this system?</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return;
+
+    await systemManager.deleteEssence(sysId, essenceId);
     await refresh();
   }
 
@@ -5502,8 +5512,10 @@ export function createAdminStore(services) {
     if (!sysId) return null;
 
     try {
+      // New recipes are incomplete drafts, so they are born disabled and the GM enables them once
+      // complete (an invalid recipe can never be activated).
       const created = await recipeManager.createRecipe(
-        { craftingSystemId: sysId },
+        { craftingSystemId: sysId, enabled: false },
         { allowIncomplete: true }
       );
       await refresh();
@@ -5540,6 +5552,9 @@ export function createAdminStore(services) {
     const data = recipe.toJSON();
     delete data.id;
     data.name = `${data.name} (Copy)`;
+    // A copy is born disabled: it starts as an editable draft and, in alchemy systems, would
+    // otherwise immediately conflict with the original's signature.
+    data.enabled = false;
 
     try {
       // A persisted shell (no ingredient sets / result groups) must duplicate into
@@ -5559,8 +5574,8 @@ export function createAdminStore(services) {
     const recipeManager = services.getRecipeManager();
 
     try {
-      // Flipping the enabled flag is identity-level and must never be blocked by
-      // completeness, so a shell can be enabled/disabled like any other recipe.
+      // Disabling is always allowed; enabling a recipe that is incomplete or has a conflicting
+      // signature is rejected by updateRecipe and surfaced as an error below.
       await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true });
       await refresh();
       return true;

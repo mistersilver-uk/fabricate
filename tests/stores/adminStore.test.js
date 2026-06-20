@@ -118,6 +118,15 @@ function createMockServices(overrides = {}) {
           sys.components = sys.components.filter(i => i.id !== itemId);
         }
       }
+    },
+    deleteEssence: async (systemId, essenceId) => {
+      const sys = systems.find(s => s.id === systemId);
+      if (!sys) return false;
+      const defs = Array.isArray(sys.essenceDefinitions) ? sys.essenceDefinitions : [];
+      if (!defs.some(d => d.id === essenceId)) return false;
+      sys.essenceDefinitions = defs.filter(d => d.id !== essenceId);
+      sys.essences = sys.essenceDefinitions.map(d => d.id);
+      return true;
     }
   };
 
@@ -1001,30 +1010,48 @@ describe('createAdminStore', () => {
       assert.ok(!updateCalled, 'updateSystem should not be called for empty name');
     });
 
-    it('removeEssence filters out by essenceId', async () => {
-      let savedEssences = null;
+    it('removeEssence shows confirm before deleting', async () => {
+      let confirmCalled = false;
+      const services = createMockServices({
+        confirmDialog: async () => { confirmCalled = true; return true; }
+      });
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) sys.essenceDefinitions = [{ id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeEssence('ess1');
+      assert.ok(confirmCalled, 'should call confirmDialog');
+      assert.ok(!manager.getSystem('sys1').essenceDefinitions.some(e => e.id === 'ess1'));
+    });
+
+    it('removeEssence does nothing when confirm declined', async () => {
+      const services = createMockServices({ confirmDialog: async () => false });
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) sys.essenceDefinitions = [{ id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeEssence('ess1');
+      assert.ok(manager.getSystem('sys1').essenceDefinitions.some(e => e.id === 'ess1'), 'should not delete when declined');
+    });
+
+    it('removeEssence delegates to systemManager.deleteEssence', async () => {
       const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
       if (sys) {
         sys.essenceDefinitions = [
           { id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null },
           { id: 'ess2', name: 'Ice', description: '', icon: '', sourceItemUuid: null }
         ];
       }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
-          await origManager.updateSystem(id, updates);
-        }
-      });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.removeEssence('ess1');
-      assert.ok(savedEssences !== null);
-      assert.ok(!savedEssences.some(e => e.id === 'ess1'));
-      assert.ok(savedEssences.some(e => e.id === 'ess2'));
+      const remaining = manager.getSystem('sys1').essenceDefinitions;
+      assert.ok(!remaining.some(e => e.id === 'ess1'));
+      assert.ok(remaining.some(e => e.id === 'ess2'));
     });
 
     it('updateEssence renames and updates description and icon inline', async () => {
@@ -1262,7 +1289,8 @@ describe('createAdminStore', () => {
       assert.ok(addedEssence, 'essence should exist after add');
       assert.ok(addedEssence.id, 'essence should have an id');
       await store.removeEssence(addedEssence.id);
-      assert.ok(!lastSavedEssences.some(e => e.id === addedEssence.id), 'essence should be removed after removeEssence');
+      const remaining = origManager.getSystem('sys1').essenceDefinitions;
+      assert.ok(!remaining.some(e => e.id === addedEssence.id), 'essence should be removed after removeEssence');
     });
   });
 
