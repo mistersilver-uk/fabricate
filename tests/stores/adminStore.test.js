@@ -1458,6 +1458,86 @@ describe('createAdminStore', () => {
       assert.equal(updateOptions?.allowIncomplete, true, 'editor save must allow incomplete');
     });
 
+    it('updateRecipe forwards notify:false for quiet step edits and defaults to notify:true', async () => {
+      const optionsSeen = [];
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => { optionsSeen.push(options); await origManager.updateRecipe(id, updates, options); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateRecipe('r1', { name: 'Loud' });
+      await store.updateRecipe('r1', { steps: [] }, { notify: false });
+      assert.equal(optionsSeen[0]?.notify, true, 'a normal save notifies');
+      assert.equal(optionsSeen[1]?.notify, false, 'a quiet step save suppresses the toast');
+    });
+
+    it('revertRecipeToSingleStep confirms then clears the steps array', async () => {
+      let confirmCalled = false;
+      let updateArgs = null;
+      const services = createMockServices({ confirmDialog: async () => { confirmCalled = true; return true; } });
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => { updateArgs = { id, updates }; await origManager.updateRecipe(id, updates, options); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.revertRecipeToSingleStep('r1');
+      assert.equal(result, true);
+      assert.ok(confirmCalled, 'should confirm before discarding extra steps');
+      assert.deepEqual(updateArgs, { id: 'r1', updates: { steps: [] } });
+    });
+
+    it('revertRecipeToSingleStep does nothing when confirm is declined', async () => {
+      let updated = false;
+      const services = createMockServices({ confirmDialog: async () => false });
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => { updated = true; await origManager.updateRecipe(id, updates, options); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.revertRecipeToSingleStep('r1');
+      assert.equal(result, false);
+      assert.equal(updated, false, 'no persistence when the revert is declined');
+    });
+
+    it('viewState.recipes entries carry raw steps and top-level authoring data for the editor', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-steps',
+        name: 'Authored',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({
+          id: 'r-steps',
+          name: 'Authored',
+          craftingSystemId: 'sys1',
+          steps: [{ id: 'sa', name: 'Step 1', description: 'first' }],
+          ingredientSets: [{ id: 'iset' }],
+          resultGroups: [{ id: 'rg' }],
+          toolIds: ['t1']
+        })
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) => [recipe].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find(r => r.id === 'r-steps');
+      assert.ok(projected, 'recipe should be projected');
+      assert.equal(projected.steps.length, 1, 'raw steps survive projection');
+      assert.equal(projected.steps[0].name, 'Step 1', 'step data is intact');
+      assert.deepEqual(projected.toolIds, ['t1'], 'top-level toolIds projected for migration');
+      assert.equal(projected.ingredientSets.length, 1, 'top-level ingredientSets projected');
+      assert.equal(projected.resultGroups.length, 1, 'top-level resultGroups projected');
+    });
+
     it('addRecipeItemFromUuid passes through the manager result', async () => {
       const passthrough = { item: { id: 'item-x' }, action: 'created' };
       const services = createMockServices();

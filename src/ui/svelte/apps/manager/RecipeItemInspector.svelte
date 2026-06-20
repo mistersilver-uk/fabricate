@@ -4,12 +4,22 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import {
+    GENERAL_RECIPE_CATEGORY,
+    getEffectiveRecipeCategories,
+    getRecipeCategoryLabel,
+    normalizeRecipeCategory
+  } from '../../../../utils/recipeCategories.js';
 
   let {
     recipe = null,
     recipeItemDefinitions = [],
+    categories = [],
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
+    onSetCategory = () => {},
+    onEnterMultiStep = () => {},
+    onRevertToSingleStep = () => {},
     onOpenItem = () => {},
     onCopyItemUuid = () => {}
   } = $props();
@@ -62,6 +72,37 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // Recipe category selector. The "general" fallback is always present; custom
+  // categories come from the crafting system. With no custom categories the
+  // dropdown is disabled and only shows "General".
+  const effectiveCategories = $derived(getEffectiveRecipeCategories(categories));
+  const hasCustomCategories = $derived(effectiveCategories.length > 1);
+  const currentCategory = $derived(normalizeRecipeCategory(recipe?.category));
+  // Keep a stale custom value selectable so the field never silently blanks.
+  function buildCategoryOptions() {
+    if (!hasCustomCategories) return [GENERAL_RECIPE_CATEGORY];
+    if (effectiveCategories.includes(currentCategory)) return effectiveCategories;
+    return [...effectiveCategories, currentCategory];
+  }
+  const categoryOptions = $derived(buildCategoryOptions());
+  const selectedCategory = $derived(hasCustomCategories ? currentCategory : GENERAL_RECIPE_CATEGORY);
+
+  function changeCategory(event) {
+    const next = String(event.currentTarget.value || GENERAL_RECIPE_CATEGORY);
+    if (next === currentCategory) return;
+    onSetCategory(next);
+  }
+
+  // Step mode: a recipe is multi-step when it has an explicit steps array. Switching
+  // mode is delegated up (seed-from-top-level on enter, confirm-then-clear on revert).
+  const isMultiStep = $derived((recipe?.steps?.length ?? 0) >= 1);
+
+  function selectStepMode(multi) {
+    if (multi === isMultiStep) return;
+    if (multi) onEnterMultiStep();
+    else onRevertToSingleStep();
   }
 
   // Drop a Foundry Item to link/replace it. Item-only: an unpersisted item drop
@@ -130,3 +171,60 @@
     </div>
   {/if}
 </section>
+
+{#if recipe}
+  <section class="manager-inspector-card" data-recipe-section="recipe-category">
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</h3>
+    <label class="manager-field">
+      <span class="sr-only">{text('FABRICATE.Admin.Manager.Recipe.CategorySelectLabel', 'Select recipe category')}</span>
+      <select
+        data-recipe-category-select
+        value={selectedCategory}
+        disabled={!hasCustomCategories}
+        title={hasCustomCategories
+          ? text('FABRICATE.Admin.Manager.Recipe.CategorySelectLabel', 'Select recipe category')
+          : text('FABRICATE.Admin.Manager.Recipe.CategoryNoneHint', 'No categories defined. Add some under Tags and Categories.')}
+        onchange={changeCategory}
+      >
+        {#each categoryOptions as category (category)}
+          <option value={category}>{getRecipeCategoryLabel(category, localize)}</option>
+        {/each}
+      </select>
+    </label>
+  </section>
+
+  <section class="manager-inspector-card" data-recipe-section="recipe-step-mode">
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
+    <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}>
+      <button
+        type="button"
+        role="radio"
+        class={`manager-environment-mode-option ${isMultiStep ? '' : 'is-selected'}`}
+        aria-checked={!isMultiStep}
+        data-recipe-step-mode-option="single"
+        onclick={() => selectStepMode(false)}
+      >
+        <span class="manager-environment-mode-head">
+          <i class="fas fa-square" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step')}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        class={`manager-environment-mode-option ${isMultiStep ? 'is-selected' : ''}`}
+        aria-checked={isMultiStep}
+        data-recipe-step-mode-option="multi"
+        onclick={() => selectStepMode(true)}
+      >
+        <span class="manager-environment-mode-head">
+          <i class="fas fa-list-ol" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.MultiStep', 'Multi-step')}</span>
+        </span>
+      </button>
+    </div>
+    <p class="manager-muted manager-environment-mode-hint">{isMultiStep
+      ? text('FABRICATE.Admin.Manager.Recipe.MultiStepHint', 'Author an ordered list of named steps in the editor.')
+      : text('FABRICATE.Admin.Manager.Recipe.SingleStepHint', 'The recipe is crafted in a single step.')}</p>
+  </section>
+{/if}

@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import RecipeStepsCard from './RecipeStepsCard.svelte';
 
   let {
     recipe = null,
@@ -11,8 +12,17 @@
     onDirtyChange = () => {},
     onDraftChange = () => {},
     onPickImagePath = null,
-    linkedItemImage = ''
+    linkedItemImage = '',
+    currencyUnits = [],
+    onAddStep = () => {},
+    onReorderSteps = () => {},
+    onUpdateStep = () => {},
+    onDeleteStep = () => {}
   } = $props();
+
+  // A recipe is multi-step when it carries an explicit steps array; the steps card
+  // is shown only then (the right-inspector toggle controls entering/leaving the mode).
+  const isMultiStep = $derived((recipe?.steps?.length ?? 0) >= 1);
 
   // When a recipe item is linked, the identity image mirrors the linked item's
   // image and the picker is locked — exactly like the environment editor locks
@@ -193,6 +203,16 @@
         {/if}
       </section>
     </form>
+    {#if isMultiStep}
+      <RecipeStepsCard
+        steps={recipe.steps || []}
+        {currencyUnits}
+        {onAddStep}
+        {onReorderSteps}
+        {onUpdateStep}
+        {onDeleteStep}
+      />
+    {/if}
   {:else}
     <div class="manager-empty">
       <div>

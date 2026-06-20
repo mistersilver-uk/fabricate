@@ -1228,12 +1228,21 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
     const recipeItemDefinition = recipeItemId
       ? systemManager.getRecipeItemDefinition?.(selectedSystem.id, recipeItemId) || null
       : null;
+    // Plain authoring data for the recipe editor's step-mode UI. Sourced from
+    // toJSON() so step / top-level shapes match Recipe._normalizeStep exactly.
+    // The multi-step editor reads `steps` (and migrates the top-level fields into
+    // the seeded first step); without these the editor cannot detect or author steps.
+    const raw = recipe.toJSON();
     return {
       id: recipe.id,
       name: recipe.name,
       img: recipe.img,
       description: display.description,
       category: normalizeRecipeCategory(recipe.category),
+      steps: Array.isArray(raw.steps) ? raw.steps : [],
+      ingredientSets: Array.isArray(raw.ingredientSets) ? raw.ingredientSets : [],
+      resultGroups: Array.isArray(raw.resultGroups) ? raw.resultGroups : [],
+      toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
@@ -5586,7 +5595,7 @@ export function createAdminStore(services) {
     }
   }
 
-  async function updateRecipe(recipeId, updates = {}) {
+  async function updateRecipe(recipeId, updates = {}, options = {}) {
     const recipeManager = services.getRecipeManager();
     const sysId = get(selectedSystemId);
     if (!recipeId || !sysId) return false;
@@ -5597,7 +5606,12 @@ export function createAdminStore(services) {
       // The recipe editor only edits identity + the linked recipe item; a shell's
       // ingredients/results may still be empty. allowIncomplete keeps those
       // identity-only saves from being blocked by completeness validation.
-      await recipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true });
+      // notify defaults on; step authoring passes notify:false to avoid a toast
+      // per keystroke-committed edit / reorder.
+      await recipeManager.updateRecipe(recipeId, updates, {
+        allowIncomplete: true,
+        notify: options.notify !== false
+      });
       await refresh();
       return true;
     } catch (err) {
@@ -5605,6 +5619,25 @@ export function createAdminStore(services) {
       services.notify?.error?.(err?.message || 'Failed to update recipe');
       return false;
     }
+  }
+
+  // Revert a multi-step recipe to single-step: clearing the steps array makes the
+  // engine fall back to the recipe's preserved top-level ingredients/results. The
+  // per-step authoring (names, descriptions, time/currency) is discarded, so confirm.
+  async function revertRecipeToSingleStep(recipeId) {
+    const recipeManager = services.getRecipeManager();
+    const recipe = recipeManager.getRecipe(recipeId);
+    if (!recipe) return false;
+
+    const confirmed = await services.confirmDialog({
+      title: 'Switch to single-step?',
+      content: `<p>Switching <strong>${recipe.name}</strong> back to single-step removes its extra steps and their names, descriptions, and time/currency requirements. This can't be undone.</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    return updateRecipe(recipeId, { steps: [] });
   }
 
   async function addRecipeItemFromUuid(systemId, itemUuid) {
@@ -5881,6 +5914,7 @@ export function createAdminStore(services) {
     duplicateRecipe,
     toggleRecipeEnabled,
     updateRecipe,
+    revertRecipeToSingleStep,
     addRecipeItemFromUuid,
     importRecipes,
     exportRecipes,
