@@ -5398,12 +5398,14 @@
    (muted) linked thumbnail and is locked — it can't be edited until the link
    is removed. */
 .fabricate-manager .manager-task-image-picker.is-scene-linked,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked {
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked,
+.fabricate-manager .manager-task-image-picker.is-source-linked {
   cursor: default;
 }
 
 .fabricate-manager .manager-task-image-picker.is-scene-linked img,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked img {
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked img,
+.fabricate-manager .manager-task-image-picker.is-source-linked img {
   object-fit: cover;
   padding: 0;
   filter: saturate(0.65) brightness(0.85);
@@ -5412,7 +5414,9 @@
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-pen,
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock,
 .fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-pen,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-lock {
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-lock,
+.fabricate-manager .manager-task-image-picker.is-source-linked .fa-pen,
+.fabricate-manager .manager-task-image-picker.is-source-linked .fa-lock {
   color: var(--fab-mv2-text-muted);
 }
 
@@ -7985,159 +7989,46 @@
   overflow: auto;
 }
 
-.fabricate-manager .manager-component-edit-tabs {
-  display: flex;
-  gap: var(--fab-space-1);
-  min-width: 0;
-  padding: var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .manager-component-edit-tab {
-  flex: 0 1 auto;
-  padding: var(--fab-space-chip) var(--fab-space-3);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.84rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-component-edit-tab:hover,
-.fabricate-manager .manager-component-edit-tab:focus-visible {
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-05);
-}
-
-.fabricate-manager .manager-component-edit-tab.is-active {
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-08);
-  border-color: var(--fab-mv2-border);
-}
-
-.fabricate-manager .manager-component-identity-grid {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: var(--fab-space-3);
-  min-width: 0;
-  align-items: start;
-}
-
-.fabricate-manager .manager-component-identity-image {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-identity-image .manager-component-preview {
-  width: 96px;
-  height: 96px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-component-identity-image .manager-component-preview.is-empty {
+/* The component identity name + description mirror the recipe identity layout but
+   are NOT editable — they come from the linked Foundry item. They render in the same
+   bordered boxes as the editor fields, but with a leading lock badge and greyed-out
+   text, so they read as "provided, not editable" rather than clickable inputs. */
+.fabricate-manager .manager-component-readonly-label {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-component-readonly-label .fa-lock {
   color: var(--fab-mv2-text-muted);
-  font-size: 1.6rem;
+  font-size: 0.7rem;
+  opacity: 0.85;
 }
 
-.fabricate-manager .manager-component-identity-label {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.76rem;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.fabricate-manager .manager-component-identity-fields {
-  display: grid;
-  align-content: start;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-identity-fields textarea {
-  min-height: 90px;
-}
-
-.fabricate-manager .manager-component-identity-hint {
-  margin: 0;
-}
-
-.fabricate-manager .manager-component-source-stack {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-source-summary {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: var(--fab-space-2);
+.fabricate-manager .manager-component-readonly-value {
+  display: flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
-}
-
-.fabricate-manager .manager-component-source-thumb {
-  width: 48px;
-  height: 48px;
+  min-height: 36px;
+  margin: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-component-source-thumb.is-empty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--fab-mv2-bg);
   color: var(--fab-mv2-text-muted);
-  background: var(--fab-overlay-light-04);
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  opacity: 0.8;
+  cursor: default;
 }
 
-.fabricate-manager .manager-component-source-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-source-copy strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fab-mv2-text);
-  font-size: 0.86rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-component-source-uuid {
-  margin: 0;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.74rem;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-manager .manager-component-source-warning {
-  margin: 0;
-  color: var(--fab-mv2-warning);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.fabricate-manager .manager-component-source-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  min-width: 0;
+.fabricate-manager .manager-component-readonly-value.is-multiline {
+  display: block;
+  min-height: 92px;
+  white-space: pre-wrap;
 }
 
 .fabricate-manager .manager-component-source-drop-zone {
@@ -8168,30 +8059,6 @@
   min-height: calc(40px + (2 * var(--fab-space-3)) + 2px);
 }
 
-.fabricate-manager .manager-component-tag-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-tag-option {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-04);
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-component-tag-option input {
-  margin: 0;
-}
-
 .fabricate-manager .manager-component-essence-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -8201,7 +8068,7 @@
 
 .fabricate-manager .manager-component-essence-card {
   display: grid;
-  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto auto auto minmax(0, 1fr);
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-2);

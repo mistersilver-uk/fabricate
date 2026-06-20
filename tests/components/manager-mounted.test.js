@@ -34,6 +34,7 @@ function rewriteClientImports(code) {
 function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
@@ -1839,9 +1840,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     const root = target.querySelector('.fabricate-manager');
     assert.equal(root.dataset.managerView, 'component-edit', 'row Edit should land on the component-edit route');
     assert.ok(target.textContent.includes('Edit component'), 'header should show the Edit component title');
-    assert.ok(target.querySelector('[data-component-edit-tab="details"].is-active'), 'Details tab should be active by default');
-    assert.ok(target.querySelector('[data-component-edit-section="identity"]'), 'Identity card should render on the Details tab');
-    assert.ok(target.querySelector('[data-component-edit-section="source"]'), 'Linked Source Item card should render on the Details tab');
+    assert.ok(target.querySelector('[data-component-edit-section="identity"]'), 'Identity card should render in the editor');
+    assert.ok(target.querySelector('[data-component-edit-section="source"]'), 'Linked Source Item card should render in the right column');
 
     target.querySelector('[data-component-edit-action="open-source"]').click();
     flushSync();
@@ -1859,25 +1859,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(replaced, [{ itemId: 'c1', data: { type: 'Item', uuid: 'Item.replacement' } }], 'drop should route through onReplaceSource for the active component');
 
-    target.querySelector('[data-component-edit-tab="tags-essences"]').click();
-    flushSync();
-    await tick();
-    flushSync();
-
-    assert.ok(target.querySelector('[data-component-edit-tab="tags-essences"].is-active'), 'Tags & Essences tab should activate on click');
+    // Tags and essences are stacked cards in the editor (no tabs), so they render immediately.
     assert.ok(target.querySelector('[data-component-edit-section="tags"]'), 'Tags section should render');
     assert.ok(target.querySelector('[data-component-edit-section="essences"]'), 'Essences section should render');
 
-    const mineralCheckbox = Array.from(target.querySelectorAll('.manager-component-tag-option'))
-      .find(label => label.textContent.includes('mineral'));
-    assert.ok(mineralCheckbox, 'tag checkboxes should render for the system itemTags');
-    const mineralInput = mineralCheckbox.querySelector('input[type="checkbox"]');
-    mineralInput.checked = true;
-    mineralInput.dispatchEvent(new Event('change', { bubbles: true }));
+    // Tags are added from a dropdown (like the gathering weather/time-of-day fields),
+    // then appear underneath as removable pills.
+    assert.equal(target.querySelector('[data-component-edit-tag-pill="mineral"]'), null, 'mineral should not be a selected pill yet');
+    target.querySelector('[data-component-edit-tag-menu]').click();
+    flushSync();
+    await tick();
+    flushSync();
+    const mineralOption = target.querySelector('[data-component-edit-tag-option="mineral"]');
+    assert.ok(mineralOption, 'tag dropdown should list the unselected system itemTags');
+    mineralOption.click();
     flushSync();
     await tick();
     flushSync();
 
+    assert.ok(target.querySelector('[data-component-edit-tag-pill="mineral"]'), 'selected tag should appear as a removable pill');
     assert.ok(target.textContent.includes('Unsaved'), 'dirty indicator should appear after a tag change');
 
     const saveButton = target.querySelector('button[form="manager-component-edit-form"]');

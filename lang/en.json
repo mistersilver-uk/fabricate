@@ -1057,7 +1057,6 @@
           "EditTitle": "Edit component",
           "EditSubtitle": "Update tags, essences, and source linkage for this component.",
           "EditBreadcrumb": "Edit component",
-          "EditTabs": "Edit component tabs",
           "EditMissingHint": "Pick a component from the browser to edit its tags, essences, and source linkage.",
           "Cancel": "Cancel",
           "SaveComponent": "Save Component",
@@ -1065,34 +1064,38 @@
           "Dirty": "Unsaved",
           "DiscardDirtyContent": "The current component has unsaved changes. Save them and continue, or discard them?",
           "SaveFailed": "Save failed. Try again or refresh the manager.",
-          "NoEditableFields": "There are no editable tag or essence fields for this component in the selected system.",
-          "Tabs": {
-            "Details": "Details",
-            "TagsEssences": "Tags & Essences"
-          },
           "Identity": {
             "Title": "Identity",
             "NameLabel": "Name",
             "DescriptionLabel": "Description",
-            "ImageLabel": "Image",
-            "SourceBackedHint": "This component is backed by a Foundry item. Changes to its source item's name, image, or description will be reflected here."
+            "SourceBackedHint": "This component is backed by a Foundry item. Changes to its source item's name, image, or description will be reflected here.",
+            "SourceLockedImage": "Image provided by the linked Foundry item",
+            "SourceLockedImageTooltip": "This image comes from the linked Foundry item and can't be edited here.",
+            "LockedFieldTooltip": "Provided by the linked Foundry item and can't be edited here."
           },
           "SourceOriginLinked": "Linked",
           "SourceCard": {
             "Title": "Linked Source Item",
             "Open": "Open Source Item",
             "Replace": "Replace Source",
-            "ReplaceHint": "Drop a Foundry item here to replace the linked source.",
+            "ReplaceHint": "Drop a Foundry item to replace it, or right-click to unlink.",
             "Unlink": "Unlink Source Item",
+            "MissingLabel": "Source item unresolved",
             "NoneLabel": "No source",
             "NoSourceHint": "Drop or replace a Foundry item to link this component to a source."
           },
           "TagsEdit": {
             "Title": "Tags",
+            "Hint": "Add the item tags that apply to this component.",
+            "AddTag": "Add tag",
+            "AllSelected": "All tags selected",
+            "RemoveTag": "Remove {name}",
+            "NoneSelected": "No tags applied",
             "NoTags": "No tags are defined for this system yet."
           },
           "EssencesEdit": {
             "Title": "Essences",
+            "Hint": "Set how much of each essence this component contributes.",
             "NoEssences": "No essences are defined for this system yet."
           }
         },
