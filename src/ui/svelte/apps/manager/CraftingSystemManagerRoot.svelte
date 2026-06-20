@@ -88,6 +88,7 @@
   const selectedSystemId = $derived(selectedSystem?.id || '');
   const systemsLoading = $derived($viewState.systemsLoading === true);
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
+  const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
@@ -5410,6 +5411,7 @@
           recipe={selectedRecipeId ? selectedRecipe : null}
           {recipeItemDefinitions}
           categories={selectedSystem?.categories || []}
+          multiStepEnabled={recipeMultiStepEnabled}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}
           onSetCategory={handleSetRecipeCategory}

@@ -63,6 +63,27 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
+  for (const recipeComponent of [
+    'RecipeEditorTabs',
+    'RecipeOverviewTab',
+    'RecipeIngredientsTab',
+    'RecipeResultsTab',
+    'RecipeValidationTab',
+    'RecipeStepAccordion',
+    'RecipeIngredientsSection',
+    'RecipeResultsSection',
+    'RecipeToolsSection'
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
+  }
+  for (const recipeModule of ['recipeReadiness.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`), 'utf8')
+    );
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');

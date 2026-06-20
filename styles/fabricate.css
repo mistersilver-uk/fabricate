@@ -9046,6 +9046,119 @@
   min-width: 0;
 }
 
+/* Shared editor tab + validation primitives. Generic so the recipe editor reuses
+   the same tab strip and readiness/issue layout the environment editor pioneered
+   without duplicating the rules per editor. */
+.fabricate-manager .manager-editor-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--fab-space-1);
+  flex-wrap: wrap;
+  min-width: 0;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-editor-tab-button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-height: 38px;
+  padding: 0 var(--fab-space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  color: var(--fab-mv2-text-muted);
+  background: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-editor-tab-button:hover {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-editor-tab-button.is-active {
+  color: var(--fab-mv2-text);
+  border-bottom-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-editor-tab-badge {
+  margin-left: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-editor-tab-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding-right: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-editor-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-chip) var(--fab-space-4);
+}
+
+.fabricate-manager .manager-editor-check {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-editor-check.is-satisfied > i {
+  color: var(--fab-success, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-editor-check.is-unsatisfied > i {
+  color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-editor-issue {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+/* Recipe editor tab shell + validation helpers built on the shared primitives. */
+.fabricate-manager .manager-recipe-edit-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-recipe-issue-title {
+  flex: 1;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-environment-inspector-facts {
   display: flex;
   gap: var(--fab-space-2);

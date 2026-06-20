@@ -15,6 +15,7 @@
     recipe = null,
     recipeItemDefinitions = [],
     categories = [],
+    multiStepEnabled = false,
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
     onSetCategory = () => {},
@@ -193,6 +194,7 @@
     </label>
   </section>
 
+  {#if multiStepEnabled || isMultiStep}
   <section class="manager-inspector-card" data-recipe-section="recipe-step-mode">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
     <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}>
@@ -227,4 +229,5 @@
       ? text('FABRICATE.Admin.Manager.Recipe.MultiStepHint', 'Author an ordered list of named steps in the editor.')
       : text('FABRICATE.Admin.Manager.Recipe.SingleStepHint', 'The recipe is crafted in a single step.')}</p>
   </section>
+  {/if}
 {/if}

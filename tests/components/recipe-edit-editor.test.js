@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
+const overviewPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte');
 const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
@@ -19,6 +20,10 @@ const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const editSource = readFileSync(editPath, 'utf8');
+// The identity card + locked image-picker markup moved into the Overview tab when
+// the editor became tabbed; the shell still owns the form, draft/dirty/save
+// callbacks, and the derived linked state.
+const overviewSource = readFileSync(overviewPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const browserSource = readFileSync(browserPath, 'utf8');
@@ -43,14 +48,14 @@ describe('RecipeEditView identity-only single column', () => {
     assert.equal(editSource.includes('is-inspector-hidden'), false, 'no inspector-hidden toggle');
   });
 
-  it('reuses the environment identity card structure on a local draft', () => {
-    assert.ok(editSource.includes('manager-task-core-card'), 'reuses the unscoped task core card');
-    assert.ok(editSource.includes('manager-task-image-picker'), 'reuses the image picker');
-    assert.ok(editSource.includes('manager-status-toggle'), 'reuses the status toggle');
-    assert.ok(editSource.includes('data-recipe-field="name"'), 'name field bound');
-    assert.ok(editSource.includes('data-recipe-field="description"'), 'description field bound');
-    assert.ok(editSource.includes('data-recipe-field="enabled"'), 'enabled toggle bound');
-    assert.ok(editSource.includes('data-recipe-field="img"'), 'image picker bound');
+  it('reuses the environment identity card structure on the Overview tab', () => {
+    assert.ok(overviewSource.includes('manager-task-core-card'), 'reuses the unscoped task core card');
+    assert.ok(overviewSource.includes('manager-task-image-picker'), 'reuses the image picker');
+    assert.ok(overviewSource.includes('manager-status-toggle'), 'reuses the status toggle');
+    assert.ok(overviewSource.includes('data-recipe-field="name"'), 'name field bound');
+    assert.ok(overviewSource.includes('data-recipe-field="description"'), 'description field bound');
+    assert.ok(overviewSource.includes('data-recipe-field="enabled"'), 'enabled toggle bound');
+    assert.ok(overviewSource.includes('data-recipe-field="img"'), 'image picker bound');
   });
 
   it('keeps the empty select-a-recipe state', () => {
@@ -433,16 +438,16 @@ describe('RecipeEditView locks the image picker to the linked recipe item', () =
   });
 
   it('renders the locked is-recipe-item-linked span with a lock icon and locked-image marker', () => {
-    assert.ok(editSource.includes('{#if isRecipeItemLinked}'), 'branches on the linked state');
-    assert.ok(editSource.includes('is-recipe-item-linked'), 'uses the recipe-specific locked class');
-    assert.ok(editSource.includes('data-recipe-item-locked-image'), 'carries the locked-image marker attribute');
-    assert.ok(editSource.includes('fa-lock'), 'shows a lock icon when linked');
+    assert.ok(overviewSource.includes('{#if isRecipeItemLinked}'), 'branches on the linked state');
+    assert.ok(overviewSource.includes('is-recipe-item-linked'), 'uses the recipe-specific locked class');
+    assert.ok(overviewSource.includes('data-recipe-item-locked-image'), 'carries the locked-image marker attribute');
+    assert.ok(overviewSource.includes('fa-lock'), 'shows a lock icon when linked');
     assert.ok(
-      editSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage')
-        && editSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip'),
+      overviewSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage')
+        && overviewSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip'),
       'uses the locked-image lang keys'
     );
-    assert.ok(editSource.includes('src={linkedItemImage || recipeImage(img)}'), 'shows the linked item image when locked');
+    assert.ok(overviewSource.includes('src={linkedItemImage || recipeImage(img)}'), 'shows the linked item image when locked');
   });
 
   it('guards chooseImage on the linked state so the picker is not editable', () => {

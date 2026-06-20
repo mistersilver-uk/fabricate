@@ -946,6 +946,34 @@
           "ToolSearchPlaceholder": "Search tools...",
           "NoToolsDefined": "No tools defined",
           "AllToolsAdded": "All tools added",
+          "NoStepsHint": "Add a step in Overview to configure this section.",
+          "Tabs": {
+            "Label": "Recipe editor sections",
+            "Overview": "Overview",
+            "Ingredients": "Ingredients",
+            "Results": "Results",
+            "Validation": "Validation"
+          },
+          "Validation": {
+            "Title": "Validation",
+            "Readiness": "Recipe readiness",
+            "Issues": "Issues",
+            "NoIssues": "No issues detected.",
+            "View": "View",
+            "Severity": {
+              "critical": "Critical",
+              "warning": "Warning",
+              "info": "Info"
+            },
+            "CheckName": "Has a name",
+            "CheckIngredientSet": "Every step has at least one ingredient set",
+            "CheckResultGroup": "Every step has at least one result group",
+            "CheckStepsNamed": "Every step is named",
+            "IssueNoName": "The recipe needs a name.",
+            "IssueNoIngredientSet": "A step has no ingredient set.",
+            "IssueNoResultGroup": "A step has no result group.",
+            "IssueDisabledIncomplete": "The recipe is disabled and cannot be enabled until its requirements are complete."
+          },
           "PlayerVisibility": "Player visibility",
           "Inspector": "Selected recipe inspector",
           "Selected": "Selected recipe",
