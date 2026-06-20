@@ -22,7 +22,10 @@ export function installFoundryEnv({ craftingSystemManager } = {}) {
 
   globalThis.foundry = {
     utils: {
-      randomID: () => `rid-${(idSeq += 1)}`,
+      randomID: () => {
+        idSeq += 1;
+        return `rid-${idSeq}`;
+      },
       getProperty: (obj, path) =>
         String(path || '')
           .split('.')
