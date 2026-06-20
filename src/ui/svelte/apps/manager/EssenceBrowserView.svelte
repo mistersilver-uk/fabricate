@@ -160,7 +160,11 @@
               <span class="manager-essence-icon" aria-hidden="true"><i class={essence.icon || 'fas fa-mortar-pestle'}></i></span>
               <span class="manager-system-copy">
                 <span class="manager-system-name" title={essence.name}>{essence.name}</span>
-                <span class="manager-system-description" title={essence.description || essence.id}>{essence.description || essence.id}</span>
+                {#if essence.description}
+                  <span class="manager-system-description" title={essence.description}>{essence.description}</span>
+                {:else}
+                  <span class="manager-system-description">{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span>
+                {/if}
               </span>
             </span>
             {#if showSourceUi}

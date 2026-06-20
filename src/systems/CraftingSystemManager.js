@@ -1793,6 +1793,7 @@ export class CraftingSystemManager {
     this._assertGM('delete component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    const removed = system.components.find((i) => i.id === itemId);
     const before = system.components.length;
     const filteredItems = system.components.filter((i) => i.id !== itemId);
     if (filteredItems.length === before) return false;
@@ -1809,9 +1810,12 @@ export class CraftingSystemManager {
     system.essences = essenceDefinitions.map((def) => def.id);
 
     // Remove item references from recipes in this system and clean up empty groups.
+    // Only recipes that actually reference the deleted component are touched, so unrelated
+    // recipes are not re-saved (and do not trigger notifications).
     const recipes = this.recipeManager
       .getRecipes({})
-      .filter((r) => r.craftingSystemId === systemId);
+      .filter((r) => r.craftingSystemId === systemId && this._recipeReferencesComponent(r, itemId));
+    let updatedRecipeCount = 0;
     for (const recipe of recipes) {
       const updated = recipe.toJSON();
       updated.ingredientSets = (updated.ingredientSets || [])
@@ -1862,14 +1866,159 @@ export class CraftingSystemManager {
         updated.enabled = false;
       }
 
-      await this.recipeManager.updateRecipe(recipe.id, updated);
+      await this.recipeManager.updateRecipe(recipe.id, updated, {
+        notify: false,
+        allowIncomplete: true,
+      });
+      updatedRecipeCount += 1;
     }
 
     // Clean up salvage runs referencing the deleted component
     await this._cleanupSalvageRunsForComponent(itemId, systemId);
 
     await this.save();
+
+    if (updatedRecipeCount > 0) {
+      ui?.notifications?.info?.(
+        `Removed "${removed?.name ?? 'component'}" and updated ${updatedRecipeCount} recipe(s).`
+      );
+    }
+
+    await this._reconcileAlchemySignaturesAfterDeletion(system);
+
     return true;
+  }
+
+  /**
+   * After an essence/component deletion in an alchemy system, re-run the signature uniqueness check
+   * and disable every recipe that now participates in a conflict, notifying the GM of their names.
+   * No-op for non-alchemy systems.
+   * @param {object} system
+   * @private
+   */
+  async _reconcileAlchemySignaturesAfterDeletion(system) {
+    if (system?.resolutionMode !== 'alchemy') return;
+    const disabled = await this.recipeManager.disableSignatureConflicts(system.id);
+    if (disabled.length > 0) {
+      const names = disabled.map((d) => d.name).join(', ');
+      ui?.notifications?.info?.(
+        `Disabled ${disabled.length} recipe(s) with conflicting signatures: ${names}`
+      );
+    }
+  }
+
+  /**
+   * Delete an essence definition and strip it from any recipe ingredient sets that reference it.
+   * Only referencing recipes are re-saved, and a single summary notification is emitted (mirrors
+   * {@link deleteItem}). Recipes left with no usable ingredient sets or results are disabled.
+   * @param {string} systemId
+   * @param {string} essenceId
+   * @returns {boolean} true if an essence definition was removed
+   */
+  async deleteEssence(systemId, essenceId) {
+    this._assertGM('delete essence');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const removed = definitions.find((def) => def.id === essenceId);
+    if (!removed) return false;
+
+    system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);
+    system.essences = system.essenceDefinitions.map((def) => def.id);
+
+    // Defensively strip the essence from any component that still carries it. The UI blocks
+    // deleting an in-use essence, but the manager must not leave dangling component references.
+    for (const component of system.components || []) {
+      if (component.essences && essenceId in component.essences) {
+        delete component.essences[essenceId];
+      }
+    }
+
+    // Strip the essence from recipe ingredient sets, touching only referencing recipes.
+    const recipes = this.recipeManager
+      .getRecipes({})
+      .filter(
+        (r) => r.craftingSystemId === systemId && this._recipeReferencesEssence(r, essenceId)
+      );
+    let updatedRecipeCount = 0;
+    for (const recipe of recipes) {
+      const updated = recipe.toJSON();
+      updated.ingredientSets = (updated.ingredientSets || [])
+        .map((set) => {
+          const essences = { ...set.essences };
+          delete essences[essenceId];
+          return { ...set, essences };
+        })
+        .filter(
+          (set) =>
+            (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
+            Object.keys(set.essences || {}).length > 0
+        );
+
+      const hasResults =
+        (updated.resultGroups?.length || 0) > 0 || (updated.results?.length || 0) > 0;
+      if (updated.ingredientSets.length === 0 || !hasResults) {
+        updated.enabled = false;
+      }
+
+      await this.recipeManager.updateRecipe(recipe.id, updated, {
+        notify: false,
+        allowIncomplete: true,
+      });
+      updatedRecipeCount += 1;
+    }
+
+    await this.save();
+    this._notifySystemsChanged();
+
+    if (updatedRecipeCount > 0) {
+      ui?.notifications?.info?.(
+        `Removed essence "${removed.name ?? 'essence'}" and updated ${updatedRecipeCount} recipe(s).`
+      );
+    }
+
+    await this._reconcileAlchemySignaturesAfterDeletion(system);
+
+    return true;
+  }
+
+  /**
+   * Whether a recipe references the given component in any ingredient set or result.
+   * Uses the same field matching as the strip logic in {@link deleteItem}.
+   * @param {object} recipe
+   * @param {string} itemId
+   * @returns {boolean}
+   */
+  _recipeReferencesComponent(recipe, itemId) {
+    const data = typeof recipe.toJSON === 'function' ? recipe.toJSON() : recipe;
+    const matchesId = (ref) =>
+      (ref?.match?.type === 'component' || ref?.match?.type === 'systemItem'
+        ? ref.match.componentId || ref.match.systemItemId
+        : ref?.componentId || ref?.systemItemId) === itemId;
+
+    for (const set of data.ingredientSets || []) {
+      for (const group of set.ingredientGroups || []) {
+        if ((group.options || []).some(matchesId)) return true;
+      }
+      if ((set.ingredients || []).some(matchesId)) return true;
+    }
+    for (const group of data.resultGroups || []) {
+      if ((group.results || []).some(matchesId)) return true;
+    }
+    if ((data.results || []).some(matchesId)) return true;
+    return false;
+  }
+
+  /**
+   * Whether a recipe references the given essence in any ingredient set.
+   * @param {object} recipe
+   * @param {string} essenceId
+   * @returns {boolean}
+   */
+  _recipeReferencesEssence(recipe, essenceId) {
+    const data = typeof recipe.toJSON === 'function' ? recipe.toJSON() : recipe;
+    return (data.ingredientSets || []).some((set) => set.essences && essenceId in set.essences);
   }
 
   /**

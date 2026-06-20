@@ -90,14 +90,26 @@ describe('RecipeManager signature validation gating', () => {
     settingsStore.clear();
   });
 
-  it('rejects overlapping signatures when the system is in alchemy mode', async () => {
+  it('persists a conflicting recipe update in alchemy mode (signatures no longer block persistence)', async () => {
     resolutionMode = 'alchemy';
     const manager = seedManagerWithCollidingRecipes();
 
+    // A plain edit (no enable transition) must persist even though the signature conflicts — the
+    // conflict only blocks activation, not persistence.
+    const updated = await manager.updateRecipe('r-b', { name: 'Forge an Axe (edited)' });
+    assert.equal(updated.name, 'Forge an Axe (edited)');
+  });
+
+  it('rejects enabling a recipe with a conflicting signature in alchemy mode', async () => {
+    resolutionMode = 'alchemy';
+    const manager = seedManagerWithCollidingRecipes();
+    // r-b starts disabled so the next update is an explicit enable transition.
+    manager.recipes.get('r-b').enabled = false;
+
     await assert.rejects(
-      () => manager.updateRecipe('r-b', { name: 'Forge an Axe (edited)' }),
-      /Overlapping signatures/,
-      'Alchemy systems must still flag ambiguous ingredient signatures'
+      () => manager.updateRecipe('r-b', { enabled: true }),
+      /Cannot enable.*Overlapping signatures/,
+      'Alchemy systems must reject activating an ambiguous recipe'
     );
   });
 

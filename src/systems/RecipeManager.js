@@ -81,12 +81,26 @@ export class RecipeManager {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
-    const validation = this._validateRecipeForCreateOrUpdate(recipe, {
+    const validation = this._validateRecipeForPersistence(recipe, {
       requireComplete: !options.allowIncomplete,
     });
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe: ${validation.errors.join(', ')}`);
+    }
+
+    // A recipe may only be created active when fully valid. A drafting create (allowIncomplete) is
+    // not an enable action, so an invalid draft is born disabled; a strict create that explicitly
+    // asks for an active recipe is rejected so the caller fixes it first.
+    if (recipe.enabled === true) {
+      const activation = this._validateRecipeForActivation(recipe);
+      if (!activation.valid) {
+        if (options.allowIncomplete) {
+          recipe.enabled = false;
+        } else {
+          throw new Error(`Cannot enable recipe "${recipe.name}": ${activation.errors.join(', ')}`);
+        }
+      }
     }
 
     this.recipes.set(recipe.id, recipe);
@@ -126,12 +140,24 @@ export class RecipeManager {
       id: recipeId,
     };
     const updatedRecipe = Recipe.fromJSON(merged);
-    const validation = this._validateRecipeForCreateOrUpdate(updatedRecipe, {
+    const validation = this._validateRecipeForPersistence(updatedRecipe, {
       requireComplete: !options.allowIncomplete,
     });
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe update: ${validation.errors.join(', ')}`);
+    }
+
+    // Only an explicit transition into the enabled state requires full validity. Edits to an
+    // already-enabled recipe (and any disable) persist on structural validity alone; the engine
+    // still gates craftability and the alchemy signature re-check disables conflicts after deletes.
+    if (updatedRecipe.enabled === true && recipe.enabled !== true) {
+      const activation = this._validateRecipeForActivation(updatedRecipe);
+      if (!activation.valid) {
+        throw new Error(
+          `Cannot enable recipe "${updatedRecipe.name}": ${activation.errors.join(', ')}`
+        );
+      }
     }
 
     this.recipes.set(recipeId, updatedRecipe);
@@ -992,7 +1018,7 @@ export class RecipeManager {
 
     for (const recipeData of recipesData) {
       const recipe = Recipe.fromJSON(recipeData);
-      const validation = this._validateRecipeForCreateOrUpdate(recipe);
+      const validation = this._validateRecipeForActivation(recipe);
 
       if (!validation.valid) {
         console.warn(`Fabricate | Skipping invalid recipe: ${recipe.name}`, validation.errors);
@@ -1037,7 +1063,17 @@ export class RecipeManager {
    * @returns {{valid: boolean, errors: string[]}}
    * @private
    */
-  _validateRecipeForCreateOrUpdate(recipe, { requireComplete = true } = {}) {
+  /**
+   * Validation required to *persist* a recipe. Structural/completeness integrity (per
+   * {@link Recipe#validate}/{@link Recipe#validateStructure}) plus essence, tag-placeholder, and
+   * resolution-mode reference checks. Signature uniqueness is intentionally excluded — a signature
+   * conflict never blocks persistence; it only blocks activation (see
+   * {@link RecipeManager#_validateRecipeForActivation}).
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validateRecipeForPersistence(recipe, { requireComplete = true } = {}) {
     const baseValidation = requireComplete ? recipe.validate() : recipe.validateStructure();
     const errors = [...(baseValidation.errors || [])];
 
@@ -1047,6 +1083,24 @@ export class RecipeManager {
     errors.push(...tagValidation.errors);
     const modeValidation = this._validateResolutionMode(recipe, { requireComplete });
     errors.push(...modeValidation.errors);
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Full validity required to *activate* a recipe (set `enabled === true`): completeness plus all
+   * persistence checks plus signature uniqueness. A recipe may be persisted while invalid, but may
+   * only be enabled when this passes.
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validateRecipeForActivation(recipe) {
+    const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
+    const errors = [...persistence.errors];
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
 
@@ -1094,6 +1148,50 @@ export class RecipeManager {
     const result = validator.validateRecipe(recipe, systemId);
     const errors = result.conflicts.map((c) => c.message);
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * In an alchemy system, disable every currently-enabled recipe that participates in any ingredient
+   * signature conflict. Used to reconcile recipes after an essence/component deletion changes
+   * signatures. No-op for non-alchemy systems.
+   * @param {string} systemId
+   * @returns {Promise<Array<{id: string, name: string}>>} the recipes that were disabled
+   */
+  async disableSignatureConflicts(systemId) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (system?.resolutionMode !== 'alchemy') return [];
+
+    const validator = new SignatureValidator({
+      getSystem: (id) => systemManager.getSystem(id),
+      getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
+      getComponentsForSystem: (id) => systemManager.getSystem(id)?.components || [],
+    });
+
+    const { conflicts } = validator.validateSystem(systemId);
+    const conflictIds = new Set();
+    for (const conflict of conflicts) {
+      conflictIds.add(conflict.recipeA.id);
+      conflictIds.add(conflict.recipeB.id);
+    }
+
+    const disabled = [];
+    for (const id of conflictIds) {
+      const recipe = this.recipes.get(id);
+      if (recipe && recipe.enabled === true) {
+        recipe.enabled = false;
+        disabled.push({ id, name: recipe.name });
+      }
+    }
+
+    if (disabled.length > 0) {
+      await this.save();
+      this._notifyRecipesChanged('update', {
+        disabledForSignatureConflict: disabled.map((d) => d.id),
+      });
+    }
+
+    return disabled;
   }
 
   /**
