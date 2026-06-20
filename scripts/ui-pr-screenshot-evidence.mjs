@@ -55,7 +55,16 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-components',
     label: 'Manager components browser',
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+  },
+  {
+    id: 'manager-component-edit',
+    label: 'Manager component editor (identity card + linked-source inspector)',
+    smokeLabels: ['manager-component-edit-normal'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComponentSourceInspector\.svelte$/,
+    ],
   },
   {
     id: 'manager-tags-categories',

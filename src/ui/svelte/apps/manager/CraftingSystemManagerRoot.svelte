@@ -10,6 +10,7 @@
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
+  import ComponentSourceInspector from './ComponentSourceInspector.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
   import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
@@ -1138,6 +1139,7 @@
 
   function inspectorLabel() {
     if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item');
+    if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item');
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Inspector', 'Tags and categories inspector');
@@ -3578,15 +3580,10 @@
         essenceOptions={componentEditEssenceOptions}
         showTags={componentEditShowTags}
         showEssences={componentEditShowEssences}
-        showSourceUi={true}
         saving={componentEditSaving}
         onSave={saveComponentEdit}
         onDirtyChange={(dirty) => { componentEditDirty = dirty; }}
         onDraftChange={handleComponentDraftChange}
-        onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
-        onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
-        onOpenSource={(uuid) => openComponentSource(uuid)}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
       {:else}
         <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}>
@@ -3687,7 +3684,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'component-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
+    {#if currentView !== 'environment-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
@@ -5324,6 +5321,23 @@
               <h3>{text('FABRICATE.Admin.Manager.Tools.SelectEmpty', 'Select a tool to inspect.')}</h3>
             </div>
           </div>
+        {/if}
+      {:else if currentView === 'component-edit'}
+        {#if componentForEdit}
+          <ComponentSourceInspector
+            component={componentForEdit}
+            onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
+            onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
+            onOpenSource={(uuid) => openComponentSource(uuid)}
+            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+          />
+        {:else}
+          <section class="manager-inspector-card">
+            <div class="manager-inspector-copy">
+              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h2>
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
+            </div>
+          </section>
         {/if}
       {:else if currentView === 'recipe-edit'}
         <RecipeItemInspector

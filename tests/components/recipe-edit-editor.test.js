@@ -468,7 +468,7 @@ describe('recipe locked-image picker reuses the scene-locked visuals', () => {
       'recipe locked class is styled'
     );
     assert.ok(
-      /\.is-scene-linked,\n[ \t]*\.fabricate-manager \.manager-task-image-picker\.is-recipe-item-linked \{/.test(css),
+      /\.is-scene-linked,\n[ \t]*\.fabricate-manager \.manager-task-image-picker\.is-recipe-item-linked[\s,{]/.test(css),
       'recipe locked class is comma-joined into the cursor rule alongside the scene class'
     );
     assert.ok(

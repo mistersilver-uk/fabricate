@@ -730,6 +730,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-toggle-row',
       '.manager-essence-edit-view',
       '.manager-recipe-edit-main',
+      '.manager-component-edit-view',
       '.environment-draft-editor',
       '.manager-environment-edit-view',
       '.manager-gathering-task-edit-view',
@@ -781,6 +782,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-event-edit-view'
       || metric.selector === '.manager-essence-edit-view'
       || metric.selector === '.manager-recipe-edit-main'
+      || metric.selector === '.manager-component-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
   if (rowCount === 0 && editFormCount === 0) {
@@ -2728,6 +2730,20 @@ async function main() {
         }
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
+
+        // Components → open the editor so the identity card (central column) and the
+        // linked-source inspector (right context panel) are captured (#398).
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-component-edit-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-component-edit-section="source"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'component edit normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-normal');
+        process.stdout.write('  D0: component edit normal screenshotted\n');
+        // Return to the components browser for the remaining navigation.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Components → stacked. Earlier CI runs hung silently between this
         // resize and the next screenshot for ~13 minutes. The withDeadline
