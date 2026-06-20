@@ -3683,6 +3683,8 @@
         onPickImagePath={services?.pickImagePath}
         linkedItemImage={selectedRecipe?.recipeItemImg || ''}
         currencyUnits={selectedCurrencyUnits}
+        toolsLibrary={selectedGatheringSystemTools}
+        onUpdateRecipe={(patch) => store.updateRecipe?.(selectedRecipeId, patch, { notify: false })}
         onAddStep={handleAddStep}
         onReorderSteps={handleReorderSteps}
         onUpdateStep={handleUpdateStep}

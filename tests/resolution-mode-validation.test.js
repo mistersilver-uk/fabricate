@@ -168,9 +168,7 @@ test('mapped mode — each set has resultGroupId matching a result group → val
   const system = buildSystem({ resolutionMode: 'mapped' });
   const service = buildService(system);
   const step = buildStep({
-    ingredientSets: [
-      { id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] },
-    ],
+    ingredientSets: [{ id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
   const recipe = buildRecipe([step]);
@@ -185,9 +183,7 @@ test('mapped mode — resultGroupId references non-existent group → invalid', 
   const system = buildSystem({ resolutionMode: 'mapped' });
   const service = buildService(system);
   const step = buildStep({
-    ingredientSets: [
-      { id: 'set-1', resultGroupId: 'rg-does-not-exist', ingredientGroups: [] },
-    ],
+    ingredientSets: [{ id: 'set-1', resultGroupId: 'rg-does-not-exist', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
   const recipe = buildRecipe([step]);
@@ -207,9 +203,7 @@ test('mapped mode — resultGroupId is null → valid (null is treated as unset,
   const system = buildSystem({ resolutionMode: 'mapped' });
   const service = buildService(system);
   const step = buildStep({
-    ingredientSets: [
-      { id: 'set-1', resultGroupId: null, ingredientGroups: [] },
-    ],
+    ingredientSets: [{ id: 'set-1', resultGroupId: null, ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
   const recipe = buildRecipe([step]);
@@ -533,7 +527,9 @@ test('progressive mode — crafting checks disabled → invalid', () => {
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /progressive.*check|check.*progressive|crafting check/i.test(e) || /check/i.test(e)),
+    result.errors.some(
+      (e) => /progressive.*check|check.*progressive|crafting check/i.test(e) || /check/i.test(e)
+    ),
     `expected error about checks being disabled, got: ${JSON.stringify(result.errors)}`
   );
 });
@@ -725,4 +721,60 @@ test('progressive mode — _getDifficulty reads difficulty from system.component
 
   assert.equal(result.valid, true);
   assert.equal(result.errors.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Incomplete authoring shells — a not-yet-chosen provider is COMPLETENESS
+// (waived under requireComplete:false so "Create recipe" can persist a shell),
+// while an invalid provider VALUE is reference integrity and always errors.
+// ---------------------------------------------------------------------------
+
+test('routed mode — missing provider is waived when requireComplete is false (shell persists)', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
+  const service = buildService(system);
+  // The shape a freshly created shell has: no sets, no groups, no provider.
+  const step = buildStep({ ingredientSets: [], resultGroups: [], resultSelection: null });
+  const recipe = buildRecipe([step]);
+
+  assert.equal(service.validateRecipe(recipe, { requireComplete: false }).valid, true);
+});
+
+test('routed mode — missing provider still errors under the strict default', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
+  const service = buildService(system);
+  const recipe = buildRecipe([buildStep({ resultSelection: null })]);
+
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /requires resultSelection\.provider/.test(e)),
+    `expected the missing-provider error, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('routed mode — an invalid provider VALUE errors even when requireComplete is false', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
+  const service = buildService(system);
+  const recipe = buildRecipe([buildStep({ resultSelection: { provider: 'bogus' } })]);
+
+  const result = service.validateRecipe(recipe, { requireComplete: false });
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /Invalid result selection provider/.test(e)),
+    `expected the invalid-provider error, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('alchemy mode — missing provider waived when incomplete, required under the strict default', () => {
+  const system = buildSystem({ resolutionMode: 'alchemy' });
+  const service = buildService(system);
+  const recipe = buildRecipe([], { ingredientSets: [], resultGroups: [], resultSelection: null });
+
+  assert.equal(service.validateRecipe(recipe, { requireComplete: false }).valid, true);
+  const strict = service.validateRecipe(recipe);
+  assert.equal(strict.valid, false);
+  assert.ok(
+    strict.errors.some((e) => /Alchemy recipe requires resultSelection\.provider/.test(e)),
+    `expected the alchemy missing-provider error, got: ${JSON.stringify(strict.errors)}`
+  );
 });

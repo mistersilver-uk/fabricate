@@ -1,15 +1,50 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import RecipeRequirementsSections from './RecipeRequirementsSections.svelte';
 
   let {
     steps = [],
     currencyUnits = [],
+    toolsLibrary = [],
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
     onDeleteStep = () => {}
   } = $props();
+
+  // Per-step requirement add/remove route through the existing onUpdateStep with
+  // a freshly computed array for the changed scope. Append entries WITHOUT an id
+  // (store normalization assigns one); remove filters by id; tools store the
+  // chosen tool id string directly.
+  function stepIngredientSets(step) {
+    return Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
+  }
+  function stepResultGroups(step) {
+    return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
+  }
+  function stepToolIds(step) {
+    return Array.isArray(step?.toolIds) ? step.toolIds : [];
+  }
+  function addStepIngredientSet(step) {
+    onUpdateStep(step.id, { ingredientSets: [...stepIngredientSets(step), { name: '' }] });
+  }
+  function removeStepIngredientSet(step, setId) {
+    onUpdateStep(step.id, { ingredientSets: stepIngredientSets(step).filter(set => set.id !== setId) });
+  }
+  function addStepResultGroup(step) {
+    onUpdateStep(step.id, { resultGroups: [...stepResultGroups(step), { name: '' }] });
+  }
+  function removeStepResultGroup(step, groupId) {
+    onUpdateStep(step.id, { resultGroups: stepResultGroups(step).filter(group => group.id !== groupId) });
+  }
+  function addStepTool(step, toolId) {
+    if (!toolId || stepToolIds(step).includes(toolId)) return;
+    onUpdateStep(step.id, { toolIds: [...stepToolIds(step), toolId] });
+  }
+  function removeStepTool(step, toolId) {
+    onUpdateStep(step.id, { toolIds: stepToolIds(step).filter(id => id !== toolId) });
+  }
 
   // Accordion + drag state are local so they survive the store refresh that follows
   // every persisted edit (rows are keyed by stable step.id).
@@ -148,6 +183,19 @@
                 onchange={(event) => onUpdateStep(step.id, { description: event.currentTarget.value })}
               ></textarea>
             </label>
+            <RecipeRequirementsSections
+              idPrefix={`step-${step.id}-`}
+              ingredientSets={stepIngredientSets(step)}
+              resultGroups={stepResultGroups(step)}
+              toolIds={stepToolIds(step)}
+              {toolsLibrary}
+              onAddIngredientSet={() => addStepIngredientSet(step)}
+              onRemoveIngredientSet={(setId) => removeStepIngredientSet(step, setId)}
+              onAddResultGroup={() => addStepResultGroup(step)}
+              onRemoveResultGroup={(groupId) => removeStepResultGroup(step, groupId)}
+              onAddTool={(toolId) => addStepTool(step, toolId)}
+              onRemoveTool={(toolId) => removeStepTool(step, toolId)}
+            />
           </div>
         {/if}
       </li>

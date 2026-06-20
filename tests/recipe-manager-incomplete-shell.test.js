@@ -12,8 +12,8 @@ globalThis.foundry = {
     getProperty: (obj, path) =>
       String(path || '')
         .split('.')
-        .reduce((value, key) => value?.[key], obj)
-  }
+        .reduce((value, key) => value?.[key], obj),
+  },
 };
 
 globalThis.game = {
@@ -25,21 +25,22 @@ globalThis.game = {
     set: async (_namespace, key, value) => {
       settingsStore.set(key, value);
       return value;
-    }
-  }
+    },
+  },
 };
 
 globalThis.ui = {
   notifications: {
-    info: message => notifications.push({ level: 'info', message }),
-    warn: message => notifications.push({ level: 'warn', message }),
-    error: message => notifications.push({ level: 'error', message })
-  }
+    info: (message) => notifications.push({ level: 'info', message }),
+    warn: (message) => notifications.push({ level: 'warn', message }),
+    error: (message) => notifications.push({ level: 'error', message }),
+  },
 };
 
 const { Recipe, DEFAULT_RECIPE_IMAGE } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
 
 function makeManager() {
@@ -60,19 +61,19 @@ function makeCompleteRecipeData(overrides = {}) {
           {
             id: 'group-1',
             name: 'Ingredients',
-            options: [{ id: 'ingredient-1', itemUuid: 'Item.ingredient', quantity: 1 }]
-          }
+            options: [{ id: 'ingredient-1', itemUuid: 'Item.ingredient', quantity: 1 }],
+          },
         ],
-        essences: {}
-      }
+        essences: {},
+      },
     ],
     resultGroups: [
       {
         id: 'result-group-1',
-        results: [{ id: 'result-1', itemUuid: 'Item.result', quantity: 1 }]
-      }
+        results: [{ id: 'result-1', itemUuid: 'Item.result', quantity: 1 }],
+      },
     ],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -92,12 +93,12 @@ function makeMultiStepShellData(overrides = {}) {
         resultGroups: [
           {
             id: 'step-result-group-1',
-            results: [{ id: 'step-result-1', itemUuid: 'Item.result', quantity: 1 }]
-          }
-        ]
-      }
+            results: [{ id: 'step-result-1', itemUuid: 'Item.result', quantity: 1 }],
+          },
+        ],
+      },
     ],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -144,8 +145,8 @@ describe('RecipeManager incomplete recipe shells', () => {
             name: 'Bad Structure',
             resultGroups: [
               { id: 'dup', results: [{ id: 'r-1', itemUuid: 'Item.a', quantity: 1 }] },
-              { id: 'dup', results: [{ id: 'r-2', itemUuid: 'Item.b', quantity: 1 }] }
-            ]
+              { id: 'dup', results: [{ id: 'r-2', itemUuid: 'Item.b', quantity: 1 }] },
+            ],
           },
           { allowIncomplete: true }
         ),
@@ -164,7 +165,7 @@ describe('RecipeManager incomplete recipe shells', () => {
           {
             craftingSystemId: 'sys-1',
             name: 'Bad Result',
-            resultGroups: [{ id: 'group-1', results: [{ id: 'r-1', quantity: 1 }] }]
+            resultGroups: [{ id: 'group-1', results: [{ id: 'r-1', quantity: 1 }] }],
           },
           { allowIncomplete: true }
         ),
@@ -225,8 +226,8 @@ describe('RecipeManager incomplete recipe shells', () => {
     // gate non-simple systems; the everyday simple system must accept a shell.
     const manager = makeManager();
     game.fabricate.getCraftingSystemManager = () => ({
-      getSystem: id =>
-        id === 'sys-simple' ? { id: 'sys-simple', resolutionMode: 'simple' } : null
+      getSystem: (id) =>
+        id === 'sys-simple' ? { id: 'sys-simple', resolutionMode: 'simple' } : null,
     });
 
     try {
@@ -238,6 +239,37 @@ describe('RecipeManager incomplete recipe shells', () => {
       assert.equal(manager.getRecipe(shell.id)?.craftingSystemId, 'sys-simple');
     } finally {
       delete game.fabricate.getCraftingSystemManager;
+    }
+  });
+
+  it('creates a shell in a routed-mode system without the not-yet-chosen provider blocking it', async () => {
+    // Repro: clicking "Create recipe" in a routed-mode system errored with
+    // 'Step "Step 1" in routed mode requires resultSelection.provider'. A brand-new
+    // shell has no provider yet — that is a completeness gap, waived by allowIncomplete.
+    const manager = makeManager();
+    const csm = {
+      getSystem: (id) =>
+        id === 'sys-routed' ? { id: 'sys-routed', resolutionMode: 'routed' } : null,
+    };
+    game.fabricate.getCraftingSystemManager = () => csm;
+    game.fabricate.getResolutionModeService = () => new ResolutionModeService(csm);
+
+    try {
+      const shell = await manager.createRecipe(
+        { craftingSystemId: 'sys-routed', enabled: false },
+        { allowIncomplete: true }
+      );
+      assert.ok(shell, 'a shell must persist in a routed-mode system');
+      assert.equal(manager.getRecipe(shell.id)?.craftingSystemId, 'sys-routed');
+
+      // Strict create (no allowIncomplete) still surfaces the provider requirement.
+      await assert.rejects(
+        () => manager.createRecipe({ craftingSystemId: 'sys-routed' }),
+        /requires resultSelection\.provider/
+      );
+    } finally {
+      delete game.fabricate.getCraftingSystemManager;
+      delete game.fabricate.getResolutionModeService;
     }
   });
 
@@ -288,11 +320,11 @@ describe('Recipe validate() vs validateStructure()', () => {
     const result = shell.validate();
     assert.equal(result.valid, false);
     assert.ok(
-      result.errors.some(e => /at least one ingredient set/.test(e)),
+      result.errors.some((e) => /at least one ingredient set/.test(e)),
       'validate() must still report the missing-ingredient-set completeness error'
     );
     assert.ok(
-      result.errors.some(e => /at least one result group/.test(e)),
+      result.errors.some((e) => /at least one result group/.test(e)),
       'validate() must still report the missing-result-group completeness error'
     );
   });
@@ -309,12 +341,12 @@ describe('Recipe validate() vs validateStructure()', () => {
       craftingSystemId: 'sys-1',
       resultGroups: [
         { id: 'dup', results: [{ id: 'r-1', itemUuid: 'Item.a', quantity: 1 }] },
-        { id: 'dup', results: [{ id: 'r-2', itemUuid: 'Item.b', quantity: 1 }] }
-      ]
+        { id: 'dup', results: [{ id: 'r-2', itemUuid: 'Item.b', quantity: 1 }] },
+      ],
     });
     const result = recipe.validateStructure();
     assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => /duplicate result group ID/.test(e)));
+    assert.ok(result.errors.some((e) => /duplicate result group ID/.test(e)));
   });
 
   it('validate() and validateStructure() agree (both valid) for a complete recipe', () => {
@@ -341,12 +373,13 @@ function makeStoreServices(recipeManager) {
         description: '',
         resolutionMode: 'simple',
         features: {},
-        recipeVisibility: { listMode: 'global' }
-      }
+        recipeVisibility: { listMode: 'global' },
+      },
     ],
-    getSystem: id => (id === STORE_SYSTEM_ID ? { id: STORE_SYSTEM_ID, name: 'Store System' } : null),
+    getSystem: (id) =>
+      id === STORE_SYSTEM_ID ? { id: STORE_SYSTEM_ID, name: 'Store System' } : null,
     getItems: () => [],
-    getRecipeItemDefinition: () => null
+    getRecipeItemDefinition: () => null,
   };
 
   return {
@@ -360,16 +393,16 @@ function makeStoreServices(recipeManager) {
     notify: {
       info: () => {},
       warn: () => {},
-      error: message => notifications.push({ level: 'error', message })
+      error: (message) => notifications.push({ level: 'error', message }),
     },
     confirmDialog: async () => true,
-    localize: key => key,
-    copyToClipboard: async () => {}
+    localize: (key) => key,
+    copyToClipboard: async () => {},
   };
 }
 
 function recipeViewModel(store, recipeId) {
-  return get(store.viewState).recipes.find(r => r.id === recipeId) || null;
+  return get(store.viewState).recipes.find((r) => r.id === recipeId) || null;
 }
 
 describe('adminStore recipe actions on incomplete shells (real manager)', () => {
@@ -395,7 +428,7 @@ describe('adminStore recipe actions on incomplete shells (real manager)', () => 
     assert.equal(result, true, 'toggle should report success');
     assert.equal(manager.getRecipe(shell.id).enabled, false, 'enabled flag must flip on the shell');
     assert.equal(
-      notifications.some(n => n.level === 'error'),
+      notifications.some((n) => n.level === 'error'),
       false,
       'toggling a shell must not surface an error notification'
     );
@@ -420,7 +453,7 @@ describe('adminStore recipe actions on incomplete shells (real manager)', () => 
 
     const recipes = manager.getRecipes({ craftingSystemId: STORE_SYSTEM_ID });
     assert.equal(recipes.length, before + 1, 'duplicate must persist a new recipe');
-    const copy = recipes.find(r => r.id !== shell.id);
+    const copy = recipes.find((r) => r.id !== shell.id);
     assert.match(copy.name, /\(Copy\)$/);
     assert.equal(copy.validate().valid, false, 'the duplicate is still a non-craftable shell');
     assert.equal(copy.validateStructure().valid, true, 'the duplicate is structurally sound');
@@ -441,8 +474,12 @@ describe('adminStore recipe actions on incomplete shells (real manager)', () => 
 
     const recipes = manager.getRecipes({ craftingSystemId: STORE_SYSTEM_ID });
     assert.equal(recipes.length, before + 1);
-    const copy = recipes.find(r => r.id !== complete.id);
-    assert.equal(copy.validate().valid, true, 'a complete recipe duplicates into a complete recipe');
+    const copy = recipes.find((r) => r.id !== complete.id);
+    assert.equal(
+      copy.validate().valid,
+      true,
+      'a complete recipe duplicates into a complete recipe'
+    );
   });
 });
 
@@ -484,13 +521,13 @@ describe('adminStore derived `incomplete` view-model field (real manager)', () =
               {
                 id: 'group-1',
                 name: 'Ingredients',
-                options: [{ id: 'ing-1', itemUuid: 'Item.ingredient', quantity: 1 }]
-              }
+                options: [{ id: 'ing-1', itemUuid: 'Item.ingredient', quantity: 1 }],
+              },
             ],
-            essences: {}
-          }
-        ]
-      }
+            essences: {},
+          },
+        ],
+      },
     ]);
     assert.equal(recipeViewModel(store, created[0].id).incomplete, true);
   });
@@ -503,13 +540,17 @@ describe('adminStore derived `incomplete` view-model field (real manager)', () =
         resultGroups: [
           {
             id: 'result-group-1',
-            results: [{ id: 'result-1', itemUuid: 'Item.result', quantity: 1 }]
-          }
-        ]
-      }
+            results: [{ id: 'result-1', itemUuid: 'Item.result', quantity: 1 }],
+          },
+        ],
+      },
     ]);
     const vm = recipeViewModel(store, created[0].id);
-    assert.equal(vm.incomplete, true, 'a set with no groups/essences is not craftable and must be flagged');
+    assert.equal(
+      vm.incomplete,
+      true,
+      'a set with no groups/essences is not craftable and must be flagged'
+    );
   });
 
   it('flags a multi-step recipe with a step missing its ingredient set as incomplete', async () => {
@@ -519,7 +560,7 @@ describe('adminStore derived `incomplete` view-model field (real manager)', () =
 
   it('does NOT flag a complete implicit recipe', async () => {
     const { store, created } = await buildListFor([
-      makeCompleteRecipeData({ id: undefined, name: 'Complete Implicit' })
+      makeCompleteRecipeData({ id: undefined, name: 'Complete Implicit' }),
     ]);
     assert.equal(recipeViewModel(store, created[0].id).incomplete, false);
   });
@@ -539,21 +580,21 @@ describe('adminStore derived `incomplete` view-model field (real manager)', () =
                   {
                     id: 'group-1',
                     name: 'Ingredients',
-                    options: [{ id: 'ing-1', itemUuid: 'Item.ingredient', quantity: 1 }]
-                  }
+                    options: [{ id: 'ing-1', itemUuid: 'Item.ingredient', quantity: 1 }],
+                  },
                 ],
-                essences: {}
-              }
+                essences: {},
+              },
             ],
             resultGroups: [
               {
                 id: 'step-result-group-1',
-                results: [{ id: 'step-result-1', itemUuid: 'Item.result', quantity: 1 }]
-              }
-            ]
-          }
-        ]
-      }
+                results: [{ id: 'step-result-1', itemUuid: 'Item.result', quantity: 1 }],
+              },
+            ],
+          },
+        ],
+      },
     ]);
     assert.equal(recipeViewModel(store, created[0].id).incomplete, false);
   });

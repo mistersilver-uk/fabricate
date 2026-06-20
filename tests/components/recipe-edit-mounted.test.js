@@ -2,7 +2,10 @@ import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES
+} from '../helpers/svelte-component-harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -21,7 +24,10 @@ const RAW_MODULES = [
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
-  'src/config/flags.js'
+  'src/config/flags.js',
+  // RecipeRequirementsSections embeds SearchablePopover for the Tools picker; the
+  // harness must copy its supporting raw modules (portal/dismiss/layout helpers).
+  ...SEARCHABLE_POPOVER_RAW_MODULES
 ];
 
 const editHarness = createMountedComponentHarness({
@@ -29,6 +35,8 @@ const editHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-edit-',
   rawModules: RAW_MODULES,
   compiledModules: [
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/RecipeRequirementsSections.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
     'src/ui/svelte/apps/manager/RecipeEditView.svelte'
   ],
@@ -47,7 +55,11 @@ const stepsHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
-  compiledModules: ['src/ui/svelte/apps/manager/RecipeStepsCard.svelte'],
+  compiledModules: [
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/RecipeRequirementsSections.svelte',
+    'src/ui/svelte/apps/manager/RecipeStepsCard.svelte'
+  ],
   componentPath: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte'
 });
 
@@ -87,6 +99,11 @@ function inspectorProps(overrides = {}) {
 
 const CURRENCY_UNITS = Object.freeze([
   { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins' }
+]);
+
+const TOOLS_LIBRARY = Object.freeze([
+  Object.freeze({ id: 'tool-hammer', label: 'Hammer', componentId: 'cmp-hammer' }),
+  Object.freeze({ id: 'tool-anvil', label: 'Anvil', componentId: 'cmp-anvil' })
 ]);
 
 const STEPS = Object.freeze([
@@ -214,6 +231,90 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(saved[0][0], 'r1', 'passes the recipe id');
     assert.equal(saved[0][1].name, 'Renamed', 'passes the edited name');
     assert.equal('recipeItemId' in saved[0][1], false, 'identity updates do not carry recipeItemId');
+    editHarness.remount();
+  });
+
+  it('renders the three empty requirement sections for a single-step recipe', async () => {
+    const target = await editHarness.mount(identityProps({ toolsLibrary: TOOLS_LIBRARY }));
+    assert.ok(target.querySelector('[data-recipe-section="ingredients"]'), 'ingredients section renders');
+    assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section renders');
+    assert.ok(target.querySelector('[data-recipe-section="tools"]'), 'tools section renders');
+    assert.match(target.textContent, /No ingredients yet/, 'ingredients empty text shown');
+    assert.match(target.textContent, /No results yet/, 'results empty text shown');
+    assert.match(target.textContent, /No tools yet/, 'tools empty text shown');
+    assert.ok(target.querySelector('[data-recipe-add="ingredient-set"]'), 'add ingredient set button shown');
+    assert.ok(target.querySelector('[data-recipe-add="result-group"]'), 'add result group button shown');
+    editHarness.remount();
+  });
+
+  it('appends an ingredient set via onUpdateRecipe when + Add set is clicked', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1' }] },
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    target.querySelector('[data-recipe-add="ingredient-set"]').click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    assert.equal(patches[0].ingredientSets.length, 2, 'the ingredient set array grew by one');
+    assert.equal('id' in patches[0].ingredientSets[1], false, 'the appended set carries no id (store assigns one)');
+    editHarness.remount();
+  });
+
+  it('appends a result group via onUpdateRecipe when + Add result group is clicked', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, resultGroups: [{ id: 'grp-1' }] },
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    target.querySelector('[data-recipe-add="result-group"]').click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    assert.equal(patches[0].resultGroups.length, 2, 'the result group array grew by one');
+    editHarness.remount();
+  });
+
+  it('opens the tools popover, lists the library, and adds a chosen tool', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      toolsLibrary: TOOLS_LIBRARY,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const trigger = target.querySelector('[data-recipe-section="tools"] .manager-recipe-tools-trigger');
+    assert.ok(trigger, 'tools picker trigger renders');
+    trigger.click();
+    await flushRender();
+    const options = [...document.querySelectorAll('.manager-travel-option')];
+    assert.equal(options.length, 2, 'the popover lists both library tools');
+    options.find((option) => /Hammer/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing a tool patches the recipe');
+    assert.deepEqual(patches[0].toolIds, ['tool-hammer'], 'the chosen tool id is appended to toolIds');
+    editHarness.remount();
+  });
+
+  it('renders a selected tool as a removable row that calls onUpdateRecipe', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, toolIds: ['tool-hammer'] },
+      toolsLibrary: TOOLS_LIBRARY,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const row = target.querySelector('[data-recipe-tool-id="tool-hammer"]');
+    assert.ok(row, 'a row renders for the selected tool');
+    assert.match(row.textContent, /Hammer/, 'the row shows the resolved tool label');
+    row.querySelector('[data-recipe-remove="tool"]').click();
+    assert.equal(patches.length, 1, 'removing fires onUpdateRecipe');
+    assert.deepEqual(patches[0].toolIds, [], 'the removed tool id is filtered out');
+    editHarness.remount();
+  });
+
+  it('shows the no-tools-defined hint in the tools popover when the library is empty', async () => {
+    const target = await editHarness.mount(identityProps({ toolsLibrary: [] }));
+    const trigger = target.querySelector('[data-recipe-section="tools"] .manager-recipe-tools-trigger');
+    trigger.click();
+    await flushRender();
+    const hint = document.querySelector('.manager-travel-empty-hint');
+    assert.ok(hint, 'the empty-list hint renders');
+    assert.match(hint.textContent, /No tools defined/, 'empty library shows the no-tools-defined hint');
     editHarness.remount();
   });
 });
@@ -455,6 +556,45 @@ describe('RecipeStepsCard (mounted)', () => {
     firstHeader.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
     target.querySelector('[data-recipe-step-id="step-2"]').dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
     assert.deepEqual(moves, [[0, 1]], 'dropping step 1 onto step 2 reorders from index 0 to 1');
+    stepsHarness.remount();
+  });
+
+  it('renders the three requirement sections (step-prefixed) inside an expanded step', async () => {
+    const target = await stepsHarness.mount(stepsProps({ toolsLibrary: TOOLS_LIBRARY }));
+    assert.equal(target.querySelector('[data-recipe-section="step-step-1-ingredients"]'), null, 'collapsed step has no sections');
+    target.querySelector('[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main').click();
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-section="step-step-1-ingredients"]'), 'ingredients section renders prefixed by step id');
+    assert.ok(target.querySelector('[data-recipe-section="step-step-1-results"]'), 'results section renders prefixed by step id');
+    assert.ok(target.querySelector('[data-recipe-section="step-step-1-tools"]'), 'tools section renders prefixed by step id');
+    stepsHarness.remount();
+  });
+
+  it('routes a step ingredient-set add through onUpdateStep', async () => {
+    const updates = [];
+    const target = await stepsHarness.mount(stepsProps({ onUpdateStep: (id, patch) => updates.push([id, patch]) }));
+    target.querySelector('[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main').click();
+    await flushRender();
+    target.querySelector('[data-recipe-section="step-step-1-ingredients"] [data-recipe-add="ingredient-set"]').click();
+    assert.equal(updates.length, 1, 'onUpdateStep invoked once');
+    assert.equal(updates[0][0], 'step-1', 'patches the expanded step');
+    assert.equal(updates[0][1].ingredientSets.length, 1, 'a single set is appended to the empty step scope');
+    stepsHarness.remount();
+  });
+
+  it('routes a step tool removal through onUpdateStep', async () => {
+    const updates = [];
+    const steps = [{ id: 'step-1', name: 'Forge', description: '', toolIds: ['tool-hammer'] }];
+    const target = await stepsHarness.mount(stepsProps({
+      steps,
+      toolsLibrary: TOOLS_LIBRARY,
+      onUpdateStep: (id, patch) => updates.push([id, patch])
+    }));
+    target.querySelector('[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main').click();
+    await flushRender();
+    target.querySelector('[data-recipe-section="step-step-1-tools"] [data-recipe-remove="tool"]').click();
+    assert.equal(updates.length, 1, 'onUpdateStep invoked once');
+    assert.deepEqual(updates[0][1].toolIds, [], 'the removed tool id is filtered out of the step scope');
     stepsHarness.remount();
   });
 });

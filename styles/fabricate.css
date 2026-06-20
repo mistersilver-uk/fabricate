@@ -4312,6 +4312,57 @@
   list-style: none;
 }
 
+/* Requirement sections (Ingredients / Results / Tools) — empty-state scaffold. */
+.fabricate-manager .manager-recipe-section-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-section-empty-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-section-empty .manager-muted {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-req-rows,
+.fabricate-manager .manager-recipe-tool-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-req-row,
+.fabricate-manager .manager-recipe-tool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-req-label,
+.fabricate-manager .manager-recipe-tool-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
 .fabricate-manager .manager-field textarea {
   min-height: 92px;
   padding: var(--fab-space-2) var(--fab-space-2);

@@ -3,6 +3,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeStepsCard from './RecipeStepsCard.svelte';
+  import RecipeRequirementsSections from './RecipeRequirementsSections.svelte';
 
   let {
     recipe = null,
@@ -14,11 +15,42 @@
     onPickImagePath = null,
     linkedItemImage = '',
     currencyUnits = [],
+    toolsLibrary = [],
+    onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
     onDeleteStep = () => {}
   } = $props();
+
+  // Current single-step requirement scopes default to empty arrays so an
+  // unconfigured recipe still renders the empty-state sections.
+  const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
+  const resultGroups = $derived(Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
+  const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
+
+  // Add/remove mirror handleAddStep: append entries WITHOUT an id (store
+  // normalization assigns one); remove filters by the entry's id; tools store the
+  // chosen tool id string directly. Each call patches only the changed scope.
+  function addIngredientSet() {
+    onUpdateRecipe({ ingredientSets: [...ingredientSets, { name: '' }] });
+  }
+  function removeIngredientSet(setId) {
+    onUpdateRecipe({ ingredientSets: ingredientSets.filter(set => set.id !== setId) });
+  }
+  function addResultGroup() {
+    onUpdateRecipe({ resultGroups: [...resultGroups, { name: '' }] });
+  }
+  function removeResultGroup(groupId) {
+    onUpdateRecipe({ resultGroups: resultGroups.filter(group => group.id !== groupId) });
+  }
+  function addTool(toolId) {
+    if (!toolId || toolIds.includes(toolId)) return;
+    onUpdateRecipe({ toolIds: [...toolIds, toolId] });
+  }
+  function removeTool(toolId) {
+    onUpdateRecipe({ toolIds: toolIds.filter(id => id !== toolId) });
+  }
 
   // A recipe is multi-step when it carries an explicit steps array; the steps card
   // is shown only then (the right-inspector toggle controls entering/leaving the mode).
@@ -207,10 +239,24 @@
       <RecipeStepsCard
         steps={recipe.steps || []}
         {currencyUnits}
+        {toolsLibrary}
         {onAddStep}
         {onReorderSteps}
         {onUpdateStep}
         {onDeleteStep}
+      />
+    {:else}
+      <RecipeRequirementsSections
+        {ingredientSets}
+        {resultGroups}
+        {toolIds}
+        {toolsLibrary}
+        onAddIngredientSet={addIngredientSet}
+        onRemoveIngredientSet={removeIngredientSet}
+        onAddResultGroup={addResultGroup}
+        onRemoveResultGroup={removeResultGroup}
+        onAddTool={addTool}
+        onRemoveTool={removeTool}
       />
     {/if}
   {:else}
