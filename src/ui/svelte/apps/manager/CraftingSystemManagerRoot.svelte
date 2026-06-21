@@ -1589,8 +1589,8 @@
     if (!recipeDraft) return false;
     const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
     const confirmed = await store.confirmRecipeAction?.({
-      title: 'Switch to single-step?',
-      content: `<p>Switching <strong>${name}</strong> back to single-step removes its extra steps and their names, descriptions, and time/currency requirements. This can't be undone.</p>`
+      title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
+      content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name })
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: [] });
@@ -1623,10 +1623,10 @@
     }
 
     const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
-    const perStep = steps.length > 0 ? ' per step' : '';
+    const perStep = steps.length > 0 ? localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimplePerStep') : '';
     const confirmed = await store.confirmRecipeAction?.({
-      title: 'Switch to simple?',
-      content: `<p>Switching <strong>${name}</strong> to simple keeps only the first ingredient set and result set${perStep}; any others are removed. This can't be undone.</p>`
+      title: localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleTitle'),
+      content: localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleContent', { name, perStep })
     });
     if (!confirmed) return false;
 
@@ -1689,15 +1689,15 @@
     const steps = currentSteps();
     const step = steps.find(entry => entry?.id === stepId);
     if (!step) return false;
-    const name = String(step.name || '').trim() || 'this step';
-    const alsoDeleted = {
-      ingredients: 'its results and tools are deleted too',
-      results: 'its ingredients and tools are deleted too',
-      tools: 'its ingredients and results are deleted too'
-    }[context] || 'its ingredients, results, and tools are deleted too';
+    const name = String(step.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedStep', 'this step');
+    const alsoDeleted = localize({
+      ingredients: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoIngredients',
+      results: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoResults',
+      tools: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoTools'
+    }[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll');
     const confirmed = await store.confirmRecipeAction?.({
-      title: 'Delete step?',
-      content: `<p>Deleting <strong>${name}</strong> removes the whole step — ${alsoDeleted}. This can't be undone.</p>`
+      title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
+      content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted })
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: steps.filter(entry => entry?.id !== stepId) });
