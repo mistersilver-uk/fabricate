@@ -52,6 +52,11 @@ export class Recipe {
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
 
+    // Recipe-level duration for the implicit (single) step. Multi-step recipes
+    // carry their own per-step `timeRequirement`; this feeds the implicit step
+    // synthesized by getExecutionSteps for single-step recipes.
+    this.timeRequirement = this._normalizeTimeRequirement(data.timeRequirement);
+
     // Recipe behaviour
     this.isVariable = data.isVariable === undefined ? false : data.isVariable;
     this.transferEffects = data.transferEffects === undefined ? false : data.transferEffects;
@@ -176,18 +181,14 @@ export class Recipe {
         ) {
           errors.push(`Step "${step.name || step.id}" must include at least one result group`);
         }
-        if (step.timeRequirement) {
-          for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
-            const value = Number(step.timeRequirement?.[unit] || 0);
-            if (!Number.isFinite(value) || value < 0) {
-              errors.push(
-                `Step "${step.name || step.id}" has invalid time requirement value for "${unit}"`
-              );
-            }
-          }
-        }
+        this._validateTimeRequirement(
+          step.timeRequirement,
+          `Step "${step.name || step.id}"`,
+          errors
+        );
       }
     } else {
+      this._validateTimeRequirement(this.timeRequirement, 'Recipe', errors);
       for (const ingredientSet of this.ingredientSets) {
         const setValidation = ingredientSet.validate({ requireComplete });
         if (!setValidation.valid) {
@@ -358,6 +359,7 @@ export class Recipe {
         results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
+      timeRequirement: this.timeRequirement,
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map((r) => r.toJSON()),
       isVariable: this.isVariable,
@@ -487,6 +489,24 @@ export class Recipe {
     };
   }
 
+  /**
+   * Validate a step/recipe time requirement: every present unit must be a
+   * finite, non-negative number. A nullish requirement is valid (no duration).
+   * @param {object|null} timeRequirement
+   * @param {string} label - Prefix for any error message (e.g. `Step "Forge"`).
+   * @param {string[]} errors - Accumulator the caller owns.
+   * @private
+   */
+  _validateTimeRequirement(timeRequirement, label, errors) {
+    if (!timeRequirement) return;
+    for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
+      const value = Number(timeRequirement?.[unit] || 0);
+      if (!Number.isFinite(value) || value < 0) {
+        errors.push(`${label} has invalid time requirement value for "${unit}"`);
+      }
+    }
+  }
+
   _normalizeTimeRequirement(timeRequirement = null) {
     if (!timeRequirement || typeof timeRequirement !== 'object') return null;
     const normalized = {
@@ -579,7 +599,7 @@ export class Recipe {
         ingredientSets: this.ingredientSets,
         resultGroups: this.resultGroups,
         toolIds: this.toolIds || [],
-        timeRequirement: null,
+        timeRequirement: this.timeRequirement || null,
         outcomeRouting: this.outcomeRouting || null,
         resultSelection: this.resultSelection || null,
       },

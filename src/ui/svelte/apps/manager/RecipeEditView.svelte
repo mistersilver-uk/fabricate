@@ -204,6 +204,7 @@
             {onToggleEnabled}
             onChooseImage={chooseImage}
             {isMultiStep}
+            {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}
             {onUpdateStep}

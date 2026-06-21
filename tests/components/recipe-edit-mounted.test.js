@@ -18,6 +18,8 @@ const RAW_MODULES = [
   // (the single low-layer source of truth), so the harness must copy that
   // module and its transitive model dependencies.
   'src/ui/svelte/util/recipeImageIcons.js',
+  // Shared duration formatter consumed by the step accordion + duration editor.
+  'src/ui/svelte/util/recipeDuration.js',
   'src/models/Recipe.js',
   'src/models/Ingredient.js',
   'src/models/IngredientSet.js',
@@ -48,6 +50,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte'
@@ -74,6 +77,7 @@ const stepsHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
   compiledModules: [
+    'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte'
   ],
@@ -282,6 +286,53 @@ describe('RecipeEditView (mounted)', () => {
 
     assert.equal(patches.length, 1, 'editing the description emits exactly one patch');
     assert.deepEqual(patches[0], { description: 'A stronger brew.' }, 'the patch carries the edited description only');
+    editHarness.remount();
+  });
+
+  it('renders a single-step Duration control on the Overview tab whose edits emit onUpdateRecipe({ timeRequirement })', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const durationSection = target.querySelector('[data-recipe-section="duration"]');
+    assert.ok(durationSection, 'the single-step Overview shows the Duration section');
+    const trigger = durationSection.querySelector('[data-recipe-duration-trigger]');
+    assert.match(trigger.textContent, /Add duration/, 'an unset duration reads Add duration');
+    trigger.click();
+    await flushRender();
+    const daysInput = document.querySelector('[data-recipe-duration-unit="days"]');
+    assert.ok(daysInput, 'the duration editor exposes a days input');
+    daysInput.value = '3';
+    daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.equal(patches.length, 1, 'editing the duration emits exactly one patch');
+    assert.deepEqual(patches[0], { timeRequirement: { minutes: 0, hours: 0, days: 3, months: 0, years: 0 } }, 'the patch carries the rebuilt recipe-level timeRequirement');
+    editHarness.remount();
+  });
+
+  it('clears the single-step recipe duration to null when the only unit is zeroed', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, timeRequirement: { minutes: 0, hours: 5, days: 0, months: 0, years: 0 } },
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const trigger = target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]');
+    assert.match(trigger.textContent, /5 hours/, 'a set duration reads its formatted value');
+    trigger.click();
+    await flushRender();
+    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
+    hoursInput.value = '0';
+    hoursInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.equal(patches.length, 1, 'zeroing the only unit emits a patch');
+    assert.deepEqual(patches[0], { timeRequirement: null }, 'an all-zero duration clears to null');
+    editHarness.remount();
+  });
+
+  it('shows the multi-step Steps card (not the single-step Duration section) on the Overview tab', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] }
+    }));
+    assert.ok(target.querySelector('[data-recipe-section="steps"]'), 'multi-step Overview shows the Steps card');
+    assert.equal(target.querySelector('[data-recipe-section="duration"]'), null, 'the single-step Duration section is hidden for a multi-step recipe');
     editHarness.remount();
   });
 
@@ -1409,15 +1460,51 @@ describe('RecipeStepsCard (mounted)', () => {
     stepsHarness.remount();
   });
 
-  it('shows a formatted time pip, and a placeholder pip when a step has no time requirement', async () => {
+  it('shows a duration trigger with the formatted time, and an Add duration trigger when none is set', async () => {
     const target = await stepsHarness.mount(stepsProps());
-    const time1 = target.querySelector('[data-recipe-step-time="step-1"]');
-    assert.match(time1.textContent, /2 hours 30 minutes/, 'time formatted from non-zero units');
-    assert.equal(time1.classList.contains('is-empty'), false, 'a populated time pip is not muted');
+    const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
+    assert.equal(triggers.length, 2, 'one duration trigger per step');
+    assert.match(triggers[0].textContent, /2 hours 30 minutes/, 'time formatted from non-zero units');
+    assert.equal(triggers[0].classList.contains('is-empty'), false, 'a populated trigger is not muted');
 
-    const time2 = target.querySelector('[data-recipe-step-time="step-2"]');
-    assert.match(time2.textContent, /Instantaneous/, 'no time requirement shows the Instantaneous placeholder');
-    assert.ok(time2.classList.contains('is-empty'), 'placeholder time pip is muted');
+    assert.match(triggers[1].textContent, /Add duration/, 'no time requirement shows the Add duration affordance');
+    assert.ok(triggers[1].classList.contains('is-empty'), 'an unset duration trigger is muted');
+    stepsHarness.remount();
+  });
+
+  it('emits onUpdateStep with the edited timeRequirement when a duration unit changes', async () => {
+    const updates = [];
+    const target = await stepsHarness.mount(stepsProps({ onUpdateStep: (id, patch) => updates.push([id, patch]) }));
+    // Open step-2's (empty) duration editor and set hours to 4.
+    const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
+    triggers[1].click();
+    await flushRender();
+    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
+    assert.ok(hoursInput, 'the duration editor exposes an hours input');
+    hoursInput.value = '4';
+    hoursInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.equal(updates.length, 1, 'editing a unit emits exactly one patch');
+    assert.equal(updates[0][0], 'step-2', 'the patch targets the edited step');
+    assert.deepEqual(updates[0][1].timeRequirement, { minutes: 0, hours: 4, days: 0, months: 0, years: 0 }, 'the patch carries the rebuilt timeRequirement');
+    stepsHarness.remount();
+  });
+
+  it('clears the duration to null when the only non-zero unit is zeroed', async () => {
+    const updates = [];
+    // A single-unit step so zeroing that unit collapses the whole requirement to
+    // null (the controlled prop does not update between synthetic events, so a
+    // multi-unit step could not reach all-zero through sequential edits).
+    const target = await stepsHarness.mount(stepsProps({
+      steps: [{ id: 'solo', name: 'Cure', description: '', timeRequirement: { days: 2 } }],
+      onUpdateStep: (id, patch) => updates.push([id, patch])
+    }));
+    target.querySelector('[data-recipe-duration-trigger]').click();
+    await flushRender();
+    const daysInput = document.querySelector('[data-recipe-duration-unit="days"]');
+    daysInput.value = '0';
+    daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.equal(updates.at(-1)[0], 'solo', 'the patch targets the edited step');
+    assert.equal(updates.at(-1)[1].timeRequirement, null, 'zeroing the only unit clears to null');
     stepsHarness.remount();
   });
 

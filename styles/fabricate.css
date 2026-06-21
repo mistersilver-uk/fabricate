@@ -4317,6 +4317,49 @@
   opacity: 0.75;
 }
 
+.fabricate-manager .manager-recipe-duration {
+  position: relative;
+  display: inline-flex;
+}
+
+.fabricate-manager .manager-recipe-duration-trigger {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-duration-trigger.is-empty {
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-duration-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4000;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 240px;
+  max-width: 300px;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: var(--fab-shadow-lg);
+}
+
+.fabricate-manager .manager-recipe-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-duration-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
   min-height: 46px;
 }

@@ -12,6 +12,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
+  import RecipeDurationEditor from './RecipeDurationEditor.svelte';
 
   let {
     recipe = null,
@@ -29,6 +30,7 @@
     onToggleEnabled = () => {},
     onChooseImage = () => {},
     isMultiStep = false,
+    onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -119,5 +121,19 @@
       {onUpdateStep}
       {onDeleteStep}
     />
+  {:else}
+    <section class="manager-task-core-card" data-recipe-section="duration">
+      <div class="manager-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.Manager.Recipe.Duration', 'Duration')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.DurationHint', 'How long this recipe takes to craft. Leave blank for an instant craft.')}</p>
+        </div>
+      </div>
+      <RecipeDurationEditor
+        timeRequirement={recipe?.timeRequirement || null}
+        disabled={saving}
+        onChange={(next) => onUpdateRecipe({ timeRequirement: next })}
+      />
+    </section>
   {/if}
 </section>

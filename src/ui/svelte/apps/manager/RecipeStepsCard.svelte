@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Overview "Steps" card: the single drag-to-reorder surface for a multi-step
-  recipe. Each step's header shows its time/currency summary chips and a delete
+  recipe. Each step's header shows its editable duration control and a delete
   button (both owned by RecipeStepAccordion); the expanded body edits only the
   step's name and description. Order and identity are set here; a step's
   ingredients, results, and tools are authored on their own tabs.
@@ -32,7 +32,7 @@
     </div>
   </div>
 
-  <RecipeStepAccordion {steps} reorderable {onReorderSteps} {onDeleteStep}>
+  <RecipeStepAccordion {steps} reorderable {onReorderSteps} {onUpdateStep} {onDeleteStep}>
     {#snippet body(step)}
       <label class="manager-field">
         <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>

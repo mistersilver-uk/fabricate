@@ -14,15 +14,22 @@
 
   Accordion (`expandedStepId`) + drag (`dragIndex`) state are local so they survive
   the store refresh that follows every persisted edit (rows are keyed by step.id).
+
+  When `onUpdateStep` is supplied (the Overview Steps card) the header's time chip
+  becomes an editable duration trigger (RecipeDurationEditor) that patches
+  `step.timeRequirement`; otherwise (the requirement tabs) it stays a read-only chip.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { formatTimeRequirement } from '../../../util/recipeDuration.js';
+  import RecipeDurationEditor from './RecipeDurationEditor.svelte';
 
   let {
     steps = [],
     reorderable = false,
     onReorderSteps = () => {},
     onDeleteStep = () => {},
+    onUpdateStep = null,
     body,
     footer
   } = $props();
@@ -35,25 +42,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const TIME_UNITS = ['years', 'months', 'days', 'hours', 'minutes'];
-
   function stepName(step, index) {
     return step?.name || `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${index + 1}`;
   }
 
   function stepDescription(step) {
     return String(step?.description || '').trim();
-  }
-
-  // Compact "2 hours 30 minutes" string from the non-zero fields of a time requirement.
-  function formatTimeRequirement(time) {
-    if (!time || typeof time !== 'object') return '';
-    const parts = [];
-    for (const unit of TIME_UNITS) {
-      const value = Number(time[unit] || 0);
-      if (value > 0) parts.push(`${value} ${text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}`);
-    }
-    return parts.join(' ');
   }
 
   function toggleStep(stepId) {
@@ -108,10 +102,17 @@
           <i class={`fas manager-recipe-steps-chevron ${expandedStepId === step.id ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
         </div>
         <div class="manager-recipe-steps-requirements">
-          <span class={`manager-chip ${step.timeRequirement ? '' : 'is-empty'}`} data-recipe-step-time={step.id}>
-            <i class="fa-solid fa-clock" aria-hidden="true"></i>
-            <span>{step.timeRequirement ? formatTimeRequirement(step.timeRequirement) : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span>
-          </span>
+          {#if onUpdateStep}
+            <RecipeDurationEditor
+              timeRequirement={step.timeRequirement || null}
+              onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
+            />
+          {:else}
+            <span class={`manager-chip ${step.timeRequirement ? '' : 'is-empty'}`} data-recipe-step-time={step.id}>
+              <i class="fa-solid fa-clock" aria-hidden="true"></i>
+              <span>{step.timeRequirement ? formatTimeRequirement(step.timeRequirement) : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span>
+            </span>
+          {/if}
         </div>
         <div class="manager-recipe-steps-row-controls">
           <button type="button" class="manager-icon-button is-danger" data-recipe-step-delete={step.id} aria-label={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')} title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')} onclick={() => onDeleteStep(step.id)}><i class="fas fa-trash" aria-hidden="true"></i></button>
