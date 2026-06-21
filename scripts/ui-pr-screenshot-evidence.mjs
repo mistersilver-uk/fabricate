@@ -117,15 +117,47 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-recipes-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
   },
+  // The recipe editor publishes FOUR distinct frames (overview/identity,
+  // ingredients, validation tab, multi-step durations). `collect` emits ONE
+  // file per recipe id (it takes the first matching smoke label), so each frame
+  // needs its own recipe — a single recipe with four smoke labels would only
+  // ever publish the first (overview) frame and silently drop the other three.
+  // The four share the same `matches` so any change to a recipe editor/inspector
+  // or recipe sub-component republishes all four together.
   {
-    id: 'manager-recipe-edit',
-    label: 'Manager recipe editor (identity card + recipe-item inspector)',
-    smokeLabels: [
-      'manager-recipe-edit-normal',
-      'manager-recipe-edit-ingredients',
-      'manager-recipe-edit-validation',
-      'manager-recipe-edit-multistep',
+    id: 'manager-recipe-edit-normal',
+    label: 'Manager recipe editor — overview / identity',
+    smokeLabels: ['manager-recipe-edit-normal'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
     ],
+  },
+  {
+    id: 'manager-recipe-edit-ingredients',
+    label: 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)',
+    smokeLabels: ['manager-recipe-edit-ingredients'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
+    ],
+  },
+  {
+    id: 'manager-recipe-edit-validation',
+    label: 'Manager recipe editor — validation tab',
+    smokeLabels: ['manager-recipe-edit-validation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
+    ],
+  },
+  {
+    id: 'manager-recipe-edit-multistep',
+    label: 'Manager recipe editor — multi-step durations',
+    smokeLabels: ['manager-recipe-edit-multistep'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,

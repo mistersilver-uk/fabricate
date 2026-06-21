@@ -64,6 +64,67 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
   });
 
+  it('maps a recipe editor file to all four recipe-edit frame recipes', () => {
+    const expected = [
+      'manager-recipe-edit-normal',
+      'manager-recipe-edit-ingredients',
+      'manager-recipe-edit-validation',
+      'manager-recipe-edit-multistep',
+    ];
+
+    // The top-level editor view, the recipe-item inspector, and any recipe
+    // sub-component all republish all four frames.
+    for (const file of [
+      'src/ui/svelte/apps/manager/RecipeEditView.svelte',
+      'src/ui/svelte/apps/manager/RecipeItemInspector.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all four recipe-edit frames`);
+    }
+
+    // Each frame carries exactly its own single smoke label.
+    const views = mapChangedFilesToViews(['src/ui/svelte/apps/manager/RecipeEditView.svelte']);
+    assert.deepEqual(views.map(view => view.smokeLabels), [
+      ['manager-recipe-edit-normal'],
+      ['manager-recipe-edit-ingredients'],
+      ['manager-recipe-edit-validation'],
+      ['manager-recipe-edit-multistep'],
+    ]);
+  });
+
+  it('collects the four recipe-edit frames into four separate files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
+    try {
+      const sourceDir = join(root, 'test-results');
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(join(sourceDir, 'screenshot-01-manager-recipe-edit-normal.png'), 'normal');
+      writeFileSync(join(sourceDir, 'screenshot-02-manager-recipe-edit-ingredients.png'), 'ingredients');
+      writeFileSync(join(sourceDir, 'screenshot-03-manager-recipe-edit-validation.png'), 'validation');
+      writeFileSync(join(sourceDir, 'screenshot-04-manager-recipe-edit-multistep.png'), 'multistep');
+
+      const result = collectScreenshotEvidence({
+        changedFiles: ['src/ui/svelte/apps/manager/RecipeEditView.svelte'],
+        prNumber: 654,
+        root,
+      });
+
+      assert.equal(result.copied.length, 4);
+      const byName = Object.fromEntries(result.copied.map(item => {
+        const name = item.destination.replace(/\\/g, '/').split('/').pop();
+        return [name, readFileSync(item.destination, 'utf8')];
+      }));
+      assert.deepEqual(byName, {
+        'manager-recipe-edit-normal.png': 'normal',
+        'manager-recipe-edit-ingredients.png': 'ingredients',
+        'manager-recipe-edit-validation.png': 'validation',
+        'manager-recipe-edit-multistep.png': 'multistep',
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps every screenshot recipe backed by real smoke labels', () => {
     for (const recipe of VIEW_RECIPES) {
       assert.ok(Array.isArray(recipe.smokeLabels), `${recipe.id} should declare smokeLabels`);
