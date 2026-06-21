@@ -2,10 +2,11 @@
 <!--
   Overview tab for the recipe editor: identity (name, description, image picker,
   enabled toggle) and — for multi-step recipes — the Steps card, the single surface
-  where step order and identity (name/description) are set. Identity is bound to the
-  shell's local `$state` via value props and input callbacks so `handleSave` keeps
-  reading component state rather than form fields. A step's ingredients, results,
-  and tools are authored on their own tabs.
+  where step order and identity (name/description) are set. Identity is fully
+  controlled: values come from the staged `recipe` draft and edits emit
+  `onUpdateRecipe(...)` patches; the enabled toggle is the immediate exception and
+  emits `onToggleEnabled()`. A step's ingredients, results, and tools are authored
+  on their own tabs.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

@@ -2088,6 +2088,20 @@ export function createAdminStore(services) {
     );
   }
 
+  // Thin yes/no confirm used by the recipe editor's destructive in-draft actions
+  // (delete step, revert multi→single, Complex→Simple trim). The editor stages the
+  // result into its root-held draft after the user confirms; this helper only owns
+  // the dialog wiring (the root has no direct services.confirmDialog seam).
+  async function confirmRecipeAction({ title, content } = {}) {
+    const confirmed = await services.confirmDialog?.({
+      title,
+      content,
+      yes: () => true,
+      no: () => false
+    });
+    return confirmed === true;
+  }
+
   function confirmDiscardDirtyGatheringTaskDraft() {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.Environment.Tasks.DiscardChangesPrompt',
@@ -5914,6 +5928,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtyRecipeDraft,
+    confirmRecipeAction,
     confirmDiscardDirtyGatheringTaskDraft,
     confirmDiscardDirtyGatheringEventDraft,
     confirmGatheringLibraryTaskCompositionLoss,

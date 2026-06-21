@@ -47,9 +47,14 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
-  let recipeEditDirty = $state(false);
   let recipeEditSaving = $state(false);
-  let recipeEditDraft = $state(null);
+  let recipeSaveFailed = $state(false);
+  // The recipe editor stages edits in a root-held draft and commits only on Save.
+  // `recipeDraft` is the live, edited copy passed down to the editor; `recipeDraftBaseline`
+  // is the last-persisted snapshot. Both are deep PLAIN clones so JSON.stringify
+  // comparison drives the dirty flag (mirrors the gathering-task/event editors).
+  let recipeDraft = $state(null);
+  let recipeDraftBaseline = $state(null);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -493,7 +498,11 @@
       || ($viewState.recipes || [])[0]
       || null
   );
-  const recipeComplex = $derived(selectedRecipe?.complex === true);
+  // Recipe-edit deriveds read the live draft (not the persisted record) so the
+  // editor, inspector, and header chip all track unsaved staged edits.
+  const recipeComplex = $derived(recipeDraft?.complex === true);
+  const recipeEditDirty = $derived(Boolean(recipeDraft)
+    && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
   const showComponentEssences = $derived(itemCards.some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
   const selectedComponent = $derived(
@@ -516,7 +525,7 @@
   const canSaveComponentEdit = $derived(componentEditDirty === true
     && componentEditSaving !== true);
   const canSaveRecipeEdit = $derived(recipeEditDirty === true
-    && recipeEditDraft?.validName === true
+    && Boolean(recipeDraft?.name?.trim())
     && recipeEditSaving !== true);
   const recipeKnowledgeMode = $derived(selectedSystem?.recipeVisibility?.knowledge?.mode || 'itemOrLearned');
   const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
@@ -1182,12 +1191,12 @@
   async function finishRecipeRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
-      if (!recipeEditDraft || recipeEditDraft.validName !== true || !recipeEditDraft.id) return false;
-      const result = await saveRecipeEdit(recipeEditDraft.id, recipeEditDraft.updates);
+      const result = await saveRecipeDraft();
       return result !== false;
     }
-    recipeEditDirty = false;
-    recipeEditDraft = null;
+    // Discard: roll the draft back to the last-persisted baseline so the dirty
+    // flag clears, then let the caller proceed with navigation.
+    recipeDraft = cloneRecipeDraft(recipeDraftBaseline);
     return true;
   }
 
@@ -1441,13 +1450,37 @@
     selectedRecipeId = recipeId;
   }
 
+  // Deep PLAIN clone for the recipe draft + baseline. Mirrors the gathering-task /
+  // event draft helpers: JSON round-trip strips reactivity and shared references so
+  // the dirty comparison and discard-revert are stable.
+  function cloneRecipeDraft(source) {
+    return source ? JSON.parse(JSON.stringify(source)) : null;
+  }
+
+  // Stage an edit into the in-flight draft without persisting. Every editor handler
+  // routes through here; Save commits the whole draft in one call.
+  function patchRecipeDraft(patch) {
+    if (!recipeDraft || !patch) return;
+    recipeDraft = { ...recipeDraft, ...patch };
+  }
+
   function editRecipe(recipeId = selectedRecipe?.id) {
     afterTruthyResult(confirmRouteExit('recipe-edit'), () => {
       selectedRecipeId = recipeId;
-      recipeEditDirty = false;
-      recipeEditDraft = null;
+      recipeEditSaving = false;
+      recipeSaveFailed = false;
+      // Seed both draft and baseline from the persisted record (deep plain clones).
+      const source = ($viewState.recipes || []).find(recipe => recipe.id === recipeId) || null;
+      recipeDraft = cloneRecipeDraft(source);
+      recipeDraftBaseline = cloneRecipeDraft(source);
       activeView = 'recipe-edit';
     });
+  }
+
+  function clearRecipeDraft() {
+    recipeDraft = null;
+    recipeDraftBaseline = null;
+    recipeSaveFailed = false;
   }
 
   function backToRecipesBrowse() {
@@ -1456,17 +1489,26 @@
     });
   }
 
-  async function saveRecipeEdit(recipeId, updates) {
+  // Commit the staged draft in a single updateRecipe call. allowIncomplete keeps a
+  // shell's empty ingredients/results from blocking the save. On success the
+  // baseline advances (clearing dirty) and we return to the browser; on failure the
+  // store toasts and we surface an in-view warning.
+  async function saveRecipeDraft() {
     if (recipeEditSaving) return false;
+    if (!recipeDraft?.id) return false;
     recipeEditSaving = true;
+    recipeSaveFailed = false;
     try {
-      const result = await store.updateRecipe?.(recipeId, updates);
-      if (result === false) return false;
-      recipeEditDirty = false;
-      recipeEditDraft = null;
+      const result = await store.updateRecipe?.(recipeDraft.id, recipeDraft, { allowIncomplete: true });
+      if (result === false) {
+        recipeSaveFailed = true;
+        return false;
+      }
+      recipeDraftBaseline = cloneRecipeDraft(recipeDraft);
       activeView = 'recipes';
       return result;
     } catch (err) {
+      recipeSaveFailed = true;
       return false;
     } finally {
       recipeEditSaving = false;
@@ -1483,89 +1525,175 @@
     if (!selectedRecipeId || recipeEditSaving) return;
     const result = await store.deleteRecipe?.(selectedRecipeId);
     if (result === false) return; // cancelled or failed → stay in the editor
-    recipeEditDirty = false;
-    recipeEditDraft = null;
+    clearRecipeDraft();
     activeView = 'recipes';
   }
 
-  function handleRecipeDraftChange(draft) {
-    recipeEditDraft = draft || null;
-    recipeEditDirty = draft?.dirty === true;
+  // The on/off toggle is the one immediate exception: enabling validates against the
+  // PERSISTED recipe, so it commits straight away (no staging, no dirty). On success
+  // both draft and baseline sync to the new state so it never registers as dirty; on
+  // failure the store toasts and we leave the toggle as-is.
+  async function handleToggleRecipeEnabled() {
+    if (!recipeDraft?.id) return;
+    const next = recipeDraft.enabled === false;
+    const ok = await store.toggleRecipeEnabled?.(recipeDraft.id, next);
+    if (ok === false) return;
+    recipeDraft = { ...recipeDraft, enabled: next };
+    recipeDraftBaseline = recipeDraftBaseline ? { ...recipeDraftBaseline, enabled: next } : recipeDraftBaseline;
   }
 
   async function handleAddRecipeItem(itemUuid) {
+    // Adding the definition to the system library is an immediate side effect; the
+    // resulting link id is staged via handleSetRecipeItem.
     return store.addRecipeItemFromUuid?.(selectedSystemId, itemUuid);
   }
 
-  async function handleSetRecipeItem(recipeItemId) {
-    if (!selectedRecipeId) return false;
-    return store.updateRecipe?.(selectedRecipeId, { recipeItemId });
+  function handleSetRecipeItem(recipeItemId) {
+    patchRecipeDraft({ recipeItemId });
+    return true;
   }
 
-  async function handleSetRecipeCategory(category) {
-    if (!selectedRecipeId) return false;
-    return store.updateRecipe?.(selectedRecipeId, { category });
+  function handleSetRecipeCategory(category) {
+    patchRecipeDraft({ category });
+    return true;
   }
 
-  // Enter multi-step: seed Step 1 from the recipe's current top-level ingredients /
+  // Enter multi-step: seed Step 1 from the draft's current top-level ingredients /
   // results / tools so an already-craftable recipe stays craftable (the engine only
   // falls back to top-level fields when the steps array is empty). New/empty recipes
   // simply start with one named, empty step.
-  async function handleEnterMultiStep() {
-    if (!selectedRecipeId || !selectedRecipe) return false;
+  function handleEnterMultiStep() {
+    if (!recipeDraft) return false;
     const seeded = {
       name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} 1`,
       description: '',
-      ingredientSets: selectedRecipe.ingredientSets || [],
-      resultGroups: selectedRecipe.resultGroups || [],
-      toolIds: selectedRecipe.toolIds || []
+      ingredientSets: recipeDraft.ingredientSets || [],
+      resultGroups: recipeDraft.resultGroups || [],
+      toolIds: recipeDraft.toolIds || []
     };
-    return store.updateRecipe?.(selectedRecipeId, { steps: [seeded] });
+    patchRecipeDraft({ steps: [seeded] });
+    return true;
   }
 
-  function handleRevertToSingleStep() {
-    if (!selectedRecipeId) return false;
-    return store.revertRecipeToSingleStep?.(selectedRecipeId);
+  // Reverting multi-step → single-step discards the per-step authoring, so warn
+  // before staging the empty steps array (engine falls back to top-level fields).
+  async function handleRevertToSingleStep() {
+    if (!recipeDraft) return false;
+    const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
+    const confirmed = await store.confirmRecipeAction?.({
+      title: 'Switch to single-step?',
+      content: `<p>Switching <strong>${name}</strong> back to single-step removes its extra steps and their names, descriptions, and time/currency requirements. This can't be undone.</p>`
+    });
+    if (!confirmed) return false;
+    patchRecipeDraft({ steps: [] });
+    return true;
   }
 
+  // Switch a recipe between Simple and Complex. Going Complex is a pure flag flip.
+  // Going Simple may drop extra sets/results across every scope (recipe-level and
+  // each step), so when anything would be removed we warn first, then stage the trim.
   async function handleSetRecipeComplexity(complex) {
-    if (!selectedRecipeId) return false;
-    return store.setRecipeComplexity?.(selectedRecipeId, complex);
+    if (!recipeDraft) return false;
+    if (complex === true) {
+      patchRecipeDraft({ complex: true });
+      return true;
+    }
+
+    const scopeHasExtras = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return ingredientSets.length > 1 || resultGroups.length > 1;
+    };
+    const steps = Array.isArray(recipeDraft.steps) ? recipeDraft.steps : [];
+    // A multi-step recipe crafts from its steps (top-level sets are the single-step
+    // fallback), so only the scope we actually trim should drive the confirm.
+    const hasExtras = steps.length > 0 ? steps.some(scopeHasExtras) : scopeHasExtras(recipeDraft);
+
+    if (!hasExtras) {
+      patchRecipeDraft({ complex: false });
+      return true;
+    }
+
+    const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
+    const perStep = steps.length > 0 ? ' per step' : '';
+    const confirmed = await store.confirmRecipeAction?.({
+      title: 'Switch to simple?',
+      content: `<p>Switching <strong>${name}</strong> to simple keeps only the first ingredient set and result set${perStep}; any others are removed. This can't be undone.</p>`
+    });
+    if (!confirmed) return false;
+
+    const trimScope = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return {
+        ingredientSets: ingredientSets.slice(0, 1),
+        resultGroups: resultGroups.slice(0, 1)
+      };
+    };
+
+    const patch = { complex: false };
+    if (steps.length > 0) {
+      patch.steps = steps.map((step) => ({ ...step, ...trimScope(step) }));
+    } else {
+      const trimmed = trimScope(recipeDraft);
+      patch.ingredientSets = trimmed.ingredientSets;
+      patch.resultGroups = trimmed.resultGroups;
+    }
+    patchRecipeDraft(patch);
+    return true;
   }
 
   function currentSteps() {
-    return Array.isArray(selectedRecipe?.steps) ? [...selectedRecipe.steps] : [];
+    return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
   }
 
-  async function handleAddStep() {
-    if (!selectedRecipeId) return false;
+  function handleAddStep() {
+    if (!recipeDraft) return false;
     const steps = currentSteps();
     steps.push({ name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`, description: '' });
-    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+    patchRecipeDraft({ steps });
+    return true;
   }
 
-  async function handleReorderSteps(from, to) {
-    if (!selectedRecipeId) return false;
+  function handleReorderSteps(from, to) {
+    if (!recipeDraft) return false;
     const steps = currentSteps();
     if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to) return false;
     const [moved] = steps.splice(from, 1);
     steps.splice(to, 0, moved);
-    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+    patchRecipeDraft({ steps });
+    return true;
   }
 
-  async function handleUpdateStep(stepId, patch) {
-    if (!selectedRecipeId || !patch) return false;
+  function handleUpdateStep(stepId, patch) {
+    if (!recipeDraft || !patch) return false;
     const steps = currentSteps().map(step => (step.id === stepId ? { ...step, ...patch } : step));
-    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+    patchRecipeDraft({ steps });
+    return true;
   }
 
-  // Deleting a step removes the whole step (its ingredients, results, and tools).
-  // The store confirms with wording contextual to the tab the delete came from
+  // Deleting a step removes the whole step (its ingredients, results, and tools), so
+  // warn with wording contextual to the tab the delete came from
   // ('overview' | 'ingredients' | 'results' | 'tools'). Removing the last step
-  // reverts to single-step (empty steps array → top-level fallback).
+  // reverts to single-step (empty steps array → top-level fallback). Then stage it.
   async function handleDeleteStep(stepId, context = 'overview') {
-    if (!selectedRecipeId) return false;
-    return store.deleteRecipeStep?.(selectedRecipeId, stepId, context);
+    if (!recipeDraft) return false;
+    const steps = currentSteps();
+    const step = steps.find(entry => entry?.id === stepId);
+    if (!step) return false;
+    const name = String(step.name || '').trim() || 'this step';
+    const alsoDeleted = {
+      ingredients: 'its results and tools are deleted too',
+      results: 'its ingredients and tools are deleted too',
+      tools: 'its ingredients and results are deleted too'
+    }[context] || 'its ingredients, results, and tools are deleted too';
+    const confirmed = await store.confirmRecipeAction?.({
+      title: 'Delete step?',
+      content: `<p>Deleting <strong>${name}</strong> removes the whole step — ${alsoDeleted}. This can't be undone.</p>`
+    });
+    if (!confirmed) return false;
+    patchRecipeDraft({ steps: steps.filter(entry => entry?.id !== stepId) });
+    return true;
   }
 
   function recipeEditSaveLabel() {
@@ -3156,7 +3284,7 @@
           <i class="fas fa-trash" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
         </button>
-        <button type="submit" form="manager-recipe-edit-form" class="manager-button is-primary" disabled={!canSaveRecipeEdit}>
+        <button type="button" class="manager-button is-primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
           <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{recipeEditSaveLabel()}</span>
         </button>
@@ -3686,13 +3814,10 @@
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
-        recipe={selectedRecipeId ? selectedRecipe : null}
+        recipe={recipeDraft}
         complex={recipeComplex}
         saving={recipeEditSaving}
-        onBack={backToRecipesBrowse}
-        onSave={saveRecipeEdit}
-        onDirtyChange={(dirty) => { recipeEditDirty = dirty; }}
-        onDraftChange={handleRecipeDraftChange}
+        saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
         linkedItemImage={selectedRecipe?.recipeItemImg || ''}
         currencyUnits={selectedCurrencyUnits}
@@ -3700,7 +3825,8 @@
         componentOptions={selectedSystem?.managedItemOptions || []}
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
         itemTags={selectedSystem?.itemTags || []}
-        onUpdateRecipe={(patch) => store.updateRecipe?.(selectedRecipeId, patch, { notify: false })}
+        onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
+        onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}
         onReorderSteps={handleReorderSteps}
         onUpdateStep={handleUpdateStep}
@@ -5423,7 +5549,7 @@
         {/if}
       {:else if currentView === 'recipe-edit'}
         <RecipeItemInspector
-          recipe={selectedRecipeId ? selectedRecipe : null}
+          recipe={recipeDraft}
           {recipeItemDefinitions}
           categories={selectedSystem?.categories || []}
           multiStepEnabled={recipeMultiStepEnabled}

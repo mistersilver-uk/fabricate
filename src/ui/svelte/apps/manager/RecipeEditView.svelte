@@ -2,14 +2,15 @@
 <!--
   Recipe editor shell. A tab strip (Overview / Ingredients / Results / Validation)
   mirroring the gathering environment editor, with the card contents moved into the
-  relevant tab. The shell owns the identity local `$state` (name/description/img/
-  enabled), the dirty/draft `$effect`s, and `handleSave`, plus every requirement
-  add/remove handler (single-step patches the recipe via `onUpdateRecipe`; per-step
-  patches the step via `onUpdateStep`).
+  relevant tab.
 
-  The whole tab workspace stays inside `<form id="manager-recipe-edit-form">` so the
-  shared header's `type="submit" form="manager-recipe-edit-form"` Save button still
-  fires on any tab — `handleSave` reads component state, not form fields.
+  The shell is fully CONTROLLED: the root holds the in-flight recipe draft and passes
+  it down as `recipe`. Identity inputs (name/description/img) read straight from
+  `recipe` and emit `onUpdateRecipe({ … })` on input; the enabled toggle emits
+  `onToggleEnabled()` (the root persists that immediately). The header Save button
+  lives in the shared header and calls the root's save handler directly — there is no
+  form-wrapper to submit. Every requirement add/remove handler stages through
+  `onUpdateRecipe`/`onUpdateStep`.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -26,10 +27,7 @@
     recipe = null,
     complex = false,
     saving = false,
-    onBack = () => {},
-    onSave = () => {},
-    onDirtyChange = () => {},
-    onDraftChange = () => {},
+    saveFailed = false,
     onPickImagePath = null,
     linkedItemImage = '',
     currencyUnits = [],
@@ -38,6 +36,7 @@
     essenceOptions = [],
     itemTags = [],
     onUpdateRecipe = () => {},
+    onToggleEnabled = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -50,6 +49,12 @@
   const resultGroups = $derived(Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
   const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
+
+  // Identity reads straight from the controlled draft.
+  const name = $derived(recipe?.name || '');
+  const description = $derived(recipe?.description || '');
+  const img = $derived(recipe?.img || '');
+  const enabled = $derived(recipe?.enabled !== false);
 
   // A recipe is multi-step when it carries an explicit steps array; per-step
   // groupings replace the recipe-level sections in that mode (the right-inspector
@@ -119,7 +124,7 @@
   }
 
   // Deleting a step removes the whole step (its ingredients, results, and tools).
-  // The store confirms with wording contextual to where the delete was triggered.
+  // The root confirms with wording contextual to where the delete was triggered.
   function deleteStepFrom(context) {
     return (stepId) => onDeleteStep(stepId, context);
   }
@@ -130,36 +135,11 @@
   const isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId));
 
   let activeTab = $state('overview');
-  let draftId = $state('');
-  let name = $state('');
-  let description = $state('');
-  let img = $state('');
-  let enabled = $state(true);
   let lastRecipeId = $state(null);
-  let lastDirty = $state(false);
-  let lastDraftSignature = $state('');
-  let saveFailed = $state(false);
 
-  const validName = $derived(Boolean(name.trim()));
-  const dirty = $derived(isDirty());
-  const draftSummary = $derived(buildDraftSummary());
-  const draftSignature = $derived([
-    draftSummary.id,
-    draftSummary.name,
-    draftSummary.description,
-    draftSummary.img,
-    draftSummary.enabled ? 'on' : 'off',
-    draftSummary.dirty ? 'dirty' : 'clean',
-    draftSummary.validName ? 'valid' : 'invalid'
-  ].join(''));
-
-  // Validation badges: critical/warning issue counts, projected with the live
-  // identity edits folded in so the chips track unsaved changes.
-  const readiness = $derived(evaluateRecipeReadiness({
-    ...(recipe || {}),
-    name,
-    enabled
-  }));
+  // Validation badges: critical/warning issue counts. The draft is the single
+  // source of truth, so the readiness evaluator reads it directly.
+  const readiness = $derived(evaluateRecipeReadiness({ ...(recipe || {}) }));
   const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
   const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
   const badges = $derived({
@@ -169,29 +149,12 @@
     ]
   });
 
+  // Reset the active tab to Overview whenever a different recipe is loaded.
   $effect(() => {
     const nextRecipeId = recipe?.id || '__none__';
     if (nextRecipeId === lastRecipeId) return;
-    draftId = recipe?.id || '';
-    name = recipe?.name || '';
-    description = recipe?.description || '';
-    img = recipe?.img || '';
-    enabled = recipe?.enabled !== false;
-    saveFailed = false;
     activeTab = 'overview';
     lastRecipeId = nextRecipeId;
-  });
-
-  $effect(() => {
-    if (dirty === lastDirty) return;
-    lastDirty = dirty;
-    onDirtyChange(dirty);
-  });
-
-  $effect(() => {
-    if (draftSignature === lastDraftSignature) return;
-    lastDraftSignature = draftSignature;
-    onDraftChange(draftSummary);
   });
 
   function text(key, fallback) {
@@ -199,40 +162,10 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function buildUpdates() {
-    return {
-      name: name.trim(),
-      description,
-      img,
-      enabled
-    };
-  }
-
-  function buildDraftSummary() {
-    return {
-      id: draftId || '',
-      updates: buildUpdates(),
-      name: name.trim(),
-      description,
-      img,
-      enabled,
-      dirty,
-      validName
-    };
-  }
-
-  function isDirty() {
-    if (!recipe) return false;
-    return name !== (recipe.name || '')
-      || description !== (recipe.description || '')
-      || img !== (recipe.img || '')
-      || enabled !== (recipe.enabled !== false);
-  }
-
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
-    if (value) img = value;
+    if (value) onUpdateRecipe({ img: value });
   }
 
   // Deep-link from a validation issue: switch to the tab that hosts the gap.
@@ -241,19 +174,6 @@
       activeTab = targetTab;
     }
   }
-
-  async function handleSave(event) {
-    event.preventDefault();
-    if (!validName || saving) return;
-    saveFailed = false;
-    let result = false;
-    try {
-      result = await onSave(draftId || null, buildUpdates());
-    } catch (err) {
-      result = false;
-    }
-    if (result === false) saveFailed = true;
-  }
 </script>
 
 <main class="manager-main manager-recipe-edit-main" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}>
@@ -261,79 +181,77 @@
     <div class="manager-recipe-edit-view" data-recipe-editor>
       <RecipeEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
 
-      <form id="manager-recipe-edit-form" onsubmit={handleSave}>
-        <div
-          class="manager-editor-tab-panel"
-          role="tabpanel"
-          id={`recipe-panel-${activeTab}`}
-          aria-labelledby={`recipe-tab-${activeTab}`}
-        >
-          {#if activeTab === 'overview'}
-            <RecipeOverviewTab
-              {recipe}
-              {name}
-              {description}
-              {img}
-              {enabled}
-              {saving}
-              {saveFailed}
-              {isRecipeItemLinked}
-              {linkedItemImage}
-              {onPickImagePath}
-              onNameInput={(value) => { name = value; }}
-              onDescriptionInput={(value) => { description = value; }}
-              onToggleEnabled={() => { enabled = !enabled; }}
-              onChooseImage={chooseImage}
-              {isMultiStep}
-              {currencyUnits}
-              {onAddStep}
-              {onReorderSteps}
-              {onUpdateStep}
-              onDeleteStep={deleteStepFrom('overview')}
-            />
-          {:else if activeTab === 'ingredients'}
-            <RecipeIngredientsTab
-              {recipe}
-              {complex}
-              {isMultiStep}
-              {currencyUnits}
-              {componentOptions}
-              {essenceOptions}
-              {itemTags}
-              onUpdateIngredientSets={updateIngredientSets}
-              onDeleteStep={deleteStepFrom('ingredients')}
-            />
-          {:else if activeTab === 'results'}
-            <RecipeResultsTab
-              {recipe}
-              {complex}
-              {isMultiStep}
-              {currencyUnits}
-              onAddResultGroup={addResultGroup}
-              onRemoveResultGroup={removeResultGroup}
-              onDeleteStep={deleteStepFrom('results')}
-            />
-          {:else if activeTab === 'tools'}
-            <RecipeToolsTab
-              {recipe}
-              {isMultiStep}
-              {toolIds}
-              {toolsLibrary}
-              {currencyUnits}
-              onAddTool={addTool}
-              onRemoveTool={removeTool}
-              onAddStepTool={addStepTool}
-              onRemoveStepTool={removeStepTool}
-              onDeleteStep={deleteStepFrom('tools')}
-            />
-          {:else if activeTab === 'validation'}
-            <RecipeValidationTab
-              recipe={{ ...recipe, name, enabled }}
-              onSelectIssue={selectIssue}
-            />
-          {/if}
-        </div>
-      </form>
+      <div
+        class="manager-editor-tab-panel"
+        role="tabpanel"
+        id={`recipe-panel-${activeTab}`}
+        aria-labelledby={`recipe-tab-${activeTab}`}
+      >
+        {#if activeTab === 'overview'}
+          <RecipeOverviewTab
+            {recipe}
+            {name}
+            {description}
+            {img}
+            {enabled}
+            {saving}
+            {saveFailed}
+            {isRecipeItemLinked}
+            {linkedItemImage}
+            {onPickImagePath}
+            onNameInput={(value) => onUpdateRecipe({ name: value })}
+            onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
+            {onToggleEnabled}
+            onChooseImage={chooseImage}
+            {isMultiStep}
+            {currencyUnits}
+            {onAddStep}
+            {onReorderSteps}
+            {onUpdateStep}
+            onDeleteStep={deleteStepFrom('overview')}
+          />
+        {:else if activeTab === 'ingredients'}
+          <RecipeIngredientsTab
+            {recipe}
+            {complex}
+            {isMultiStep}
+            {currencyUnits}
+            {componentOptions}
+            {essenceOptions}
+            {itemTags}
+            onUpdateIngredientSets={updateIngredientSets}
+            onDeleteStep={deleteStepFrom('ingredients')}
+          />
+        {:else if activeTab === 'results'}
+          <RecipeResultsTab
+            {recipe}
+            {complex}
+            {isMultiStep}
+            {currencyUnits}
+            onAddResultGroup={addResultGroup}
+            onRemoveResultGroup={removeResultGroup}
+            onDeleteStep={deleteStepFrom('results')}
+          />
+        {:else if activeTab === 'tools'}
+          <RecipeToolsTab
+            {recipe}
+            {isMultiStep}
+            {toolIds}
+            {toolsLibrary}
+            {currencyUnits}
+            onAddTool={addTool}
+            onRemoveTool={removeTool}
+            onAddStepTool={addStepTool}
+            onRemoveStepTool={removeStepTool}
+            onDeleteStep={deleteStepFrom('tools')}
+          />
+        {:else if activeTab === 'validation'}
+          <RecipeValidationTab
+            {recipe}
+            onSelectIssue={selectIssue}
+          />
+        {/if}
+      </div>
     </div>
   {:else}
     <div class="manager-empty">

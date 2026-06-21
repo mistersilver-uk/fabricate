@@ -86,7 +86,9 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   it('imports and renders RecipeEditView', () => {
     assert.ok(rootSource.includes("import RecipeEditView from './RecipeEditView.svelte'"), 'RecipeEditView should be imported');
     assert.ok(rootSource.includes('<RecipeEditView'), 'RecipeEditView should be rendered');
-    assert.ok(rootSource.includes('onBack={backToRecipesBrowse}'), 'back button wired to the route-exit-aware backToRecipesBrowse');
+    // The route-exit-aware Back lives in the shared header (onclick={backToRecipesBrowse}),
+    // not as a view prop — the controlled editor carries no onBack.
+    assert.ok(rootSource.includes('onclick={backToRecipesBrowse}'), 'header Back wired to the route-exit-aware backToRecipesBrowse');
   });
 
   it('defines editRecipe and backToRecipesBrowse navigation', () => {
@@ -133,9 +135,10 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
 });
 
 describe('RecipeEditView empty-state regression guards', () => {
-  it('declares recipe and onBack props', () => {
+  it('declares the recipe prop (controlled view, no onBack)', () => {
     assert.ok(editSource.includes('recipe = null'), 'recipe prop defaults to null');
-    assert.ok(editSource.includes('onBack = () => {}'), 'onBack prop is declared');
+    // The controlled editor has no onBack — Back is owned by the shared header.
+    assert.equal(editSource.includes('onBack'), false, 'onBack prop is no longer declared');
   });
 
   it('renders a null-recipe empty branch reusing SelectRecipe', () => {

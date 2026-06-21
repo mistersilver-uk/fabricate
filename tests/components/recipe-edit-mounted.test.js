@@ -93,11 +93,9 @@ function identityProps(overrides = {}) {
   return {
     recipe: RECIPE,
     saving: false,
-    onBack: () => {},
-    onSave: () => true,
-    onDirtyChange: () => {},
-    onDraftChange: () => {},
     onPickImagePath: null,
+    onUpdateRecipe: () => {},
+    onToggleEnabled: () => {},
     ...overrides
   };
 }
@@ -263,22 +261,33 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('marks the draft dirty and pushes a draft when the name changes', async () => {
-    const dirtyCalls = [];
-    const draftCalls = [];
+  it('emits onUpdateRecipe with the edited name when the name changes (controlled)', async () => {
+    const patches = [];
     const target = await editHarness.mount(identityProps({
-      onDirtyChange: (dirty) => dirtyCalls.push(dirty),
-      onDraftChange: (draft) => draftCalls.push(draft)
+      onUpdateRecipe: (patch) => patches.push(patch)
     }));
     const nameInput = target.querySelector('[data-recipe-field="name"]');
     nameInput.value = 'Greater Healing Draught';
     nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await Promise.resolve();
 
-    assert.ok(dirtyCalls.includes(true), 'onDirtyChange(true) fired');
-    const lastDraft = draftCalls.at(-1);
-    assert.equal(lastDraft.name, 'Greater Healing Draught', 'draft carries the edited name');
-    assert.equal(lastDraft.dirty, true, 'draft is dirty');
+    assert.equal(patches.length, 1, 'editing the name emits exactly one patch');
+    assert.deepEqual(patches[0], { name: 'Greater Healing Draught' }, 'the patch carries the edited name only');
+    editHarness.remount();
+  });
+
+  it('emits onUpdateRecipe with the edited description when the description changes (controlled)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const descriptionInput = target.querySelector('[data-recipe-field="description"]');
+    descriptionInput.value = 'A stronger brew.';
+    descriptionInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await Promise.resolve();
+
+    assert.equal(patches.length, 1, 'editing the description emits exactly one patch');
+    assert.deepEqual(patches[0], { description: 'A stronger brew.' }, 'the patch carries the edited description only');
     editHarness.remount();
   });
 
@@ -308,38 +317,43 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('invokes onSave with identity-only draft updates on submit', async () => {
-    const saved = [];
-    const target = await editHarness.mount(identityProps({ onSave: (id, updates) => { saved.push([id, updates]); return true; } }));
-    const nameInput = target.querySelector('[data-recipe-field="name"]');
-    nameInput.value = 'Renamed';
-    nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    target.querySelector('#manager-recipe-edit-form').dispatchEvent(new globalThis.window.Event('submit', { bubbles: true, cancelable: true }));
-    await Promise.resolve();
-
-    assert.equal(saved.length, 1, 'onSave invoked once');
-    assert.equal(saved[0][0], 'r1', 'passes the recipe id');
-    assert.equal(saved[0][1].name, 'Renamed', 'passes the edited name');
-    assert.equal('recipeItemId' in saved[0][1], false, 'identity updates do not carry recipeItemId');
+  it('has no in-view save form (the header Save button owns committing)', async () => {
+    const target = await editHarness.mount(identityProps());
+    // The editor is fully controlled: there is no <form> to submit; the root's
+    // header Save button commits the staged draft via a plain onclick.
+    assert.equal(target.querySelector('#manager-recipe-edit-form'), null, 'no recipe-edit form wrapper in the view');
+    assert.equal(target.querySelector('form'), null, 'the editor renders no form element');
     editHarness.remount();
   });
 
-  it('saves via the header submit button while a non-Overview tab is active', async () => {
-    const saved = [];
-    const target = await editHarness.mount(identityProps({ onSave: (id, updates) => { saved.push([id, updates]); return true; } }));
-    // Edit the name in Overview, then switch to Results and submit the form.
-    const nameInput = target.querySelector('[data-recipe-field="name"]');
-    nameInput.value = 'From Results Tab';
-    nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    clickTab(target, 'results');
-    await flushRender();
-    assert.equal(target.querySelector('[data-recipe-field="name"]'), null, 'identity inputs are not on the Results tab');
-    // The submit button lives in the shared header (form=manager-recipe-edit-form);
-    // dispatching submit on the form mirrors clicking it from any tab.
-    target.querySelector('#manager-recipe-edit-form').dispatchEvent(new globalThis.window.Event('submit', { bubbles: true, cancelable: true }));
+  it('emits onToggleEnabled (not onUpdateRecipe) when the enabled toggle is clicked', async () => {
+    const patches = [];
+    const toggles = [];
+    const target = await editHarness.mount(identityProps({
+      onUpdateRecipe: (patch) => patches.push(patch),
+      onToggleEnabled: () => toggles.push(true)
+    }));
+    target.querySelector('[data-recipe-field="enabled"]').click();
     await Promise.resolve();
-    assert.equal(saved.length, 1, 'onSave fired from a non-Overview tab');
-    assert.equal(saved[0][1].name, 'From Results Tab', 'the in-component state (not form fields) is saved');
+    assert.deepEqual(toggles, [true], 'the enabled toggle emits onToggleEnabled');
+    assert.equal(patches.length, 0, 'the enabled toggle does not stage an onUpdateRecipe patch');
+    editHarness.remount();
+  });
+
+  it('emits onUpdateRecipe with the chosen image when the image picker resolves a path', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      onUpdateRecipe: (patch) => patches.push(patch),
+      onPickImagePath: async () => 'icons/consumables/potions/potion-tube-corked-green.webp'
+    }));
+    target.querySelector('button[data-recipe-field="img"]').click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing an image emits a single patch');
+    assert.deepEqual(
+      patches[0],
+      { img: 'icons/consumables/potions/potion-tube-corked-green.webp' },
+      'the patch carries the chosen image path'
+    );
     editHarness.remount();
   });
 

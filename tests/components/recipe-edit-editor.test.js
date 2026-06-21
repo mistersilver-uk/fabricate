@@ -20,9 +20,9 @@ const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const editSource = readFileSync(editPath, 'utf8');
-// The identity card + locked image-picker markup moved into the Overview tab when
-// the editor became tabbed; the shell still owns the form, draft/dirty/save
-// callbacks, and the derived linked state.
+// The identity card + locked image-picker markup live in the Overview tab. The
+// editor is fully controlled: the root holds the recipe draft and the shell forwards
+// identity edits via onUpdateRecipe / onToggleEnabled (no form, no local draft state).
 const overviewSource = readFileSync(overviewPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
@@ -40,7 +40,10 @@ const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.
 
 describe('RecipeEditView identity-only single column', () => {
   it('renders the identity card in the standard manager-main, with no bespoke workspace', () => {
-    assert.ok(editSource.includes('id="manager-recipe-edit-form"'), 'identity form has the recipe-edit form id');
+    // The editor is fully controlled now: no <form> wrapper, the root's header Save
+    // button commits the staged draft.
+    assert.equal(editSource.includes('manager-recipe-edit-form'), false, 'no recipe-edit form wrapper in the controlled view');
+    assert.equal(/<form\b/.test(editSource), false, 'the controlled editor renders no form element');
     assert.ok(editSource.includes('manager-recipe-edit-main'), 'reuses the recipe-edit main class');
     assert.equal(editSource.includes('manager-recipe-workspace'), false, 'no bespoke workspace grid');
     assert.equal(editSource.includes('manager-recipe-edit-panel'), false, 'no bespoke editing panel');
@@ -62,11 +65,19 @@ describe('RecipeEditView identity-only single column', () => {
     assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.SelectRecipe'), 'empty state copy retained');
   });
 
-  it('wires the draft/dirty/save callbacks for identity only', () => {
-    assert.ok(editSource.includes('onDirtyChange('), 'emits onDirtyChange');
-    assert.ok(editSource.includes('onDraftChange('), 'emits onDraftChange');
-    assert.ok(editSource.includes('onSave('), 'invokes onSave');
-    assert.ok(editSource.includes('validName'), 'tracks name validity');
+  it('is fully controlled: identity edits stage via onUpdateRecipe and enabled via onToggleEnabled', () => {
+    // No local identity state / dirty / save machinery survives in the view.
+    assert.equal(editSource.includes('onDirtyChange'), false, 'no onDirtyChange prop/emit');
+    assert.equal(editSource.includes('onDraftChange'), false, 'no onDraftChange prop/emit');
+    assert.equal(editSource.includes('onSave'), false, 'no onSave prop/emit');
+    assert.equal(editSource.includes('buildDraftSummary'), false, 'no draft summary builder');
+    assert.equal(/let name = \$state/.test(editSource), false, 'no local name state');
+    assert.equal(/let enabled = \$state/.test(editSource), false, 'no local enabled state');
+    // Identity edits emit onUpdateRecipe; the enabled toggle emits onToggleEnabled.
+    assert.ok(editSource.includes('onUpdateRecipe({ name: value })'), 'name input stages via onUpdateRecipe');
+    assert.ok(editSource.includes('onUpdateRecipe({ description: value })'), 'description input stages via onUpdateRecipe');
+    assert.ok(editSource.includes('onUpdateRecipe({ img: value })'), 'image picker stages via onUpdateRecipe');
+    assert.ok(editSource.includes('{onToggleEnabled}'), 'the enabled toggle forwards onToggleEnabled');
   });
 
   it('carries no recipe-item editing state, props, or card in the view', () => {
@@ -159,19 +170,35 @@ describe('adminStore recipe-item projections + API', () => {
 });
 
 describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
-  it('owns recipe draft/save handlers and a knowledge-mode derived value', () => {
-    assert.ok(/async function saveRecipeEdit\(/.test(rootSource), 'saveRecipeEdit defined');
+  it('owns the root-held recipe draft, staging handlers, and a knowledge-mode derived value', () => {
+    assert.ok(/async function saveRecipeDraft\(/.test(rootSource), 'saveRecipeDraft defined');
     assert.ok(/function backToRecipesBrowse\(/.test(rootSource), 'backToRecipesBrowse defined');
     assert.ok(/async function deleteRecipeFromEdit\(/.test(rootSource), 'deleteRecipeFromEdit defined');
-    assert.ok(/function handleRecipeDraftChange\(/.test(rootSource), 'handleRecipeDraftChange defined');
+    assert.ok(/function patchRecipeDraft\(/.test(rootSource), 'patchRecipeDraft stages edits into the draft');
     assert.ok(/async function handleAddRecipeItem\(/.test(rootSource), 'handleAddRecipeItem defined');
-    assert.ok(/async function handleSetRecipeItem\(/.test(rootSource), 'handleSetRecipeItem defined');
+    assert.ok(/function handleSetRecipeItem\(/.test(rootSource), 'handleSetRecipeItem defined');
+    assert.ok(/async function handleToggleRecipeEnabled\(/.test(rootSource), 'handleToggleRecipeEnabled defined');
+    // The draft + baseline + JSON-diff dirty flag are the source of truth.
+    assert.ok(/let recipeDraft = \$state\(null\)/.test(rootSource), 'recipeDraft state declared');
+    assert.ok(/let recipeDraftBaseline = \$state\(null\)/.test(rootSource), 'recipeDraftBaseline state declared');
+    assert.ok(rootSource.includes('JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline)'), 'dirty derives from a JSON diff');
+    // The editor no longer calls the immediate-persist store methods.
+    assert.equal(rootSource.includes('store.deleteRecipeStep?.('), false, 'editor no longer calls store.deleteRecipeStep');
+    assert.equal(rootSource.includes('store.setRecipeComplexity?.('), false, 'editor no longer calls store.setRecipeComplexity');
+    assert.equal(rootSource.includes('store.revertRecipeToSingleStep?.('), false, 'editor no longer calls store.revertRecipeToSingleStep');
     assert.ok(rootSource.includes('canSaveRecipeEdit'), 'canSaveRecipeEdit derived');
     assert.ok(rootSource.includes('recipeKnowledgeMode'), 'recipeKnowledgeMode derived');
   });
 
-  it('wires the recipe-edit header chip + Back/Delete/Save and the slimmed view props', () => {
-    assert.ok(rootSource.includes('form="manager-recipe-edit-form"'), 'header Save submits the recipe-edit form');
+  it('stages destructive in-draft actions through the confirm-only store helper', () => {
+    assert.ok(rootSource.includes('store.confirmRecipeAction?.('), 'destructive actions confirm via store.confirmRecipeAction');
+    assert.ok(/async function confirmRecipeAction\(/.test(storeSource), 'store defines confirmRecipeAction');
+    assert.ok(/\n[ \t]*confirmRecipeAction,/.test(storeSource), 'store exports confirmRecipeAction');
+  });
+
+  it('wires the recipe-edit header chip + Back/Delete/Save and the controlled view props', () => {
+    assert.ok(rootSource.includes('onclick={saveRecipeDraft}'), 'header Save commits via a plain onclick');
+    assert.equal(rootSource.includes('form="manager-recipe-edit-form"'), false, 'header Save no longer submits a form');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.Dirty'), 'dirty chip uses Recipe.Dirty');
     assert.ok(rootSource.includes('onclick={backToRecipesBrowse}'), 'header Back to recipes wired');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.BackToBrowse'), 'Back button uses Recipe.BackToBrowse');
@@ -185,8 +212,18 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(recipeEditHeader.includes('is-danger'), 'Delete button carries the is-danger class');
     assert.ok(!recipeEditHeader.includes('cancelRecipeEdit'), 'recipe-edit header no longer renders Cancel');
     assert.ok(rootSource.includes('onPickImagePath={services?.pickImagePath}'), 'passes onPickImagePath');
-    assert.ok(rootSource.includes('onSave={saveRecipeEdit}'), 'passes onSave');
-    assert.ok(rootSource.includes('onDraftChange={handleRecipeDraftChange}'), 'passes onDraftChange');
+    assert.ok(rootSource.includes('recipe={recipeDraft}'), 'passes the root-held draft as recipe');
+    assert.ok(rootSource.includes('onUpdateRecipe={(patch) => patchRecipeDraft(patch)}'), 'onUpdateRecipe stages into the draft');
+    assert.ok(rootSource.includes('onToggleEnabled={handleToggleRecipeEnabled}'), 'passes the immediate enabled toggle');
+    // Scope the removed-prop assertions to the RecipeEditView mount (essence/component
+    // editors still use onDraftChange/onDirtyChange of their own).
+    const recipeViewMount = rootSource.slice(
+      rootSource.indexOf('<RecipeEditView'),
+      rootSource.indexOf('/>', rootSource.indexOf('<RecipeEditView'))
+    );
+    assert.equal(recipeViewMount.includes('onSave='), false, 'no onSave prop on the controlled view');
+    assert.equal(recipeViewMount.includes('onDraftChange='), false, 'no onDraftChange prop on the controlled view');
+    assert.equal(recipeViewMount.includes('onDirtyChange='), false, 'no onDirtyChange prop on the controlled view');
   });
 
   it('renders the recipe-item card in the global inspector aside, gated on knowledge mode', () => {

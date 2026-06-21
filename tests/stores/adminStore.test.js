@@ -1582,6 +1582,23 @@ describe('createAdminStore', () => {
       assert.deepEqual(errors, ['recipe boom']);
     });
 
+    it('confirmRecipeAction resolves true/false from services.confirmDialog (no persistence)', async () => {
+      let captured = null;
+      const services = createMockServices({
+        confirmDialog: async (opts) => { captured = opts; return true; }
+      });
+      const store = createAdminStore(services);
+      const yes = await store.confirmRecipeAction({ title: 'Delete step?', content: '<p>Remove it?</p>' });
+      assert.equal(yes, true, 'returns true when the user confirms');
+      assert.equal(captured.title, 'Delete step?', 'forwards the title');
+      assert.equal(captured.content, '<p>Remove it?</p>', 'forwards the content');
+
+      const noServices = createMockServices({ confirmDialog: async () => false });
+      const noStore = createAdminStore(noServices);
+      const no = await noStore.confirmRecipeAction({ title: 't', content: 'c' });
+      assert.equal(no, false, 'returns false when the user declines');
+    });
+
     it('createRecipe requests an incomplete shell via the allowIncomplete option', async () => {
       let createArgs = null;
       const services = createMockServices();

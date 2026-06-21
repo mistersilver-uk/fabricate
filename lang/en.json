@@ -919,6 +919,7 @@
           "Steps": "Steps",
           "StepsHint": "Order the named steps used to craft this recipe. Drag to reorder.",
           "StepLabel": "Step",
+          "UnnamedRecipe": "this recipe",
           "AddStep": "Add a step",
           "DeleteStep": "Delete step",
           "DragStep": "Drag to reorder",

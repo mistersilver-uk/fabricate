@@ -762,8 +762,8 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
     assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
     assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');
-    // saveRecipeEdit now lives in the root (the recipe-edit view owns a real
-    // save), so scope the inline-save absence to the browser source instead.
+    // saveRecipeDraft lives in the root (it commits the root-held draft), so scope
+    // the inline-save absence to the browser source instead.
     assert.ok(!recipesBrowserSource.includes('saveRecipe'), 'recipes browser should not introduce inline save behavior');
     assert.ok(!rootSource.includes('required station'), 'recipes browser should not introduce unsupported recipe fields');
   });
