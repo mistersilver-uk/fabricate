@@ -4437,6 +4437,12 @@
 .fabricate-manager .manager-recipe-ingredient-set-name {
   flex: 1 1 auto;
   min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
   font-weight: 700;
 }
 
@@ -4556,13 +4562,42 @@
   box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
 }
 
-/* The component alternative's trigger reads as `[img] Name`, sized to its
-   content and left-aligned at the start of the row. */
+/* The component alternative's trigger is the image-only picker target, sized to
+   its thumbnail; the resolved component name renders as static text beside it. */
 .fabricate-manager .manager-recipe-component-trigger {
   justify-content: flex-start;
   width: auto;
   height: auto;
   min-height: 34px;
+}
+
+/* The selected component's name, rendered beside the image-only picker trigger
+   (not inside the clickable button). */
+.fabricate-manager .manager-recipe-component-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The option's match editor lays the image trigger and the static name on one
+   row so the name reads beside the thumbnail. */
+.fabricate-manager .manager-recipe-option-component {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* The per-OR-group footer add cluster: one set of "Add component / Add tag
+   requirement" controls inside the requirement box instead of per row. */
+.fabricate-manager .manager-recipe-requirement-adds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2xs);
+  padding-top: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
@@ -4612,6 +4647,12 @@
 .fabricate-manager .manager-recipe-option-quantity {
   flex: 0 0 auto;
   width: 4.5rem;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
 }
 
 .fabricate-manager .manager-recipe-essence-quantity {

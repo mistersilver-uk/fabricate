@@ -26,7 +26,8 @@
     onRemove = () => {},
     onAddComponentAlternative = () => {},
     onAddTagAlternative = () => {},
-    canRemove = true
+    canRemove = true,
+    showRowAdds = true
   } = $props();
 
   function text(key, fallback) {
@@ -90,21 +91,27 @@
 <div class="manager-recipe-ingredient-option-row" data-recipe-option>
   <div class="manager-recipe-option-target">
     {#if matchType === 'component'}
-      <SearchablePopover
-        options={componentPickerOptions}
-        value={componentId}
-        pickerClass="manager-recipe-component-picker"
-        triggerClass="manager-button manager-recipe-component-trigger"
-        triggerImg={selectedComponent?.img || ''}
-        triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-        triggerLabel={selectedComponent ? selectedComponent.name : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-        onChoose={(id) => chooseComponent(id)}
-      />
+      <div class="manager-recipe-option-component">
+        <SearchablePopover
+          options={componentPickerOptions}
+          value={componentId}
+          pickerClass="manager-recipe-component-picker"
+          triggerClass="manager-button manager-recipe-component-trigger"
+          triggerImg={selectedComponent?.img || ''}
+          triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
+          triggerLabel={selectedComponent ? '' : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+          triggerTitle={selectedComponent?.name || ''}
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+          onChoose={(id) => chooseComponent(id)}
+        />
+        {#if selectedComponent}
+          <span class="manager-recipe-component-name">{selectedComponent.name}</span>
+        {/if}
+      </div>
     {:else}
       <div class="manager-recipe-option-tags">
         {#if tags.length > 0}
@@ -172,30 +179,33 @@
       onchange={(e) => setQuantity(e.target.value)}
     />
 
-    <div class="manager-recipe-option-alternative-adds">
-      <SearchablePopover
-        options={componentPickerOptions}
-        pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
-        triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
-        triggerIcon="fas fa-cube"
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
-        triggerAddMarker="alternative-component"
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
-        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-        showChevron={false}
-        onChoose={(id) => onAddComponentAlternative(id)}
-      />
-      <button
-        type="button"
-        class="manager-button is-subtle manager-recipe-add-alternative-trigger"
-        data-recipe-add="alternative-tag"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
-        title={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
-        onclick={() => onAddTagAlternative()}
-      ><i class="fas fa-tags" aria-hidden="true"></i></button>
-    </div>
+    {#if showRowAdds}
+      <div class="manager-recipe-option-alternative-adds">
+        <SearchablePopover
+          options={componentPickerOptions}
+          pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
+          triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
+          triggerIcon="fas fa-cube"
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+          triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+          triggerAddMarker="alternative-component"
+          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+          showChevron={false}
+          onChoose={(id) => onAddComponentAlternative(id)}
+        />
+        <button
+          type="button"
+          class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+          data-recipe-add="alternative-tag"
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+          title={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+          onclick={() => onAddTagAlternative()}
+        ><i class="fas fa-tags" aria-hidden="true"></i></button>
+      </div>
+    {/if}
 
     {#if canRemove}
       <button

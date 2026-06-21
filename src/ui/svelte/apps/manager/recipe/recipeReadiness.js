@@ -19,6 +19,29 @@ function asArray(value) {
 }
 
 /**
+ * Compute a stable match signature for an alternative (option). Used to detect
+ * exact-duplicate matches within an OR group or set. Returns null for options
+ * with no usable match (an empty component slot or a tags match with no tags).
+ *
+ * @param {object} option One alternative inside a requirement.
+ * @returns {string | null}
+ */
+function optionSignature(option) {
+  const match = option?.match;
+  if (match?.type === 'component') {
+    const componentId = trimmed(match.componentId);
+    return componentId ? `component:${componentId}` : null;
+  }
+  if (match?.type === 'tags') {
+    const tags = asArray(match.tags).map(trimmed).filter(Boolean);
+    if (tags.length === 0) return null;
+    const tagMatch = match.tagMatch === 'all' ? 'all' : 'any';
+    return `tags:${[...tags].sort().join(',')}|${tagMatch}`;
+  }
+  return null;
+}
+
+/**
  * Resolve the recipe's execution steps exactly like the admin store's
  * `_getRecipeExecutionSteps`: explicit `recipe.steps` when non-empty, otherwise
  * one implicit step built from the recipe-level sets/groups/tools.
@@ -101,6 +124,53 @@ export function evaluateRecipeReadiness(recipe = {}) {
       });
     }
   }
+
+  // Duplicate-match detection: a recipe must not repeat the same component or an
+  // identical tag match twice inside one OR group, nor as duplicate requirements
+  // within a set. Both surface as blocking, critical issues.
+  let duplicateFound = false;
+  for (const step of executionSteps) {
+    for (const set of asArray(step.ingredientSets)) {
+      const groups = asArray(set?.ingredientGroups);
+      const requirementSignatures = [];
+
+      for (const group of groups) {
+        const signatures = asArray(group?.options)
+          .map(optionSignature)
+          .filter(Boolean);
+
+        // Within an OR group: any repeated option signature is a duplicate.
+        if (new Set(signatures).size !== signatures.length) {
+          duplicateFound = true;
+          issues.push({
+            id: 'duplicateAlternative',
+            severity: 'critical',
+            blocks: 'enable',
+            target: 'ingredients',
+            ...(isMultiStep ? { stepId: step.id, stepName: step.name } : {})
+          });
+        }
+
+        if (signatures.length > 0) {
+          requirementSignatures.push([...signatures].sort().join('&&'));
+        }
+      }
+
+      // Within a set: two requirements sharing a requirement signature duplicate.
+      if (new Set(requirementSignatures).size !== requirementSignatures.length) {
+        duplicateFound = true;
+        issues.push({
+          id: 'duplicateRequirement',
+          severity: 'critical',
+          blocks: 'enable',
+          target: 'ingredients',
+          ...(isMultiStep ? { stepId: step.id, stepName: step.name } : {})
+        });
+      }
+    }
+  }
+
+  checks.push({ id: 'noDuplicateMatches', satisfied: !duplicateFound });
 
   // A disabled recipe still saves, but flag that it cannot be enabled until the
   // critical requirements above are met. The store/model projects `incomplete`;

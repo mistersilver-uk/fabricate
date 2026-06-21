@@ -91,6 +91,155 @@ describe('evaluateRecipeReadiness', () => {
     assert.equal(check(checks, 'hasResultGroup').satisfied, true);
   });
 
+  it('flags a duplicate component within an OR group as a critical duplicateAlternative', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Dupe',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [{
+          id: 'g1',
+          options: [
+            { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+            { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }
+          ]
+        }]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    const dupes = issues.filter(i => i.id === 'duplicateAlternative');
+    assert.equal(dupes.length, 1, 'one duplicateAlternative per offending group');
+    assert.equal(dupes[0].severity, 'critical');
+    assert.equal(dupes[0].blocks, 'enable');
+    assert.equal(dupes[0].target, 'ingredients');
+    assert.equal(check(checks, 'noDuplicateMatches').satisfied, false);
+    assert.equal(blocksEnable(issues), true);
+  });
+
+  it('flags an identical tag match within an OR group regardless of tag order', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Tag dupe',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [{
+          id: 'g1',
+          options: [
+            { quantity: 1, match: { type: 'tags', tags: ['a', 'b'], tagMatch: 'all' } },
+            { quantity: 1, match: { type: 'tags', tags: ['b', 'a'], tagMatch: 'all' } }
+          ]
+        }]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.filter(i => i.id === 'duplicateAlternative').length, 1, 'sorted-tag signature collapses tag order');
+  });
+
+  it('does not flag tag matches that differ only by tagMatch', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Distinct tagMatch',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [{
+          id: 'g1',
+          options: [
+            { quantity: 1, match: { type: 'tags', tags: ['a'], tagMatch: 'any' } },
+            { quantity: 1, match: { type: 'tags', tags: ['a'], tagMatch: 'all' } }
+          ]
+        }]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.some(i => i.id === 'duplicateAlternative'), false, 'any vs all are distinct matches');
+  });
+
+  it('flags two identical single-component requirements in a set as duplicateRequirement', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Req dupe',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [
+          { id: 'g1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
+          { id: 'g2', options: [{ quantity: 3, match: { type: 'component', componentId: 'cmp-herb' } }] }
+        ]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    const dupes = issues.filter(i => i.id === 'duplicateRequirement');
+    assert.equal(dupes.length, 1, 'one duplicateRequirement for the set');
+    assert.equal(dupes[0].severity, 'critical');
+    assert.equal(dupes[0].blocks, 'enable');
+    assert.equal(dupes[0].target, 'ingredients');
+    assert.equal(check(checks, 'noDuplicateMatches').satisfied, false);
+  });
+
+  it('reports noDuplicateMatches satisfied and no duplicate issues for all-distinct matches', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Distinct',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [
+          { id: 'g1', options: [
+            { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+            { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+          ] },
+          { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['liquid'], tagMatch: 'any' } }] }
+        ]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.some(i => i.id === 'duplicateAlternative'), false);
+    assert.equal(issues.some(i => i.id === 'duplicateRequirement'), false);
+    assert.equal(check(checks, 'noDuplicateMatches').satisfied, true);
+  });
+
+  it('does not flag duplicates among options that have no usable match yet', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Empty matches',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [
+          { id: 'g1', options: [
+            { quantity: 1, match: { type: 'component', componentId: '' } },
+            { quantity: 1, match: { type: 'component', componentId: '' } }
+          ] },
+          { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }
+        ]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.some(i => i.id === 'duplicateAlternative'), false, 'empty matches are not signatures');
+    assert.equal(issues.some(i => i.id === 'duplicateRequirement'), false);
+    assert.equal(check(checks, 'noDuplicateMatches').satisfied, true);
+  });
+
+  it('carries stepId/stepName on a duplicate issue for a multi-step recipe', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Multi dupe',
+      enabled: true,
+      steps: [
+        { id: 'sa', name: 'Forge', ingredientSets: [{
+          id: 's1',
+          ingredientGroups: [{
+            id: 'g1',
+            options: [
+              { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+              { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }
+            ]
+          }]
+        }], resultGroups: [{ id: 'r1' }] }
+      ]
+    });
+    const dupe = issues.find(i => i.id === 'duplicateAlternative');
+    assert.ok(dupe, 'duplicate surfaced for the multi-step recipe');
+    assert.equal(dupe.stepId, 'sa', 'carries the offending step id');
+    assert.equal(dupe.stepName, 'Forge', 'carries the step name');
+  });
+
   it('marks every multi-step requirement check satisfied for a complete multi-step recipe', () => {
     const { checks, issues } = evaluateRecipeReadiness({
       name: 'Forged Blade',

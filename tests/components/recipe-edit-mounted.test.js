@@ -719,6 +719,105 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('renders the component option image trigger with the name as separate static text (not inside the button)', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const row = target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-option]');
+    const trigger = row.querySelector('.manager-recipe-component-trigger');
+    assert.ok(trigger, 'the component picker trigger renders');
+    assert.ok(trigger.querySelector('.manager-travel-portrait img'), 'the trigger shows the component image');
+    // The name must NOT be inside the clickable trigger button.
+    assert.equal(/Mountain Herb/.test(trigger.textContent), false, 'the component name is not inside the trigger button');
+    // The name renders as separate static text beside the trigger.
+    const name = row.querySelector('.manager-recipe-component-name');
+    assert.ok(name, 'the component name renders as static text beside the trigger');
+    assert.equal(name.textContent.trim(), 'Mountain Herb', 'the static name resolves the component name');
+    // The image trigger carries the component name as a tooltip.
+    assert.equal(trigger.getAttribute('title'), 'Mountain Herb', 'the image trigger has a name tooltip');
+    editHarness.remount();
+  });
+
+  it('renders the per-row add cluster (with tooltips) for a single-alternative requirement', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const req = target.querySelector('[data-recipe-group-id="grp-1"]');
+    const row = req.querySelector('[data-recipe-option]');
+    // The add cluster lives inside the option row for a single-alternative requirement.
+    const rowAddComponent = row.querySelector('[data-recipe-add="alternative-component"]');
+    const rowAddTag = row.querySelector('[data-recipe-add="alternative-tag"]');
+    assert.ok(rowAddComponent, 'the per-row add-component control renders in the option row');
+    assert.ok(rowAddTag, 'the per-row add-tag control renders in the option row');
+    // No footer add cluster for a single-alternative requirement.
+    assert.equal(req.querySelector('.manager-recipe-requirement-adds'), null, 'no footer add cluster for a bare requirement');
+    // Both inline add controls carry title tooltips.
+    assert.equal(rowAddComponent.getAttribute('title'), 'Add component', 'the add-component trigger has a tooltip');
+    assert.equal(rowAddTag.getAttribute('title'), 'Add tag requirement', 'the add-tag button has a tooltip');
+    editHarness.remount();
+  });
+
+  it('renders exactly one footer add cluster (and no per-row adds) for a multi-alternative OR group', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+      ] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const req = target.querySelector('[data-recipe-group-id="grp-1"]');
+    // Exactly one add-component and one add-tag control in the whole requirement.
+    assert.equal(req.querySelectorAll('[data-recipe-add="alternative-component"]').length, 1, 'one add-component control per OR group');
+    assert.equal(req.querySelectorAll('[data-recipe-add="alternative-tag"]').length, 1, 'one add-tag control per OR group');
+    // The single add cluster lives in the requirement footer, not in any option row.
+    const footer = req.querySelector('.manager-recipe-requirement-adds');
+    assert.ok(footer, 'the footer add cluster renders for an OR group');
+    assert.ok(footer.querySelector('[data-recipe-add="alternative-component"]'), 'the add-component control is in the footer');
+    for (const optionRow of req.querySelectorAll('[data-recipe-option]')) {
+      assert.equal(optionRow.querySelector('.manager-recipe-option-alternative-adds'), null, 'option rows have no per-row add cluster');
+      assert.equal(optionRow.querySelector('[data-recipe-add="alternative-component"]'), null, 'option rows have no add-component control');
+    }
+    // The footer add controls keep their tooltips.
+    assert.equal(footer.querySelector('[data-recipe-add="alternative-component"]').getAttribute('title'), 'Add component', 'footer add-component tooltip');
+    assert.equal(footer.querySelector('[data-recipe-add="alternative-tag"]').getAttribute('title'), 'Add tag requirement', 'footer add-tag tooltip');
+    editHarness.remount();
+  });
+
+  it('appends an alternative from the OR-group footer add-component control', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'tags', tags: ['liquid'], tagMatch: 'any' } }
+      ] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const footer = target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds');
+    footer.querySelector('[data-recipe-add="alternative-component"]').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Pure Water/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing from the footer patches the recipe');
+    const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 3, 'the alternative list grew by one');
+    assert.deepEqual(options[2].match, { type: 'component', componentId: 'cmp-water' }, 'the appended alternative is the chosen component');
+    editHarness.remount();
+  });
+
   it('changes a component alternative via its picker trigger', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({

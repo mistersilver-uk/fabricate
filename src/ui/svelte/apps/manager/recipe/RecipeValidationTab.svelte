@@ -32,13 +32,16 @@
     hasName: ['CheckName', 'Has a name'],
     hasIngredientSet: ['CheckIngredientSet', 'Every step has at least one ingredient set'],
     hasResultGroup: ['CheckResultGroup', 'Every step has at least one result set'],
-    stepsNamed: ['CheckStepsNamed', 'Every step is named']
+    stepsNamed: ['CheckStepsNamed', 'Every step is named'],
+    noDuplicateMatches: ['CheckNoDuplicateMatches', 'No duplicate component or tag matches']
   };
   const ISSUE_LABELS = {
     noName: ['IssueNoName', 'The recipe needs a name.'],
     noIngredientSet: ['IssueNoIngredientSet', 'A step has no ingredient set.'],
     noResultGroup: ['IssueNoResultGroup', 'A step has no result set.'],
-    disabledIncomplete: ['IssueDisabledIncomplete', 'The recipe is disabled and cannot be enabled until its requirements are complete.']
+    disabledIncomplete: ['IssueDisabledIncomplete', 'The recipe is disabled and cannot be enabled until its requirements are complete.'],
+    duplicateAlternative: ['IssueDuplicateAlternative', 'An OR group repeats the same component or tag match.'],
+    duplicateRequirement: ['IssueDuplicateRequirement', 'A set repeats the same ingredient requirement.']
   };
 
   function checkLabel(id) {

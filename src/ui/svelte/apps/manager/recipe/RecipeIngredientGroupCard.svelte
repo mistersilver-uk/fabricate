@@ -17,6 +17,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
 
   let {
     group = {},
@@ -33,6 +34,12 @@
 
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
+
+  // The footer add cluster (rendered once for an OR group) needs its own picker
+  // option list mirroring the per-row component picker.
+  const componentPickerOptions = $derived(
+    (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
+  );
 
   function updateOption(index, nextOption) {
     onChange({ ...group, options: options.map((option, i) => (i === index ? nextOption : option)) });
@@ -75,6 +82,7 @@
         {componentOptions}
         {itemTags}
         canRemove={true}
+        showRowAdds={options.length === 1}
         onChange={(nextOption) => updateOption(index, nextOption)}
         onRemove={() => removeOption(index)}
         onAddComponentAlternative={(id) => addComponentAlternative(id)}
@@ -82,4 +90,32 @@
       />
     {/each}
   </div>
+
+  {#if hasAlternatives}
+    <div class="manager-recipe-requirement-adds">
+      <SearchablePopover
+        options={componentPickerOptions}
+        pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
+        triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
+        triggerIcon="fas fa-cube"
+        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        triggerAddMarker="alternative-component"
+        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+        showChevron={false}
+        onChoose={(id) => addComponentAlternative(id)}
+      />
+      <button
+        type="button"
+        class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+        data-recipe-add="alternative-tag"
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+        title={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+        onclick={() => addTagAlternative()}
+      ><i class="fas fa-tags" aria-hidden="true"></i></button>
+    </div>
+  {/if}
 </div>

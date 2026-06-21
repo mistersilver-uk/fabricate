@@ -1000,10 +1000,13 @@
             "CheckIngredientSet": "Every step has at least one ingredient set",
             "CheckResultGroup": "Every step has at least one result set",
             "CheckStepsNamed": "Every step is named",
+            "CheckNoDuplicateMatches": "No duplicate component or tag matches",
             "IssueNoName": "The recipe needs a name.",
             "IssueNoIngredientSet": "A step has no ingredient set.",
             "IssueNoResultGroup": "A step has no result set.",
-            "IssueDisabledIncomplete": "The recipe is disabled and cannot be enabled until its requirements are complete."
+            "IssueDisabledIncomplete": "The recipe is disabled and cannot be enabled until its requirements are complete.",
+            "IssueDuplicateAlternative": "An OR group repeats the same component or tag match.",
+            "IssueDuplicateRequirement": "A set repeats the same ingredient requirement."
           },
           "PlayerVisibility": "Player visibility",
           "Inspector": "Selected recipe inspector",

@@ -21,6 +21,8 @@
     triggerAddMarker — optional value for a `data-recipe-add` attribute on the
                    trigger button (lets the recipe editor mark popover-backed add
                    controls without wrapping the button)
+    triggerTitle — optional native `title` tooltip on the trigger button
+                   (backward-compatible; omitted when empty)
     *AriaLabel / searchPlaceholder / emptyHint — localized strings
     onChoose(id) — called with the chosen option id
 -->
@@ -40,6 +42,7 @@
     valueClass = '',
     showChevron = true,
     triggerAddMarker = '',
+    triggerTitle = '',
     triggerAriaLabel = '',
     dialogAriaLabel = '',
     searchPlaceholder = '',
@@ -163,6 +166,7 @@
     aria-expanded={open}
     {disabled}
     data-recipe-add={triggerAddMarker || undefined}
+    title={triggerTitle || undefined}
     aria-label={triggerAriaLabel || undefined}
     onclick={toggle}
     onkeydown={stop}
