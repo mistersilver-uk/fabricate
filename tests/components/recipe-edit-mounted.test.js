@@ -773,8 +773,8 @@ describe('RecipeEditView (mounted)', () => {
     // No footer add cluster for a single-alternative requirement.
     assert.equal(req.querySelector('.manager-recipe-requirement-adds'), null, 'no footer add cluster for a bare requirement');
     // Both inline add controls carry title tooltips.
-    assert.equal(rowAddComponent.getAttribute('title'), 'Add component', 'the add-component trigger has a tooltip');
-    assert.equal(rowAddTag.getAttribute('title'), 'Add tag requirement', 'the add-tag button has a tooltip');
+    assert.equal(rowAddComponent.getAttribute('title'), 'Add alternative component', 'the add-component trigger has a tooltip');
+    assert.equal(rowAddTag.getAttribute('title'), 'Add alternative tag requirement', 'the add-tag button has a tooltip');
     editHarness.remount();
   });
 
@@ -802,8 +802,8 @@ describe('RecipeEditView (mounted)', () => {
       assert.equal(optionRow.querySelector('[data-recipe-add="alternative-component"]'), null, 'option rows have no add-component control');
     }
     // The footer add controls keep their tooltips.
-    assert.equal(footer.querySelector('[data-recipe-add="alternative-component"]').getAttribute('title'), 'Add component', 'footer add-component tooltip');
-    assert.equal(footer.querySelector('[data-recipe-add="alternative-tag"]').getAttribute('title'), 'Add tag requirement', 'footer add-tag tooltip');
+    assert.equal(footer.querySelector('[data-recipe-add="alternative-component"]').getAttribute('title'), 'Add alternative component', 'footer add-component tooltip');
+    assert.equal(footer.querySelector('[data-recipe-add="alternative-tag"]').getAttribute('title'), 'Add alternative tag requirement', 'footer add-tag tooltip');
     editHarness.remount();
   });
 

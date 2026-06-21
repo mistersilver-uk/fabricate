@@ -98,10 +98,10 @@
         pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
         triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
         triggerIcon="fas fa-cube"
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
-        triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
+        triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
         triggerAddMarker="alternative-component"
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
         searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
         searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
@@ -112,8 +112,8 @@
         type="button"
         class="manager-button is-subtle manager-recipe-add-alternative-trigger"
         data-recipe-add="alternative-tag"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
-        title={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
+        title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
         onclick={() => addTagAlternative()}
       ><i class="fas fa-tags" aria-hidden="true"></i></button>
     </div>
