@@ -401,6 +401,20 @@ describe('RecipeEditView (mounted)', () => {
       img.getAttribute('src').includes('potion-tube-corked-blue'),
       'shows the linked item image'
     );
+
+    // Regression: the locked image is fully controlled by the (staged) linkedItemImage
+    // prop, so staging a different recipe-item link updates the preview without a save.
+    editHarness.remount();
+    const restaged = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, recipeItemId: 'ri2' },
+      linkedItemImage: 'icons/consumables/potions/potion-tube-corked-green.webp',
+      onPickImagePath: async () => 'icons/should-not-be-used.webp'
+    }));
+    const restagedImg = restaged.querySelector('[data-recipe-item-locked-image] img');
+    assert.ok(
+      restagedImg.getAttribute('src').includes('potion-tube-corked-green'),
+      'a staged link change swaps the locked preview image without a save'
+    );
     editHarness.remount();
   });
 
@@ -1283,6 +1297,44 @@ describe('RecipeItemInspector (mounted)', () => {
     await Promise.resolve();
     await Promise.resolve();
     assert.deepEqual(set, ['ri-existing'], 'skipped action still sets the recipeItemId');
+    inspectorHarness.remount();
+  });
+
+  it('derives the linked image/name from the STAGED recipeItemId against the definitions', async () => {
+    // Two definitions; fromUuid resolves a doc per uuid so the thumb/name come from
+    // the resolved source. The displayed pair must track the recipe draft's
+    // recipeItemId — the staged source — not any persisted projection.
+    const DOCS = {
+      'Item.blue': { name: 'Blue Potion', img: 'icons/blue-potion.webp' },
+      'Item.green': { name: 'Green Potion', img: 'icons/green-potion.webp' }
+    };
+    globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
+    const DEFS = [
+      { id: 'ri-blue', name: 'Blue Def', img: 'icons/blue-def.webp', sourceItemUuid: 'Item.blue' },
+      { id: 'ri-green', name: 'Green Def', img: 'icons/green-def.webp', sourceItemUuid: 'Item.green' }
+    ];
+    const target = await inspectorHarness.mount(inspectorProps({
+      recipe: { ...RECIPE, recipeItemId: 'ri-blue' },
+      recipeItemDefinitions: DEFS
+    }));
+    await new Promise((r) => setTimeout(r, 10));
+    const imgEl = target.querySelector('[data-recipe-item-linked] img.manager-environment-scene-thumb');
+    const nameEl = target.querySelector('[data-recipe-item-linked] .manager-environment-scene-name');
+    assert.ok(imgEl.getAttribute('src').includes('blue-potion'), 'shows the blue source image for the staged ri-blue link');
+    assert.ok(nameEl.textContent.includes('Blue Potion'), 'shows the blue source name for the staged ri-blue link');
+
+    // Regression: staging a different recipeItemId updates the preview WITHOUT a
+    // save — the inspector resolves from the (staged) draft, not a persisted record.
+    inspectorHarness.remount();
+    const restaged = await inspectorHarness.mount(inspectorProps({
+      recipe: { ...RECIPE, recipeItemId: 'ri-green' },
+      recipeItemDefinitions: DEFS
+    }));
+    await new Promise((r) => setTimeout(r, 10));
+    const imgAfter = restaged.querySelector('[data-recipe-item-linked] img.manager-environment-scene-thumb');
+    const nameAfter = restaged.querySelector('[data-recipe-item-linked] .manager-environment-scene-name');
+    assert.ok(imgAfter.getAttribute('src').includes('green-potion'), 'staged ri-green link swaps the displayed image without a save');
+    assert.ok(nameAfter.textContent.includes('Green Potion'), 'staged ri-green link swaps the displayed name without a save');
     inspectorHarness.remount();
   });
 

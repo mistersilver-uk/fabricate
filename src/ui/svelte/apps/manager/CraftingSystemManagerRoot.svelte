@@ -529,6 +529,17 @@
     && recipeEditSaving !== true);
   const recipeKnowledgeMode = $derived(selectedSystem?.recipeVisibility?.knowledge?.mode || 'itemOrLearned');
   const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
+  // Locked recipe-item image for the Overview tab: resolve from the STAGED draft's
+  // recipeItemId against the available definitions, so staging a link change updates
+  // the preview immediately (do not read the persisted selectedRecipe projection).
+  const recipeDraftLinkedItemImage = $derived(
+    (() => {
+      const linkedId = String(recipeDraft?.recipeItemId || '');
+      if (!linkedId) return '';
+      const def = recipeItemDefinitions.find((entry) => entry.id === linkedId);
+      return def?.img || '';
+    })()
+  );
   // The recipe-item card lives in the global inspector and is shown only when
   // the system's knowledge mode consumes an item; for 'learned' the aside is
   // suppressed (full-width main), matching the other suppressed edit views.
@@ -3827,7 +3838,7 @@
         saving={recipeEditSaving}
         saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
-        linkedItemImage={selectedRecipe?.recipeItemImg || ''}
+        linkedItemImage={recipeDraftLinkedItemImage}
         currencyUnits={selectedCurrencyUnits}
         toolsLibrary={selectedGatheringSystemTools}
         componentOptions={selectedSystem?.managedItemOptions || []}
