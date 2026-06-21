@@ -141,6 +141,7 @@ function compileManagerRoot() {
     'src/models/IngredientSet.js',
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
+    'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
     'src/config/flags.js',
     'src/config/currencyPresets.js',

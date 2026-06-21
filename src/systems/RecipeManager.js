@@ -1,6 +1,7 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools } from '../gatheringToolRuntime.js';
+import { getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
 import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
@@ -744,9 +745,13 @@ export class RecipeManager {
   ingredientMatchesItem(recipe, ingredient, item) {
     const features = this._getSystemFeatures(recipe);
     const match = ingredient.match || null;
+    const handler = getMatchHandler(match);
+    // A component (or legacy systemItem) match resolves its id via the handler;
+    // tags/currency/no-match return null and fall to the bare-field fallback,
+    // then on to `_matchesIngredient`.
     const componentId =
-      match?.type === 'component' || match?.type === 'systemItem'
-        ? match.componentId || match.systemItemId || null
+      handler.type === 'component'
+        ? handler.getComponentId(match)
         : ingredient.componentId || ingredient.systemItemId || null;
 
     if (componentId) {
@@ -801,22 +806,15 @@ export class RecipeManager {
   _matchesIngredient(ingredient, item, features) {
     if (ingredient.itemUuid && item.uuid === ingredient.itemUuid) return true;
 
-    if (ingredient.match?.type === 'tags') {
-      if (!features.enableTags) return false;
-      const requiredTags = Array.isArray(ingredient.match.tags) ? ingredient.match.tags : [];
-      const itemTags = getFabricateFlag(item, 'tags', []);
-      const matched =
-        ingredient.match.tagMatch === 'all'
-          ? requiredTags.every((tag) => itemTags.includes(tag))
-          : requiredTags.some((tag) => itemTags.includes(tag));
-      if (!matched) return false;
-      return true;
-    }
-
-    if (ingredient.match?.type === 'currency') {
-      // A currency alternative matches no inventory item.
-      // Currency matches are authored-only; craft-time currency spend is a separate follow-up.
-      return false;
+    // Dispatch ONLY for terminal match types (tags/currency) — they fully decide
+    // the result off the match object. A `component`/null/unknown match falls
+    // through to the legacy bare-field `ingredient.tag` block and the
+    // `ingredient.alternatives` recursion below, which key off bare
+    // `ingredient.*` fields, not the match (so a `{type:'component'}` ingredient
+    // with `alternatives` still recurses into them).
+    const handler = getMatchHandler(ingredient.match);
+    if (handler.type === 'tags' || handler.type === 'currency') {
+      return handler.matchesItem(ingredient.match, item, { features });
     }
 
     if (ingredient.tag) {
@@ -1292,8 +1290,7 @@ export class RecipeManager {
         for (const group of groups) {
           for (const option of group.options || []) {
             const match = option.match || null;
-            const isTagPlaceholder = match?.type === 'tags';
-            if (!isTagPlaceholder) continue;
+            if (getMatchHandler(match).type !== 'tags') continue;
             const tagIds = Array.isArray(match.tags) ? match.tags : [];
 
             for (const tagId of tagIds) {

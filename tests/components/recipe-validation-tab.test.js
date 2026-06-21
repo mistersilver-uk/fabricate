@@ -12,6 +12,10 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-validation-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    // recipeReadiness dispatches through the match-type registry, which reads
+    // item flags — copy both so the harness module graph resolves.
+    'src/config/flags.js',
+    'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js'
   ],
   compiledModules: ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],

@@ -29,6 +29,8 @@ const RAW_MODULES = [
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
   'src/config/flags.js',
+  // Ingredient + recipeReadiness dispatch through the match-type registry.
+  'src/models/match/matchTypes.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness

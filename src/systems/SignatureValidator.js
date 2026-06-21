@@ -11,6 +11,8 @@
  *   - getRecipesForSystem(systemId)
  *   - getComponentsForSystem(systemId)
  */
+import { getMatchHandler } from '../models/match/matchTypes.js';
+
 export class SignatureValidator {
   constructor(craftingSystemManager) {
     this._csm = craftingSystemManager;
@@ -24,37 +26,10 @@ export class SignatureValidator {
    * @returns {Set<string>} component IDs that can match this ingredient
    */
   expandIngredientToComponentIds(ingredient, systemComponents) {
-    const match = ingredient?.match;
-    if (!match) return new Set();
-
-    if (match.type === 'component') {
-      const id = match.componentId || match.systemItemId || null;
-      return id ? new Set([id]) : new Set();
-    }
-
-    if (match.type === 'tags') {
-      const tags = Array.isArray(match.tags) ? match.tags : [];
-      const tagMatch = match.tagMatch === 'all' ? 'all' : 'any';
-
-      return new Set(
-        (systemComponents || [])
-          .filter((c) => {
-            const compTags = Array.isArray(c.tags) ? c.tags : [];
-            return tagMatch === 'all'
-              ? tags.every((t) => compTags.includes(t))
-              : tags.some((t) => compTags.includes(t));
-          })
-          .map((c) => c.id)
-      );
-    }
-
-    // A currency alternative is not a managed component, so it contributes no
-    // component ids and is ignored by alchemy signature overlap detection.
-    if (match.type === 'currency') {
-      return new Set();
-    }
-
-    return new Set();
+    return getMatchHandler(ingredient?.match).expandToComponentIds(
+      ingredient?.match,
+      systemComponents
+    );
   }
 
   /**
