@@ -850,7 +850,7 @@
             "OutcomeRouting": "Enables routed outcome configuration where supported.",
             "EffectTransfer": "Allows crafted results to inherit effects from source components.",
             "ChatOutput": "Posts a summary chat card after crafting and gathering attempts.",
-            "Currency": "Enables step currency requirements and the currency configuration for this system."
+            "Currency": "Enables the currency configuration for this system."
           }
         },
         "Nav": {
@@ -924,7 +924,6 @@
           "DeleteStep": "Delete step",
           "DragStep": "Drag to reorder",
           "Instantaneous": "Instantaneous",
-          "NoCost": "No cost",
           "NoRequirements": "No requirements",
           "AlternativeSets": "{count} alternative sets",
           "StepRequirements": "{count} steps",
@@ -2674,7 +2673,7 @@
         },
         "CurrencyRequirements": {
           "Title": "Currency Requirements",
-          "Hint": "Allow steps to require currency, resolved via system adapter or macros.",
+          "Hint": "Configure this system's currencies and how they are spent, via system adapter or macros.",
           "MacroProvider": "Macro provider",
           "SystemAdapter": "System adapter",
           "SelectAdapter": "Select adapter",

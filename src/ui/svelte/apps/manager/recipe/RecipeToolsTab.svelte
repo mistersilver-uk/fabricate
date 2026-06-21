@@ -20,7 +20,6 @@
     isMultiStep = false,
     toolIds = [],
     toolsLibrary = [],
-    currencyUnits = [],
     onAddTool = () => {},
     onRemoveTool = () => {},
     onAddStepTool = () => {},
@@ -50,7 +49,7 @@
 
   {#if isMultiStep && steps.length > 0}
     <h4 class="manager-recipe-tools-steps-title">{text('FABRICATE.Admin.Manager.Recipe.PerStepTools', 'Tools per step')}</h4>
-    <RecipeStepAccordion {steps} {currencyUnits} {onDeleteStep}>
+    <RecipeStepAccordion {steps} {onDeleteStep}>
       {#snippet body(step)}
         <RecipeToolsSection
           idPrefix={`step-${step.id}-`}

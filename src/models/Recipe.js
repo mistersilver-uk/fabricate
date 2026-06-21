@@ -186,16 +186,6 @@ export class Recipe {
             }
           }
         }
-        if (step.currencyRequirement) {
-          const unit = String(step.currencyRequirement?.unit || '').trim();
-          const amount = Number(step.currencyRequirement?.amount || 0);
-          if (!unit) {
-            errors.push(`Step "${step.name || step.id}" has invalid currency requirement unit`);
-          }
-          if (!Number.isFinite(amount) || amount <= 0) {
-            errors.push(`Step "${step.name || step.id}" has invalid currency requirement amount`);
-          }
-        }
       }
     } else {
       for (const ingredientSet of this.ingredientSets) {
@@ -488,7 +478,6 @@ export class Recipe {
       resultGroups: this._normalizeResultGroups(step),
       toolIds: this._normalizeToolIds(step.toolIds),
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
-      currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
       currencyCost: this._normalizeCurrencyCost(step.currencyCost),
       outcomeRouting:
         step.outcomeRouting && typeof step.outcomeRouting === 'object'
@@ -514,13 +503,6 @@ export class Recipe {
       normalized.months +
       normalized.years;
     return total > 0 ? normalized : null;
-  }
-
-  _normalizeCurrencyRequirement(currencyRequirement = null) {
-    if (!currencyRequirement || typeof currencyRequirement !== 'object') return null;
-    const unit = String(currencyRequirement.unit || '').trim();
-    const amount = Math.max(0, Number(currencyRequirement.amount || 0) || 0);
-    return unit && amount > 0 ? { unit, amount } : null;
   }
 
   _normalizeCurrencyCost(cost) {
@@ -598,7 +580,6 @@ export class Recipe {
         resultGroups: this.resultGroups,
         toolIds: this.toolIds || [],
         timeRequirement: null,
-        currencyRequirement: null,
         outcomeRouting: this.outcomeRouting || null,
         resultSelection: this.resultSelection || null,
       },

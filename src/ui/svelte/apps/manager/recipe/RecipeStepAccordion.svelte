@@ -2,7 +2,7 @@
 <!--
   Shared expandable/collapsible step accordion. Renders the recipe's ordered steps
   as a list of rows; each row's header carries the order pip, the name/description
-  toggle, the time/currency summary chips, and a delete button, while the expanded
+  toggle, the time summary chip, and a delete button, while the expanded
   body is supplied by the caller via the `body` snippet. An optional `footer`
   snippet (e.g. an "add step" row) lets the Overview surface add steps.
 
@@ -20,7 +20,6 @@
 
   let {
     steps = [],
-    currencyUnits = [],
     reorderable = false,
     onReorderSteps = () => {},
     onDeleteStep = () => {},
@@ -44,19 +43,6 @@
 
   function stepDescription(step) {
     return String(step?.description || '').trim();
-  }
-
-  // Resolve currency unit display from the system's currency units (mirrors
-  // SystemEditView): fall back to the abbreviation/id, then the generic coins icon.
-  function currencyUnit(unitId) {
-    return (currencyUnits || []).find(entry => entry.id === unitId) || null;
-  }
-  function currencyUnitLabel(unitId) {
-    const unit = currencyUnit(unitId);
-    return unit?.label || unit?.abbreviation || unitId;
-  }
-  function currencyUnitIcon(unitId) {
-    return currencyUnit(unitId)?.icon || 'fa-solid fa-coins';
   }
 
   // Compact "2 hours 30 minutes" string from the non-zero fields of a time requirement.
@@ -125,10 +111,6 @@
           <span class={`manager-chip ${step.timeRequirement ? '' : 'is-empty'}`} data-recipe-step-time={step.id}>
             <i class="fa-solid fa-clock" aria-hidden="true"></i>
             <span>{step.timeRequirement ? formatTimeRequirement(step.timeRequirement) : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span>
-          </span>
-          <span class={`manager-chip ${step.currencyRequirement ? '' : 'is-empty'}`} data-recipe-step-currency={step.id}>
-            <i class={step.currencyRequirement ? currencyUnitIcon(step.currencyRequirement.unit) : 'fa-solid fa-coins'} aria-hidden="true"></i>
-            <span>{step.currencyRequirement ? `${step.currencyRequirement.amount} ${currencyUnitLabel(step.currencyRequirement.unit)}` : text('FABRICATE.Admin.Manager.Recipe.NoCost', 'No cost')}</span>
           </span>
         </div>
         <div class="manager-recipe-steps-row-controls">

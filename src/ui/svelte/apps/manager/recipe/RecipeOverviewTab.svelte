@@ -29,7 +29,6 @@
     onToggleEnabled = () => {},
     onChooseImage = () => {},
     isMultiStep = false,
-    currencyUnits = [],
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -115,7 +114,6 @@
   {#if isMultiStep}
     <RecipeStepsCard
       steps={recipe?.steps || []}
-      {currencyUnits}
       {onAddStep}
       {onReorderSteps}
       {onUpdateStep}

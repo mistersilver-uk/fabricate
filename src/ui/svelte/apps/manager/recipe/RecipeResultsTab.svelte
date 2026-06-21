@@ -18,7 +18,6 @@
     recipe = null,
     complex = true,
     isMultiStep = false,
-    currencyUnits = [],
     onAddResultGroup = () => {},
     onRemoveResultGroup = () => {},
     onDeleteStep = () => {}
@@ -42,7 +41,7 @@
     {#if steps.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its results.')}</p>
     {:else}
-      <RecipeStepAccordion {steps} {currencyUnits} {onDeleteStep}>
+      <RecipeStepAccordion {steps} {onDeleteStep}>
         {#snippet body(step)}
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}

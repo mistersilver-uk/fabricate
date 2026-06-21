@@ -12,7 +12,6 @@
 
   let {
     steps = [],
-    currencyUnits = [],
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -33,7 +32,7 @@
     </div>
   </div>
 
-  <RecipeStepAccordion {steps} {currencyUnits} reorderable {onReorderSteps} {onDeleteStep}>
+  <RecipeStepAccordion {steps} reorderable {onReorderSteps} {onDeleteStep}>
     {#snippet body(step)}
       <label class="manager-field">
         <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>

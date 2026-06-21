@@ -9,13 +9,7 @@ import {
   itemMatchesComponentSource,
 } from '../utils/sourceUuid.js';
 
-import { ActorPropertyCoinSpender, MacroCoinSpender } from './CoinSpenders.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
-import {
-  findCurrencyUnit,
-  formatCurrencyRequirement,
-  validateCurrencyProfile,
-} from './currencyProfile.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 /**
@@ -28,20 +22,13 @@ export class CraftingEngine {
     craftingRunManager = null,
     resolutionModeService = null,
     itemPilesIntegration = null,
-    salvageRunManager = null,
-    actorInventoryCoinSpender = null,
-    actorPropertyCoinSpender = null
+    salvageRunManager = null
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
-    // Stubbable spend seams: the actorInventory spender is injected by tests (and wired in
-    // main.js) so they can assert which path ran; the actorProperty spender defaults to the
-    // generic implementation and needs no system-specific wiring.
-    this.actorInventoryCoinSpender = actorInventoryCoinSpender;
-    this.actorPropertyCoinSpender = actorPropertyCoinSpender;
   }
 
   /**
@@ -243,15 +230,6 @@ export class CraftingEngine {
       };
     }
 
-    const currencyCheck = await this._checkCurrencyRequirement(craftingActor, recipe, step);
-    if (!currencyCheck.valid) {
-      return {
-        success: false,
-        results: null,
-        message: currencyCheck.message,
-      };
-    }
-
     const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
     if (!itemPilesAffordCheck.valid) {
       return {
@@ -420,15 +398,6 @@ export class CraftingEngine {
         success: false,
         results: null,
         message,
-      };
-    }
-
-    const currencyDecrement = await this._decrementCurrencyRequirement(craftingActor, recipe, step);
-    if (!currencyDecrement.valid) {
-      return {
-        success: false,
-        results: null,
-        message: currencyDecrement.message,
       };
     }
 
@@ -1228,28 +1197,6 @@ export class CraftingEngine {
     return definition.sourceItemUuid || null;
   }
 
-  _getCurrencyRequirementConfig(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return null;
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(systemId);
-    if (!system) return null;
-
-    const currency = system?.requirements?.currency || {};
-    const spendStrategy = ['actorInventory', 'macro'].includes(currency.spendStrategy)
-      ? currency.spendStrategy
-      : 'actorProperty';
-    const macros = currency.macros && typeof currency.macros === 'object' ? currency.macros : {};
-    return {
-      enabled: currency.enabled === true,
-      spendStrategy,
-      providerId: String(currency.providerId || ''),
-      macros,
-      units: Array.isArray(currency.units) ? currency.units : [],
-      system,
-    };
-  }
-
   _getFailureConsumptionPolicy(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
@@ -1297,14 +1244,6 @@ export class CraftingEngine {
     } catch (error) {
       console.error(`Fabricate | Failure macro failed (${failureMacroUuid}):`, error);
     }
-  }
-
-  _getStepCurrencyRequirement(step) {
-    if (!step?.currencyRequirement || typeof step.currencyRequirement !== 'object') return null;
-    const unit = String(step.currencyRequirement.unit || '').trim();
-    const amount = Math.max(0, Number(step.currencyRequirement.amount || 0) || 0);
-    if (!unit || amount <= 0) return null;
-    return { unit, amount };
   }
 
   /**
@@ -1357,170 +1296,6 @@ export class CraftingEngine {
       await integration.deductCurrency(craftingActor, cost.currencies);
     } catch (error) {
       console.error('Fabricate | Item Piles deductCurrency error', error);
-    }
-  }
-
-  /**
-   * Resolve the coin spender for one of the three peer spend strategies.
-   * `actorInventory` → the injected inventory spender (it resolves a per-system adapter;
-   * `providerId` is reserved for a future multi-provider system); `macro` → a per-config
-   * {@link MacroCoinSpender}; `actorProperty` (default) → the generic property spender.
-   * The actorInventory/property spenders are injected (tests / main.js) or read from the
-   * `game.fabricate` accessor; the actorProperty spender defaults to the generic implementation.
-   * @private
-   */
-  _resolveCoinSpender(config = {}) {
-    if (config.spendStrategy === 'actorInventory') {
-      return (
-        this.actorInventoryCoinSpender || game.fabricate?.getActorInventoryCoinSpender?.() || null
-      );
-    }
-    if (config.spendStrategy === 'macro') {
-      return new MacroCoinSpender({ macros: config.macros });
-    }
-    return (
-      this.actorPropertyCoinSpender ||
-      game.fabricate?.getActorPropertyCoinSpender?.() ||
-      new ActorPropertyCoinSpender()
-    );
-  }
-
-  /**
-   * Validate the currency profile, resolve the requirement unit, and resolve the spender.
-   * @private
-   */
-  _resolveCurrencySpend(craftingActor, recipe, step) {
-    const requirement = this._getStepCurrencyRequirement(step);
-    if (!requirement) return { skip: true };
-
-    const config = this._getCurrencyRequirementConfig(recipe);
-    if (!config?.enabled) return { skip: true };
-
-    const profile = validateCurrencyProfile(config.units || [], {
-      spendStrategy: config.spendStrategy,
-      macros: config.macros,
-    });
-    if (!profile.valid) {
-      return {
-        error: {
-          valid: false,
-          message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
-        },
-      };
-    }
-    const unit = findCurrencyUnit(profile.units, requirement.unit);
-    if (!unit) {
-      return {
-        error: { valid: false, message: `Currency unit "${requirement.unit}" is not configured.` },
-      };
-    }
-    const spender = this._resolveCoinSpender(config);
-    return { requirement, config, profile, unit, spender };
-  }
-
-  /**
-   * Build the context handed to currency macros (canAfford / decrement). The agreed shape is
-   * `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement,
-   * recipe, craftingSystem }`. `cost` keys the requirement by the unit's abbreviation so macros
-   * match coins by the same abbreviation the GM configured on each unit.
-   * @private
-   */
-  _buildCurrencyMacroContext({ actor, requirement, profile, unit, recipe, config }) {
-    return {
-      actor,
-      cost: [{ abbreviation: unit.abbreviation, amount: requirement.amount }],
-      units: (profile.units || []).map((entry) => ({
-        id: entry.id,
-        abbreviation: entry.abbreviation,
-        label: entry.label,
-      })),
-      requirement: { unit: requirement.unit, amount: requirement.amount },
-      recipe,
-      craftingSystem: config?.system || null,
-    };
-  }
-
-  /**
-   * Assemble the `ctx` passed to a coin spender's `check`/`spend`. Carries the validated profile
-   * and resolved unit (used by the property/inventory spenders) plus the macro context (used by
-   * {@link MacroCoinSpender}).
-   * @private
-   */
-  _buildCurrencySpendContext(resolved, craftingActor, recipe) {
-    const { requirement, config, profile, unit } = resolved;
-    return {
-      profile,
-      unit,
-      units: profile.units,
-      requirement,
-      recipe,
-      craftingSystem: config?.system || null,
-      macroContext: this._buildCurrencyMacroContext({
-        actor: craftingActor,
-        requirement,
-        profile,
-        unit,
-        recipe,
-        config,
-      }),
-    };
-  }
-
-  async _checkCurrencyRequirement(craftingActor, recipe, step) {
-    const resolved = this._resolveCurrencySpend(craftingActor, recipe, step);
-    if (resolved.skip) return { valid: true };
-    if (resolved.error) return resolved.error;
-    const { requirement, unit, spender } = resolved;
-
-    if (!spender?.check) {
-      return {
-        valid: false,
-        message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
-      };
-    }
-    const ctx = this._buildCurrencySpendContext(resolved, craftingActor, recipe);
-    const result = await spender.check(craftingActor, { unit, amount: requirement.amount }, ctx);
-    if (!result?.valid) {
-      return {
-        valid: false,
-        message:
-          result?.message ||
-          `Insufficient currency. Requires ${formatCurrencyRequirement(requirement, resolved.profile.units)}.`,
-      };
-    }
-    return { valid: true };
-  }
-
-  async _decrementCurrencyRequirement(craftingActor, recipe, step) {
-    const resolved = this._resolveCurrencySpend(craftingActor, recipe, step);
-    if (resolved.skip) return { valid: true };
-    if (resolved.error) return resolved.error;
-    const { requirement, profile, unit, spender } = resolved;
-
-    if (!spender?.spend) {
-      return {
-        valid: false,
-        message: `Currency unit "${unit.label || unit.id}" is not available on ${craftingActor?.name || 'actor'}.`,
-      };
-    }
-    try {
-      const ctx = this._buildCurrencySpendContext(resolved, craftingActor, recipe);
-      const result = await spender.spend(craftingActor, { unit, amount: requirement.amount }, ctx);
-      if (!result?.valid) {
-        return {
-          valid: false,
-          message:
-            result?.message ||
-            `Could not spend currency (${formatCurrencyRequirement(requirement, profile.units)}).`,
-        };
-      }
-      return { valid: true };
-    } catch (error) {
-      console.error('Fabricate | Failed to decrement currency', error);
-      return {
-        valid: false,
-        message: `Could not spend currency (${formatCurrencyRequirement(requirement, profile.units)}).`,
-      };
     }
   }
 

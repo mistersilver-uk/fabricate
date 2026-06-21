@@ -204,7 +204,6 @@
             {onToggleEnabled}
             onChooseImage={chooseImage}
             {isMultiStep}
-            {currencyUnits}
             {onAddStep}
             {onReorderSteps}
             {onUpdateStep}
@@ -227,7 +226,6 @@
             {recipe}
             {complex}
             {isMultiStep}
-            {currencyUnits}
             onAddResultGroup={addResultGroup}
             onRemoveResultGroup={removeResultGroup}
             onDeleteStep={deleteStepFrom('results')}
@@ -238,7 +236,6 @@
             {isMultiStep}
             {toolIds}
             {toolsLibrary}
-            {currencyUnits}
             onAddTool={addTool}
             onRemoveTool={removeTool}
             onAddStepTool={addStepTool}

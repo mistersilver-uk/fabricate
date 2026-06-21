@@ -112,10 +112,6 @@ function inspectorProps(overrides = {}) {
   };
 }
 
-const CURRENCY_UNITS = Object.freeze([
-  { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins' }
-]);
-
 const TOOLS_LIBRARY = Object.freeze([
   Object.freeze({ id: 'tool-hammer', label: 'Hammer', componentId: 'cmp-hammer' }),
   Object.freeze({ id: 'tool-anvil', label: 'Anvil', componentId: 'cmp-anvil' })
@@ -161,10 +157,9 @@ const STEPS = Object.freeze([
     id: 'step-1',
     name: 'Gather reagents',
     description: 'Collect the base herbs.',
-    timeRequirement: { minutes: 30, hours: 2, days: 0, months: 0, years: 0 },
-    currencyRequirement: { unit: 'gp', amount: 5 }
+    timeRequirement: { minutes: 30, hours: 2, days: 0, months: 0, years: 0 }
   }),
-  Object.freeze({ id: 'step-2', name: 'Distil', description: '', timeRequirement: null, currencyRequirement: null })
+  Object.freeze({ id: 'step-2', name: 'Distil', description: '', timeRequirement: null })
 ]);
 
 // Let Svelte's scheduler flush DOM updates triggered by an event handler.
@@ -175,7 +170,6 @@ function flushRender() {
 function stepsProps(overrides = {}) {
   return {
     steps: STEPS,
-    currencyUnits: CURRENCY_UNITS,
     onAddStep: () => {},
     onReorderSteps: () => {},
     onUpdateStep: () => {},
@@ -1065,20 +1059,18 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('shows time/currency chips and a delete control in every requirement tab header', async () => {
+  it('shows the time chip and a delete control in every requirement tab header', async () => {
     const target = await editHarness.mount(identityProps({
       recipe: {
         ...RECIPE,
-        steps: [{ id: 'sa', name: 'Forge', timeRequirement: { hours: 1 }, currencyRequirement: { unit: 'gp', amount: 3 } }]
+        steps: [{ id: 'sa', name: 'Forge', timeRequirement: { hours: 1 } }]
       },
-      currencyUnits: CURRENCY_UNITS,
       toolsLibrary: TOOLS_LIBRARY
     }));
     for (const tab of ['ingredients', 'results', 'tools']) {
       clickTab(target, tab);
       await flushRender();
       assert.ok(target.querySelector('[data-recipe-step-time="sa"]'), `${tab} header shows the time chip`);
-      assert.ok(target.querySelector('[data-recipe-step-currency="sa"]'), `${tab} header shows the currency chip`);
       assert.ok(target.querySelector('[data-recipe-step-delete="sa"]'), `${tab} header shows the delete control`);
     }
     editHarness.remount();
@@ -1417,20 +1409,15 @@ describe('RecipeStepsCard (mounted)', () => {
     stepsHarness.remount();
   });
 
-  it('shows formatted time/currency pips, and placeholder pips when a step has no requirements', async () => {
+  it('shows a formatted time pip, and a placeholder pip when a step has no time requirement', async () => {
     const target = await stepsHarness.mount(stepsProps());
     const time1 = target.querySelector('[data-recipe-step-time="step-1"]');
-    const currency1 = target.querySelector('[data-recipe-step-currency="step-1"]');
     assert.match(time1.textContent, /2 hours 30 minutes/, 'time formatted from non-zero units');
-    assert.match(currency1.textContent, /5 Gold/, 'currency resolves the unit label');
     assert.equal(time1.classList.contains('is-empty'), false, 'a populated time pip is not muted');
 
     const time2 = target.querySelector('[data-recipe-step-time="step-2"]');
-    const currency2 = target.querySelector('[data-recipe-step-currency="step-2"]');
     assert.match(time2.textContent, /Instantaneous/, 'no time requirement shows the Instantaneous placeholder');
-    assert.match(currency2.textContent, /No cost/, 'no currency requirement shows the No cost placeholder');
     assert.ok(time2.classList.contains('is-empty'), 'placeholder time pip is muted');
-    assert.ok(currency2.classList.contains('is-empty'), 'placeholder currency pip is muted');
     stepsHarness.remount();
   });
 

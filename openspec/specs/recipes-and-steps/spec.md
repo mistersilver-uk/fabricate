@@ -16,7 +16,7 @@ This spec does not redefine mode semantics; mode-specific resolution is defined 
 When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**. The following rules apply:
 
 - Recipe-level `ingredientSets` and `resultGroups` MAY be empty arrays or absent entirely.
-- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `toolIds`, `timeRequirement`, and `currencyRequirement`.
+- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `toolIds`, and `timeRequirement`.
 - Recipe-level fields serve as fallback ONLY for implicit single-step recipes (where `steps` is empty and the recipe-level fields form one implicit step).
 - Step-level fields always take priority. Recipe-level fields are never merged into or combined with step-level fields.
 - Recipe-level `toolIds` defined outside any step are additive: they apply to every step in addition to each step's own `toolIds`.
@@ -50,7 +50,6 @@ Each step can define:
 - `ingredientSets`
 - `resultGroups`
 - optional `timeRequirement`
-- optional `currencyRequirement`
 
 ## Ingredient and Tool Semantics
 
@@ -76,7 +75,7 @@ Each step can define:
 
 1. Validate ingredient/tool availability.
 2. Validate optional essence requirements when enabled.
-3. Validate step-level time/currency requirements when enabled.
+3. Validate step-level time requirements when enabled.
 
 ### Check and Resolution
 
@@ -139,14 +138,6 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 - Runtime execution normalizes duration fields to a world-time target timestamp for gate checks.
 - A step with time gating is incomplete until world time reaches the target completion timestamp.
 - Fabricate listens to the `updateWorldTime` hook, and checks game time on startup, to mark recipes and steps with a time requirement as completed, and subsequently notify users.
-- Currency behaviour is configured by `CraftingSystem.requirements.currency.units[]` and the configured `spendStrategy` (see `data-models` *Currency Spend Strategy*):
-  - `currencyRequirement.unit` references a configured `CurrencyUnit.id`.
-  - the engine validates the currency profile, resolves the requirement unit, and resolves a coin spender by the peer `spendStrategy` (`actorProperty` | `actorInventory` | `macro`), then drives an up-front affordability `check` followed by a `spend` deduction.
-  - under `actorProperty`: checks convert held denominations and the required amount to the configured terminal base unit; decrements spend configured denominations deterministically and make change through the unit breakdown.
-  - under `actorInventory`: the per-system inventory adapter (pf2e) reads coins from the inventory aggregate and spends through the system's own coin API, which makes its own change; Fabricate does not run its own change-making.
-  - under `macro`: the GM's `canAfford` macro gates the craft and the `decrement` macro performs the deduction (the `increment` macro is reserved and never invoked); a `false`/`null`/thrown result fails loudly.
-  - a failed affordability check or a failed deduction aborts the step **before** ingredient consumption.
-  - invalid currency profiles, missing actor paths, stale unit references, an unresolvable spender/adapter, and insufficient funds block the step with a GM-readable message.
 
 ## Effect Transfer Semantics
 
