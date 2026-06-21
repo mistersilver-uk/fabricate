@@ -6,6 +6,7 @@ import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
 import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
 
+import { buildCurrencyAffordProbe } from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
@@ -296,6 +297,10 @@ export class RecipeManager {
    *   is marked `{ available: true, virtual: true }` so the caller excludes it
    *   from breakage/usage. componentId is per-system, so the system scope prevents
    *   a tool from system A satisfying a system-B recipe.
+   * @param {object|null} [options.craftingActor] - the actor whose currency funds a
+   *   currency-alternative group. The display probe is bound to this actor so the
+   *   craftability shown to a player agrees with what the engine spends. Defaults to
+   *   `null`, which makes every currency option show as missing (no crash).
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
@@ -305,7 +310,11 @@ export class RecipeManager {
    *   toolStates: Array<{ name: string, available: boolean, virtual?: boolean }>
    * }}
    */
-  evaluateCraftability(componentSourceActors, recipe, { presentTools = null } = {}) {
+  evaluateCraftability(
+    componentSourceActors,
+    recipe,
+    { presentTools = null, craftingActor = null } = {}
+  ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
       : componentSourceActors
@@ -335,6 +344,11 @@ export class RecipeManager {
 
     const features = this._getSystemFeatures(recipe);
 
+    // Bind the currency affordability probe to the crafting actor so a currency
+    // alternative is selectable in the display exactly when the engine could spend
+    // it. A null actor yields a probe that is always false (currency shows missing).
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+
     // Attempt to find a satisfiable ingredient set.
     // We capture both the satisfiable set (if any) and the first-set result for
     // the fallback display path.
@@ -348,10 +362,18 @@ export class RecipeManager {
     for (const ingredientSet of recipe.ingredientSets) {
       const selection =
         typeof ingredientSet.resolveIngredientSelection === 'function'
-          ? ingredientSet.resolveIngredientSelection(availableItems, (ingredient, item) =>
-              this.ingredientMatchesItem(recipe, ingredient, item)
+          ? ingredientSet.resolveIngredientSelection(
+              availableItems,
+              (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
+              { affordCurrency }
             )
-          : { success: true, missingGroups: [], selectedIngredients: [], plan: [] };
+          : {
+              success: true,
+              missingGroups: [],
+              selectedIngredients: [],
+              plan: [],
+              currencySpends: [],
+            };
 
       // Track the first set's selection for the unsatisfied fallback display.
       if (firstSetSelection === null) {
@@ -620,9 +642,11 @@ export class RecipeManager {
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [options.presentTools] -
    *   Virtual-present payload from an active canvas Tool station (see
    *   evaluateCraftability for the system-scoping semantics).
+   * @param {object|null} [options.craftingActor] - actor whose currency funds a
+   *   currency-alternative group (see evaluateCraftability). Defaults to `null`.
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
-  canCraft(componentSourceActors, recipe, { presentTools = null } = {}) {
+  canCraft(componentSourceActors, recipe, { presentTools = null, craftingActor = null } = {}) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
       : componentSourceActors
@@ -639,12 +663,20 @@ export class RecipeManager {
 
     const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(sourceActors, recipe, {
       presentTools,
+      craftingActor,
     });
     return { canCraft, satisfiableSet, missing };
   }
 
   /**
-   * Check if an ingredient set can be satisfied with available items
+   * Check if an ingredient set can be satisfied with available items.
+   *
+   * Deliberately currency-BLIND: it passes no `affordCurrency` probe, so a currency
+   * alternative never satisfies a group here. This helper does not feed the
+   * craftability decision (that runs through {@link evaluateCraftability}, which is
+   * actor-bound and currency-aware); it is an item/essence-only completeness check,
+   * so threading the actor probe through it would add nothing.
+   *
    * @param {IngredientSet} ingredientSet - The ingredient set to check
    * @param {Item[]} availableItems - Items available for crafting
    * @returns {{ingredients: Array, essences: Array}}

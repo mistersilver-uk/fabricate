@@ -10,6 +10,11 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
+import {
+  buildCurrencyAffordProbe,
+  checkCurrencySpends,
+  spendCurrencySpends,
+} from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 /**
@@ -22,13 +27,33 @@ export class CraftingEngine {
     craftingRunManager = null,
     resolutionModeService = null,
     itemPilesIntegration = null,
-    salvageRunManager = null
+    salvageRunManager = null,
+    actorInventoryCoinSpender = null,
+    actorPropertyCoinSpender = null
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
+    // Stubbable spend seams: the actorInventory spender is injected by tests (and wired in
+    // main.js) so they can assert which path ran; the actorProperty spender defaults to the
+    // generic implementation and needs no system-specific wiring. They flow through to the
+    // shared currency-affordance resolver as the spend-strategy → spender seams.
+    this.actorInventoryCoinSpender = actorInventoryCoinSpender;
+    this.actorPropertyCoinSpender = actorPropertyCoinSpender;
+  }
+
+  /**
+   * The spend seams handed to the shared currency-affordance helpers
+   * ({@link buildCurrencyAffordProbe}, {@link checkCurrencySpends}, {@link spendCurrencySpends}).
+   * @private
+   */
+  _currencySeams() {
+    return {
+      actorInventoryCoinSpender: this.actorInventoryCoinSpender,
+      actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+    };
   }
 
   /**
@@ -181,9 +206,12 @@ export class CraftingEngine {
 
     const executionRecipe = this._buildStepRecipeView(recipe, step);
 
-    // Check if recipe step can be crafted
+    // Check if recipe step can be crafted. Thread the crafting actor so a currency
+    // alternative is craftable exactly when this actor can afford it — display and
+    // execution agree on the same currency-aware decision.
     const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
       presentTools,
+      craftingActor,
     });
     if (!canCraftCheck.canCraft) {
       const missingMsg = this._formatMissingItems(canCraftCheck.missing);
@@ -210,6 +238,19 @@ export class CraftingEngine {
       ingredientSet = canCraftCheck.satisfiableSet;
     }
 
+    // SINGLE SELECTION SOURCE: compute the widened selection exactly once here, with
+    // the currency probe bound to the crafting actor + system currency profile. Both
+    // consumption (its item `plan`) and the currency gate/spend (its `currencySpends`)
+    // read THIS selection — never a recompute — so item mutation mid-craft can never
+    // diverge the gated spend from the consumed plan.
+    const craftSelection = this._resolveCraftSelection(
+      componentSourceActors,
+      ingredientSet,
+      executionRecipe,
+      craftingActor
+    );
+    const currencySpends = craftSelection.currencySpends || [];
+
     // Validate tools: the recipe's resolved library Tools must be present
     // (a matching, non-broken item) on the component source actors.
     const toolsForSet =
@@ -227,6 +268,24 @@ export class CraftingEngine {
         success: false,
         results: null,
         message: toolValidation.message,
+      };
+    }
+
+    // Currency afford gate: every chosen currency spend must be affordable (aggregated
+    // cross-unit on the common ladder) BEFORE any item/currency mutation or the
+    // Item-Piles deduct. On a shortfall we abort here with zero mutation and never fall
+    // back to an unselected item plan.
+    const currencyAffordCheck = await checkCurrencySpends(
+      craftingActor,
+      executionRecipe,
+      currencySpends,
+      this._currencySeams()
+    );
+    if (!currencyAffordCheck.valid) {
+      return {
+        success: false,
+        results: null,
+        message: currencyAffordCheck.message,
       };
     }
 
@@ -254,11 +313,10 @@ export class CraftingEngine {
       let usedToolsOnFail = [];
       try {
         if (failurePolicy.consumeIngredientsOnFail) {
-          consumedOnFail = await this._consumeIngredients(
-            componentSourceActors,
-            ingredientSet,
-            executionRecipe
-          );
+          consumedOnFail = await this._consumeIngredients(craftSelection.plan);
+          // Currency is consumed alongside items on the failure path only when the
+          // policy consumes ingredients on failure (it is a chosen ingredient).
+          await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
         }
         if (failurePolicy.consumeCatalystsOnFail) {
           usedToolPairs = toolValidation.tools;
@@ -334,11 +392,8 @@ export class CraftingEngine {
       let usedToolsOnValidationFail = [];
       try {
         if (validationFailurePolicy.consumeIngredientsOnFail) {
-          consumedOnValidationFail = await this._consumeIngredients(
-            componentSourceActors,
-            ingredientSet,
-            executionRecipe
-          );
+          consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
+          await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
         }
         if (validationFailurePolicy.consumeCatalystsOnFail) {
           usedToolPairsOnValidationFail = toolValidation.tools;
@@ -401,12 +456,8 @@ export class CraftingEngine {
       };
     }
 
-    // Consume ingredients from component source actors
-    const consumedItems = await this._consumeIngredients(
-      componentSourceActors,
-      ingredientSet,
-      executionRecipe
-    );
+    // Consume ingredients from the single craft selection's item plan.
+    const consumedItems = await this._consumeIngredients(craftSelection.plan);
 
     // For alchemy attempts: also consume submitted items that weren't handled
     // by standard ingredient matching (e.g. items used only for essences).
@@ -428,6 +479,11 @@ export class CraftingEngine {
         }
       }
     }
+
+    // Deduct the chosen currency spends after item consumption (the afford gate above
+    // already confirmed every spend is affordable). A mid-loop spend failure is logged
+    // like the Item-Piles deduct error below — not refunded.
+    await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
     // Apply tool usage/breakage for the recipe's resolved library Tools.
     const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
@@ -782,19 +838,69 @@ export class CraftingEngine {
   }
 
   /**
-   * Consume ingredients from component source actors
+   * Deduct the chosen currency spends for a craft. The afford gate in {@link craft}
+   * already confirmed affordability, so this runs after item consumption. A spend
+   * failure here is logged (mirroring the Item-Piles deduct-error handling) and never
+   * refunded — it does not abort the craft, matching the no-refund policy.
    * @private
    */
-  async _consumeIngredients(componentSourceActors, ingredientSet, recipe) {
-    const consumedItems = [];
+  async _spendCraftCurrency(craftingActor, recipe, currencySpends) {
+    if (!currencySpends?.length) return;
+    try {
+      const result = await spendCurrencySpends(
+        craftingActor,
+        recipe,
+        currencySpends,
+        this._currencySeams()
+      );
+      if (!result?.valid) {
+        console.error('Fabricate | Currency deduction reported failure', result?.message);
+      }
+    } catch (error) {
+      console.error('Fabricate | Currency deduction error', error);
+    }
+  }
 
-    // Aggregate all items from component source actors
+  /**
+   * Resolve the single craft selection for a step: the widened ingredient-set
+   * selection with the currency afford probe bound to the crafting actor. The
+   * returned object carries the item `plan` (consumed by {@link _consumeIngredients})
+   * and the `currencySpends` (gated/spent by the engine). Computed ONCE in
+   * {@link craft} so consumption and the currency spend never diverge.
+   *
+   * @private
+   * @returns {{ success: boolean, plan: Array, currencySpends: Array, missingGroups: Array }}
+   */
+  _resolveCraftSelection(componentSourceActors, ingredientSet, recipe, craftingActor) {
     const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
+    const matcher = (ingredient, item) =>
+      this.recipeManager.ingredientMatchesItem(recipe, ingredient, item);
+    if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
+      const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
+      return ingredientSet.resolveIngredientSelection(availableItems, matcher, { affordCurrency });
+    }
+    // Back-compat: an ingredient set exposing only matchIngredients (older duck-typed
+    // shapes) yields an item-only plan with no currency spends.
+    if (typeof ingredientSet?.matchIngredients === 'function') {
+      return {
+        success: true,
+        plan: ingredientSet.matchIngredients(availableItems, matcher),
+        currencySpends: [],
+        missingGroups: [],
+      };
+    }
+    return { success: true, plan: [], currencySpends: [], missingGroups: [] };
+  }
 
-    // Match ingredients to items
-    const consumptionPlan = ingredientSet.matchIngredients(availableItems, (ingredient, item) =>
-      this.recipeManager.ingredientMatchesItem(recipe, ingredient, item)
-    );
+  /**
+   * Consume the item plan from the single craft selection. The plan is computed once
+   * in {@link craft} (via {@link _resolveCraftSelection}) and passed in, so this never
+   * recomputes the match against possibly-mutated items.
+   * @private
+   * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
+   */
+  async _consumeIngredients(consumptionPlan = []) {
+    const consumedItems = [];
 
     // Execute consumption
     for (const { item, quantity, ingredient } of consumptionPlan) {

@@ -60,6 +60,11 @@ import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
+import {
+  ActorInventoryCoinSpender,
+  ActorPropertyCoinSpender,
+} from './systems/CoinSpenders.js';
+import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -490,6 +495,8 @@ class Fabricate {
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
     this.itemPilesIntegration = null;
+    this.actorInventoryCoinSpender = null;
+    this.actorPropertyCoinSpender = null;
     this.compendiumImporter = null;
     this.ready = false;
     // Replay-safe readiness signal: resolves once `initialize()` completes and
@@ -534,13 +541,22 @@ class Fabricate {
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
+    // The generic actor-inventory spender resolves a per-system coin adapter by
+    // game.system.id; pf2e is the sole registered adapter (an internal map, not a plugin
+    // registry). The actor-property spender is generic and needs no system-specific wiring.
+    this.actorInventoryCoinSpender = new ActorInventoryCoinSpender({
+      adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
+    });
+    this.actorPropertyCoinSpender = new ActorPropertyCoinSpender();
     this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
       this.resolutionModeService,
       this.itemPilesIntegration,
-      this.salvageRunManager
+      this.salvageRunManager,
+      this.actorInventoryCoinSpender,
+      this.actorPropertyCoinSpender
     );
 
     // Initialize recipe manager
@@ -1052,6 +1068,14 @@ class Fabricate {
 
   getItemPilesIntegration() {
     return this.itemPilesIntegration;
+  }
+
+  getActorInventoryCoinSpender() {
+    return this.actorInventoryCoinSpender;
+  }
+
+  getActorPropertyCoinSpender() {
+    return this.actorPropertyCoinSpender;
   }
 
   getCompendiumImporter() {

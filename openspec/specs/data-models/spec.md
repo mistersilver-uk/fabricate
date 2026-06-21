@@ -531,7 +531,7 @@ Ingredient = {
   extractEffects: boolean,
 
   match: {
-    type: "component" | "tags",
+    type: "component" | "tags" | "currency",
 
     // type = "component"
     componentId?: string,
@@ -539,6 +539,10 @@ Ingredient = {
     // type = "tags"
     tags?: string[],
     tagMatch?: "any" | "all", // default "any"
+
+    // type = "currency"
+    unit?: string,    // a configured requirements.currency.units[].id
+    amount?: number,  // positive cost in that unit
   },
 }
 ```
@@ -551,6 +555,17 @@ Ingredient = {
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
+7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured `requirements.currency.units[].id` and `amount` is a positive cost. A currency option matches no inventory item and contributes no alchemy signature.
+
+### Currency-Alternative Spend (Craft-Time)
+
+When the crafting system has `requirements.currency.enabled === true`, a currency option can satisfy its ingredient group by spending the crafting actor's currency at craft time:
+
+1. Selection is **items-first, currency-fallback** per group. Every non-currency option is tried first; the first item-satisfiable option wins even if a currency option is authored earlier (items strictly beat currency). Only if no item option satisfies does the resolver choose the first AFFORDABLE currency option in author order among the group's currency options.
+2. Affordability is evaluated against the crafting actor through the same currency profile/spend strategy the system configures (`actorProperty` / `actorInventory` / `macro`). The craftability display and the engine execution resolve currency against the **same** actor, so what a player sees agrees with what the craft spends. With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
+3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated across units that share a base ladder — **before** any item or currency mutation. On a shortfall the craft aborts with an `Insufficient currency` message and zero mutation, and never falls back to an unselected item plan.
+4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients). Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
+5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 
 ## Alchemy Signature Uniqueness (Validation Contract)
 

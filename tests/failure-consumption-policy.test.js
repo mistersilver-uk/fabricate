@@ -108,7 +108,8 @@ function buildFakeTool(componentId = 'tool-1') {
 
 /**
  * Build a minimal fake ingredient set with one ingredient matching one item.
- * matchIngredients() is the method called by _consumeIngredients().
+ * matchIngredients() is the method the engine's single-selection resolver
+ * (_resolveCraftSelection) calls to build the consumption plan for this stub.
  */
 function buildFakeIngredientSet(ingredientItem) {
   const ingredient = { systemItemId: ingredientItem.id, quantity: 1, getDescription: () => ingredientItem.name };
@@ -430,11 +431,12 @@ test('_consumeIngredients defaults missing item.system.quantity to 1', async () 
   const ingredientItem = buildFakeItem('ing-missing-system', 1);
   ingredientItem.system = undefined;
   const ingredientSet = buildFakeIngredientSet(ingredientItem);
-  const recipe = buildFakeRecipe(ingredientSet, []);
   const engine = buildEngine({ ingredientItem, ingredientSet });
-  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
 
-  const consumedItems = await engine._consumeIngredients([sourceActor], ingredientSet, recipe);
+  // _consumeIngredients now consumes a precomputed item plan (the single craft selection
+  // is resolved once in craft()); pass the plan directly here.
+  const consumptionPlan = [{ item: ingredientItem, quantity: 1, ingredient: { quantity: 1 } }];
+  const consumedItems = await engine._consumeIngredients(consumptionPlan);
 
   assert.equal(consumedItems.length, 1, 'one matched ingredient should be returned');
   assert.equal(consumedItems[0].item, ingredientItem);
