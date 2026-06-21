@@ -4692,6 +4692,20 @@
   min-width: 0;
 }
 
+/* The chosen tags sit in their own bordered area below the match controls;
+   when empty it shows a muted "No tags set". */
+.fabricate-manager .manager-recipe-option-tags-list {
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-recipe-tags-empty {
+  font-size: 0.85rem;
+}
+
 .fabricate-manager .manager-recipe-tag-chips {
   display: flex;
   flex-wrap: wrap;

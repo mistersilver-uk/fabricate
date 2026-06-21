@@ -1005,6 +1005,42 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('lays out the tag match with Any/All first and the tags in a bordered area (No tags set when empty)', async () => {
+    const tagTarget = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }] }] },
+      itemTags: ITEM_TAGS
+    }));
+    clickTab(tagTarget, 'ingredients');
+    await flushRender();
+    const option = tagTarget.querySelector('[data-recipe-option]');
+    // The controls row leads with the Any/All toggle, then the Add tag control.
+    const controls = option.querySelector('.manager-recipe-option-tags-controls').innerHTML;
+    const toggleAt = controls.indexOf('manager-recipe-tag-match-toggle');
+    const triggerAt = controls.indexOf('manager-recipe-tag-trigger');
+    assert.ok(toggleAt !== -1 && triggerAt !== -1 && toggleAt < triggerAt, 'the Any/All toggle precedes the Add tag control');
+    // The tags live in their own bordered area below; empty shows "No tags set".
+    const list = option.querySelector('[data-recipe-tags-list]');
+    assert.ok(list, 'the tags render in their own bordered area');
+    assert.equal(list.querySelector('.manager-recipe-tag-chips'), null, 'no chip list renders when empty');
+    const empty = list.querySelector('[data-recipe-tags-empty]');
+    assert.ok(empty, 'an empty tag requirement shows the empty-state marker');
+    assert.equal(empty.textContent.trim(), 'No tags set', 'the empty state reads "No tags set"');
+    editHarness.remount();
+  });
+
+  it('renders chosen tags as chips inside the bordered area with no empty state', async () => {
+    const tagTarget = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } }] }] }] },
+      itemTags: ITEM_TAGS
+    }));
+    clickTab(tagTarget, 'ingredients');
+    await flushRender();
+    const list = tagTarget.querySelector('[data-recipe-option] [data-recipe-tags-list]');
+    assert.ok(list.querySelector('[data-recipe-tag="herbal"]'), 'the chosen tag renders as a chip inside the bordered area');
+    assert.equal(list.querySelector('[data-recipe-tags-empty]'), null, 'no empty state when tags are set');
+    editHarness.remount();
+  });
+
   it('appends a currency requirement (one currency option, id-less) via set-level Add cost', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({

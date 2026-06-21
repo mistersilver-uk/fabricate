@@ -962,6 +962,7 @@
           "RemoveTag": "Remove tag",
           "TagSearchPlaceholder": "Search tags...",
           "NoTagsDefined": "No tags defined",
+          "NoTagsSet": "No tags set",
           "AddCost": "Add cost",
           "RemoveCost": "Remove cost",
           "PickCurrency": "Pick currency",

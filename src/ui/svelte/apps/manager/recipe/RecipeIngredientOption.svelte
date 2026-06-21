@@ -159,37 +159,7 @@
       </div>
     {:else if matchType === 'tags'}
       <div class="manager-recipe-option-tags">
-        {#if tags.length > 0}
-          <ul class="manager-recipe-tag-chips">
-            {#each tags as tag (tag)}
-              <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
-                <span>{tag}</span>
-                <button
-                  type="button"
-                  class="manager-recipe-tag-remove"
-                  data-recipe-remove="tag"
-                  aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                  title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                  onclick={() => removeTag(tag)}
-                ><i class="fas fa-times" aria-hidden="true"></i></button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
         <div class="manager-recipe-option-tags-controls">
-          <SearchablePopover
-            options={tagPickerOptions}
-            pickerClass="manager-recipe-tag-picker"
-            triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
-            triggerIcon="fas fa-tag"
-            triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
-            onChoose={(tag) => addTag(tag)}
-          />
           <div class="manager-recipe-tag-match-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}>
             <button
               type="button"
@@ -208,6 +178,40 @@
               onclick={() => setTagMatch('all')}
             >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button>
           </div>
+          <SearchablePopover
+            options={tagPickerOptions}
+            pickerClass="manager-recipe-tag-picker"
+            triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
+            triggerIcon="fas fa-tag"
+            triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
+            onChoose={(tag) => addTag(tag)}
+          />
+        </div>
+        <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+          {#if tags.length > 0}
+            <ul class="manager-recipe-tag-chips">
+              {#each tags as tag (tag)}
+                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
+                  <span>{tag}</span>
+                  <button
+                    type="button"
+                    class="manager-recipe-tag-remove"
+                    data-recipe-remove="tag"
+                    aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                    title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                    onclick={() => removeTag(tag)}
+                  ><i class="fas fa-times" aria-hidden="true"></i></button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
+          {/if}
         </div>
       </div>
     {:else}
