@@ -943,7 +943,6 @@
           "Or": "OR",
           "AddComponent": "Add component",
           "AddTagRequirement": "Add tag requirement",
-          "AddAlternative": "Add alternative",
           "RemoveComponent": "Remove component",
           "RemoveAlternative": "Remove alternative",
           "PickComponent": "Pick component",

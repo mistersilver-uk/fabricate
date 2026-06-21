@@ -1,15 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One alternative (an `Ingredient`) inside a requirement. Alternatives have no
-  id, so the parent keys them by index and owns add/remove; this component
-  renders the matching control and the quantity, emitting the whole updated
-  option via `onChange(nextOption)`.
+  id, so the parent keys them by index and owns the option list; this component
+  renders the matching control, the quantity, and the per-row controls that
+  append a new alternative (component or tag) to the requirement, emitting the
+  whole updated option via `onChange(nextOption)`.
 
-  The match type is FIXED at creation (chosen via the set's "Add component" /
-  "Add tag requirement" buttons) and read from `option.match.type` — there is no
-  per-row Component|Tags toggle. A component alternative shows the component's
-  image + name as the picker trigger (click to swap the component); a tag
-  alternative shows tag chips + an "Add tag" picker + an any/all toggle.
+  Each alternative reads its match type from `option.match.type` — a component
+  alternative shows the component's image + name as the picker trigger (click to
+  swap the component); a tag alternative shows tag chips + an "Add tag" picker +
+  an any/all toggle. The row-end control cluster ("Add component" /
+  "Add tag requirement" / remove) adds or removes ALTERNATIVES on the
+  requirement, which is distinct from the within-option tag editor's "Add tag"
+  (which edits THIS alternative's tags).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -21,6 +24,8 @@
     itemTags = [],
     onChange = () => {},
     onRemove = () => {},
+    onAddComponentAlternative = () => {},
+    onAddTagAlternative = () => {},
     canRemove = true
   } = $props();
 
@@ -82,92 +87,115 @@
   }
 </script>
 
-<div class="manager-recipe-ingredient-option" data-recipe-option>
-  <div class="manager-recipe-ingredient-option-main">
-    <div class="manager-recipe-option-target">
-      {#if matchType === 'component'}
-        <SearchablePopover
-          options={componentPickerOptions}
-          value={componentId}
-          pickerClass="manager-recipe-component-picker"
-          triggerClass="manager-button manager-recipe-component-trigger"
-          triggerImg={selectedComponent?.img || ''}
-          triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-          triggerLabel={selectedComponent ? selectedComponent.name : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-          onChoose={(id) => chooseComponent(id)}
-        />
-      {:else}
-        <div class="manager-recipe-option-tags">
-          {#if tags.length > 0}
-            <ul class="manager-recipe-tag-chips">
-              {#each tags as tag (tag)}
-                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
-                  <span>{tag}</span>
-                  <button
-                    type="button"
-                    class="manager-recipe-tag-remove"
-                    data-recipe-remove="tag"
-                    aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                    title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                    onclick={() => removeTag(tag)}
-                  ><i class="fas fa-times" aria-hidden="true"></i></button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-          <div class="manager-recipe-option-tags-controls">
-            <SearchablePopover
-              options={tagPickerOptions}
-              pickerClass="manager-recipe-tag-picker"
-              triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
-              triggerIcon="fas fa-tag"
-              triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-              triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-              dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-              searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-              searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-              emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
-              onChoose={(tag) => addTag(tag)}
-            />
-            <div class="manager-recipe-tag-match-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}>
-              <button
-                type="button"
-                class="manager-recipe-tag-match-option"
-                class:is-selected={tagMatch === 'any'}
-                data-recipe-tag-match="any"
-                aria-pressed={tagMatch === 'any'}
-                onclick={() => setTagMatch('any')}
-              >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any')}</button>
-              <button
-                type="button"
-                class="manager-recipe-tag-match-option"
-                class:is-selected={tagMatch === 'all'}
-                data-recipe-tag-match="all"
-                aria-pressed={tagMatch === 'all'}
-                onclick={() => setTagMatch('all')}
-              >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button>
-            </div>
+<div class="manager-recipe-ingredient-option-row" data-recipe-option>
+  <div class="manager-recipe-option-target">
+    {#if matchType === 'component'}
+      <SearchablePopover
+        options={componentPickerOptions}
+        value={componentId}
+        pickerClass="manager-recipe-component-picker"
+        triggerClass="manager-button manager-recipe-component-trigger"
+        triggerImg={selectedComponent?.img || ''}
+        triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
+        triggerLabel={selectedComponent ? selectedComponent.name : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+        onChoose={(id) => chooseComponent(id)}
+      />
+    {:else}
+      <div class="manager-recipe-option-tags">
+        {#if tags.length > 0}
+          <ul class="manager-recipe-tag-chips">
+            {#each tags as tag (tag)}
+              <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
+                <span>{tag}</span>
+                <button
+                  type="button"
+                  class="manager-recipe-tag-remove"
+                  data-recipe-remove="tag"
+                  aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                  title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                  onclick={() => removeTag(tag)}
+                ><i class="fas fa-times" aria-hidden="true"></i></button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <div class="manager-recipe-option-tags-controls">
+          <SearchablePopover
+            options={tagPickerOptions}
+            pickerClass="manager-recipe-tag-picker"
+            triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
+            triggerIcon="fas fa-tag"
+            triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
+            onChoose={(tag) => addTag(tag)}
+          />
+          <div class="manager-recipe-tag-match-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}>
+            <button
+              type="button"
+              class="manager-recipe-tag-match-option"
+              class:is-selected={tagMatch === 'any'}
+              data-recipe-tag-match="any"
+              aria-pressed={tagMatch === 'any'}
+              onclick={() => setTagMatch('any')}
+            >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any')}</button>
+            <button
+              type="button"
+              class="manager-recipe-tag-match-option"
+              class:is-selected={tagMatch === 'all'}
+              data-recipe-tag-match="all"
+              aria-pressed={tagMatch === 'all'}
+              onclick={() => setTagMatch('all')}
+            >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button>
           </div>
         </div>
-      {/if}
-    </div>
+      </div>
+    {/if}
+  </div>
 
-    <label class="manager-field manager-recipe-option-quantity-field">
-      <span>{text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}</span>
-      <input
-        type="number"
-        min="1"
-        class="manager-recipe-option-quantity"
-        data-recipe-option-quantity
-        value={quantity}
-        onchange={(e) => setQuantity(e.target.value)}
+  <div class="manager-recipe-option-controls">
+    <input
+      type="number"
+      min="1"
+      class="manager-recipe-option-quantity"
+      data-recipe-option-quantity
+      aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+      value={quantity}
+      onchange={(e) => setQuantity(e.target.value)}
+    />
+
+    <div class="manager-recipe-option-alternative-adds">
+      <SearchablePopover
+        options={componentPickerOptions}
+        pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
+        triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
+        triggerIcon="fas fa-cube"
+        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        triggerAddMarker="alternative-component"
+        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
+        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+        showChevron={false}
+        onChoose={(id) => onAddComponentAlternative(id)}
       />
-    </label>
+      <button
+        type="button"
+        class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+        data-recipe-add="alternative-tag"
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+        title={text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}
+        onclick={() => onAddTagAlternative()}
+      ><i class="fas fa-tags" aria-hidden="true"></i></button>
+    </div>
 
     {#if canRemove}
       <button

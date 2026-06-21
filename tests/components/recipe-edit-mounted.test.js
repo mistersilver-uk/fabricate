@@ -596,7 +596,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a same-type component alternative via the "+ or" picker', async () => {
+  it('appends a component alternative via the row-end Add component popover', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({
       recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
@@ -605,7 +605,7 @@ describe('RecipeEditView (mounted)', () => {
     }));
     clickTab(target, 'ingredients');
     await flushRender();
-    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative"]').click();
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]').click();
     await flushRender();
     [...document.querySelectorAll('.manager-travel-option')].find((option) => /Pure Water/.test(option.textContent)).click();
     await flushRender();
@@ -615,8 +615,91 @@ describe('RecipeEditView (mounted)', () => {
     assert.deepEqual(
       options[1].match,
       { type: 'component', componentId: 'cmp-water' },
-      'the new alternative is a same-type component match'
+      'the new alternative is a component match'
     );
+    editHarness.remount();
+  });
+
+  it('appends a tag alternative via the row-end Add tag requirement button', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]').click();
+    assert.equal(patches.length, 1, 'adding a tag alternative patches the recipe');
+    const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 2, 'the alternative list grew by one');
+    assert.deepEqual(
+      options[1].match,
+      { type: 'tags', tags: [], tagMatch: 'any' },
+      'the new alternative is an empty tags match'
+    );
+    editHarness.remount();
+  });
+
+  it('mixes component and tag alternatives in one requirement, rendering the box + OR separator', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    // Starting from a one-component requirement, add a tag alternative from the row.
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]').click();
+    await flushRender();
+    const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 2, 'the requirement now holds two alternatives');
+    const matchTypes = options.map((option) => option.match.type).sort();
+    assert.deepEqual(matchTypes, ['component', 'tags'], 'the requirement mixes a component and a tags match');
+
+    // The in-component state re-renders to two alternatives once we feed the
+    // patch back in (the parent owns recipe state in production); render a
+    // pre-mixed requirement directly to assert the box + separator.
+    const mixed = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }
+      ] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS
+    }));
+    clickTab(mixed, 'ingredients');
+    await flushRender();
+    const req = mixed.querySelector('[data-recipe-group-id="grp-1"]');
+    assert.ok(req.classList.contains('has-alternatives'), 'a 2-alternative requirement renders the box');
+    assert.ok(req.querySelector('.manager-recipe-ingredient-or-separator'), 'the "— or —" separator renders');
+    const optionRows = req.querySelectorAll('[data-recipe-option]');
+    assert.ok(optionRows[0].querySelector('.manager-recipe-component-trigger'), 'the first alternative is a component editor');
+    assert.ok(optionRows[1].querySelector('[data-recipe-tag-match="any"]'), 'the second alternative is a tag editor');
+    editHarness.remount();
+  });
+
+  it('renders a single-alternative requirement as a bare row and a multi-alternative one as a box', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [
+        { id: 'grp-bare', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
+        { id: 'grp-box', options: [
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+        ] }
+      ] }] },
+      componentOptions: COMPONENT_OPTIONS
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const bare = target.querySelector('[data-recipe-group-id="grp-bare"]');
+    assert.ok(bare, 'the single-alternative requirement still renders as a group');
+    assert.equal(bare.classList.contains('has-alternatives'), false, 'a single-alternative requirement has no alternatives box');
+    const box = target.querySelector('[data-recipe-group-id="grp-box"]');
+    assert.ok(box.classList.contains('has-alternatives'), 'a multi-alternative requirement renders the alternatives box');
     editHarness.remount();
   });
 
@@ -670,6 +753,11 @@ describe('RecipeEditView (mounted)', () => {
     clickTab(target, 'ingredients');
     await flushRender();
     const qty = target.querySelector('[data-recipe-option-quantity]');
+    // The visible "Quantity" label is gone; the input keeps an aria-label.
+    assert.equal(qty.closest('.manager-recipe-option-quantity-field'), null, 'no labelled quantity field wrapper');
+    assert.equal(qty.getAttribute('aria-label'), 'Quantity', 'the quantity input carries an aria-label');
+    const row = qty.closest('[data-recipe-option]');
+    assert.equal([...row.querySelectorAll('span')].some((node) => node.textContent.trim() === 'Quantity'), false, 'no visible Quantity text label in the row');
     qty.value = '5';
     qty.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
     assert.equal(patches.length, 1, 'editing the quantity patches the recipe');

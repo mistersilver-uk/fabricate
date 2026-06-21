@@ -2,21 +2,21 @@
 <!--
   One requirement inside a set (the data model still calls it an
   `ingredientGroup`). A requirement is satisfied by ANY one of its alternatives
-  (OR), so the alternatives render linked by a "— or —" separator and read as one
-  bracketed unit. The requirement emits a shallow-updated copy via
+  (OR), so when it has two or more alternatives they render linked by a "— or —"
+  separator inside a bracketed box; a single-alternative requirement renders as a
+  bare row (no box). The requirement emits a shallow-updated copy via
   `onChange(nextGroup)` and is dropped entirely via `onRemove()`.
 
-  The requirement's TYPE is fixed by its first alternative's match
-  (`options[0].match.type`): a tag requirement adds empty tag alternatives, a
-  component requirement opens a component picker for each new alternative. There
-  is no group-name field — a requirement is identified by its component image +
-  name. New alternatives are appended id-less; the store normalizes them.
-  Removing the last alternative removes the whole requirement.
+  Alternatives can now mix match types within one requirement: each
+  alternative's row ends with a component-add popover and a tag-requirement add
+  button, so adding from any row appends an alternative of that type to this
+  requirement (e.g. "Iron OR anything tagged hardwood"). New alternatives are
+  appended id-less; the store normalizes them. Removing the last alternative
+  removes the whole requirement.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
 
   let {
     group = {},
@@ -32,11 +32,7 @@
   }
 
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
-  const requirementType = $derived(options[0]?.match?.type === 'tags' ? 'tags' : 'component');
-
-  const componentPickerOptions = $derived(
-    (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
-  );
+  const hasAlternatives = $derived(options.length >= 2);
 
   function updateOption(index, nextOption) {
     onChange({ ...group, options: options.map((option, i) => (i === index ? nextOption : option)) });
@@ -61,7 +57,12 @@
   }
 </script>
 
-<div class="manager-recipe-ingredient-requirement" data-recipe-group data-recipe-group-id={group?.id || ''}>
+<div
+  class="manager-recipe-ingredient-requirement"
+  class:has-alternatives={hasAlternatives}
+  data-recipe-group
+  data-recipe-group-id={group?.id || ''}
+>
   <div class="manager-recipe-ingredient-requirement-options">
     {#each options as option, index (index)}
       {#if index > 0}
@@ -76,36 +77,9 @@
         canRemove={true}
         onChange={(nextOption) => updateOption(index, nextOption)}
         onRemove={() => removeOption(index)}
+        onAddComponentAlternative={(id) => addComponentAlternative(id)}
+        onAddTagAlternative={() => addTagAlternative()}
       />
     {/each}
   </div>
-
-  {#if requirementType === 'component'}
-    <SearchablePopover
-      options={componentPickerOptions}
-      pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
-      triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
-      triggerIcon="fas fa-plus"
-      triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternative', 'Add alternative')}
-      triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternative', 'Add alternative')}
-      triggerAddMarker="alternative"
-      dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-      searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-      searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-      emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-      showChevron={false}
-      onChoose={(id) => addComponentAlternative(id)}
-    />
-  {:else}
-    <button
-      type="button"
-      class="manager-button is-subtle manager-recipe-add-alternative-trigger"
-      data-recipe-add="alternative"
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternative', 'Add alternative')}
-      onclick={() => addTagAlternative()}
-    >
-      <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.AddAlternative', 'Add alternative')}</span>
-    </button>
-  {/if}
 </div>
