@@ -31,13 +31,13 @@
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
     hasIngredientSet: ['CheckIngredientSet', 'Every step has at least one ingredient set'],
-    hasResultGroup: ['CheckResultGroup', 'Every step has at least one result group'],
+    hasResultGroup: ['CheckResultGroup', 'Every step has at least one result set'],
     stepsNamed: ['CheckStepsNamed', 'Every step is named']
   };
   const ISSUE_LABELS = {
     noName: ['IssueNoName', 'The recipe needs a name.'],
     noIngredientSet: ['IssueNoIngredientSet', 'A step has no ingredient set.'],
-    noResultGroup: ['IssueNoResultGroup', 'A step has no result group.'],
+    noResultGroup: ['IssueNoResultGroup', 'A step has no result set.'],
     disabledIncomplete: ['IssueDisabledIncomplete', 'The recipe is disabled and cannot be enabled until its requirements are complete.']
   };
 

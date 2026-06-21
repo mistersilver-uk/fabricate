@@ -344,7 +344,7 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders the single-step ingredient/results/tools sections on their tabs', async () => {
-    const target = await editHarness.mount(identityProps({ toolsLibrary: TOOLS_LIBRARY }));
+    const target = await editHarness.mount(identityProps({ complex: true, toolsLibrary: TOOLS_LIBRARY }));
 
     clickTab(target, 'ingredients');
     await flushRender();
@@ -356,7 +356,7 @@ describe('RecipeEditView (mounted)', () => {
     await flushRender();
     assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section renders');
     assert.match(target.textContent, /No results yet/, 'results empty text shown');
-    assert.ok(target.querySelector('[data-recipe-add="result-group"]'), 'add result group button shown');
+    assert.ok(target.querySelector('[data-recipe-add="result-set"]'), 'add result set button shown');
 
     clickTab(target, 'tools');
     await flushRender();
@@ -365,10 +365,46 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('collapses the ingredients tab to a single chromeless set in Simple mode', async () => {
+    const target = await editHarness.mount(identityProps({ complex: false }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-section="ingredients"]'), 'ingredients section still renders');
+    assert.equal(target.querySelector('[data-recipe-add="ingredient-set"]'), null, 'no Add set button in Simple mode');
+    assert.equal(target.querySelector('[data-recipe-set-field="name"]'), null, 'no set-name input in Simple mode');
+    assert.equal(target.querySelector('.manager-recipe-ingredient-set-or'), null, 'no OR separator in Simple mode');
+    assert.ok(target.querySelector('.manager-recipe-ingredient-set.is-chromeless'), 'the single set renders chromeless');
+    editHarness.remount();
+  });
+
+  it('collapses the results tab to a single result set in Simple mode', async () => {
+    const target = await editHarness.mount(identityProps({ complex: false }));
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section still renders');
+    assert.equal(target.querySelector('[data-recipe-add="result-set"]'), null, 'no Add result set button in Simple mode');
+    assert.equal(target.querySelector('[data-recipe-remove="result-set"]'), null, 'no remove control in Simple mode');
+    assert.ok(target.querySelector('[data-recipe-result-simple]'), 'the simple result set placeholder renders');
+    editHarness.remount();
+  });
+
+  it('shows full ingredient/result set scaffolding in Complex mode', async () => {
+    const target = await editHarness.mount(identityProps({ complex: true }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-add="ingredient-set"]'), 'Add set button shown in Complex mode');
+
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-add="result-set"]'), 'Add result set button shown in Complex mode');
+    editHarness.remount();
+  });
+
   it('appends an ingredient set via onUpdateRecipe when + Add set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1' }] },
+      complex: true,
+      recipe: { ...RECIPE, complex: true, ingredientSets: [{ id: 'set-1' }] },
       onUpdateRecipe: (patch) => patches.push(patch)
     }));
     clickTab(target, 'ingredients');
@@ -380,15 +416,16 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a result group via onUpdateRecipe when + Add result group is clicked', async () => {
+  it('appends a result set via onUpdateRecipe when + Add result set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, resultGroups: [{ id: 'grp-1' }] },
+      complex: true,
+      recipe: { ...RECIPE, complex: true, resultGroups: [{ id: 'grp-1' }] },
       onUpdateRecipe: (patch) => patches.push(patch)
     }));
     clickTab(target, 'results');
     await flushRender();
-    target.querySelector('[data-recipe-add="result-group"]').click();
+    target.querySelector('[data-recipe-add="result-set"]').click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     assert.equal(patches[0].resultGroups.length, 2, 'the result group array grew by one');
     editHarness.remount();
@@ -452,7 +489,8 @@ describe('RecipeEditView (mounted)', () => {
   it('routes a per-step ingredient add through onUpdateStep for a multi-step recipe', async () => {
     const updates = [];
     const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge', ingredientSets: [{ id: 'pre' }] }] },
+      complex: true,
+      recipe: { ...RECIPE, complex: true, steps: [{ id: 'sa', name: 'Forge', ingredientSets: [{ id: 'pre' }] }] },
       onUpdateStep: (id, patch) => updates.push([id, patch])
     }));
     clickTab(target, 'ingredients');
@@ -468,7 +506,8 @@ describe('RecipeEditView (mounted)', () => {
 
   it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
     const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [POPULATED_SET] },
+      complex: true,
+      recipe: { ...RECIPE, complex: true, ingredientSets: [POPULATED_SET] },
       componentOptions: COMPONENT_OPTIONS,
       essenceOptions: ESSENCE_OPTIONS,
       itemTags: ITEM_TAGS
@@ -851,14 +890,15 @@ describe('RecipeEditView (mounted)', () => {
   it('routes a per-step result add through onUpdateStep for a multi-step recipe', async () => {
     const updates = [];
     const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] },
+      complex: true,
+      recipe: { ...RECIPE, complex: true, steps: [{ id: 'sa', name: 'Forge' }] },
       onUpdateStep: (id, patch) => updates.push([id, patch])
     }));
     clickTab(target, 'results');
     await flushRender();
     target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
     await flushRender();
-    target.querySelector('[data-recipe-section="step-sa-results"] [data-recipe-add="result-group"]').click();
+    target.querySelector('[data-recipe-section="step-sa-results"] [data-recipe-add="result-set"]').click();
     assert.equal(updates.length, 1, 'onUpdateStep invoked once');
     assert.equal(updates[0][0], 'sa', 'patches the right step');
     assert.equal(updates[0][1].resultGroups.length, 1, 'a single group is appended to the empty step scope');
@@ -1052,6 +1092,61 @@ describe('RecipeItemInspector (mounted)', () => {
     single.click();
     assert.deepEqual(reverted, [true], 'clicking single fires onRevertToSingleStep');
     assert.equal(entered.length, 0, 'enter not called when reverting');
+    inspectorHarness.remount();
+  });
+
+  it('always renders the recipe-mode toggle with Simple selected by default', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      recipe: { ...RECIPE, steps: [] },
+      multiStepEnabled: false
+    }));
+    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
+    assert.ok(card, 'recipe-mode card renders even without multi-step');
+    const simple = card.querySelector('[data-recipe-mode-option="simple"]');
+    assert.ok(simple.classList.contains('is-selected'), 'Simple is selected when complex is false');
+    inspectorHarness.remount();
+  });
+
+  it('disables the Complex option when multiSetAllowed is false and the recipe is not already complex', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      complex: false,
+      multiSetAllowed: false
+    }));
+    const complex = target.querySelector('[data-recipe-mode-option="complex"]');
+    assert.equal(complex.disabled, true, 'Complex is disabled when the system forbids multiple sets');
+    assert.ok(target.querySelector('[data-recipe-mode-hint="locked"]'), 'a locked hint is shown');
+    inspectorHarness.remount();
+  });
+
+  it('enables the Complex option when multiSetAllowed is true', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      complex: false,
+      multiSetAllowed: true
+    }));
+    const complex = target.querySelector('[data-recipe-mode-option="complex"]');
+    assert.equal(complex.disabled, false, 'Complex is enabled when the system allows multiple sets');
+    assert.equal(target.querySelector('[data-recipe-mode-hint="locked"]'), null, 'no locked hint when allowed');
+    inspectorHarness.remount();
+  });
+
+  it('fires onSetComplexity(true) on Complex and onSetComplexity(false) on Simple', async () => {
+    const calls = [];
+    const target = await inspectorHarness.mount(inspectorProps({
+      complex: false,
+      multiSetAllowed: true,
+      onSetComplexity: (next) => calls.push(next)
+    }));
+    target.querySelector('[data-recipe-mode-option="complex"]').click();
+    assert.deepEqual(calls, [true], 'clicking Complex requests complex mode');
+
+    inspectorHarness.remount();
+    const target2 = await inspectorHarness.mount(inspectorProps({
+      complex: true,
+      multiSetAllowed: true,
+      onSetComplexity: (next) => calls.push(next)
+    }));
+    target2.querySelector('[data-recipe-mode-option="simple"]').click();
+    assert.deepEqual(calls, [true, false], 'clicking Simple requests simple mode');
     inspectorHarness.remount();
   });
 });

@@ -9221,6 +9221,28 @@
   line-height: 1.35;
 }
 
+/* A gated mode option (e.g. Complex on a single-set resolution mode) is shown
+   locked rather than hidden so authors can see it exists but cannot select it. */
+.fabricate-manager .manager-environment-mode-option.is-locked,
+.fabricate-manager .manager-environment-mode-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fabricate-manager .manager-environment-mode-option.is-locked:hover {
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Simple mode renders a single chromeless ingredient/result set: no set-name
+   header or remove control, so it sits flush without the set list's spacing. */
+.fabricate-manager .manager-recipe-ingredient-set.is-chromeless {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-result-set-simple {
+  margin-top: var(--fab-space-2);
+}
+
 
 .fabricate-manager .manager-environment-composition {
   display: flex;

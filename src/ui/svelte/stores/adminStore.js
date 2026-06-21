@@ -1242,6 +1242,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       steps: Array.isArray(raw.steps) ? raw.steps : [],
       ingredientSets: Array.isArray(raw.ingredientSets) ? raw.ingredientSets : [],
       resultGroups: Array.isArray(raw.resultGroups) ? raw.resultGroups : [],
+      complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
@@ -5674,6 +5675,63 @@ export function createAdminStore(services) {
     return updateRecipe(recipeId, { steps: nextSteps }, { notify: false });
   }
 
+  // Switch a recipe between Simple (one ingredient set + one result set) and Complex
+  // (today's multi-set UI). Going Complex is a pure flag flip. Going Simple may have to
+  // drop extra sets/results across every scope (recipe-level and each step), so when
+  // anything would be removed we confirm first, mirroring revertRecipeToSingleStep.
+  async function setRecipeComplexity(recipeId, complex) {
+    const recipeManager = services.getRecipeManager();
+    const recipe = recipeManager.getRecipe(recipeId);
+    if (!recipe) return false;
+
+    if (complex === true) {
+      return updateRecipe(recipeId, { complex: true }, { notify: false });
+    }
+
+    const scopeHasExtras = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return ingredientSets.length > 1 || resultGroups.length > 1;
+    };
+    const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+    // A multi-step recipe crafts from its steps (top-level sets are the single-step
+    // fallback), so only the scope we actually trim should drive the confirm.
+    const hasExtras = steps.length > 0 ? steps.some(scopeHasExtras) : scopeHasExtras(recipe);
+
+    if (!hasExtras) {
+      return updateRecipe(recipeId, { complex: false }, { notify: false });
+    }
+
+    const perStep = steps.length > 0 ? ' per step' : '';
+    const confirmed = await services.confirmDialog({
+      title: 'Switch to simple?',
+      content: `<p>Switching <strong>${recipe.name}</strong> to simple keeps only the first ingredient set and result set${perStep}; any others are removed. This can't be undone.</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    const trimScope = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return {
+        ingredientSets: ingredientSets.slice(0, 1),
+        resultGroups: resultGroups.slice(0, 1)
+      };
+    };
+
+    const updates = { complex: false };
+    if (steps.length > 0) {
+      updates.steps = steps.map((step) => ({ ...step, ...trimScope(step) }));
+    } else {
+      const trimmed = trimScope(recipe);
+      updates.ingredientSets = trimmed.ingredientSets;
+      updates.resultGroups = trimmed.resultGroups;
+    }
+
+    return updateRecipe(recipeId, updates, { notify: false });
+  }
+
   async function addRecipeItemFromUuid(systemId, itemUuid) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
@@ -5950,6 +6008,7 @@ export function createAdminStore(services) {
     updateRecipe,
     revertRecipeToSingleStep,
     deleteRecipeStep,
+    setRecipeComplexity,
     addRecipeItemFromUuid,
     importRecipes,
     exportRecipes,

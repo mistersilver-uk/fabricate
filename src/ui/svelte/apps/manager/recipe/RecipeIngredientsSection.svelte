@@ -17,6 +17,7 @@
 
   let {
     ingredientSets = [],
+    complex = true,
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
@@ -30,6 +31,21 @@
   }
 
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
+
+  // Defensive: never let the simple (chromeless, single-set) render hide extra
+  // sets. Trimming to one set is the confirmed store path; if a recipe is somehow
+  // flagged simple while still holding >1 set (e.g. imported data), fall back to
+  // the full list so the first edit can't silently drop set[1..].
+  const effectiveComplex = $derived(complex || sets.length > 1);
+
+  // Simple mode shows exactly one chromeless set bound to the first set. If none
+  // exists yet, synthesize an empty placeholder for editing; the first edit writes
+  // the whole single-element array back so the scope materializes a real set.
+  const simpleSet = $derived(sets[0] || { ingredientGroups: [] });
+
+  function updateSimpleSet(nextSet) {
+    onChange([nextSet]);
+  }
 
   function updateSet(index, nextSet) {
     onChange(sets.map((set, i) => (i === index ? nextSet : set)));
@@ -50,10 +66,21 @@
       <h3>{text('FABRICATE.Admin.Manager.Recipe.IngredientsSection', 'Ingredients')}</h3>
     </div>
   </div>
-  {#if sets.length === 0}
+  {#if !effectiveComplex}
+    <div class="manager-recipe-ingredient-set-simple">
+      <RecipeIngredientSetCard
+        set={simpleSet}
+        chromeless={true}
+        {componentOptions}
+        {essenceOptions}
+        {itemTags}
+        onChange={(nextSet) => updateSimpleSet(nextSet)}
+      />
+    </div>
+  {:else if sets.length === 0}
     <div class="manager-recipe-section-empty">
       <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmpty', 'No ingredients yet')}</p>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmptyHint', 'Add a set of ingredients required to craft.')}</p>
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmptyHint', 'Add a set of ingredients required to craft this recipe.')}</p>
       <button type="button" class="manager-button" data-recipe-add="ingredient-set" onclick={() => addSet()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add set')}</span>

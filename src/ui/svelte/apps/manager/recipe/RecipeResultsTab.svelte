@@ -16,6 +16,7 @@
 
   let {
     recipe = null,
+    complex = true,
     isMultiStep = false,
     currencyUnits = [],
     onAddResultGroup = () => {},
@@ -46,6 +47,7 @@
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}
             resultGroups={stepResultGroups(step)}
+            {complex}
             onAddResultGroup={() => onAddResultGroup(step.id)}
             onRemoveResultGroup={(groupId) => onRemoveResultGroup(step.id, groupId)}
           />
@@ -55,6 +57,7 @@
   {:else}
     <RecipeResultsSection
       {resultGroups}
+      {complex}
       onAddResultGroup={() => onAddResultGroup(null)}
       onRemoveResultGroup={(groupId) => onRemoveResultGroup(null, groupId)}
     />

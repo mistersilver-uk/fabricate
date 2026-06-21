@@ -24,6 +24,7 @@
 
   let {
     recipe = null,
+    complex = false,
     saving = false,
     onBack = () => {},
     onSave = () => {},
@@ -293,6 +294,7 @@
           {:else if activeTab === 'ingredients'}
             <RecipeIngredientsTab
               {recipe}
+              {complex}
               {isMultiStep}
               {currencyUnits}
               {componentOptions}
@@ -304,6 +306,7 @@
           {:else if activeTab === 'results'}
             <RecipeResultsTab
               {recipe}
+              {complex}
               {isMultiStep}
               {currencyUnits}
               onAddResultGroup={addResultGroup}

@@ -579,6 +579,120 @@ describe('createAdminStore', () => {
       assert.match(content.tools, /ingredients and results/, 'Tools warns ingredients + results go too');
     });
 
+    function seedComplexitySingleSet(overrides = {}) {
+      const services = createMockServices(overrides);
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-simple',
+        craftingSystemId: 'sys1',
+        ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+        resultGroups: [{ id: 'rg-1', results: [] }]
+      }));
+      return services;
+    }
+
+    function seedComplexityMultiSet(overrides = {}) {
+      const services = createMockServices(overrides);
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-complex',
+        craftingSystemId: 'sys1',
+        ingredientSets: [
+          { id: 'set-1', ingredientGroups: [] },
+          { id: 'set-2', ingredientGroups: [] }
+        ],
+        resultGroups: [
+          { id: 'rg-1', results: [] },
+          { id: 'rg-2', results: [] }
+        ]
+      }));
+      return services;
+    }
+
+    it('setRecipeComplexity(id, true) persists complex:true without confirming', async () => {
+      let confirmCalled = false;
+      const services = seedComplexitySingleSet({ confirmDialog: async () => { confirmCalled = true; return true; } });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setRecipeComplexity('r-simple', true);
+      assert.notEqual(result, false, 'resolves truthy');
+      assert.equal(confirmCalled, false, 'no confirm for going complex');
+      const recipe = services.getRecipeManager().getRecipe('r-simple');
+      assert.equal(recipe.complex, true);
+    });
+
+    it('setRecipeComplexity(id, false) on a single-set recipe persists complex:false without confirm/trim', async () => {
+      let confirmCalled = false;
+      const services = seedComplexitySingleSet({ confirmDialog: async () => { confirmCalled = true; return true; } });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setRecipeComplexity('r-simple', false);
+      assert.notEqual(result, false, 'resolves truthy');
+      assert.equal(confirmCalled, false, 'no confirm when nothing is trimmed');
+      const recipe = services.getRecipeManager().getRecipe('r-simple');
+      assert.equal(recipe.complex, false);
+      assert.deepEqual(recipe.ingredientSets.map(s => s.id), ['set-1']);
+      assert.deepEqual(recipe.resultGroups.map(g => g.id), ['rg-1']);
+    });
+
+    it('setRecipeComplexity(id, false) on a multi-set recipe confirms then trims to the first set/result', async () => {
+      let captured = null;
+      const services = seedComplexityMultiSet({ confirmDialog: async (opts) => { captured = opts; return true; } });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setRecipeComplexity('r-complex', false);
+      assert.notEqual(result, false, 'resolves truthy once confirmed');
+      assert.ok(captured, 'confirm dialog was shown');
+      assert.match(captured.content, /first ingredient set and result set/, 'content explains the trim');
+      const recipe = services.getRecipeManager().getRecipe('r-complex');
+      assert.equal(recipe.complex, false);
+      assert.deepEqual(recipe.ingredientSets.map(s => s.id), ['set-1'], 'ingredient sets trimmed to first');
+      assert.deepEqual(recipe.resultGroups.map(g => g.id), ['rg-1'], 'result groups trimmed to first');
+    });
+
+    it('setRecipeComplexity(id, false) makes no change when the trim confirm is declined', async () => {
+      const services = seedComplexityMultiSet({ confirmDialog: async () => false });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setRecipeComplexity('r-complex', false);
+      assert.equal(result, false, 'returns false when declined');
+      const recipe = services.getRecipeManager().getRecipe('r-complex');
+      assert.notEqual(recipe.complex, false, 'complexity unchanged');
+      assert.deepEqual(recipe.ingredientSets.map(s => s.id), ['set-1', 'set-2'], 'no sets removed when declined');
+      assert.deepEqual(recipe.resultGroups.map(g => g.id), ['rg-1', 'rg-2'], 'no result groups removed when declined');
+    });
+
+    it('setRecipeComplexity(id, false) trims every step of a multi-step recipe to its first set/result', async () => {
+      const services = createMockServices({ confirmDialog: async () => true });
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-stepped',
+        craftingSystemId: 'sys1',
+        steps: [
+          {
+            id: 'step-a',
+            name: 'Forge',
+            ingredientSets: [{ id: 'a-set-1', ingredientGroups: [] }, { id: 'a-set-2', ingredientGroups: [] }],
+            resultGroups: [{ id: 'a-rg-1', results: [] }, { id: 'a-rg-2', results: [] }]
+          },
+          {
+            id: 'step-b',
+            name: 'Quench',
+            ingredientSets: [{ id: 'b-set-1', ingredientGroups: [] }, { id: 'b-set-2', ingredientGroups: [] }],
+            resultGroups: [{ id: 'b-rg-1', results: [] }]
+          }
+        ]
+      }));
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setRecipeComplexity('r-stepped', false);
+      assert.notEqual(result, false, 'resolves truthy once confirmed');
+      const recipe = services.getRecipeManager().getRecipe('r-stepped');
+      assert.equal(recipe.complex, false);
+      assert.deepEqual(recipe.steps.map(s => s.id), ['step-a', 'step-b'], 'step order/identity preserved');
+      assert.deepEqual(recipe.steps[0].ingredientSets.map(s => s.id), ['a-set-1'], 'step A ingredient sets trimmed');
+      assert.deepEqual(recipe.steps[0].resultGroups.map(g => g.id), ['a-rg-1'], 'step A result sets trimmed');
+      assert.deepEqual(recipe.steps[1].ingredientSets.map(s => s.id), ['b-set-1'], 'step B ingredient sets trimmed');
+      assert.deepEqual(recipe.steps[1].resultGroups.map(g => g.id), ['b-rg-1'], 'step B already-single result set kept');
+    });
+
     it('saveSystemDetails calls systemManager.updateSystem with given name and description', async () => {
       let updateArgs = null;
       const services = createMockServices();

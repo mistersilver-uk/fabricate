@@ -20,6 +20,7 @@
 
   let {
     recipe = null,
+    complex = true,
     isMultiStep = false,
     currencyUnits = [],
     componentOptions = [],
@@ -52,6 +53,7 @@
           <RecipeIngredientsSection
             idPrefix={`step-${step.id}-`}
             ingredientSets={stepIngredientSets(step)}
+            {complex}
             {componentOptions}
             {essenceOptions}
             {itemTags}
@@ -63,6 +65,7 @@
   {:else}
     <RecipeIngredientsSection
       {ingredientSets}
+      {complex}
       {componentOptions}
       {essenceOptions}
       {itemTags}

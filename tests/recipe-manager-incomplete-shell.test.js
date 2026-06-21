@@ -682,3 +682,77 @@ describe('adminStore derived `incomplete` view-model field (real manager)', () =
     assert.equal(recipeViewModel(store, created[0].id).incomplete, false);
   });
 });
+
+describe('Recipe complexity flag', () => {
+  it('derives complex=true when a recipe has more than one ingredient set', () => {
+    const recipe = new Recipe(
+      makeCompleteRecipeData({
+        ingredientSets: [
+          { id: 'set-a', ingredientGroups: [], essences: {} },
+          { id: 'set-b', ingredientGroups: [], essences: {} },
+        ],
+      })
+    );
+    assert.equal(recipe.complex, true);
+  });
+
+  it('derives complex=true when a recipe has more than one result group', () => {
+    const recipe = new Recipe(
+      makeCompleteRecipeData({
+        resultGroups: [
+          { id: 'rg-a', results: [{ id: 'r-a', itemUuid: 'Item.a', quantity: 1 }] },
+          { id: 'rg-b', results: [{ id: 'r-b', itemUuid: 'Item.b', quantity: 1 }] },
+        ],
+      })
+    );
+    assert.equal(recipe.complex, true);
+  });
+
+  it('derives complex=true when any step holds more than one ingredient set', () => {
+    const recipe = new Recipe({
+      id: `recipe-${++idSeq}`,
+      name: 'Stepped',
+      steps: [
+        {
+          id: 'step-1',
+          name: 'Step One',
+          ingredientSets: [
+            { id: 'set-a', ingredientGroups: [], essences: {} },
+            { id: 'set-b', ingredientGroups: [], essences: {} },
+          ],
+          resultGroups: [{ id: 'rg', results: [] }],
+        },
+      ],
+    });
+    assert.equal(recipe.complex, true);
+  });
+
+  it('derives complex=false for a single-set, single-result recipe', () => {
+    const recipe = new Recipe(makeCompleteRecipeData());
+    assert.equal(recipe.complex, false);
+  });
+
+  it('honors an explicit complex flag over the derived default', () => {
+    const forcedSimple = new Recipe(
+      makeCompleteRecipeData({
+        complex: false,
+        ingredientSets: [
+          { id: 'set-a', ingredientGroups: [], essences: {} },
+          { id: 'set-b', ingredientGroups: [], essences: {} },
+        ],
+      })
+    );
+    assert.equal(forcedSimple.complex, false);
+
+    const forcedComplex = new Recipe(makeCompleteRecipeData({ complex: true }));
+    assert.equal(forcedComplex.complex, true);
+  });
+
+  it('round-trips complex through toJSON/fromJSON', () => {
+    const recipe = new Recipe(makeCompleteRecipeData({ complex: true }));
+    const json = recipe.toJSON();
+    assert.equal(json.complex, true);
+    const restored = Recipe.fromJSON(json);
+    assert.equal(restored.complex, true);
+  });
+});

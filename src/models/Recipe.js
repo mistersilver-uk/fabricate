@@ -44,6 +44,11 @@ export class Recipe {
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap((group) => group.results);
 
+    // Authoring complexity: Simple (one ingredient set + one result set, streamlined
+    // UI) vs Complex (multiple sets, full UI). An explicit flag wins; otherwise it is
+    // derived so legacy multi-set recipes are never silently collapsed to Simple.
+    this.complex = typeof data.complex === 'boolean' ? data.complex : this._deriveComplex(data);
+
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
 
@@ -343,6 +348,7 @@ export class Recipe {
       recipeItemId: this.recipeItemId,
       linkedRecipeItemUuid: this.linkedRecipeItemUuid,
       visibility: this.visibility,
+      complex: this.complex,
       steps: this.steps.map((step) => ({
         ...step,
         ingredientSets: (step.ingredientSets || []).map((set) => (set.toJSON ? set.toJSON() : set)),
@@ -418,6 +424,25 @@ export class Recipe {
       isVariable: false,
       transferEffects: false,
     });
+  }
+
+  /**
+   * Derive the default Complex flag from raw construction data. Returns true when
+   * any scope (recipe-level or any step) already holds more than one ingredient set
+   * or more than one result group, so legacy multi-set recipes default to Complex.
+   * @param {object} data - Raw recipe construction data.
+   * @returns {boolean}
+   * @private
+   */
+  _deriveComplex(data = {}) {
+    const scopeIsComplex = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return ingredientSets.length > 1 || resultGroups.length > 1;
+    };
+    if (scopeIsComplex(data)) return true;
+    const steps = Array.isArray(data.steps) ? data.steps : [];
+    return steps.some((step) => scopeIsComplex(step));
   }
 
   _normalizeResultSelection(resultSelection) {

@@ -89,6 +89,9 @@
   const systemsLoading = $derived($viewState.systemsLoading === true);
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
+  // Complex recipes need a resolution mode that allows multiple ingredient/result
+  // sets; simple/progressive systems craft exactly one set into one result.
+  const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
@@ -490,6 +493,7 @@
       || ($viewState.recipes || [])[0]
       || null
   );
+  const recipeComplex = $derived(selectedRecipe?.complex === true);
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
   const showComponentEssences = $derived(itemCards.some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
   const selectedComponent = $derived(
@@ -1522,6 +1526,11 @@
   function handleRevertToSingleStep() {
     if (!selectedRecipeId) return false;
     return store.revertRecipeToSingleStep?.(selectedRecipeId);
+  }
+
+  async function handleSetRecipeComplexity(complex) {
+    if (!selectedRecipeId) return false;
+    return store.setRecipeComplexity?.(selectedRecipeId, complex);
   }
 
   function currentSteps() {
@@ -3678,6 +3687,7 @@
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
         recipe={selectedRecipeId ? selectedRecipe : null}
+        complex={recipeComplex}
         saving={recipeEditSaving}
         onBack={backToRecipesBrowse}
         onSave={saveRecipeEdit}
@@ -5417,6 +5427,9 @@
           {recipeItemDefinitions}
           categories={selectedSystem?.categories || []}
           multiStepEnabled={recipeMultiStepEnabled}
+          complex={recipeComplex}
+          multiSetAllowed={recipeMultiSetAllowed}
+          onSetComplexity={handleSetRecipeComplexity}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}
           onSetCategory={handleSetRecipeCategory}

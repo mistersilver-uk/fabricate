@@ -20,6 +20,7 @@
 
   let {
     set = {},
+    chromeless = false,
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
@@ -70,26 +71,28 @@
   }
 </script>
 
-<div class="manager-recipe-ingredient-set" data-recipe-set data-recipe-set-id={set?.id || ''}>
-  <div class="manager-recipe-ingredient-set-head">
-    <input
-      type="text"
-      class="manager-recipe-ingredient-set-name"
-      data-recipe-set-field="name"
-      placeholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
-      value={set?.name || ''}
-      onchange={(e) => setName(e.target.value)}
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
-    />
-    <button
-      type="button"
-      class="manager-icon-button is-danger"
-      data-recipe-remove="ingredient-set"
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
-      title={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
-      onclick={() => onRemove()}
-    ><i class="fas fa-trash" aria-hidden="true"></i></button>
-  </div>
+<div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-set-id={set?.id || ''}>
+  {#if !chromeless}
+    <div class="manager-recipe-ingredient-set-head">
+      <input
+        type="text"
+        class="manager-recipe-ingredient-set-name"
+        data-recipe-set-field="name"
+        placeholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
+        value={set?.name || ''}
+        onchange={(e) => setName(e.target.value)}
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
+      />
+      <button
+        type="button"
+        class="manager-icon-button is-danger"
+        data-recipe-remove="ingredient-set"
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
+        title={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
+        onclick={() => onRemove()}
+      ><i class="fas fa-trash" aria-hidden="true"></i></button>
+    </div>
+  {/if}
 
   {#if groups.length === 0}
     <p class="manager-muted manager-recipe-ingredient-set-empty">{text('FABRICATE.Admin.Manager.Recipe.SetEmptyHint', 'Add a component or a tag requirement this set must satisfy.')}</p>
