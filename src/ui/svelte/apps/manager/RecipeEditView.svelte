@@ -1,79 +1,160 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  Recipe editor shell. A tab strip (Overview / Ingredients / Results / Validation)
+  mirroring the gathering environment editor, with the card contents moved into the
+  relevant tab.
+
+  The shell is fully CONTROLLED: the root holds the in-flight recipe draft and passes
+  it down as `recipe`. Identity inputs (name/description/img) read straight from
+  `recipe` and emit `onUpdateRecipe({ … })` on input; the enabled toggle emits
+  `onToggleEnabled()` (the root persists that immediately). The header Save button
+  lives in the shared header and calls the root's save handler directly — there is no
+  form-wrapper to submit. Every requirement add/remove handler stages through
+  `onUpdateRecipe`/`onUpdateStep`.
+-->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
-  import RecipeStepsCard from './RecipeStepsCard.svelte';
+  import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';
+  import RecipeOverviewTab from './recipe/RecipeOverviewTab.svelte';
+  import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
+  import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
+  import RecipeToolsTab from './recipe/RecipeToolsTab.svelte';
+  import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
+  import { evaluateRecipeReadiness } from './recipe/recipeReadiness.js';
 
   let {
     recipe = null,
+    complex = false,
     saving = false,
-    onBack = () => {},
-    onSave = () => {},
-    onDirtyChange = () => {},
-    onDraftChange = () => {},
+    saveFailed = false,
     onPickImagePath = null,
     linkedItemImage = '',
     currencyUnits = [],
+    toolsLibrary = [],
+    componentOptions = [],
+    essenceOptions = [],
+    itemTags = [],
+    onUpdateRecipe = () => {},
+    onToggleEnabled = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
     onDeleteStep = () => {}
   } = $props();
 
-  // A recipe is multi-step when it carries an explicit steps array; the steps card
-  // is shown only then (the right-inspector toggle controls entering/leaving the mode).
-  const isMultiStep = $derived((recipe?.steps?.length ?? 0) >= 1);
+  // Current single-step requirement scopes default to empty arrays so an
+  // unconfigured recipe still renders the empty-state sections.
+  const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
+  const resultGroups = $derived(Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
+  const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
+  const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
+
+  // Identity reads straight from the controlled draft.
+  const name = $derived(recipe?.name || '');
+  const description = $derived(recipe?.description || '');
+  const img = $derived(recipe?.img || '');
+  const enabled = $derived(recipe?.enabled !== false);
+
+  // A recipe is multi-step when it carries an explicit steps array; per-step
+  // groupings replace the recipe-level sections in that mode (the right-inspector
+  // toggle controls entering/leaving the mode).
+  const isMultiStep = $derived(steps.length >= 1);
+
+  function stepById(stepId) {
+    return steps.find(step => step.id === stepId) || null;
+  }
+  function stepResultGroups(step) {
+    return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
+  }
+  function stepToolIds(step) {
+    return Array.isArray(step?.toolIds) ? step.toolIds : [];
+  }
+
+  // Add/remove mirror handleAddStep: append entries WITHOUT an id (store
+  // normalization assigns one); remove filters by the entry's id; tools store the
+  // chosen tool id string directly. A null stepId patches the recipe scope; a
+  // present stepId patches that step.
+  // The ingredient section emits the whole replacement sets array (shallow-cloned
+  // down to the changed node); route it to the recipe scope (null stepId) or the
+  // step scope. The store normalizes via Recipe.fromJSON (assigns ids, normalizes
+  // each option's match) so nothing here hand-assigns ids.
+  function updateIngredientSets(stepId, nextSets) {
+    if (stepId == null) {
+      onUpdateRecipe({ ingredientSets: nextSets });
+      return;
+    }
+    if (!stepById(stepId)) return;
+    onUpdateStep(stepId, { ingredientSets: nextSets });
+  }
+  function addResultGroup(stepId) {
+    if (stepId == null) {
+      onUpdateRecipe({ resultGroups: [...resultGroups, { name: '' }] });
+      return;
+    }
+    const step = stepById(stepId);
+    if (!step) return;
+    onUpdateStep(stepId, { resultGroups: [...stepResultGroups(step), { name: '' }] });
+  }
+  function removeResultGroup(stepId, groupId) {
+    if (stepId == null) {
+      onUpdateRecipe({ resultGroups: resultGroups.filter(group => group.id !== groupId) });
+      return;
+    }
+    const step = stepById(stepId);
+    if (!step) return;
+    onUpdateStep(stepId, { resultGroups: stepResultGroups(step).filter(group => group.id !== groupId) });
+  }
+  function addTool(toolId) {
+    if (!toolId || toolIds.includes(toolId)) return;
+    onUpdateRecipe({ toolIds: [...toolIds, toolId] });
+  }
+  function removeTool(toolId) {
+    onUpdateRecipe({ toolIds: toolIds.filter(id => id !== toolId) });
+  }
+  function addStepTool(stepId, toolId) {
+    const step = stepById(stepId);
+    if (!step || !toolId || stepToolIds(step).includes(toolId)) return;
+    onUpdateStep(stepId, { toolIds: [...stepToolIds(step), toolId] });
+  }
+  function removeStepTool(stepId, toolId) {
+    const step = stepById(stepId);
+    if (!step) return;
+    onUpdateStep(stepId, { toolIds: stepToolIds(step).filter(id => id !== toolId) });
+  }
+
+  // Deleting a step removes the whole step (its ingredients, results, and tools).
+  // The root confirms with wording contextual to where the delete was triggered.
+  function deleteStepFrom(context) {
+    return (stepId) => onDeleteStep(stepId, context);
+  }
 
   // When a recipe item is linked, the identity image mirrors the linked item's
   // image and the picker is locked — exactly like the environment editor locks
   // its image to a linked scene.
   const isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId));
 
-  let draftId = $state('');
-  let name = $state('');
-  let description = $state('');
-  let img = $state('');
-  let enabled = $state(true);
+  let activeTab = $state('overview');
   let lastRecipeId = $state(null);
-  let lastDirty = $state(false);
-  let lastDraftSignature = $state('');
-  let saveFailed = $state(false);
 
-  const validName = $derived(Boolean(name.trim()));
-  const dirty = $derived(isDirty());
-  const draftSummary = $derived(buildDraftSummary());
-  const draftSignature = $derived([
-    draftSummary.id,
-    draftSummary.name,
-    draftSummary.description,
-    draftSummary.img,
-    draftSummary.enabled ? 'on' : 'off',
-    draftSummary.dirty ? 'dirty' : 'clean',
-    draftSummary.validName ? 'valid' : 'invalid'
-  ].join(''));
+  // Validation badges: critical/warning issue counts. The draft is the single
+  // source of truth, so the readiness evaluator reads it directly.
+  const readiness = $derived(evaluateRecipeReadiness({ ...(recipe || {}) }));
+  const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
+  const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+  const badges = $derived({
+    validation: [
+      ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
+      ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
+    ]
+  });
 
+  // Reset the active tab to Overview whenever a different recipe is loaded.
   $effect(() => {
     const nextRecipeId = recipe?.id || '__none__';
     if (nextRecipeId === lastRecipeId) return;
-    draftId = recipe?.id || '';
-    name = recipe?.name || '';
-    description = recipe?.description || '';
-    img = recipe?.img || '';
-    enabled = recipe?.enabled !== false;
-    saveFailed = false;
+    activeTab = 'overview';
     lastRecipeId = nextRecipeId;
-  });
-
-  $effect(() => {
-    if (dirty === lastDirty) return;
-    lastDirty = dirty;
-    onDirtyChange(dirty);
-  });
-
-  $effect(() => {
-    if (draftSignature === lastDraftSignature) return;
-    lastDraftSignature = draftSignature;
-    onDraftChange(draftSummary);
   });
 
   function text(key, fallback) {
@@ -81,138 +162,95 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function recipeImage(value) {
-    return value || DEFAULT_RECIPE_IMAGE;
-  }
-
-  function buildUpdates() {
-    return {
-      name: name.trim(),
-      description,
-      img,
-      enabled
-    };
-  }
-
-  function buildDraftSummary() {
-    return {
-      id: draftId || '',
-      updates: buildUpdates(),
-      name: name.trim(),
-      description,
-      img,
-      enabled,
-      dirty,
-      validName
-    };
-  }
-
-  function isDirty() {
-    if (!recipe) return false;
-    return name !== (recipe.name || '')
-      || description !== (recipe.description || '')
-      || img !== (recipe.img || '')
-      || enabled !== (recipe.enabled !== false);
-  }
-
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
-    if (value) img = value;
+    if (value) onUpdateRecipe({ img: value });
   }
 
-  async function handleSave(event) {
-    event.preventDefault();
-    if (!validName || saving) return;
-    saveFailed = false;
-    let result = false;
-    try {
-      result = await onSave(draftId || null, buildUpdates());
-    } catch (err) {
-      result = false;
+  // Deep-link from a validation issue: switch to the tab that hosts the gap.
+  function selectIssue(targetTab) {
+    if (['overview', 'ingredients', 'results', 'tools'].includes(targetTab)) {
+      activeTab = targetTab;
     }
-    if (result === false) saveFailed = true;
   }
 </script>
 
 <main class="manager-main manager-recipe-edit-main" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}>
   {#if recipe}
-    <form id="manager-recipe-edit-form" onsubmit={handleSave}>
-      <section class="manager-task-core-card" data-recipe-section="identity">
-        <div class="manager-task-card-heading">
-          <div>
-            <h3>{text('FABRICATE.Admin.Manager.Recipe.Identity', 'Identity')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.IdentityHint', 'Name the recipe, describe it, choose an image, and toggle whether it is active.')}</p>
-          </div>
-        </div>
-        <div class="manager-task-core-grid">
-          <div class="manager-task-media-column">
-            {#if isRecipeItemLinked}
-              <span
-                class="manager-task-image-picker is-recipe-item-linked"
-                data-recipe-item-locked-image
-                title={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip', "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.")}
-                aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage', 'Image provided by the linked recipe item')}
-              >
-                <img src={linkedItemImage || recipeImage(img)} alt="" />
-                <i class="fas fa-lock" aria-hidden="true"></i>
-              </span>
-            {:else}
-              <button
-                type="button"
-                class="manager-task-image-picker"
-                data-recipe-field="img"
-                aria-label={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
-                onclick={chooseImage}
-                disabled={typeof onPickImagePath !== 'function' || saving}
-              >
-                <img src={recipeImage(img)} alt="" />
-                <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
-            {/if}
-            <div class="manager-task-core-status">
-              <button
-                type="button"
-                class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-                data-recipe-field="enabled"
-                aria-pressed={enabled}
-                disabled={saving}
-                onclick={() => { enabled = !enabled; }}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                <span class="manager-status-toggle-label">{enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
-              </button>
-              <p class="manager-muted">{enabled
-                ? text('FABRICATE.Admin.Manager.Recipe.EnabledHint', 'Available to players while on.')
-                : text('FABRICATE.Admin.Manager.Recipe.DisabledHint', 'Hidden from players while off.')}</p>
-            </div>
-          </div>
-          <div class="manager-task-identity-fields">
-            <label class="manager-field" for="manager-recipe-edit-name">
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>
-              <input id="manager-recipe-edit-name" data-recipe-field="name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} disabled={saving} required />
-            </label>
-            <label class="manager-field" for="manager-recipe-edit-description">
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Description', 'Description')}</span>
-              <textarea id="manager-recipe-edit-description" data-recipe-field="description" value={description} oninput={(event) => description = event.currentTarget.value} disabled={saving}></textarea>
-            </label>
-          </div>
-        </div>
-        {#if saveFailed}
-          <p class="manager-muted manager-form-warning">{text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed. Check for duplicate or blank names and try again.')}</p>
+    <div class="manager-recipe-edit-view" data-recipe-editor>
+      <RecipeEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
+
+      <div
+        class="manager-editor-tab-panel"
+        role="tabpanel"
+        id={`recipe-panel-${activeTab}`}
+        aria-labelledby={`recipe-tab-${activeTab}`}
+      >
+        {#if activeTab === 'overview'}
+          <RecipeOverviewTab
+            {recipe}
+            {name}
+            {description}
+            {img}
+            {enabled}
+            {saving}
+            {saveFailed}
+            {isRecipeItemLinked}
+            {linkedItemImage}
+            {onPickImagePath}
+            onNameInput={(value) => onUpdateRecipe({ name: value })}
+            onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
+            {onToggleEnabled}
+            onChooseImage={chooseImage}
+            {isMultiStep}
+            {onUpdateRecipe}
+            {onAddStep}
+            {onReorderSteps}
+            {onUpdateStep}
+            onDeleteStep={deleteStepFrom('overview')}
+          />
+        {:else if activeTab === 'ingredients'}
+          <RecipeIngredientsTab
+            {recipe}
+            {complex}
+            {isMultiStep}
+            {currencyUnits}
+            {componentOptions}
+            {essenceOptions}
+            {itemTags}
+            onUpdateIngredientSets={updateIngredientSets}
+            onDeleteStep={deleteStepFrom('ingredients')}
+          />
+        {:else if activeTab === 'results'}
+          <RecipeResultsTab
+            {recipe}
+            {complex}
+            {isMultiStep}
+            onAddResultGroup={addResultGroup}
+            onRemoveResultGroup={removeResultGroup}
+            onDeleteStep={deleteStepFrom('results')}
+          />
+        {:else if activeTab === 'tools'}
+          <RecipeToolsTab
+            {recipe}
+            {isMultiStep}
+            {toolIds}
+            {toolsLibrary}
+            onAddTool={addTool}
+            onRemoveTool={removeTool}
+            onAddStepTool={addStepTool}
+            onRemoveStepTool={removeStepTool}
+            onDeleteStep={deleteStepFrom('tools')}
+          />
+        {:else if activeTab === 'validation'}
+          <RecipeValidationTab
+            {recipe}
+            onSelectIssue={selectIssue}
+          />
         {/if}
-      </section>
-    </form>
-    {#if isMultiStep}
-      <RecipeStepsCard
-        steps={recipe.steps || []}
-        {currencyUnits}
-        {onAddStep}
-        {onReorderSteps}
-        {onUpdateStep}
-        {onDeleteStep}
-      />
-    {/if}
+      </div>
+    </div>
   {:else}
     <div class="manager-empty">
       <div>

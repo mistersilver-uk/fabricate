@@ -63,6 +63,33 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
+  for (const recipeComponent of [
+    'RecipeEditorTabs',
+    'RecipeOverviewTab',
+    'RecipeIngredientsTab',
+    'RecipeResultsTab',
+    'RecipeToolsTab',
+    'RecipeValidationTab',
+    'RecipeStepAccordion',
+    'RecipeDurationEditor',
+    'RecipeIngredientsSection',
+    'RecipeIngredientSetCard',
+    'RecipeIngredientGroupCard',
+    'RecipeIngredientOption',
+    'RecipeEssenceRequirements',
+    'RecipeResultsSection',
+    'RecipeToolsSection'
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
+  }
+  for (const recipeModule of ['recipeReadiness.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`), 'utf8')
+    );
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
@@ -96,7 +123,7 @@ function compileManagerRoot() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js', 'gatheringFormat.js', 'recipeImageIcons.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js', 'gatheringFormat.js', 'recipeImageIcons.js', 'recipeDuration.js', 'recipeCurrency.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
@@ -148,6 +175,40 @@ function gatheringSubitem(labelText) {
 
 function gatheringToggle() {
   return target.querySelector('.manager-nav-toggle');
+}
+
+// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
+// Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
+// returns the mounted target for the caller to query.
+async function openRecipeEditor(calls, storeOptions = {}) {
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(Component, {
+    target,
+    props: {
+      store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+      services: { openCurrentAdmin: () => {} }
+    }
+  });
+  flushSync();
+  navButton('Recipes').click();
+  await tick();
+  flushSync();
+  target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
+  await tick();
+  flushSync();
+  return target;
+}
+
+function headerSaveButton(target) {
+  return Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    .find(button => button.textContent.includes('Save'));
+}
+
+function editRecipeName(target, value) {
+  const nameInput = target.querySelector('.manager-main [data-recipe-field="name"]');
+  nameInput.value = value;
+  nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
 }
 
 function writeCompiledSvelte(sourcePath) {
@@ -777,7 +838,26 @@ function createStore(calls = [], options = {}) {
     importRecipes: () => calls.push(['importRecipes']),
     exportRecipes: () => calls.push(['exportRecipes']),
     setRecipeSearch: (term) => calls.push(['setRecipeSearch', term]),
-    toggleRecipeEnabled: (id, enabled) => calls.push(['toggleRecipeEnabled', id, enabled]),
+    toggleRecipeEnabled: (id, enabled) => {
+      calls.push(['toggleRecipeEnabled', id, enabled]);
+      return options.toggleRecipeEnabledResult ?? true;
+    },
+    updateRecipe: (id, updates, opts) => {
+      calls.push(['updateRecipe', id, updates, opts]);
+      return options.updateRecipeResult ?? true;
+    },
+    addRecipeItemFromUuid: (systemId, uuid) => {
+      calls.push(['addRecipeItemFromUuid', systemId, uuid]);
+      return options.addRecipeItemResult ?? { item: { id: 'ri-created' }, action: 'added' };
+    },
+    confirmDiscardDirtyRecipeDraft: () => {
+      calls.push(['confirmDiscardDirtyRecipeDraft']);
+      return options.confirmDiscardRecipeResult ?? 'discard';
+    },
+    confirmRecipeAction: (opts) => {
+      calls.push(['confirmRecipeAction', opts]);
+      return options.confirmRecipeActionResult ?? true;
+    },
     duplicateRecipe: (id) => calls.push(['duplicateRecipe', id]),
     deleteRecipe: (id) => {
       calls.push(['deleteRecipe', id]);
@@ -1466,7 +1546,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Recipe library'));
     assert.ok(target.textContent.includes('Healing Draught'));
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
-    assert.ok(target.textContent.includes('Requirements'));
     assert.ok(target.textContent.includes('Player visibility'));
     const enabledRecipeToggle = target.querySelector('[data-recipe-id="r1"] .manager-status-toggle');
     const disabledRecipeToggle = target.querySelector('[data-recipe-id="r2"] .manager-status-toggle');
@@ -1627,6 +1706,153 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'), null, 'recipe-item card is hidden for the learned knowledge mode');
     assert.equal(target.querySelector('.manager-inspector'), null, 'the inspector aside is fully suppressed for the learned knowledge mode');
     assert.ok(target.textContent.includes('Edit identity for this recipe.'), 'learned mode shows the identity-only subtitle');
+  });
+
+  it('stages editor edits without persisting until the header Save is pressed', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls);
+
+    editRecipeName(target, 'Greater Healing Draught');
+    await tick();
+    flushSync();
+
+    // No persistence has happened yet — the edit is staged in the root-held draft.
+    assert.ok(!calls.some(call => call[0] === 'updateRecipe'), 'editing does not call store.updateRecipe before Save');
+    // The Unsaved chip reflects the dirty draft.
+    const dirtyChip = Array.from(target.querySelectorAll('.manager-header-actions .manager-chip.is-warning'))
+      .find(chip => chip.textContent.includes('Unsaved'));
+    assert.ok(dirtyChip, 'the Unsaved chip is shown while the draft is dirty');
+
+    // The header Save commits the whole staged draft in exactly one updateRecipe call.
+    headerSaveButton(target).click();
+    await tick();
+    flushSync();
+    const updateCalls = calls.filter(call => call[0] === 'updateRecipe');
+    assert.equal(updateCalls.length, 1, 'Save fires exactly one store.updateRecipe');
+    assert.equal(updateCalls[0][1], 'r1', 'updateRecipe targets the edited recipe id');
+    assert.equal(updateCalls[0][2].name, 'Greater Healing Draught', 'the committed draft carries the staged name');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'a successful Save returns to the recipes browser');
+  });
+
+  it('gives a step seeded by switching to multi-step a stable id (so step-scoped edits route to the step, not the recipe)', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, {
+      selectedFeatures: { essences: true, effectTransfer: true, itemTags: true, gathering: true, recipeCategories: true, multiStepRecipes: true }
+    });
+
+    // Switching a single-step recipe to multi-step seeds one step into the draft.
+    // It must carry an id up front: step-scoped edits route by step id, and an
+    // id-less step (undefined == null) misroutes to the recipe scope — looking
+    // like the per-step ingredient/result/tool/cost adds do nothing.
+    target.querySelector('.manager-inspector [data-recipe-step-mode-option="multi"]').click();
+    await tick();
+    flushSync();
+
+    headerSaveButton(target).click();
+    await tick();
+    flushSync();
+
+    const updateCalls = calls.filter(call => call[0] === 'updateRecipe');
+    assert.equal(updateCalls.length, 1, 'Save commits the staged multi-step draft once');
+    const committed = updateCalls[0][2];
+    assert.ok(Array.isArray(committed.steps) && committed.steps.length === 1, 'the draft now holds one explicit step');
+    assert.ok(
+      typeof committed.steps[0].id === 'string' && committed.steps[0].id.length > 0,
+      'the seeded step carries a stable id so its scoped edits do not misroute'
+    );
+  });
+
+  it('persists the enabled toggle immediately and never marks the editor dirty', async () => {
+    const calls = [];
+    await openRecipeEditor(calls);
+
+    // r1 starts enabled; toggling fires toggleRecipeEnabled(false) immediately.
+    target.querySelector('.manager-main [data-recipe-field="enabled"]').click();
+    await tick();
+    flushSync();
+
+    const toggleCalls = calls.filter(call => call[0] === 'toggleRecipeEnabled');
+    assert.equal(toggleCalls.length, 1, 'the enabled toggle persists immediately via toggleRecipeEnabled');
+    assert.deepEqual([toggleCalls[0][1], toggleCalls[0][2]], ['r1', false], 'it disables the persisted recipe');
+    assert.ok(!calls.some(call => call[0] === 'updateRecipe'), 'the enabled toggle does not stage an updateRecipe');
+
+    // The toggle synced the baseline, so the editor is not dirty: no Unsaved chip.
+    const dirtyChip = Array.from(target.querySelectorAll('.manager-header-actions .manager-chip.is-warning'))
+      .find(chip => chip.textContent.includes('Unsaved'));
+    assert.equal(dirtyChip, undefined, 'toggling enabled does not mark the editor dirty');
+  });
+
+  it('does not prompt on navigation when only the enabled toggle changed', async () => {
+    const calls = [];
+    await openRecipeEditor(calls);
+
+    target.querySelector('.manager-main [data-recipe-field="enabled"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Back to recipes')).click();
+    await tick();
+    flushSync();
+
+    assert.ok(!calls.some(call => call[0] === 'confirmDiscardDirtyRecipeDraft'), 'no discard prompt fires after only toggling enabled');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'navigation proceeds without a prompt');
+  });
+
+  it('prompts the 3-way choice on dirty navigation and Saves on the save choice', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'save' });
+
+    editRecipeName(target, 'Save On Exit');
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Back to recipes')).click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyRecipeDraft'), 'the 3-way choice dialog is consulted on dirty navigation');
+    const updateCalls = calls.filter(call => call[0] === 'updateRecipe');
+    assert.equal(updateCalls.length, 1, 'choosing Save commits the staged draft');
+    assert.equal(updateCalls[0][2].name, 'Save On Exit', 'the committed draft carries the staged name');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'navigation proceeds after Save');
+  });
+
+  it('discards staged edits on the discard choice and does not persist them', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'discard' });
+
+    editRecipeName(target, 'Discard Me');
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Back to recipes')).click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyRecipeDraft'), 'the choice dialog is consulted');
+    assert.ok(!calls.some(call => call[0] === 'updateRecipe'), 'choosing Discard persists nothing');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'navigation proceeds after Discard');
+  });
+
+  it('stays in the editor on the cancel (keep editing) choice', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
+
+    editRecipeName(target, 'Keep Editing');
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Back to recipes')).click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyRecipeDraft'), 'the choice dialog is consulted');
+    assert.ok(!calls.some(call => call[0] === 'updateRecipe'), 'cancelling persists nothing');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit', 'cancelling keeps the editor open');
   });
 
   it('routes to the components browser with filters, drop import, selected inspector, and actions', async () => {

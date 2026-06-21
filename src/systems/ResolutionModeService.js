@@ -120,11 +120,12 @@ export class ResolutionModeService {
    * Validate a recipe against its system's resolution mode.
    * @param {Recipe} recipe
    * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
-   *   false, mode CARDINALITY checks (e.g. "must have exactly/at least N
-   *   ingredient set/result group", progressive "requires ordered results") are
-   *   waived as completeness. Mode REFERENCE-INTEGRITY checks (mapped invalid
-   *   resultGroupId, routed invalid provider, tiered outcome→group mapping)
-   *   always apply.
+   *   false, mode COMPLETENESS checks (e.g. "must have exactly/at least N
+   *   ingredient set/result group", progressive "requires ordered results", and a
+   *   not-yet-chosen routed/alchemy `resultSelection.provider`) are waived so an
+   *   incomplete authoring shell can persist. Mode REFERENCE-INTEGRITY checks (a
+   *   mapped invalid resultGroupId, an invalid provider VALUE, tiered outcome→group
+   *   mapping) always apply.
    * @returns {{valid: boolean, errors: string[]}}
    */
   validateRecipe(recipe, { requireComplete = true } = {}) {
@@ -205,9 +206,12 @@ export class ResolutionModeService {
         } else {
           const provider = this.getProviderForStep(recipe, step);
           if (!provider) {
-            errors.push(
-              `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
-            );
+            // A not-yet-chosen provider is a completeness gap (an authoring shell),
+            // not a reference-integrity error — waive it while drafting.
+            if (requireComplete)
+              errors.push(
+                `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
+              );
           } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
             errors.push('Invalid result selection provider: ' + provider);
           }
@@ -272,7 +276,9 @@ export class ResolutionModeService {
       if (hasExplicitSteps) errors.push('Alchemy recipe must not have explicit steps');
       const provider = this.getProvider(recipe);
       if (!provider) {
-        errors.push('Alchemy recipe requires resultSelection.provider');
+        // Missing provider is a completeness gap (drafting shell); waive it unless
+        // a complete recipe is required. An invalid provider VALUE still errors below.
+        if (requireComplete) errors.push('Alchemy recipe requires resultSelection.provider');
       } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
         errors.push('Invalid result selection provider: ' + provider);
       }

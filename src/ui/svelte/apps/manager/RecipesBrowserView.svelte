@@ -3,6 +3,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
 
   let {
     recipes = [],
@@ -58,58 +59,11 @@
     return recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
   }
 
-  function ingredientCount(recipe) {
-    return recipe?.ingredientCount ?? recipe?.ingredients?.length ?? 0;
-  }
-
-  function toolCount(recipe) {
-    return recipe?.toolCount ?? recipe?.tools?.length ?? 0;
-  }
-
-  function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
-    const key = count === 1 ? keySingular : keyPlural;
-    const fallback = count === 1 ? fallbackSingular : fallbackPlural;
-    return `${count} ${text(key, fallback)}`;
-  }
-
-  function stepRequirementSummary(step) {
-    if (!step) return text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements');
-    if (step.hasAlternatives) {
-      return text('FABRICATE.Admin.Manager.Recipe.AlternativeSets', '{count} alternative sets')
-        .replace('{count}', step.ingredientSetCount || step.ingredientSetSummaries?.length || 0);
-    }
-    const ingredients = step.ingredientCount || 0;
-    const tools = step.toolCount || 0;
-    const ingredientLabel = formatCount(
-      'FABRICATE.Admin.Manager.Recipe.Ingredient',
-      'ingredient',
-      'FABRICATE.Admin.Manager.Recipe.Ingredients',
-      'ingredients',
-      ingredients
-    );
-    if (tools <= 0) return ingredientLabel;
-    const toolLabel = formatCount(
-      'FABRICATE.Admin.Manager.Recipe.Tool',
-      'tool',
-      'FABRICATE.Admin.Manager.Recipe.Tools',
-      'tools',
-      tools
-    );
-    return `${ingredientLabel}, ${toolLabel}`;
-  }
-
-  function requirementsSummary(recipe) {
-    const steps = Array.isArray(recipe?.requirementsPreview) ? recipe.requirementsPreview : [];
-    if (steps.length > 1) {
-      return text('FABRICATE.Admin.Manager.Recipe.StepRequirements', '{count} steps')
-        .replace('{count}', steps.length);
-    }
-    if (steps.length === 1) return stepRequirementSummary(steps[0]);
-    return stepRequirementSummary({
-      ingredientCount: ingredientCount(recipe),
-      toolCount: toolCount(recipe),
-      ingredientSetCount: 1
-    });
+  // Render the recipe's category in sentence case: the reserved fallback resolves
+  // to a localized "General" rather than the raw lowercase value; custom
+  // categories keep their authored casing.
+  function categoryLabel(recipe) {
+    return getRecipeCategoryLabel(recipe?.category, localize);
   }
 
   function structureLabel(recipe) {
@@ -209,12 +163,19 @@
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
           {/if}
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Recipe.Requirements', 'Requirements')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Recipe.Status', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedRecipes as recipe (recipe.id)}
           <div class={`manager-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''}`} role="row" aria-selected={isSelectedRecipe(recipe)} data-recipe-id={recipe.id}>
+            {#if recipe.incomplete}
+              <span class="manager-recipe-row-flag-slot">
+                <span class="manager-chip is-warning manager-recipe-incomplete-chip" title={text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}>
+                  <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}</span>
+                </span>
+              </span>
+            {/if}
             <button type="button" class="manager-recipe-identity" onclick={() => onSelectRecipe(recipe.id)} role="cell">
               <img class="manager-recipe-thumb" src={recipeImage(recipe)} alt="" />
               <span class="manager-system-copy">
@@ -227,21 +188,15 @@
                 {#if recipe.locked}
                   <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Recipe.Locked', 'Locked')}</span>
                 {/if}
-                {#if recipe.incomplete}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}</span>
-                {/if}
               </span>
             </button>
             {#if showRecipeCategories}
               <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}>
-                <span class="manager-chip">{recipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}</span>
+                <span class="manager-chip">{categoryLabel(recipe)}</span>
               </span>
             {/if}
             <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}>
               <span class="manager-chip">{structureLabel(recipe)}</span>
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Recipe.Requirements', 'Requirements')}>
-              <span class="manager-muted">{requirementsSummary(recipe)}</span>
             </span>
             <span role="cell" class="manager-recipe-status manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Recipe.Status', 'Status')}>
               <button

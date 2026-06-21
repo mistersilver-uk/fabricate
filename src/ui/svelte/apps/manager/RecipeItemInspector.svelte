@@ -15,6 +15,10 @@
     recipe = null,
     recipeItemDefinitions = [],
     categories = [],
+    multiStepEnabled = false,
+    complex = false,
+    multiSetAllowed = false,
+    onSetComplexity = () => {},
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
     onSetCategory = () => {},
@@ -105,6 +109,16 @@
     else onRevertToSingleStep();
   }
 
+  // Simple vs Complex authoring mode. Complex is gated on the system's resolution
+  // mode (multiSetAllowed); a recipe that is already complex can always stay complex.
+  const complexAllowed = $derived(multiSetAllowed || complex);
+
+  function selectComplexity(next) {
+    if (next === complex) return;
+    if (next && !complexAllowed) return;
+    onSetComplexity(next);
+  }
+
   // Drop a Foundry Item to link/replace it. Item-only: an unpersisted item drop
   // carries { type: 'Item' } with no uuid and is a no-op.
   async function handleItemDrop(data) {
@@ -193,6 +207,7 @@
     </label>
   </section>
 
+  {#if multiStepEnabled || isMultiStep}
   <section class="manager-inspector-card" data-recipe-section="recipe-step-mode">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
     <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}>
@@ -226,5 +241,47 @@
     <p class="manager-muted manager-environment-mode-hint">{isMultiStep
       ? text('FABRICATE.Admin.Manager.Recipe.MultiStepHint', 'Author an ordered list of named steps in the editor.')
       : text('FABRICATE.Admin.Manager.Recipe.SingleStepHint', 'The recipe is crafted in a single step.')}</p>
+  </section>
+  {/if}
+
+  <section class="manager-inspector-card" data-recipe-section="recipe-mode">
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}</h3>
+    <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}>
+      <button
+        type="button"
+        role="radio"
+        class={`manager-environment-mode-option ${complex ? '' : 'is-selected'}`}
+        aria-checked={!complex}
+        data-recipe-mode-option="simple"
+        onclick={() => selectComplexity(false)}
+      >
+        <span class="manager-environment-mode-head">
+          <i class="fas fa-equals" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.SimpleMode', 'Simple')}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        class={`manager-environment-mode-option ${complex ? 'is-selected' : ''} ${complexAllowed ? '' : 'is-locked'}`}
+        aria-checked={complex}
+        data-recipe-mode-option="complex"
+        disabled={!complexAllowed}
+        title={complexAllowed ? null : text('FABRICATE.Admin.Manager.Recipe.ModeLocked', 'This system crafts one set of ingredients into one result.')}
+        onclick={() => selectComplexity(true)}
+      >
+        <span class="manager-environment-mode-head">
+          <i class="fas fa-diagram-project" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.ComplexMode', 'Complex')}</span>
+        </span>
+      </button>
+    </div>
+    {#if !complexAllowed}
+      <p class="manager-muted manager-environment-mode-hint" data-recipe-mode-hint="locked">{text('FABRICATE.Admin.Manager.Recipe.ModeLocked', 'This system crafts one set of ingredients into one result.')}</p>
+    {:else}
+      <p class="manager-muted manager-environment-mode-hint">{complex
+        ? text('FABRICATE.Admin.Manager.Recipe.ComplexHint', 'Author multiple ingredient sets and result sets.')
+        : text('FABRICATE.Admin.Manager.Recipe.SimpleHint', 'One set of ingredients makes one result.')}</p>
+    {/if}
   </section>
 {/if}

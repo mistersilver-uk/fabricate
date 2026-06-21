@@ -1,0 +1,250 @@
+/**
+ * Pure recipe readiness + issue evaluation for the recipe editor's Validation
+ * tab. Consumes the projected plain recipe (the same shape the admin store
+ * builds: `name`, `enabled`, `ingredientSets`, `resultGroups`, `steps`,
+ * `toolIds`, `incomplete`, `structureKey`) and returns structured checks/issues
+ * with stable ids; the UI layer maps ids to localized copy. No Svelte, Foundry,
+ * or store dependencies so it stays unit-testable.
+ *
+ * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', stepId?: string, stepName?: string }} ReadinessIssue
+ */
+
+function trimmed(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Compute a stable match signature for an alternative (option). Used to detect
+ * exact-duplicate matches within an OR group or set. Returns null for options
+ * with no usable match (an empty component slot or a tags match with no tags).
+ *
+ * @param {object} option One alternative inside a requirement.
+ * @returns {string | null}
+ */
+function optionSignature(option) {
+  const match = option?.match;
+  if (match?.type === 'component') {
+    const componentId = trimmed(match.componentId);
+    return componentId ? `component:${componentId}` : null;
+  }
+  if (match?.type === 'tags') {
+    const tags = asArray(match.tags).map(trimmed).filter(Boolean);
+    if (tags.length === 0) return null;
+    const tagMatch = match.tagMatch === 'all' ? 'all' : 'any';
+    return `tags:${[...tags].sort((a, b) => a.localeCompare(b)).join(',')}|${tagMatch}`;
+  }
+  if (match?.type === 'currency') {
+    const unit = trimmed(match.unit);
+    const amount = Number(match.amount) || 0;
+    if (!unit || amount <= 0) return null;
+    return `currency:${unit}:${amount}`;
+  }
+  return null;
+}
+
+/**
+ * Resolve the recipe's execution steps exactly like the admin store's
+ * `_getRecipeExecutionSteps`: explicit `recipe.steps` when non-empty, otherwise
+ * one implicit step built from the recipe-level sets/groups/tools.
+ *
+ * @param {object} recipe Projected plain recipe.
+ * @returns {{ id: string, name: string, ingredientSets: object[], resultGroups: object[], toolIds: string[], explicit: boolean }[]}
+ */
+function getExecutionSteps(recipe) {
+  const steps = asArray(recipe?.steps);
+  if (steps.length > 0) {
+    return steps.map((step, index) => ({
+      id: step?.id || `step-${index + 1}`,
+      name: trimmed(step?.name),
+      ingredientSets: asArray(step?.ingredientSets),
+      resultGroups: asArray(step?.resultGroups),
+      toolIds: asArray(step?.toolIds),
+      explicit: true
+    }));
+  }
+
+  return [{
+    id: 'implicit-step',
+    name: '',
+    ingredientSets: asArray(recipe?.ingredientSets),
+    resultGroups: asArray(recipe?.resultGroups),
+    toolIds: asArray(recipe?.toolIds),
+    explicit: false
+  }];
+}
+
+/**
+ * Build the `{ stepId, stepName }` tag spread carried by per-step issues. Empty
+ * for single-step recipes so their issues stay step-agnostic.
+ *
+ * @param {{ id: string, name: string }} step
+ * @param {boolean} isMultiStep
+ * @returns {{ stepId: string, stepName: string } | {}}
+ */
+function stepTag(step, isMultiStep) {
+  return isMultiStep ? { stepId: step.id, stepName: step.name } : {};
+}
+
+/**
+ * Missing-ingredient-set and missing-result-group issues, one per offending
+ * step. Surfaced as blocking, critical issues against their editor tab.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectMissingRequirementIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    if (step.ingredientSets.length === 0) {
+      issues.push({
+        id: 'noIngredientSet',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'ingredients',
+        ...stepTag(step, isMultiStep)
+      });
+    }
+  }
+  for (const step of executionSteps) {
+    if (step.resultGroups.length === 0) {
+      issues.push({
+        id: 'noResultGroup',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+        ...stepTag(step, isMultiStep)
+      });
+    }
+  }
+  return issues;
+}
+
+/**
+ * Duplicate-match issues for a single ingredient set: a `duplicateAlternative`
+ * per OR group that repeats an option signature, plus one `duplicateRequirement`
+ * when two requirements in the set share a requirement signature.
+ *
+ * @param {object} set One ingredient set.
+ * @param {object} step Owning execution step.
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectSetDuplicateIssues(set, step, isMultiStep) {
+  const issues = [];
+  const requirementSignatures = [];
+
+  for (const group of asArray(set?.ingredientGroups)) {
+    const signatures = asArray(group?.options)
+      .map(optionSignature)
+      .filter(Boolean);
+
+    // Within an OR group: any repeated option signature is a duplicate.
+    if (new Set(signatures).size !== signatures.length) {
+      issues.push({
+        id: 'duplicateAlternative',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'ingredients',
+        ...stepTag(step, isMultiStep)
+      });
+    }
+
+    if (signatures.length > 0) {
+      requirementSignatures.push([...signatures].sort((a, b) => a.localeCompare(b)).join('&&'));
+    }
+  }
+
+  // Within a set: two requirements sharing a requirement signature duplicate.
+  if (new Set(requirementSignatures).size !== requirementSignatures.length) {
+    issues.push({
+      id: 'duplicateRequirement',
+      severity: 'critical',
+      blocks: 'enable',
+      target: 'ingredients',
+      ...stepTag(step, isMultiStep)
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Duplicate-match detection across every step/set: a recipe must not repeat the
+ * same component or an identical tag/currency match twice inside one OR group,
+ * nor as duplicate requirements within a set.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectDuplicateMatchIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    for (const set of asArray(step.ingredientSets)) {
+      issues.push(...collectSetDuplicateIssues(set, step, isMultiStep));
+    }
+  }
+  return issues;
+}
+
+/**
+ * @param {object} recipe Projected plain recipe.
+ * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
+ */
+export function evaluateRecipeReadiness(recipe = {}) {
+  const executionSteps = getExecutionSteps(recipe);
+  const isMultiStep = executionSteps.length > 0 && executionSteps[0].explicit;
+  const active = recipe?.enabled !== false;
+
+  const hasName = Boolean(trimmed(recipe?.name));
+  const hasIngredientSet = executionSteps.every(step => step.ingredientSets.length > 0);
+  const hasResultGroup = executionSteps.every(step => step.resultGroups.length > 0);
+  const stepsNamed = executionSteps.every(step => Boolean(step.name));
+
+  const checks = [
+    { id: 'hasName', satisfied: hasName },
+    { id: 'hasIngredientSet', satisfied: hasIngredientSet },
+    { id: 'hasResultGroup', satisfied: hasResultGroup }
+  ];
+  if (isMultiStep) {
+    checks.push({ id: 'stepsNamed', satisfied: stepsNamed });
+  }
+
+  const issues = [];
+
+  if (!hasName) {
+    issues.push({ id: 'noName', severity: 'critical', blocks: 'enable', target: 'overview' });
+  }
+
+  issues.push(...collectMissingRequirementIssues(executionSteps, isMultiStep));
+
+  const duplicateIssues = collectDuplicateMatchIssues(executionSteps, isMultiStep);
+  issues.push(...duplicateIssues);
+  checks.push({ id: 'noDuplicateMatches', satisfied: duplicateIssues.length === 0 });
+
+  // A disabled recipe still saves, but flag that it cannot be enabled until the
+  // critical requirements above are met. The store/model projects `incomplete`;
+  // fall back to the locally computed gaps when the flag is absent.
+  const incomplete = typeof recipe?.incomplete === 'boolean'
+    ? recipe.incomplete
+    : (!hasName || !hasIngredientSet || !hasResultGroup);
+  if (!active && incomplete) {
+    issues.push({ id: 'disabledIncomplete', severity: 'warning', target: 'overview' });
+  }
+
+  return { checks, issues };
+}
+
+export function countIssues(severity, issues = []) {
+  return issues.filter(issue => issue.severity === severity).length;
+}
+
+export function blocksEnable(issues = []) {
+  return issues.some(issue => issue.blocks === 'enable');
+}

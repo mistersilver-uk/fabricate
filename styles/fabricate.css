@@ -2026,7 +2026,7 @@
 }
 
 .fabricate-manager .manager-recipes-table {
-  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.5fr) minmax(0, 0.48fr) minmax(0, 0.76fr) minmax(0, 0.58fr) 118px;
+  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.86fr) minmax(0, 0.86fr) minmax(0, 0.58fr) 118px;
 
   display: flex;
   flex-direction: column;
@@ -2035,7 +2035,34 @@
 }
 
 .fabricate-manager .manager-recipes-table.has-no-category {
-  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 0.52fr) minmax(0, 0.82fr) minmax(0, 0.58fr) 118px;
+  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 1.3fr) minmax(0, 0.58fr) 118px;
+}
+
+/* Incomplete flag pinned to the top-left, overlapping the row's top border, the
+   same affordance as the Tools library "Unsaved" chip (manager-tools-dirty-chip). */
+.fabricate-manager .manager-recipe-row {
+  position: relative;
+}
+
+.fabricate-manager .manager-recipe-row-flag-slot {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  z-index: 4;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.fabricate-manager .manager-recipe-incomplete-chip {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-mv2-surface-1);
+  gap: var(--fab-space-1);
+  white-space: nowrap;
+  box-shadow:
+    inset 0 0 0 999px var(--fab-warning-soft),
+    0 2px 8px var(--fab-overlay-dark-28);
 }
 
 .fabricate-manager .manager-components-table {
@@ -4290,6 +4317,49 @@
   opacity: 0.75;
 }
 
+.fabricate-manager .manager-recipe-duration {
+  position: relative;
+  display: inline-flex;
+}
+
+.fabricate-manager .manager-recipe-duration-trigger {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-duration-trigger.is-empty {
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-duration-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4000;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 240px;
+  max-width: 300px;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: var(--fab-shadow-lg);
+}
+
+.fabricate-manager .manager-recipe-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-duration-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
   min-height: 46px;
 }
@@ -4310,6 +4380,455 @@
 
 .fabricate-manager .manager-recipe-steps-add {
   list-style: none;
+}
+
+/* Requirement sections (Ingredients / Results / Tools) — empty-state scaffold. */
+.fabricate-manager .manager-recipe-section-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-section-empty-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-section-empty .manager-muted {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-req-rows,
+.fabricate-manager .manager-recipe-tool-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-req-row,
+.fabricate-manager .manager-recipe-tool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-req-label,
+.fabricate-manager .manager-recipe-tool-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* Nested ingredient editor: sets -> groups -> options + per-set essences. */
+.fabricate-manager .manager-recipe-ingredient-sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-or,
+.fabricate-manager .manager-recipe-ingredient-or-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Flank the "OR" label with a faint rule so each component/tag/cost alternative
+   reads as a visually separated row within the requirement. */
+.fabricate-manager .manager-recipe-ingredient-or-separator::before,
+.fabricate-manager .manager-recipe-ingredient-or-separator::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-empty {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+/* Two-button add row: "Add component" (popover) + "Add tag requirement". */
+.fabricate-manager .manager-recipe-ingredient-set-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+/* A requirement is a flat container by default (a single alternative reads as a
+   bare row). When it holds two or more alternatives they read as one bracketed
+   unit, accented on the left so the "— or —" links are visually grouped. */
+.fabricate-manager .manager-recipe-ingredient-requirement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives {
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-left: 3px solid var(--fab-mv2-accent);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+/* A faint divider between two consecutive single-alternative (bare) requirements
+   in a set, so the AND'd component/tag/cost rows read as separated. An OR-group
+   box already carries its own border, so requirements adjacent to one get no
+   extra divider. */
+.fabricate-manager
+  .manager-recipe-ingredient-set-groups
+  > .manager-recipe-ingredient-requirement:not(.has-alternatives)
+  + .manager-recipe-ingredient-requirement:not(.has-alternatives) {
+  border-top: 1px solid var(--fab-mv2-border);
+  padding-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-ingredient-requirement-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+/* An alternative is a single flat row: the match editor grows on the left, the
+   quantity + per-row add/remove controls cluster on the right. */
+.fabricate-manager .manager-recipe-ingredient-option-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-target {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+/* The per-row alternative-add cluster is grouped on the right, visually distinct
+   from the within-option tag editor on the left. */
+.fabricate-manager .manager-recipe-option-alternative-adds {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+/* Square, icon-only add controls so they don't read as the labelled set-level
+   "Add component" / "Add tag requirement" buttons; sized to match the adjacent
+   remove (icon) button. */
+.fabricate-manager .manager-button.manager-recipe-add-alternative-trigger {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+}
+
+.fabricate-manager .manager-recipe-tag-match-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-recipe-tag-match-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-chip);
+  height: auto;
+  min-height: 30px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-tag-match-option:hover:not(.is-selected) {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-tag-match-option.is-selected {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+/* The component alternative's trigger is the image-only picker target, sized to
+   its thumbnail; the resolved component name renders as static text beside it.
+   The `.manager-button.…` selector raises specificity above the base
+   `.manager-button` padding (declared later in this file) so the horizontal
+   padding actually tightens to match the vertical breathing room. */
+.fabricate-manager .manager-button.manager-recipe-component-trigger {
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  min-height: 34px;
+  padding: var(--fab-space-1);
+}
+
+/* The selected component's name, rendered beside the image-only picker trigger
+   (not inside the clickable button). */
+.fabricate-manager .manager-recipe-component-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The option's match editor lays the image trigger and the static name on one
+   row so the name reads beside the thumbnail. */
+.fabricate-manager .manager-recipe-option-component {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* The per-OR-group footer add cluster: one set of "Add component / Add tag
+   requirement" controls inside the requirement box instead of per row. */
+.fabricate-manager .manager-recipe-requirement-adds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-manager .manager-recipe-option-tags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-tags-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* The chosen tags sit in their own bordered area below the match controls;
+   when empty it shows a muted "No tags set". */
+.fabricate-manager .manager-recipe-option-tags-list {
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-recipe-tags-empty {
+  font-size: 0.85rem;
+}
+
+.fabricate-manager .manager-recipe-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-tag-chip {
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-recipe-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-option-quantity {
+  flex: 0 0 auto;
+  width: 3.75rem;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-option-currency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-currency-amount {
+  flex: 0 0 auto;
+  width: 3.75rem;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-currency-unit {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-quantity {
+  width: 100%;
+}
+
+.fabricate-manager .manager-recipe-option-remove {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-button.is-subtle {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-essences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-ingredient-essences-title {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.fabricate-manager .manager-recipe-essence-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-essence-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-quantity-field {
+  flex: 0 0 auto;
+  width: 6rem;
+}
+
+.fabricate-manager .manager-recipe-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .fabricate-manager .manager-field textarea {
@@ -8870,6 +9389,28 @@
   line-height: 1.35;
 }
 
+/* A gated mode option (e.g. Complex on a single-set resolution mode) is shown
+   locked rather than hidden so authors can see it exists but cannot select it. */
+.fabricate-manager .manager-environment-mode-option.is-locked,
+.fabricate-manager .manager-environment-mode-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fabricate-manager .manager-environment-mode-option.is-locked:hover {
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Simple mode renders a single chromeless ingredient/result set: no set-name
+   header or remove control, so it sits flush without the set list's spacing. */
+.fabricate-manager .manager-recipe-ingredient-set.is-chromeless {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-result-set-simple {
+  margin-top: var(--fab-space-2);
+}
+
 
 .fabricate-manager .manager-environment-composition {
   display: flex;
@@ -8991,6 +9532,119 @@
 }
 
 .fabricate-manager .manager-environment-issue-title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Shared editor tab + validation primitives. Generic so the recipe editor reuses
+   the same tab strip and readiness/issue layout the environment editor pioneered
+   without duplicating the rules per editor. */
+.fabricate-manager .manager-editor-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--fab-space-1);
+  flex-wrap: wrap;
+  min-width: 0;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-editor-tab-button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-height: 38px;
+  padding: 0 var(--fab-space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  color: var(--fab-mv2-text-muted);
+  background: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-editor-tab-button:hover {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-editor-tab-button.is-active {
+  color: var(--fab-mv2-text);
+  border-bottom-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-editor-tab-badge {
+  margin-left: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-editor-tab-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding-right: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-editor-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-chip) var(--fab-space-4);
+}
+
+.fabricate-manager .manager-editor-check {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-editor-check.is-satisfied > i {
+  color: var(--fab-success, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-editor-check.is-unsatisfied > i {
+  color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-editor-issue {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+/* Recipe editor tab shell + validation helpers built on the shared primitives. */
+.fabricate-manager .manager-recipe-edit-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-recipe-issue-title {
   flex: 1;
   min-width: 0;
 }
@@ -9208,6 +9862,21 @@
   color: var(--fab-mv2-text-muted);
   cursor: grab;
   transform: translateY(3px);
+}
+
+/* Non-reorderable step rows (Ingredients / Results / Tools tabs) keep the order
+   pip but are not a drag handle, so they should not invite a grab. */
+.fabricate-manager .manager-environment-comp-handle.is-static {
+  cursor: default;
+}
+
+/* Heading above the per-step tools accordion on the Tools tab. */
+.fabricate-manager .manager-recipe-tools-steps-title {
+  margin: var(--fab-space-2) 0 0;
+  font-size: 0.95em;
+  color: var(--fab-mv2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .fabricate-manager .manager-environment-comp-order {

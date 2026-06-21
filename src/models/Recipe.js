@@ -44,8 +44,18 @@ export class Recipe {
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap((group) => group.results);
 
+    // Authoring complexity: Simple (one ingredient set + one result set, streamlined
+    // UI) vs Complex (multiple sets, full UI). An explicit flag wins; otherwise it is
+    // derived so legacy multi-set recipes are never silently collapsed to Simple.
+    this.complex = typeof data.complex === 'boolean' ? data.complex : this._deriveComplex(data);
+
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
+
+    // Recipe-level duration for the implicit (single) step. Multi-step recipes
+    // carry their own per-step `timeRequirement`; this feeds the implicit step
+    // synthesized by getExecutionSteps for single-step recipes.
+    this.timeRequirement = this._normalizeTimeRequirement(data.timeRequirement);
 
     // Recipe behaviour
     this.isVariable = data.isVariable === undefined ? false : data.isVariable;
@@ -171,28 +181,14 @@ export class Recipe {
         ) {
           errors.push(`Step "${step.name || step.id}" must include at least one result group`);
         }
-        if (step.timeRequirement) {
-          for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
-            const value = Number(step.timeRequirement?.[unit] || 0);
-            if (!Number.isFinite(value) || value < 0) {
-              errors.push(
-                `Step "${step.name || step.id}" has invalid time requirement value for "${unit}"`
-              );
-            }
-          }
-        }
-        if (step.currencyRequirement) {
-          const unit = String(step.currencyRequirement?.unit || '').trim();
-          const amount = Number(step.currencyRequirement?.amount || 0);
-          if (!unit) {
-            errors.push(`Step "${step.name || step.id}" has invalid currency requirement unit`);
-          }
-          if (!Number.isFinite(amount) || amount <= 0) {
-            errors.push(`Step "${step.name || step.id}" has invalid currency requirement amount`);
-          }
-        }
+        this._validateTimeRequirement(
+          step.timeRequirement,
+          `Step "${step.name || step.id}"`,
+          errors
+        );
       }
     } else {
+      this._validateTimeRequirement(this.timeRequirement, 'Recipe', errors);
       for (const ingredientSet of this.ingredientSets) {
         const setValidation = ingredientSet.validate({ requireComplete });
         if (!setValidation.valid) {
@@ -343,6 +339,7 @@ export class Recipe {
       recipeItemId: this.recipeItemId,
       linkedRecipeItemUuid: this.linkedRecipeItemUuid,
       visibility: this.visibility,
+      complex: this.complex,
       steps: this.steps.map((step) => ({
         ...step,
         ingredientSets: (step.ingredientSets || []).map((set) => (set.toJSON ? set.toJSON() : set)),
@@ -362,6 +359,7 @@ export class Recipe {
         results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
+      timeRequirement: this.timeRequirement,
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map((r) => r.toJSON()),
       isVariable: this.isVariable,
@@ -420,6 +418,25 @@ export class Recipe {
     });
   }
 
+  /**
+   * Derive the default Complex flag from raw construction data. Returns true when
+   * any scope (recipe-level or any step) already holds more than one ingredient set
+   * or more than one result group, so legacy multi-set recipes default to Complex.
+   * @param {object} data - Raw recipe construction data.
+   * @returns {boolean}
+   * @private
+   */
+  _deriveComplex(data = {}) {
+    const scopeIsComplex = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return ingredientSets.length > 1 || resultGroups.length > 1;
+    };
+    if (scopeIsComplex(data)) return true;
+    const steps = Array.isArray(data.steps) ? data.steps : [];
+    return steps.some((step) => scopeIsComplex(step));
+  }
+
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
     const VALID_PROVIDERS = ['ingredientSet', 'macroOutcome', 'rollTableOutcome'];
@@ -463,7 +480,6 @@ export class Recipe {
       resultGroups: this._normalizeResultGroups(step),
       toolIds: this._normalizeToolIds(step.toolIds),
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
-      currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
       currencyCost: this._normalizeCurrencyCost(step.currencyCost),
       outcomeRouting:
         step.outcomeRouting && typeof step.outcomeRouting === 'object'
@@ -471,6 +487,24 @@ export class Recipe {
           : null,
       resultSelection: this._normalizeResultSelection(step.resultSelection),
     };
+  }
+
+  /**
+   * Validate a step/recipe time requirement: every present unit must be a
+   * finite, non-negative number. A nullish requirement is valid (no duration).
+   * @param {object|null} timeRequirement
+   * @param {string} label - Prefix for any error message (e.g. `Step "Forge"`).
+   * @param {string[]} errors - Accumulator the caller owns.
+   * @private
+   */
+  _validateTimeRequirement(timeRequirement, label, errors) {
+    if (!timeRequirement) return;
+    for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
+      const value = Number(timeRequirement?.[unit] || 0);
+      if (!Number.isFinite(value) || value < 0) {
+        errors.push(`${label} has invalid time requirement value for "${unit}"`);
+      }
+    }
   }
 
   _normalizeTimeRequirement(timeRequirement = null) {
@@ -489,13 +523,6 @@ export class Recipe {
       normalized.months +
       normalized.years;
     return total > 0 ? normalized : null;
-  }
-
-  _normalizeCurrencyRequirement(currencyRequirement = null) {
-    if (!currencyRequirement || typeof currencyRequirement !== 'object') return null;
-    const unit = String(currencyRequirement.unit || '').trim();
-    const amount = Math.max(0, Number(currencyRequirement.amount || 0) || 0);
-    return unit && amount > 0 ? { unit, amount } : null;
   }
 
   _normalizeCurrencyCost(cost) {
@@ -572,8 +599,7 @@ export class Recipe {
         ingredientSets: this.ingredientSets,
         resultGroups: this.resultGroups,
         toolIds: this.toolIds || [],
-        timeRequirement: null,
-        currencyRequirement: null,
+        timeRequirement: this.timeRequirement || null,
         outcomeRouting: this.outcomeRouting || null,
         resultSelection: this.resultSelection || null,
       },

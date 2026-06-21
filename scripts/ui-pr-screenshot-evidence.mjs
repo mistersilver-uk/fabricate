@@ -120,10 +120,16 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-recipe-edit',
     label: 'Manager recipe editor (identity card + recipe-item inspector)',
-    smokeLabels: ['manager-recipe-edit-normal'],
+    smokeLabels: [
+      'manager-recipe-edit-normal',
+      'manager-recipe-edit-ingredients',
+      'manager-recipe-edit-validation',
+      'manager-recipe-edit-multistep',
+    ],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
     ],
   },
   {

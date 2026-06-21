@@ -813,6 +813,12 @@ export class RecipeManager {
       return true;
     }
 
+    if (ingredient.match?.type === 'currency') {
+      // A currency alternative matches no inventory item.
+      // Currency matches are authored-only; craft-time currency spend is a separate follow-up.
+      return false;
+    }
+
     if (ingredient.tag) {
       if (!features.enableTags) return false;
       const itemTags = getFabricateFlag(item, 'tags', []);
