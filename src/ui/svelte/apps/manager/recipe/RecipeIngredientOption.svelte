@@ -289,8 +289,8 @@
             type="button"
             class="manager-button is-subtle manager-recipe-add-alternative-trigger"
             data-recipe-add="alternative-cost"
-            aria-label={text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}
-            title={text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}
+            aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')}
+            title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')}
             onclick={() => onAddCurrencyAlternative()}
           ><i class="fa-solid fa-coins" aria-hidden="true"></i></button>
         {/if}

@@ -1562,9 +1562,17 @@
   // results / tools so an already-craftable recipe stays craftable (the engine only
   // falls back to top-level fields when the steps array is empty). New/empty recipes
   // simply start with one named, empty step.
+  // Draft-staged steps need a stable id up front: step-scoped edits (ingredient
+  // sets, results, tools, duration) route by step id, and the store only assigns
+  // ids on save. Without one, an id-less step's edits misroute to the recipe scope.
+  function newStepId() {
+    return globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   function handleEnterMultiStep() {
     if (!recipeDraft) return false;
     const seeded = {
+      id: newStepId(),
       name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} 1`,
       description: '',
       ingredientSets: recipeDraft.ingredientSets || [],
@@ -1650,7 +1658,7 @@
   function handleAddStep() {
     if (!recipeDraft) return false;
     const steps = currentSteps();
-    steps.push({ name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`, description: '' });
+    steps.push({ id: newStepId(), name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`, description: '' });
     patchRecipeDraft({ steps });
     return true;
   }

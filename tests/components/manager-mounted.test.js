@@ -1732,6 +1732,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes', 'a successful Save returns to the recipes browser');
   });
 
+  it('gives a step seeded by switching to multi-step a stable id (so step-scoped edits route to the step, not the recipe)', async () => {
+    const calls = [];
+    await openRecipeEditor(calls, {
+      selectedFeatures: { essences: true, effectTransfer: true, itemTags: true, gathering: true, recipeCategories: true, multiStepRecipes: true }
+    });
+
+    // Switching a single-step recipe to multi-step seeds one step into the draft.
+    // It must carry an id up front: step-scoped edits route by step id, and an
+    // id-less step (undefined == null) misroutes to the recipe scope — looking
+    // like the per-step ingredient/result/tool/cost adds do nothing.
+    target.querySelector('.manager-inspector [data-recipe-step-mode-option="multi"]').click();
+    await tick();
+    flushSync();
+
+    headerSaveButton().click();
+    await tick();
+    flushSync();
+
+    const updateCalls = calls.filter(call => call[0] === 'updateRecipe');
+    assert.equal(updateCalls.length, 1, 'Save commits the staged multi-step draft once');
+    const committed = updateCalls[0][2];
+    assert.ok(Array.isArray(committed.steps) && committed.steps.length === 1, 'the draft now holds one explicit step');
+    assert.ok(
+      typeof committed.steps[0].id === 'string' && committed.steps[0].id.length > 0,
+      'the seeded step carries a stable id so its scoped edits do not misroute'
+    );
+  });
+
   it('persists the enabled toggle immediately and never marks the editor dirty', async () => {
     const calls = [];
     await openRecipeEditor(calls);

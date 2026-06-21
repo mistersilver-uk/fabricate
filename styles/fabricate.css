@@ -4454,10 +4454,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--fab-space-2);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--fab-mv2-text-muted);
+}
+
+/* Flank the "OR" label with a faint rule so each component/tag/cost alternative
+   reads as a visually separated row within the requirement. */
+.fabricate-manager .manager-recipe-ingredient-or-separator::before,
+.fabricate-manager .manager-recipe-ingredient-or-separator::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-recipe-ingredient-set {
