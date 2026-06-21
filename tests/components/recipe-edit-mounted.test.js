@@ -6,6 +6,7 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES
 } from '../helpers/svelte-component-harness.js';
+import { Recipe } from '../../src/models/Recipe.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -47,6 +48,8 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEssenceRequirements.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
@@ -217,6 +220,24 @@ async function mountIngredientGroups(groups, { props = {}, set = {} } = {}) {
 // holding the given option alternatives.
 function mountSingleGroup(options, opts = {}) {
   return mountIngredientGroups([{ id: 'grp-1', options }], opts);
+}
+
+// Mount the editor on a recipe carrying the given result groups, wired to a fresh
+// patch collector, then switch to the Results tab and flush the first render.
+// `props` merges extra editor props (e.g. componentOptions); `recipe` merges extra
+// fields onto the base RECIPE. Returns the mounted target plus the collector.
+async function mountResultGroups(resultGroups, { props = {}, recipe = {} } = {}) {
+  const patches = [];
+  const target = await editHarness.mount(identityProps({
+    complex: true,
+    componentOptions: COMPONENT_OPTIONS,
+    recipe: { ...RECIPE, complex: true, resultGroups, ...recipe },
+    onUpdateRecipe: (patch) => patches.push(patch),
+    ...props
+  }));
+  clickTab(target, 'results');
+  await flushRender();
+  return { target, patches };
 }
 
 // Open the searchable popover under `trigger` (a node or a selector resolved on
@@ -533,18 +554,22 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a result set via onUpdateRecipe when + Add result set is clicked', async () => {
+  it('appends a result set via onUpdateRecipe({ resultGroups }) when + Add result set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({
       complex: true,
-      recipe: { ...RECIPE, complex: true, resultGroups: [{ id: 'grp-1' }] },
+      recipe: { ...RECIPE, complex: true, resultGroups: [{ id: 'grp-1', name: 'Primary', results: [] }] },
       onUpdateRecipe: (patch) => patches.push(patch)
     }));
     clickTab(target, 'results');
     await flushRender();
     target.querySelector('[data-recipe-add="result-set"]').click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    // The whole replacement groups array flows through onChange → onUpdateResultGroups.
     assert.equal(patches[0].resultGroups.length, 2, 'the result group array grew by one');
+    assert.equal(patches[0].resultGroups[0].id, 'grp-1', 'the existing group survives with its id');
+    assert.equal(patches[0].resultGroups[0].name, 'Primary', 'the existing group survives with its name');
+    assert.equal('id' in patches[0].resultGroups[1], false, 'the appended group carries no id (store assigns one)');
     editHarness.remount();
   });
 
@@ -1221,7 +1246,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('routes a per-step result add through onUpdateStep for a multi-step recipe', async () => {
+  it('routes a per-step result add through onUpdateStep({ resultGroups }) for a multi-step recipe', async () => {
     const updates = [];
     const target = await editHarness.mount(identityProps({
       complex: true,
@@ -1235,7 +1260,190 @@ describe('RecipeEditView (mounted)', () => {
     target.querySelector('[data-recipe-section="step-sa-results"] [data-recipe-add="result-set"]').click();
     assert.equal(updates.length, 1, 'onUpdateStep invoked once');
     assert.equal(updates[0][0], 'sa', 'patches the right step');
+    // The section emits the whole replacement groups array via onChange → onUpdateResultGroups.
     assert.equal(updates[0][1].resultGroups.length, 1, 'a single group is appended to the empty step scope');
+    assert.equal('id' in updates[0][1].resultGroups[0], false, 'the appended group carries no id (store assigns one)');
+    editHarness.remount();
+  });
+
+  it('removes a result group (the array shrinks; surviving groups keep id/name)', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [] },
+      { id: 'grp-2', name: 'Bonus', results: [] }
+    ]);
+    const second = target.querySelector('[data-recipe-result-set-id="grp-2"]');
+    second.querySelector('[data-recipe-remove="result-set"]').click();
+    assert.equal(patches.length, 1, 'removing a group patches the recipe once');
+    assert.equal(patches[0].resultGroups.length, 1, 'the result group array shrank by one');
+    assert.equal(patches[0].resultGroups[0].id, 'grp-1', 'the survivor keeps its id');
+    assert.equal(patches[0].resultGroups[0].name, 'Primary', 'the survivor keeps its name');
+    editHarness.remount();
+  });
+
+  it('edits a result group name, preserving its id', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [] }
+    ]);
+    const nameInput = target.querySelector('[data-recipe-result-set-field="name"]');
+    assert.equal(nameInput.value, 'Primary', 'the group name is editable and populated');
+    nameInput.value = 'Renamed';
+    nameInput.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.equal(patches.length, 1, 'editing the name patches the recipe');
+    assert.equal(patches[0].resultGroups[0].id, 'grp-1', 'the edited group keeps its id');
+    assert.equal(patches[0].resultGroups[0].name, 'Renamed', 'the new name is written');
+    editHarness.remount();
+  });
+
+  it('adds a result item id-less to a group via the Add item popover', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [] }
+    ]);
+    await pickPopoverOption(target, '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger', /Mountain Herb/);
+    assert.equal(patches.length, 1, 'adding an item patches the recipe');
+    const items = patches[0].resultGroups[0].results;
+    assert.equal(items.length, 1, 'the group has one result item');
+    assert.deepEqual(items[0], { componentId: 'cmp-herb', quantity: 1 }, 'the item is id-less with quantity 1');
+    editHarness.remount();
+  });
+
+  it('removes a result item (the group empties)', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [{ componentId: 'cmp-herb', quantity: 1 }] }
+    ]);
+    const item = target.querySelector('[data-recipe-result-item]');
+    assert.ok(item, 'the result item row renders');
+    item.querySelector('[data-recipe-remove="result-item"]').click();
+    assert.equal(patches.length, 1, 'removing an item patches the recipe');
+    assert.deepEqual(patches[0].resultGroups[0].results, [], 'the group is now empty');
+    editHarness.remount();
+  });
+
+  it('bumps quantity (capped) instead of duplicating when the same component is re-added', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }] }
+    ]);
+    await pickPopoverOption(target, '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger', /Mountain Herb/);
+    assert.equal(patches.length, 1, 're-adding the same component patches the recipe');
+    const items = patches[0].resultGroups[0].results;
+    assert.equal(items.length, 1, 'no duplicate item appended');
+    assert.equal(items[0].quantity, 2, 'the existing item quantity is bumped to 2');
+    assert.equal(items[0].id, 'res-1', 'the bumped item keeps its normalized id');
+    assert.equal(items[0].componentId, 'cmp-herb', 'the bumped item keeps its component');
+    editHarness.remount();
+  });
+
+  it('picks/swaps the component of a result item (name span + trigger image reflect the choice)', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [{ componentId: 'cmp-herb', quantity: 1 }] }
+    ]);
+    const item = target.querySelector('[data-recipe-result-item]');
+    assert.match(item.textContent, /Mountain Herb/, 'the item resolves the component name in a span');
+    const img = item.querySelector('.manager-travel-portrait img');
+    assert.equal(img.getAttribute('src'), 'icons/herb.webp', 'the trigger image is the resolved component img');
+    // Swap to the other component via the image-only picker trigger.
+    await pickPopoverOption(target, item.querySelector('.manager-recipe-component-trigger'), /Pure Water/);
+    assert.equal(patches.length, 1, 'swapping the component patches the recipe');
+    assert.equal(patches[0].resultGroups[0].results[0].componentId, 'cmp-water', 'the new component id is written');
+    assert.equal(patches[0].resultGroups[0].results[0].quantity, 1, 'the quantity is preserved across the swap');
+    editHarness.remount();
+  });
+
+  it('caps result item quantity at 9999 and floors invalid input to 1', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [{ componentId: 'cmp-herb', quantity: 2 }] }
+    ]);
+    const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
+    assert.equal(input.value, '2', 'the quantity input reflects the item quantity');
+    input.value = '999999';
+    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.equal(patches.at(-1).resultGroups[0].results[0].quantity, 9999, 'over-cap input is capped to 9999');
+    input.value = '0';
+    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.equal(patches.at(-1).resultGroups[0].results[0].quantity, 1, 'non-positive input floors to 1');
+    editHarness.remount();
+  });
+
+  it('shows a single chromeless authorable group with picker + quantity and no add/remove-set in Simple mode', async () => {
+    const { target, patches } = await mountResultGroups(
+      [{ id: 'grp-1', name: 'Primary', results: [{ componentId: 'cmp-herb', quantity: 3 }] }],
+      { props: { complex: false }, recipe: { complex: false } }
+    );
+    assert.ok(target.querySelector('[data-recipe-result-simple]'), 'the simple result wrapper renders');
+    assert.ok(target.querySelector('.manager-recipe-ingredient-set.is-chromeless'), 'the single group renders chromeless');
+    assert.equal(target.querySelector('[data-recipe-add="result-set"]'), null, 'no Add result set button in Simple mode');
+    assert.equal(target.querySelector('[data-recipe-remove="result-set"]'), null, 'no remove-set control in Simple mode');
+    assert.equal(target.querySelector('[data-recipe-result-set-field="name"]'), null, 'no group-name field in Simple mode');
+    // The single group is still fully authorable (picker + quantity).
+    assert.ok(target.querySelector('[data-recipe-result-item] .manager-recipe-component-trigger'), 'the component picker renders');
+    assert.equal(target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]').value, '3', 'the quantity renders');
+    // A simple-mode edit preserves the existing group id/name.
+    const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
+    input.value = '4';
+    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.equal(patches.at(-1).resultGroups[0].id, 'grp-1', 'a simple-mode edit preserves the group id');
+    assert.equal(patches.at(-1).resultGroups[0].name, 'Primary', 'a simple-mode edit preserves the group name');
+    editHarness.remount();
+  });
+
+  it('materializes a real group on the first Simple-mode edit when none exists yet', async () => {
+    const { target, patches } = await mountResultGroups(
+      [],
+      { props: { complex: false }, recipe: { complex: false } }
+    );
+    assert.ok(target.querySelector('[data-recipe-result-simple]'), 'the simple result wrapper renders an empty placeholder');
+    await pickPopoverOption(target, '.manager-recipe-add-component-trigger', /Mountain Herb/);
+    assert.equal(patches.length, 1, 'the first edit writes the single-element groups array');
+    assert.equal(patches[0].resultGroups.length, 1, 'a single group materializes');
+    assert.deepEqual(patches[0].resultGroups[0].results, [{ componentId: 'cmp-herb', quantity: 1 }], 'the group holds the added item');
+    editHarness.remount();
+  });
+
+  it('shows the Add result set button in Complex mode', async () => {
+    const { target } = await mountResultGroups([]);
+    assert.ok(target.querySelector('[data-recipe-add="result-set"]'), 'Add result set button shown in Complex mode');
+    editHarness.remount();
+  });
+
+  it('round-trips authored resultGroups through Recipe.fromJSON().toJSON(), keeping componentId/quantity', async () => {
+    const { target, patches } = await mountResultGroups([
+      { id: 'grp-1', name: 'Primary', results: [] }
+    ]);
+    await pickPopoverOption(target, '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger', /Pure Water/);
+    const authored = patches.at(-1).resultGroups;
+    // The Recipe model assigns ids via global foundry.utils.randomID(); the mounted
+    // harness installs game.i18n but not foundry, so stub it for the round-trip.
+    const hadFoundry = 'foundry' in globalThis;
+    const priorFoundry = globalThis.foundry;
+    let counter = 0;
+    globalThis.foundry = { utils: { randomID: () => `id-${++counter}` } };
+    const roundTripped = Recipe.fromJSON({ id: 'r1', name: 'Healing Draught', resultGroups: authored }).toJSON();
+    if (hadFoundry) globalThis.foundry = priorFoundry; else delete globalThis.foundry;
+    const item = roundTripped.resultGroups[0].results[0];
+    assert.equal(item.componentId, 'cmp-water', 'componentId survives the round-trip');
+    assert.equal(item.quantity, 1, 'quantity survives the round-trip');
+    assert.equal(roundTripped.resultGroups[0].name, 'Primary', 'group name survives the round-trip');
+    editHarness.remount();
+  });
+
+  it('preserves a group id AND name when editing a recipe that carries outcomeRouting/resultSelection', async () => {
+    // Routing references the group by id (outcomeRouting/resultMapping) and by
+    // name (roll-table resultSelection, case-insensitive), so the first edit must
+    // not drop either.
+    const { target, patches } = await mountResultGroups(
+      [{ id: 'grp-1', name: 'Primary', results: [{ componentId: 'cmp-herb', quantity: 1 }] }],
+      {
+        recipe: {
+          outcomeRouting: { success: 'grp-1' },
+          resultSelection: { mode: 'rollTable', rollTableOutcome: { Primary: 'grp-1' } }
+        }
+      }
+    );
+    // Edit the group's only item (a quantity change) — the lightest-touch edit path.
+    const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
+    input.value = '5';
+    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.equal(patches.at(-1).resultGroups[0].id, 'grp-1', 'the edited group keeps its routing id');
+    assert.equal(patches.at(-1).resultGroups[0].name, 'Primary', 'the edited group keeps its routing name');
     editHarness.remount();
   });
 });

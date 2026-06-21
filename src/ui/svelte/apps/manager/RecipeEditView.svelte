@@ -65,9 +65,6 @@
   function stepById(stepId) {
     return steps.find(step => step.id === stepId) || null;
   }
-  function stepResultGroups(step) {
-    return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
-  }
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
   }
@@ -88,23 +85,18 @@
     if (!stepById(stepId)) return;
     onUpdateStep(stepId, { ingredientSets: nextSets });
   }
-  function addResultGroup(stepId) {
+  // The result section emits the whole replacement groups array (shallow-cloned
+  // down to the changed node); route it to the recipe scope (null stepId) or the
+  // step scope. The store normalizes via Recipe.fromJSON (assigns ids, normalizes
+  // each result) so nothing here hand-assigns ids; existing group ids/names (which
+  // routing references) are preserved upstream in the section's edit paths.
+  function updateResultGroups(stepId, nextGroups) {
     if (stepId == null) {
-      onUpdateRecipe({ resultGroups: [...resultGroups, { name: '' }] });
+      onUpdateRecipe({ resultGroups: nextGroups });
       return;
     }
-    const step = stepById(stepId);
-    if (!step) return;
-    onUpdateStep(stepId, { resultGroups: [...stepResultGroups(step), { name: '' }] });
-  }
-  function removeResultGroup(stepId, groupId) {
-    if (stepId == null) {
-      onUpdateRecipe({ resultGroups: resultGroups.filter(group => group.id !== groupId) });
-      return;
-    }
-    const step = stepById(stepId);
-    if (!step) return;
-    onUpdateStep(stepId, { resultGroups: stepResultGroups(step).filter(group => group.id !== groupId) });
+    if (!stepById(stepId)) return;
+    onUpdateStep(stepId, { resultGroups: nextGroups });
   }
   function addTool(toolId) {
     if (!toolId || toolIds.includes(toolId)) return;
@@ -228,8 +220,8 @@
             {recipe}
             {complex}
             {isMultiStep}
-            onAddResultGroup={addResultGroup}
-            onRemoveResultGroup={removeResultGroup}
+            {componentOptions}
+            onUpdateResultGroups={updateResultGroups}
             onDeleteStep={deleteStepFrom('results')}
           />
         {:else if activeTab === 'tools'}
