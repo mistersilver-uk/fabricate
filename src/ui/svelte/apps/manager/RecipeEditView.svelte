@@ -18,6 +18,7 @@
   import RecipeOverviewTab from './recipe/RecipeOverviewTab.svelte';
   import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
+  import RecipeToolsTab from './recipe/RecipeToolsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
   import { evaluateRecipeReadiness } from './recipe/recipeReadiness.js';
 
@@ -32,6 +33,9 @@
     linkedItemImage = '',
     currencyUnits = [],
     toolsLibrary = [],
+    componentOptions = [],
+    essenceOptions = [],
+    itemTags = [],
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -54,9 +58,6 @@
   function stepById(stepId) {
     return steps.find(step => step.id === stepId) || null;
   }
-  function stepIngredientSets(step) {
-    return Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
-  }
   function stepResultGroups(step) {
     return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
   }
@@ -68,23 +69,17 @@
   // normalization assigns one); remove filters by the entry's id; tools store the
   // chosen tool id string directly. A null stepId patches the recipe scope; a
   // present stepId patches that step.
-  function addIngredientSet(stepId) {
+  // The ingredient section emits the whole replacement sets array (shallow-cloned
+  // down to the changed node); route it to the recipe scope (null stepId) or the
+  // step scope. The store normalizes via Recipe.fromJSON (assigns ids, normalizes
+  // each option's match) so nothing here hand-assigns ids.
+  function updateIngredientSets(stepId, nextSets) {
     if (stepId == null) {
-      onUpdateRecipe({ ingredientSets: [...ingredientSets, { name: '' }] });
+      onUpdateRecipe({ ingredientSets: nextSets });
       return;
     }
-    const step = stepById(stepId);
-    if (!step) return;
-    onUpdateStep(stepId, { ingredientSets: [...stepIngredientSets(step), { name: '' }] });
-  }
-  function removeIngredientSet(stepId, setId) {
-    if (stepId == null) {
-      onUpdateRecipe({ ingredientSets: ingredientSets.filter(set => set.id !== setId) });
-      return;
-    }
-    const step = stepById(stepId);
-    if (!step) return;
-    onUpdateStep(stepId, { ingredientSets: stepIngredientSets(step).filter(set => set.id !== setId) });
+    if (!stepById(stepId)) return;
+    onUpdateStep(stepId, { ingredientSets: nextSets });
   }
   function addResultGroup(stepId) {
     if (stepId == null) {
@@ -110,6 +105,22 @@
   }
   function removeTool(toolId) {
     onUpdateRecipe({ toolIds: toolIds.filter(id => id !== toolId) });
+  }
+  function addStepTool(stepId, toolId) {
+    const step = stepById(stepId);
+    if (!step || !toolId || stepToolIds(step).includes(toolId)) return;
+    onUpdateStep(stepId, { toolIds: [...stepToolIds(step), toolId] });
+  }
+  function removeStepTool(stepId, toolId) {
+    const step = stepById(stepId);
+    if (!step) return;
+    onUpdateStep(stepId, { toolIds: stepToolIds(step).filter(id => id !== toolId) });
+  }
+
+  // Deleting a step removes the whole step (its ingredients, results, and tools).
+  // The store confirms with wording contextual to where the delete was triggered.
+  function deleteStepFrom(context) {
+    return (stepId) => onDeleteStep(stepId, context);
   }
 
   // When a recipe item is linked, the identity image mirrors the linked item's
@@ -225,7 +236,7 @@
 
   // Deep-link from a validation issue: switch to the tab that hosts the gap.
   function selectIssue(targetTab) {
-    if (targetTab === 'ingredients' || targetTab === 'results' || targetTab === 'overview') {
+    if (['overview', 'ingredients', 'results', 'tools'].includes(targetTab)) {
       activeTab = targetTab;
     }
   }
@@ -273,31 +284,44 @@
               onToggleEnabled={() => { enabled = !enabled; }}
               onChooseImage={chooseImage}
               {isMultiStep}
-              {toolIds}
-              {toolsLibrary}
               {currencyUnits}
-              onAddTool={addTool}
-              onRemoveTool={removeTool}
               {onAddStep}
               {onReorderSteps}
               {onUpdateStep}
-              {onDeleteStep}
+              onDeleteStep={deleteStepFrom('overview')}
             />
           {:else if activeTab === 'ingredients'}
             <RecipeIngredientsTab
               {recipe}
               {isMultiStep}
-              onAddIngredientSet={addIngredientSet}
-              onRemoveIngredientSet={removeIngredientSet}
-              {onReorderSteps}
+              {currencyUnits}
+              {componentOptions}
+              {essenceOptions}
+              {itemTags}
+              onUpdateIngredientSets={updateIngredientSets}
+              onDeleteStep={deleteStepFrom('ingredients')}
             />
           {:else if activeTab === 'results'}
             <RecipeResultsTab
               {recipe}
               {isMultiStep}
+              {currencyUnits}
               onAddResultGroup={addResultGroup}
               onRemoveResultGroup={removeResultGroup}
-              {onReorderSteps}
+              onDeleteStep={deleteStepFrom('results')}
+            />
+          {:else if activeTab === 'tools'}
+            <RecipeToolsTab
+              {recipe}
+              {isMultiStep}
+              {toolIds}
+              {toolsLibrary}
+              {currencyUnits}
+              onAddTool={addTool}
+              onRemoveTool={removeTool}
+              onAddStepTool={addStepTool}
+              onRemoveStepTool={removeStepTool}
+              onDeleteStep={deleteStepFrom('tools')}
             />
           {:else if activeTab === 'validation'}
             <RecipeValidationTab

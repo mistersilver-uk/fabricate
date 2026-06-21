@@ -2026,7 +2026,7 @@
 }
 
 .fabricate-manager .manager-recipes-table {
-  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.5fr) minmax(0, 0.48fr) minmax(0, 0.76fr) minmax(0, 0.58fr) 118px;
+  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.86fr) minmax(0, 0.86fr) minmax(0, 0.58fr) 118px;
 
   display: flex;
   flex-direction: column;
@@ -2035,7 +2035,34 @@
 }
 
 .fabricate-manager .manager-recipes-table.has-no-category {
-  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 0.52fr) minmax(0, 0.82fr) minmax(0, 0.58fr) 118px;
+  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 1.3fr) minmax(0, 0.58fr) 118px;
+}
+
+/* Incomplete flag pinned to the top-left, overlapping the row's top border, the
+   same affordance as the Tools library "Unsaved" chip (manager-tools-dirty-chip). */
+.fabricate-manager .manager-recipe-row {
+  position: relative;
+}
+
+.fabricate-manager .manager-recipe-row-flag-slot {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  z-index: 4;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.fabricate-manager .manager-recipe-incomplete-chip {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-mv2-surface-1);
+  gap: var(--fab-space-1);
+  white-space: nowrap;
+  box-shadow:
+    inset 0 0 0 999px var(--fab-warning-soft),
+    0 2px 8px var(--fab-overlay-dark-28);
 }
 
 .fabricate-manager .manager-components-table {
@@ -4361,6 +4388,279 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
+}
+
+/* Nested ingredient editor: sets -> groups -> options + per-set essences. */
+.fabricate-manager .manager-recipe-ingredient-sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-or,
+.fabricate-manager .manager-recipe-ingredient-or-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-empty {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+/* Two-button add row: "Add component" (popover) + "Add tag requirement". */
+.fabricate-manager .manager-recipe-ingredient-set-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+/* A requirement: its alternatives read as one bracketed unit, accented on the
+   left so the "— or —" links are visually grouped. */
+.fabricate-manager .manager-recipe-ingredient-requirement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-left: 3px solid var(--fab-mv2-accent);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-recipe-ingredient-requirement-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+/* The "+ or" add-alternative trigger reads as a quiet inline control. */
+.fabricate-manager .manager-recipe-add-alternative-trigger {
+  align-self: flex-start;
+}
+
+.fabricate-manager .manager-recipe-ingredient-option {
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-option-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-target {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-tag-match-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-recipe-tag-match-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-chip);
+  height: auto;
+  min-height: 30px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-tag-match-option:hover:not(.is-selected) {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-tag-match-option.is-selected {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+/* The component alternative's trigger reads as `[img] Name ▾` filling the row. */
+.fabricate-manager .manager-recipe-component-trigger {
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  min-height: 34px;
+}
+
+.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-manager .manager-recipe-option-tags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-tags-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-tag-chip {
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-recipe-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-option-quantity-field {
+  flex: 0 0 auto;
+  width: 6rem;
+}
+
+.fabricate-manager .manager-recipe-option-quantity,
+.fabricate-manager .manager-recipe-essence-quantity {
+  width: 100%;
+}
+
+.fabricate-manager .manager-recipe-option-remove {
+  flex: 0 0 auto;
+  margin-bottom: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-button.is-subtle {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-essences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-ingredient-essences-title {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.fabricate-manager .manager-recipe-essence-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-essence-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-quantity-field {
+  flex: 0 0 auto;
+  width: 6rem;
+}
+
+.fabricate-manager .manager-recipe-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .fabricate-manager .manager-field textarea {
@@ -9372,6 +9672,21 @@
   color: var(--fab-mv2-text-muted);
   cursor: grab;
   transform: translateY(3px);
+}
+
+/* Non-reorderable step rows (Ingredients / Results / Tools tabs) keep the order
+   pip but are not a drag handle, so they should not invite a grab. */
+.fabricate-manager .manager-environment-comp-handle.is-static {
+  cursor: default;
+}
+
+/* Heading above the per-step tools accordion on the Tools tab. */
+.fabricate-manager .manager-recipe-tools-steps-title {
+  margin: var(--fab-space-2) 0 0;
+  font-size: 0.95em;
+  color: var(--fab-mv2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .fabricate-manager .manager-environment-comp-order {

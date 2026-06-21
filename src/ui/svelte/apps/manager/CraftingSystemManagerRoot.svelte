@@ -1550,11 +1550,13 @@
     return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
   }
 
-  async function handleDeleteStep(stepId) {
+  // Deleting a step removes the whole step (its ingredients, results, and tools).
+  // The store confirms with wording contextual to the tab the delete came from
+  // ('overview' | 'ingredients' | 'results' | 'tools'). Removing the last step
+  // reverts to single-step (empty steps array → top-level fallback).
+  async function handleDeleteStep(stepId, context = 'overview') {
     if (!selectedRecipeId) return false;
-    const steps = currentSteps().filter(step => step.id !== stepId);
-    // Removing the last step reverts to single-step (empty steps array → top-level fallback).
-    return store.updateRecipe?.(selectedRecipeId, { steps }, { notify: false });
+    return store.deleteRecipeStep?.(selectedRecipeId, stepId, context);
   }
 
   function recipeEditSaveLabel() {
@@ -3685,6 +3687,9 @@
         linkedItemImage={selectedRecipe?.recipeItemImg || ''}
         currencyUnits={selectedCurrencyUnits}
         toolsLibrary={selectedGatheringSystemTools}
+        componentOptions={selectedSystem?.managedItemOptions || []}
+        essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
+        itemTags={selectedSystem?.itemTags || []}
         onUpdateRecipe={(patch) => store.updateRecipe?.(selectedRecipeId, patch, { notify: false })}
         onAddStep={handleAddStep}
         onReorderSteps={handleReorderSteps}

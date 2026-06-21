@@ -12,15 +12,23 @@ export class IngredientGroup {
     );
   }
 
-  validate() {
+  /**
+   * Validate this ingredient group.
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, the completeness check (must include at least one option) is waived so
+   *   a freshly added, still-empty group persists; each option's structural checks
+   *   still fire.
+   * @returns {{valid: boolean, errors: string[]}}
+   */
+  validate({ requireComplete = true } = {}) {
     const errors = [];
 
-    if (!Array.isArray(this.options) || this.options.length === 0) {
+    if (requireComplete && (!Array.isArray(this.options) || this.options.length === 0)) {
       errors.push('Ingredient group must include at least one option');
     }
 
     for (const option of this.options) {
-      const validation = option.validate();
+      const validation = option.validate({ requireComplete });
       if (!validation.valid) {
         errors.push(...validation.errors.map((err) => `Option: ${err}`));
       }

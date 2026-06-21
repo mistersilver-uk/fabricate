@@ -36,12 +36,17 @@ const RAW_MODULES = [
 const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeEssenceRequirements.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
@@ -69,8 +74,6 @@ const stepsHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
   compiledModules: [
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte'
   ],
@@ -119,6 +122,41 @@ const TOOLS_LIBRARY = Object.freeze([
   Object.freeze({ id: 'tool-hammer', label: 'Hammer', componentId: 'cmp-hammer' }),
   Object.freeze({ id: 'tool-anvil', label: 'Anvil', componentId: 'cmp-anvil' })
 ]);
+
+const COMPONENT_OPTIONS = Object.freeze([
+  Object.freeze({ id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' }),
+  Object.freeze({ id: 'cmp-water', name: 'Pure Water', img: 'icons/water.webp' })
+]);
+
+const ESSENCE_OPTIONS = Object.freeze([
+  Object.freeze({ id: 'ess-life', name: 'Life', icon: 'fas fa-heart' }),
+  Object.freeze({ id: 'ess-water', name: 'Water', icon: 'fas fa-droplet' })
+]);
+
+const ITEM_TAGS = Object.freeze(['herbal', 'liquid', 'rare']);
+
+// A fully populated single-set recipe: a component requirement with two
+// component alternatives (linked by "— or —"), a separate tag requirement, plus
+// a per-set essence requirement. Requirements have no name field; a requirement
+// is identified by its component image + name (or its tag chips).
+const POPULATED_SET = Object.freeze({
+  id: 'set-1',
+  name: 'Primary',
+  ingredientGroups: [
+    Object.freeze({
+      id: 'grp-1',
+      options: [
+        Object.freeze({ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }),
+        Object.freeze({ quantity: 1, match: { type: 'component', componentId: 'cmp-water' } })
+      ]
+    }),
+    Object.freeze({
+      id: 'grp-2',
+      options: [Object.freeze({ quantity: 1, match: { type: 'tags', tags: ['liquid'], tagMatch: 'any' } })]
+    })
+  ],
+  essences: { 'ess-life': 3 }
+});
 
 const STEPS = Object.freeze([
   Object.freeze({
@@ -169,10 +207,10 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.teardown();
   });
 
-  it('renders the four editor tabs with Overview active by default', async () => {
+  it('renders the five editor tabs with Overview active by default', async () => {
     const target = await editHarness.mount(identityProps());
     const tabs = [...target.querySelectorAll('[data-recipe-tab-button]')].map((btn) => btn.getAttribute('data-recipe-tab-button'));
-    assert.deepEqual(tabs, ['overview', 'ingredients', 'results', 'validation'], 'four tabs render in order');
+    assert.deepEqual(tabs, ['overview', 'ingredients', 'results', 'tools', 'validation'], 'five tabs render in order');
     assert.equal(target.querySelector('[role="tabpanel"]').getAttribute('id'), 'recipe-panel-overview', 'overview panel is shown first');
     assert.ok(target.querySelector('[data-recipe-tab="overview"]'), 'overview tab content renders');
     editHarness.remount();
@@ -190,19 +228,24 @@ describe('RecipeEditView (mounted)', () => {
 
   it('swaps the visible tabpanel when a tab is clicked', async () => {
     const target = await editHarness.mount(identityProps({ toolsLibrary: TOOLS_LIBRARY }));
-    // Overview hosts Tools; Ingredients/Results are on their own tabs.
-    assert.ok(target.querySelector('[data-recipe-section="tools"]'), 'tools section lives in Overview');
+    // Overview hosts identity only (single-step); each requirement type has its own tab.
+    assert.ok(target.querySelector('[data-recipe-section="identity"]'), 'identity lives in Overview');
     assert.equal(target.querySelector('[data-recipe-section="ingredients"]'), null, 'ingredients not in Overview');
+    assert.equal(target.querySelector('[data-recipe-section="tools"]'), null, 'tools not in Overview');
 
     clickTab(target, 'ingredients');
     await flushRender();
     assert.equal(target.querySelector('[role="tabpanel"]').getAttribute('id'), 'recipe-panel-ingredients', 'panel switched to ingredients');
     assert.ok(target.querySelector('[data-recipe-section="ingredients"]'), 'ingredients section renders on its tab');
-    assert.equal(target.querySelector('[data-recipe-section="tools"]'), null, 'tools no longer rendered');
 
     clickTab(target, 'results');
     await flushRender();
     assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section renders on its tab');
+
+    clickTab(target, 'tools');
+    await flushRender();
+    assert.equal(target.querySelector('[role="tabpanel"]').getAttribute('id'), 'recipe-panel-tools', 'panel switched to tools');
+    assert.ok(target.querySelector('[data-recipe-section="tools"]'), 'tools section renders on its tab');
 
     clickTab(target, 'validation');
     await flushRender();
@@ -302,8 +345,6 @@ describe('RecipeEditView (mounted)', () => {
 
   it('renders the single-step ingredient/results/tools sections on their tabs', async () => {
     const target = await editHarness.mount(identityProps({ toolsLibrary: TOOLS_LIBRARY }));
-    assert.ok(target.querySelector('[data-recipe-section="tools"]'), 'tools section renders in Overview');
-    assert.match(target.textContent, /No tools yet/, 'tools empty text shown');
 
     clickTab(target, 'ingredients');
     await flushRender();
@@ -316,6 +357,11 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section renders');
     assert.match(target.textContent, /No results yet/, 'results empty text shown');
     assert.ok(target.querySelector('[data-recipe-add="result-group"]'), 'add result group button shown');
+
+    clickTab(target, 'tools');
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-section="tools"]'), 'tools section renders on the Tools tab');
+    assert.match(target.textContent, /No tools yet/, 'tools empty text shown');
     editHarness.remount();
   });
 
@@ -348,14 +394,16 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('opens the tools popover in Overview, lists the library, and adds a chosen tool', async () => {
+  it('opens the recipe-level tools popover on the Tools tab, lists the library, and adds a chosen tool', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({
       toolsLibrary: TOOLS_LIBRARY,
       onUpdateRecipe: (patch) => patches.push(patch)
     }));
+    clickTab(target, 'tools');
+    await flushRender();
     const trigger = target.querySelector('[data-recipe-section="tools"] .manager-recipe-tools-trigger');
-    assert.ok(trigger, 'tools picker trigger renders in Overview');
+    assert.ok(trigger, 'tools picker trigger renders on the Tools tab');
     trigger.click();
     await flushRender();
     const options = [...document.querySelectorAll('.manager-travel-option')];
@@ -367,13 +415,15 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders a selected tool as a removable row that calls onUpdateRecipe', async () => {
+  it('renders a selected recipe-level tool as a removable row that calls onUpdateRecipe', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({
       recipe: { ...RECIPE, toolIds: ['tool-hammer'] },
       toolsLibrary: TOOLS_LIBRARY,
       onUpdateRecipe: (patch) => patches.push(patch)
     }));
+    clickTab(target, 'tools');
+    await flushRender();
     const row = target.querySelector('[data-recipe-tool-id="tool-hammer"]');
     assert.ok(row, 'a row renders for the selected tool');
     assert.match(row.textContent, /Hammer/, 'the row shows the resolved tool label');
@@ -416,20 +466,385 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('reorders steps from the Results tab via the shared onReorderSteps (keeping ingredients in sync)', async () => {
+  it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [POPULATED_SET] },
+      componentOptions: COMPONENT_OPTIONS,
+      essenceOptions: ESSENCE_OPTIONS,
+      itemTags: ITEM_TAGS
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const set = target.querySelector('[data-recipe-set-id="set-1"]');
+    assert.ok(set, 'the set card renders');
+    assert.equal(set.querySelector('[data-recipe-set-field="name"]').value, 'Primary', 'set name is editable and populated');
+    // The group-name field and the per-row match toggle are both gone.
+    assert.equal(set.querySelector('[data-recipe-group-field="name"]'), null, 'no group-name field on a requirement');
+    assert.equal(set.querySelector('[data-recipe-option-match]'), null, 'no Component|Tags match toggle on an option');
+
+    // First requirement: a component requirement with two alternatives.
+    const componentReq = set.querySelector('[data-recipe-group-id="grp-1"]');
+    assert.ok(componentReq, 'the component requirement renders');
+    const options = componentReq.querySelectorAll('[data-recipe-option]');
+    assert.equal(options.length, 2, 'both component alternatives render');
+    assert.ok(componentReq.querySelector('.manager-recipe-ingredient-or-separator'), 'an OR separator links the alternatives');
+    assert.match(options[0].textContent, /Mountain Herb/, 'first alternative resolves the component name on the trigger');
+    // The component image renders in the row (the popover trigger portrait).
+    const herbImg = options[0].querySelector('.manager-travel-portrait img');
+    assert.ok(herbImg, 'the component alternative shows an image');
+    assert.equal(herbImg.getAttribute('src'), 'icons/herb.webp', 'the image src is the resolved component img');
+    assert.equal(options[0].querySelector('[data-recipe-option-quantity]').value, '2', 'component alternative quantity shown');
+    assert.match(options[1].textContent, /Pure Water/, 'second alternative resolves its component name');
+
+    // Second requirement: a tag requirement with a chip and any/all toggle.
+    const tagReq = set.querySelector('[data-recipe-group-id="grp-2"]');
+    assert.ok(tagReq, 'the tag requirement renders');
+    assert.ok(tagReq.querySelector('[data-recipe-tag="liquid"]'), 'the tag chip renders');
+    assert.equal(tagReq.querySelector('[data-recipe-tag-match="any"]').getAttribute('aria-pressed'), 'true', 'tag match defaults to Any');
+
+    // The per-set essence row renders.
+    assert.ok(set.querySelector('[data-recipe-essence-id="ess-life"]'), 'the per-set essence row renders');
+    assert.equal(set.querySelector('[data-recipe-essence-id="ess-life"] [data-recipe-essence-quantity]').value, '3', 'essence quantity shown');
+    editHarness.remount();
+  });
+
+  it('appends a component requirement (born populated, id-less) via the Add component popover', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Mountain Herb/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing a component patches the recipe');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'a requirement is appended to the set');
+    assert.equal('id' in groups[0], false, 'the appended requirement carries no id');
+    assert.deepEqual(
+      groups[0].options[0].match,
+      { type: 'component', componentId: 'cmp-herb' },
+      'the requirement is born populated with the chosen component'
+    );
+    assert.equal(groups[0].options[0].quantity, 1, 'the alternative defaults to quantity 1');
+    editHarness.remount();
+  });
+
+  it('appends a tag requirement (empty tags option, id-less) via Add tag requirement', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="tag-requirement"]').click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'a tag requirement is appended');
+    assert.equal('id' in groups[0], false, 'the appended requirement carries no id');
+    assert.deepEqual(
+      groups[0].options[0].match,
+      { type: 'tags', tags: [], tagMatch: 'any' },
+      'the tag requirement starts with an empty tags match'
+    );
+    editHarness.remount();
+  });
+
+  it('appends a same-type component alternative via the "+ or" picker', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative"]').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Pure Water/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing an alternative patches the recipe');
+    const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 2, 'the alternative list grew by one');
+    assert.deepEqual(
+      options[1].match,
+      { type: 'component', componentId: 'cmp-water' },
+      'the new alternative is a same-type component match'
+    );
+    editHarness.remount();
+  });
+
+  it('renders an OR separator once a component requirement has two alternatives', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+      ] }] }] },
+      componentOptions: COMPONENT_OPTIONS
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const req = target.querySelector('[data-recipe-group-id="grp-1"]');
+    assert.equal(req.querySelectorAll('[data-recipe-option]').length, 2, 'both alternatives render');
+    assert.ok(req.querySelector('.manager-recipe-ingredient-or-separator'), 'the "— or —" separator renders between alternatives');
+    editHarness.remount();
+  });
+
+  it('changes a component alternative via its picker trigger', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-option] .manager-recipe-component-trigger').click();
+    await flushRender();
+    const options = [...document.querySelectorAll('.manager-travel-option')];
+    assert.equal(options.length, 2, 'the popover lists both components');
+    options.find((option) => /Pure Water/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing a component patches the recipe');
+    assert.deepEqual(
+      patches[0].ingredientSets[0].ingredientGroups[0].options[0].match,
+      { type: 'component', componentId: 'cmp-water' },
+      'the alternative records the newly chosen component id'
+    );
+    editHarness.remount();
+  });
+
+  it('patches the option quantity when the quantity input changes', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const qty = target.querySelector('[data-recipe-option-quantity]');
+    qty.value = '5';
+    qty.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.equal(patches.length, 1, 'editing the quantity patches the recipe');
+    assert.equal(patches[0].ingredientSets[0].ingredientGroups[0].options[0].quantity, 5, 'the new quantity is recorded');
+    editHarness.remount();
+  });
+
+  it('adds a tag to a tag requirement and toggles any/all', async () => {
+    const next = [];
+    const tagTarget = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }] }] },
+      itemTags: ITEM_TAGS,
+      onUpdateRecipe: (patch) => next.push(patch)
+    }));
+    clickTab(tagTarget, 'ingredients');
+    await flushRender();
+    tagTarget.querySelector('[data-recipe-option] .manager-recipe-tag-trigger').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /herbal/.test(option.textContent)).click();
+    await flushRender();
+    assert.deepEqual(
+      next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
+      { type: 'tags', tags: ['herbal'], tagMatch: 'any' },
+      'adding a tag records it on the tags match'
+    );
+    // The any/all toggle writes tagMatch.
+    tagTarget.querySelector('[data-recipe-option] [data-recipe-tag-match="all"]').click();
+    await flushRender();
+    assert.equal(
+      next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.tagMatch,
+      'all',
+      'toggling to All records tagMatch:all'
+    );
+    editHarness.remount();
+  });
+
+  it('removing the last alternative drops the whole requirement from the set', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [
+        { id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
+        { id: 'grp-2', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }] }
+      ] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    // grp-1 has a single alternative; removing it removes the requirement.
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-remove="alternative"]').click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'the requirement was dropped from the set');
+    assert.equal(groups[0].id, 'grp-2', 'the other requirement remains');
+    editHarness.remount();
+  });
+
+  it('removing one of several alternatives keeps the requirement and drops just that alternative', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+      ] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelectorAll('[data-recipe-group-id="grp-1"] [data-recipe-remove="alternative"]')[0].click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 1, 'only one alternative remains');
+    assert.equal(options[0].match.componentId, 'cmp-water', 'the surviving alternative is the one not removed');
+    editHarness.remount();
+  });
+
+  it('adds a per-set essence via the essence popover, writing the essences map', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [], essences: {} }] },
+      essenceOptions: ESSENCE_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Life/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing an essence patches the recipe');
+    assert.deepEqual(patches[0].ingredientSets[0].essences, { 'ess-life': 1 }, 'the essences map records the chosen essence at quantity 1');
+    editHarness.remount();
+  });
+
+  it('omits the per-set essence editor when the system has no essences', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [] }] },
+      essenceOptions: []
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    assert.ok(target.querySelector('[data-recipe-set-id="set-1"]'), 'the set still renders');
+    assert.equal(target.querySelector('[data-recipe-section-essences]'), null, 'no essence editor without essences');
+    editHarness.remount();
+  });
+
+  it('routes a per-step requirement add through onUpdateStep for a multi-step recipe', async () => {
+    const updates = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge', ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      itemTags: ITEM_TAGS,
+      onUpdateStep: (id, patch) => updates.push([id, patch])
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
+    await flushRender();
+    target.querySelector('[data-recipe-section="step-sa-ingredients"] [data-recipe-set-id="set-1"] [data-recipe-add="tag-requirement"]').click();
+    assert.equal(updates.length, 1, 'onUpdateStep invoked once');
+    assert.equal(updates[0][0], 'sa', 'patches the right step');
+    assert.equal(updates[0][1].ingredientSets[0].ingredientGroups.length, 1, 'the step set gains a requirement');
+    assert.equal(updates[0][1].ingredientSets[0].ingredientGroups[0].options[0].match.type, 'tags', 'the appended requirement is a tag requirement');
+    editHarness.remount();
+  });
+
+  it('does not allow step reordering on the Ingredients/Results/Tools tabs (Overview only)', async () => {
     const moves = [];
     const target = await editHarness.mount(identityProps({
       recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }, { id: 'sb', name: 'Quench' }] },
+      toolsLibrary: TOOLS_LIBRARY,
       onReorderSteps: (from, to) => moves.push([from, to])
     }));
+    for (const tab of ['ingredients', 'results', 'tools']) {
+      clickTab(target, tab);
+      await flushRender();
+      const head = target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-head');
+      assert.ok(head, `${tab} tab shows step rows`);
+      assert.notEqual(head.getAttribute('draggable'), 'true', `${tab} tab step header is not a drag handle`);
+      // A drag attempt is inert on these tabs.
+      head.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
+      target.querySelector('[data-recipe-step-id="sb"]').dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
+    }
+    assert.deepEqual(moves, [], 'no reorder fires from the requirement tabs');
+    editHarness.remount();
+  });
+
+  it('shows time/currency chips and a delete control in every requirement tab header', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: {
+        ...RECIPE,
+        steps: [{ id: 'sa', name: 'Forge', timeRequirement: { hours: 1 }, currencyRequirement: { unit: 'gp', amount: 3 } }]
+      },
+      currencyUnits: CURRENCY_UNITS,
+      toolsLibrary: TOOLS_LIBRARY
+    }));
+    for (const tab of ['ingredients', 'results', 'tools']) {
+      clickTab(target, tab);
+      await flushRender();
+      assert.ok(target.querySelector('[data-recipe-step-time="sa"]'), `${tab} header shows the time chip`);
+      assert.ok(target.querySelector('[data-recipe-step-currency="sa"]'), `${tab} header shows the currency chip`);
+      assert.ok(target.querySelector('[data-recipe-step-delete="sa"]'), `${tab} header shows the delete control`);
+    }
+    editHarness.remount();
+  });
+
+  it('routes a step delete to onDeleteStep tagged with the originating tab context', async () => {
+    const deletes = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] },
+      toolsLibrary: TOOLS_LIBRARY,
+      onDeleteStep: (id, context) => deletes.push([id, context])
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-step-delete="sa"]').click();
+    assert.deepEqual(deletes.at(-1), ['sa', 'ingredients'], 'delete from Ingredients tags the ingredients context');
+
     clickTab(target, 'results');
     await flushRender();
-    // Dragging a step header in Results reorders the shared steps array, so the same
-    // move applies to the Ingredients (and Overview) views.
-    const firstHeader = target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-head');
-    firstHeader.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
-    target.querySelector('[data-recipe-step-id="sb"]').dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
-    assert.deepEqual(moves, [[0, 1]], 'reordering in Results fires the shared onReorderSteps(from, to)');
+    target.querySelector('[data-recipe-step-delete="sa"]').click();
+    assert.deepEqual(deletes.at(-1), ['sa', 'results'], 'delete from Results tags the results context');
+
+    clickTab(target, 'tools');
+    await flushRender();
+    target.querySelector('[data-recipe-step-delete="sa"]').click();
+    assert.deepEqual(deletes.at(-1), ['sa', 'tools'], 'delete from Tools tags the tools context');
+    editHarness.remount();
+  });
+
+  it('shows the recipe-level tools section plus per-step tool sections on the Tools tab', async () => {
+    const updates = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, toolIds: ['tool-anvil'], steps: [{ id: 'sa', name: 'Forge' }] },
+      toolsLibrary: TOOLS_LIBRARY,
+      onUpdateStep: (id, patch) => updates.push([id, patch])
+    }));
+    clickTab(target, 'tools');
+    await flushRender();
+    // Recipe-level tools section (idPrefix '') shows the recipe-wide tool.
+    assert.ok(target.querySelector('[data-recipe-section="tools"] [data-recipe-tool-id="tool-anvil"]'), 'recipe-level tools section lists the recipe-wide tool');
+    // Per-step tool section is collapsed until the step is expanded.
+    assert.equal(target.querySelector('[data-recipe-section="step-sa-tools"]'), null, 'per-step tools section is collapsed');
+    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
+    await flushRender();
+    const stepTools = target.querySelector('[data-recipe-section="step-sa-tools"]');
+    assert.ok(stepTools, 'expanding the step reveals its tools section');
+    stepTools.querySelector('.manager-recipe-tools-trigger').click();
+    await flushRender();
+    document.querySelectorAll('.manager-travel-option').forEach((option) => { if (/Hammer/.test(option.textContent)) option.click(); });
+    await flushRender();
+    assert.equal(updates.at(-1)[0], 'sa', 'adding a per-step tool patches the step');
+    assert.deepEqual(updates.at(-1)[1].toolIds, ['tool-hammer'], 'the chosen tool id is appended to the step toolIds');
     editHarness.remount();
   });
 
@@ -719,31 +1134,16 @@ describe('RecipeStepsCard (mounted)', () => {
     stepsHarness.remount();
   });
 
-  it('renders only the tools section (step-prefixed) inside an expanded step', async () => {
-    const target = await stepsHarness.mount(stepsProps({ toolsLibrary: TOOLS_LIBRARY }));
-    assert.equal(target.querySelector('[data-recipe-section="step-step-1-tools"]'), null, 'collapsed step has no tools section');
+  it('edits only name and description inside an expanded step (no tools/ingredients/results)', async () => {
+    const target = await stepsHarness.mount(stepsProps());
     target.querySelector('[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main').click();
     await flushRender();
-    assert.ok(target.querySelector('[data-recipe-section="step-step-1-tools"]'), 'tools section renders prefixed by step id');
-    // Ingredients/results moved to their own tabs and are no longer inside steps.
-    assert.equal(target.querySelector('[data-recipe-section="step-step-1-ingredients"]'), null, 'no ingredients section inside the step');
-    assert.equal(target.querySelector('[data-recipe-section="step-step-1-results"]'), null, 'no results section inside the step');
-    stepsHarness.remount();
-  });
-
-  it('routes a step tool removal through onUpdateStep', async () => {
-    const updates = [];
-    const steps = [{ id: 'step-1', name: 'Forge', description: '', toolIds: ['tool-hammer'] }];
-    const target = await stepsHarness.mount(stepsProps({
-      steps,
-      toolsLibrary: TOOLS_LIBRARY,
-      onUpdateStep: (id, patch) => updates.push([id, patch])
-    }));
-    target.querySelector('[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main').click();
-    await flushRender();
-    target.querySelector('[data-recipe-section="step-step-1-tools"] [data-recipe-remove="tool"]').click();
-    assert.equal(updates.length, 1, 'onUpdateStep invoked once');
-    assert.deepEqual(updates[0][1].toolIds, [], 'the removed tool id is filtered out of the step scope');
+    assert.ok(target.querySelector('[data-recipe-step-field="name"]'), 'name input renders when expanded');
+    assert.ok(target.querySelector('[data-recipe-step-field="description"]'), 'description input renders when expanded');
+    // Requirement sections live on their own tabs, never inside the Overview step card.
+    assert.equal(target.querySelector('[data-recipe-section="step-step-1-tools"]'), null, 'no tools section inside the Overview step');
+    assert.equal(target.querySelector('[data-recipe-section="step-step-1-ingredients"]'), null, 'no ingredients section inside the Overview step');
+    assert.equal(target.querySelector('[data-recipe-section="step-step-1-results"]'), null, 'no results section inside the Overview step');
     stepsHarness.remount();
   });
 });

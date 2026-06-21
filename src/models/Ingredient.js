@@ -103,17 +103,26 @@ export class Ingredient {
    * Validate that this ingredient has all required data
    * @returns {{valid: boolean, errors: string[]}}
    */
-  validate() {
+  /**
+   * Validate that this ingredient has all required data.
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, the completeness checks (must carry a match rule / a tag) are waived
+   *   so an unfinished authoring option still persists; structural checks (a
+   *   positive quantity) always fire.
+   * @returns {{valid: boolean, errors: string[]}}
+   */
+  validate({ requireComplete = true } = {}) {
     const errors = [];
     const hasComponentMatch = this.match?.type === 'component' && !!this.match.componentId;
     const hasTagMatch =
       this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
 
-    if (!hasComponentMatch && !hasTagMatch && !this.itemUuid) {
+    if (requireComplete && !hasComponentMatch && !hasTagMatch && !this.itemUuid) {
       errors.push('Ingredient must include a match rule or specific item UUID');
     }
 
     if (
+      requireComplete &&
       this.match?.type === 'tags' &&
       (!Array.isArray(this.match.tags) || this.match.tags.length === 0)
     ) {
@@ -126,7 +135,7 @@ export class Ingredient {
 
     // Validate alternatives
     for (const alt of this.alternatives) {
-      const altValidation = alt.validate();
+      const altValidation = alt.validate({ requireComplete });
       if (!altValidation.valid) {
         errors.push(`Alternative ingredient: ${altValidation.errors.join(', ')}`);
       }

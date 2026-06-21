@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Tab strip for the recipe editor (Overview / Ingredients / Results / Validation),
+  Tab strip for the recipe editor (Overview / Ingredients / Results / Tools /
+  Validation),
   mirroring EnvironmentEditorTabs: roving tabindex, arrow-key navigation, and
   per-tab badge chips. Uses the shared generic `.manager-editor-tabs*` classes so
   it does not duplicate the environment editor's tab CSS.
@@ -19,6 +20,7 @@
     { id: 'overview', icon: 'fas fa-circle-info', key: 'Overview', fallback: 'Overview' },
     { id: 'ingredients', icon: 'fas fa-flask', key: 'Ingredients', fallback: 'Ingredients' },
     { id: 'results', icon: 'fas fa-box-open', key: 'Results', fallback: 'Results' },
+    { id: 'tools', icon: 'fas fa-screwdriver-wrench', key: 'Tools', fallback: 'Tools' },
     { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
   ];
 

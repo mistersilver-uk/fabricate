@@ -85,7 +85,7 @@ export class IngredientSet {
 
     // Validate ingredient groups/options
     for (const group of this.ingredientGroups) {
-      const groupValidation = group.validate();
+      const groupValidation = group.validate({ requireComplete });
       if (!groupValidation.valid) {
         errors.push(
           `Ingredient group "${group.name || group.id}": ${groupValidation.errors.join(', ')}`

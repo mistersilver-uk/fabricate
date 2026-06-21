@@ -68,9 +68,14 @@ function compileManagerRoot() {
     'RecipeOverviewTab',
     'RecipeIngredientsTab',
     'RecipeResultsTab',
+    'RecipeToolsTab',
     'RecipeValidationTab',
     'RecipeStepAccordion',
     'RecipeIngredientsSection',
+    'RecipeIngredientSetCard',
+    'RecipeIngredientGroupCard',
+    'RecipeIngredientOption',
+    'RecipeEssenceRequirements',
     'RecipeResultsSection',
     'RecipeToolsSection'
   ]) {
@@ -1487,7 +1492,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Recipe library'));
     assert.ok(target.textContent.includes('Healing Draught'));
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
-    assert.ok(target.textContent.includes('Requirements'));
     assert.ok(target.textContent.includes('Player visibility'));
     const enabledRecipeToggle = target.querySelector('[data-recipe-id="r1"] .manager-status-toggle');
     const disabledRecipeToggle = target.querySelector('[data-recipe-id="r2"] .manager-status-toggle');

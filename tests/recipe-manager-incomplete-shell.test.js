@@ -312,6 +312,38 @@ describe('RecipeManager incomplete recipe shells', () => {
     const sourceActor = { name: 'Source', items: [] };
     assert.equal(manager.evaluateCraftability([sourceActor], shell).canCraft, false);
   });
+
+  it('updateRecipe persists an ingredient set with an empty group / match-less option under allowIncomplete', async () => {
+    // Reproduces the ingredient-editor authoring flow: add a group, add an option,
+    // before a component/tag is chosen. With allowIncomplete the draft must persist;
+    // a strict update still rejects it.
+    const manager = makeManager();
+    const created = await manager.createRecipe(
+      { craftingSystemId: 'sys-1' },
+      { allowIncomplete: true }
+    );
+    const ingredientSets = [
+      { id: 'set-1', ingredientGroups: [{ id: 'g1', name: 'Base', options: [{ quantity: 1 }] }] },
+    ];
+
+    const updated = await manager.updateRecipe(
+      created.id,
+      { ingredientSets },
+      { allowIncomplete: true }
+    );
+    assert.ok(updated, 'the draft ingredient set persists');
+    assert.equal(
+      manager.getRecipe(created.id)?.ingredientSets?.[0]?.ingredientGroups?.[0]?.options?.length,
+      1,
+      'the appended option is retained'
+    );
+
+    await assert.rejects(
+      () => manager.updateRecipe(created.id, { ingredientSets }),
+      /Invalid recipe update/,
+      'a strict update still rejects the incomplete option'
+    );
+  });
 });
 
 describe('Recipe validate() vs validateStructure()', () => {
@@ -353,6 +385,57 @@ describe('Recipe validate() vs validateStructure()', () => {
     const recipe = new Recipe(makeCompleteRecipeData());
     assert.equal(recipe.validate().valid, true);
     assert.equal(recipe.validateStructure().valid, true);
+  });
+
+  it('validateStructure() waives an incomplete ingredient group/option (authoring draft persists)', () => {
+    // An empty group and a match-less option are in-progress authoring states: the
+    // ingredient editor creates them before the GM picks a component/tag. They must
+    // persist structurally so the edit is not silently dropped.
+    const recipe = new Recipe({
+      craftingSystemId: 'sys-1',
+      ingredientSets: [
+        {
+          id: 'set-1',
+          ingredientGroups: [
+            { id: 'g-empty', name: 'Empty', options: [] },
+            { id: 'g-draft', name: 'Draft', options: [{ quantity: 1 }] },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg-1', results: [{ id: 'res-1', itemUuid: 'Item.x', quantity: 1 }] }],
+    });
+    assert.equal(
+      recipe.validateStructure().valid,
+      true,
+      'incomplete groups/options are waived structurally'
+    );
+
+    // A negative option quantity is a structural error and still fails (the model
+    // coerces 0 → 1 in the constructor, so use a negative to exercise the check).
+    const badQty = new Recipe({
+      craftingSystemId: 'sys-1',
+      ingredientSets: [{ id: 's', ingredientGroups: [{ id: 'g', options: [{ quantity: -1 }] }] }],
+      resultGroups: [{ id: 'rg', results: [{ id: 'r', itemUuid: 'Item.x', quantity: 1 }] }],
+    });
+    const badResult = badQty.validateStructure();
+    assert.equal(badResult.valid, false, 'a negative option quantity still fails structurally');
+    assert.ok(badResult.errors.some((e) => /positive number/.test(e)));
+  });
+
+  it('validate() still rejects an incomplete ingredient option (completeness contract)', () => {
+    const recipe = new Recipe({
+      craftingSystemId: 'sys-1',
+      ingredientSets: [
+        { id: 'set-1', ingredientGroups: [{ id: 'g', name: 'G', options: [{ quantity: 1 }] }] },
+      ],
+      resultGroups: [{ id: 'rg', results: [{ id: 'r', itemUuid: 'Item.x', quantity: 1 }] }],
+    });
+    const result = recipe.validate();
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.errors.some((e) => /match rule or specific item UUID/.test(e)),
+      'validate() reports the match-less option'
+    );
   });
 });
 

@@ -5640,6 +5640,40 @@ export function createAdminStore(services) {
     return updateRecipe(recipeId, { steps: [] });
   }
 
+  // Delete one step from a multi-step recipe. A step is a unit: removing it deletes
+  // its ingredients, results, and tools, so confirm first with wording contextual to
+  // the tab the delete came from. Removing the last step empties the steps array,
+  // which reverts the recipe to single-step (top-level fallback).
+  async function deleteRecipeStep(recipeId, stepId, context = 'overview') {
+    const recipeManager = services.getRecipeManager();
+    const recipe = recipeManager.getRecipe(recipeId);
+    if (!recipe) return false;
+
+    const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+    const step = steps.find(entry => entry?.id === stepId);
+    if (!step) return false;
+    const name = String(step.name || '').trim() || 'this step';
+
+    // Each tab warns about the OTHER facets that go with the step (vice-versa);
+    // Overview spells out all of them.
+    const alsoDeleted = {
+      ingredients: 'its results and tools are deleted too',
+      results: 'its ingredients and tools are deleted too',
+      tools: 'its ingredients and results are deleted too'
+    }[context] || 'its ingredients, results, and tools are deleted too';
+
+    const confirmed = await services.confirmDialog({
+      title: 'Delete step?',
+      content: `<p>Deleting <strong>${name}</strong> removes the whole step — ${alsoDeleted}. This can't be undone.</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    const nextSteps = steps.filter(entry => entry?.id !== stepId);
+    return updateRecipe(recipeId, { steps: nextSteps }, { notify: false });
+  }
+
   async function addRecipeItemFromUuid(systemId, itemUuid) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
@@ -5915,6 +5949,7 @@ export function createAdminStore(services) {
     toggleRecipeEnabled,
     updateRecipe,
     revertRecipeToSingleStep,
+    deleteRecipeStep,
     addRecipeItemFromUuid,
     importRecipes,
     exportRecipes,

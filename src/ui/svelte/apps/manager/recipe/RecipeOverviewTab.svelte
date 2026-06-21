@@ -1,15 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Overview tab for the recipe editor: identity (name, description, image picker,
-  enabled toggle) plus Tools. Identity is bound to the shell's local `$state` via
-  value props and input callbacks so `handleSave` keeps reading component state
-  rather than form fields. Tools live here — recipe-level for single-step recipes,
-  or inside each step (via RecipeStepsCard) for multi-step.
+  enabled toggle) and — for multi-step recipes — the Steps card, the single surface
+  where step order and identity (name/description) are set. Identity is bound to the
+  shell's local `$state` via value props and input callbacks so `handleSave` keeps
+  reading component state rather than form fields. A step's ingredients, results,
+  and tools are authored on their own tabs.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
-  import RecipeToolsSection from './RecipeToolsSection.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
 
   let {
@@ -28,11 +28,7 @@
     onToggleEnabled = () => {},
     onChooseImage = () => {},
     isMultiStep = false,
-    toolIds = [],
-    toolsLibrary = [],
     currencyUnits = [],
-    onAddTool = () => {},
-    onRemoveTool = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -119,18 +115,10 @@
     <RecipeStepsCard
       steps={recipe?.steps || []}
       {currencyUnits}
-      {toolsLibrary}
       {onAddStep}
       {onReorderSteps}
       {onUpdateStep}
       {onDeleteStep}
-    />
-  {:else}
-    <RecipeToolsSection
-      {toolIds}
-      {toolsLibrary}
-      {onAddTool}
-      {onRemoveTool}
     />
   {/if}
 </section>

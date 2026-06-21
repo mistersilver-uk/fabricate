@@ -1,12 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Results tab. Single-step recipes show the recipe-level result section directly;
-  multi-step recipes show the steps as an expandable/collapsible, drag-to-reorder
-  accordion (shared with Overview and Ingredients), each expanded step hosting its
-  own result section (scoped via `idPrefix`). Reordering here uses the same
-  `onReorderSteps` as every other surface, so a move stays in sync with the
-  Ingredients and Overview views. The shell owns the add/remove patching; `stepId`
-  is null for the single-step (recipe) scope.
+  multi-step recipes show the ordered steps as an expandable/collapsible accordion
+  (shared with Overview, Ingredients, and Tools) — WITHOUT drag-reorder (order is
+  set in Overview) but WITH the time/currency chips and a delete button in each
+  header, each expanded step hosting its own result section (scoped via `idPrefix`).
+  Deleting a step here removes the whole step (its ingredients and tools too), so
+  the parent confirms. The shell owns the add/remove patching; `stepId` is null for
+  the single-step (recipe) scope.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -16,9 +17,10 @@
   let {
     recipe = null,
     isMultiStep = false,
+    currencyUnits = [],
     onAddResultGroup = () => {},
     onRemoveResultGroup = () => {},
-    onReorderSteps = () => {}
+    onDeleteStep = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -39,7 +41,7 @@
     {#if steps.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its results.')}</p>
     {:else}
-      <RecipeStepAccordion {steps} {onReorderSteps}>
+      <RecipeStepAccordion {steps} {currencyUnits} {onDeleteStep}>
         {#snippet body(step)}
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}

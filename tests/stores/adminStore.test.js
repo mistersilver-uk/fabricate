@@ -533,6 +533,52 @@ describe('createAdminStore', () => {
       assert.ok(remaining.some(s => s.id === 'sys1'), 'sys1 should not be deleted when declined');
     });
 
+    function seedSteppedServices(overrides = {}) {
+      const services = createMockServices(overrides);
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-multi',
+        craftingSystemId: 'sys1',
+        steps: [{ id: 'sa', name: 'Forge' }, { id: 'sb', name: 'Quench' }]
+      }));
+      return services;
+    }
+
+    it('deleteRecipeStep confirms then removes the whole step from the recipe', async () => {
+      const services = seedSteppedServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteRecipeStep('r-multi', 'sa', 'overview');
+      assert.notEqual(result, false, 'resolves truthy once confirmed');
+      const recipe = services.getRecipeManager().getRecipe('r-multi');
+      assert.deepEqual(recipe.steps.map(s => s.id), ['sb'], 'the deleted step is removed, the rest preserved');
+    });
+
+    it('deleteRecipeStep does nothing when the confirm is declined', async () => {
+      const services = seedSteppedServices({ confirmDialog: async () => false });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteRecipeStep('r-multi', 'sa', 'overview');
+      assert.equal(result, false, 'returns false when declined');
+      const recipe = services.getRecipeManager().getRecipe('r-multi');
+      assert.deepEqual(recipe.steps.map(s => s.id), ['sa', 'sb'], 'no steps removed when declined');
+    });
+
+    it('deleteRecipeStep warns about the other facets with wording contextual to the tab', async () => {
+      const content = {};
+      for (const context of ['overview', 'ingredients', 'results', 'tools']) {
+        let captured = null;
+        const services = seedSteppedServices({ confirmDialog: async (opts) => { captured = opts; return false; } });
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        await store.deleteRecipeStep('r-multi', 'sa', context);
+        content[context] = captured?.content || '';
+      }
+      assert.match(content.overview, /ingredients, results, and tools/, 'Overview names all three facets');
+      assert.match(content.ingredients, /results and tools/, 'Ingredients warns results + tools go too');
+      assert.match(content.results, /ingredients and tools/, 'Results warns ingredients + tools go too');
+      assert.match(content.tools, /ingredients and results/, 'Tools warns ingredients + results go too');
+    });
+
     it('saveSystemDetails calls systemManager.updateSystem with given name and description', async () => {
       let updateArgs = null;
       const services = createMockServices();

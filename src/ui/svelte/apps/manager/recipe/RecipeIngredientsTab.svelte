@@ -1,12 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Ingredients tab. Single-step recipes show the recipe-level ingredient section
-  directly; multi-step recipes show the steps as an expandable/collapsible,
-  drag-to-reorder accordion (shared with Overview and Results), each expanded step
-  hosting its own ingredient section (scoped via `idPrefix`). Reordering here uses
-  the same `onReorderSteps` as every other surface, so a move stays in sync with
-  the Results and Overview views. The shell owns the add/remove patching; `stepId`
-  is null for the single-step (recipe) scope.
+  directly; multi-step recipes show the ordered steps as an expandable/collapsible
+  accordion (shared with Overview, Results, and Tools) — WITHOUT drag-reorder
+  (order is set in Overview) but WITH the time/currency chips and a delete button
+  in each header, each expanded step hosting its own ingredient section (scoped via
+  `idPrefix`). Deleting a step here removes the whole step (its results and tools
+  too), so the parent confirms.
+
+  Each ingredient section emits the whole replacement sets array via a single
+  `onChange(nextSets)`; the shell maps it to the right scope patch (recipe vs.
+  step) through `onUpdateIngredientSets(stepId, nextSets)`. `stepId` is null for
+  the single-step (recipe) scope.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -16,9 +21,12 @@
   let {
     recipe = null,
     isMultiStep = false,
-    onAddIngredientSet = () => {},
-    onRemoveIngredientSet = () => {},
-    onReorderSteps = () => {}
+    currencyUnits = [],
+    componentOptions = [],
+    essenceOptions = [],
+    itemTags = [],
+    onUpdateIngredientSets = () => {},
+    onDeleteStep = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -39,13 +47,15 @@
     {#if steps.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its ingredients.')}</p>
     {:else}
-      <RecipeStepAccordion {steps} {onReorderSteps}>
+      <RecipeStepAccordion {steps} {currencyUnits} {onDeleteStep}>
         {#snippet body(step)}
           <RecipeIngredientsSection
             idPrefix={`step-${step.id}-`}
             ingredientSets={stepIngredientSets(step)}
-            onAddIngredientSet={() => onAddIngredientSet(step.id)}
-            onRemoveIngredientSet={(setId) => onRemoveIngredientSet(step.id, setId)}
+            {componentOptions}
+            {essenceOptions}
+            {itemTags}
+            onChange={(nextSets) => onUpdateIngredientSets(step.id, nextSets)}
           />
         {/snippet}
       </RecipeStepAccordion>
@@ -53,8 +63,10 @@
   {:else}
     <RecipeIngredientsSection
       {ingredientSets}
-      onAddIngredientSet={() => onAddIngredientSet(null)}
-      onRemoveIngredientSet={(setId) => onRemoveIngredientSet(null, setId)}
+      {componentOptions}
+      {essenceOptions}
+      {itemTags}
+      onChange={(nextSets) => onUpdateIngredientSets(null, nextSets)}
     />
   {/if}
 </section>
