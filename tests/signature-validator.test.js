@@ -353,6 +353,35 @@ test('expandIngredientToComponentIds: tags all match returns only components wit
 });
 
 // ---------------------------------------------------------------------------
+// 14b. expandIngredientToComponentIds: currency contributes no component ids
+// ---------------------------------------------------------------------------
+
+test('expandIngredientToComponentIds: currency match returns an empty set', () => {
+  const validator = buildValidator(null);
+  const ingredient = { match: { type: 'currency', unit: 'gp', amount: 100 } };
+  const components = [makeComponent('comp-a', ['fire'])];
+
+  const result = validator.expandIngredientToComponentIds(ingredient, components);
+  assert.ok(result instanceof Set);
+  assert.equal(result.size, 0, 'currency is not a managed component');
+});
+
+test('computeSignature ignores a currency option but keeps component ids in the group', () => {
+  const validator = buildValidator(null);
+  const components = [makeComponent('comp-iron', [])];
+  const group = makeGroup([
+    makeIngredient('component', { componentId: 'comp-iron' }),
+    { match: { type: 'currency', unit: 'gp', amount: 100 } },
+  ]);
+  const set = makeIngredientSet([group]);
+
+  const signature = validator.computeSignature(set, components);
+  assert.equal(signature.length, 1, 'one group');
+  assert.equal(signature[0].size, 1, 'currency option adds no ids');
+  assert.ok(signature[0].has('comp-iron'));
+});
+
+// ---------------------------------------------------------------------------
 // 15. Multiple ingredient sets per recipe: each set generates separate entries
 // ---------------------------------------------------------------------------
 

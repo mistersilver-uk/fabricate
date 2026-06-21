@@ -38,6 +38,12 @@ function optionSignature(option) {
     const tagMatch = match.tagMatch === 'all' ? 'all' : 'any';
     return `tags:${[...tags].sort().join(',')}|${tagMatch}`;
   }
+  if (match?.type === 'currency') {
+    const unit = trimmed(match.unit);
+    const amount = Number(match.amount) || 0;
+    if (!unit || amount <= 0) return null;
+    return `currency:${unit}:${amount}`;
+  }
   return null;
 }
 

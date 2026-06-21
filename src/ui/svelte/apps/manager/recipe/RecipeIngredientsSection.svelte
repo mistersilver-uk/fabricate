@@ -21,6 +21,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    currencyUnits = [],
     onChange = () => {},
     idPrefix = ''
   } = $props();
@@ -74,6 +75,7 @@
         {componentOptions}
         {essenceOptions}
         {itemTags}
+        {currencyUnits}
         onChange={(nextSet) => updateSimpleSet(nextSet)}
       />
     </div>
@@ -100,6 +102,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {currencyUnits}
             onChange={(nextSet) => updateSet(index, nextSet)}
             onRemove={() => removeSet(index)}
           />

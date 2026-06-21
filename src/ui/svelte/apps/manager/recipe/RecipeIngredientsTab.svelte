@@ -57,6 +57,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {currencyUnits}
             onChange={(nextSets) => onUpdateIngredientSets(step.id, nextSets)}
           />
         {/snippet}
@@ -69,6 +70,7 @@
       {componentOptions}
       {essenceOptions}
       {itemTags}
+      {currencyUnits}
       onChange={(nextSets) => onUpdateIngredientSets(null, nextSets)}
     />
   {/if}

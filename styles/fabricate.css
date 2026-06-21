@@ -4704,6 +4704,30 @@
   color: var(--fab-mv2-text);
 }
 
+.fabricate-manager .manager-recipe-option-currency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-currency-amount {
+  flex: 0 0 auto;
+  width: 3.75rem;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-currency-unit {
+  display: inline-flex;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-recipe-essence-quantity {
   width: 100%;
 }

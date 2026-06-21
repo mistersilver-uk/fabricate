@@ -39,6 +39,17 @@ export class Ingredient {
         };
       }
 
+      if (raw.type === 'currency') {
+        // A currency alternative ("100 gp") mirrors the legacy step-currency shape:
+        // a unit id string plus a non-negative amount. Authored cost only today —
+        // craft-time spending is a deferred follow-up.
+        return {
+          type: 'currency',
+          unit: String(raw.unit || '').trim(),
+          amount: Math.max(0, Number(raw.amount) || 0),
+        };
+      }
+
       // Accept both 'component' (primary) and 'systemItem' (legacy fallback)
       const componentId =
         raw.componentId || raw.systemItemId || data.componentId || data.systemItemId || null;
@@ -116,8 +127,16 @@ export class Ingredient {
     const hasComponentMatch = this.match?.type === 'component' && !!this.match.componentId;
     const hasTagMatch =
       this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
+    const hasCurrencyMatch =
+      this.match?.type === 'currency' && !!this.match.unit && Number(this.match.amount) > 0;
 
-    if (requireComplete && !hasComponentMatch && !hasTagMatch && !this.itemUuid) {
+    if (
+      requireComplete &&
+      !hasComponentMatch &&
+      !hasTagMatch &&
+      !hasCurrencyMatch &&
+      !this.itemUuid
+    ) {
       errors.push('Ingredient must include a match rule or specific item UUID');
     }
 
@@ -129,6 +148,12 @@ export class Ingredient {
       errors.push('Tag-based ingredient match requires at least one tag');
     }
 
+    if (requireComplete && this.match?.type === 'currency' && !hasCurrencyMatch) {
+      errors.push('Currency ingredient match requires a unit and a positive amount');
+    }
+
+    // A currency option carries its amount on the match, not the option quantity,
+    // so quantity stays the default 1 and never needs validating for currency.
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
       errors.push('Ingredient quantity must be a positive number');
     }

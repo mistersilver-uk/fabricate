@@ -23,6 +23,7 @@
     group = {},
     componentOptions = [],
     itemTags = [],
+    currencyUnits = [],
     onChange = () => {},
     onRemove = () => {}
   } = $props();
@@ -77,6 +78,16 @@
   function addTagAlternative() {
     onChange({ ...group, options: [...options, { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] });
   }
+
+  // A currency alternative is born with the first configured unit (or empty when
+  // none) and an amount of 1; the editor refines both inline.
+  function addCurrencyAlternative() {
+    const firstUnit = (currencyUnits || [])[0]?.id || '';
+    onChange({
+      ...group,
+      options: [...options, { quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }]
+    });
+  }
 </script>
 
 <div
@@ -96,12 +107,14 @@
         {option}
         {componentOptions}
         {itemTags}
+        {currencyUnits}
         canRemove={true}
         showRowAdds={options.length === 1}
         onChange={(nextOption) => updateOption(index, nextOption)}
         onRemove={() => removeOption(index)}
         onAddComponentAlternative={(id) => addComponentAlternative(id)}
         onAddTagAlternative={() => addTagAlternative()}
+        onAddCurrencyAlternative={() => addCurrencyAlternative()}
       />
     {/each}
   </div>
@@ -131,6 +144,16 @@
         title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
         onclick={() => addTagAlternative()}
       ><i class="fas fa-tags" aria-hidden="true"></i></button>
+      {#if (currencyUnits || []).length > 0}
+        <button
+          type="button"
+          class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+          data-recipe-add="alternative-cost"
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}
+          title={text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}
+          onclick={() => addCurrencyAlternative()}
+        ><i class="fa-solid fa-coins" aria-hidden="true"></i></button>
+      {/if}
     </div>
   {/if}
 </div>

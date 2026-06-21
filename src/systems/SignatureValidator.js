@@ -48,6 +48,12 @@ export class SignatureValidator {
       );
     }
 
+    // A currency alternative is not a managed component, so it contributes no
+    // component ids and is ignored by alchemy signature overlap detection.
+    if (match.type === 'currency') {
+      return new Set();
+    }
+
     return new Set();
   }
 

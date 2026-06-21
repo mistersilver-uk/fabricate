@@ -20,6 +20,8 @@ const RAW_MODULES = [
   'src/ui/svelte/util/recipeImageIcons.js',
   // Shared duration formatter consumed by the step accordion + duration editor.
   'src/ui/svelte/util/recipeDuration.js',
+  // Shared currency label/icon helpers consumed by the ingredient option editor.
+  'src/ui/svelte/util/recipeCurrency.js',
   'src/models/Recipe.js',
   'src/models/Ingredient.js',
   'src/models/IngredientSet.js',
@@ -132,6 +134,11 @@ const ESSENCE_OPTIONS = Object.freeze([
 ]);
 
 const ITEM_TAGS = Object.freeze(['herbal', 'liquid', 'rare']);
+
+const CURRENCY_UNITS = Object.freeze([
+  Object.freeze({ id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins' }),
+  Object.freeze({ id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins' })
+]);
 
 // A fully populated single-set recipe: a component requirement with two
 // component alternatives (linked by "— or —"), a separate tag requirement, plus
@@ -995,6 +1002,103 @@ describe('RecipeEditView (mounted)', () => {
       'all',
       'toggling to All records tagMatch:all'
     );
+    editHarness.remount();
+  });
+
+  it('appends a currency requirement (one currency option, id-less) via set-level Add cost', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      currencyUnits: CURRENCY_UNITS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="cost"]').click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'a currency requirement is appended');
+    assert.equal('id' in groups[0], false, 'the appended requirement carries no id');
+    assert.deepEqual(
+      groups[0].options[0].match,
+      { type: 'currency', unit: 'gp', amount: 1 },
+      'the currency requirement starts with the first unit and amount 1'
+    );
+    editHarness.remount();
+  });
+
+  it('appends a currency alternative via the row-end Add cost button', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      currencyUnits: CURRENCY_UNITS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-cost"]').click();
+    assert.equal(patches.length, 1, 'adding a cost alternative patches the recipe');
+    const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 2, 'the alternative list grew by one');
+    assert.deepEqual(
+      options[1].match,
+      { type: 'currency', unit: 'gp', amount: 1 },
+      'the new alternative is a currency match'
+    );
+    editHarness.remount();
+  });
+
+  it('edits a currency alternative unit and amount, emitting the right match', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      currencyUnits: CURRENCY_UNITS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    // The currency option renders an amount input + a unit picker (no quantity input).
+    const currency = target.querySelector('[data-recipe-option-currency]');
+    assert.ok(currency, 'the currency option renders its editor');
+    assert.equal(target.querySelector('[data-recipe-option] [data-recipe-option-quantity]'), null, 'currency rows have no separate quantity input');
+
+    // Controlled component: each edit derives from the unchanged prop, so the
+    // amount edit keeps the chosen unit and the unit edit keeps the prop amount.
+    const amount = currency.querySelector('[data-recipe-currency-amount]');
+    amount.value = '250';
+    amount.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.deepEqual(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
+      { type: 'currency', unit: 'gp', amount: 250 },
+      'editing the amount records it on the currency match (keeping the unit)'
+    );
+
+    // Open the unit picker and choose Silver.
+    target.querySelector('[data-recipe-currency-unit] .manager-recipe-currency-trigger').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Silver/.test(option.textContent)).click();
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
+      { type: 'currency', unit: 'sp', amount: 100 },
+      'choosing a unit records it (keeping the prop amount)'
+    );
+    editHarness.remount();
+  });
+
+  it('hides every Add cost control when the system defines no currency units', async () => {
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      currencyUnits: []
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    assert.equal(target.querySelector('[data-recipe-add="cost"]'), null, 'no set-level Add cost button');
+    assert.equal(target.querySelector('[data-recipe-add="alternative-cost"]'), null, 'no row-level Add cost button');
     editHarness.remount();
   });
 

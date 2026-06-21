@@ -154,6 +154,61 @@ describe('evaluateRecipeReadiness', () => {
     assert.equal(issues.some(i => i.id === 'duplicateAlternative'), false, 'any vs all are distinct matches');
   });
 
+  it('flags two identical currency alternatives within an OR group as duplicateAlternative', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Currency dupe',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [{
+          id: 'g1',
+          options: [
+            { quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } },
+            { quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }
+          ]
+        }]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.filter(i => i.id === 'duplicateAlternative').length, 1, 'identical currency matches collide');
+  });
+
+  it('does not flag currency alternatives with distinct units or amounts', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Currency distinct',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [{
+          id: 'g1',
+          options: [
+            { quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } },
+            { quantity: 1, match: { type: 'currency', unit: 'sp', amount: 100 } },
+            { quantity: 1, match: { type: 'currency', unit: 'gp', amount: 50 } }
+          ]
+        }]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.some(i => i.id === 'duplicateAlternative'), false, 'distinct unit/amount are distinct matches');
+  });
+
+  it('flags two identical currency requirements in a set as duplicateRequirement', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Currency req dupe',
+      enabled: true,
+      ingredientSets: [{
+        id: 's1',
+        ingredientGroups: [
+          { id: 'g1', options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }] },
+          { id: 'g2', options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }] }
+        ]
+      }],
+      resultGroups: [{ id: 'r1' }]
+    });
+    assert.equal(issues.filter(i => i.id === 'duplicateRequirement').length, 1, 'identical currency requirements collide');
+  });
+
   it('flags two identical single-component requirements in a set as duplicateRequirement', () => {
     const { checks, issues } = evaluateRecipeReadiness({
       name: 'Req dupe',

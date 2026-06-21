@@ -813,6 +813,13 @@ export class RecipeManager {
       return true;
     }
 
+    if (ingredient.match?.type === 'currency') {
+      // A currency alternative matches no inventory item; craft-time currency
+      // spend is the deferred follow-up.
+      // TODO: component-level currency spend (deferred)
+      return false;
+    }
+
     if (ingredient.tag) {
       if (!features.enableTags) return false;
       const itemTags = getFabricateFlag(item, 'tags', []);

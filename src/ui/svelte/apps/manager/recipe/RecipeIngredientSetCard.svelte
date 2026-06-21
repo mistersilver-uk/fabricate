@@ -24,6 +24,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    currencyUnits = [],
     onChange = () => {},
     onRemove = () => {}
   } = $props();
@@ -88,6 +89,16 @@
     });
   }
 
+  // A currency requirement is a one-option group born with the first configured
+  // unit (or empty) and an amount of 1, refined inline in the requirement editor.
+  function addCurrencyRequirement() {
+    const firstUnit = (currencyUnits || [])[0]?.id || '';
+    onChange({
+      ...set,
+      ingredientGroups: [...groups, { options: [{ quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }] }]
+    });
+  }
+
   function updateEssences(nextEssences) {
     onChange({ ...set, essences: nextEssences });
   }
@@ -125,6 +136,7 @@
           {group}
           {componentOptions}
           {itemTags}
+          {currencyUnits}
           onChange={(nextGroup) => updateGroup(index, nextGroup)}
           onRemove={() => removeGroup(index)}
         />
@@ -157,6 +169,17 @@
       <i class="fas fa-tags" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
     </button>
+    {#if (currencyUnits || []).length > 0}
+      <button
+        type="button"
+        class="manager-button is-subtle"
+        data-recipe-add="cost"
+        onclick={() => addCurrencyRequirement()}
+      >
+        <i class="fa-solid fa-coins" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
+      </button>
+    {/if}
   </div>
 
   {#if (essenceOptions || []).length > 0}

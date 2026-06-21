@@ -16,16 +16,23 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import {
+    currencyUnitLabel,
+    currencyUnitIcon,
+    findCurrencyUnit
+  } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../SearchablePopover.svelte';
 
   let {
     option = {},
     componentOptions = [],
     itemTags = [],
+    currencyUnits = [],
     onChange = () => {},
     onRemove = () => {},
     onAddComponentAlternative = () => {},
     onAddTagAlternative = () => {},
+    onAddCurrencyAlternative = () => {},
     canRemove = true,
     showRowAdds = true
   } = $props();
@@ -35,13 +42,32 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const matchType = $derived(option?.match?.type === 'tags' ? 'tags' : 'component');
+  const matchType = $derived(
+    option?.match?.type === 'tags' || option?.match?.type === 'currency'
+      ? option.match.type
+      : 'component'
+  );
   const quantity = $derived(Number(option?.quantity) > 0 ? Number(option.quantity) : 1);
   const componentId = $derived(option?.match?.type === 'component' ? option.match.componentId || '' : '');
   const tags = $derived(
     option?.match?.type === 'tags' && Array.isArray(option.match.tags) ? option.match.tags : []
   );
   const tagMatch = $derived(option?.match?.tagMatch === 'all' ? 'all' : 'any');
+
+  const currencyUnitId = $derived(option?.match?.type === 'currency' ? option.match.unit || '' : '');
+  const currencyAmount = $derived(
+    option?.match?.type === 'currency' && Number(option.match.amount) > 0
+      ? Number(option.match.amount)
+      : 1
+  );
+  const selectedCurrencyUnit = $derived(findCurrencyUnit(currencyUnits, currencyUnitId));
+  const currencyPickerOptions = $derived(
+    (currencyUnits || []).map((unit) => ({
+      id: unit.id,
+      label: currencyUnitLabel(currencyUnits, unit.id),
+      icon: currencyUnitIcon(currencyUnits, unit.id)
+    }))
+  );
 
   const selectedComponent = $derived(
     componentId ? (componentOptions || []).find(item => item.id === componentId) || null : null
@@ -88,6 +114,23 @@
   function setTagMatch(mode) {
     emit({ match: { type: 'tags', tags: [...tags], tagMatch: mode === 'all' ? 'all' : 'any' } });
   }
+
+  function chooseCurrencyUnit(unitId) {
+    emit({ match: { type: 'currency', unit: String(unitId || ''), amount: currencyAmount } });
+  }
+
+  // Currency amounts share the four-digit cap with quantities and are stored on
+  // the match (not the option quantity), which stays the default 1.
+  function setCurrencyAmount(value) {
+    const next = Number(value);
+    emit({
+      match: {
+        type: 'currency',
+        unit: currencyUnitId,
+        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1
+      }
+    });
+  }
 </script>
 
 <div class="manager-recipe-ingredient-option-row" data-recipe-option>
@@ -114,7 +157,7 @@
           <span class="manager-recipe-component-name">{selectedComponent.name}</span>
         {/if}
       </div>
-    {:else}
+    {:else if matchType === 'tags'}
       <div class="manager-recipe-option-tags">
         {#if tags.length > 0}
           <ul class="manager-recipe-tag-chips">
@@ -167,20 +210,54 @@
           </div>
         </div>
       </div>
+    {:else}
+      <div class="manager-recipe-option-currency" data-recipe-option-currency>
+        <input
+          type="number"
+          min="1"
+          max="9999"
+          class="manager-recipe-currency-amount"
+          data-recipe-currency-amount
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+          value={currencyAmount}
+          onchange={(e) => setCurrencyAmount(e.target.value)}
+        />
+        <span class="manager-recipe-currency-unit" data-recipe-currency-unit>
+          <SearchablePopover
+            options={currencyPickerOptions}
+            value={currencyUnitId}
+            pickerClass="manager-recipe-currency-picker"
+            triggerClass="manager-button is-subtle manager-recipe-currency-trigger"
+            triggerIcon={currencyUnitIcon(currencyUnits, currencyUnitId)}
+            triggerLabel={selectedCurrencyUnit
+              ? currencyUnitLabel(currencyUnits, currencyUnitId)
+              : text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+            triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined')}
+            onChoose={(unitId) => chooseCurrencyUnit(unitId)}
+          />
+        </span>
+      </div>
     {/if}
   </div>
 
   <div class="manager-recipe-option-controls">
-    <input
-      type="number"
-      min="1"
-      max="9999"
-      class="manager-recipe-option-quantity"
-      data-recipe-option-quantity
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-      value={quantity}
-      onchange={(e) => setQuantity(e.target.value)}
-    />
+    {#if matchType !== 'currency'}
+      <input
+        type="number"
+        min="1"
+        max="9999"
+        class="manager-recipe-option-quantity"
+        data-recipe-option-quantity
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        value={quantity}
+        onchange={(e) => setQuantity(e.target.value)}
+      />
+    {/if}
 
     {#if showRowAdds}
       <div class="manager-recipe-option-alternative-adds">
@@ -207,6 +284,16 @@
           title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
           onclick={() => onAddTagAlternative()}
         ><i class="fas fa-tags" aria-hidden="true"></i></button>
+        {#if (currencyUnits || []).length > 0}
+          <button
+            type="button"
+            class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+            data-recipe-add="alternative-cost"
+            aria-label={text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}
+            title={text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}
+            onclick={() => onAddCurrencyAlternative()}
+          ><i class="fa-solid fa-coins" aria-hidden="true"></i></button>
+        {/if}
       </div>
     {/if}
 
