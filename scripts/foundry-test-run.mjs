@@ -1937,7 +1937,30 @@ async function main() {
         }
 
         await csm.updateSystem(systemId, {
-          features: { essences: true, gathering: true },
+          // 'mapped' resolution allows multiple ingredient/result sets, so the recipe
+          // editor unlocks Complex mode (recipeMultiSetAllowed gates on a mode NOT in
+          // ['simple','progressive']). multiStepRecipes unlocks the step-mode toggle and
+          // the per-step duration controls; itemTags unlocks the tag-requirement picker;
+          // recipeCategories unlocks the category selector.
+          resolutionMode: 'mapped',
+          features: {
+            essences: true,
+            gathering: true,
+            multiStepRecipes: true,
+            itemTags: true,
+            recipeCategories: true
+          },
+          // Two currency units so the currency-cost requirement row can target a unit.
+          itemTags: ['rare', 'reagent', 'metallic'],
+          requirements: {
+            currency: {
+              enabled: true,
+              units: [
+                { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins' },
+                { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins' }
+              ]
+            }
+          },
           essenceDefinitions: [
             {
               name: 'Verdant',
@@ -2067,6 +2090,113 @@ async function main() {
             }]
           }]
         });
+
+        // Showcase recipe whose single ingredient set exercises every requirement row
+        // type so the Ingredients tab renders: a plain component, an OR group (one
+        // group with two component options), a tag requirement, and a currency cost.
+        // complex:true forces the full set-card render; allowIncomplete persists it as a
+        // structurally-valid editor shell without tripping mapped-mode craftability.
+        const showcaseRecipe = await rm.createRecipe({
+          name: 'Showcase Requirements',
+          description: 'Demonstrates every ingredient requirement row: component, OR group, tag, and currency cost.',
+          craftingSystemId: systemId,
+          img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+          complex: true,
+          ingredientSets: [{
+            name: 'Primary',
+            ingredientGroups: [
+              {
+                name: 'Iron Ore',
+                options: [{
+                  quantity: 2,
+                  match: { type: 'component', componentId: componentMap['Iron Ore'] }
+                }]
+              },
+              {
+                name: 'Catalyst (either works)',
+                options: [
+                  {
+                    quantity: 1,
+                    match: { type: 'component', componentId: componentMap['Mystic Herb'] }
+                  },
+                  {
+                    quantity: 1,
+                    match: { type: 'component', componentId: componentMap['Dragon Scale'] }
+                  }
+                ]
+              },
+              {
+                name: 'Any reagent',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'tags', tags: ['reagent', 'rare'], tagMatch: 'any' }
+                }]
+              },
+              {
+                name: 'Gold cost',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'currency', unit: 'gp', amount: 100 }
+                }]
+              }
+            ]
+          }],
+          resultGroups: [{
+            name: 'Showcase Result',
+            results: [{
+              componentId: componentMap['Healing Potion'],
+              quantity: 1
+            }]
+          }]
+        }, { allowIncomplete: true });
+
+        // Multi-step recipe so the Overview steps accordion shows the per-step duration
+        // controls (data-recipe-step-time chips + the duration editor). Each step owns its
+        // own ingredient sets, result groups, and timeRequirement.
+        const multiStepRecipe = await rm.createRecipe({
+          name: 'Multi-Step Alloy',
+          description: 'A two-step recipe to showcase the steps accordion and per-step durations.',
+          craftingSystemId: systemId,
+          img: 'icons/commodities/metal/ingot-stack-steel.webp',
+          steps: [
+            {
+              name: 'Smelt Ore',
+              ingredientSets: [{
+                name: 'Ore',
+                ingredientGroups: [{
+                  name: 'Iron Ore',
+                  options: [{
+                    quantity: 2,
+                    match: { type: 'component', componentId: componentMap['Iron Ore'] }
+                  }]
+                }]
+              }],
+              resultGroups: [{
+                name: 'Molten Iron',
+                results: [{ componentId: componentMap['Iron Sword'], quantity: 1 }]
+              }],
+              timeRequirement: { hours: 2, minutes: 30 }
+            },
+            {
+              name: 'Forge Blade',
+              ingredientSets: [{
+                name: 'Blade',
+                ingredientGroups: [{
+                  name: 'Dragon Scale',
+                  options: [{
+                    quantity: 1,
+                    match: { type: 'component', componentId: componentMap['Dragon Scale'] }
+                  }]
+                }]
+              }],
+              resultGroups: [{
+                name: 'Finished Blade',
+                results: [{ componentId: componentMap['Dragon Scale Armor'], quantity: 1 }]
+              }],
+              timeRequirement: { days: 1 }
+            }
+          ]
+        }, { allowIncomplete: true });
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
@@ -2246,7 +2376,7 @@ async function main() {
         return {
           systemId,
           componentMap,
-          recipeIds: [recipe1.id, recipe2.id, recipe3.id],
+          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id],
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
@@ -2717,6 +2847,48 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-normal');
+        // Return to the recipes browser for the remaining recipe-editor captures.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // Showcase Requirements → Ingredients tab: capture every requirement row type
+        // (component, OR group, tag, currency cost), the faint dividers, and the tag
+        // layout. The recipe is authored complex, so the section renders the full set
+        // card list with one or more data-recipe-group cards.
+        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Showcase Requirements") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
+        await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-recipe-tab="ingredients"] [data-recipe-group]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'recipe edit ingredients');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-ingredients');
+
+        // Same recipe → Validation tab: capture the validation summary panel.
+        await page.locator('.fabricate-manager [data-recipe-tab-button="validation"]').first().click();
+        await page.locator('.fabricate-manager [data-recipe-tab="validation"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'recipe edit validation');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-validation');
+
+        // Return to the recipes browser before opening the multi-step recipe.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // Multi-Step Alloy → Overview: the steps accordion shows the per-step duration
+        // chips/controls. Wait on the steps card and a per-step time chip.
+        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Multi-Step Alloy") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-recipe-tab="overview"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-recipe-section="steps"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        // The Overview steps accordion passes onUpdateStep, so each step header renders the
+        // editable duration control (data-recipe-duration-trigger), not the read-only
+        // data-recipe-step-time chip used on the ingredients/results/tools accordions.
+        await page.locator('.fabricate-manager [data-recipe-section="steps"] [data-recipe-duration-trigger]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'recipe edit multistep');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-multistep');
+
         // Return to the recipes browser for the remaining navigation.
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
