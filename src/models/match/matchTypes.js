@@ -299,11 +299,12 @@ export function normalizeMatch(data = {}) {
     };
   }
 
-  const tags = Array.isArray(data.tags)
-    ? data.tags.map((t) => String(t || '').trim()).filter(Boolean)
-    : data.tag
-      ? [String(data.tag).trim()]
-      : [];
+  let tags = [];
+  if (Array.isArray(data.tags)) {
+    tags = data.tags.map((t) => String(t || '').trim()).filter(Boolean);
+  } else if (data.tag) {
+    tags = [String(data.tag).trim()];
+  }
   if (tags.length > 0) {
     return {
       type: 'tags',

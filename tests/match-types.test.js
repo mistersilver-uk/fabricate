@@ -140,7 +140,9 @@ test('tags handler: expandToComponentIds filters components by any/all', () => {
     { id: 'c', tags: ['wood'] },
   ];
   assert.deepEqual(
-    [...h.expandToComponentIds({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, components)].sort(),
+    [...h.expandToComponentIds({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, components)].sort((x, y) =>
+      x.localeCompare(y),
+    ),
     ['a', 'b']
   );
   assert.deepEqual(
