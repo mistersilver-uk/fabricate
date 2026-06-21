@@ -55,7 +55,22 @@
     onChange({ ...group, options: options.filter((_, i) => i !== index) });
   }
 
+  // Adding a component this requirement already lists as an alternative bumps
+  // that alternative's quantity by 1 (capped) rather than creating a duplicate
+  // match, which the Validation tab would otherwise flag.
   function addComponentAlternative(id) {
+    const existingIndex = options.findIndex(
+      (option) => option?.match?.type === 'component' && option.match.componentId === id
+    );
+    if (existingIndex !== -1) {
+      const existing = options[existingIndex];
+      const nextQuantity = Math.min(9999, (Number(existing.quantity) > 0 ? Number(existing.quantity) : 1) + 1);
+      onChange({
+        ...group,
+        options: options.map((option, i) => (i === existingIndex ? { ...existing, quantity: nextQuantity } : option))
+      });
+      return;
+    }
     onChange({ ...group, options: [...options, { quantity: 1, match: { type: 'component', componentId: id } }] });
   }
 

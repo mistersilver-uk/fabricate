@@ -4513,16 +4513,18 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-2);
 }
 
-/* Compact, icon-forward add controls so they don't read as the labelled
-   set-level "Add component" / "Add tag requirement" buttons. */
-.fabricate-manager .manager-recipe-add-alternative-trigger {
-  flex: 0 0 auto;
-  width: auto;
+/* Square, icon-only add controls so they don't read as the labelled set-level
+   "Add component" / "Add tag requirement" buttons; sized to match the adjacent
+   remove (icon) button. */
+.fabricate-manager .manager-button.manager-recipe-add-alternative-trigger {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
   min-width: 0;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
+  padding: 0;
 }
 
 .fabricate-manager .manager-recipe-tag-match-toggle {
@@ -4563,12 +4565,16 @@
 }
 
 /* The component alternative's trigger is the image-only picker target, sized to
-   its thumbnail; the resolved component name renders as static text beside it. */
-.fabricate-manager .manager-recipe-component-trigger {
+   its thumbnail; the resolved component name renders as static text beside it.
+   The `.manager-button.…` selector raises specificity above the base
+   `.manager-button` padding (declared later in this file) so the horizontal
+   padding actually tightens to match the vertical breathing room. */
+.fabricate-manager .manager-button.manager-recipe-component-trigger {
   justify-content: flex-start;
   width: auto;
   height: auto;
   min-height: 34px;
+  padding: var(--fab-space-1);
 }
 
 /* The selected component's name, rendered beside the image-only picker trigger
@@ -4596,7 +4602,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-2);
   padding-top: var(--fab-space-1);
 }
 
@@ -4646,7 +4652,7 @@
 
 .fabricate-manager .manager-recipe-option-quantity {
   flex: 0 0 auto;
-  width: 4.5rem;
+  width: 3.75rem;
   height: 36px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);

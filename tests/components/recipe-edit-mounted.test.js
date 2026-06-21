@@ -634,6 +634,52 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('increments an existing single-component requirement instead of duplicating it', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Mountain Herb/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing the already-required component patches the recipe');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'no duplicate requirement is appended');
+    assert.equal(groups[0].options.length, 1, 'the requirement keeps a single option');
+    assert.equal(groups[0].options[0].quantity, 3, 'the existing requirement quantity is incremented by one');
+    editHarness.remount();
+  });
+
+  it('increments an existing component alternative instead of duplicating it', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
+      componentOptions: COMPONENT_OPTIONS,
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    clickTab(target, 'ingredients');
+    await flushRender();
+    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]').click();
+    await flushRender();
+    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Mountain Herb/.test(option.textContent)).click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'choosing the existing alternative component patches the recipe');
+    const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+    assert.equal(options.length, 1, 'no duplicate alternative is appended');
+    assert.equal(options[0].quantity, 2, 'the existing alternative quantity is incremented by one');
+    assert.deepEqual(
+      options[0].match,
+      { type: 'component', componentId: 'cmp-herb' },
+      'the match is unchanged'
+    );
+    editHarness.remount();
+  });
+
   it('appends a tag alternative via the row-end Add tag requirement button', async () => {
     const patches = [];
     const target = await editHarness.mount(identityProps({

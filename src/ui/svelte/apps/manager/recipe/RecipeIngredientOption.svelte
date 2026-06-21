@@ -64,9 +64,11 @@
     onChange({ ...option, ...next });
   }
 
+  // Quantities are capped at 9999 (four digits) — more of a single component is
+  // not a meaningful recipe requirement, and it keeps the input narrow.
   function setQuantity(value) {
     const next = Number(value);
-    emit({ quantity: Number.isFinite(next) && next > 0 ? next : 1 });
+    emit({ quantity: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1 });
   }
 
   function chooseComponent(id) {
@@ -172,6 +174,7 @@
     <input
       type="number"
       min="1"
+      max="9999"
       class="manager-recipe-option-quantity"
       data-recipe-option-quantity
       aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}

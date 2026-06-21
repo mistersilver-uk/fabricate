@@ -52,7 +52,29 @@
     onChange({ ...set, ingredientGroups: groups.filter((_, i) => i !== index) });
   }
 
+  // Adding a component the set already requires as its own single-component
+  // requirement bumps that requirement's quantity by 1 (capped) rather than
+  // appending a duplicate requirement, which the Validation tab would flag.
   function addComponentRequirement(id) {
+    const existingIndex = groups.findIndex(
+      (group) =>
+        Array.isArray(group?.options) &&
+        group.options.length === 1 &&
+        group.options[0]?.match?.type === 'component' &&
+        group.options[0].match.componentId === id
+    );
+    if (existingIndex !== -1) {
+      const existing = groups[existingIndex];
+      const option = existing.options[0];
+      const nextQuantity = Math.min(9999, (Number(option.quantity) > 0 ? Number(option.quantity) : 1) + 1);
+      onChange({
+        ...set,
+        ingredientGroups: groups.map((group, i) =>
+          i === existingIndex ? { ...existing, options: [{ ...option, quantity: nextQuantity }] } : group
+        )
+      });
+      return;
+    }
     onChange({
       ...set,
       ingredientGroups: [...groups, { options: [{ quantity: 1, match: { type: 'component', componentId: id } }] }]
