@@ -11,9 +11,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+let stubIdSeq = 0;
 globalThis.foundry = {
   utils: {
-    randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
+    randomID: () => `id-${(stubIdSeq++).toString(36).padStart(6, '0')}`,
     getProperty: (obj, path) =>
       String(path)
         .split('.')

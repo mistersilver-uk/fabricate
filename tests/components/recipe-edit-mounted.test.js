@@ -193,6 +193,41 @@ function clickTab(target, tab) {
   target.querySelector(`[data-recipe-tab-button="${tab}"]`).click();
 }
 
+// Mount the editor on a single-set recipe whose only set holds the given
+// ingredient groups, wired to a fresh patch collector, then switch to the
+// Ingredients tab and flush the first render. `props` merges extra editor props
+// (e.g. componentOptions, itemTags, currencyUnits) and `set` merges extra fields
+// onto the single 'set-1' set (e.g. name). Returns the mounted target plus the
+// collector so callers assert on emitted onUpdateRecipe patches.
+async function mountIngredientGroups(groups, { props = {}, set = {} } = {}) {
+  const patches = [];
+  const target = await editHarness.mount(identityProps({
+    recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ...set, ingredientGroups: groups }] },
+    onUpdateRecipe: (patch) => patches.push(patch),
+    ...props
+  }));
+  clickTab(target, 'ingredients');
+  await flushRender();
+  return { target, patches };
+}
+
+// Convenience for the common single-group case: one requirement ('grp-1')
+// holding the given option alternatives.
+function mountSingleGroup(options, opts = {}) {
+  return mountIngredientGroups([{ id: 'grp-1', options }], opts);
+}
+
+// Open the searchable popover under `trigger` (a node or a selector resolved on
+// `target`) and click the rendered option whose text matches `optionPattern`,
+// flushing render after each step.
+async function pickPopoverOption(target, trigger, optionPattern) {
+  const triggerNode = typeof trigger === 'string' ? target.querySelector(trigger) : trigger;
+  triggerNode.click();
+  await flushRender();
+  [...document.querySelectorAll('.manager-travel-option')].find((option) => optionPattern.test(option.textContent)).click();
+  await flushRender();
+}
+
 // Drive a drop through the dragDrop action using a plain Event + a dataTransfer
 // stub (text/plain JSON), not a synthetic native DragEvent.
 function dispatchDrop(node, payload) {
@@ -614,18 +649,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends a component requirement (born populated, id-less) via the Add component popover', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
-    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Mountain Herb/.test(option.textContent)).click();
-    await flushRender();
+    const { target, patches } = await mountIngredientGroups([], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS }
+    });
+    await pickPopoverOption(target, '[data-recipe-set-id="set-1"] [data-recipe-add="component"]', /Mountain Herb/);
     assert.equal(patches.length, 1, 'choosing a component patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a requirement is appended to the set');
@@ -640,15 +668,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends a tag requirement (empty tags option, id-less) via Add tag requirement', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountIngredientGroups([], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS }
+    });
     target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="tag-requirement"]').click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
@@ -663,18 +686,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends a component alternative via the row-end Add component popover', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
-    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Pure Water/.test(option.textContent)).click();
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    await pickPopoverOption(target, '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]', /Pure Water/);
     assert.equal(patches.length, 1, 'choosing an alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
@@ -687,18 +703,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('increments an existing single-component requirement instead of duplicating it', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
-    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Mountain Herb/.test(option.textContent)).click();
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { set: { name: 'Primary' }, props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    await pickPopoverOption(target, '[data-recipe-set-id="set-1"] [data-recipe-add="component"]', /Mountain Herb/);
     assert.equal(patches.length, 1, 'choosing the already-required component patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'no duplicate requirement is appended');
@@ -708,18 +717,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('increments an existing component alternative instead of duplicating it', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
-    target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Mountain Herb/.test(option.textContent)).click();
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
+    await pickPopoverOption(target, '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]', /Mountain Herb/);
     assert.equal(patches.length, 1, 'choosing the existing alternative component patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 1, 'no duplicate alternative is appended');
@@ -733,15 +735,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends a tag alternative via the row-end Add tag requirement button', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
     target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]').click();
     assert.equal(patches.length, 1, 'adding a tag alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
@@ -755,15 +752,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('mixes component and tag alternatives in one requirement, rendering the box + OR separator', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
     // Starting from a one-component requirement, add a tag alternative from the row.
     target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]').click();
     await flushRender();
@@ -775,16 +767,10 @@ describe('RecipeEditView (mounted)', () => {
     // The in-component state re-renders to two alternatives once we feed the
     // patch back in (the parent owns recipe state in production); render a
     // pre-mixed requirement directly to assert the box + separator.
-    const mixed = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }
-      ] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS
-    }));
-    clickTab(mixed, 'ingredients');
-    await flushRender();
+    const { target: mixed } = await mountSingleGroup([
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }
+    ], { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } });
     const req = mixed.querySelector('[data-recipe-group-id="grp-1"]');
     assert.ok(req.classList.contains('has-alternatives'), 'a 2-alternative requirement renders the box');
     assert.ok(req.querySelector('.manager-recipe-ingredient-or-separator'), 'the "— or —" separator renders');
@@ -795,18 +781,13 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders a single-alternative requirement as a bare row and a multi-alternative one as a box', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [
-        { id: 'grp-bare', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
-        { id: 'grp-box', options: [
-          { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-          { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
-        ] }
-      ] }] },
-      componentOptions: COMPONENT_OPTIONS
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountIngredientGroups([
+      { id: 'grp-bare', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
+      { id: 'grp-box', options: [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+      ] }
+    ], { props: { componentOptions: COMPONENT_OPTIONS } });
     const bare = target.querySelector('[data-recipe-group-id="grp-bare"]');
     assert.ok(bare, 'the single-alternative requirement still renders as a group');
     assert.equal(bare.classList.contains('has-alternatives'), false, 'a single-alternative requirement has no alternatives box');
@@ -816,15 +797,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders an OR separator once a component requirement has two alternatives', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
-      ] }] }] },
-      componentOptions: COMPONENT_OPTIONS
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountSingleGroup([
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+    ], { props: { componentOptions: COMPONENT_OPTIONS } });
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
     assert.equal(req.querySelectorAll('[data-recipe-option]').length, 2, 'both alternatives render');
     assert.ok(req.querySelector('.manager-recipe-ingredient-or-separator'), 'the "— or —" separator renders between alternatives');
@@ -832,12 +808,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders the component option image trigger with the name as separate static text (not inside the button)', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
     const row = target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-option]');
     const trigger = row.querySelector('.manager-recipe-component-trigger');
     assert.ok(trigger, 'the component picker trigger renders');
@@ -854,13 +828,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders the per-row add cluster (with tooltips) for a single-alternative requirement', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
     const row = req.querySelector('[data-recipe-option]');
     // The add cluster lives inside the option row for a single-alternative requirement.
@@ -877,16 +848,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders exactly one footer add cluster (and no per-row adds) for a multi-alternative OR group', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
-      ] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountSingleGroup([
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+    ], { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } });
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
     // Exactly one add-component and one add-tag control in the whole requirement.
     assert.equal(req.querySelectorAll('[data-recipe-add="alternative-component"]').length, 1, 'one add-component control per OR group');
@@ -906,23 +871,12 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends an alternative from the OR-group footer add-component control', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'tags', tags: ['liquid'], tagMatch: 'any' } }
-      ] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup([
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'tags', tags: ['liquid'], tagMatch: 'any' } }
+    ], { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } });
     const footer = target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds');
-    footer.querySelector('[data-recipe-add="alternative-component"]').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Pure Water/.test(option.textContent)).click();
-    await flushRender();
+    await pickPopoverOption(target, footer.querySelector('[data-recipe-add="alternative-component"]'), /Pure Water/);
     assert.equal(patches.length, 1, 'choosing from the footer patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 3, 'the alternative list grew by one');
@@ -931,14 +885,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('changes a component alternative via its picker trigger', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
     target.querySelector('[data-recipe-option] .manager-recipe-component-trigger').click();
     await flushRender();
     const options = [...document.querySelectorAll('.manager-travel-option')];
@@ -955,14 +905,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('patches the option quantity when the quantity input changes', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS } }
+    );
     const qty = target.querySelector('[data-recipe-option-quantity]');
     // The visible "Quantity" label is gone; the input keeps an aria-label.
     assert.equal(qty.closest('.manager-recipe-option-quantity-field'), null, 'no labelled quantity field wrapper');
@@ -977,18 +923,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('adds a tag to a tag requirement and toggles any/all', async () => {
-    const next = [];
-    const tagTarget = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }] }] },
-      itemTags: ITEM_TAGS,
-      onUpdateRecipe: (patch) => next.push(patch)
-    }));
-    clickTab(tagTarget, 'ingredients');
-    await flushRender();
-    tagTarget.querySelector('[data-recipe-option] .manager-recipe-tag-trigger').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /herbal/.test(option.textContent)).click();
-    await flushRender();
+    const { target: tagTarget, patches: next } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+      { props: { itemTags: ITEM_TAGS } }
+    );
+    await pickPopoverOption(tagTarget, '[data-recipe-option] .manager-recipe-tag-trigger', /herbal/);
     assert.deepEqual(
       next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
       { type: 'tags', tags: ['herbal'], tagMatch: 'any' },
@@ -1006,12 +945,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('lays out the tag match with Any/All first and the tags in a bordered area (No tags set when empty)', async () => {
-    const tagTarget = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }] }] },
-      itemTags: ITEM_TAGS
-    }));
-    clickTab(tagTarget, 'ingredients');
-    await flushRender();
+    const { target: tagTarget } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+      { props: { itemTags: ITEM_TAGS } }
+    );
     const option = tagTarget.querySelector('[data-recipe-option]');
     // The controls row leads with the Any/All toggle, then the Add tag control.
     const controls = option.querySelector('.manager-recipe-option-tags-controls').innerHTML;
@@ -1029,12 +966,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders chosen tags as chips inside the bordered area with no empty state', async () => {
-    const tagTarget = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } }] }] }] },
-      itemTags: ITEM_TAGS
-    }));
-    clickTab(tagTarget, 'ingredients');
-    await flushRender();
+    const { target: tagTarget } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } }],
+      { props: { itemTags: ITEM_TAGS } }
+    );
     const list = tagTarget.querySelector('[data-recipe-option] [data-recipe-tags-list]');
     assert.ok(list.querySelector('[data-recipe-tag="herbal"]'), 'the chosen tag renders as a chip inside the bordered area');
     assert.equal(list.querySelector('[data-recipe-tags-empty]'), null, 'no empty state when tags are set');
@@ -1042,15 +977,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends a currency requirement (one currency option, id-less) via set-level Add cost', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', name: 'Primary', ingredientGroups: [] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      currencyUnits: CURRENCY_UNITS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountIngredientGroups([], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS }
+    });
     target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="cost"]').click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
@@ -1065,15 +995,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('appends a currency alternative via the row-end Add cost button', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      currencyUnits: CURRENCY_UNITS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
+    );
     target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-cost"]').click();
     assert.equal(patches.length, 1, 'adding a cost alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
@@ -1087,15 +1012,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('edits a currency alternative unit and amount, emitting the right match', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      currencyUnits: CURRENCY_UNITS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
+    );
     // The currency option renders an amount input + a unit picker (no quantity input).
     const currency = target.querySelector('[data-recipe-option-currency]');
     assert.ok(currency, 'the currency option renders its editor');
@@ -1113,10 +1033,7 @@ describe('RecipeEditView (mounted)', () => {
     );
 
     // Open the unit picker and choose Silver.
-    target.querySelector('[data-recipe-currency-unit] .manager-recipe-currency-trigger').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Silver/.test(option.textContent)).click();
-    await flushRender();
+    await pickPopoverOption(target, '[data-recipe-currency-unit] .manager-recipe-currency-trigger', /Silver/);
     assert.deepEqual(
       patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
       { type: 'currency', unit: 'sp', amount: 100 },
@@ -1126,30 +1043,20 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('hides every Add cost control when the system defines no currency units', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      currencyUnits: []
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: [] } }
+    );
     assert.equal(target.querySelector('[data-recipe-add="cost"]'), null, 'no set-level Add cost button');
     assert.equal(target.querySelector('[data-recipe-add="alternative-cost"]'), null, 'no row-level Add cost button');
     editHarness.remount();
   });
 
   it('removing the last alternative drops the whole requirement from the set', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [
-        { id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
-        { id: 'grp-2', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }] }
-      ] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountIngredientGroups([
+      { id: 'grp-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
+      { id: 'grp-2', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }] }
+    ], { props: { componentOptions: COMPONENT_OPTIONS } });
     // grp-1 has a single alternative; removing it removes the requirement.
     target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-remove="alternative"]').click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
@@ -1160,17 +1067,10 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('removing one of several alternatives keeps the requirement and drops just that alternative', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
-      ] }] }] },
-      componentOptions: COMPONENT_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target, patches } = await mountSingleGroup([
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } }
+    ], { props: { componentOptions: COMPONENT_OPTIONS } });
     target.querySelectorAll('[data-recipe-group-id="grp-1"] [data-recipe-remove="alternative"]')[0].click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
@@ -1180,30 +1080,18 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('adds a per-set essence via the essence popover, writing the essences map', async () => {
-    const patches = [];
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [], essences: {} }] },
-      essenceOptions: ESSENCE_OPTIONS,
-      onUpdateRecipe: (patch) => patches.push(patch)
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
-    target.querySelector('[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger').click();
-    await flushRender();
-    [...document.querySelectorAll('.manager-travel-option')].find((option) => /Life/.test(option.textContent)).click();
-    await flushRender();
+    const { target, patches } = await mountIngredientGroups([], {
+      set: { essences: {} },
+      props: { essenceOptions: ESSENCE_OPTIONS }
+    });
+    await pickPopoverOption(target, '[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger', /Life/);
     assert.equal(patches.length, 1, 'choosing an essence patches the recipe');
     assert.deepEqual(patches[0].ingredientSets[0].essences, { 'ess-life': 1 }, 'the essences map records the chosen essence at quantity 1');
     editHarness.remount();
   });
 
   it('omits the per-set essence editor when the system has no essences', async () => {
-    const target = await editHarness.mount(identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ingredientGroups: [] }] },
-      essenceOptions: []
-    }));
-    clickTab(target, 'ingredients');
-    await flushRender();
+    const { target } = await mountIngredientGroups([], { props: { essenceOptions: [] } });
     assert.ok(target.querySelector('[data-recipe-set-id="set-1"]'), 'the set still renders');
     assert.equal(target.querySelector('[data-recipe-section-essences]'), null, 'no essence editor without essences');
     editHarness.remount();
