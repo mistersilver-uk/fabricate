@@ -69,6 +69,45 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  // The overlapping-requirement recipe: a component "Iron Ore" requirement AND a
+  // "metal" tag requirement that Iron Ore satisfies — ambiguous overlap.
+  const overlapRecipe = {
+    name: 'Smelt',
+    enabled: true,
+    ingredientSets: [{
+      id: 's1',
+      ingredientGroups: [
+        { id: 'g1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-iron-ore' } }] },
+        { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+      ]
+    }],
+    resultGroups: [{ id: 'r1' }]
+  };
+
+  // No harness rawModules/compiledModules change is needed: recipeReadiness and
+  // the match-type registry it dispatches through are already copied above, so
+  // overlap expansion resolves with the existing module graph.
+  it('warns about overlapping requirements when componentTagOptions are supplied', async () => {
+    const target = await harness.mount({
+      recipe: overlapRecipe,
+      componentTagOptions: [{ id: 'cmp-iron-ore', tags: ['metal'] }]
+    });
+    const warningList = target.querySelector('[data-issue-severity="warning"]');
+    assert.ok(warningList, 'a warning issue group renders');
+    assert.ok(warningList.querySelector('[data-issue="requirementOverlap"]'), 'overlap warning listed under the warning bucket');
+    const overlapCheck = target.querySelector('[data-check="noRequirementOverlap"]');
+    assert.equal(overlapCheck.dataset.satisfied, 'false', 'overlap check fails');
+    harness.remount();
+  });
+
+  it('does not warn about overlap when componentTagOptions are absent', async () => {
+    const target = await harness.mount({ recipe: overlapRecipe });
+    assert.equal(target.querySelector('[data-issue="requirementOverlap"]'), null, 'no overlap issue without a catalogue');
+    const overlapCheck = target.querySelector('[data-check="noRequirementOverlap"]');
+    assert.equal(overlapCheck.dataset.satisfied, 'true', 'overlap check passes with no catalogue');
+    harness.remount();
+  });
+
   it("fires onSelectIssue with the issue's deep-link target when View is clicked", async () => {
     const targets = [];
     const target = await harness.mount({

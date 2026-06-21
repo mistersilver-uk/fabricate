@@ -33,6 +33,7 @@
     currencyUnits = [],
     toolsLibrary = [],
     componentOptions = [],
+    componentTagOptions = [],
     essenceOptions = [],
     itemTags = [],
     onUpdateRecipe = () => {},
@@ -246,6 +247,7 @@
         {:else if activeTab === 'validation'}
           <RecipeValidationTab
             {recipe}
+            {componentTagOptions}
             onSelectIssue={selectIssue}
           />
         {/if}

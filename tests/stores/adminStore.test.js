@@ -2287,7 +2287,7 @@ describe('createAdminStore', () => {
       assert.ok(sys !== null, 'selectedSystem should not be null');
       const requiredKeys = [
         'id', 'name', 'description', 'enabled', 'features',
-        'categories', 'itemTags', 'essenceDefinitions', 'managedItemOptions',
+        'categories', 'itemTags', 'essenceDefinitions', 'managedItemOptions', 'componentTagOptions',
         'requirements', 'craftingCheck', 'recipeVisibility',
         'showRecipeVisibilityKnowledgeOptions', 'showRecipeVisibilityPlayerNote',
         'showTags', 'showEssences', 'availableScriptMacros', 'sceneOptions', 'rollTableOptions'
@@ -4500,6 +4500,38 @@ describe('createAdminStore', () => {
       assert.equal(linkedEssence.associatedItemName, 'Blazing Herb');
       assert.equal(unlinkedEssence.associatedItem, null);
       assert.equal(unlinkedEssence.associatedItemName, null);
+    });
+
+    it('viewState.selectedSystem.componentTagOptions is an { id, tags } projection separate from managedItemOptions', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({ id: 'comp-1', name: 'Iron Ore', tags: [' metal ', 'ore', ''] }),
+          makeItem({ id: 'comp-2', name: 'Herb', tags: ['plant'] }),
+          makeItem({ id: 'comp-3', name: 'Untagged' })
+        ];
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+
+      // Built as { id, tags } from managed items, with tags trim-normalized to
+      // line up with how the tags-match handler stores match tags.
+      assert.deepEqual(vs.selectedSystem.componentTagOptions, [
+        { id: 'comp-1', tags: ['metal', 'ore'] },
+        { id: 'comp-2', tags: ['plant'] },
+        { id: 'comp-3', tags: [] }
+      ]);
+
+      // The managedItemOptions contract shape is unchanged (no tags leak in).
+      assert.deepEqual(vs.selectedSystem.managedItemOptions, [
+        { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '' },
+        { id: 'comp-2', name: 'Herb', img: 'item.png', description: '' },
+        { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '' }
+      ]);
     });
 
     it('viewState.essenceCards expose source state and component usage for manager', async () => {

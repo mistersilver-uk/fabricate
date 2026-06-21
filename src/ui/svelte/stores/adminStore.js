@@ -381,6 +381,27 @@ function _buildManagedItemOptions(managedItems = []) {
   }));
 }
 
+/**
+ * Minimal `{ id, tags }` projection of the managed components, used only by the
+ * recipe Validation tab's overlapping-requirement detection. Kept SEPARATE from
+ * `_buildManagedItemOptions` (whose `{ id, name, img, ... }` shape is asserted by
+ * the manager contract tests and feeds many pickers). Tags are normalized the
+ * same way the tags-match handler stores match tags (trim + drop blanks) so a
+ * tag requirement's `match.tags` line up with a component's `tags` during
+ * expansion; mismatched normalization would silently miss overlaps.
+ *
+ * @param {object[]} [managedItems]
+ * @returns {{ id: string, tags: string[] }[]}
+ */
+function _buildComponentTagOptions(managedItems = []) {
+  return managedItems.map(item => ({
+    id: item.id,
+    tags: Array.isArray(item.tags)
+      ? item.tags.map(tag => String(tag ?? '').trim()).filter(Boolean)
+      : []
+  }));
+}
+
 function _resolutionModeLabel(mode, localizeFn) {
   const key = RESOLUTION_MODE_LABEL_KEYS[mode];
   return key ? (localizeFn?.(key) || mode) : mode;
@@ -1510,6 +1531,7 @@ function _descriptionTextCandidate(value, seen = new Set()) {
 function _buildSelectedSystemViewData(
   selectedSystem,
   managedItemOptions,
+  componentTagOptions,
   essenceDefinitions,
   availableScriptMacros,
   sceneOptions,
@@ -1547,6 +1569,10 @@ function _buildSelectedSystemViewData(
     itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
     essenceDefinitions,
     managedItemOptions,
+    // `{ id, tags }` projection consumed only by the recipe Validation tab's
+    // overlapping-requirement detection. Empty when no component carries tags →
+    // the overlap check no-ops.
+    componentTagOptions,
     // System-owned library Tools (canonical source). Surfaced here so the Tools
     // browser and the gathering task editor's tool picker read the system's
     // tools rather than the gathering-config copy.
@@ -3413,6 +3439,7 @@ export function createAdminStore(services) {
     if (selectedSystem) {
       const managedItems = _getManagedItems(selectedSystem);
       const managedItemOptions = _buildManagedItemOptions(managedItems);
+      const componentTagOptions = _buildComponentTagOptions(managedItems);
       const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
 
       const rawEssenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
@@ -3437,6 +3464,7 @@ export function createAdminStore(services) {
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
         managedItemOptions,
+        componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
         sceneOptions,

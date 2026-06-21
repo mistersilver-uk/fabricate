@@ -310,3 +310,110 @@ describe('evaluateRecipeReadiness', () => {
     assert.equal(issues.length, 0);
   });
 });
+
+describe('evaluateRecipeReadiness overlapping requirements', () => {
+  // Iron Ore is tagged "metal"; the system catalogue lets the tag requirement
+  // expand to component ids.
+  const systemComponents = [
+    { id: 'cmp-iron-ore', tags: ['metal', 'ore'] },
+    { id: 'cmp-copper-ore', tags: ['metal', 'ore'] },
+    { id: 'cmp-herb', tags: ['plant'] }
+  ];
+
+  function overlapRecipe(groups) {
+    return {
+      name: 'Overlap',
+      enabled: true,
+      ingredientSets: [{ id: 's1', ingredientGroups: groups }],
+      resultGroups: [{ id: 'r1' }]
+    };
+  }
+
+  it('flags a tag requirement overlapping a component it tags as one warning', () => {
+    const { checks, issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-iron-ore' } }] },
+      { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+    ]), { systemComponents });
+
+    const overlaps = issues.filter(i => i.id === 'requirementOverlap');
+    assert.equal(overlaps.length, 1, 'one requirementOverlap for the set');
+    assert.equal(overlaps[0].severity, 'warning');
+    assert.equal('blocks' in overlaps[0], false, 'overlap never blocks enabling');
+    assert.equal(overlaps[0].target, 'ingredients');
+    assert.equal(check(checks, 'noRequirementOverlap').satisfied, false);
+    assert.equal(blocksEnable(issues), false, 'ambiguity does not block enabling');
+  });
+
+  it('flags two tag requirements whose tagged components intersect', () => {
+    const { issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+      { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['ore'], tagMatch: 'any' } }] }
+    ]), { systemComponents });
+    assert.equal(issues.filter(i => i.id === 'requirementOverlap').length, 1);
+  });
+
+  it('does not double-flag exact-duplicate requirements as an overlap', () => {
+    const { issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+      { id: 'g2', options: [{ quantity: 3, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+    ]), { systemComponents });
+    assert.equal(issues.filter(i => i.id === 'duplicateRequirement').length, 1, 'exact dup flagged once');
+    assert.equal(issues.some(i => i.id === 'requirementOverlap'), false, 'no overlap double-flag');
+  });
+
+  it('reports clean for disjoint requirements', () => {
+    const { checks, issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] },
+      { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+    ]), { systemComponents });
+    assert.equal(issues.some(i => i.id === 'requirementOverlap'), false);
+    assert.equal(check(checks, 'noRequirementOverlap').satisfied, true);
+  });
+
+  it('does not flag a currency requirement against a tag requirement (currency expands empty)', () => {
+    const { issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }] },
+      { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+    ]), { systemComponents });
+    assert.equal(issues.some(i => i.id === 'requirementOverlap'), false);
+  });
+
+  it('detects no overlap when systemComponents is absent (one-arg back-compat call)', () => {
+    const { checks, issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-iron-ore' } }] },
+      { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+    ]));
+    assert.equal(issues.some(i => i.id === 'requirementOverlap'), false, 'no catalogue → no overlap');
+    assert.equal(check(checks, 'noRequirementOverlap').satisfied, true);
+    assert.equal(blocksEnable(issues), false);
+  });
+
+  it('carries stepId on a multi-step overlap issue', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Multi overlap',
+      enabled: true,
+      steps: [
+        { id: 'sa', name: 'Smelt', ingredientSets: [{
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-iron-ore' } }] },
+            { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] }
+          ]
+        }], resultGroups: [{ id: 'r1' }] }
+      ]
+    }, { systemComponents });
+    const overlap = issues.find(i => i.id === 'requirementOverlap');
+    assert.ok(overlap, 'overlap surfaced for the multi-step recipe');
+    assert.equal(overlap.stepId, 'sa');
+    assert.equal(overlap.stepName, 'Smelt');
+  });
+
+  it('emits exactly one overlap issue for three mutually-overlapping requirements in a set', () => {
+    const { issues } = evaluateRecipeReadiness(overlapRecipe([
+      { id: 'g1', options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+      { id: 'g2', options: [{ quantity: 1, match: { type: 'tags', tags: ['ore'], tagMatch: 'any' } }] },
+      { id: 'g3', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-copper-ore' } }] }
+    ]), { systemComponents });
+    assert.equal(issues.filter(i => i.id === 'requirementOverlap').length, 1, 'one issue per set');
+  });
+});
