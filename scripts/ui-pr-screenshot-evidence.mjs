@@ -16,6 +16,15 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
+// The recipe editor's four screenshot frames (overview/ingredients/validation/
+// multi-step) share the same trigger files, so any recipe editor/inspector/
+// sub-component change republishes all four.
+const RECIPE_EDIT_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
+];
+
 export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-systems',
@@ -128,41 +137,25 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-recipe-edit-normal',
     label: 'Manager recipe editor — overview / identity',
     smokeLabels: ['manager-recipe-edit-normal'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
-    ],
+    matches: RECIPE_EDIT_MATCHES,
   },
   {
     id: 'manager-recipe-edit-ingredients',
     label: 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)',
     smokeLabels: ['manager-recipe-edit-ingredients'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
-    ],
+    matches: RECIPE_EDIT_MATCHES,
   },
   {
     id: 'manager-recipe-edit-validation',
     label: 'Manager recipe editor — validation tab',
     smokeLabels: ['manager-recipe-edit-validation'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
-    ],
+    matches: RECIPE_EDIT_MATCHES,
   },
   {
     id: 'manager-recipe-edit-multistep',
     label: 'Manager recipe editor — multi-step durations',
     smokeLabels: ['manager-recipe-edit-multistep'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
-    ],
+    matches: RECIPE_EDIT_MATCHES,
   },
   {
     id: 'player-gathering',

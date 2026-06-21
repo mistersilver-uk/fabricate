@@ -22,6 +22,23 @@ import {
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 
+// Run `runAssert(root)` against a temp dir seeded with `test-results/<name>`
+// fixtures, cleaning up afterwards. Module-scope so the per-test collect setup is
+// shared rather than repeated scaffolding in each `collect` test.
+function withScreenshotFixtures(fixtures, runAssert) {
+  const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
+  try {
+    const sourceDir = join(root, 'test-results');
+    mkdirSync(sourceDir, { recursive: true });
+    for (const [name, content] of Object.entries(fixtures || {})) {
+      writeFileSync(join(sourceDir, name), content);
+    }
+    runAssert(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 describe('UI PR screenshot evidence', () => {
   it('detects UI changes with the same path rules as CI', () => {
     assert.equal(hasUiChanges(['src/ui/svelte/apps/FabricateAppRoot.svelte']), true);
@@ -94,35 +111,34 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('collects the four recipe-edit frames into four separate files', () => {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
-    try {
-      const sourceDir = join(root, 'test-results');
-      mkdirSync(sourceDir, { recursive: true });
-      writeFileSync(join(sourceDir, 'screenshot-01-manager-recipe-edit-normal.png'), 'normal');
-      writeFileSync(join(sourceDir, 'screenshot-02-manager-recipe-edit-ingredients.png'), 'ingredients');
-      writeFileSync(join(sourceDir, 'screenshot-03-manager-recipe-edit-validation.png'), 'validation');
-      writeFileSync(join(sourceDir, 'screenshot-04-manager-recipe-edit-multistep.png'), 'multistep');
-
-      const result = collectScreenshotEvidence({
-        changedFiles: ['src/ui/svelte/apps/manager/RecipeEditView.svelte'],
-        prNumber: 654,
-        root,
-      });
-
-      assert.equal(result.copied.length, 4);
-      const byName = Object.fromEntries(result.copied.map(item => {
-        const name = item.destination.replace(/\\/g, '/').split('/').pop();
-        return [name, readFileSync(item.destination, 'utf8')];
-      }));
-      assert.deepEqual(byName, {
-        'manager-recipe-edit-normal.png': 'normal',
-        'manager-recipe-edit-ingredients.png': 'ingredients',
-        'manager-recipe-edit-validation.png': 'validation',
-        'manager-recipe-edit-multistep.png': 'multistep',
-      });
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    withScreenshotFixtures(
+      {
+        'screenshot-01-manager-recipe-edit-normal.png': 'normal',
+        'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
+        'screenshot-03-manager-recipe-edit-validation.png': 'validation',
+        'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
+      },
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/RecipeEditView.svelte'],
+          prNumber: 654,
+          root,
+        });
+        assert.equal(result.copied.length, 4);
+        const byName = Object.fromEntries(
+          result.copied.map(item => [
+            item.destination.replaceAll('\\', '/').split('/').pop(),
+            readFileSync(item.destination, 'utf8'),
+          ]),
+        );
+        assert.deepEqual(byName, {
+          'manager-recipe-edit-normal.png': 'normal',
+          'manager-recipe-edit-ingredients.png': 'ingredients',
+          'manager-recipe-edit-validation.png': 'validation',
+          'manager-recipe-edit-multistep.png': 'multistep',
+        });
+      },
+    );
   });
 
   it('keeps every screenshot recipe backed by real smoke labels', () => {
@@ -189,34 +205,28 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps smoke screenshot collection available as an explicit fallback', () => {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
-    try {
-      const sourceDir = join(root, 'test-results');
-      mkdirSync(sourceDir, { recursive: true });
-      writeFileSync(join(sourceDir, 'screenshot-09-manager-environments-browse-normal-retry.png'), 'wrong');
-      writeFileSync(join(sourceDir, 'screenshot-08-manager-environments-browse-normal.png'), 'png');
-      writeFileSync(join(sourceDir, 'screenshot-07-manager-environments-browse-stacked.png'), 'stacked');
-
-      const result = collectScreenshotEvidence({
-        changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
-        prNumber: 456,
-        root,
-      });
-
-      assert.equal(result.copied.length, 1);
-      const relativeDestination = result.copied[0].destination.replace(root, '').replace(/\\/g, '/');
-      assert.equal(relativeDestination, '/tmp/pr-screenshots/456/manager-environments.png');
-      assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'stacked');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    withScreenshotFixtures(
+      {
+        'screenshot-09-manager-environments-browse-normal-retry.png': 'wrong',
+        'screenshot-08-manager-environments-browse-normal.png': 'png',
+        'screenshot-07-manager-environments-browse-stacked.png': 'stacked',
+      },
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
+          prNumber: 456,
+          root,
+        });
+        assert.equal(result.copied.length, 1);
+        const relativeDestination = result.copied[0].destination.replace(root, '').replaceAll('\\', '/');
+        assert.equal(relativeDestination, '/tmp/pr-screenshots/456/manager-environments.png');
+        assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'stacked');
+      },
+    );
   });
 
   it('reports missing collection screenshots and supports allowMissing', () => {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
-    try {
-      mkdirSync(join(root, 'test-results'), { recursive: true });
-
+    withScreenshotFixtures({}, (root) => {
       assert.throws(() => collectScreenshotEvidence({
         changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
         prNumber: 456,
@@ -230,9 +240,7 @@ describe('UI PR screenshot evidence', () => {
         allowMissing: true,
       });
       assert.deepEqual(result.missing.map(view => view.id), ['manager-tools']);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    });
   });
 
   it('does not expose the removed synthetic screenshot generator path', () => {
