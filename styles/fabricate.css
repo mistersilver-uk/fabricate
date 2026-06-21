@@ -4534,6 +4534,18 @@
   background: var(--fab-overlay-light-03);
 }
 
+/* A faint divider between two consecutive single-alternative (bare) requirements
+   in a set, so the AND'd component/tag/cost rows read as separated. An OR-group
+   box already carries its own border, so requirements adjacent to one get no
+   extra divider. */
+.fabricate-manager
+  .manager-recipe-ingredient-set-groups
+  > .manager-recipe-ingredient-requirement:not(.has-alternatives)
+  + .manager-recipe-ingredient-requirement:not(.has-alternatives) {
+  border-top: 1px solid var(--fab-mv2-border);
+  padding-top: var(--fab-space-2);
+}
+
 .fabricate-manager .manager-recipe-ingredient-requirement-options {
   display: flex;
   flex-direction: column;
