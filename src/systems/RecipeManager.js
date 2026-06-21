@@ -814,9 +814,8 @@ export class RecipeManager {
     }
 
     if (ingredient.match?.type === 'currency') {
-      // A currency alternative matches no inventory item; craft-time currency
-      // spend is the deferred follow-up.
-      // TODO: component-level currency spend (deferred)
+      // A currency alternative matches no inventory item.
+      // Currency matches are authored-only; craft-time currency spend is a separate follow-up.
       return false;
     }
 

@@ -216,6 +216,44 @@ async function setupCurrencyStore(overrides = {}) {
   };
 }
 
+function seedSteppedServices(overrides = {}) {
+  const services = createMockServices(overrides);
+  services._getRecipesMutable().push(makeRecipe({
+    id: 'r-multi',
+    craftingSystemId: 'sys1',
+    steps: [{ id: 'sa', name: 'Forge' }, { id: 'sb', name: 'Quench' }]
+  }));
+  return services;
+}
+
+function seedComplexitySingleSet(overrides = {}) {
+  const services = createMockServices(overrides);
+  services._getRecipesMutable().push(makeRecipe({
+    id: 'r-simple',
+    craftingSystemId: 'sys1',
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  }));
+  return services;
+}
+
+function seedComplexityMultiSet(overrides = {}) {
+  const services = createMockServices(overrides);
+  services._getRecipesMutable().push(makeRecipe({
+    id: 'r-complex',
+    craftingSystemId: 'sys1',
+    ingredientSets: [
+      { id: 'set-1', ingredientGroups: [] },
+      { id: 'set-2', ingredientGroups: [] }
+    ],
+    resultGroups: [
+      { id: 'rg-1', results: [] },
+      { id: 'rg-2', results: [] }
+    ]
+  }));
+  return services;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -533,16 +571,6 @@ describe('createAdminStore', () => {
       assert.ok(remaining.some(s => s.id === 'sys1'), 'sys1 should not be deleted when declined');
     });
 
-    function seedSteppedServices(overrides = {}) {
-      const services = createMockServices(overrides);
-      services._getRecipesMutable().push(makeRecipe({
-        id: 'r-multi',
-        craftingSystemId: 'sys1',
-        steps: [{ id: 'sa', name: 'Forge' }, { id: 'sb', name: 'Quench' }]
-      }));
-      return services;
-    }
-
     it('deleteRecipeStep confirms then removes the whole step from the recipe', async () => {
       const services = seedSteppedServices();
       const store = createAdminStore(services);
@@ -578,34 +606,6 @@ describe('createAdminStore', () => {
       assert.match(content.results, /ingredients and tools/, 'Results warns ingredients + tools go too');
       assert.match(content.tools, /ingredients and results/, 'Tools warns ingredients + results go too');
     });
-
-    function seedComplexitySingleSet(overrides = {}) {
-      const services = createMockServices(overrides);
-      services._getRecipesMutable().push(makeRecipe({
-        id: 'r-simple',
-        craftingSystemId: 'sys1',
-        ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
-        resultGroups: [{ id: 'rg-1', results: [] }]
-      }));
-      return services;
-    }
-
-    function seedComplexityMultiSet(overrides = {}) {
-      const services = createMockServices(overrides);
-      services._getRecipesMutable().push(makeRecipe({
-        id: 'r-complex',
-        craftingSystemId: 'sys1',
-        ingredientSets: [
-          { id: 'set-1', ingredientGroups: [] },
-          { id: 'set-2', ingredientGroups: [] }
-        ],
-        resultGroups: [
-          { id: 'rg-1', results: [] },
-          { id: 'rg-2', results: [] }
-        ]
-      }));
-      return services;
-    }
 
     it('setRecipeComplexity(id, true) persists complex:true without confirming', async () => {
       let confirmCalled = false;

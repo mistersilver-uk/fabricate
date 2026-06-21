@@ -36,7 +36,7 @@ function optionSignature(option) {
     const tags = asArray(match.tags).map(trimmed).filter(Boolean);
     if (tags.length === 0) return null;
     const tagMatch = match.tagMatch === 'all' ? 'all' : 'any';
-    return `tags:${[...tags].sort().join(',')}|${tagMatch}`;
+    return `tags:${[...tags].sort((a, b) => a.localeCompare(b)).join(',')}|${tagMatch}`;
   }
   if (match?.type === 'currency') {
     const unit = trimmed(match.unit);
@@ -79,6 +79,121 @@ function getExecutionSteps(recipe) {
 }
 
 /**
+ * Build the `{ stepId, stepName }` tag spread carried by per-step issues. Empty
+ * for single-step recipes so their issues stay step-agnostic.
+ *
+ * @param {{ id: string, name: string }} step
+ * @param {boolean} isMultiStep
+ * @returns {{ stepId: string, stepName: string } | {}}
+ */
+function stepTag(step, isMultiStep) {
+  return isMultiStep ? { stepId: step.id, stepName: step.name } : {};
+}
+
+/**
+ * Missing-ingredient-set and missing-result-group issues, one per offending
+ * step. Surfaced as blocking, critical issues against their editor tab.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectMissingRequirementIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    if (step.ingredientSets.length === 0) {
+      issues.push({
+        id: 'noIngredientSet',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'ingredients',
+        ...stepTag(step, isMultiStep)
+      });
+    }
+  }
+  for (const step of executionSteps) {
+    if (step.resultGroups.length === 0) {
+      issues.push({
+        id: 'noResultGroup',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+        ...stepTag(step, isMultiStep)
+      });
+    }
+  }
+  return issues;
+}
+
+/**
+ * Duplicate-match issues for a single ingredient set: a `duplicateAlternative`
+ * per OR group that repeats an option signature, plus one `duplicateRequirement`
+ * when two requirements in the set share a requirement signature.
+ *
+ * @param {object} set One ingredient set.
+ * @param {object} step Owning execution step.
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectSetDuplicateIssues(set, step, isMultiStep) {
+  const issues = [];
+  const requirementSignatures = [];
+
+  for (const group of asArray(set?.ingredientGroups)) {
+    const signatures = asArray(group?.options)
+      .map(optionSignature)
+      .filter(Boolean);
+
+    // Within an OR group: any repeated option signature is a duplicate.
+    if (new Set(signatures).size !== signatures.length) {
+      issues.push({
+        id: 'duplicateAlternative',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'ingredients',
+        ...stepTag(step, isMultiStep)
+      });
+    }
+
+    if (signatures.length > 0) {
+      requirementSignatures.push([...signatures].sort((a, b) => a.localeCompare(b)).join('&&'));
+    }
+  }
+
+  // Within a set: two requirements sharing a requirement signature duplicate.
+  if (new Set(requirementSignatures).size !== requirementSignatures.length) {
+    issues.push({
+      id: 'duplicateRequirement',
+      severity: 'critical',
+      blocks: 'enable',
+      target: 'ingredients',
+      ...stepTag(step, isMultiStep)
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Duplicate-match detection across every step/set: a recipe must not repeat the
+ * same component or an identical tag/currency match twice inside one OR group,
+ * nor as duplicate requirements within a set.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectDuplicateMatchIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    for (const set of asArray(step.ingredientSets)) {
+      issues.push(...collectSetDuplicateIssues(set, step, isMultiStep));
+    }
+  }
+  return issues;
+}
+
+/**
  * @param {object} recipe Projected plain recipe.
  * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
  */
@@ -107,76 +222,11 @@ export function evaluateRecipeReadiness(recipe = {}) {
     issues.push({ id: 'noName', severity: 'critical', blocks: 'enable', target: 'overview' });
   }
 
-  for (const step of executionSteps) {
-    if (step.ingredientSets.length === 0) {
-      issues.push({
-        id: 'noIngredientSet',
-        severity: 'critical',
-        blocks: 'enable',
-        target: 'ingredients',
-        ...(isMultiStep ? { stepId: step.id, stepName: step.name } : {})
-      });
-    }
-  }
+  issues.push(...collectMissingRequirementIssues(executionSteps, isMultiStep));
 
-  for (const step of executionSteps) {
-    if (step.resultGroups.length === 0) {
-      issues.push({
-        id: 'noResultGroup',
-        severity: 'critical',
-        blocks: 'enable',
-        target: 'results',
-        ...(isMultiStep ? { stepId: step.id, stepName: step.name } : {})
-      });
-    }
-  }
-
-  // Duplicate-match detection: a recipe must not repeat the same component or an
-  // identical tag match twice inside one OR group, nor as duplicate requirements
-  // within a set. Both surface as blocking, critical issues.
-  let duplicateFound = false;
-  for (const step of executionSteps) {
-    for (const set of asArray(step.ingredientSets)) {
-      const groups = asArray(set?.ingredientGroups);
-      const requirementSignatures = [];
-
-      for (const group of groups) {
-        const signatures = asArray(group?.options)
-          .map(optionSignature)
-          .filter(Boolean);
-
-        // Within an OR group: any repeated option signature is a duplicate.
-        if (new Set(signatures).size !== signatures.length) {
-          duplicateFound = true;
-          issues.push({
-            id: 'duplicateAlternative',
-            severity: 'critical',
-            blocks: 'enable',
-            target: 'ingredients',
-            ...(isMultiStep ? { stepId: step.id, stepName: step.name } : {})
-          });
-        }
-
-        if (signatures.length > 0) {
-          requirementSignatures.push([...signatures].sort().join('&&'));
-        }
-      }
-
-      // Within a set: two requirements sharing a requirement signature duplicate.
-      if (new Set(requirementSignatures).size !== requirementSignatures.length) {
-        duplicateFound = true;
-        issues.push({
-          id: 'duplicateRequirement',
-          severity: 'critical',
-          blocks: 'enable',
-          target: 'ingredients',
-          ...(isMultiStep ? { stepId: step.id, stepName: step.name } : {})
-        });
-      }
-    }
-  }
-
-  checks.push({ id: 'noDuplicateMatches', satisfied: !duplicateFound });
+  const duplicateIssues = collectDuplicateMatchIssues(executionSteps, isMultiStep);
+  issues.push(...duplicateIssues);
+  checks.push({ id: 'noDuplicateMatches', satisfied: duplicateIssues.length === 0 });
 
   // A disabled recipe still saves, but flag that it cannot be enabled until the
   // critical requirements above are met. The store/model projects `incomplete`;
@@ -191,7 +241,7 @@ export function evaluateRecipeReadiness(recipe = {}) {
   return { checks, issues };
 }
 
-export function countIssues(issues = [], severity) {
+export function countIssues(severity, issues = []) {
   return issues.filter(issue => issue.severity === severity).length;
 }
 

@@ -177,6 +177,40 @@ function gatheringToggle() {
   return target.querySelector('.manager-nav-toggle');
 }
 
+// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
+// Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
+// returns the mounted target for the caller to query.
+async function openRecipeEditor(calls, storeOptions = {}) {
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(Component, {
+    target,
+    props: {
+      store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+      services: { openCurrentAdmin: () => {} }
+    }
+  });
+  flushSync();
+  navButton('Recipes').click();
+  await tick();
+  flushSync();
+  target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
+  await tick();
+  flushSync();
+  return target;
+}
+
+function headerSaveButton(target) {
+  return Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    .find(button => button.textContent.includes('Save'));
+}
+
+function editRecipeName(target, value) {
+  const nameInput = target.querySelector('.manager-main [data-recipe-field="name"]');
+  nameInput.value = value;
+  nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+}
+
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
   const compiled = compile(source, {
@@ -1674,43 +1708,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Edit identity for this recipe.'), 'learned mode shows the identity-only subtitle');
   });
 
-  // Mount the manager, route to Recipes, and open the recipe-edit route for r1.
-  async function openRecipeEditor(calls, storeOptions = {}) {
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-    navButton('Recipes').click();
-    await tick();
-    flushSync();
-    target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
-    await tick();
-    flushSync();
-    return target;
-  }
-
-  function headerSaveButton() {
-    return Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
-      .find(button => button.textContent.includes('Save'));
-  }
-
-  function editRecipeName(value) {
-    const nameInput = target.querySelector('.manager-main [data-recipe-field="name"]');
-    nameInput.value = value;
-    nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-  }
-
   it('stages editor edits without persisting until the header Save is pressed', async () => {
     const calls = [];
-    await openRecipeEditor(calls);
+    const target = await openRecipeEditor(calls);
 
-    editRecipeName('Greater Healing Draught');
+    editRecipeName(target, 'Greater Healing Draught');
     await tick();
     flushSync();
 
@@ -1722,7 +1724,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(dirtyChip, 'the Unsaved chip is shown while the draft is dirty');
 
     // The header Save commits the whole staged draft in exactly one updateRecipe call.
-    headerSaveButton().click();
+    headerSaveButton(target).click();
     await tick();
     flushSync();
     const updateCalls = calls.filter(call => call[0] === 'updateRecipe');
@@ -1734,7 +1736,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('gives a step seeded by switching to multi-step a stable id (so step-scoped edits route to the step, not the recipe)', async () => {
     const calls = [];
-    await openRecipeEditor(calls, {
+    const target = await openRecipeEditor(calls, {
       selectedFeatures: { essences: true, effectTransfer: true, itemTags: true, gathering: true, recipeCategories: true, multiStepRecipes: true }
     });
 
@@ -1746,7 +1748,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    headerSaveButton().click();
+    headerSaveButton(target).click();
     await tick();
     flushSync();
 
@@ -1799,9 +1801,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('prompts the 3-way choice on dirty navigation and Saves on the save choice', async () => {
     const calls = [];
-    await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'save' });
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'save' });
 
-    editRecipeName('Save On Exit');
+    editRecipeName(target, 'Save On Exit');
     await tick();
     flushSync();
 
@@ -1819,9 +1821,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('discards staged edits on the discard choice and does not persist them', async () => {
     const calls = [];
-    await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'discard' });
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'discard' });
 
-    editRecipeName('Discard Me');
+    editRecipeName(target, 'Discard Me');
     await tick();
     flushSync();
 
@@ -1837,9 +1839,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('stays in the editor on the cancel (keep editing) choice', async () => {
     const calls = [];
-    await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
 
-    editRecipeName('Keep Editing');
+    editRecipeName(target, 'Keep Editing');
     await tick();
     flushSync();
 

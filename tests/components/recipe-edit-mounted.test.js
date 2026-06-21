@@ -212,7 +212,7 @@ describe('RecipeEditView (mounted)', () => {
 
   it('renders the five editor tabs with Overview active by default', async () => {
     const target = await editHarness.mount(identityProps());
-    const tabs = [...target.querySelectorAll('[data-recipe-tab-button]')].map((btn) => btn.getAttribute('data-recipe-tab-button'));
+    const tabs = [...target.querySelectorAll('[data-recipe-tab-button]')].map((btn) => btn.dataset.recipeTabButton);
     assert.deepEqual(tabs, ['overview', 'ingredients', 'results', 'tools', 'validation'], 'five tabs render in order');
     assert.equal(target.querySelector('[role="tabpanel"]').getAttribute('id'), 'recipe-panel-overview', 'overview panel is shown first');
     assert.ok(target.querySelector('[data-recipe-tab="overview"]'), 'overview tab content renders');

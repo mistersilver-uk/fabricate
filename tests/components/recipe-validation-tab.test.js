@@ -38,9 +38,9 @@ describe('RecipeValidationTab (mounted)', () => {
     const nameCheck = target.querySelector('[data-check="hasName"]');
     const ingredientCheck = target.querySelector('[data-check="hasIngredientSet"]');
     const resultCheck = target.querySelector('[data-check="hasResultGroup"]');
-    assert.equal(nameCheck.getAttribute('data-satisfied'), 'true', 'name check satisfied');
-    assert.equal(ingredientCheck.getAttribute('data-satisfied'), 'true', 'ingredient check satisfied');
-    assert.equal(resultCheck.getAttribute('data-satisfied'), 'false', 'result check unsatisfied');
+    assert.equal(nameCheck.dataset.satisfied, 'true', 'name check satisfied');
+    assert.equal(ingredientCheck.dataset.satisfied, 'true', 'ingredient check satisfied');
+    assert.equal(resultCheck.dataset.satisfied, 'false', 'result check unsatisfied');
     harness.remount();
   });
 

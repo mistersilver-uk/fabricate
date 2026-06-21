@@ -28,8 +28,10 @@ export function formatTimeRequirement(time) {
   const parts = [];
   for (const unit of TIME_UNITS) {
     const value = Number(time[unit] || 0);
-    if (value > 0)
-      parts.push(`${value} ${text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}`);
+    if (value > 0) {
+      const unitKey = `FABRICATE.Admin.Manager.Economy.Unit.${unit}`;
+      parts.push(`${value} ${text(unitKey, unit)}`);
+    }
   }
   return parts.join(' ');
 }
