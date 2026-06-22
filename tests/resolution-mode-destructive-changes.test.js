@@ -72,9 +72,11 @@ test('changing resolutionMode deletes recipes in the system and cleans stale pro
     resolutionMode: 'simple'
   }));
 
+  // The legacy `tiered` token normalizes to canonical `routed`; the mode still
+  // changes (simple → routed), so dependent recipes are still deleted.
   await manager.updateSystem('sys-1', { resolutionMode: 'tiered' });
 
-  assert.equal(manager.getSystem('sys-1').resolutionMode, 'tiered');
+  assert.equal(manager.getSystem('sys-1').resolutionMode, 'routed');
   assert.deepEqual(recipeManager.getDeletedRecipeIds(), ['recipe-1']);
   assert.deepEqual(settingsStore.get('progressiveResultOrder'), {
     'recipe-2': ['c', 'd']

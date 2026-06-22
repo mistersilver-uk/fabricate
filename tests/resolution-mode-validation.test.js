@@ -1,6 +1,7 @@
 /**
  * Unit tests for ResolutionModeService.validateRecipe (T-021)
- * Tests mode-specific validation logic for simple, mapped, legacy tiered compatibility, and progressive modes.
+ * Tests mode-specific validation logic for simple, routed (ingredientSet /
+ * macroOutcome / rollTableOutcome), and progressive modes.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -161,15 +162,19 @@ test('simple mode — zero result groups → invalid', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC 2 — Mapped mode: resultGroupId references must be valid
+// AC 2 — Routed + ingredientSet: resultGroupId references must be valid
+// (the former `mapped` reference-integrity contract, now canonical)
 // ---------------------------------------------------------------------------
 
-test('mapped mode — each set has resultGroupId matching a result group → valid', () => {
-  const system = buildSystem({ resolutionMode: 'mapped' });
+const INGREDIENT_SET = { provider: 'ingredientSet' };
+
+test('routed ingredientSet — each set has resultGroupId matching a result group → valid', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [{ id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
+    resultSelection: INGREDIENT_SET,
   });
   const recipe = buildRecipe([step]);
 
@@ -179,12 +184,13 @@ test('mapped mode — each set has resultGroupId matching a result group → val
   assert.equal(result.errors.length, 0);
 });
 
-test('mapped mode — resultGroupId references non-existent group → invalid', () => {
-  const system = buildSystem({ resolutionMode: 'mapped' });
+test('routed ingredientSet — resultGroupId references non-existent group → invalid', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [{ id: 'set-1', resultGroupId: 'rg-does-not-exist', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
+    resultSelection: INGREDIENT_SET,
   });
   const recipe = buildRecipe([step]);
 
@@ -197,14 +203,13 @@ test('mapped mode — resultGroupId references non-existent group → invalid', 
   );
 });
 
-test('mapped mode — resultGroupId is null → valid (null is treated as unset, not an error)', () => {
-  // The source code: `const mappedId = set?.resultGroupId || null; if (mappedId && !groupIds.has(mappedId)) { ... }`
-  // null/undefined resultGroupId is skipped — not an error.
-  const system = buildSystem({ resolutionMode: 'mapped' });
+test('routed ingredientSet — resultGroupId is null → valid (null is treated as unset, not an error)', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [{ id: 'set-1', resultGroupId: null, ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
+    resultSelection: INGREDIENT_SET,
   });
   const recipe = buildRecipe([step]);
 
@@ -213,8 +218,8 @@ test('mapped mode — resultGroupId is null → valid (null is treated as unset,
   assert.equal(result.valid, true);
 });
 
-test('mapped mode — multiple sets with valid mappings → valid', () => {
-  const system = buildSystem({ resolutionMode: 'mapped' });
+test('routed ingredientSet — multiple sets with valid mappings → valid', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [
@@ -225,6 +230,7 @@ test('mapped mode — multiple sets with valid mappings → valid', () => {
       { id: 'rg-1', results: [] },
       { id: 'rg-2', results: [] },
     ],
+    resultSelection: INGREDIENT_SET,
   });
   const recipe = buildRecipe([step]);
 
@@ -234,10 +240,10 @@ test('mapped mode — multiple sets with valid mappings → valid', () => {
   assert.equal(result.errors.length, 0);
 });
 
-test('mapped mode — zero ingredient sets → invalid', () => {
-  const system = buildSystem({ resolutionMode: 'mapped' });
+test('routed ingredientSet — zero ingredient sets → invalid', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
-  const step = buildStep({ ingredientSets: [] });
+  const step = buildStep({ ingredientSets: [], resultSelection: INGREDIENT_SET });
   const recipe = buildRecipe([step]);
 
   const result = service.validateRecipe(recipe);
@@ -246,10 +252,10 @@ test('mapped mode — zero ingredient sets → invalid', () => {
   assert.ok(result.errors.length > 0);
 });
 
-test('mapped mode — zero result groups → invalid', () => {
-  const system = buildSystem({ resolutionMode: 'mapped' });
+test('routed ingredientSet — zero result groups → invalid', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
-  const step = buildStep({ resultGroups: [] });
+  const step = buildStep({ resultGroups: [], resultSelection: INGREDIENT_SET });
   const recipe = buildRecipe([step]);
 
   const result = service.validateRecipe(recipe);
@@ -259,15 +265,18 @@ test('mapped mode — zero result groups → invalid', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC 3 — Legacy tiered compatibility mode: checks enabled, outcomes non-empty, valid routing
+// AC 3 — Routed mode: provider-dependent check requirement + reserved/duplicate
+// ResultGroup.name rules under EVERY routed provider (the legacy tiered
+// outcomeRouting validation is gone; its behavior is reproduced by migrated
+// macroOutcome data).
 // ---------------------------------------------------------------------------
 
 /**
- * Build a valid legacy tiered compatibility system: checks enabled, outcomes declared, managedItems populated.
+ * Build a routed system with crafting checks enabled (the macroOutcome contract).
  */
-function buildLegacyOutcomeRoutingSystem(overrides = {}) {
+function buildRoutedCheckSystem(overrides = {}) {
   return buildSystem({
-    resolutionMode: 'tiered',
+    resolutionMode: 'routed',
     craftingCheck: {
       enabled: true,
       macroUuid: null,
@@ -279,190 +288,137 @@ function buildLegacyOutcomeRoutingSystem(overrides = {}) {
 }
 
 /**
- * Build a valid legacy tiered compatibility step: 1 set, 2 result groups, outcomeRouting covers all declared outcomes.
+ * Build a routed step with two distinctly-named result groups and the given provider.
  */
-function buildLegacyOutcomeRoutingStep(overrides = {}) {
+function buildRoutedNamedStep(provider, overrides = {}) {
   return buildStep({
     ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [
-      { id: 'rg-success', results: [] },
-      { id: 'rg-failure', results: [] },
+      { id: 'rg-fine', name: 'Fine', results: [] },
+      { id: 'rg-superb', name: 'Superb', results: [] },
     ],
-    outcomeRouting: {
-      success: 'rg-success',
-      failure: 'rg-failure',
-    },
+    resultSelection: { provider },
     ...overrides,
   });
 }
 
-test('legacy tiered compatibility mode — checks enabled, outcomes present, valid routing → valid', () => {
-  const system = buildLegacyOutcomeRoutingSystem();
+test('routed macroOutcome — checks enabled, distinct group names → valid', () => {
+  const system = buildRoutedCheckSystem();
   const service = buildService(system);
-  const step = buildLegacyOutcomeRoutingStep();
-  const recipe = buildRecipe([step]);
+  const recipe = buildRecipe([buildRoutedNamedStep('macroOutcome')]);
 
   const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, true);
+  assert.equal(result.valid, true, result.errors.join(', '));
   assert.equal(result.errors.length, 0);
 });
 
-test('legacy tiered compatibility mode — crafting checks disabled → invalid', () => {
-  const system = buildLegacyOutcomeRoutingSystem({
-    craftingCheck: {
-      enabled: false,
-      macroUuid: null,
-      outcomes: ['success', 'failure'],
-      progressive: null,
-    },
+test('routed macroOutcome — crafting checks disabled → invalid (check required)', () => {
+  const system = buildRoutedCheckSystem({
+    craftingCheck: { enabled: false, macroUuid: null, outcomes: [], progressive: null },
   });
   const service = buildService(system);
-  const step = buildLegacyOutcomeRoutingStep();
-  const recipe = buildRecipe([step]);
+  const recipe = buildRecipe([buildRoutedNamedStep('macroOutcome')]);
 
   const result = service.validateRecipe(recipe);
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /crafting check/i.test(e) || /check/i.test(e)),
-    `expected error about checks being disabled, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /macroOutcome/i.test(e) || /check/i.test(e)),
+    `expected error about macroOutcome requiring checks, got: ${JSON.stringify(result.errors)}`
   );
 });
 
-test('legacy tiered compatibility mode — crafting checks enabled via macroUuid (not boolean enabled) → valid', () => {
-  // checkEnabled = system.craftingCheck.enabled === true || !!system.craftingCheck.macroUuid
-  const system = buildLegacyOutcomeRoutingSystem({
-    craftingCheck: {
-      enabled: false,
-      macroUuid: 'Macro.some-uuid',
-      outcomes: ['success', 'failure'],
-      progressive: null,
-    },
-  });
+test('routed ingredientSet — check optional (no checks enabled still valid)', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
-  const step = buildLegacyOutcomeRoutingStep();
-  const recipe = buildRecipe([step]);
+  const recipe = buildRecipe([buildRoutedNamedStep('ingredientSet')]);
 
   const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, true);
-  assert.equal(result.errors.length, 0);
+  assert.equal(result.valid, true, result.errors.join(', '));
 });
 
-test('legacy tiered compatibility mode — empty outcomes array → invalid', () => {
-  const system = buildLegacyOutcomeRoutingSystem({
-    craftingCheck: {
-      enabled: true,
-      macroUuid: null,
-      outcomes: [],
-      progressive: null,
-    },
-  });
+test('routed rollTableOutcome — requires a roll table UUID', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
-  const step = buildLegacyOutcomeRoutingStep();
-  const recipe = buildRecipe([step]);
+  const recipe = buildRecipe([buildRoutedNamedStep('rollTableOutcome')]);
 
   const result = service.validateRecipe(recipe);
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /outcome/i.test(e)),
-    `expected error mentioning outcomes, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /roll table UUID/i.test(e)),
+    `expected error about a missing roll table UUID, got: ${JSON.stringify(result.errors)}`
   );
 });
 
-test('legacy tiered compatibility mode — outcome maps to non-existent result group → invalid', () => {
-  const system = buildLegacyOutcomeRoutingSystem();
+test('routed rollTableOutcome — roll table UUID present → valid (check not required)', () => {
+  const system = buildSystem({ resolutionMode: 'routed' });
   const service = buildService(system);
-  const step = buildLegacyOutcomeRoutingStep({
-    outcomeRouting: {
-      success: 'rg-success',
-      failure: 'rg-does-not-exist', // invalid target
-    },
-  });
-  const recipe = buildRecipe([step]);
+  const recipe = buildRecipe([
+    buildRoutedNamedStep('rollTableOutcome', {
+      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'RollTable.x' },
+    }),
+  ]);
 
   const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /failure/i.test(e) || /outcome/i.test(e)),
-    `expected error about invalid outcome routing, got: ${JSON.stringify(result.errors)}`
-  );
+  assert.equal(result.valid, true, result.errors.join(', '));
 });
 
-test('legacy tiered compatibility mode — missing routing entry for an outcome → invalid', () => {
-  const system = buildLegacyOutcomeRoutingSystem();
-  const service = buildService(system);
-  const step = buildLegacyOutcomeRoutingStep({
-    outcomeRouting: {
-      success: 'rg-success',
-      // 'failure' is missing entirely
-    },
-  });
-  const recipe = buildRecipe([step]);
+// Reserved-name + duplicate-name rules apply under EVERY routed provider.
+for (const provider of ['ingredientSet', 'macroOutcome', 'rollTableOutcome']) {
+  test(`routed ${provider} — reserved ResultGroup.name (hazard family) → invalid`, () => {
+    const system = buildRoutedCheckSystem();
+    const service = buildService(system);
+    const recipe = buildRecipe([
+      buildRoutedNamedStep(provider, {
+        resultGroups: [
+          { id: 'rg-ok', name: 'Fine', results: [] },
+          { id: 'rg-bad', name: 'Hazard', results: [] },
+        ],
+        resultSelection:
+          provider === 'rollTableOutcome'
+            ? { provider, rollTableUuid: 'RollTable.x' }
+            : { provider },
+      }),
+    ]);
 
-  const result = service.validateRecipe(recipe);
+    const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /failure/i.test(e) || /outcome/i.test(e)),
-    `expected error about missing routing for "failure", got: ${JSON.stringify(result.errors)}`
-  );
-});
-
-test('legacy tiered compatibility mode — step-level outcomeRouting overrides recipe-level routing', () => {
-  const system = buildLegacyOutcomeRoutingSystem();
-  const service = buildService(system);
-
-  // Step has valid routing; recipe-level routing is intentionally invalid/incomplete.
-  const step = buildLegacyOutcomeRoutingStep({
-    outcomeRouting: {
-      success: 'rg-success',
-      failure: 'rg-failure',
-    },
-  });
-  // Recipe-level routing is present but would be wrong — step-level wins
-  const recipe = buildRecipe([step], {
-    outcomeRouting: {
-      success: 'rg-does-not-exist',
-      failure: 'rg-also-wrong',
-    },
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.errors.some((e) => /reserved routing keyword/i.test(e)),
+      `expected reserved-name error under ${provider}, got: ${JSON.stringify(result.errors)}`
+    );
   });
 
-  const result = service.validateRecipe(recipe);
+  test(`routed ${provider} — duplicate ResultGroup.name (case-insensitive) → invalid`, () => {
+    const system = buildRoutedCheckSystem();
+    const service = buildService(system);
+    const recipe = buildRecipe([
+      buildRoutedNamedStep(provider, {
+        resultGroups: [
+          { id: 'rg-1', name: 'Fine', results: [] },
+          { id: 'rg-2', name: 'fine', results: [] },
+        ],
+        resultSelection:
+          provider === 'rollTableOutcome'
+            ? { provider, rollTableUuid: 'RollTable.x' }
+            : { provider },
+      }),
+    ]);
 
-  // Step-level routing is valid, so overall result should be valid
-  assert.equal(result.valid, true);
-  assert.equal(result.errors.length, 0);
-});
+    const result = service.validateRecipe(recipe);
 
-test('legacy tiered compatibility mode — no step-level routing, valid recipe-level routing → valid', () => {
-  const system = buildLegacyOutcomeRoutingSystem();
-  const service = buildService(system);
-
-  // Step has NO outcomeRouting; recipe-level routing covers both outcomes
-  const step = buildStep({
-    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
-    resultGroups: [
-      { id: 'rg-success', results: [] },
-      { id: 'rg-failure', results: [] },
-    ],
-    // No outcomeRouting on step
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.errors.some((e) => /unique names/i.test(e) || /Duplicate result group name/i.test(e)),
+      `expected duplicate-name error under ${provider}, got: ${JSON.stringify(result.errors)}`
+    );
   });
-  const recipe = buildRecipe([step], {
-    outcomeRouting: {
-      success: 'rg-success',
-      failure: 'rg-failure',
-    },
-  });
-
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, true);
-  assert.equal(result.errors.length, 0);
-});
+}
 
 // ---------------------------------------------------------------------------
 // AC 4 — Progressive mode: checks enabled, progressive config, difficulty >= 1

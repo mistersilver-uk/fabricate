@@ -145,6 +145,7 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
+    'src/utils/routedOutcomeKeywords.js',
     'src/config/flags.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
@@ -5729,7 +5730,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('.manager-system-edit-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     const resolution = target.querySelector('#manager-system-resolution-mode');
-    resolution.value = 'mapped';
+    resolution.value = 'routed';
     resolution.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
 
@@ -5738,7 +5739,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'saveSystemDetails'
       && call[1] === 'Greater Alchemy'
       && call[2] === 'Updated potion work'));
-    assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'mapped'));
+    assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'routed'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
   });
 

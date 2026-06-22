@@ -604,12 +604,12 @@ describe('createAdminStore', () => {
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      const result = await store.setResolutionMode('tiered');
+      const result = await store.setResolutionMode('routed');
 
       assert.equal(result, true);
       assert.equal(confirmCalled, true);
       assert.equal(updateArgs?.id, 'sys1');
-      assert.equal(updateArgs?.updates?.resolutionMode, 'tiered');
+      assert.equal(updateArgs?.updates?.resolutionMode, 'routed');
     });
 
     it('setResolutionMode leaves the system unchanged when the confirmation is declined', async () => {
@@ -625,7 +625,7 @@ describe('createAdminStore', () => {
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      const result = await store.setResolutionMode('tiered');
+      const result = await store.setResolutionMode('routed');
 
       assert.equal(result, false);
       assert.equal(updateCalled, false);

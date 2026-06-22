@@ -4,7 +4,8 @@
  * Covers:
  *   AC1: Constructor accepts and persists resultGroupId
  *   AC3: toJSON() emits resultGroupId
- *   AC4: Mapped mode resolution routes correctly via resultGroupId
+ *   AC4: Canonical routed + ingredientSet resolution routes correctly via
+ *        resultGroupId (the former `mapped` behavior, now canonical).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,12 +42,13 @@ const { ResolutionModeService } = await import('../src/systems/ResolutionModeSer
 // ---------------------------------------------------------------------------
 
 /**
- * Build a mapped-mode crafting system.
+ * Build a canonical routed crafting system (the former `mapped` shape; routing
+ * by ingredientSet.resultGroupId is now the `ingredientSet` provider contract).
  */
 function buildMappedSystem(overrides = {}) {
   return {
     id: 'test-system',
-    resolutionMode: 'mapped',
+    resolutionMode: 'routed',
     features: { multiStepRecipes: false, essences: false, craftingChecks: false },
     craftingCheck: {
       enabled: false,
@@ -77,6 +79,7 @@ function buildMappedRecipe(step) {
   return {
     id: 'test-recipe',
     craftingSystemId: 'test-system',
+    resultSelection: { provider: 'ingredientSet' },
     getExecutionSteps: () => [step],
   };
 }
@@ -140,7 +143,7 @@ test('fromJSON round-trip preserves resultGroupId', () => {
 // Group 2 — Mapped Mode Resolution via resultGroupId
 // ---------------------------------------------------------------------------
 
-test('mapped mode uses resultGroupId to select the correct result group', () => {
+test('routed + ingredientSet uses resultGroupId to select the correct result group', () => {
   const system = buildMappedSystem();
   const service = buildService(system);
 
@@ -154,7 +157,7 @@ test('mapped mode uses resultGroupId to select the correct result group', () => 
   assert.equal(result.groups[0].id, 'rg-2', 'should select rg-2 as specified by resultGroupId');
 });
 
-test('mapped mode falls back to resultMapping when resultGroupId is null', () => {
+test('routed + ingredientSet falls back to resultMapping when resultGroupId is null', () => {
   const system = buildMappedSystem();
   const service = buildService(system);
 
@@ -173,7 +176,7 @@ test('mapped mode falls back to resultMapping when resultGroupId is null', () =>
   assert.equal(result.groups[0].id, 'rg-1', 'should select rg-1 via resultMapping fallback');
 });
 
-test('mapped mode prefers resultGroupId over resultMapping when both are present', () => {
+test('routed + ingredientSet prefers resultGroupId over resultMapping when both are present', () => {
   const system = buildMappedSystem();
   const service = buildService(system);
 
@@ -193,7 +196,7 @@ test('mapped mode prefers resultGroupId over resultMapping when both are present
     'should prefer resultGroupId (rg-2) over resultMapping (rg-1)');
 });
 
-test('mapped mode falls back to selectedResultGroupId when ingredientSet has no resultGroupId', () => {
+test('routed + ingredientSet falls back to selectedResultGroupId when ingredientSet has no resultGroupId', () => {
   const system = buildMappedSystem();
   const service = buildService(system);
 
@@ -218,7 +221,7 @@ test('mapped mode falls back to selectedResultGroupId when ingredientSet has no 
     'should use selectedResultGroupId when resultGroupId and resultMapping are absent');
 });
 
-test('mapped mode falls back to first result group when no routing info is available', () => {
+test('routed + ingredientSet falls back to first result group when no routing info is available', () => {
   const system = buildMappedSystem();
   const service = buildService(system);
 
@@ -239,7 +242,7 @@ test('mapped mode falls back to first result group when no routing info is avail
     'should fall back to the first result group when no routing info is available');
 });
 
-test('mapped mode returns empty array when resultGroupId references a nonexistent group', () => {
+test('routed + ingredientSet returns empty array when resultGroupId references a nonexistent group', () => {
   const system = buildMappedSystem();
   const service = buildService(system);
 

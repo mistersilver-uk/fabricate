@@ -29,6 +29,7 @@ const RAW_MODULES = [
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
+  'src/utils/routedOutcomeKeywords.js',
   'src/config/flags.js',
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',

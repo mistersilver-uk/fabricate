@@ -265,6 +265,17 @@ describe('ResolutionModeService name helpers', () => {
     assert.ok(!service._isFailKeyword('failing'));
   });
 
+  it('_isFailKeyword routes the hazard family to the failure path', () => {
+    // Spec 004 macroOutcome rule 1 / data-models §7: the hazard family is part of
+    // the reserved failure-keyword set and takes the failure path.
+    assert.ok(service._isFailKeyword('hazard'));
+    assert.ok(service._isFailKeyword('Danger'));
+    assert.ok(service._isFailKeyword('COMPLICATION'));
+    assert.ok(service._isFailKeyword('trap'));
+    assert.ok(service._isFailKeyword('oops'));
+    assert.ok(!service._isMissKeyword('hazard'), 'hazard is a fail-path keyword, not a miss');
+  });
+
   it('_isMissKeyword identifies all miss keywords', () => {
     assert.ok(service._isMissKeyword('miss'));
     assert.ok(service._isMissKeyword('Miss'));
@@ -429,10 +440,14 @@ describe('Regression: existing resolution modes unaffected', () => {
     assert.equal(result.groups[0].name, 'Sword');
   });
 
-  it('mapped mode: resolveResultGroups resolves by ingredientSet.resultGroupId', () => {
-    const service = makeService({ resolutionMode: 'mapped' });
+  it('routed + ingredientSet: resolveResultGroups resolves by ingredientSet.resultGroupId', () => {
+    const service = makeService({ resolutionMode: 'routed' });
     const groups = makeResultGroups(['Sword', 'Shield']);
-    const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
+    const recipe = {
+      craftingSystemId: 'sys-1',
+      resultGroups: groups,
+      resultSelection: { provider: 'ingredientSet' }
+    };
     const step = { resultGroups: groups };
     const ingredientSet = { resultGroupId: 'group-2' };
 
@@ -455,13 +470,16 @@ describe('Regression: existing resolution modes unaffected', () => {
     assert.equal(result.meta.error, 'Unknown resolution mode');
   });
 
-  it('legacy tiered compatibility mode: resolveResultGroups resolves by outcomeRouting', () => {
-    const service = makeService({ resolutionMode: 'tiered' });
-    const groups = makeResultGroups(['Sword', 'Shield']);
+  it('routed + macroOutcome: resolveResultGroups resolves by ResultGroup name (former tiered behavior)', () => {
+    // The 1.4.0 migration reconciles legacy outcomeRouting { success: 'group-1' }
+    // by renaming group-1 to "success"; canonical macroOutcome name-matching then
+    // reproduces the old routing.
+    const service = makeService({ resolutionMode: 'routed' });
+    const groups = makeResultGroups(['success', 'failure']);
     const recipe = {
       craftingSystemId: 'sys-1',
       resultGroups: groups,
-      outcomeRouting: { success: 'group-1', failure: 'group-2' }
+      resultSelection: { provider: 'macroOutcome' }
     };
     const step = { resultGroups: groups };
     const checkResult = { outcome: 'success' };
@@ -469,11 +487,11 @@ describe('Regression: existing resolution modes unaffected', () => {
     const result = service.resolveResultGroups({ recipe, step, ingredientSet: null, checkResult });
 
     assert.equal(result.groups.length, 1);
-    assert.equal(result.groups[0].name, 'Sword');
+    assert.equal(result.groups[0].name, 'success');
   });
 
   it('rollTableResult provided: resolveResultGroups uses it directly', () => {
-    const service = makeService({ resolutionMode: 'mapped' });
+    const service = makeService({ resolutionMode: 'routed' });
     const groups = makeResultGroups(['Sword', 'Shield']);
     const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
     const step = { resultGroups: groups };
