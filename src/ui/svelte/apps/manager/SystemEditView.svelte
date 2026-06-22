@@ -357,6 +357,10 @@
             data-system-resolution-mode
           >
             <legend class="manager-resolution-mode-legend">{text('FABRICATE.Admin.SystemSettings.ResolutionMode', 'Resolution mode')}</legend>
+            <p class="manager-resolution-mode-note" role="note">
+              <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint', 'Changing resolution mode uses the current destructive confirmation and cleanup behavior.')}</span>
+            </p>
             <div class="manager-resolution-mode-options">
               {#each resolutionModeOptions as option (option.value)}
                 <label
@@ -377,7 +381,6 @@
                 </label>
               {/each}
             </div>
-            <small class="manager-resolution-mode-note">{text('FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint', 'Changing resolution mode uses the current destructive confirmation and cleanup behavior.')}</small>
           </fieldset>
         </div>
       </section>
