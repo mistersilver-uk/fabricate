@@ -90,6 +90,24 @@ function makeService(systemOverrides = {}) {
   return new ResolutionModeService(mgr);
 }
 
+// A rollTableOutcome recipe pointing at the canonical test table UUID.
+function rollTableRecipe(rollTableUuid = 'table-uuid-1') {
+  return { resultSelection: { provider: 'rollTableOutcome', rollTableUuid } };
+}
+
+// Arrange the standard rollTableOutcome case (result groups + recipe + mocked
+// draw) and resolve it, returning the resolution result.
+async function resolveDraw(service, groupNames, drawnText) {
+  const groups = makeResultGroups(groupNames);
+  mockFromUuidResult = makeRollTable(drawnText);
+  return service.resolveByRollTable(rollTableRecipe(), null, groups);
+}
+
+// A single result group literal with one result, for validation fixtures.
+function resultGroupLiteral(id, name, resultId, componentId) {
+  return { id, name, results: [{ id: resultId, componentId, quantity: 1 }] };
+}
+
 // ---------------------------------------------------------------------------
 // ResolutionModeService.resolveByRollTable tests
 // ---------------------------------------------------------------------------
@@ -103,11 +121,7 @@ describe('ResolutionModeService.resolveByRollTable', () => {
   });
 
   it('1. happy path: drawn name matches a result group', async () => {
-    const groups = makeResultGroups(['Sword', 'Shield', 'Potion']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('Sword');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword', 'Shield', 'Potion'], 'Sword');
 
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups.length, 1);
@@ -116,66 +130,42 @@ describe('ResolutionModeService.resolveByRollTable', () => {
   });
 
   it('2. case-insensitive matching: "SWORD" matches ResultGroup "sword"', async () => {
-    const groups = makeResultGroups(['sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('SWORD');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['sword'], 'SWORD');
 
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups[0].name, 'sword');
   });
 
   it('3a. whitespace-padded name " Sword " matches result group "Sword"', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable(' Sword ');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], ' Sword ');
 
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups[0].name, 'Sword');
   });
 
   it('3b. fail keyword "fail" returns disposition fail', async () => {
-    const groups = makeResultGroups(['Sword', 'Shield']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('fail');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword', 'Shield'], 'fail');
 
     assert.equal(result.meta.disposition, 'fail');
     assert.equal(result.groups.length, 0);
   });
 
   it('3c. fail keyword "Failed" (case-insensitive) returns disposition fail', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('Failed');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], 'Failed');
 
     assert.equal(result.meta.disposition, 'fail');
     assert.equal(result.groups.length, 0);
   });
 
   it('3d. miss keyword "nothing" returns disposition miss', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('nothing');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], 'nothing');
 
     assert.equal(result.meta.disposition, 'miss');
     assert.equal(result.groups.length, 0);
   });
 
   it('3e. miss keyword "whiff" returns disposition miss', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('whiff');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], 'whiff');
 
     assert.equal(result.meta.disposition, 'miss');
   });
@@ -202,11 +192,7 @@ describe('ResolutionModeService.resolveByRollTable', () => {
   });
 
   it('6. no matching result group returns misconfiguration error', async () => {
-    const groups = makeResultGroups(['Sword', 'Shield']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('Potion');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword', 'Shield'], 'Potion');
 
     assert.equal(result.meta.disposition, 'misconfiguration');
     assert.ok(result.meta.error);
@@ -263,6 +249,17 @@ describe('ResolutionModeService name helpers', () => {
     assert.ok(service._isFailKeyword('f'));
     assert.ok(!service._isFailKeyword('success'));
     assert.ok(!service._isFailKeyword('failing'));
+  });
+
+  it('_isFailKeyword routes the hazard family to the failure path', () => {
+    // Spec 004 macroOutcome rule 1 / data-models §7: the hazard family is part of
+    // the reserved failure-keyword set and takes the failure path.
+    assert.ok(service._isFailKeyword('hazard'));
+    assert.ok(service._isFailKeyword('Danger'));
+    assert.ok(service._isFailKeyword('COMPLICATION'));
+    assert.ok(service._isFailKeyword('trap'));
+    assert.ok(service._isFailKeyword('oops'));
+    assert.ok(!service._isMissKeyword('hazard'), 'hazard is a fail-path keyword, not a miss');
   });
 
   it('_isMissKeyword identifies all miss keywords', () => {
@@ -364,8 +361,8 @@ describe('Recipe.validate() for rollTableOutcome', () => {
     const recipe = new Recipe(makeRecipeData({
       resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
       resultGroups: [
-        { id: 'g1', name: 'Sword', results: [{ id: 'r1', componentId: 'item-1', quantity: 1 }] },
-        { id: 'g2', name: 'SWORD', results: [{ id: 'r2', componentId: 'item-2', quantity: 1 }] }
+        resultGroupLiteral('g1', 'Sword', 'r1', 'item-1'),
+        resultGroupLiteral('g2', 'SWORD', 'r2', 'item-2')
       ]
     }));
     const { valid, errors } = recipe.validate();
@@ -376,9 +373,7 @@ describe('Recipe.validate() for rollTableOutcome', () => {
   it('fails if rollTableOutcome result group name is a reserved fail keyword', () => {
     const recipe = new Recipe(makeRecipeData({
       resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [
-        { id: 'g1', name: 'fail', results: [{ id: 'r1', componentId: 'item-1', quantity: 1 }] }
-      ]
+      resultGroups: [resultGroupLiteral('g1', 'fail', 'r1', 'item-1')]
     }));
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
@@ -388,9 +383,7 @@ describe('Recipe.validate() for rollTableOutcome', () => {
   it('fails if rollTableOutcome result group name is a reserved miss keyword', () => {
     const recipe = new Recipe(makeRecipeData({
       resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [
-        { id: 'g1', name: 'nothing', results: [{ id: 'r1', componentId: 'item-1', quantity: 1 }] }
-      ]
+      resultGroups: [resultGroupLiteral('g1', 'nothing', 'r1', 'item-1')]
     }));
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
@@ -429,10 +422,14 @@ describe('Regression: existing resolution modes unaffected', () => {
     assert.equal(result.groups[0].name, 'Sword');
   });
 
-  it('mapped mode: resolveResultGroups resolves by ingredientSet.resultGroupId', () => {
-    const service = makeService({ resolutionMode: 'mapped' });
+  it('routed + ingredientSet: resolveResultGroups resolves by ingredientSet.resultGroupId', () => {
+    const service = makeService({ resolutionMode: 'routed' });
     const groups = makeResultGroups(['Sword', 'Shield']);
-    const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
+    const recipe = {
+      craftingSystemId: 'sys-1',
+      resultGroups: groups,
+      resultSelection: { provider: 'ingredientSet' }
+    };
     const step = { resultGroups: groups };
     const ingredientSet = { resultGroupId: 'group-2' };
 
@@ -455,13 +452,16 @@ describe('Regression: existing resolution modes unaffected', () => {
     assert.equal(result.meta.error, 'Unknown resolution mode');
   });
 
-  it('legacy tiered compatibility mode: resolveResultGroups resolves by outcomeRouting', () => {
-    const service = makeService({ resolutionMode: 'tiered' });
-    const groups = makeResultGroups(['Sword', 'Shield']);
+  it('routed + macroOutcome: resolveResultGroups resolves by ResultGroup name (former tiered behavior)', () => {
+    // The 1.4.0 migration reconciles legacy outcomeRouting { success: 'group-1' }
+    // by renaming group-1 to "success"; canonical macroOutcome name-matching then
+    // reproduces the old routing.
+    const service = makeService({ resolutionMode: 'routed' });
+    const groups = makeResultGroups(['success', 'failure']);
     const recipe = {
       craftingSystemId: 'sys-1',
       resultGroups: groups,
-      outcomeRouting: { success: 'group-1', failure: 'group-2' }
+      resultSelection: { provider: 'macroOutcome' }
     };
     const step = { resultGroups: groups };
     const checkResult = { outcome: 'success' };
@@ -469,11 +469,11 @@ describe('Regression: existing resolution modes unaffected', () => {
     const result = service.resolveResultGroups({ recipe, step, ingredientSet: null, checkResult });
 
     assert.equal(result.groups.length, 1);
-    assert.equal(result.groups[0].name, 'Sword');
+    assert.equal(result.groups[0].name, 'success');
   });
 
   it('rollTableResult provided: resolveResultGroups uses it directly', () => {
-    const service = makeService({ resolutionMode: 'mapped' });
+    const service = makeService({ resolutionMode: 'routed' });
     const groups = makeResultGroups(['Sword', 'Shield']);
     const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
     const step = { resultGroups: groups };

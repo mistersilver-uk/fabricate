@@ -81,8 +81,7 @@ const FEATURE_MAP = {
 
 const RESOLUTION_MODE_LABEL_KEYS = {
   simple: 'FABRICATE.Admin.SystemSettings.ResolutionSimple',
-  mapped: 'FABRICATE.Admin.SystemSettings.ResolutionMapped',
-  tiered: 'FABRICATE.Admin.SystemSettings.ResolutionTiered',
+  routed: 'FABRICATE.Admin.SystemSettings.ResolutionRouted',
   progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
   alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy'
 };
