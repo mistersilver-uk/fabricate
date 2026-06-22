@@ -2795,6 +2795,7 @@
         "DropNotAnItem": "Only Item documents can be added as crafting components. Dropped: {type}.",
         "FolderImportSummary": "Imported {added} new, updated {updated}, skipped {skipped} of {total} items from folder \"{name}\".",
         "FolderEmpty": "Folder \"{name}\" contains no Item documents.",
+        "FolderNotResolved": "Could not find the dropped folder. Try dragging it from the Items sidebar again.",
         "DropNoSystemSelected": "Select a crafting system first before dropping items.",
         "Editor": {
           "WindowTitle": "Edit {name}",
