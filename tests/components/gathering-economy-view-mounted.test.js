@@ -67,6 +67,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     writeFileSync(util, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js')).href);
     GatheringEconomyView = mod.default;
@@ -90,6 +91,49 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.equal(target.querySelector('[data-economy-mode-option].is-active'), null);
     options.forEach(o => assert.equal(o.getAttribute('aria-pressed'), 'false'));
     assert.ok(target.querySelector('[data-economy-no-limit-hint]'));
+    unmount(mounted); mounted = null; target.remove();
+  });
+
+  it('renders a gathering resolution-mode card above limitation mode (d100 live, others coming soon)', async () => {
+    const { services, calls } = makeServices({ stamina: { enabled: false, regen: { policy: 'none' } }, nodes: { enabled: false } });
+    await mountView({ services, systemId: 'sys-1' });
+
+    const resolutionCard = target.querySelector('[data-gathering-resolution-mode]');
+    assert.ok(resolutionCard, 'gathering resolution-mode card should render');
+
+    // The resolution card renders BEFORE the limitation-mode card in document order.
+    const limitationCard = target.querySelector('[data-economy-mode-card]');
+    assert.ok(limitationCard, 'limitation mode card should render');
+    assert.equal(
+      resolutionCard.compareDocumentPosition(limitationCard) & Node.DOCUMENT_POSITION_FOLLOWING,
+      Node.DOCUMENT_POSITION_FOLLOWING,
+      'the resolution card precedes the limitation card'
+    );
+
+    const rows = [...resolutionCard.querySelectorAll('[data-gathering-resolution-mode-option]')];
+    assert.deepEqual(
+      rows.map(row => row.getAttribute('data-gathering-resolution-mode-option')),
+      ['d100', 'progressive', 'routed'],
+      'gathering card lists d100, progressive, routed in order'
+    );
+
+    const radioFor = (value) => resolutionCard.querySelector(`[data-gathering-resolution-mode-option="${value}"] input[type="radio"]`);
+    assert.equal(radioFor('d100').disabled, false, 'd100 is selectable');
+    assert.equal(radioFor('progressive').disabled, true, 'progressive is disabled (coming soon)');
+    assert.equal(radioFor('routed').disabled, true, 'routed is disabled (coming soon)');
+
+    // Clicking a disabled option persists nothing.
+    const before = calls.setEconomy.length;
+    radioFor('progressive').click();
+    flushSync();
+    assert.equal(calls.setEconomy.length, before, 'clicking a disabled option pushes no setEconomy call');
+
+    // Selecting d100 round-trips resolutionMode === 'd100'.
+    const d100 = radioFor('d100');
+    d100.checked = true;
+    d100.dispatchEvent(new window.Event('change', { bubbles: true }));
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.resolutionMode, 'd100', 'selecting d100 persists resolutionMode d100');
     unmount(mounted); mounted = null; target.remove();
   });
 
@@ -195,6 +239,9 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
     // Set an override on the rolled character, then bulk-save from the header.
     const override = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-max]');
+    // With no override set, the placeholder shows the base (rolled) max so the GM
+    // sees the value they would be overriding.
+    assert.equal(override.getAttribute('placeholder'), '10', 'max-override placeholder shows the un-overridden rolled max');
     override.value = '15';
     override.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();

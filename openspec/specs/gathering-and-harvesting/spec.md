@@ -833,6 +833,7 @@ Allow crafting systems with gathering enabled to independently toggle two pacing
 // Two independent boolean toggles select the limitation models; there is no
 // single mutually-exclusive `mode` field.
 GatheringEconomyConfig = {
+  resolutionMode: "d100" | "progressive" | "routed", // system-level gathering resolution; default "d100"
   stamina: {
     enabled: boolean,                   // actor stamina limitation toggle
     max: string,                        // expression template (number or formula), blank ⇒ start full at max
@@ -881,6 +882,11 @@ A legacy pool persisted under the former `provider: "external"` value reads back
 23. Actor stamina state may be stored in Fabricate actor flags when no external provider owns stamina.
 24. Actor stamina display includes current and maximum values when known.
 25. Stamina history should record enough evidence for players and GMs to understand spend, manual adjustment, and regeneration events.
+26. The economy block carries a system-level `resolutionMode` (`"d100" | "progressive" | "routed"`, default `"d100"`) normalized on both the read and persist paths;
+an absent, invalid, or wrong-shape value (including a stray `"simple"`) falls back to `"d100"`.
+It is GM configuration and is not part of the player gathering listing payload.
+This is the system-level default gathering resolution and relates to the existing per-task `resolutionMode`:
+today only `d100` is honored at runtime, and `progressive`/`routed` are modelled but unimplemented (surfaced disabled in the GM UI as a "coming soon" affordance).
 
 ## Gathering Risk and Encounters
 

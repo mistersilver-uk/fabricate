@@ -671,10 +671,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const prevEconomy = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[opts?.systemId]?.economy;
           const prevStamina = prevEconomy?.stamina?.enabled === true;
           const prevNodes = prevEconomy?.nodes?.enabled === true;
+          const prevResolution = prevEconomy?.resolutionMode ?? 'd100';
           const nextStamina = opts?.economy?.stamina?.enabled === true;
           const nextNodes = opts?.economy?.nodes?.enabled === true;
+          const nextResolution = opts?.economy?.resolutionMode ?? 'd100';
           const result = await game?.fabricate?.setGatheringEconomy?.(opts);
-          if (nextStamina !== prevStamina || nextNodes !== prevNodes) this._adminStore?.refreshGatheringConfig?.();
+          if (nextStamina !== prevStamina || nextNodes !== prevNodes || nextResolution !== prevResolution) this._adminStore?.refreshGatheringConfig?.();
           return result;
         },
         getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],

@@ -78,6 +78,31 @@ describe('gathering economy — config normalization', () => {
     assert.ok(settings.get(SETTING_KEYS.GATHERING_CONFIG).systems[SYSTEM].economy);
   });
 
+  it('normalizes the system-level resolutionMode (default d100; preserves valid; rejects the rest)', () => {
+    const econFor = (economy) =>
+      makeRichState({ config: { systems: { [SYSTEM]: { economy } } } }).service.systemEconomy(SYSTEM);
+
+    // Absent ⇒ d100 (the only currently implemented gathering resolution).
+    assert.equal(econFor({}).resolutionMode, 'd100');
+    assert.equal(econFor({ nodes: { enabled: true } }).resolutionMode, 'd100');
+
+    // Valid modes are preserved.
+    assert.equal(econFor({ resolutionMode: 'progressive' }).resolutionMode, 'progressive');
+    assert.equal(econFor({ resolutionMode: 'routed' }).resolutionMode, 'routed');
+    assert.equal(econFor({ resolutionMode: 'd100' }).resolutionMode, 'd100');
+
+    // Invalid / wrong-shape values fall back to d100.
+    for (const bad of ['simple', 'bogus', null, 42]) {
+      assert.equal(econFor({ resolutionMode: bad }).resolutionMode, 'd100', `resolutionMode ${String(bad)} ⇒ d100`);
+    }
+  });
+
+  it('round-trips resolutionMode through setSystemEconomy', async () => {
+    const { service } = makeRichState({ config: {} });
+    await service.setSystemEconomy({ systemId: SYSTEM, economy: { resolutionMode: 'routed', nodes: { enabled: true } } });
+    assert.equal(service.systemEconomy(SYSTEM).resolutionMode, 'routed');
+  });
+
   it('weatherEnabled/timeOfDayEnabled default to true and reflect the per-system toggles', () => {
     const enabled = makeRichState({ config: { systems: { [SYSTEM]: {} } } }).service;
     assert.equal(enabled.weatherEnabled(SYSTEM), true, 'weather defaults enabled');

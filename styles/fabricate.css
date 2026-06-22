@@ -4361,6 +4361,37 @@
   line-height: 1.35;
 }
 
+/* A modelled-but-unimplemented option: dim the row and block the pointer while
+   keeping the name legible. The real `disabled` attribute on the radio already
+   removes it from the tab order; this is the visible affordance. */
+.fabricate-manager .manager-resolution-option.is-disabled {
+  cursor: not-allowed;
+}
+
+.fabricate-manager .manager-resolution-option.is-disabled .manager-resolution-option-desc {
+  opacity: 0.6;
+}
+
+.fabricate-manager .manager-resolution-option.is-disabled input[type='radio'] {
+  cursor: not-allowed;
+}
+
+/* "Coming soon" badge inline with the option name. Theme tokens only. */
+.fabricate-manager .manager-resolution-option-badge {
+  display: inline-block;
+  margin-left: var(--fab-space-2);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: var(--fab-overlay-light-04);
+}
+
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea {

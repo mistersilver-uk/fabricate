@@ -542,6 +542,92 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'), 'v2 row edit should not seed and launch the current admin');
   });
 
+  it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
+    // The recipe card legend is renamed; its only consumer is this legend.
+    assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
+    assert.ok(systemEditSource.includes("legendFallback=\"Recipe resolution mode\""), 'system edit inline fallback should match the renamed value');
+
+    // Salvage card source hooks: fieldset + option attribute names and the radio group name.
+    assert.ok(systemEditSource.includes('data-system-salvage-resolution-mode'), 'system edit should declare the salvage fieldset hook');
+    assert.ok(systemEditSource.includes('data-system-salvage-resolution-mode-option'), 'system edit should declare the salvage option hook');
+    assert.ok(systemEditSource.includes('manager-system-salvage-resolution-mode'), 'system edit should use the dedicated salvage radio group name');
+
+    // New salvage i18n keys are present and non-empty.
+    for (const key of [
+      'SalvageResolutionMode',
+      'SalvageResolutionModeHint',
+      'SalvageResolutionSimple',
+      'SalvageResolutionSimpleDesc',
+      'SalvageResolutionProgressive',
+      'SalvageResolutionProgressiveDesc',
+      'SalvageResolutionRouted',
+      'SalvageResolutionRoutedDesc',
+      'ResolutionComingSoon'
+    ]) {
+      const value = lang.FABRICATE.Admin.SystemSettings[key];
+      assert.equal(typeof value, 'string', `SystemSettings.${key} should be a string`);
+      assert.ok(value.length > 0, `SystemSettings.${key} should be non-empty`);
+    }
+
+    // Salvage option-set guard: the salvage options offer simple (default) +
+    // progressive + routed, but never alchemy (no ingredient-set routing).
+    const salvageOptionsMatch = systemEditSource.match(/salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(salvageOptionsMatch, 'system edit should define a salvageResolutionModeOptions array');
+    const salvageOptionsBlock = salvageOptionsMatch[1];
+    assert.ok(salvageOptionsBlock.includes("value: 'simple'"), 'salvage should offer simple');
+    assert.ok(salvageOptionsBlock.includes("value: 'progressive'"), 'salvage should offer progressive');
+    assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
+    assert.ok(!salvageOptionsBlock.includes("value: 'alchemy'"), 'salvage should NOT offer alchemy');
+
+    // Persistence wiring threaded from the root through the edit view to the store.
+    assert.ok(systemEditSource.includes('onSetSalvageResolutionMode'), 'system edit should accept the salvage persistence prop');
+    assert.ok(rootSource.includes('store.setSalvageResolutionMode?.'), 'root should pass the salvage callback through to the system-edit view');
+  });
+
+  it('offers a gathering resolution-mode card with d100 selectable and progressive/routed coming soon', () => {
+    const gatheringEconomySource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte'),
+      'utf8'
+    );
+    assert.ok(gatheringEconomySource.includes('data-gathering-resolution-mode'), 'gathering view should declare the resolution fieldset hook');
+    assert.ok(gatheringEconomySource.includes('data-gathering-resolution-mode-option'), 'gathering view should declare the resolution option hook');
+    assert.ok(gatheringEconomySource.includes('manager-gathering-resolution-mode'), 'gathering view should use the dedicated resolution radio group name');
+
+    const optionsMatch = gatheringEconomySource.match(/gatheringResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(optionsMatch, 'gathering view should define a gatheringResolutionModeOptions array');
+    const optionsBlock = optionsMatch[1];
+    assert.ok(optionsBlock.includes("value: 'd100'"), 'gathering should offer d100');
+    assert.ok(optionsBlock.includes("value: 'progressive'"), 'gathering should offer progressive');
+    assert.ok(optionsBlock.includes("value: 'routed'"), 'gathering should offer routed');
+
+    // d100 is selectable; progressive/routed are disabled coming-soon affordances.
+    assert.equal(lang.FABRICATE.Admin.Manager.Economy.GatheringResolutionMode, 'Gathering resolution mode');
+    for (const key of ['D100', 'D100Desc', 'Progressive', 'Routed']) {
+      const value = lang.FABRICATE.Admin.Manager.Economy.Resolution[key];
+      assert.equal(typeof value, 'string', `Economy.Resolution.${key} should be a string`);
+      assert.ok(value.length > 0, `Economy.Resolution.${key} should be non-empty`);
+    }
+  });
+
+  it('retitles the system summary card and aligns system/recipe detail facts with the environment details card', () => {
+    // The card is retitled "System Details"; the old "Edit summary" key is gone.
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Details, 'System Details');
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Summary, undefined, 'the legacy Summary key is removed');
+    assert.ok(!rootSource.includes('SystemEdit.Summary'), 'no consumer references the removed Summary key');
+    assert.ok(rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Details', 'System Details')"), 'system details card uses the renamed title');
+
+    // System and recipe detail facts use the same inline fact-line/fact-label
+    // typography as the environment details card (the layout reference).
+    assert.ok(
+      rootSource.includes('<span class="manager-fact-line"><strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong> <span class="manager-fact-label">'),
+      'system details facts use the shared manager-fact-line/label styling'
+    );
+    assert.ok(
+      rootSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
+      'recipe details facts use the shared manager-fact-line/label styling'
+    );
+  });
+
   it('keeps first-slice action and navigation hierarchy focused', () => {
     assert.ok(!rootSource.includes('function viewKicker'), 'top-bar view kickers should not duplicate the page title');
     assert.ok(!rootSource.includes('{viewKicker()}'), 'top-bar header should render only the page title and subtitle');
