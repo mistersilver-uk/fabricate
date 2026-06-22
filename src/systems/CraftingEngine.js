@@ -1405,6 +1405,23 @@ export class CraftingEngine {
     }
   }
 
+  /**
+   * Run the crafting check for an attempt, if one is required or enabled.
+   *
+   * A check is REQUIRED (run even when the system has crafting checks disabled)
+   * when the recipe needs a check outcome to select its result:
+   *  - `progressive` mode, or
+   *  - `routed` mode with the `macroOutcome` provider.
+   *
+   * The other routed providers do not need a check outcome to route:
+   * `ingredientSet` selects by the chosen ingredient set, and `rollTableOutcome`
+   * selects by a drawn roll-table entry. For those, and for `simple`/`alchemy`,
+   * the check only runs when the system enables crafting checks. There is no
+   * legacy `tiered` branch — `tiered` is gone, replaced by `routed` + provider.
+   *
+   * @private
+   * @returns {Promise<{success: boolean, outcome: ?string, value?: *, data: object}>}
+   */
   async _runCraftingCheck(
     recipe,
     craftingActor,

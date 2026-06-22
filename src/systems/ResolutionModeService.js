@@ -7,6 +7,21 @@ import {
 
 /**
  * Handles mode-specific validation and result resolution logic.
+ *
+ * Canonical resolution modes are `simple`, `routed`, `progressive`, and
+ * `alchemy`. `routed` is the only non-simple selection model and dispatches on
+ * `resultSelection.provider`, one of the three first-class providers:
+ *  - `ingredientSet` — the chosen ingredient set's `resultGroupId` selects the
+ *    result group (the former `mapped` behavior, now canonical).
+ *  - `macroOutcome` — a crafting-check outcome name routes to the `ResultGroup`
+ *    of the same name.
+ *  - `rollTableOutcome` — a drawn roll-table entry name routes by `ResultGroup`
+ *    name.
+ *
+ * Legacy `mapped`/`tiered` are NOT live modes. They are accepted only as
+ * one-time inputs to the 1.4.0 migration (`migrateLegacyResolutionModes`), and
+ * the manager's token normalizer maps any un-migrated/imported `mapped`/`tiered`
+ * token to `routed`. No `mapped`/`tiered` resolution branch survives here.
  */
 export class ResolutionModeService {
   constructor(craftingSystemManager) {
@@ -40,7 +55,10 @@ export class ResolutionModeService {
   }
 
   // ---------------------------------------------------------------------------
-  // Name normalization helpers for rollTableOutcome
+  // Routed name-normalization + reserved-keyword helpers. Shared with Recipe.js
+  // via ../utils/routedOutcomeKeywords.js so runtime resolution and authoring-time
+  // validation use one source of truth. They apply under every routed provider
+  // (ingredientSet / macroOutcome / rollTableOutcome), not just rollTableOutcome.
   // ---------------------------------------------------------------------------
 
   _normalizeName(name) {

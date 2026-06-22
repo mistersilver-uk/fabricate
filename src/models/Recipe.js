@@ -298,6 +298,24 @@ export class Recipe {
     }
   }
 
+  /**
+   * Validate a routed `resultSelection` and its `ResultGroup` names.
+   *
+   * Applies to the three first-class routed providers (`ingredientSet`,
+   * `macroOutcome`, `rollTableOutcome`); a recipe with no `resultSelection`
+   * (simple/progressive/legacy) is unaffected. `rollTableOutcome` additionally
+   * requires a roll-table UUID.
+   *
+   * Under EVERY routed provider, `ResultGroup.name` must be unique under
+   * trim+lowercase comparison and must not collide with a reserved routing
+   * keyword (the fail/miss/hazard families in `routedOutcomeKeywords.js`). The
+   * shared keyword set keeps this in lockstep with the runtime resolution path in
+   * `ResolutionModeService`.
+   *
+   * @param {{provider?: string, rollTableUuid?: string}} resultSelection
+   * @param {Array<{id?: string, name?: string}>} resultGroups
+   * @param {string[]} errors push-target for validation messages
+   */
   _validateRoutedResultSelection(resultSelection, resultGroups, errors) {
     const provider = resultSelection?.provider;
     // Only the three routed providers route by ResultGroup.name / draw; a recipe
