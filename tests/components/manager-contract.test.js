@@ -609,6 +609,25 @@ describe('CraftingSystemManager source contract', () => {
     }
   });
 
+  it('retitles the system summary card and aligns system/recipe detail facts with the environment details card', () => {
+    // The card is retitled "System Details"; the old "Edit summary" key is gone.
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Details, 'System Details');
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Summary, undefined, 'the legacy Summary key is removed');
+    assert.ok(!rootSource.includes('SystemEdit.Summary'), 'no consumer references the removed Summary key');
+    assert.ok(rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Details', 'System Details')"), 'system details card uses the renamed title');
+
+    // System and recipe detail facts use the same inline fact-line/fact-label
+    // typography as the environment details card (the layout reference).
+    assert.ok(
+      rootSource.includes('<span class="manager-fact-line"><strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong> <span class="manager-fact-label">'),
+      'system details facts use the shared manager-fact-line/label styling'
+    );
+    assert.ok(
+      rootSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
+      'recipe details facts use the shared manager-fact-line/label styling'
+    );
+  });
+
   it('keeps first-slice action and navigation hierarchy focused', () => {
     assert.ok(!rootSource.includes('function viewKicker'), 'top-bar view kickers should not duplicate the page title');
     assert.ok(!rootSource.includes('{viewKicker()}'), 'top-bar header should render only the page title and subtitle');

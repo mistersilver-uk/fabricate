@@ -5351,21 +5351,17 @@
             <div class="manager-fact-grid">
               {#if showRecipeCategories}
                 <div class="manager-fact" data-recipe-fact="category">
-                  <strong>{selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
+                  <span class="manager-fact-line"><strong>{selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span></span>
                 </div>
               {/if}
               <div class="manager-fact" data-recipe-fact="structure">
-                <strong>{structureLabel(selectedRecipe)}</strong>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}</span>
+                <span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}</span></span>
               </div>
               <div class="manager-fact" data-recipe-fact="steps">
-                <strong>{stepCount(selectedRecipe)}</strong>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps')}</span>
+                <span class="manager-fact-line"><strong>{stepCount(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps')}</span></span>
               </div>
               <div class="manager-fact" data-recipe-fact="result-groups">
-                <strong>{resultGroupCount(selectedRecipe)}</strong>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.ResultGroups', 'Result groups')}</span>
+                <span class="manager-fact-line"><strong>{resultGroupCount(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.ResultGroups', 'Result groups')}</span></span>
               </div>
             </div>
             {#if $viewState.showVisibilitySummary}
@@ -5623,15 +5619,13 @@
         </section>
 
         <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Summary', 'Edit summary')}</h3>
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Details', 'System Details')}</h3>
           <div class="manager-fact-grid">
             <div class="manager-fact">
-              <strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong>
-              <span>{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span>
+              <span class="manager-fact-line"><strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span></span>
             </div>
             <div class="manager-fact">
-              <strong>{enabledFeatureLabels.length}</strong>
-              <span>{text('FABRICATE.Admin.Manager.SystemEdit.EnabledFeatureCount', 'Features enabled')}</span>
+              <span class="manager-fact-line"><strong>{enabledFeatureLabels.length}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.SystemEdit.EnabledFeatureCount', 'Features enabled')}</span></span>
             </div>
           </div>
           <p class="manager-muted">{text('FABRICATE.Admin.Manager.SystemEdit.DeepConfigHint', 'Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager views.')}</p>

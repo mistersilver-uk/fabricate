@@ -843,7 +843,7 @@
           "FeatureOff": "Off",
           "Inspector": "System edit evidence",
           "Editing": "Editing",
-          "Summary": "Edit summary",
+          "Details": "System Details",
           "EnabledFeatureCount": "Features enabled",
           "DeepConfigHint": "Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager views.",
           "FeatureHint": {
