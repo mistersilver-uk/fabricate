@@ -528,8 +528,28 @@ describe('RecipeEditView locks the image picker to the linked recipe item', () =
     assert.equal(editSource.includes('img = linkedItemImage'), false, 'never writes the item image into the draft');
   });
 
-  it('passes the linked recipe-item image into the view from the root', () => {
-    assert.ok(rootSource.includes("linkedItemImage={selectedRecipe?.recipeItemImg || ''}"), 'root passes recipeItemImg as linkedItemImage');
+  it('passes the STAGED-draft linked recipe-item image into the view from the root', () => {
+    // Regression: the locked Overview image must derive from the staged recipeDraft's
+    // recipeItemId resolved against recipeItemDefinitions, NOT the persisted
+    // selectedRecipe projection — so staging a link change updates the preview pre-save.
+    assert.ok(
+      rootSource.includes('linkedItemImage={recipeDraftLinkedItemImage}'),
+      'root passes the staged-draft-derived image as linkedItemImage'
+    );
+    assert.equal(
+      rootSource.includes("linkedItemImage={selectedRecipe?.recipeItemImg"),
+      false,
+      'root no longer reads the persisted selectedRecipe.recipeItemImg for the locked image'
+    );
+    assert.ok(
+      /const recipeDraftLinkedItemImage = \$derived\(/.test(rootSource),
+      'root derives the locked image from a dedicated $derived'
+    );
+    assert.ok(
+      rootSource.includes('recipeDraft?.recipeItemId')
+        && rootSource.includes('recipeItemDefinitions.find('),
+      'the derivation resolves the staged recipeItemId against recipeItemDefinitions'
+    );
   });
 });
 
