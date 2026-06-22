@@ -44,7 +44,10 @@ Match the change against every signal that applies. All matching agents run in p
 
 Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
 
-1. **Plan review loop.** The driver drafts the OpenSpec delta in the issue's `openspec-delta` block (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the delta (verdicts posted as issue comments). The driver rewrites the delta block in place until every plan reviewer approves.
+In every loop, reviewers return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
+Reviewers do not post verdicts (or other workflow notes) as GitHub issue or PR comments.
+
+1. **Plan review loop.** The driver drafts the OpenSpec delta in the issue's `openspec-delta` block (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the delta, returning its verdict to the driver rather than commenting on the issue. The driver rewrites the delta block in place until every plan reviewer approves.
 2. **Implementation review loop.** The driver spawns the implementer to ship changes — including the canonical spec changes under `openspec/specs/` that the delta requires — then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts. Reviewers compare the actual `openspec/specs/` diff against the proposed delta in the issue and confirm a faithful realization (or flag a justified deviation to reconcile). The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
 3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating it and its `Deviations` note when implementation justifiably diverged) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site to match the shipped canonical spec). Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
 
@@ -233,6 +236,7 @@ as agents:
 ## What Agents Must Not Do
 
 - Merge to `main` without reviewer approval.
+- Post review verdicts or other workflow notes as GitHub issue or PR comments. Plan-review, implementation-review, and docs-loop reviewers return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 - Delete test files.
 - Change `module.json` id or module name.
 - Add npm dependencies without a plan entry that explains why they are needed.
