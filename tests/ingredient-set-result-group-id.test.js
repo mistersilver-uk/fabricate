@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 // Minimal Foundry surface this module's import chain touches. Assembled
 // piecewise (rather than one large object literal) so this arrange block stays
 // distinct from the shared stubs in sibling suites.
-const utils = { randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`, getProperty: () => undefined };
+const utils = { randomID: () => `id-${crypto.randomUUID().slice(0, 8)}`, getProperty: () => undefined };
 const HandlebarsApplicationMixin = (Base) => class extends Base {};
 class ApplicationV2 {
   async _prepareContext() {
