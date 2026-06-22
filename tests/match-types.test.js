@@ -74,6 +74,11 @@ test('getMatchHandler aliases systemItem to the component handler', () => {
     [...handler.expandToComponentIds({ type: 'systemItem', systemItemId: 'cmp-iron' }, [])],
     ['cmp-iron']
   );
+  // A raw, un-normalized systemItem match must read as complete and sign the
+  // same as its normalized component form, so it is not dropped as incomplete
+  // or unsignatured on paths that run before normalizeMatch.
+  assert.equal(handler.isComplete({ type: 'systemItem', systemItemId: 'cmp-iron' }), true);
+  assert.equal(handler.signature({ type: 'systemItem', systemItemId: ' cmp-iron ' }), 'component:cmp-iron');
 });
 
 test('getMatchHandler returns a safe fallback for null and unknown types', () => {

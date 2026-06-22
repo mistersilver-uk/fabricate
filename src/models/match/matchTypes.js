@@ -49,7 +49,10 @@ const componentHandler = {
   },
 
   isComplete(match) {
-    return match?.type === 'component' && !!match.componentId;
+    // Use the shared ID extraction so the legacy `systemItem`/`systemItemId`
+    // alias is treated as complete even before normalisation folds it to
+    // `componentId`.
+    return !!componentHandler.getComponentId(match);
   },
 
   validate() {
@@ -57,7 +60,9 @@ const componentHandler = {
   },
 
   signature(match) {
-    const componentId = trimmed(match?.componentId);
+    // Read through getComponentId so a raw `{ type: 'systemItem', systemItemId }`
+    // signs identically to its normalised `{ type: 'component', componentId }`.
+    const componentId = trimmed(componentHandler.getComponentId(match));
     return componentId ? `component:${componentId}` : null;
   },
 
