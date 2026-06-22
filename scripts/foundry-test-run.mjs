@@ -2009,6 +2009,9 @@ async function main() {
           description: 'Hammer iron ore into a sturdy blade.',
           craftingSystemId: systemId,
           img: 'icons/weapons/swords/sword-guard-brass-worn.webp',
+          // System normalizes mapped -> routed, so recipes need a canonical provider.
+          // ingredientSet is mapped's equivalent; a single result group needs no resultGroupId.
+          resultSelection: { provider: 'ingredientSet' },
           ingredientSets: [{
             ingredientGroups: [{
               name: 'Iron Ore',
@@ -2032,6 +2035,7 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
+          resultSelection: { provider: 'ingredientSet' },
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -2064,6 +2068,7 @@ async function main() {
           description: 'Forge dragon scales with iron ore into legendary armor.',
           craftingSystemId: systemId,
           img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp',
+          resultSelection: { provider: 'ingredientSet' },
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -2102,6 +2107,7 @@ async function main() {
           craftingSystemId: systemId,
           img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
           complex: true,
+          resultSelection: { provider: 'ingredientSet' },
           ingredientSets: [{
             name: 'Primary',
             ingredientGroups: [
@@ -2158,6 +2164,7 @@ async function main() {
           description: 'A two-step recipe to showcase the steps accordion and per-step durations.',
           craftingSystemId: systemId,
           img: 'icons/commodities/metal/ingot-stack-steel.webp',
+          resultSelection: { provider: 'ingredientSet' },
           steps: [
             {
               name: 'Smelt Ore',
