@@ -4,18 +4,23 @@
 
   A routed crafting check has a TYPE (relative or fixed), a roll EXPRESSION, and
   a table of OUTCOME TIERS:
-    - relative: each tier carries a +/- DC applied to a recipe's DC.
-    - fixed:    each tier carries a start/end segment of the expression's value
+    - relative: each tier's threshold is expressed relative to a recipe's DC
+                (DC -5, DC +10, …).
+    - fixed:    each tier owns a start/end segment of the expression's value
                 range; segments must not overlap.
-  Every outcome has a name, a generated secret id, a success toggle, and a
-  break-tools toggle. Both the relative DC and the fixed start/end are kept on
-  each outcome so switching type never destroys the other mode's values.
+  Every outcome has a name, a generated secret id (kept in data, never shown), a
+  success toggle, and a break-tools toggle. Both the relative DC and the fixed
+  start/end are kept on each outcome so switching type never destroys the other
+  mode's values.
 
-  Controlled component: it renders `value` and emits the next value through
-  `onChange`. Parsing/validation lives in utils/craftingCheckExpression.js.
+  Reuses the shared GM-UI primitives: ResolutionModeCard for the type selector
+  and manager-status-toggle for the per-tier switches. Controlled component:
+  renders `value`, emits the next value through `onChange`. Parsing/validation
+  lives in utils/craftingCheckExpression.js.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import ResolutionModeCard from '../ResolutionModeCard.svelte';
   import {
     parseDiceGroups,
     expressionRange,
@@ -34,22 +39,20 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  const TYPES = [
+  const TYPE_OPTIONS = [
     {
-      id: 'relative',
-      label: text('FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative', 'Relative'),
-      desc: text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
-        'Each tier shifts a recipe DC up or down by a fixed amount.'
-      ),
+      value: 'relative',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative',
+      fallback: 'Relative',
+      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
+      descFallback: 'Tier thresholds are relative to the recipe DC, e.g. DC -5 or DC +10.',
     },
     {
-      id: 'fixed',
-      label: text('FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed', 'Fixed'),
-      desc: text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
-        'Each tier owns a non-overlapping segment of the roll value range.'
-      ),
+      value: 'fixed',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
+      fallback: 'Fixed',
+      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
+      descFallback: 'Each tier owns a non-overlapping segment of the roll value range.',
     },
   ];
 
@@ -76,6 +79,9 @@
     ].filter(Boolean)
   );
 
+  const onLabel = $derived(text('FABRICATE.Admin.Manager.StatusOn', 'On'));
+  const offLabel = $derived(text('FABRICATE.Admin.Manager.StatusOff', 'Off'));
+
   function emit(patch) {
     onChange({ ...value, ...patch });
   }
@@ -86,7 +92,9 @@
   }
 
   function updateOutcome(id, patch) {
-    emit({ outcomes: outcomes.map((outcome) => (outcome.id === id ? { ...outcome, ...patch } : outcome)) });
+    emit({
+      outcomes: outcomes.map((outcome) => (outcome.id === id ? { ...outcome, ...patch } : outcome)),
+    });
   }
 
   function removeOutcome(id) {
@@ -116,23 +124,16 @@
 </script>
 
 <div class="manager-checks-editor" data-crafting-check-editor>
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}</h3>
-    <div class="manager-checks-type-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}>
-      {#each TYPES as option (option.id)}
-        <button
-          type="button"
-          class={`manager-checks-type-option ${type === option.id ? 'is-active' : ''}`}
-          aria-pressed={type === option.id}
-          data-check-type-option={option.id}
-          onclick={() => setType(option.id)}
-        >
-          <span class="manager-checks-type-name">{option.label}</span>
-          <span class="manager-checks-type-desc">{option.desc}</span>
-        </button>
-      {/each}
-    </div>
-  </section>
+  <ResolutionModeCard
+    legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
+    legendFallback="Check type"
+    options={TYPE_OPTIONS}
+    selectedValue={type}
+    groupName="crafting-check-type"
+    dataAttr="data-check-type-card"
+    optionDataAttr="data-check-type-option"
+    onChange={setType}
+  />
 
   <section class="manager-inspector-card">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.ExpressionTitle', 'Roll expression')}</h3>
@@ -180,69 +181,83 @@
     {#if outcomes.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes', 'No outcome tiers yet. Add the tiers this check routes results into.')}</p>
     {:else}
-      <ul class="manager-checks-outcomes">
+      <div class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}>
+        <div class="manager-checks-outcome-head" role="row">
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span>
+          {#if type === 'relative'}
+            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}</span>
+          {:else}
+            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}</span>
+            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span>
+          {/if}
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+          <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
+        </div>
+
         {#each outcomes as outcome, index (outcome.id)}
-          <li class={`manager-checks-outcome-row ${rowInvalid(index) ? 'is-invalid' : ''}`} data-outcome-row={outcome.id}>
-            <label class="manager-field manager-checks-outcome-name">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span>
-              <input
-                data-outcome-name
-                value={outcome.name || ''}
-                oninput={(event) => updateOutcome(outcome.id, { name: event.currentTarget.value })}
-              />
-            </label>
+          <div
+            class={`manager-checks-outcome-row ${rowInvalid(index) ? 'is-invalid' : ''}`}
+            role="row"
+            data-outcome-row={outcome.id}
+            data-outcome-id={outcome.id}
+          >
+            <input
+              data-outcome-name
+              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}
+              value={outcome.name || ''}
+              oninput={(event) => updateOutcome(outcome.id, { name: event.currentTarget.value })}
+            />
 
             {#if type === 'relative'}
-              <label class="manager-field manager-checks-outcome-value">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}</span>
-                <input
-                  type="number"
-                  data-outcome-dc
-                  value={outcome.dc ?? 0}
-                  oninput={(event) => updateOutcome(outcome.id, { dc: numeric(event.currentTarget.value) })}
-                />
-              </label>
+              <input
+                type="number"
+                data-outcome-dc
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}
+                value={outcome.dc ?? 0}
+                oninput={(event) => updateOutcome(outcome.id, { dc: numeric(event.currentTarget.value) })}
+              />
             {:else}
-              <label class="manager-field manager-checks-outcome-value">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}</span>
-                <input
-                  type="number"
-                  data-outcome-start
-                  value={outcome.start ?? 0}
-                  oninput={(event) => updateOutcome(outcome.id, { start: numeric(event.currentTarget.value) })}
-                />
-              </label>
-              <label class="manager-field manager-checks-outcome-value">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span>
-                <input
-                  type="number"
-                  data-outcome-end
-                  value={outcome.end ?? 0}
-                  oninput={(event) => updateOutcome(outcome.id, { end: numeric(event.currentTarget.value) })}
-                />
-              </label>
+              <input
+                type="number"
+                data-outcome-start
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}
+                value={outcome.start ?? 0}
+                oninput={(event) => updateOutcome(outcome.id, { start: numeric(event.currentTarget.value) })}
+              />
+              <input
+                type="number"
+                data-outcome-end
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}
+                value={outcome.end ?? 0}
+                oninput={(event) => updateOutcome(outcome.id, { end: numeric(event.currentTarget.value) })}
+              />
             {/if}
 
-            <label class="manager-toggle">
-              <input
-                type="checkbox"
-                data-outcome-success
-                checked={outcome.success === true}
-                onchange={(event) => updateOutcome(outcome.id, { success: event.currentTarget.checked })}
-              />
-              <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}</span>
-            </label>
-            <label class="manager-toggle">
-              <input
-                type="checkbox"
-                data-outcome-break
-                checked={outcome.breakTools === true}
-                onchange={(event) => updateOutcome(outcome.id, { breakTools: event.currentTarget.checked })}
-              />
-              <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
-            </label>
+            <button
+              type="button"
+              class={`manager-status-toggle ${outcome.success === true ? 'is-on' : 'is-off'}`}
+              data-outcome-success
+              aria-pressed={outcome.success === true}
+              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
+              onclick={() => updateOutcome(outcome.id, { success: !(outcome.success === true) })}
+            >
+              <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+              <span class="manager-status-toggle-label">{outcome.success === true ? onLabel : offLabel}</span>
+            </button>
 
-            <span class="manager-checks-outcome-id" title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeId', 'Secret outcome ID')} data-outcome-id={outcome.id}>#{String(outcome.id).slice(0, 6)}</span>
+            <button
+              type="button"
+              class={`manager-status-toggle ${outcome.breakTools === true ? 'is-on' : 'is-off'}`}
+              data-outcome-break
+              aria-pressed={outcome.breakTools === true}
+              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
+              onclick={() => updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
+            >
+              <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+              <span class="manager-status-toggle-label">{outcome.breakTools === true ? onLabel : offLabel}</span>
+            </button>
+
             <button
               type="button"
               class="manager-icon-button is-danger"
@@ -252,9 +267,9 @@
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
             </button>
-          </li>
+          </div>
         {/each}
-      </ul>
+      </div>
     {/if}
 
     {#if validationMessages.length > 0}

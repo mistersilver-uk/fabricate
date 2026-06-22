@@ -1736,19 +1736,35 @@ describe('CraftingSystemManager mounted behavior', () => {
       [...target.querySelectorAll('[data-dice-group]')].map((chip) => chip.textContent.trim()),
       ['2d6', '1d4']
     );
+    // Column labels live in the table header, not on every row.
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
+        .map((cell) => cell.textContent.trim())
+        .filter(Boolean),
+      ['Name', 'DC ±', 'Success', 'Break tools']
+    );
     assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
     assert.equal(
       target.querySelector('[data-outcome-start]'),
       null,
       'relative tiers do not expose a fixed range'
     );
-    assert.equal(
-      target.querySelector('[data-outcome-id]').textContent.trim(),
-      '#a1b2c3',
-      'the generated id is shown truncated as a secret reference'
-    );
 
-    target.querySelector('[data-check-type-option="fixed"]').click();
+    // The generated id is kept on the row but never printed (secret).
+    const row = target.querySelector('[data-outcome-row]');
+    assert.equal(row.getAttribute('data-outcome-id'), 'a1b2c3d4ef');
+    assert.ok(!row.textContent.includes('a1b2c3'), 'the secret id is not displayed');
+
+    // Toggles are themed switches, not raw checkboxes.
+    const successToggle = target.querySelector('[data-outcome-success]');
+    assert.equal(successToggle.tagName, 'BUTTON');
+    assert.ok(successToggle.querySelector('.manager-status-toggle-track'));
+    assert.equal(target.querySelector('[data-outcome-success] input'), null, 'no default checkbox');
+    successToggle.click();
+    assert.equal(emitted.at(-1).outcomes[0].success, true, 'toggling success emits the new state');
+
+    // The type selector is the shared resolution-mode radio card.
+    target.querySelector('[data-check-type-option="fixed"] input').click();
     assert.equal(emitted.at(-1).type, 'fixed', 'switching type emits the new type');
 
     target.querySelector('[data-add-outcome]').click();

@@ -2668,7 +2668,7 @@
             "Docs": "Crafting checks docs",
             "TypeTitle": "Check type",
             "TypeRelative": "Relative",
-            "TypeRelativeDesc": "Each tier shifts a recipe DC up or down by a fixed amount.",
+            "TypeRelativeDesc": "Tier thresholds are relative to the recipe DC, e.g. DC -5 or DC +10.",
             "TypeFixed": "Fixed",
             "TypeFixedDesc": "Each tier owns a non-overlapping segment of the roll value range.",
             "ExpressionTitle": "Roll expression",
@@ -2686,7 +2686,7 @@
             "OutcomeEnd": "End",
             "OutcomeSuccess": "Success",
             "OutcomeBreak": "Break tools",
-            "OutcomeId": "Secret outcome ID",
+            "OutcomeActions": "Actions",
             "RemoveOutcome": "Remove outcome",
             "RangeInvalid": "Some tiers have a start greater than their end.",
             "RangeOverlap": "Some tier ranges overlap. Each value range must be unique."
