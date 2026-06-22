@@ -5734,10 +5734,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const modeCard = target.querySelector('#manager-system-resolution-mode');
     assert.ok(modeCard, 'resolution-mode radiogroup card should render');
     const activeMode = card => card.querySelector('.manager-resolution-option.is-active')
-      ?.getAttribute('data-system-resolution-mode-option');
+      ?.dataset.systemResolutionModeOption;
     const modeRows = [...modeCard.querySelectorAll('[data-system-resolution-mode-option]')];
     assert.deepEqual(
-      modeRows.map(row => row.getAttribute('data-system-resolution-mode-option')),
+      modeRows.map(row => row.dataset.systemResolutionModeOption),
       ['simple', 'routed', 'progressive', 'alchemy'],
       'the card lists all four modes in order'
     );
@@ -6056,7 +6056,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const modeCard = target.querySelector('#manager-system-resolution-mode');
     const activeMode = () => modeCard.querySelector('.manager-resolution-option.is-active')
-      ?.getAttribute('data-system-resolution-mode-option');
+      ?.dataset.systemResolutionModeOption;
     assert.equal(activeMode(), 'alchemy');
     const progressiveRadio = modeCard.querySelector('[data-system-resolution-mode-option="progressive"] input[type="radio"]');
     progressiveRadio.checked = true;

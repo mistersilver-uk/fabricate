@@ -233,7 +233,7 @@ test('does not mutate the input payload', () => {
       }),
     ],
   };
-  const snapshot = JSON.parse(JSON.stringify(input));
+  const snapshot = structuredClone(input);
   migrateLegacyResolutionModes(input);
   assert.deepEqual(input, snapshot, 'input payload is cloned, not mutated');
 });
