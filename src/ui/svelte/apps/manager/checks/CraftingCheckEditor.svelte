@@ -20,7 +20,6 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ResolutionModeCard from '../ResolutionModeCard.svelte';
   import {
     parseDiceGroups,
     expressionRange,
@@ -126,16 +125,29 @@
 </script>
 
 <div class="manager-checks-editor" data-crafting-check-editor>
-  <ResolutionModeCard
-    legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
-    legendFallback="Check type"
-    options={TYPE_OPTIONS}
-    selectedValue={type}
-    groupName="crafting-check-type"
-    dataAttr="data-check-type-card"
-    optionDataAttr="data-check-type-option"
-    onChange={setType}
-  />
+  <section class="manager-inspector-card">
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}</h3>
+    <div class="manager-checks-type-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}>
+      {#each TYPE_OPTIONS as option (option.value)}
+        <label
+          class={`manager-resolution-option ${type === option.value ? 'is-active' : ''}`}
+          data-check-type-option={option.value}
+        >
+          <input
+            type="radio"
+            name="crafting-check-type"
+            value={option.value}
+            checked={type === option.value}
+            onchange={() => setType(option.value)}
+          />
+          <span class="manager-resolution-option-body">
+            <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
+            <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
+          </span>
+        </label>
+      {/each}
+    </div>
+  </section>
 
   <section class="manager-inspector-card">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.ExpressionTitle', 'Roll expression')}</h3>

@@ -1215,12 +1215,14 @@
   margin-bottom: var(--fab-space-2);
 }
 
-/* The crafting check type selector lays its two options side by side rather than
-   stacked (the shared resolution-mode card stacks them by default). */
-.fabricate-manager [data-check-type-card] .manager-resolution-mode-options {
+/* The crafting check type selector reuses the resolution radio-option styling
+   but lays its two options side by side inside a normal inspector card (no
+   fieldset/legend), so it matches the other editor cards. */
+.fabricate-manager .manager-checks-type-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-checks-dice {
@@ -4441,6 +4443,13 @@
 .fabricate-manager .manager-resolution-option input[type='radio']:focus {
   outline: none;
   box-shadow: none;
+}
+
+/* Keep the checked centre dot while the radio is focused — the bare :focus rule
+   above zeroes box-shadow, which is also what paints the dot, so a checked radio
+   loses its dot the moment it is clicked/focused without this restore. */
+.fabricate-manager .manager-resolution-option input[type='radio']:checked:focus {
+  box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
 }
 
 .fabricate-manager .manager-resolution-option input[type='radio']:focus-visible {

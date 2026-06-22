@@ -2670,7 +2670,7 @@
             "TypeRelative": "Relative",
             "TypeRelativeDesc": "Tier thresholds are relative to the recipe DC, e.g. DC -5 or DC +10.",
             "TypeFixed": "Fixed",
-            "TypeFixedDesc": "Each tier owns a non-overlapping segment of the roll value range.",
+            "TypeFixedDesc": "Each tier owns a non-overlapping segment of the roll value range. Recipes to not have a DC in this mode.",
             "ExpressionTitle": "Roll expression",
             "ExpressionLabel": "Expression",
             "DiceGroups": "Dice groups",
