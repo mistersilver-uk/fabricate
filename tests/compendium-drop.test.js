@@ -1543,12 +1543,27 @@ test('onDropItem integration — Folder with Items imports each and shows summar
   assert.equal(infos[0].params.total, 2);
 });
 
-test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync and imports each', async () => {
-  // Regression: real Foundry v13 drag data carries only { type: 'Folder', uuid }.
+// Shared probe for the v13 folder-drop regression tests below: builds the handler
+// and captures the calls/notifications it emits, so each test only declares its inputs.
+function buildFolderDropProbe(folders = new Map()) {
   const addCalls = [];
   const infos = [];
   const warnings = [];
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: {
+      addItemFromUuid: async (_sysId, uuid) => { addCalls.push(uuid); return { item: { name: uuid }, action: 'added' }; },
+      addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+    },
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
+  });
+  return { handler, addCalls, infos, warnings };
+}
 
+test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync and imports each', async () => {
+  // Regression: real Foundry v13 drag data carries only { type: 'Folder', uuid }.
   const folderDoc = {
     id: 'folder1',
     name: 'My Folder',
@@ -1559,19 +1574,8 @@ test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync 
   };
   globalThis.fromUuidSync = (uuid) => (uuid === 'Folder.folder1' ? folderDoc : null);
 
-  const mgr = {
-    addItemFromUuid: async (_sysId, uuid) => { addCalls.push(uuid); return { item: { name: uuid }, action: 'added' }; },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
-  };
-
-  const handler = buildFullOnDropItem({
-    systemId: 'sys1',
-    systemManager: mgr,
-    notifyWarn: (key) => { warnings.push(key); },
-    notifyInfo: (key, params) => { infos.push({ key, params }); },
-    folders: new Map() // intentionally empty: resolution must come from the uuid, not the id map
-  });
-
+  // Empty id map: resolution must come from the uuid, not the id lookup.
+  const { handler, addCalls, infos, warnings } = buildFolderDropProbe(new Map());
   await handler({ type: 'Folder', uuid: 'Folder.folder1' });
 
   delete globalThis.fromUuidSync;
@@ -1583,25 +1587,9 @@ test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync 
 });
 
 test('onDropItem integration — v13 Folder uuid drop falls back to id lookup when fromUuidSync is unavailable', async () => {
-  const addCalls = [];
-  const infos = [];
-
-  const mgr = {
-    addItemFromUuid: async (_sysId, uuid) => { addCalls.push(uuid); return { item: { name: uuid }, action: 'added' }; },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
-  };
-
-  const folders = new Map([
+  const { handler, addCalls, infos } = buildFolderDropProbe(new Map([
     ['folder1', { id: 'folder1', name: 'My Folder', contents: [{ documentName: 'Item', uuid: 'Item.item-x' }] }]
-  ]);
-
-  const handler = buildFullOnDropItem({
-    systemId: 'sys1',
-    systemManager: mgr,
-    notifyWarn: () => {},
-    notifyInfo: (key, params) => { infos.push({ key, params }); },
-    folders
-  });
+  ]));
 
   // No globalThis.fromUuidSync defined — id is stripped from the uuid and looked up in the map.
   await handler({ type: 'Folder', uuid: 'Folder.folder1' });
@@ -1611,21 +1599,7 @@ test('onDropItem integration — v13 Folder uuid drop falls back to id lookup wh
 });
 
 test('onDropItem integration — unresolvable Folder drop warns instead of silently no-opping', async () => {
-  const addCalls = [];
-  const warnings = [];
-
-  const mgr = {
-    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
-  };
-
-  const handler = buildFullOnDropItem({
-    systemId: 'sys1',
-    systemManager: mgr,
-    notifyWarn: (key) => { warnings.push(key); },
-    notifyInfo: () => {},
-    folders: new Map()
-  });
+  const { handler, addCalls, warnings } = buildFolderDropProbe(new Map());
 
   await handler({ type: 'Folder', uuid: 'Folder.does-not-exist' });
 
