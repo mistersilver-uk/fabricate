@@ -81,6 +81,7 @@
   let gatheringEventDraftBaseline = $state(null);
   let gatheringEventSaving = $state(false);
   let gatheringEventSaveError = $state('');
+  let activeChecksTab = $state('crafting');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
@@ -1151,6 +1152,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
@@ -1396,6 +1398,19 @@
       activeView = view;
       if (view === 'tools') store?.enterToolsDraft?.(selectedSystemId);
     });
+  }
+
+  function checksCreateLabel(kind) {
+    if (kind === 'salvage') return text('FABRICATE.Admin.Manager.Checks.Salvage.Create', 'Create a Salvage Check');
+    if (kind === 'gathering') return text('FABRICATE.Admin.Manager.Checks.Gathering.Create', 'Create a Gathering Check');
+    return text('FABRICATE.Admin.Manager.Checks.Crafting.Create', 'Create a Crafting Check');
+  }
+
+  // The checks data model does not exist yet; this keeps the create affordance in
+  // place (mirroring the recipe browser) so it can be wired once checks are real.
+  function createCheck(kind) {
+    if (!selectedSystem || kind === 'validation') return;
+    store?.createCheckDraft?.(selectedSystemId, kind);
   }
 
   function selectSystem(systemId, nextView = 'systems') {
@@ -3334,7 +3349,12 @@
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
-        <!-- no header actions for the checks view -->
+        {#if activeChecksTab !== 'validation'}
+          <button type="button" class="manager-button is-primary" data-checks-create={activeChecksTab} onclick={() => createCheck(activeChecksTab)}>
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{checksCreateLabel(activeChecksTab)}</span>
+          </button>
+        {/if}
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -3726,7 +3746,7 @@
     {:else if currentView === 'checks' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
         <section class="manager-environment-editor-shell">
-          <ChecksView />
+          <ChecksView activeTab={activeChecksTab} onSelectTab={(tab) => { activeChecksTab = tab; }} />
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}

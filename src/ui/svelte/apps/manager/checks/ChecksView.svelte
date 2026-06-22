@@ -6,48 +6,56 @@
   (Crafting / Salvage / Gathering / Validation) above a workspace split into a
   central column and a right context menu. Crafting is the default tab. The
   Crafting, Salvage, and Gathering tabs show the right context menu; Validation
-  spans the full width with no menu (the menu is not mounted there). All tabs
-  and menus carry placeholder content for this first iteration.
+  spans the full width with no menu (the menu is not mounted there).
+
+  The active tab is owned by the manager root (a controlled `activeTab` prop) so
+  the root header can render a tab-aware "Create a … Check" action beside it.
+  Until the checks data model exists, every tab renders the recipe-browser-style
+  central empty state with a "No … checks yet" call to action.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
 
+  let { activeTab = 'crafting', onSelectTab = () => {} } = $props();
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  let activeTab = $state('crafting');
-
   const PANELS = {
     crafting: {
-      title: text('FABRICATE.Admin.Manager.Checks.Crafting.Title', 'Crafting checks'),
-      body: text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.Body',
-        'Configure how crafting attempts are checked. Content for this tab is coming soon.'
+      icon: 'fas fa-hammer',
+      emptyTitle: text('FABRICATE.Admin.Manager.Checks.Crafting.EmptyTitle', 'No crafting checks yet'),
+      emptyHint: text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.EmptyHint',
+        'Create a crafting check to gate crafting attempts behind a roll.'
       )
     },
     salvage: {
-      title: text('FABRICATE.Admin.Manager.Checks.Salvage.Title', 'Salvage checks'),
-      body: text(
-        'FABRICATE.Admin.Manager.Checks.Salvage.Body',
-        'Configure how salvage attempts are checked. Content for this tab is coming soon.'
+      icon: 'fas fa-recycle',
+      emptyTitle: text('FABRICATE.Admin.Manager.Checks.Salvage.EmptyTitle', 'No salvage checks yet'),
+      emptyHint: text(
+        'FABRICATE.Admin.Manager.Checks.Salvage.EmptyHint',
+        'Create a salvage check to gate salvage attempts behind a roll.'
       )
     },
     gathering: {
-      title: text('FABRICATE.Admin.Manager.Checks.Gathering.Title', 'Gathering checks'),
-      body: text(
-        'FABRICATE.Admin.Manager.Checks.Gathering.Body',
-        'Configure how gathering attempts are checked. Content for this tab is coming soon.'
+      icon: 'fas fa-seedling',
+      emptyTitle: text('FABRICATE.Admin.Manager.Checks.Gathering.EmptyTitle', 'No gathering checks yet'),
+      emptyHint: text(
+        'FABRICATE.Admin.Manager.Checks.Gathering.EmptyHint',
+        'Create a gathering check to gate gathering attempts behind a roll.'
       )
     },
     validation: {
-      title: text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation'),
-      body: text(
-        'FABRICATE.Admin.Manager.Checks.Validation.Body',
-        'Review issues across crafting, salvage, and gathering checks. Content for this tab is coming soon.'
+      icon: 'fas fa-clipboard-check',
+      emptyTitle: text('FABRICATE.Admin.Manager.Checks.Validation.EmptyTitle', 'Nothing to validate yet'),
+      emptyHint: text(
+        'FABRICATE.Admin.Manager.Checks.Validation.EmptyHint',
+        'Issues across crafting, salvage, and gathering checks will be listed here.'
       )
     }
   };
@@ -57,7 +65,7 @@
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
-  <ChecksEditorTabs {activeTab} onSelect={(tab) => { activeTab = tab; }} />
+  <ChecksEditorTabs {activeTab} onSelect={onSelectTab} />
 
   <div class="manager-environment-workspace" class:is-inspector-hidden={!hasMenu}>
     <div
@@ -66,10 +74,13 @@
       id={`checks-panel-${activeTab}`}
       aria-labelledby={`checks-tab-${activeTab}`}
     >
-      <section class="manager-inspector-card" data-checks-panel={activeTab}>
-        <h2 class="manager-card-title">{panel.title}</h2>
-        <p class="manager-muted">{panel.body}</p>
-      </section>
+      <div class="manager-empty" data-checks-panel={activeTab}>
+        <div>
+          <i class={panel.icon} aria-hidden="true"></i>
+          <h3>{panel.emptyTitle}</h3>
+          <p>{panel.emptyHint}</p>
+        </div>
+      </div>
     </div>
 
     {#if hasMenu}

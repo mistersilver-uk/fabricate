@@ -2643,6 +2643,7 @@
         "Checks": {
           "Title": "Checks",
           "Subtitle": "Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.",
+          "Actions": "Checks actions",
           "Tabs": {
             "Label": "Checks sections",
             "Crafting": "Crafting",
@@ -2654,29 +2655,32 @@
             "Label": "Checks context menu"
           },
           "Crafting": {
-            "Title": "Crafting checks",
-            "Body": "Configure how crafting attempts are checked. Content for this tab is coming soon.",
+            "Create": "Create a Crafting Check",
+            "EmptyTitle": "No crafting checks yet",
+            "EmptyHint": "Create a crafting check to gate crafting attempts behind a roll.",
             "MenuKicker": "Crafting checks",
             "MenuTitle": "Crafting context",
             "MenuHint": "Context actions for crafting checks will live here."
           },
           "Salvage": {
-            "Title": "Salvage checks",
-            "Body": "Configure how salvage attempts are checked. Content for this tab is coming soon.",
+            "Create": "Create a Salvage Check",
+            "EmptyTitle": "No salvage checks yet",
+            "EmptyHint": "Create a salvage check to gate salvage attempts behind a roll.",
             "MenuKicker": "Salvage checks",
             "MenuTitle": "Salvage context",
             "MenuHint": "Context actions for salvage checks will live here."
           },
           "Gathering": {
-            "Title": "Gathering checks",
-            "Body": "Configure how gathering attempts are checked. Content for this tab is coming soon.",
+            "Create": "Create a Gathering Check",
+            "EmptyTitle": "No gathering checks yet",
+            "EmptyHint": "Create a gathering check to gate gathering attempts behind a roll.",
             "MenuKicker": "Gathering checks",
             "MenuTitle": "Gathering context",
             "MenuHint": "Context actions for gathering checks will live here."
           },
           "Validation": {
-            "Title": "Validation",
-            "Body": "Review issues across crafting, salvage, and gathering checks. Content for this tab is coming soon."
+            "EmptyTitle": "Nothing to validate yet",
+            "EmptyHint": "Issues across crafting, salvage, and gathering checks will be listed here."
           }
         }
       },
