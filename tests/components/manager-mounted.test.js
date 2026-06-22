@@ -5729,10 +5729,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     description.dispatchEvent(new Event('input', { bubbles: true }));
     target.querySelector('.manager-system-edit-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
+    // The help panel explains every resolution mode (all four) and highlights the active one.
+    const helpPanel = target.querySelector('[data-system-resolution-help]');
+    assert.ok(helpPanel, 'resolution-mode help panel should render');
+    const helpModes = [...helpPanel.querySelectorAll('[data-system-resolution-help-mode]')]
+      .map(item => item.getAttribute('data-system-resolution-help-mode'));
+    assert.deepEqual(helpModes, ['simple', 'routed', 'progressive', 'alchemy'], 'help panel lists all four modes');
+    assert.ok(
+      [...helpPanel.querySelectorAll('dd')].every(dd => dd.textContent.trim().length > 0),
+      'each mode has a non-empty description'
+    );
+    assert.equal(
+      helpPanel.querySelector('.manager-resolution-help-item.is-active')?.getAttribute('data-system-resolution-help-mode'),
+      'alchemy',
+      'the active row matches the system resolution mode'
+    );
+
     const resolution = target.querySelector('#manager-system-resolution-mode');
     resolution.value = 'routed';
     resolution.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      helpPanel.querySelector('.manager-resolution-help-item.is-active')?.getAttribute('data-system-resolution-help-mode'),
+      'routed',
+      'changing the select moves the active highlight to the chosen mode'
+    );
 
     target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
 

@@ -286,10 +286,10 @@
   ];
 
   const resolutionModeOptions = [
-    { value: 'simple', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimple', fallback: 'Simple' },
-    { value: 'routed', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionRouted', fallback: 'Routed' },
-    { value: 'progressive', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive', fallback: 'Progressive' },
-    { value: 'alchemy', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy', fallback: 'Alchemy' }
+    { value: 'simple', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimple', fallback: 'Simple', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimpleDesc', descFallback: 'One ingredient set and one result group, with an optional pass/fail check.' },
+    { value: 'routed', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionRouted', fallback: 'Routed', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedDesc', descFallback: 'Multiple ingredient sets and result groups; exactly one result is selected per craft by ingredients, a macro, or a roll table.' },
+    { value: 'progressive', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive', fallback: 'Progressive', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressiveDesc', descFallback: 'One ingredient set and one ordered result group; a numeric check awards every result whose difficulty threshold is met.' },
+    { value: 'alchemy', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy', fallback: 'Alchemy', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemyDesc', descFallback: 'Players submit ingredient combinations directly to discover hidden recipes; one result is selected per attempt.' }
   ];
 
   const visibleFeatures = $derived(featureDefinitions.filter(feature => hasFeatureKey(selectedSystem, feature.systemKey)));
@@ -351,15 +351,31 @@
             <span>{text('FABRICATE.Admin.SystemSettings.Description', 'Description')}</span>
             <textarea id="manager-system-description" rows="4" bind:value={systemDescriptionValue}></textarea>
           </label>
-          <label class="manager-field" for="manager-system-resolution-mode">
-            <span>{text('FABRICATE.Admin.SystemSettings.ResolutionMode', 'Resolution mode')}</span>
-            <select id="manager-system-resolution-mode" value={systemResolutionModeValue} onchange={handleResolutionModeChange}>
+          <div class="manager-field is-wide manager-resolution-mode-field">
+            <div class="manager-resolution-mode-control">
+              <label class="manager-field" for="manager-system-resolution-mode">
+                <span>{text('FABRICATE.Admin.SystemSettings.ResolutionMode', 'Resolution mode')}</span>
+                <select id="manager-system-resolution-mode" value={systemResolutionModeValue} onchange={handleResolutionModeChange}>
+                  {#each resolutionModeOptions as option (option.value)}
+                    <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+                  {/each}
+                </select>
+                <small>{text('FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint', 'Changing resolution mode uses the current destructive confirmation and cleanup behavior.')}</small>
+              </label>
+            </div>
+            <dl class="manager-resolution-help" data-system-resolution-help>
+              <p class="manager-resolution-help-title">{text('FABRICATE.Admin.SystemSettings.ResolutionModeHelpTitle', 'What each mode does')}</p>
               {#each resolutionModeOptions as option (option.value)}
-                <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+                <div
+                  class={`manager-resolution-help-item ${option.value === systemResolutionModeValue ? 'is-active' : ''}`}
+                  data-system-resolution-help-mode={option.value}
+                >
+                  <dt>{text(option.labelKey, option.fallback)}</dt>
+                  <dd>{text(option.descKey, option.descFallback)}</dd>
+                </div>
               {/each}
-            </select>
-            <small>{text('FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint', 'Changing resolution mode uses the current destructive confirmation and cleanup behavior.')}</small>
-          </label>
+            </dl>
+          </div>
         </div>
       </section>
 

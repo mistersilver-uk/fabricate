@@ -2636,6 +2636,11 @@
         "ResolutionRouted": "Routed",
         "ResolutionProgressive": "Progressive",
         "ResolutionAlchemy": "Alchemy",
+        "ResolutionModeHelpTitle": "What each mode does",
+        "ResolutionSimpleDesc": "One ingredient set and one result group, with an optional pass/fail check.",
+        "ResolutionRoutedDesc": "Multiple ingredient sets and result groups; exactly one result is selected per craft by ingredients, a macro, or a roll table.",
+        "ResolutionProgressiveDesc": "One ingredient set and one ordered result group; a numeric check awards every result whose difficulty threshold is met.",
+        "ResolutionAlchemyDesc": "Players submit ingredient combinations directly to discover hidden recipes; one result is selected per attempt.",
         "ResolutionModeChangeTitle": "Change Resolution Mode?",
         "ResolutionModeChangeContent": "Changing resolution mode to {mode} will delete {count} recipe(s) in this crafting system and clean up related runs and learned recipes.",
         "SaveDetails": "Save Details"

@@ -4222,6 +4222,72 @@
   font-size: 0.82rem;
 }
 
+/* The resolution-mode field spans the full edit grid and lays the select beside a help panel
+   that explains every mode, collapsing the panel below the select on narrow widths. */
+.fabricate-manager .manager-resolution-mode-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--fab-space-3);
+  align-items: start;
+}
+
+.fabricate-manager .manager-resolution-mode-control {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-resolution-help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-help-title {
+  margin: 0 0 var(--fab-space-2xs);
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-resolution-help-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-resolution-help-item.is-active {
+  background: var(--fab-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-resolution-help-item dt {
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-resolution-help-item dd {
+  margin: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-resolution-mode-field {
+    grid-template-columns: 1fr;
+  }
+}
+
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea {
