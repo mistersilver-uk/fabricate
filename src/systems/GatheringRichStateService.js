@@ -106,6 +106,10 @@ function resolveDropModifierMode(systemMode) {
 // compat mapping in normalizeGatheringEconomy (legacy `mode` ⇒ stamina/nodes
 // flags). The canonical state is the two independent booleans, not this enum.
 const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
+// System-level gathering resolution mode. `d100` is the only currently implemented
+// resolution; `progressive`/`routed` are modelled but unimplemented (the manager
+// shows them disabled). It is GM config, not part of the player listing payload.
+const GATHERING_RESOLUTION_MODES = new Set(['d100', 'progressive', 'routed']);
 // Stamina regeneration over world time.
 const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
 // Legacy stamina-regen policy mapped onto the unified `overTime` term. The 1.2.0
@@ -1707,8 +1711,12 @@ function shouldDepleteNode(task, outcome) {
  * `nodes` ⇒ nodes.enabled, else both false). Present flags always win over a
  * stale `mode`, so a stale `mode` can never resurrect a disabled limitation.
  *
+ * `resolutionMode` is the system-level gathering resolution (default `d100`, the
+ * only currently honored value). It is GM config and is NOT part of the player
+ * gathering listing payload.
+ *
  * @param {object} raw Raw economy block.
- * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
+ * @returns {{resolutionMode: string, stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
  */
 function normalizeGatheringEconomy(raw = {}) {
   const regen = raw?.stamina?.regen || {};
@@ -1722,6 +1730,9 @@ function normalizeGatheringEconomy(raw = {}) {
   const staminaEnabled = hasStaminaFlag ? raw.stamina.enabled === true : legacyMode === 'stamina';
   const nodesEnabled = hasNodesFlag ? raw.nodes.enabled === true : legacyMode === 'nodes';
   return {
+    resolutionMode: GATHERING_RESOLUTION_MODES.has(raw?.resolutionMode)
+      ? raw.resolutionMode
+      : 'd100',
     stamina: {
       enabled: staminaEnabled,
       // Expression templates (number or formula, e.g. "40" or "4 * @abilities.con.mod"),

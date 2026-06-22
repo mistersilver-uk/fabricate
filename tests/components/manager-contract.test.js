@@ -542,6 +542,70 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'), 'v2 row edit should not seed and launch the current admin');
   });
 
+  it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
+    // The recipe card legend is renamed; its only consumer is this legend.
+    assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
+    assert.ok(systemEditSource.includes("legendFallback=\"Recipe resolution mode\""), 'system edit inline fallback should match the renamed value');
+
+    // Salvage card source hooks: fieldset + option attribute names and the radio group name.
+    assert.ok(systemEditSource.includes('data-system-salvage-resolution-mode'), 'system edit should declare the salvage fieldset hook');
+    assert.ok(systemEditSource.includes('data-system-salvage-resolution-mode-option'), 'system edit should declare the salvage option hook');
+    assert.ok(systemEditSource.includes('manager-system-salvage-resolution-mode'), 'system edit should use the dedicated salvage radio group name');
+
+    // New salvage i18n keys are present and non-empty.
+    for (const key of [
+      'SalvageResolutionMode',
+      'SalvageResolutionModeHint',
+      'SalvageResolutionProgressive',
+      'SalvageResolutionProgressiveDesc',
+      'SalvageResolutionRouted',
+      'SalvageResolutionRoutedDesc',
+      'ResolutionComingSoon'
+    ]) {
+      const value = lang.FABRICATE.Admin.SystemSettings[key];
+      assert.equal(typeof value, 'string', `SystemSettings.${key} should be a string`);
+      assert.ok(value.length > 0, `SystemSettings.${key} should be non-empty`);
+    }
+
+    // Salvage option-set guard: the salvage options offer progressive + routed only.
+    const salvageOptionsMatch = systemEditSource.match(/salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(salvageOptionsMatch, 'system edit should define a salvageResolutionModeOptions array');
+    const salvageOptionsBlock = salvageOptionsMatch[1];
+    assert.ok(salvageOptionsBlock.includes("value: 'progressive'"), 'salvage should offer progressive');
+    assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
+    assert.ok(!salvageOptionsBlock.includes("value: 'simple'"), 'salvage should NOT offer simple');
+    assert.ok(!salvageOptionsBlock.includes("value: 'alchemy'"), 'salvage should NOT offer alchemy');
+
+    // Persistence wiring threaded from the root through the edit view to the store.
+    assert.ok(systemEditSource.includes('onSetSalvageResolutionMode'), 'system edit should accept the salvage persistence prop');
+    assert.ok(rootSource.includes('store.setSalvageResolutionMode?.'), 'root should pass the salvage callback through to the system-edit view');
+  });
+
+  it('offers a gathering resolution-mode card with d100 selectable and progressive/routed coming soon', () => {
+    const gatheringEconomySource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte'),
+      'utf8'
+    );
+    assert.ok(gatheringEconomySource.includes('data-gathering-resolution-mode'), 'gathering view should declare the resolution fieldset hook');
+    assert.ok(gatheringEconomySource.includes('data-gathering-resolution-mode-option'), 'gathering view should declare the resolution option hook');
+    assert.ok(gatheringEconomySource.includes('manager-gathering-resolution-mode'), 'gathering view should use the dedicated resolution radio group name');
+
+    const optionsMatch = gatheringEconomySource.match(/gatheringResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(optionsMatch, 'gathering view should define a gatheringResolutionModeOptions array');
+    const optionsBlock = optionsMatch[1];
+    assert.ok(optionsBlock.includes("value: 'd100'"), 'gathering should offer d100');
+    assert.ok(optionsBlock.includes("value: 'progressive'"), 'gathering should offer progressive');
+    assert.ok(optionsBlock.includes("value: 'routed'"), 'gathering should offer routed');
+
+    // d100 is selectable; progressive/routed are disabled coming-soon affordances.
+    assert.equal(lang.FABRICATE.Admin.Manager.Economy.GatheringResolutionMode, 'Gathering resolution mode');
+    for (const key of ['D100', 'D100Desc', 'Progressive', 'Routed']) {
+      const value = lang.FABRICATE.Admin.Manager.Economy.Resolution[key];
+      assert.equal(typeof value, 'string', `Economy.Resolution.${key} should be a string`);
+      assert.ok(value.length > 0, `Economy.Resolution.${key} should be non-empty`);
+    }
+  });
+
   it('keeps first-slice action and navigation hierarchy focused', () => {
     assert.ok(!rootSource.includes('function viewKicker'), 'top-bar view kickers should not duplicate the page title');
     assert.ok(!rootSource.includes('{viewKicker()}'), 'top-bar header should render only the page title and subtitle');

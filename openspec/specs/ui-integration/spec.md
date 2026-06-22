@@ -140,9 +140,25 @@ Display list + detail editor for crafting systems.
 
 - Name
 - Description
-- Resolution mode (`simple`, `routed`, `progressive`, `alchemy`)
+- Recipe resolution mode (`simple`, `routed`, `progressive`, `alchemy`)
+- Salvage resolution mode
 
-Changing resolution mode is destructive and must follow `007` confirmation/cleanup rules.
+Changing recipe resolution mode is destructive and must follow `007` confirmation/cleanup rules.
+
+#### Salvage Resolution Mode Card
+
+The Salvage resolution mode card renders directly beneath the recipe resolution-mode card.
+Salvage has exactly one ingredient, so ingredient-set routing is meaningless:
+the card offers only `progressive` and `routed` (display name "Routed by check").
+It does not offer `simple` or `alchemy`.
+
+When the system's persisted `salvageResolutionMode` is `simple` or absent the card SHALL render with no radio checked
+(an honest "unset — pick one"); it MUST NOT pre-select `routed` or silently migrate stored `simple` data.
+Persistence happens only on an explicit GM selection through `setSalvageResolutionMode`.
+
+Changing salvage resolution mode is non-destructive:
+it reversibly disables salvage on components incompatible with the new mode and deletes no recipes or runs,
+so the confirmation copy is salvage-accurate and not the recipe-deletion warning.
 
 #### Feature Toggles
 
@@ -333,6 +349,12 @@ Current GM editor behavior:
 - Tasks / Nodes authoring exposes task identity, enabled state, current node count, max node count, depletion timing, respawn policy, next respawn evidence, and manual restock controls when node economy is enabled.
 - Manual restock controls are GM-only and show whether they affect current count, max count, or both.
 - Economy authoring shows the selected gathering economy mode and exposes only relevant controls as primary: time requirement for `time`, node controls for `nodes`, stamina cost/regeneration for `stamina`, and combined controls for `hybrid`.
+- Economy authoring exposes a Gathering resolution mode card above the Limitation mode card.
+  It offers `d100` (the only currently implemented gathering resolution; selectable and the default),
+  `progressive`, and `routed` (display name "Routed by check").
+  `progressive` and `routed` are modelled but unimplemented and SHALL render disabled with a "Coming soon" affordance;
+  clicking a disabled option persists nothing.
+  The selection persists on the system gathering economy block as `economy.resolutionMode`.
 - Stamina authoring exposes system-level stamina configuration, including max/current provider strategy, regeneration mode, regeneration rule, manual adjustment permissions, and task stamina costs.
 - GM controls allow authorized GMs to manually set an actor's current gathering stamina and, when Fabricate owns the maximum, maximum gathering stamina.
 - Risk / Encounters authoring exposes environment risk, task risk overrides, encounter table links, trigger hooks, and player-facing risk copy.

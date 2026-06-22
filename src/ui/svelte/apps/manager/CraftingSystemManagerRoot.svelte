@@ -3886,6 +3886,7 @@
         {selectedSystem}
         onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
+        onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}

@@ -630,6 +630,49 @@ describe('createAdminStore', () => {
       assert.equal(result, false);
       assert.equal(updateCalled, false);
     });
+
+    // Salvage mode change is non-destructive (updateSystem runs only the inline
+    // _disableInvalidSalvageConfigs cleanup), so the confirm is salvage-accurate.
+    // Both branches share this setup, parameterized on the confirm answer.
+    async function runSalvageMode(confirmAnswer) {
+      let confirmCalled = false;
+      let updateArgs = null;
+      const services = createMockServices({
+        confirmDialog: async () => { confirmCalled = true; return confirmAnswer; }
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setSalvageResolutionMode('routed');
+      return { store, result, confirmCalled, updateArgs: () => updateArgs };
+    }
+
+    it('setSalvageResolutionMode confirms and persists the new salvage mode', async () => {
+      const { result, confirmCalled, updateArgs } = await runSalvageMode(true);
+      assert.equal(result, true);
+      assert.equal(confirmCalled, true);
+      assert.equal(updateArgs()?.id, 'sys1');
+      assert.equal(updateArgs()?.updates?.salvageResolutionMode, 'routed');
+    });
+
+    it('setSalvageResolutionMode leaves the system unchanged when the confirmation is declined', async () => {
+      const { result, confirmCalled, updateArgs } = await runSalvageMode(false);
+      assert.equal(result, false);
+      assert.equal(confirmCalled, true);
+      assert.equal(updateArgs(), null);
+    });
+
+    it('exposes setSalvageResolutionMode on the store API', () => {
+      const store = createAdminStore(createMockServices());
+      assert.equal(typeof store.setSalvageResolutionMode, 'function');
+    });
   });
 
   // -------------------------------------------------------------------------

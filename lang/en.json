@@ -632,6 +632,15 @@
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
         "Economy": {
+          "GatheringResolutionMode": "Gathering resolution mode",
+          "Resolution": {
+            "D100": "d100 roll",
+            "D100Desc": "Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.",
+            "Progressive": "Progressive",
+            "ProgressiveDesc": "A numeric check awards every drop whose difficulty threshold is met.",
+            "Routed": "Routed by check",
+            "RoutedDesc": "The gathering check outcome selects which drop group is returned."
+          },
           "ModeTitle": "Limitation mode",
           "ModeHint": "How this system limits how often tasks can be attempted.",
           "Mode": {
@@ -2645,7 +2654,7 @@
         "NoSystemSelectedHint": "Create a new system to configure categories, tags, essences, and rules.",
         "Name": "Name",
         "Description": "Description",
-        "ResolutionMode": "Resolution Mode",
+        "ResolutionMode": "Recipe resolution mode",
         "ResolutionModeHint": "Controls how recipes in this system choose results and which advanced editor controls are available.",
         "ResolutionSimple": "Simple",
         "ResolutionRouted": "Routed",
@@ -2658,6 +2667,15 @@
         "ResolutionAlchemyDesc": "Players submit ingredient combinations directly to discover hidden recipes; one result is selected per attempt.",
         "ResolutionModeChangeTitle": "Change Resolution Mode?",
         "ResolutionModeChangeContent": "Changing resolution mode to {mode} will delete {count} recipe(s) in this crafting system and clean up related runs and learned recipes.",
+        "ResolutionComingSoon": "Coming soon",
+        "SalvageResolutionMode": "Salvage resolution mode",
+        "SalvageResolutionModeHint": "Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled.",
+        "SalvageResolutionProgressive": "Progressive",
+        "SalvageResolutionProgressiveDesc": "One ordered result group; a numeric salvage check awards every result whose difficulty threshold is met.",
+        "SalvageResolutionRouted": "Routed by check",
+        "SalvageResolutionRoutedDesc": "Multiple result groups; the salvage check outcome selects which result group is returned.",
+        "SalvageResolutionModeChangeTitle": "Change Salvage Resolution Mode?",
+        "SalvageResolutionModeChangeContent": "Changing the salvage resolution mode for {name}: components incompatible with the new salvage mode will have salvage disabled.",
         "SaveDetails": "Save Details"
       },
       "Features": {

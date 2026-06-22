@@ -3657,6 +3657,42 @@ export function createAdminStore(services) {
     return true;
   }
 
+  // Salvage resolution mode is non-destructive: updateSystem runs only the inline
+  // salvage-cleanup block (_disableInvalidSalvageConfigs), which reversibly disables
+  // salvage on components incompatible with the new mode. It deletes no recipes or
+  // runs, so the confirm is salvage-accurate, not the recipe-deletion warning.
+  async function setSalvageResolutionMode(salvageResolutionMode) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return false;
+
+    const system = systemManager.getSystem(sysId);
+    if (!system) return false;
+
+    const nextMode = String(salvageResolutionMode || '').trim() || 'progressive';
+    const currentMode = system.salvageResolutionMode || 'simple';
+    if (nextMode === currentMode) return true;
+
+    const localizeFn = services.localize;
+    const confirmed = await services.confirmDialog({
+      title: localizeFn?.('FABRICATE.Admin.SystemSettings.SalvageResolutionModeChangeTitle')
+        || 'Change Salvage Resolution Mode?',
+      content: `<p>${
+        localizeFn?.('FABRICATE.Admin.SystemSettings.SalvageResolutionModeChangeContent', {
+          name: system.name,
+          mode: nextMode
+        }) || `Changing the salvage resolution mode for ${system.name}: components incompatible with the new salvage mode will have salvage disabled.`
+      }</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    await systemManager.updateSystem(sysId, { salvageResolutionMode: nextMode });
+    await refresh();
+    return true;
+  }
+
   // --- Tab navigation ---
 
   async function setTab(tabName) {
@@ -5831,6 +5867,7 @@ export function createAdminStore(services) {
     deleteSystem,
     saveSystemDetails,
     setResolutionMode,
+    setSalvageResolutionMode,
     setTab,
     selectEnvironment,
     createEnvironmentDraft,

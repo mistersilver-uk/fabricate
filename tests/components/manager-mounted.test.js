@@ -92,6 +92,7 @@ function compileManagerRoot() {
       readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`), 'utf8')
     );
   }
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
@@ -824,6 +825,10 @@ function createStore(calls = [], options = {}) {
       calls.push(['setResolutionMode', mode]);
       return options.resolutionModeResult ?? true;
     },
+    setSalvageResolutionMode: async (mode) => {
+      calls.push(['setSalvageResolutionMode', mode]);
+      return options.salvageResolutionModeResult ?? true;
+    },
     toggleFeature: (feature, enabled) => {
       calls.push(['toggleFeature', feature, enabled]);
       return options.toggleFeatureResult ?? true;
@@ -1106,6 +1111,28 @@ async function mountCurrencyEditor(storeOptions) {
   await tick();
   flushSync();
   return { calls };
+}
+
+// Shared assertion for a ResolutionModeCard's option list: the rows render in the
+// expected order, each wraps a real radio in the named group, and each has a
+// non-empty description. Hoisted so the recipe/salvage tests stay DRY (Sonar gate).
+function assertResolutionCard(card, { optionAttr, groupName, expectedValues }) {
+  assert.ok(card, 'resolution-mode card should render');
+  const rows = [...card.querySelectorAll(`[${optionAttr}]`)];
+  assert.deepEqual(
+    rows.map(row => row.getAttribute(optionAttr)),
+    expectedValues,
+    'card lists its options in order'
+  );
+  assert.ok(
+    rows.every(row => row.querySelector(`input[type="radio"][name="${groupName}"]`)),
+    'each row wraps a real radio in the group'
+  );
+  assert.ok(
+    rows.every(row => row.querySelector('.manager-resolution-option-desc')?.textContent.trim().length > 0),
+    'each row has a non-empty description'
+  );
+  return rows;
 }
 
 describe('CraftingSystemManager mounted behavior', () => {
@@ -5767,6 +5794,36 @@ describe('CraftingSystemManager mounted behavior', () => {
       && call[2] === 'Updated potion work'));
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'routed'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
+  });
+
+  it('renders the salvage resolution-mode card (progressive/routed) and routes its change', async () => {
+    // Alchemy has no salvageResolutionMode (absent ⇒ simple), so no radio is checked.
+    const { calls } = await mountCurrencyEditor();
+
+    const salvageCard = target.querySelector('[data-system-salvage-resolution-mode]');
+    const rows = assertResolutionCard(salvageCard, {
+      optionAttr: 'data-system-salvage-resolution-mode-option',
+      groupName: 'manager-system-salvage-resolution-mode',
+      expectedValues: ['progressive', 'routed']
+    });
+    assert.equal(rows.length, 2, 'salvage card offers exactly two options');
+
+    // No active radio for a simple/absent system (honest "unset — pick one").
+    assert.equal(
+      salvageCard.querySelector('input[type="radio"][name="manager-system-salvage-resolution-mode"]:checked'),
+      null,
+      'no salvage radio is checked when the stored mode is simple/absent'
+    );
+
+    const routedRadio = salvageCard.querySelector('[data-system-salvage-resolution-mode-option="routed"] input[type="radio"]');
+    routedRadio.checked = true;
+    routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'setSalvageResolutionMode' && call[1] === 'routed'),
+      'selecting the routed radio persists the canonical routed value');
   });
 
   it('renders the currency spend-strategy control with three options and routes its change', async () => {

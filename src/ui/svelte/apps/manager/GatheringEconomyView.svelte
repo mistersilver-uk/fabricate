@@ -19,6 +19,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ResolutionModeCard from './ResolutionModeCard.svelte';
 
   let { services = null, systemId = '' } = $props();
 
@@ -36,7 +37,23 @@
   let actorPageSize = $state(6);
 
   function defaultEconomy() {
-    return { stamina: { enabled: false, max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } };
+    return { resolutionMode: 'd100', stamina: { enabled: false, max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } };
+  }
+
+  // Gathering resolution mode is system config (default d100, the only currently
+  // implemented gathering resolution). progressive/routed are modelled but not yet
+  // implemented, so they render disabled with a "Coming soon" badge.
+  const GATHERING_RESOLUTION_MODES = ['d100', 'progressive', 'routed'];
+
+  const gatheringResolutionModeOptions = [
+    { value: 'd100', labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100', fallback: 'd100 roll', descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100Desc', descFallback: 'Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.' },
+    { value: 'progressive', labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Progressive', fallback: 'Progressive', descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.ProgressiveDesc', descFallback: 'A numeric check awards every drop whose difficulty threshold is met.', disabled: true, badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon', badgeFallback: 'Coming soon' },
+    { value: 'routed', labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Routed', fallback: 'Routed by check', descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.RoutedDesc', descFallback: 'The gathering check outcome selects which drop group is returned.', disabled: true, badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon', badgeFallback: 'Coming soon' }
+  ];
+
+  function setResolutionMode(mode) {
+    economy.resolutionMode = GATHERING_RESOLUTION_MODES.includes(mode) ? mode : 'd100';
+    void persistEconomy();
   }
 
   // Reload economy + actor stamina whenever the selected system changes.
@@ -77,6 +94,7 @@
     const hasNodesFlag = raw.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
     const legacyMode = ['none', 'stamina', 'nodes'].includes(raw.mode) ? raw.mode : 'none';
     return {
+      resolutionMode: GATHERING_RESOLUTION_MODES.includes(raw.resolutionMode) ? raw.resolutionMode : 'd100',
       stamina: {
         enabled: hasStaminaFlag ? raw.stamina.enabled === true : legacyMode === 'stamina',
         max: raw.stamina?.max == null ? '' : String(raw.stamina.max),
@@ -184,6 +202,19 @@
 </script>
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
+  <section class="manager-economy-card" data-gathering-resolution-card>
+    <ResolutionModeCard
+      legendKey="FABRICATE.Admin.Manager.Economy.GatheringResolutionMode"
+      legendFallback="Gathering resolution mode"
+      options={gatheringResolutionModeOptions}
+      selectedValue={economy.resolutionMode}
+      groupName="manager-gathering-resolution-mode"
+      dataAttr="data-gathering-resolution-mode"
+      optionDataAttr="data-gathering-resolution-mode-option"
+      onChange={setResolutionMode}
+    />
+  </section>
+
   <section class="manager-economy-card" data-economy-mode-card>
     <header class="manager-economy-card-head">
       <h3 class="manager-economy-card-title"><i class="fas fa-scale-balanced" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}</span></h3>
@@ -337,9 +368,14 @@
 
 <style>
   /* Span the full settings grid (2 columns) so the economy reads as one card
-     above the Times-of-day / Weather / Regions panels. */
+     above the Times-of-day / Weather / Regions panels. Stack the resolution-mode
+     card and the limitation card vertically with the same gap the cards use
+     internally, so the two sibling cards don't render flush against each other. */
   .manager-gathering-economy {
     grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
   /* Card chrome mirrors the sibling .manager-condition-panel. */

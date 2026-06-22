@@ -149,6 +149,9 @@ CraftingSystem = {
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
 9. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
+9a. The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
+An absent, invalid, or wrong-shape value (including a stray `"simple"`) normalizes to `"d100"` on both the read and persist paths.
+It is GM configuration and is not part of the player gathering listing payload.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
