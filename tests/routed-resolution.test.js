@@ -172,28 +172,64 @@ describe('routed recipe resolution', () => {
     assert.equal(rollTableResult.groups[0].name, 'Mythic');
   });
 
-  it('legacy mapped and tiered compatibility still resolve as before', () => {
-    const mappedService = buildService({ id: 'sys-routed', resolutionMode: 'mapped' });
-    const tieredService = buildService({ id: 'sys-routed', resolutionMode: 'tiered' });
-    const activeStep = step({
-      outcomeRouting: { pass: 'mythic' },
-      resultSelection: null
-    });
-    const recipe = recipeWithStep(activeStep);
+  // Back-compat regression guard: legacy persisted `mapped`/`tiered` data still
+  // resolves correctly AFTER the canonical pipeline (manager token-normalizer +
+  // 1.4.0 migration). The legacy routing algorithms are gone from the service;
+  // canonical `routed` + a seeded provider (and, for tiered, reconciled group
+  // names) reproduce the old behavior.
+  it('legacy mapped token normalizes to routed and resolves by ingredientSet', () => {
+    const manager = new CraftingSystemManager(null);
+    const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'mapped' });
+    assert.equal(system.resolutionMode, 'routed');
 
-    const mapped = mappedService.resolveResultGroups({
+    const service = buildService({ ...buildSystem(), id: 'sys-routed', resolutionMode: 'routed' });
+    const activeStep = step({ resultSelection: { provider: 'ingredientSet' } });
+    const recipe = recipeWithStep(activeStep);
+    const mapped = service.resolveResultGroups({
       recipe,
       step: recipe.steps[0],
       ingredientSet: recipe.steps[0].ingredientSets[0]
     });
-    const tiered = tieredService.resolveResultGroups({
+    assert.equal(mapped.groups[0].name, 'Standard');
+  });
+
+  it('legacy tiered token normalizes to routed and resolves by macroOutcome name matching', async () => {
+    const manager = new CraftingSystemManager(null);
+    const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'tiered' });
+    assert.equal(system.resolutionMode, 'routed');
+
+    // The 1.4.0 migration renames the routed group to the outcome ('pass') and
+    // seeds macroOutcome, so canonical name-matching reproduces the legacy
+    // outcomeRouting { pass: 'mythic' } behavior.
+    const { migrateLegacyResolutionModes } = await import(
+      '../src/migration/migrateLegacyResolutionModes.js'
+    );
+    const migrated = migrateLegacyResolutionModes({
+      systems: [{ id: 'sys-routed', resolutionMode: 'tiered' }],
+      recipes: [
+        {
+          id: 'recipe-1',
+          craftingSystemId: 'sys-routed',
+          resultGroups: groups(),
+          outcomeRouting: { pass: 'mythic' }
+        }
+      ]
+    });
+    const migratedRecipe = migrated.recipes[0];
+    assert.equal(migratedRecipe.resultSelection.provider, 'macroOutcome');
+    const passGroup = migratedRecipe.resultGroups.find(g => g.id === 'mythic');
+    assert.equal(passGroup.name, 'pass');
+
+    const service = buildService({ ...buildSystem(), id: 'sys-routed', resolutionMode: 'routed' });
+    const recipe = recipeWithStep(
+      step({ resultGroups: migratedRecipe.resultGroups, resultSelection: { provider: 'macroOutcome' } })
+    );
+    const tiered = service.resolveResultGroups({
       recipe,
       step: recipe.steps[0],
       ingredientSet: recipe.steps[0].ingredientSets[0],
       checkResult: { outcome: 'pass' }
     });
-
-    assert.equal(mapped.groups[0].name, 'Standard');
-    assert.equal(tiered.groups[0].name, 'Mythic');
+    assert.equal(tiered.groups[0].id, 'mythic');
   });
 });

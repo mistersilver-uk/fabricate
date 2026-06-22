@@ -780,7 +780,10 @@ test('_resolveSalvageResultGroups routed mode selects correct group for each out
   assert.equal(failResult[0].id, 'rg-fail');
 });
 
-test('_resolveSalvageResultGroups legacy tiered alias uses routed logic', () => {
+test('_resolveSalvageResultGroups routed salvage routes by outcomeRouting (former tiered alias, now canonical)', () => {
+  // Salvage retains its own outcomeRouting model at runtime; the legacy `tiered`
+  // salvage token is normalized to `routed` by the manager / 1.4.0 migration
+  // before reaching the engine, so the engine only ever sees canonical `routed`.
   const engine = makeEngine();
   const groups = [
     { id: 'rg-pass', name: 'Pass', results: [{ id: 'r-1', componentId: 'ore', quantity: 1 }] },
@@ -794,7 +797,7 @@ test('_resolveSalvageResultGroups legacy tiered alias uses routed logic', () => 
       outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' }
     }
   };
-  const system = makeSystem({ salvageResolutionMode: 'tiered', components: [component] });
+  const system = makeSystem({ salvageResolutionMode: 'routed', components: [component] });
 
   const passResult = engine._resolveSalvageResultGroups(component, system, { outcome: 'pass', value: null });
   assert.equal(passResult.length, 1);

@@ -7,7 +7,7 @@
  * Groups:
  *   1. Simple mode — validate, consume, create result
  *   2. Multi-step — start, advance, complete
- *   3. Legacy tiered compatibility mode — check macro returns outcome, routed to correct result group
+ *   3. Routed macroOutcome — check macro returns outcome, name-matched to a result group
  *   4. Progressive mode — check macro returns value, awards based on difficulty
  */
 import test from 'node:test';
@@ -138,6 +138,7 @@ function makeRecipe({
   ingredientSets = [],
   resultGroups = [],
   outcomeRouting = null,
+  resultSelection = null,
   steps = null
 } = {}) {
   const recipe = {
@@ -147,6 +148,7 @@ function makeRecipe({
     ingredientSets,
     resultGroups,
     outcomeRouting,
+    resultSelection,
     transferEffects: false,
     validate() { return { valid: true, errors: [] }; },
     toJSON() { return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId }; }
@@ -538,13 +540,13 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
 });
 
 // ===========================================================================
-// Group 3: Legacy tiered compatibility mode — check macro returns outcome, routed to correct result group
+// Group 3: Routed macroOutcome — check macro returns outcome, name-matched to a result group
 // ===========================================================================
 
 function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
   return makeSystem({
     id,
-    resolutionMode: 'tiered',
+    resolutionMode: 'routed',
     craftingCheck: {
       enabled: true,
       macroUuid: 'macro:check',
@@ -565,26 +567,29 @@ function makeLegacyOutcomeRoutingRecipeFixture(system) {
   const herb = makeItem({ id: 'herb-routing', name: 'Herb', quantity: 5 });
   const ingredientSet = makeIngredientSet({ id: 'set-routing', ingredientItem: herb, quantity: 1 });
 
+  // Canonical routed + macroOutcome (the 1.4.0 migration output): groups are
+  // name-matched against the outcome. The non-reserved outcomes `critical`/`pass`
+  // name their groups; the reserved `fail` outcome takes the failure path.
   const step = {
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
     resultGroups: [
-      { id: 'rg-critical', results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }] },
-      { id: 'rg-pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }
+      { id: 'rg-critical', name: 'critical', results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }] },
+      { id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }
     ],
-    outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-pass' }, timeRequirement: null
+    resultSelection: { provider: 'macroOutcome' }, timeRequirement: null
   };
 
   const recipe = makeRecipe({
     craftingSystemId: system.id,
-    outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-pass' },
+    resultSelection: { provider: 'macroOutcome' },
     steps: [step]
   });
 
   return { herb, ingredientSet, step, recipe };
 }
 
-test('legacy tiered compatibility mode: "critical" outcome routes to high-value result group', async () => {
+test('routed macroOutcome: "critical" outcome routes to the critical-named result group', async () => {
   const system = makeLegacyOutcomeRoutingSystem('sys-legacy-routing-1');
   setupGame(system);
 
@@ -609,12 +614,12 @@ test('legacy tiered compatibility mode: "critical" outcome routes to high-value 
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(result.success, true, 'legacy tiered compatibility craft should succeed');
+  assert.equal(result.success, true, 'routed macroOutcome craft should succeed');
   assert.equal(craftingActor.createdItems.length, 1, 'exactly one result item created');
   assert.equal(craftingActor.createdItems[0].name, 'Greater Potion', '"critical" outcome routes to Greater Potion');
 });
 
-test('legacy tiered compatibility mode: "pass" outcome routes to normal result group', async () => {
+test('routed macroOutcome: "pass" outcome routes to the pass-named result group', async () => {
   const system = makeLegacyOutcomeRoutingSystem('sys-legacy-routing-2');
   setupGame(system);
 
@@ -645,12 +650,12 @@ test('legacy tiered compatibility mode: "pass" outcome routes to normal result g
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(result.success, true, 'legacy tiered compatibility craft should succeed with "pass" outcome');
+  assert.equal(result.success, true, 'routed macroOutcome craft should succeed with "pass" outcome');
   assert.equal(craftingActor.createdItems.length, 1, 'exactly one result item created');
   assert.equal(craftingActor.createdItems[0].name, 'Potion', '"pass" outcome routes to normal Potion');
 });
 
-test('legacy tiered compatibility mode: check failure returns failure without creating results', async () => {
+test('routed macroOutcome: check failure returns failure without creating results', async () => {
   const system = makeLegacyOutcomeRoutingSystem('sys-legacy-routing-3');
   setupGame(system);
   globalThis.fromUuid = async () => null;
@@ -661,13 +666,13 @@ test('legacy tiered compatibility mode: check failure returns failure without cr
   const step = {
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }],
-    outcomeRouting: { critical: 'rg-pass', pass: 'rg-pass', fail: 'rg-pass' }, timeRequirement: null
+    resultGroups: [{ id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }],
+    resultSelection: { provider: 'macroOutcome' }, timeRequirement: null
   };
 
   const recipe = makeRecipe({
     craftingSystemId: system.id,
-    outcomeRouting: { critical: 'rg-pass', pass: 'rg-pass', fail: 'rg-pass' },
+    resultSelection: { provider: 'macroOutcome' },
     steps: [step]
   });
 
@@ -683,7 +688,7 @@ test('legacy tiered compatibility mode: check failure returns failure without cr
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(result.success, false, 'legacy tiered compatibility craft should fail when check fails');
+  assert.equal(result.success, false, 'routed macroOutcome craft should fail when check fails');
   assert.match(result.message, /Roll too low/i, 'failure message should propagate');
   assert.equal(craftingActor.createdItems.length, 0, 'no items created on check failure');
 });

@@ -1405,6 +1405,23 @@ export class CraftingEngine {
     }
   }
 
+  /**
+   * Run the crafting check for an attempt, if one is required or enabled.
+   *
+   * A check is REQUIRED (run even when the system has crafting checks disabled)
+   * when the recipe needs a check outcome to select its result:
+   *  - `progressive` mode, or
+   *  - `routed` mode with the `macroOutcome` provider.
+   *
+   * The other routed providers do not need a check outcome to route:
+   * `ingredientSet` selects by the chosen ingredient set, and `rollTableOutcome`
+   * selects by a drawn roll-table entry. For those, and for `simple`/`alchemy`,
+   * the check only runs when the system enables crafting checks. There is no
+   * legacy `tiered` branch — `tiered` is gone, replaced by `routed` + provider.
+   *
+   * @private
+   * @returns {Promise<{success: boolean, outcome: ?string, value?: *, data: object}>}
+   */
   async _runCraftingCheck(
     recipe,
     craftingActor,
@@ -1428,9 +1445,7 @@ export class CraftingEngine {
     const selection =
       resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
     const checkRequired =
-      mode === 'tiered' ||
-      mode === 'progressive' ||
-      (mode === 'routed' && selection?.provider === 'macroOutcome');
+      mode === 'progressive' || (mode === 'routed' && selection?.provider === 'macroOutcome');
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
@@ -2222,8 +2237,9 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult) {
-    const rawMode = system?.salvageResolutionMode || 'simple';
-    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
+    // Legacy salvage tokens are normalized to canonical values by the manager
+    // (salvage token normalizer) and the 1.4.0 migration before reaching here.
+    const mode = system?.salvageResolutionMode || 'simple';
     const allGroups = Array.isArray(component.salvage?.resultGroups)
       ? component.salvage.resultGroups
       : [];

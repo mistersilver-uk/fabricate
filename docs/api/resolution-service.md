@@ -54,9 +54,15 @@ Hooks.once('fabricate.ready', () => {
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 ingredient set, exactly 1 result group |
-| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid, and result group names must be unique (case-insensitive) |
+| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid, result group names are unique (case-insensitive) and do not use reserved keywords |
 | Routed (`macroOutcome`) | 1+ ingredient sets, 1+ result groups, checks enabled, `resultSelection.macroUuid` present or system fallback set, result group names are unique and do not use reserved keywords |
 | Routed (`rollTableOutcome`) | 1+ ingredient sets, 1+ result groups, `resultSelection.rollTableUuid` present, result group names are unique and do not use reserved keywords |
+
+The unique-name and reserved-keyword rules apply under every routed provider, not just `macroOutcome` and `rollTableOutcome`.
+Reserved keywords cover three families.
+The fail family is `fail`, `failed`, `failure`, `f`.
+The hazard family is `hazard`, `danger`, `complication`, `trap`, `oops`, and it also routes a check outcome to the failure path.
+The miss family is `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`.
 | Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
 
 ### validateSalvage(component, system)

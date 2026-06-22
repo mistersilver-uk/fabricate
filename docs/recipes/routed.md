@@ -51,12 +51,15 @@ This feature may be deprecated in favor of numerical range check outcome routing
 
 With the skill-check and roll-table options, the outcome name is matched to a result by name.
 Upper and lower case and surrounding spaces are ignored, so each result needs a name that is unique once case is ignored.
+This unique-name rule applies to all three selection methods, so no two results may share a name once case is ignored.
 
 A few names are reserved so a recipe can fail or come up empty without a separate check.
+These reserved names cannot be used as a result name in any of the three selection methods.
 
 | Reserved name | What happens |
 |:--------------|:-------------|
 | fail, failed, failure, f | The craft takes the failure path |
+| hazard, danger, complication, trap, oops | The craft takes the failure path |
 | miss, missed, m, nothing, none, whiff, whiffed | The craft produces nothing |
 
 If an outcome is neither a reserved name nor one of your result names, the craft stops and reports a setup problem rather than treating it as a player failure.
