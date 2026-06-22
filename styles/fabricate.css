@@ -4222,23 +4222,12 @@
   font-size: 0.82rem;
 }
 
-/* The resolution-mode field spans the full edit grid and lays the select beside a help panel
-   that explains every mode, collapsing the panel below the select on narrow widths. */
-.fabricate-manager .manager-resolution-mode-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: var(--fab-space-3);
-  align-items: start;
-}
-
-.fabricate-manager .manager-resolution-mode-control {
-  min-width: 0;
-}
-
-.fabricate-manager .manager-resolution-help {
+/* The resolution-mode card spans the full edit grid and is itself the selector: each mode is a
+   selectable radio row with its name and one-line description, the active row highlighted. */
+.fabricate-manager .manager-resolution-mode-card {
   display: flex;
   flex-direction: column;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-2);
   min-width: 0;
   margin: 0;
   padding: var(--fab-space-3);
@@ -4247,45 +4236,71 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-resolution-help-title {
-  margin: 0 0 var(--fab-space-2xs);
+.fabricate-manager .manager-resolution-mode-legend {
+  padding: 0;
   color: var(--fab-mv2-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-.fabricate-manager .manager-resolution-help-item {
+.fabricate-manager .manager-resolution-mode-options {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
-  padding: var(--fab-space-2);
-  border-radius: 6px;
 }
 
-.fabricate-manager .manager-resolution-help-item.is-active {
+.fabricate-manager .manager-resolution-option {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-resolution-option:hover {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-option.is-active {
+  border-color: var(--fab-mv2-border);
   background: var(--fab-accent-soft);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
-.fabricate-manager .manager-resolution-help-item dt {
+.fabricate-manager .manager-resolution-option input[type='radio'] {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  margin-top: 0.2rem;
+}
+
+.fabricate-manager .manager-resolution-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-resolution-option-name {
   color: var(--fab-mv2-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-.fabricate-manager .manager-resolution-help-item dd {
-  margin: 0;
+.fabricate-manager .manager-resolution-option-desc {
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1.35;
 }
 
-@media (width <= 720px) {
-  .fabricate-manager .manager-resolution-mode-field {
-    grid-template-columns: 1fr;
-  }
+.fabricate-manager .manager-resolution-mode-note {
+  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-field input,
