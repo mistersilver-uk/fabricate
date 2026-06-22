@@ -20,6 +20,24 @@ Shared project skills live in `skills/` (the canonical persona definition for ea
 invocable as `/slash` commands in the main loop. Use those shared skills instead of creating
 provider-local copies or provider-specific mirrors; see the bindings table in `AGENTS.md`.
 
+## Git & PR mechanics
+
+Before any multi-PR or git-history operation — stacking PRs, rebasing a branch after its base
+merges, force-pushing, or rewording commits — read the stacked-PR guidance in
+`skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first. This
+applies in the main loop, not just to spawned sub-agents. Key traps they cover:
+
+- **Squash-merge breaks descendants.** Squashing a base re-lands its commits on `main` under a new
+  SHA, so every child still carrying the originals conflicts the moment its base merges. Restack
+  bottom-up: after each base merges, `git rebase --onto origin/main <old-base-tip> <child>`
+  (derive `<old-base-tip>` from the child's own history — do NOT guess a SHA), force-push with
+  `--force-with-lease` (it protects against clobbering a concurrent maintainer push), and let CI
+  re-run before merging. `git rebase --update-refs` restacks a whole local chain and moves the
+  intermediate branch refs in one pass.
+- **Commits AND the PR title are linted** against Conventional Commits — every commit on the
+  branch, not just the tip. Use one valid type (`feat`/`fix`/`docs`/`refactor`/`test`/… — `i18n:`
+  is not valid; use `feat(i18n):`), a lowercase subject, and remember to fix the PR title too.
+
 ## OpenSpec
 
 For non-trivial work, use the OpenSpec workflow:
