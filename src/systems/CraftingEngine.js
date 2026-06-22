@@ -1428,9 +1428,7 @@ export class CraftingEngine {
     const selection =
       resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
     const checkRequired =
-      mode === 'tiered' ||
-      mode === 'progressive' ||
-      (mode === 'routed' && selection?.provider === 'macroOutcome');
+      mode === 'progressive' || (mode === 'routed' && selection?.provider === 'macroOutcome');
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
@@ -2222,8 +2220,9 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult) {
-    const rawMode = system?.salvageResolutionMode || 'simple';
-    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
+    // Legacy salvage tokens are normalized to canonical values by the manager
+    // (salvage token normalizer) and the 1.4.0 migration before reaching here.
+    const mode = system?.salvageResolutionMode || 'simple';
     const allGroups = Array.isArray(component.salvage?.resultGroups)
       ? component.salvage.resultGroups
       : [];

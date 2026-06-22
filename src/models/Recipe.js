@@ -1,4 +1,5 @@
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
+import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';
@@ -223,7 +224,7 @@ export class Recipe {
       this._validateResultGroups(container.resultGroups, container.label, errors, {
         requireComplete,
       });
-      this._validateRollTableResultSelection(
+      this._validateRoutedResultSelection(
         container.resultSelection,
         container.resultGroups,
         errors
@@ -297,29 +298,31 @@ export class Recipe {
     }
   }
 
-  _validateRollTableResultSelection(resultSelection, resultGroups, errors) {
-    if (resultSelection?.provider === 'rollTableOutcome') {
-      if (!resultSelection.rollTableUuid) {
-        errors.push('rollTableOutcome provider requires a roll table UUID');
-      }
+  _validateRoutedResultSelection(resultSelection, resultGroups, errors) {
+    const provider = resultSelection?.provider;
+    // Only the three routed providers route by ResultGroup.name / draw; a recipe
+    // with no resultSelection (simple/progressive/legacy) is unaffected.
+    if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) return;
 
-      // Validate ResultGroup name uniqueness (case-insensitive) and reserved keywords
-      const FAIL_KEYWORDS = new Set(['fail', 'failed', 'failure', 'f']);
-      const MISS_KEYWORDS = new Set(['miss', 'missed', 'm', 'nothing', 'none', 'whiff', 'whiffed']);
-      const seenNames = new Map();
-      for (const group of resultGroups) {
-        const normalized = String(group.name || '')
-          .trim()
-          .toLowerCase();
-        if (seenNames.has(normalized)) {
-          errors.push(
-            `Duplicate result group name "${group.name}" (case-insensitive) — rollTableOutcome requires unique names`
-          );
-        }
-        seenNames.set(normalized, group.id);
-        if (FAIL_KEYWORDS.has(normalized) || MISS_KEYWORDS.has(normalized)) {
-          errors.push(`Result group name "${group.name}" conflicts with reserved routing keyword`);
-        }
+    if (provider === 'rollTableOutcome' && !resultSelection.rollTableUuid) {
+      errors.push('rollTableOutcome provider requires a roll table UUID');
+    }
+
+    // Reserved + unique ResultGroup.name rules apply under EVERY routed provider
+    // (spec 004 §Validation lines 79-80), using the shared keyword set so the
+    // model and ResolutionModeService never drift.
+    const seenNames = new Set();
+    for (const group of resultGroups || []) {
+      const normalized = normalizeRoutedName(group?.name);
+      if (!normalized) continue;
+      if (seenNames.has(normalized)) {
+        errors.push(
+          `Duplicate result group name "${group.name}" (case-insensitive) — routed mode requires unique names`
+        );
+      }
+      seenNames.add(normalized);
+      if (isReservedRoutedName(normalized)) {
+        errors.push(`Result group name "${group.name}" conflicts with reserved routing keyword`);
       }
     }
   }

@@ -100,9 +100,12 @@ export class CraftingSystemManager {
       enabled: system.enabled !== false,
       resolutionMode: (function _normalizeResolutionMode(raw) {
         if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-        return ['simple', 'mapped', 'tiered', 'routed', 'progressive', 'alchemy'].includes(raw)
-          ? raw
-          : 'simple';
+        // Legacy mode TOKEN aliases for un-migrated/imported data (the 1.4.0
+        // migration hard-converts persisted data + reconciles routing). This is a
+        // token rename only — the legacy routing algorithms are gone; canonical
+        // `routed` + a seeded provider reproduces the old behavior.
+        if (raw === 'mapped' || raw === 'tiered') return 'routed';
+        return ['simple', 'routed', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
       })(system.resolutionMode),
       // New spec-first shape
       features,
