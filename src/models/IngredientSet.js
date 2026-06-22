@@ -1,6 +1,7 @@
 import { getFabricateFlag } from '../config/flags.js';
 
 import { IngredientGroup } from './IngredientGroup.js';
+import { getMatchHandler } from './match/matchTypes.js';
 
 /**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
@@ -152,14 +153,42 @@ export class IngredientSet {
   /**
    * Match ingredients to available items and return consumption plan
    * @param {Item[]} availableItems - Items from actor(s)
+   * @param {Function|null} [matcher] - `(ingredient, item) => boolean` override
+   * @param {{ affordCurrency?: (match: object) => boolean }} [opts] - forwarded to
+   *   {@link resolveIngredientSelection}; the `currencySpends` it returns are NOT
+   *   part of the item plan this method returns (currency is spent separately).
    * @returns {Array<{item: Item, quantity: number, ingredient: Ingredient}>}
    */
-  matchIngredients(availableItems, matcher = null) {
-    const selection = this.resolveIngredientSelection(availableItems, matcher);
+  matchIngredients(availableItems, matcher = null, opts = {}) {
+    const selection = this.resolveIngredientSelection(availableItems, matcher, opts);
     return selection.success ? selection.plan : [];
   }
 
-  resolveIngredientSelection(availableItems, matcher = null) {
+  /**
+   * Resolve which option satisfies each ingredient group, building the item
+   * consumption plan and (when a currency probe is supplied) the currency spends.
+   *
+   * Per group the resolution is items-first, currency-fallback: every NON-currency
+   * option is tried first and the first item-satisfiable one wins, even if a
+   * currency option is authored earlier — items strictly beat currency. Only if no
+   * item option satisfies does the resolver choose the first AFFORDABLE currency
+   * option (author order among currency options). A satisfied currency group adds a
+   * `{ unit, amount, ingredient }` entry to `currencySpends`; the item `plan` stays
+   * item-only.
+   *
+   * With no `affordCurrency` probe (the default), currency is NEVER chosen, so the
+   * result is byte-for-byte the legacy item-only behavior that `canBeCraftedWith`
+   * and the display path rely on.
+   *
+   * @param {Item[]} availableItems
+   * @param {Function|null} [matcher]
+   * @param {{ affordCurrency?: (match: object) => boolean }} [options]
+   * @returns {{ success: boolean, selectedIngredients: Ingredient[],
+   *   plan: Array<{item: Item, quantity: number, ingredient: Ingredient}>,
+   *   currencySpends: Array<{unit: string, amount: number, ingredient: Ingredient}>,
+   *   missingGroups: Array<object> }}
+   */
+  resolveIngredientSelection(availableItems, matcher = null, { affordCurrency } = {}) {
     const remaining = new Map();
     for (const item of availableItems) {
       remaining.set(this._itemKey(item), Number(item.system?.quantity || 1));
@@ -167,13 +196,17 @@ export class IngredientSet {
 
     const selectedIngredients = [];
     const plan = [];
+    const currencySpends = [];
     const missingGroups = [];
 
     for (const group of this.ingredientGroups) {
+      const options = group.options || [];
       let chosen = null;
       let bestMissing = null;
 
-      for (const option of group.options || []) {
+      // Items-first: try every non-currency option; first item-satisfiable wins.
+      for (const option of options) {
+        if (option?.match?.type === 'currency') continue;
         const candidate = this._buildPlanForIngredient(option, availableItems, remaining, matcher);
         if (candidate.ok) {
           chosen = { option, plan: candidate.plan };
@@ -182,6 +215,36 @@ export class IngredientSet {
         if (!bestMissing || candidate.have > bestMissing.have) {
           bestMissing = { ingredient: option, have: candidate.have, need: option.quantity };
         }
+      }
+
+      // Currency-fallback: only if no item option satisfied, choose the first
+      // AFFORDABLE currency option (author order among currency options).
+      let chosenCurrency = null;
+      if (!chosen) {
+        for (const option of options) {
+          if (option?.match?.type !== 'currency') continue;
+          const handler = getMatchHandler(option.match);
+          if (handler.affords(option.match, { affordCurrency })) {
+            chosenCurrency = { option, spend: handler.getCurrencySpend(option.match) };
+            break;
+          }
+          // Track an unaffordable currency option as the missing representative
+          // when the group has no item option at all (so the missing entry can
+          // surface the currency requirement).
+          if (!bestMissing) {
+            bestMissing = { ingredient: option, have: 0, need: option.quantity };
+          }
+        }
+      }
+
+      if (chosenCurrency?.spend) {
+        selectedIngredients.push(chosenCurrency.option);
+        currencySpends.push({
+          unit: chosenCurrency.spend.unit,
+          amount: chosenCurrency.spend.amount,
+          ingredient: chosenCurrency.option,
+        });
+        continue;
       }
 
       if (!chosen) {
@@ -205,11 +268,19 @@ export class IngredientSet {
       success: missingGroups.length === 0,
       selectedIngredients,
       plan,
+      currencySpends,
       missingGroups,
     };
   }
 
   _buildPlanForIngredient(ingredient, availableItems, remaining, matcher = null) {
+    // A currency option is never item-satisfiable: short-circuit to not-satisfiable
+    // so the resolver never item-matches it (currency is chosen by the affordability
+    // probe in the fallback pass, not here).
+    if (ingredient?.match?.type === 'currency') {
+      return { ok: false, plan: [], have: 0 };
+    }
+
     let neededQuantity = ingredient.quantity;
     const optionPlan = [];
     let totalAvailable = 0;

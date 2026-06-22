@@ -58,6 +58,44 @@ function checkAffordabilityViaReadCoins(spender, actor, requirement, ctx = {}) {
 }
 
 /**
+ * Build the SYNCHRONOUS affordability probe handed to ingredient-set resolution.
+ *
+ * The selection resolver is synchronous and calls `affordCurrency(match) -> boolean` to decide
+ * whether a currency option may satisfy a group. It must answer without awaiting, so this probe
+ * does a synchronous coin READ (not the async spend) for the property/inventory strategies, and
+ * is optimistic for the `macro` strategy (the authoritative `canAfford` macro is async and runs
+ * in the engine gate later — see {@link CraftingEngine}). It returns `false` for a null actor, an
+ * invalid profile, an unknown unit, or insufficient held value.
+ *
+ * @param {object} args
+ * @param {object|null} args.actor - the crafting actor; `null` short-circuits to never-affordable.
+ * @param {object} args.profile - a validated currency profile ({@link validateCurrencyProfile}).
+ * @param {string} args.spendStrategy
+ * @param {object} args.spender - resolved coin spender (exposes `readCoins`).
+ * @returns {(match: { unit?: string, amount?: number }) => boolean}
+ */
+export function buildAffordCurrencyProbe({ actor, profile, spendStrategy, spender } = {}) {
+  return (match) => {
+    if (!actor) return false;
+    const amount = Math.max(0, Number(match?.amount) || 0);
+    if (amount <= 0) return false;
+    const unit = (profile?.units || []).find(
+      (entry) => entry.id === String(match?.unit || '').trim()
+    );
+    if (!unit) return false;
+    // Macro spending can only be checked by running the (async) canAfford macro, which the
+    // synchronous probe cannot do. Stay optimistic here; the engine's async gate is authoritative
+    // and aborts loudly on a real shortfall (never granting a free craft).
+    if (spendStrategy === 'macro') return true;
+    if (typeof spender?.readCoins !== 'function') return false;
+    const coins = spender.readCoins(actor, { profile, unit, units: profile.units });
+    if (!coins || coins.valid === false) return false;
+    const baseValue = Number(profile?.metadata?.get(unit.id)?.baseValue) || 0;
+    return Number(coins.copperValue) >= amount * baseValue;
+  };
+}
+
+/**
  * Interpret a currency macro's return value into a uniform `{ valid, message? }` result. Reuses
  * the original currency-macro contract: a bare `true`, or an object with a truthy `success` or
  * `canAfford`, means the gate/deduction passed; `false`, `null`, a thrown error, or an object

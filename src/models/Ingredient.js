@@ -124,6 +124,13 @@ export class Ingredient {
     ) {
       return getMatchHandler(this.match).describe(this.match, { quantity });
     }
+    // A currency alternative ("100 gp") describes its cost as an insufficient-currency
+    // requirement so it surfaces sensibly in the engine's missing-items list and the
+    // craftability display when it is the unaffordable representative of a group.
+    if (this.match?.type === 'currency' && getMatchHandler(this.match).isComplete(this.match)) {
+      const spend = getMatchHandler(this.match).getCurrencySpend(this.match);
+      return `Insufficient currency. Requires ${spend.amount} ${spend.unit}.`;
+    }
     if (this.alternatives.length > 0) {
       return `${quantity}x (${this.alternatives.length} alternatives)`;
     }

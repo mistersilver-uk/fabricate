@@ -22,6 +22,8 @@
  * @property {(match: object, item: object, options: {features?: object}) => boolean} matchesItem
  * @property {(match: object) => (string|null)} getComponentId
  * @property {(match: object, options: {quantity?: number}) => string} describe
+ * @property {(match: object, options: {affordCurrency?: (match: object) => boolean}) => boolean} affords
+ * @property {(match: object) => ({unit: string, amount: number}|null)} getCurrencySpend
  */
 import { getFabricateFlag } from '../../config/flags.js';
 
@@ -83,6 +85,15 @@ const componentHandler = {
 
   describe(match, { quantity = 1 } = {}) {
     return `${quantity}x component`;
+  },
+
+  affords() {
+    // A component option is satisfied by inventory items, never by currency.
+    return false;
+  },
+
+  getCurrencySpend() {
+    return null;
   },
 };
 
@@ -156,6 +167,15 @@ const tagsHandler = {
     const joined = tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ');
     return `${quantity}x ${joined}`;
   },
+
+  affords() {
+    // A tag option is satisfied by inventory items, never by currency.
+    return false;
+  },
+
+  getCurrencySpend() {
+    return null;
+  },
 };
 
 /** @type {MatchHandler} */
@@ -165,8 +185,8 @@ const currencyHandler = {
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
     // A currency alternative ("100 gp") mirrors the legacy step-currency shape:
-    // a unit id string plus a non-negative amount. Authored cost only today —
-    // craft-time spending is a deferred follow-up.
+    // a unit id string plus a non-negative amount. It is spent at craft time via
+    // the currency-affordance layer (see src/systems/currencyAffordance.js).
     return {
       type: 'currency',
       unit: String(raw?.unit || '').trim(),
@@ -199,8 +219,9 @@ const currencyHandler = {
   },
 
   matchesItem() {
-    // A currency alternative matches no inventory item. Currency matches are
-    // authored-only; craft-time currency spend is a separate follow-up.
+    // A currency alternative matches no inventory item — it is satisfied by
+    // affording its cost, handled out-of-band during ingredient selection and
+    // spent by the currency-affordance layer, not by item matching here.
     return false;
   },
 
@@ -208,10 +229,32 @@ const currencyHandler = {
     return null;
   },
 
-  describe(match, { quantity = 1 } = {}) {
+  describe(match) {
+    // A currency alternative carries its cost on the match (`amount`/`unit`), not
+    // the option quantity, so the description reads as a flat currency cost rather
+    // than an "Nx" item count.
     const unit = trimmed(match?.unit);
     const amount = Number(match?.amount) || 0;
-    return `${quantity}x ${amount} ${unit}`;
+    return `${amount} ${unit}`.trim();
+  },
+
+  /**
+   * Whether the actor can afford this currency option. The `affordCurrency` probe
+   * (bound to the crafting actor + system currency profile in the engine) reports
+   * affordability; with no probe (the default, back-compat for `canBeCraftedWith`)
+   * currency is NEVER affordable, so an item plan is byte-for-byte unchanged.
+   */
+  affords(match, { affordCurrency } = {}) {
+    return typeof affordCurrency === 'function' ? !!affordCurrency(match) : false;
+  },
+
+  /**
+   * The `{ unit, amount }` spend this currency option requires, or null when the
+   * option is incomplete (no unit / non-positive amount).
+   */
+  getCurrencySpend(match) {
+    if (!currencyHandler.isComplete(match)) return null;
+    return { unit: trimmed(match?.unit), amount: Number(match?.amount) || 0 };
   },
 };
 
@@ -246,6 +289,12 @@ const unknownHandler = {
   },
   describe() {
     return '';
+  },
+  affords() {
+    return false;
+  },
+  getCurrencySpend() {
+    return null;
   },
 };
 
