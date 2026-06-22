@@ -203,9 +203,14 @@ test('routed mode — checks enabled, outcomes present, valid routing → valid'
   assert.equal(result.errors.length, 0);
 });
 
-test('legacy tiered salvageResolutionMode alias uses routed validation semantics', () => {
-  const service = buildService();
-  const system = buildSystem({
+test('legacy tiered salvageResolutionMode token normalizes to routed and validates', async () => {
+  // The legacy `tiered` salvage token is normalized to canonical `routed` by the
+  // manager's salvage token normalizer (and the 1.4.0 migration) before reaching
+  // validateSalvage; the service itself no longer carries a tiered branch.
+  const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+  const manager = new CraftingSystemManager(null);
+  const normalized = manager._normalizeSystem({
+    id: 'test-system',
     salvageResolutionMode: 'tiered',
     salvageCraftingCheck: {
       enabled: true,
@@ -214,11 +219,14 @@ test('legacy tiered salvageResolutionMode alias uses routed validation semantics
       progressive: null,
     },
   });
+  assert.equal(normalized.salvageResolutionMode, 'routed');
+
+  const service = buildService();
   const component = buildRoutedComponent();
 
-  const result = service.validateSalvage(component, system);
+  const result = service.validateSalvage(component, normalized);
 
-  assert.equal(result.valid, true);
+  assert.equal(result.valid, true, result.errors.join(', '));
   assert.equal(result.errors.length, 0);
 });
 

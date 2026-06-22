@@ -145,6 +145,7 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
+    'src/utils/routedOutcomeKeywords.js',
     'src/config/flags.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
@@ -5728,17 +5729,43 @@ describe('CraftingSystemManager mounted behavior', () => {
     description.dispatchEvent(new Event('input', { bubbles: true }));
     target.querySelector('.manager-system-edit-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    const resolution = target.querySelector('#manager-system-resolution-mode');
-    resolution.value = 'mapped';
-    resolution.dispatchEvent(new Event('change', { bubbles: true }));
+    // The resolution-mode card IS the selector: one radio row per mode, all four in order,
+    // each with a non-empty description, and the active row matching the system's mode.
+    const modeCard = target.querySelector('#manager-system-resolution-mode');
+    assert.ok(modeCard, 'resolution-mode radiogroup card should render');
+    const activeMode = card => card.querySelector('.manager-resolution-option.is-active')
+      ?.dataset.systemResolutionModeOption;
+    const modeRows = [...modeCard.querySelectorAll('[data-system-resolution-mode-option]')];
+    assert.deepEqual(
+      modeRows.map(row => row.dataset.systemResolutionModeOption),
+      ['simple', 'routed', 'progressive', 'alchemy'],
+      'the card lists all four modes in order'
+    );
+    assert.ok(
+      modeRows.every(row => row.querySelector('.manager-resolution-option-desc')?.textContent.trim().length > 0),
+      'each mode row has a non-empty description'
+    );
+    assert.ok(
+      modeRows.every(row => row.querySelector('input[type="radio"][name="manager-system-resolution-mode"]')),
+      'each mode row wraps a real radio input'
+    );
+    assert.equal(activeMode(modeCard), 'alchemy', 'the active row matches the system resolution mode');
+
+    const routedRadio = modeCard.querySelector('[data-system-resolution-mode-option="routed"] input[type="radio"]');
+    routedRadio.checked = true;
+    routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(activeMode(modeCard), 'routed', 'selecting the routed radio moves the active highlight to routed');
 
     target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
 
     assert.ok(calls.some(call => call[0] === 'saveSystemDetails'
       && call[1] === 'Greater Alchemy'
       && call[2] === 'Updated potion work'));
-    assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'mapped'));
+    assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'routed'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
   });
 
@@ -6027,13 +6054,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-feature-key="craftingChecks"]'), null);
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
-    const resolution = target.querySelector('#manager-system-resolution-mode');
-    resolution.value = 'progressive';
-    resolution.dispatchEvent(new Event('change', { bubbles: true }));
+    const modeCard = target.querySelector('#manager-system-resolution-mode');
+    const activeMode = () => modeCard.querySelector('.manager-resolution-option.is-active')
+      ?.dataset.systemResolutionModeOption;
+    assert.equal(activeMode(), 'alchemy');
+    const progressiveRadio = modeCard.querySelector('[data-system-resolution-mode-option="progressive"] input[type="radio"]');
+    progressiveRadio.checked = true;
+    progressiveRadio.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
     await tick();
     flushSync();
-    assert.equal(resolution.value, 'alchemy');
+    // A rejected change reverts the selection: the active row and checked radio return to the system's mode.
+    assert.equal(activeMode(), 'alchemy');
+    assert.equal(
+      modeCard.querySelector('input[type="radio"][name="manager-system-resolution-mode"]:checked')?.value,
+      'alchemy',
+      'the rejected change re-checks the previously-selected radio'
+    );
 
     const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');

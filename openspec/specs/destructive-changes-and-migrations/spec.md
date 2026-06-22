@@ -208,6 +208,7 @@ The pre-release migration path removes legacy crafting modes `mapped` and `tiere
 2. Recipe migration:
    - legacy mapped recipes -> `resultSelection.provider = "ingredientSet"`
    - legacy tiered recipes -> `resultSelection.provider = "macroOutcome"`
+2a. For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical `macroOutcome` name-matching reproduces the legacy routing), then `outcomeRouting` is removed. Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 3).
 3. Mode and recipe migration is best-effort with hard cleanup on invalid documents:
    - recipes that cannot be migrated are deleted,
    - cascading cleanup is applied immediately (runs, learned flags, UI prefs, and stale references),

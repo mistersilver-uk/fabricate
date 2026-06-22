@@ -4222,6 +4222,145 @@
   font-size: 0.82rem;
 }
 
+/* The resolution-mode card spans the full edit grid and is itself the selector: each mode is a
+   selectable radio row with its name and one-line description, the active row highlighted. It sits
+   beside the Identity / Optional Features cards, so it reuses their surface tokens, an uppercase
+   section kicker for the legend, and a top-of-card destructive-change note. */
+.fabricate-manager .manager-resolution-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-mode-legend {
+  padding: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Destructive-change note, hoisted above the options so the warning reads before the GM picks a
+   mode. Soft-warning surface keeps it integrated rather than alarming. */
+.fabricate-manager .manager-resolution-mode-note {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 6px;
+  color: var(--fab-warning-text);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-resolution-mode-note i {
+  margin-top: 0.1rem;
+  color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-resolution-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-resolution-option {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-resolution-option:hover {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-option.is-active {
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+/* Custom radio: strip Foundry's orange native control and draw a circular, themed control. The
+   unchecked state is a hollow ring on the border token; the checked state paints a green accent
+   ring plus a filled centre dot via an inset box-shadow (no gradients, no orange anywhere). The
+   inset spread fills the inner circle to the accent colour while the border stays the ring. */
+.fabricate-manager .manager-resolution-option input[type='radio'] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  margin: 0;
+  margin-top: 0.15rem;
+  padding: 0;
+  border: 1.5px solid var(--fab-mv2-border);
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Foundry's core stylesheet draws the native radio's inner chrome via ::before/::after, which
+   appearance: none does NOT remove — so it bleeds through over our themed control. Hide those
+   pseudo-elements here so only the themed ring + inset-box-shadow dot shows. Load-bearing: do not
+   "clean up" this rule. Scoped to the resolution-mode radios only, never radios globally. */
+.fabricate-manager .manager-resolution-option input[type='radio']::before,
+.fabricate-manager .manager-resolution-option input[type='radio']::after {
+  display: none;
+}
+
+.fabricate-manager .manager-resolution-option input[type='radio']:checked {
+  border-color: var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-resolution-option input[type='radio']:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-resolution-option input[type='radio']:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-resolution-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-resolution-option-name {
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-resolution-option-desc {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea {

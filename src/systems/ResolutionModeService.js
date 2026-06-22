@@ -1,5 +1,27 @@
+import {
+  normalizeRoutedName,
+  isFailKeyword,
+  isMissKeyword,
+  isReservedRoutedName,
+} from '../utils/routedOutcomeKeywords.js';
+
 /**
  * Handles mode-specific validation and result resolution logic.
+ *
+ * Canonical resolution modes are `simple`, `routed`, `progressive`, and
+ * `alchemy`. `routed` is the only non-simple selection model and dispatches on
+ * `resultSelection.provider`, one of the three first-class providers:
+ *  - `ingredientSet` — the chosen ingredient set's `resultGroupId` selects the
+ *    result group (the former `mapped` behavior, now canonical).
+ *  - `macroOutcome` — a crafting-check outcome name routes to the `ResultGroup`
+ *    of the same name.
+ *  - `rollTableOutcome` — a drawn roll-table entry name routes by `ResultGroup`
+ *    name.
+ *
+ * Legacy `mapped`/`tiered` are NOT live modes. They are accepted only as
+ * one-time inputs to the 1.4.0 migration (`migrateLegacyResolutionModes`), and
+ * the manager's token normalizer maps any un-migrated/imported `mapped`/`tiered`
+ * token to `routed`. No `mapped`/`tiered` resolution branch survives here.
  */
 export class ResolutionModeService {
   constructor(craftingSystemManager) {
@@ -33,23 +55,54 @@ export class ResolutionModeService {
   }
 
   // ---------------------------------------------------------------------------
-  // Name normalization helpers for rollTableOutcome
+  // Routed name-normalization + reserved-keyword helpers. Shared with Recipe.js
+  // via ../utils/routedOutcomeKeywords.js so runtime resolution and authoring-time
+  // validation use one source of truth. They apply under every routed provider
+  // (ingredientSet / macroOutcome / rollTableOutcome), not just rollTableOutcome.
   // ---------------------------------------------------------------------------
 
   _normalizeName(name) {
-    return String(name || '')
-      .trim()
-      .toLowerCase();
+    return normalizeRoutedName(name);
   }
 
+  // The fail/miss/hazard keyword sets are shared with Recipe.js via
+  // ../utils/routedOutcomeKeywords.js so the runtime failure path and the routed
+  // ResultGroup.name validation can never drift. The hazard family
+  // (hazard/danger/complication/trap/oops) routes to the failure path here.
   _isFailKeyword(name) {
-    const normalized = this._normalizeName(name);
-    return ['fail', 'failed', 'failure', 'f'].includes(normalized);
+    return isFailKeyword(name);
   }
 
   _isMissKeyword(name) {
-    const normalized = this._normalizeName(name);
-    return ['miss', 'missed', 'm', 'nothing', 'none', 'whiff', 'whiffed'].includes(normalized);
+    return isMissKeyword(name);
+  }
+
+  /**
+   * Reserved/duplicate routed `ResultGroup.name` validation, applied under every
+   * routed provider. Reserved names (fail/miss/hazard families) may not name a
+   * result group; names must be unique under trim-normalized comparison.
+   * @param {Array<{id?: string, name?: string}>} groups
+   * @param {{name?: string, id?: string}} step
+   * @param {string[]} errors
+   */
+  _validateRoutedGroupNames(groups, step, errors) {
+    const seenNames = new Set();
+    const label = step?.name || step?.id;
+    for (const group of groups || []) {
+      const normalized = normalizeRoutedName(group?.name);
+      if (!normalized) continue;
+      if (isReservedRoutedName(normalized)) {
+        errors.push(
+          `Result group name "${group.name}" conflicts with reserved routing keyword in step "${label}"`
+        );
+      }
+      if (seenNames.has(normalized)) {
+        errors.push(
+          `Duplicate result group name "${group.name}" (case-insensitive) in step "${label}" — routed mode requires unique names`
+        );
+      }
+      seenNames.add(normalized);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -123,9 +176,12 @@ export class ResolutionModeService {
    *   false, mode COMPLETENESS checks (e.g. "must have exactly/at least N
    *   ingredient set/result group", progressive "requires ordered results", and a
    *   not-yet-chosen routed/alchemy `resultSelection.provider`) are waived so an
-   *   incomplete authoring shell can persist. Mode REFERENCE-INTEGRITY checks (a
-   *   mapped invalid resultGroupId, an invalid provider VALUE, tiered outcome→group
-   *   mapping) always apply.
+   *   incomplete authoring shell can persist. Mode REFERENCE-INTEGRITY checks
+   *   (an invalid provider VALUE, an invalid routed `ingredientSet` resultGroupId,
+   *   reserved/duplicate routed `ResultGroup.name`) always apply. Legacy `mapped`
+   *   and `tiered` are not live modes — they are accepted only as one-time
+   *   migration inputs (see `migrateLegacyResolutionModes`) and the manager's
+   *   token normalizer maps un-migrated tokens to `routed`.
    * @returns {{valid: boolean, errors: string[]}}
    */
   validateRecipe(recipe, { requireComplete = true } = {}) {
@@ -139,9 +195,6 @@ export class ResolutionModeService {
       system?.craftingCheck?.enabled === true ||
       !!system?.craftingCheck?.macroUuid ||
       system?.craftingCheck?.checkSource === 'builtIn';
-    const outcomes = Array.isArray(system?.craftingCheck?.outcomes)
-      ? system.craftingCheck.outcomes
-      : [];
 
     for (const step of steps) {
       const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
@@ -158,71 +211,50 @@ export class ResolutionModeService {
           );
       }
 
-      if (mode === 'mapped') {
+      if (mode === 'routed') {
         if (requireComplete && sets.length === 0)
           errors.push(
-            `Step "${step.name || step.id}" must have at least 1 ingredient set in mapped mode`
+            `Step "${step.name || step.id}" must have at least 1 ingredient set in routed mode`
           );
         if (requireComplete && groups.length === 0)
           errors.push(
-            `Step "${step.name || step.id}" must have at least 1 result group in mapped mode`
+            `Step "${step.name || step.id}" must have at least 1 result group in routed mode`
           );
-        const groupIds = new Set(groups.map((g) => g.id));
-        for (const set of sets) {
-          const mappedId = set?.resultGroupId || null;
-          if (mappedId && !groupIds.has(mappedId)) {
+
+        const provider = this.getProviderForStep(recipe, step);
+        if (!provider) {
+          // A not-yet-chosen provider is a completeness gap (an authoring shell),
+          // not a reference-integrity error — waive it while drafting.
+          if (requireComplete)
             errors.push(
-              `Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`
+              `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
             );
-          }
+        } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
+          errors.push('Invalid result selection provider: ' + provider);
         }
-      }
-
-      if (mode === 'tiered' || mode === 'routed') {
-        if (requireComplete && sets.length === 0)
-          errors.push(
-            `Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`
-          );
-        if (requireComplete && groups.length === 0)
-          errors.push(
-            `Step "${step.name || step.id}" must have at least 1 result group in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`
-          );
-
-        if (mode === 'tiered') {
-          if (!checkEnabled)
-            errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
-          if (outcomes.length === 0)
-            errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
+        const selection = this.getResultSelection(recipe, step);
+        if (provider === 'rollTableOutcome' && !selection?.rollTableUuid) {
+          errors.push('rollTableOutcome provider requires a roll table UUID');
+        }
+        if (provider === 'macroOutcome' && !checkEnabled) {
+          errors.push('macroOutcome provider requires crafting checks enabled');
+        }
+        if (provider === 'ingredientSet') {
+          // Reference integrity: an ingredientSet resultGroupId must point at a
+          // real group in the step (the former `mapped` invariant, now canonical).
           const groupIds = new Set(groups.map((g) => g.id));
-          const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
-          for (const outcome of outcomes) {
-            const target = routing?.[outcome];
-            if (!target || !groupIds.has(target)) {
+          for (const set of sets) {
+            const mappedId = set?.resultGroupId || null;
+            if (mappedId && !groupIds.has(mappedId)) {
               errors.push(
-                `Outcome "${outcome}" must map to a valid result group in step "${step.name || step.id}"`
+                `Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`
               );
             }
           }
-        } else {
-          const provider = this.getProviderForStep(recipe, step);
-          if (!provider) {
-            // A not-yet-chosen provider is a completeness gap (an authoring shell),
-            // not a reference-integrity error — waive it while drafting.
-            if (requireComplete)
-              errors.push(
-                `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
-              );
-          } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
-            errors.push('Invalid result selection provider: ' + provider);
-          }
-          const selection = this.getResultSelection(recipe, step);
-          if (provider === 'rollTableOutcome' && !selection?.rollTableUuid) {
-            errors.push('rollTableOutcome provider requires a roll table UUID');
-          }
-          if (provider === 'macroOutcome' && !checkEnabled) {
-            errors.push('macroOutcome provider requires crafting checks enabled');
-          }
         }
+        // Reserved/duplicate ResultGroup.name applies under EVERY routed provider
+        // (spec 004 §Validation lines 79-80), not just rollTableOutcome.
+        this._validateRoutedGroupNames(groups, step, errors);
       }
 
       if (mode === 'progressive') {
@@ -299,17 +331,17 @@ export class ResolutionModeService {
     // Pre-checks: return early if there's nothing to validate
     if (!component?.salvage || !system) return { valid: true, errors };
 
-    const rawMode = system.salvageResolutionMode || 'simple';
-    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
+    // Legacy salvage tokens (`tiered`/`mapped`) are normalized to canonical
+    // values by the manager's salvage token normalizer + the 1.4.0 migration
+    // before they reach here, so this path only ever sees canonical modes.
+    const mode = system.salvageResolutionMode || 'simple';
     const componentLabel = component.name || component.id || 'unknown';
 
     if (!['simple', 'routed', 'progressive'].includes(mode)) {
-      if (rawMode === 'mapped') {
-        errors.push('Mapped mode is not supported for salvage');
-      } else if (rawMode === 'alchemy') {
+      if (mode === 'alchemy') {
         errors.push('Alchemy mode is not supported for salvage');
       } else {
-        errors.push(`Unsupported salvage resolution mode: ${rawMode}`);
+        errors.push(`Unsupported salvage resolution mode: ${mode}`);
       }
       return { valid: false, errors };
     }
@@ -416,45 +448,21 @@ export class ResolutionModeService {
       };
     }
 
-    if (mode === 'mapped') {
-      const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
-      if (mappedId) {
-        return {
-          groups: allGroups.filter((group) => group.id === mappedId),
-          meta: {},
-        };
-      }
-
-      // Legacy fallback to resultMapping support.
-      if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
-        return {
-          groups: allGroups.filter((group) => ingredientSet.resultMapping.includes(group.id)),
-          meta: {},
-        };
-      }
-
-      return {
-        groups: allGroups.slice(0, 1),
-        meta: {},
-      };
-    }
-
-    if (mode === 'tiered' || mode === 'routed') {
+    if (mode === 'routed') {
       const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
-      if (mode === 'tiered') {
-        const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
-        const routedId = outcome ? routing[outcome] : null;
-        return {
-          groups: routedId ? allGroups.filter((group) => group.id === routedId) : [],
-          meta: { outcome, routedId },
-        };
-      }
-
       const provider = this.getProviderForStep(recipe, step);
       if (provider === 'ingredientSet') {
+        // Former `mapped` behavior: route by ingredientSet.resultGroupId, with the
+        // legacy resultMapping fallback, then first-group fallback.
         const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
         if (mappedId)
           return { groups: allGroups.filter((group) => group.id === mappedId), meta: {} };
+        if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
+          return {
+            groups: allGroups.filter((group) => ingredientSet.resultMapping.includes(group.id)),
+            meta: {},
+          };
+        }
         return { groups: allGroups.slice(0, 1), meta: {} };
       }
       if (provider === 'macroOutcome') {
@@ -583,9 +591,6 @@ export class ResolutionModeService {
 
   validateCheckResult({ recipe, checkResult }) {
     const mode = this.getMode(recipe);
-    if (mode === 'tiered') {
-      return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
-    }
     if (mode === 'routed') {
       return (
         this.getProvider(recipe) !== 'macroOutcome' ||
