@@ -132,6 +132,11 @@
   {:else}
     <div class="manager-recipe-ingredient-set-groups">
       {#each groups as group, index (group?.id || index)}
+        {#if index > 0}
+          <div class="manager-recipe-ingredient-and-separator" aria-hidden="true">
+            <span>{text('FABRICATE.Admin.Manager.Recipe.And', 'AND')}</span>
+          </div>
+        {/if}
         <RecipeIngredientGroupCard
           {group}
           {componentOptions}

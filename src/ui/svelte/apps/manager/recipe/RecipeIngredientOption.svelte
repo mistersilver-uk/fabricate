@@ -192,27 +192,6 @@
             onChoose={(tag) => addTag(tag)}
           />
         </div>
-        <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-          {#if tags.length > 0}
-            <ul class="manager-recipe-tag-chips">
-              {#each tags as tag (tag)}
-                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
-                  <span>{tag}</span>
-                  <button
-                    type="button"
-                    class="manager-recipe-tag-remove"
-                    data-recipe-remove="tag"
-                    aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                    title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                    onclick={() => removeTag(tag)}
-                  ><i class="fas fa-times" aria-hidden="true"></i></button>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
-          {/if}
-        </div>
       </div>
     {:else}
       <div class="manager-recipe-option-currency" data-recipe-option-currency>
@@ -316,4 +295,31 @@
       ><i class="fas fa-minus" aria-hidden="true"></i></button>
     {/if}
   </div>
+
+  {#if matchType === 'tags'}
+    <!-- The chosen tags sit in a full-width bordered area on their own line below
+         the match controls/quantity row, so chips never compete for width with
+         the row-end controls. -->
+    <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+      {#if tags.length > 0}
+        <ul class="manager-recipe-tag-chips">
+          {#each tags as tag (tag)}
+            <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
+              <span>{tag}</span>
+              <button
+                type="button"
+                class="manager-recipe-tag-remove"
+                data-recipe-remove="tag"
+                aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                onclick={() => removeTag(tag)}
+              ><i class="fas fa-times" aria-hidden="true"></i></button>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
+      {/if}
+    </div>
+  {/if}
 </div>

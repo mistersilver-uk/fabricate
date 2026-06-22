@@ -393,6 +393,41 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('increments a duration unit via the up stepper button', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({ onUpdateRecipe: (patch) => patches.push(patch) }));
+    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
+    await flushRender();
+    const upDays = document.querySelector('[data-recipe-duration-stepper="days"] [data-recipe-duration-step="up"]');
+    assert.ok(upDays, 'each unit exposes an up stepper');
+    upDays.click();
+    assert.deepEqual(patches.at(-1), { timeRequirement: { minutes: 0, hours: 0, days: 1, months: 0, years: 0 } }, 'the up stepper increments the unit by one');
+    editHarness.remount();
+  });
+
+  it('increments a duration unit via the ArrowUp key on the input', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({ onUpdateRecipe: (patch) => patches.push(patch) }));
+    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
+    await flushRender();
+    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
+    hoursInput.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    assert.deepEqual(patches.at(-1), { timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 } }, 'ArrowUp increments the focused unit');
+    editHarness.remount();
+  });
+
+  it('clears the single-step recipe duration when the trigger is right-clicked', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, timeRequirement: { minutes: 0, hours: 5, days: 0, months: 0, years: 0 } },
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const trigger = target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]');
+    trigger.dispatchEvent(new globalThis.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    assert.deepEqual(patches.at(-1), { timeRequirement: null }, 'right-clicking a set duration clears it');
+    editHarness.remount();
+  });
+
   it('shows the multi-step Steps card (not the single-step Duration section) on the Overview tab', async () => {
     const target = await editHarness.mount(identityProps({
       recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] }
@@ -683,6 +718,12 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(tagReq, 'the tag requirement renders');
     assert.ok(tagReq.querySelector('[data-recipe-tag="liquid"]'), 'the tag chip renders');
     assert.equal(tagReq.querySelector('[data-recipe-tag-match="any"]').getAttribute('aria-pressed'), 'true', 'tag match defaults to Any');
+
+    // The two AND'd requirements are separated by a labelled "AND" divider that
+    // mirrors the within-group "OR" divider (same casing/markup, different label).
+    const andSeparators = set.querySelectorAll('.manager-recipe-ingredient-and-separator');
+    assert.equal(andSeparators.length, 1, 'one AND divider sits between the two AND’d requirements');
+    assert.equal(andSeparators[0].querySelector('span').textContent.trim(), 'AND', 'the AND divider reads "AND"');
 
     // The per-set essence row renders.
     assert.ok(set.querySelector('[data-recipe-essence-id="ess-life"]'), 'the per-set essence row renders');
@@ -1676,26 +1717,41 @@ describe('RecipeItemInspector (mounted)', () => {
     inspectorHarness.remount();
   });
 
-  it('always renders the recipe-mode toggle with Simple selected by default', async () => {
+  it('renders the recipe-mode toggle with Simple selected when the system allows complex', async () => {
     const target = await inspectorHarness.mount(inspectorProps({
       recipe: { ...RECIPE, steps: [] },
-      multiStepEnabled: false
+      multiStepEnabled: false,
+      multiSetAllowed: true
     }));
     const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'recipe-mode card renders even without multi-step');
+    assert.ok(card, 'recipe-mode card renders when complex is an available choice');
     const simple = card.querySelector('[data-recipe-mode-option="simple"]');
     assert.ok(simple.classList.contains('is-selected'), 'Simple is selected when complex is false');
     inspectorHarness.remount();
   });
 
-  it('disables the Complex option when multiSetAllowed is false and the recipe is not already complex', async () => {
+  it('hides the recipe-mode section when the system forbids multiple sets and the recipe is not already complex', async () => {
     const target = await inspectorHarness.mount(inspectorProps({
       complex: false,
       multiSetAllowed: false
     }));
-    const complex = target.querySelector('[data-recipe-mode-option="complex"]');
-    assert.equal(complex.disabled, true, 'Complex is disabled when the system forbids multiple sets');
-    assert.ok(target.querySelector('[data-recipe-mode-hint="locked"]'), 'a locked hint is shown');
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-mode"]'),
+      null,
+      'a simple-resolution system does not show the recipe-mode toggle at all'
+    );
+    inspectorHarness.remount();
+  });
+
+  it('still shows the recipe-mode section for an already-complex recipe even when the system forbids multiple sets', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      complex: true,
+      multiSetAllowed: false
+    }));
+    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
+    assert.ok(card, 'an already-complex recipe keeps the recipe-mode toggle so it can be reverted');
+    const complex = card.querySelector('[data-recipe-mode-option="complex"]');
+    assert.ok(complex.classList.contains('is-selected'), 'Complex is selected for an already-complex recipe');
     inspectorHarness.remount();
   });
 
@@ -1730,6 +1786,66 @@ describe('RecipeItemInspector (mounted)', () => {
     assert.deepEqual(calls, [true, false], 'clicking Simple requests simple mode');
     inspectorHarness.remount();
   });
+
+  it('shows the Check/Ingredient routing toggle only for routed systems', async () => {
+    const routedTarget = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'ingredientSet'
+    }));
+    const card = routedTarget.querySelector('[data-recipe-section="recipe-routing"]');
+    assert.ok(card, 'routed systems show the result-routing toggle');
+    assert.ok(card.querySelector('[data-recipe-routing-option="check"]'), 'a Check option renders');
+    assert.ok(
+      card.querySelector('[data-recipe-routing-option="ingredient"]').classList.contains('is-selected'),
+      'the ingredientSet provider selects the Ingredient option'
+    );
+    inspectorHarness.remount();
+
+    const simpleTarget = await inspectorHarness.mount(inspectorProps({ routed: false }));
+    assert.equal(
+      simpleTarget.querySelector('[data-recipe-section="recipe-routing"]'),
+      null,
+      'non-routed systems do not show the routing toggle'
+    );
+    inspectorHarness.remount();
+  });
+
+  it('selects Check for an outcome-driven provider and writes the provider on toggle', async () => {
+    const calls = [];
+    const target = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'check',
+      onSetRoutingProvider: (provider) => calls.push(provider)
+    }));
+    assert.ok(
+      target.querySelector('[data-recipe-routing-option="check"]').classList.contains('is-selected'),
+      'the check provider selects the Check option'
+    );
+    target.querySelector('[data-recipe-routing-option="ingredient"]').click();
+    assert.deepEqual(calls, ['ingredientSet'], 'clicking Ingredient requests the ingredientSet provider');
+
+    inspectorHarness.remount();
+    const target2 = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'ingredientSet',
+      onSetRoutingProvider: (provider) => calls.push(provider)
+    }));
+    target2.querySelector('[data-recipe-routing-option="check"]').click();
+    assert.deepEqual(calls, ['ingredientSet', 'check'], 'clicking Check requests the check provider');
+    inspectorHarness.remount();
+  });
+
+  it('reads a legacy macroOutcome provider back as Check routing', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'macroOutcome'
+    }));
+    assert.ok(
+      target.querySelector('[data-recipe-routing-option="check"]').classList.contains('is-selected'),
+      'the legacy macroOutcome provider still reads as Check'
+    );
+    inspectorHarness.remount();
+  });
 });
 
 describe('RecipeStepsCard (mounted)', () => {
@@ -1755,7 +1871,7 @@ describe('RecipeStepsCard (mounted)', () => {
     const target = await stepsHarness.mount(stepsProps());
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
     assert.equal(triggers.length, 2, 'one duration trigger per step');
-    assert.match(triggers[0].textContent, /2 hours 30 minutes/, 'time formatted from non-zero units');
+    assert.match(triggers[0].textContent, /2 hours, 30 minutes/, 'time formatted from non-zero units');
     assert.equal(triggers[0].classList.contains('is-empty'), false, 'a populated trigger is not muted');
 
     assert.match(triggers[1].textContent, /Add duration/, 'no time requirement shows the Add duration affordance');

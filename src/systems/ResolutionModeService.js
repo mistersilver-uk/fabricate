@@ -10,13 +10,15 @@ import {
  *
  * Canonical resolution modes are `simple`, `routed`, `progressive`, and
  * `alchemy`. `routed` is the only non-simple selection model and dispatches on
- * `resultSelection.provider`, one of the three first-class providers:
+ * `resultSelection.provider`:
  *  - `ingredientSet` — the chosen ingredient set's `resultGroupId` selects the
  *    result group (the former `mapped` behavior, now canonical).
- *  - `macroOutcome` — a crafting-check outcome name routes to the `ResultGroup`
- *    of the same name.
- *  - `rollTableOutcome` — a drawn roll-table entry name routes by `ResultGroup`
- *    name.
+ *  - `check` — the system-level crafting-check outcome name routes to the
+ *    `ResultGroup` of the same name. This is the canonical check-driven provider.
+ *  - `macroOutcome` / `rollTableOutcome` — legacy check-driven providers (route
+ *    by macro outcome / roll-table draw) pending removal in favour of `check`
+ *    (tracked in #424); still accepted and resolved like `check` until they are
+ *    migrated away.
  *
  * Legacy `mapped`/`tiered` are NOT live modes. They are accepted only as
  * one-time inputs to the 1.4.0 migration (`migrateLegacyResolutionModes`), and
@@ -109,6 +111,11 @@ export class ResolutionModeService {
   // rollTableOutcome resolution
   // ---------------------------------------------------------------------------
 
+  /**
+   * @deprecated `rollTableOutcome` is a legacy routed provider slated for removal
+   *   in favour of `check` (system crafting-check outcome). Retained only until a
+   *   migration moves existing recipes off it. Removal is tracked in #424.
+   */
   async resolveByRollTable(recipe, step, allGroups) {
     const selection = this.getResultSelection(recipe, step);
     const tableUuid = selection?.rollTableUuid;
@@ -229,10 +236,15 @@ export class ResolutionModeService {
             errors.push(
               `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
             );
-        } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
+        } else if (
+          !['ingredientSet', 'check', 'macroOutcome', 'rollTableOutcome'].includes(provider)
+        ) {
           errors.push('Invalid result selection provider: ' + provider);
         }
         const selection = this.getResultSelection(recipe, step);
+        // @deprecated rollTableOutcome / macroOutcome — legacy check-driven
+        // providers superseded by `check`; these branches go away once a
+        // migration moves existing recipes onto `check` (tracked in #424).
         if (provider === 'rollTableOutcome' && !selection?.rollTableUuid) {
           errors.push('rollTableOutcome provider requires a roll table UUID');
         }
@@ -465,7 +477,9 @@ export class ResolutionModeService {
         }
         return { groups: allGroups.slice(0, 1), meta: {} };
       }
-      if (provider === 'macroOutcome') {
+      // `check` is the canonical successor to `macroOutcome`: both route by the
+      // crafting-check outcome name to the ResultGroup of that name.
+      if (provider === 'macroOutcome' || provider === 'check') {
         const normalized = this._normalizeName(outcome);
         if (this._isFailKeyword(normalized))
           return { groups: [], meta: { outcome, disposition: 'fail' } };
@@ -592,8 +606,9 @@ export class ResolutionModeService {
   validateCheckResult({ recipe, checkResult }) {
     const mode = this.getMode(recipe);
     if (mode === 'routed') {
+      const provider = this.getProvider(recipe);
       return (
-        this.getProvider(recipe) !== 'macroOutcome' ||
+        !['macroOutcome', 'check'].includes(provider) ||
         !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0)
       );
     }

@@ -1075,7 +1075,9 @@ export class CraftingEngine {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
 
-    // Pre-resolve rollTableOutcome before calling resolveResultGroups
+    // Pre-resolve rollTableOutcome before calling resolveResultGroups.
+    // @deprecated rollTableOutcome is a legacy routed provider slated for removal
+    // in favour of `check`; this pre-resolution branch goes with it (tracked in #424).
     let rollTableResult = null;
     if (recipe?.resultSelection?.provider === 'rollTableOutcome' && resolutionService) {
       const allGroups =
@@ -1411,7 +1413,7 @@ export class CraftingEngine {
    * A check is REQUIRED (run even when the system has crafting checks disabled)
    * when the recipe needs a check outcome to select its result:
    *  - `progressive` mode, or
-   *  - `routed` mode with the `macroOutcome` provider.
+   *  - `routed` mode with the `check` provider (or the legacy `macroOutcome`).
    *
    * The other routed providers do not need a check outcome to route:
    * `ingredientSet` selects by the chosen ingredient set, and `rollTableOutcome`
@@ -1445,7 +1447,8 @@ export class CraftingEngine {
     const selection =
       resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
     const checkRequired =
-      mode === 'progressive' || (mode === 'routed' && selection?.provider === 'macroOutcome');
+      mode === 'progressive' ||
+      (mode === 'routed' && ['check', 'macroOutcome'].includes(selection?.provider));
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;

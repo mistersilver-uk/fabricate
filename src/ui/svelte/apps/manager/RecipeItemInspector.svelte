@@ -18,7 +18,10 @@
     multiStepEnabled = false,
     complex = false,
     multiSetAllowed = false,
+    routed = false,
+    routingProvider = null,
     onSetComplexity = () => {},
+    onSetRoutingProvider = () => {},
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
     onSetCategory = () => {},
@@ -117,6 +120,21 @@
     if (next === complex) return;
     if (next && !complexAllowed) return;
     onSetComplexity(next);
+  }
+
+  // Routed result routing: a routed system selects its result group either by the
+  // chosen ingredient set ("Ingredient", provider `ingredientSet`) or by the
+  // system-level crafting-check outcome ("Check", provider `check`). The
+  // @deprecated `macroOutcome`/`rollTableOutcome` providers are also check-driven,
+  // so they read back as "Check" until they are migrated away and removed (issue 424).
+  const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
+  const isCheckRouting = $derived(
+    ['check', 'macroOutcome', 'rollTableOutcome'].includes(routingProvider)
+  );
+
+  function selectRouting(provider) {
+    if (provider === routingProvider) return;
+    onSetRoutingProvider(provider);
   }
 
   // Drop a Foundry Item to link/replace it. Item-only: an unpersisted item drop
@@ -244,6 +262,12 @@
   </section>
   {/if}
 
+  {#if complexAllowed}
+  <!-- The recipe-mode toggle only appears when Complex is an available choice:
+       a system whose resolution mode forbids multiple sets (e.g. simple) crafts
+       one set into one result, so the toggle would offer no real choice and is
+       hidden entirely. An already-complex recipe keeps the toggle so it can be
+       inspected or reverted. -->
   <section class="manager-inspector-card" data-recipe-section="recipe-mode">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}</h3>
     <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}>
@@ -263,11 +287,9 @@
       <button
         type="button"
         role="radio"
-        class={`manager-environment-mode-option ${complex ? 'is-selected' : ''} ${complexAllowed ? '' : 'is-locked'}`}
+        class={`manager-environment-mode-option ${complex ? 'is-selected' : ''}`}
         aria-checked={complex}
         data-recipe-mode-option="complex"
-        disabled={!complexAllowed}
-        title={complexAllowed ? null : text('FABRICATE.Admin.Manager.Recipe.ModeLocked', 'This system crafts one set of ingredients into one result.')}
         onclick={() => selectComplexity(true)}
       >
         <span class="manager-environment-mode-head">
@@ -276,12 +298,49 @@
         </span>
       </button>
     </div>
-    {#if !complexAllowed}
-      <p class="manager-muted manager-environment-mode-hint" data-recipe-mode-hint="locked">{text('FABRICATE.Admin.Manager.Recipe.ModeLocked', 'This system crafts one set of ingredients into one result.')}</p>
-    {:else}
-      <p class="manager-muted manager-environment-mode-hint">{complex
-        ? text('FABRICATE.Admin.Manager.Recipe.ComplexHint', 'Author multiple ingredient sets and result sets.')
-        : text('FABRICATE.Admin.Manager.Recipe.SimpleHint', 'One set of ingredients makes one result.')}</p>
-    {/if}
+    <p class="manager-muted manager-environment-mode-hint">{complex
+      ? text('FABRICATE.Admin.Manager.Recipe.ComplexHint', 'Author multiple ingredient sets and result sets.')
+      : text('FABRICATE.Admin.Manager.Recipe.SimpleHint', 'One set of ingredients makes one result.')}</p>
   </section>
+  {/if}
+
+  {#if routed}
+  <!-- Routed systems pick how a result group is selected: by the chosen
+       ingredient set, or by the system-level crafting-check outcome. The toggle
+       only appears for routed resolution. -->
+  <section class="manager-inspector-card" data-recipe-section="recipe-routing">
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Routing', 'Result routing')}</h3>
+    <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.Routing', 'Result routing')}>
+      <button
+        type="button"
+        role="radio"
+        class={`manager-environment-mode-option ${isCheckRouting ? 'is-selected' : ''}`}
+        aria-checked={isCheckRouting}
+        data-recipe-routing-option="check"
+        onclick={() => selectRouting('check')}
+      >
+        <span class="manager-environment-mode-head">
+          <i class="fas fa-dice-d20" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.CheckRouting', 'Check')}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        class={`manager-environment-mode-option ${isIngredientRouting ? 'is-selected' : ''}`}
+        aria-checked={isIngredientRouting}
+        data-recipe-routing-option="ingredient"
+        onclick={() => selectRouting('ingredientSet')}
+      >
+        <span class="manager-environment-mode-head">
+          <i class="fas fa-flask-vial" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.IngredientRouting', 'Ingredient')}</span>
+        </span>
+      </button>
+    </div>
+    <p class="manager-muted manager-environment-mode-hint">{isIngredientRouting
+      ? text('FABRICATE.Admin.Manager.Recipe.IngredientRoutingHint', 'The chosen ingredient set selects which result group is produced.')
+      : text('FABRICATE.Admin.Manager.Recipe.CheckRoutingHint', "The crafting check's outcome selects which result group is produced.")}</p>
+  </section>
+  {/if}
 {/if}

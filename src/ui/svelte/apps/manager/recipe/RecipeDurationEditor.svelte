@@ -22,7 +22,11 @@
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../../actions/portal.js';
   import { computeIconPickerPopoverLayout } from '../../../util/iconPickerPopover.js';
-  import { TIME_UNITS, formatTimeRequirement } from '../../../util/recipeDuration.js';
+  import {
+    TIME_UNITS,
+    formatTimeRequirement,
+    durationUnitLabelSingular
+  } from '../../../util/recipeDuration.js';
 
   let { timeRequirement = null, disabled = false, onChange = () => {} } = $props();
 
@@ -62,6 +66,32 @@
     };
     const total = next.minutes + next.hours + next.days + next.months + next.years;
     onChange(total > 0 ? next : null);
+  }
+
+  // Step a single unit up/down (the spinner buttons and ArrowUp/ArrowDown keys),
+  // clamped at 0 by setUnit.
+  function stepUnit(unit, delta) {
+    setUnit(unit, unitValue(unit) + delta);
+  }
+
+  function onUnitKeydown(event, unit) {
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      stepUnit(unit, 1);
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      stepUnit(unit, -1);
+    }
+  }
+
+  // Right-clicking the trigger clears the whole duration (mirrors the recipe-item
+  // right-click-to-unlink affordance).
+  function clearDuration(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabled || !hasDuration) return;
+    onChange(null);
+    close();
   }
 
   function close() {
@@ -106,7 +136,10 @@
         width: hostRect.width || window.innerWidth,
         height: hostRect.height || window.innerHeight
       },
-      { horizontalAlign: 'left', minWidth: 240, maxWidth: 300 }
+      // The popover itself sizes to its content (CSS `width: max-content`); this
+      // width only reserves horizontal room so the left-aligned popover stays
+      // clamped inside the host when the trigger sits near the right edge.
+      { horizontalAlign: 'left', minWidth: 340, maxWidth: 380 }
     );
     if (!layout) {
       popoverStyle = '';
@@ -116,10 +149,11 @@
       layout.placement === 'top'
         ? `top: auto; bottom: ${layout.bottom}px;`
         : `top: ${layout.top}px; bottom: auto;`;
+    // No explicit width — CSS `width: max-content` makes the popover exactly as
+    // wide as its single-line contents, so it never needs horizontal scroll.
     popoverStyle = [
       `left: ${layout.left}px;`,
       'right: auto;',
-      `width: ${layout.width}px;`,
       `max-height: ${layout.maxHeight}px;`,
       vertical
     ].join(' ');
@@ -155,9 +189,12 @@
     aria-haspopup="dialog"
     aria-expanded={open}
     {disabled}
-    title={triggerLabel}
+    title={hasDuration
+      ? `${triggerLabel} — ${text('FABRICATE.Admin.Manager.Recipe.DurationClearHint', 'Right-click to clear')}`
+      : triggerLabel}
     aria-label={triggerLabel}
     onclick={toggle}
+    oncontextmenu={clearDuration}
   >
     <i class="fa-solid fa-clock" aria-hidden="true"></i>
     <span>{triggerLabel}</span>
@@ -180,20 +217,42 @@
         }
       }}
     >
-      <div class="manager-recipe-duration-grid">
+      <div class="manager-recipe-duration-row">
         {#each TIME_UNITS as unit (unit)}
-          <label class="manager-field manager-recipe-duration-field">
-            <span>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              data-recipe-duration
-              data-recipe-duration-unit={unit}
-              value={unitValue(unit)}
-              oninput={(event) => setUnit(unit, event.currentTarget.value)}
-            />
-          </label>
+          {@const unitLabel = durationUnitLabelSingular(unit)}
+          <div class="manager-recipe-duration-stepper" data-recipe-duration-stepper={unit}>
+            <span class="manager-recipe-duration-unit">{unitLabel}</span>
+            <button
+              type="button"
+              class="manager-recipe-duration-step"
+              data-recipe-duration-step="up"
+              aria-label={`${text('FABRICATE.Admin.Manager.Recipe.DurationIncrease', 'Increase')} ${unitLabel}`}
+              title={`${text('FABRICATE.Admin.Manager.Recipe.DurationIncrease', 'Increase')} ${unitLabel}`}
+              onclick={() => stepUnit(unit, 1)}
+            ><i class="fa-solid fa-chevron-up" aria-hidden="true"></i></button>
+            <div class="manager-recipe-duration-field">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                class="manager-recipe-duration-input"
+                data-recipe-duration
+                data-recipe-duration-unit={unit}
+                aria-label={unitLabel}
+                value={unitValue(unit)}
+                oninput={(event) => setUnit(unit, event.currentTarget.value)}
+                onkeydown={(event) => onUnitKeydown(event, unit)}
+              />
+            </div>
+            <button
+              type="button"
+              class="manager-recipe-duration-step"
+              data-recipe-duration-step="down"
+              aria-label={`${text('FABRICATE.Admin.Manager.Recipe.DurationDecrease', 'Decrease')} ${unitLabel}`}
+              title={`${text('FABRICATE.Admin.Manager.Recipe.DurationDecrease', 'Decrease')} ${unitLabel}`}
+              onclick={() => stepUnit(unit, -1)}
+            ><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+          </div>
         {/each}
       </div>
     </div>

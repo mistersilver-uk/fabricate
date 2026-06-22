@@ -4479,8 +4479,7 @@
   z-index: 4000;
   box-sizing: border-box;
   width: max-content;
-  min-width: 240px;
-  max-width: 300px;
+  max-width: none;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 8px;
@@ -4488,15 +4487,104 @@
   box-shadow: var(--fab-shadow-lg);
 }
 
-.fabricate-manager .manager-recipe-duration-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+/* All five unit steppers sit on one line. The popover sizes to this row
+   (`width: max-content`), so the row is never wider than its container and never
+   needs horizontal scroll. */
+.fabricate-manager .manager-recipe-duration-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-recipe-duration-field input {
-  width: 100%;
+/* One unit column: the unit label header, then the up chevron / editable field /
+   down chevron fused into a single connected control (no gaps; the chevrons share
+   the field's border and are square where they meet it). Fixed, narrow width so
+   every column is uniform. */
+.fabricate-manager .manager-recipe-duration-stepper {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: 3.25rem;
+}
+
+.fabricate-manager .manager-recipe-duration-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-mv2-text);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+/* Round only the outer corners; square where the chevron joins the field, and
+   drop the shared border edge so the join reads as a single line. */
+.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='up'] {
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+}
+
+.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='down'] {
+  border-radius: 0 0 6px 6px;
+  border-top: none;
+}
+
+.fabricate-manager .manager-recipe-duration-step:hover {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-08);
+}
+
+/* The number-only field. Square corners so it sits flush between the two
+   chevrons. */
+.fabricate-manager .manager-recipe-duration-field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 0;
+  background: var(--fab-mv2-bg);
+}
+
+/* The count fills the narrow field, centred (up to four digits). */
+.fabricate-manager .manager-recipe-duration-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fab-mv2-text);
+  text-align: center;
+  appearance: textfield;
+}
+
+/* Hide the native spinners — the custom up/down chevrons replace them. */
+.fabricate-manager .manager-recipe-duration-input::-webkit-outer-spin-button,
+.fabricate-manager .manager-recipe-duration-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* The unit label sits at the top of the column, above the connected stepper. */
+.fabricate-manager .manager-recipe-duration-unit {
+  margin-bottom: var(--fab-space-2xs);
+  overflow: hidden;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
@@ -4588,8 +4676,12 @@
   gap: var(--fab-space-2);
 }
 
+/* The set-level "OR", the within-requirement "OR", and the between-requirement
+   "AND" dividers share one label-flanked-by-rules treatment; only the label
+   differs. */
 .fabricate-manager .manager-recipe-ingredient-set-or,
-.fabricate-manager .manager-recipe-ingredient-or-separator {
+.fabricate-manager .manager-recipe-ingredient-or-separator,
+.fabricate-manager .manager-recipe-ingredient-and-separator {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4600,10 +4692,12 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Flank the "OR" label with a faint rule so each component/tag/cost alternative
-   reads as a visually separated row within the requirement. */
+/* Flank the label with a faint rule so each alternative ("OR") or each AND'd
+   requirement reads as a visually separated unit. */
 .fabricate-manager .manager-recipe-ingredient-or-separator::before,
-.fabricate-manager .manager-recipe-ingredient-or-separator::after {
+.fabricate-manager .manager-recipe-ingredient-or-separator::after,
+.fabricate-manager .manager-recipe-ingredient-and-separator::before,
+.fabricate-manager .manager-recipe-ingredient-and-separator::after {
   content: '';
   flex: 1 1 auto;
   height: 1px;
@@ -4673,18 +4767,6 @@
   background: var(--fab-overlay-light-03);
 }
 
-/* A faint divider between two consecutive single-alternative (bare) requirements
-   in a set, so the AND'd component/tag/cost rows read as separated. An OR-group
-   box already carries its own border, so requirements adjacent to one get no
-   extra divider. */
-.fabricate-manager
-  .manager-recipe-ingredient-set-groups
-  > .manager-recipe-ingredient-requirement:not(.has-alternatives)
-  + .manager-recipe-ingredient-requirement:not(.has-alternatives) {
-  border-top: 1px solid var(--fab-mv2-border);
-  padding-top: var(--fab-space-2);
-}
-
 .fabricate-manager .manager-recipe-ingredient-requirement-options {
   display: flex;
   flex-direction: column;
@@ -4695,6 +4777,7 @@
    quantity + per-row add/remove controls cluster on the right. */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
@@ -4831,9 +4914,12 @@
   min-width: 0;
 }
 
-/* The chosen tags sit in their own bordered area below the match controls;
-   when empty it shows a muted "No tags set". */
+/* The chosen tags sit in their own bordered area on a full-width line below the
+   match controls/quantity row; as a flex item with a 100% basis it always wraps
+   to its own line and fills the row. When empty it shows a muted "No tags set". */
 .fabricate-manager .manager-recipe-option-tags-list {
+  flex: 1 1 100%;
+  box-sizing: border-box;
   min-width: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
@@ -4848,14 +4934,28 @@
 .fabricate-manager .manager-recipe-tag-chips {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--fab-space-chip);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Chips are <li>s. `margin: 0` zeroes a host list rule that gives non-last items
+   a margin-bottom (which inflated the first chip's box, e.g. 34px vs 30px). The
+   min-width floors short tags ("rare") so they don't collapse to a near-square
+   pill next to longer tags ("reagent"); space-between overrides the base chip's
+   centring so the label sits left and the remove button right regardless of tag
+   length; and the pinned height keeps every chip the same box despite tag glyphs
+   or sub-pixel rounding. */
 .fabricate-manager .manager-recipe-tag-chip {
   gap: var(--fab-space-chip);
+  box-sizing: border-box;
+  margin: 0;
+  justify-content: space-between;
+  min-width: 4.5rem;
+  height: 28px;
+  min-height: 28px;
 }
 
 .fabricate-manager .manager-recipe-tag-remove {
