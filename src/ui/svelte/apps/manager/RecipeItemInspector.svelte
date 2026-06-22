@@ -126,7 +126,7 @@
   // chosen ingredient set ("Ingredient", provider `ingredientSet`) or by the
   // system-level crafting-check outcome ("Check", provider `check`). The
   // @deprecated `macroOutcome`/`rollTableOutcome` providers are also check-driven,
-  // so they read back as "Check" until they are migrated away and removed.
+  // so they read back as "Check" until they are migrated away and removed (issue 424).
   const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
   const isCheckRouting = $derived(
     ['check', 'macroOutcome', 'rollTableOutcome'].includes(routingProvider)

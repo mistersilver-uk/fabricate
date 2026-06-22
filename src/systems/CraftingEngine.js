@@ -1077,7 +1077,7 @@ export class CraftingEngine {
 
     // Pre-resolve rollTableOutcome before calling resolveResultGroups.
     // @deprecated rollTableOutcome is a legacy routed provider slated for removal
-    // in favour of `check`; this pre-resolution branch goes with it.
+    // in favour of `check`; this pre-resolution branch goes with it (tracked in #424).
     let rollTableResult = null;
     if (recipe?.resultSelection?.provider === 'rollTableOutcome' && resolutionService) {
       const allGroups =
