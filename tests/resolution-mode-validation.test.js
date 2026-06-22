@@ -367,25 +367,32 @@ test('routed rollTableOutcome — roll table UUID present → valid (check not r
   assert.equal(result.valid, true, result.errors.join(', '));
 });
 
+// The routed `resultSelection` for a provider (rollTableOutcome needs a UUID).
+function routedResultSelection(provider) {
+  return provider === 'rollTableOutcome'
+    ? { provider, rollTableUuid: 'RollTable.x' }
+    : { provider };
+}
+
+// Validate a routed recipe whose single step carries the given result groups.
+function validateRoutedNamedGroups(provider, resultGroups) {
+  const service = buildService(buildRoutedCheckSystem());
+  const recipe = buildRecipe([
+    buildRoutedNamedStep(provider, {
+      resultGroups,
+      resultSelection: routedResultSelection(provider),
+    }),
+  ]);
+  return service.validateRecipe(recipe);
+}
+
 // Reserved-name + duplicate-name rules apply under EVERY routed provider.
 for (const provider of ['ingredientSet', 'macroOutcome', 'rollTableOutcome']) {
   test(`routed ${provider} — reserved ResultGroup.name (hazard family) → invalid`, () => {
-    const system = buildRoutedCheckSystem();
-    const service = buildService(system);
-    const recipe = buildRecipe([
-      buildRoutedNamedStep(provider, {
-        resultGroups: [
-          { id: 'rg-ok', name: 'Fine', results: [] },
-          { id: 'rg-bad', name: 'Hazard', results: [] },
-        ],
-        resultSelection:
-          provider === 'rollTableOutcome'
-            ? { provider, rollTableUuid: 'RollTable.x' }
-            : { provider },
-      }),
+    const result = validateRoutedNamedGroups(provider, [
+      { id: 'rg-ok', name: 'Fine', results: [] },
+      { id: 'rg-bad', name: 'Hazard', results: [] },
     ]);
-
-    const result = service.validateRecipe(recipe);
 
     assert.equal(result.valid, false);
     assert.ok(
@@ -395,22 +402,10 @@ for (const provider of ['ingredientSet', 'macroOutcome', 'rollTableOutcome']) {
   });
 
   test(`routed ${provider} — duplicate ResultGroup.name (case-insensitive) → invalid`, () => {
-    const system = buildRoutedCheckSystem();
-    const service = buildService(system);
-    const recipe = buildRecipe([
-      buildRoutedNamedStep(provider, {
-        resultGroups: [
-          { id: 'rg-1', name: 'Fine', results: [] },
-          { id: 'rg-2', name: 'fine', results: [] },
-        ],
-        resultSelection:
-          provider === 'rollTableOutcome'
-            ? { provider, rollTableUuid: 'RollTable.x' }
-            : { provider },
-      }),
+    const result = validateRoutedNamedGroups(provider, [
+      { id: 'rg-1', name: 'Fine', results: [] },
+      { id: 'rg-2', name: 'fine', results: [] },
     ]);
-
-    const result = service.validateRecipe(recipe);
 
     assert.equal(result.valid, false);
     assert.ok(
@@ -512,13 +507,17 @@ test('progressive mode — missing progressive config → invalid', () => {
   );
 });
 
-test('progressive mode — difficulty < 1 on a result → invalid', () => {
-  const system = buildProgressiveSystem([{ id: 'item-herb', difficulty: 0.5 }]);
+// Validate a progressive recipe whose single result references one component with
+// the given id/difficulty.
+function validateProgressiveDifficulty(itemId, difficulty) {
+  const system = buildProgressiveSystem([{ id: itemId, difficulty }]);
   const service = buildService(system);
-  const step = buildProgressiveStep([{ id: 'result-1', componentId: 'item-herb' }]);
-  const recipe = buildRecipe([step]);
+  const step = buildProgressiveStep([{ id: 'result-1', componentId: itemId }]);
+  return service.validateRecipe(buildRecipe([step]));
+}
 
-  const result = service.validateRecipe(recipe);
+test('progressive mode — difficulty < 1 on a result → invalid', () => {
+  const result = validateProgressiveDifficulty('item-herb', 0.5);
 
   assert.equal(result.valid, false);
   assert.ok(
@@ -528,12 +527,7 @@ test('progressive mode — difficulty < 1 on a result → invalid', () => {
 });
 
 test('progressive mode — difficulty = 0 → invalid', () => {
-  const system = buildProgressiveSystem([{ id: 'item-zero', difficulty: 0 }]);
-  const service = buildService(system);
-  const step = buildProgressiveStep([{ id: 'result-1', componentId: 'item-zero' }]);
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
+  const result = validateProgressiveDifficulty('item-zero', 0);
 
   assert.equal(result.valid, false);
   assert.ok(

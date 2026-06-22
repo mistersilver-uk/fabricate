@@ -90,6 +90,24 @@ function makeService(systemOverrides = {}) {
   return new ResolutionModeService(mgr);
 }
 
+// A rollTableOutcome recipe pointing at the canonical test table UUID.
+function rollTableRecipe(rollTableUuid = 'table-uuid-1') {
+  return { resultSelection: { provider: 'rollTableOutcome', rollTableUuid } };
+}
+
+// Arrange the standard rollTableOutcome case (result groups + recipe + mocked
+// draw) and resolve it, returning the resolution result.
+async function resolveDraw(service, groupNames, drawnText) {
+  const groups = makeResultGroups(groupNames);
+  mockFromUuidResult = makeRollTable(drawnText);
+  return service.resolveByRollTable(rollTableRecipe(), null, groups);
+}
+
+// A single result group literal with one result, for validation fixtures.
+function resultGroupLiteral(id, name, resultId, componentId) {
+  return { id, name, results: [{ id: resultId, componentId, quantity: 1 }] };
+}
+
 // ---------------------------------------------------------------------------
 // ResolutionModeService.resolveByRollTable tests
 // ---------------------------------------------------------------------------
@@ -103,11 +121,7 @@ describe('ResolutionModeService.resolveByRollTable', () => {
   });
 
   it('1. happy path: drawn name matches a result group', async () => {
-    const groups = makeResultGroups(['Sword', 'Shield', 'Potion']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('Sword');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword', 'Shield', 'Potion'], 'Sword');
 
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups.length, 1);
@@ -116,66 +130,42 @@ describe('ResolutionModeService.resolveByRollTable', () => {
   });
 
   it('2. case-insensitive matching: "SWORD" matches ResultGroup "sword"', async () => {
-    const groups = makeResultGroups(['sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('SWORD');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['sword'], 'SWORD');
 
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups[0].name, 'sword');
   });
 
   it('3a. whitespace-padded name " Sword " matches result group "Sword"', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable(' Sword ');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], ' Sword ');
 
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups[0].name, 'Sword');
   });
 
   it('3b. fail keyword "fail" returns disposition fail', async () => {
-    const groups = makeResultGroups(['Sword', 'Shield']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('fail');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword', 'Shield'], 'fail');
 
     assert.equal(result.meta.disposition, 'fail');
     assert.equal(result.groups.length, 0);
   });
 
   it('3c. fail keyword "Failed" (case-insensitive) returns disposition fail', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('Failed');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], 'Failed');
 
     assert.equal(result.meta.disposition, 'fail');
     assert.equal(result.groups.length, 0);
   });
 
   it('3d. miss keyword "nothing" returns disposition miss', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('nothing');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], 'nothing');
 
     assert.equal(result.meta.disposition, 'miss');
     assert.equal(result.groups.length, 0);
   });
 
   it('3e. miss keyword "whiff" returns disposition miss', async () => {
-    const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('whiff');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword'], 'whiff');
 
     assert.equal(result.meta.disposition, 'miss');
   });
@@ -202,11 +192,7 @@ describe('ResolutionModeService.resolveByRollTable', () => {
   });
 
   it('6. no matching result group returns misconfiguration error', async () => {
-    const groups = makeResultGroups(['Sword', 'Shield']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
-    mockFromUuidResult = makeRollTable('Potion');
-
-    const result = await service.resolveByRollTable(recipe, null, groups);
+    const result = await resolveDraw(service, ['Sword', 'Shield'], 'Potion');
 
     assert.equal(result.meta.disposition, 'misconfiguration');
     assert.ok(result.meta.error);
@@ -375,8 +361,8 @@ describe('Recipe.validate() for rollTableOutcome', () => {
     const recipe = new Recipe(makeRecipeData({
       resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
       resultGroups: [
-        { id: 'g1', name: 'Sword', results: [{ id: 'r1', componentId: 'item-1', quantity: 1 }] },
-        { id: 'g2', name: 'SWORD', results: [{ id: 'r2', componentId: 'item-2', quantity: 1 }] }
+        resultGroupLiteral('g1', 'Sword', 'r1', 'item-1'),
+        resultGroupLiteral('g2', 'SWORD', 'r2', 'item-2')
       ]
     }));
     const { valid, errors } = recipe.validate();
@@ -387,9 +373,7 @@ describe('Recipe.validate() for rollTableOutcome', () => {
   it('fails if rollTableOutcome result group name is a reserved fail keyword', () => {
     const recipe = new Recipe(makeRecipeData({
       resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [
-        { id: 'g1', name: 'fail', results: [{ id: 'r1', componentId: 'item-1', quantity: 1 }] }
-      ]
+      resultGroups: [resultGroupLiteral('g1', 'fail', 'r1', 'item-1')]
     }));
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
@@ -399,9 +383,7 @@ describe('Recipe.validate() for rollTableOutcome', () => {
   it('fails if rollTableOutcome result group name is a reserved miss keyword', () => {
     const recipe = new Recipe(makeRecipeData({
       resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [
-        { id: 'g1', name: 'nothing', results: [{ id: 'r1', componentId: 'item-1', quantity: 1 }] }
-      ]
+      resultGroups: [resultGroupLiteral('g1', 'nothing', 'r1', 'item-1')]
     }));
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
