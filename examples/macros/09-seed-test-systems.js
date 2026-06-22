@@ -137,12 +137,22 @@
     await sweep(game.macros, Macro);
     await sweep(game.actors, Actor);
     await sweep(game.items, Item);
+    // Folders last: their flagged items are already gone, so the folder is empty.
+    await sweep(game.folders, Folder);
   };
 
   // ===========================================================================
   // 2. SUPPORTING FOUNDRY DOCUMENTS
   // ===========================================================================
   const createSupport = async () => {
+    // One Item folder holds every world item this macro creates, so the seed does
+    // not clutter the root Items directory. Flagged so teardown removes it too.
+    const itemFolder = await Folder.create({
+      name: `${PREFIX} Seed Items`,
+      type: 'Item',
+      flags: { ...SEED_FLAG }
+    });
+
     // World items. `Flame Shard` carries an Active Effect so the effect-transfer
     // demo (S4) has something to transfer onto crafted results.
     const itemData = [
@@ -157,6 +167,8 @@
       { name: 'Iron Sword', img: ICON.sword },
       { name: 'Dragon Scale Armor', img: ICON.armor },
       { name: 'Healing Potion', img: ICON.potion },
+      { name: 'Minor Healing Potion', img: ICON.potion },
+      { name: 'Greater Healing Potion', img: ICON.potion },
       { name: 'Refined Ingot', img: ICON.ingot },
       {
         name: 'Flame Shard',
@@ -176,6 +188,7 @@
       ...d,
       name: `${PREFIX} ${d.name}`,
       type: ITEM_TYPE,
+      folder: itemFolder.id,
       flags: { ...SEED_FLAG }
     }));
 
@@ -558,11 +571,15 @@
 
     const herb = await addComponent(sid, sup.item['Mystic Herb'], { difficulty: 1 });
     const vial = await addComponent(sid, sup.item['Empty Vial'], {});
+    // Progressive result ladder. Every result component needs difficulty >= 1; the ordered
+    // result group awards each tier whose difficulty the check value exceeds, so a stronger
+    // check yields more (and better) potions.
+    const minorPotion = await addComponent(sid, sup.item['Minor Healing Potion'], { difficulty: 1 });
     const potion = await addComponent(sid, sup.item['Healing Potion'], {
-      // Progressive mode requires every result component to have difficulty >= 1; potion is this recipe's result.
-      difficulty: 1,
+      difficulty: 3,
       salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [{ id: 'rg-reagents', name: 'Reagents', results: [{ componentId: herb, quantity: 1 }] }] }
     });
+    const greaterPotion = await addComponent(sid, sup.item['Greater Healing Potion'], { difficulty: 5 });
     const sickle = await addComponent(sid, sup.item['Herbalist Sickle'], {});
 
     // System tool: chance-based breakage that destroys the tool on break.
@@ -575,7 +592,7 @@
     await rm.createRecipe(
       {
         name: 'Brew Healing Potion',
-        description: 'Progressive craft: result quality scales with the check.',
+        description: 'Progressive craft: a better check yields a better potion (minor -> standard -> greater).',
         craftingSystemId: sid,
         img: ICON.potion,
         ingredientSets: [
@@ -584,7 +601,11 @@
             { name: 'Empty Vial', options: [{ quantity: 1, match: { type: 'component', componentId: vial } }] }
           ] }
         ],
-        resultGroups: [{ id: 'rg-potion', name: 'Brewed', results: [{ componentId: potion, quantity: 1 }] }]
+        resultGroups: [{ id: 'rg-potion', name: 'Brewed', results: [
+          { componentId: minorPotion, quantity: 1 },
+          { componentId: potion, quantity: 1 },
+          { componentId: greaterPotion, quantity: 1 }
+        ] }]
       },
       { allowIncomplete: true, notify: false }
     );
