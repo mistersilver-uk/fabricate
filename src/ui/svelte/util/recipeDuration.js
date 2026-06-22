@@ -12,14 +12,57 @@ import { localize } from './foundryBridge.js';
  */
 export const TIME_UNITS = ['years', 'months', 'days', 'hours', 'minutes'];
 
+// English fallbacks used when no i18n is available. Singular reuses the shared
+// `Economy.Unit.*` labels; plural has its own `Recipe.DurationUnitPlural.*` keys.
+const SINGULAR_FALLBACK = {
+  years: 'year',
+  months: 'month',
+  days: 'day',
+  hours: 'hour',
+  minutes: 'minute'
+};
+const PLURAL_FALLBACK = {
+  years: 'years',
+  months: 'months',
+  days: 'days',
+  hours: 'hours',
+  minutes: 'minutes'
+};
+
 function text(key, fallback) {
   const translated = localize(key);
   return translated && translated !== key ? translated : fallback;
 }
 
 /**
- * Build a compact "2 hours 30 minutes" string from the non-zero fields of a
- * time requirement, using the `FABRICATE.Admin.Manager.Economy.Unit.*` labels.
+ * The singular unit label (e.g. "Minute"), shared with the editor's per-input
+ * unit suffix so the popover and the formatted string draw from one source.
+ * @param {string} unit - One of `TIME_UNITS`.
+ * @returns {string}
+ */
+export function durationUnitLabelSingular(unit) {
+  return text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, SINGULAR_FALLBACK[unit] || unit);
+}
+
+/**
+ * The unit label for a given quantity, respecting plurals: exactly 1 uses the
+ * singular `Economy.Unit.*` label, any other count uses the plural
+ * `Recipe.DurationUnitPlural.*` label (e.g. "1 Minute" vs "2 Minutes").
+ * @param {string} unit - One of `TIME_UNITS`.
+ * @param {number} value - The quantity for that unit.
+ * @returns {string}
+ */
+export function durationUnitLabel(unit, value) {
+  if (Number(value) === 1) return durationUnitLabelSingular(unit);
+  return text(
+    `FABRICATE.Admin.Manager.Recipe.DurationUnitPlural.${unit}`,
+    PLURAL_FALLBACK[unit] || unit
+  );
+}
+
+/**
+ * Build a compact "2 Hours, 30 Minutes" string from the non-zero fields of a time
+ * requirement, pluralizing each unit by its count and separating units with ", ".
  * @param {object|null} time - `{ minutes, hours, days, months, years }` or null.
  * @returns {string} Empty string when there is no duration.
  */
@@ -29,9 +72,8 @@ export function formatTimeRequirement(time) {
   for (const unit of TIME_UNITS) {
     const value = Number(time[unit] || 0);
     if (value > 0) {
-      const unitKey = `FABRICATE.Admin.Manager.Economy.Unit.${unit}`;
-      parts.push(`${value} ${text(unitKey, unit)}`);
+      parts.push(`${value} ${durationUnitLabel(unit, value)}`);
     }
   }
-  return parts.join(' ');
+  return parts.join(', ');
 }

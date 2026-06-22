@@ -942,6 +942,16 @@
           "DurationHint": "How long this recipe takes to craft. Leave blank for an instant craft.",
           "AddDuration": "Add duration",
           "EditDuration": "Edit duration",
+          "DurationClearHint": "Right-click to clear",
+          "DurationIncrease": "Increase",
+          "DurationDecrease": "Decrease",
+          "DurationUnitPlural": {
+            "minutes": "Minutes",
+            "hours": "Hours",
+            "days": "Days",
+            "months": "Months",
+            "years": "Years"
+          },
           "NoRequirements": "No requirements",
           "AlternativeSets": "{count} alternative sets",
           "StepRequirements": "{count} steps",

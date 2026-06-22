@@ -393,6 +393,41 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('increments a duration unit via the up stepper button', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({ onUpdateRecipe: (patch) => patches.push(patch) }));
+    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
+    await flushRender();
+    const upDays = document.querySelector('[data-recipe-duration-stepper="days"] [data-recipe-duration-step="up"]');
+    assert.ok(upDays, 'each unit exposes an up stepper');
+    upDays.click();
+    assert.deepEqual(patches.at(-1), { timeRequirement: { minutes: 0, hours: 0, days: 1, months: 0, years: 0 } }, 'the up stepper increments the unit by one');
+    editHarness.remount();
+  });
+
+  it('increments a duration unit via the ArrowUp key on the input', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({ onUpdateRecipe: (patch) => patches.push(patch) }));
+    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
+    await flushRender();
+    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
+    hoursInput.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    assert.deepEqual(patches.at(-1), { timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 } }, 'ArrowUp increments the focused unit');
+    editHarness.remount();
+  });
+
+  it('clears the single-step recipe duration when the trigger is right-clicked', async () => {
+    const patches = [];
+    const target = await editHarness.mount(identityProps({
+      recipe: { ...RECIPE, timeRequirement: { minutes: 0, hours: 5, days: 0, months: 0, years: 0 } },
+      onUpdateRecipe: (patch) => patches.push(patch)
+    }));
+    const trigger = target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]');
+    trigger.dispatchEvent(new globalThis.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    assert.deepEqual(patches.at(-1), { timeRequirement: null }, 'right-clicking a set duration clears it');
+    editHarness.remount();
+  });
+
   it('shows the multi-step Steps card (not the single-step Duration section) on the Overview tab', async () => {
     const target = await editHarness.mount(identityProps({
       recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] }
@@ -1836,7 +1871,7 @@ describe('RecipeStepsCard (mounted)', () => {
     const target = await stepsHarness.mount(stepsProps());
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
     assert.equal(triggers.length, 2, 'one duration trigger per step');
-    assert.match(triggers[0].textContent, /2 hours 30 minutes/, 'time formatted from non-zero units');
+    assert.match(triggers[0].textContent, /2 hours, 30 minutes/, 'time formatted from non-zero units');
     assert.equal(triggers[0].classList.contains('is-empty'), false, 'a populated trigger is not muted');
 
     assert.match(triggers[1].textContent, /Add duration/, 'no time requirement shows the Add duration affordance');

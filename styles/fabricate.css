@@ -4479,8 +4479,7 @@
   z-index: 4000;
   box-sizing: border-box;
   width: max-content;
-  min-width: 240px;
-  max-width: 300px;
+  max-width: none;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 8px;
@@ -4488,15 +4487,104 @@
   box-shadow: var(--fab-shadow-lg);
 }
 
-.fabricate-manager .manager-recipe-duration-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+/* All five unit steppers sit on one line. The popover sizes to this row
+   (`width: max-content`), so the row is never wider than its container and never
+   needs horizontal scroll. */
+.fabricate-manager .manager-recipe-duration-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-recipe-duration-field input {
-  width: 100%;
+/* One unit column: the unit label header, then the up chevron / editable field /
+   down chevron fused into a single connected control (no gaps; the chevrons share
+   the field's border and are square where they meet it). Fixed, narrow width so
+   every column is uniform. */
+.fabricate-manager .manager-recipe-duration-stepper {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: 3.25rem;
+}
+
+.fabricate-manager .manager-recipe-duration-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-mv2-text);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+/* Round only the outer corners; square where the chevron joins the field, and
+   drop the shared border edge so the join reads as a single line. */
+.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='up'] {
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+}
+
+.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='down'] {
+  border-radius: 0 0 6px 6px;
+  border-top: none;
+}
+
+.fabricate-manager .manager-recipe-duration-step:hover {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-08);
+}
+
+/* The number-only field. Square corners so it sits flush between the two
+   chevrons. */
+.fabricate-manager .manager-recipe-duration-field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 0;
+  background: var(--fab-mv2-bg);
+}
+
+/* The count fills the narrow field, centred (up to four digits). */
+.fabricate-manager .manager-recipe-duration-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fab-mv2-text);
+  text-align: center;
+  appearance: textfield;
+}
+
+/* Hide the native spinners — the custom up/down chevrons replace them. */
+.fabricate-manager .manager-recipe-duration-input::-webkit-outer-spin-button,
+.fabricate-manager .manager-recipe-duration-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* The unit label sits at the top of the column, above the connected stepper. */
+.fabricate-manager .manager-recipe-duration-unit {
+  margin-bottom: var(--fab-space-2xs);
+  overflow: hidden;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
