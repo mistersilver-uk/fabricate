@@ -556,6 +556,8 @@ describe('CraftingSystemManager source contract', () => {
     for (const key of [
       'SalvageResolutionMode',
       'SalvageResolutionModeHint',
+      'SalvageResolutionSimple',
+      'SalvageResolutionSimpleDesc',
       'SalvageResolutionProgressive',
       'SalvageResolutionProgressiveDesc',
       'SalvageResolutionRouted',
@@ -567,13 +569,14 @@ describe('CraftingSystemManager source contract', () => {
       assert.ok(value.length > 0, `SystemSettings.${key} should be non-empty`);
     }
 
-    // Salvage option-set guard: the salvage options offer progressive + routed only.
+    // Salvage option-set guard: the salvage options offer simple (default) +
+    // progressive + routed, but never alchemy (no ingredient-set routing).
     const salvageOptionsMatch = systemEditSource.match(/salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
     assert.ok(salvageOptionsMatch, 'system edit should define a salvageResolutionModeOptions array');
     const salvageOptionsBlock = salvageOptionsMatch[1];
+    assert.ok(salvageOptionsBlock.includes("value: 'simple'"), 'salvage should offer simple');
     assert.ok(salvageOptionsBlock.includes("value: 'progressive'"), 'salvage should offer progressive');
     assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
-    assert.ok(!salvageOptionsBlock.includes("value: 'simple'"), 'salvage should NOT offer simple');
     assert.ok(!salvageOptionsBlock.includes("value: 'alchemy'"), 'salvage should NOT offer alchemy');
 
     // Persistence wiring threaded from the root through the edit view to the store.

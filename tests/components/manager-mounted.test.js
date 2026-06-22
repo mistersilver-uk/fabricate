@@ -5796,23 +5796,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
   });
 
-  it('renders the salvage resolution-mode card (progressive/routed) and routes its change', async () => {
-    // Alchemy has no salvageResolutionMode (absent ⇒ simple), so no radio is checked.
+  it('renders the salvage resolution-mode card (simple/progressive/routed) and routes its change', async () => {
+    // Alchemy has no salvageResolutionMode (absent ⇒ simple, the default).
     const { calls } = await mountCurrencyEditor();
 
     const salvageCard = target.querySelector('[data-system-salvage-resolution-mode]');
     const rows = assertResolutionCard(salvageCard, {
       optionAttr: 'data-system-salvage-resolution-mode-option',
       groupName: 'manager-system-salvage-resolution-mode',
-      expectedValues: ['progressive', 'routed']
+      expectedValues: ['simple', 'progressive', 'routed']
     });
-    assert.equal(rows.length, 2, 'salvage card offers exactly two options');
+    assert.equal(rows.length, 3, 'salvage card offers exactly three options');
 
-    // No active radio for a simple/absent system (honest "unset — pick one").
+    // Simple is the default, so it is the checked radio for a simple/absent system.
+    const checked = salvageCard.querySelector('input[type="radio"][name="manager-system-salvage-resolution-mode"]:checked');
+    assert.ok(checked, 'a salvage radio is checked for a simple/absent system');
     assert.equal(
-      salvageCard.querySelector('input[type="radio"][name="manager-system-salvage-resolution-mode"]:checked'),
-      null,
-      'no salvage radio is checked when the stored mode is simple/absent'
+      checked.closest('[data-system-salvage-resolution-mode-option]').dataset.systemSalvageResolutionModeOption,
+      'simple',
+      'simple is the default selected salvage mode'
     );
 
     const routedRadio = salvageCard.querySelector('[data-system-salvage-resolution-mode-option="routed"] input[type="radio"]');

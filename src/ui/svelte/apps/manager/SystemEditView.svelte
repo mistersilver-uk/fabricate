@@ -271,17 +271,16 @@
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
   let systemResolutionModeValue = $state('simple');
-  // The salvage card shows NO checked radio when the stored mode is `simple`/
-  // absent (an honest "unset — pick one"); only `progressive`/`routed` select a
-  // radio. We never pre-select or silently migrate stored `simple` data.
-  let systemSalvageResolutionModeValue = $state('');
+  // Salvage defaults to `simple` (one result group, optional pass/fail check).
+  // The stored mode is already normalized to `simple`/`routed`/`progressive`, so
+  // the matching radio is always selected.
+  let systemSalvageResolutionModeValue = $state('simple');
 
   $effect(() => {
     systemNameValue = selectedSystem?.name ?? '';
     systemDescriptionValue = selectedSystem?.description ?? '';
     systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
-    const storedSalvageMode = selectedSystem?.salvageResolutionMode ?? 'simple';
-    systemSalvageResolutionModeValue = storedSalvageMode === 'progressive' || storedSalvageMode === 'routed' ? storedSalvageMode : '';
+    systemSalvageResolutionModeValue = selectedSystem?.salvageResolutionMode ?? 'simple';
   });
 
   const featureDefinitions = [
@@ -300,10 +299,12 @@
     { value: 'alchemy', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy', fallback: 'Alchemy', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemyDesc', descFallback: 'Players submit ingredient combinations directly to discover hidden recipes; one result is selected per attempt.' }
   ];
 
-  // Salvage has exactly one ingredient, so ingredient-set routing is meaningless:
-  // only progressive and routed are offered (no simple/alchemy). The canonical
-  // persisted token stays `routed`; the display name is "Routed by check".
+  // Salvage has exactly one ingredient, so ingredient-set routing is meaningless;
+  // `alchemy` is also not offered. The default `simple` returns one result group
+  // with an optional pass/fail salvage check. For routed, the canonical persisted
+  // token stays `routed`; the display name is "Routed by check".
   const salvageResolutionModeOptions = [
+    { value: 'simple', labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimple', fallback: 'Simple', descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimpleDesc', descFallback: 'One result group, with an optional pass/fail salvage check.' },
     { value: 'progressive', labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive', fallback: 'Progressive', descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressiveDesc', descFallback: 'One ordered result group; a numeric salvage check awards every result whose difficulty threshold is met.' },
     { value: 'routed', labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRouted', fallback: 'Routed by check', descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRoutedDesc', descFallback: 'Multiple result groups; the salvage check outcome selects which result group is returned.' }
   ];

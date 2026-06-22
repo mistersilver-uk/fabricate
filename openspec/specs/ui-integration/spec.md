@@ -148,12 +148,11 @@ Changing recipe resolution mode is destructive and must follow `007` confirmatio
 #### Salvage Resolution Mode Card
 
 The Salvage resolution mode card renders directly beneath the recipe resolution-mode card.
-Salvage has exactly one ingredient, so ingredient-set routing is meaningless:
-the card offers only `progressive` and `routed` (display name "Routed by check").
-It does not offer `simple` or `alchemy`.
+The card offers `simple` (the default), `progressive`, and `routed` (display name "Routed by check").
+Salvage has exactly one ingredient, so ingredient-set routing is meaningless and `alchemy` does not apply: neither is offered.
+`simple` returns one result group with an optional pass/fail salvage check.
 
-When the system's persisted `salvageResolutionMode` is `simple` or absent the card SHALL render with no radio checked
-(an honest "unset — pick one"); it MUST NOT pre-select `routed` or silently migrate stored `simple` data.
+The card SHALL render with the system's persisted `salvageResolutionMode` selected, defaulting to `simple` when the value is `simple` or absent.
 Persistence happens only on an explicit GM selection through `setSalvageResolutionMode`.
 
 Changing salvage resolution mode is non-destructive:

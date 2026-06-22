@@ -239,6 +239,9 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
     // Set an override on the rolled character, then bulk-save from the header.
     const override = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-max]');
+    // With no override set, the placeholder shows the base (rolled) max so the GM
+    // sees the value they would be overriding.
+    assert.equal(override.getAttribute('placeholder'), '10', 'max-override placeholder shows the un-overridden rolled max');
     override.value = '15';
     override.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();

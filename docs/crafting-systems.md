@@ -21,11 +21,12 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 ### System Settings
 
-| Setting             | Description                                                                                                                                        |
-|:--------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Name**            | Display name shown in the UI                                                                                                                       |
-| **Description**     | Optional flavour text                                                                                                                              |
-| **Resolution Mode** | How recipes produce results: Simple, Routed, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| Setting                      | Description                                                                                                                                        |
+|:-----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Name**                     | Display name shown in the UI                                                                                                                       |
+| **Description**              | Optional flavour text                                                                                                                              |
+| **Recipe resolution mode**   | How recipes produce results: Simple, Routed, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| **Salvage resolution mode**  | How salvaging a component awards results: Simple (default), Progressive, or Routed by check. See [Salvage]({% link salvage.md %}#salvage-resolution-mode) |
 
 ### Tags And Categories
 
@@ -49,7 +50,16 @@ Toggle optional features in the **Features** card on the System tab of the Craft
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
 {: .warning }
-> Changing the **resolution mode** is a destructive operation. All recipes in the system will be deleted because they may be invalid under the new mode. You will be asked to confirm.
+> Changing the **recipe resolution mode** is a destructive operation. All recipes in the system will be deleted because they may be invalid under the new mode. You will be asked to confirm.
+
+Changing the **salvage resolution mode** is not destructive.
+No recipes or runs are deleted.
+Any component whose salvage setup is incompatible with the new mode simply has its salvage disabled, and can be re-enabled once it is reconfigured.
+You will be asked to confirm.
+
+The **Salvage resolution mode** card offers Simple (the default), Progressive, and Routed by check.
+A salvaged component has a single ingredient, so ingredient-set routing (and Alchemy) does not apply and is not offered.
+Simple returns one result group with an optional pass/fail salvage check.
 
 ### Chat Output
 

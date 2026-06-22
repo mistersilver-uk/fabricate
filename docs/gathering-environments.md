@@ -25,6 +25,14 @@ Fabricate keeps the header action in step as crafting systems change, so disabli
 
 ![Fabricate gathering feature enabled](img/screenshots/fabricate-enable-gathering.webp)
 
+## Gathering Resolution Mode
+
+The system's gathering **Settings** tab has a **Gathering resolution mode** card above the Limitation card.
+It chooses how a gathering attempt decides its outcome.
+
+The only mode available today is **d100**, which is selected by default.
+**Progressive** and **Routed by check** are shown but disabled with a "Coming soon" label, because they are planned and not yet available.
+
 ## Gathering Limitations
 
 Each crafting system decides how often its gathering tasks can be attempted through **two independent limitations**, set on the system's gathering **Settings** tab under **Limitation**:
