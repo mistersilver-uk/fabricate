@@ -1331,6 +1331,19 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
     ];
   }
 
+  // Mirrors production collectCompendiumFolderItemUuids: a compendium folder's `.contents` are
+  // index entries (uuid only, no documentName), and descendants come from getSubfolders(true).
+  function collectCompendiumFolderItemUuids(folder) {
+    if (!folder) return [];
+    const type = folder.documentType || folder.type || '';
+    if (type && type !== 'Item') return [];
+    const subfolders = typeof folder.getSubfolders === 'function' ? folder.getSubfolders(true) : [];
+    return [folder, ...subfolders]
+      .flatMap(current => current?.contents || [])
+      .map(entry => entry?.uuid)
+      .filter(Boolean);
+  }
+
   return async (data) => {
     // Bulk compendium pack drop
     if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
@@ -1360,10 +1373,12 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
         notifyWarn('FolderNotResolved');
         return;
       }
-      const folderItems = folder.documentType && folder.documentType !== 'Item'
-        ? []
-        : collectItems(folder);
-      if (folderItems.length === 0) {
+      // Compendium folders (folder.pack set) resolve to pack index entry uuids; world folders
+      // traverse live Item documents.
+      const itemUuids = folder.pack
+        ? collectCompendiumFolderItemUuids(folder)
+        : (folder.documentType && folder.documentType !== 'Item' ? [] : collectItems(folder)).map(fi => fi.uuid);
+      if (itemUuids.length === 0) {
         notifyInfo('FolderEmpty', { name: folder.name });
         return;
       }
@@ -1371,14 +1386,14 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
       let updated = 0;
       let skipped = 0;
       const sourceFallbacks = [];
-      for (const fi of folderItems) {
-        const res = await systemManager.addItemFromUuid(systemId, fi.uuid);
+      for (const itemUuid of itemUuids) {
+        const res = await systemManager.addItemFromUuid(systemId, itemUuid);
         if (res.action === 'added') added++;
         else if (res.action === 'updated') updated++;
         else skipped++;
         if (Array.isArray(res.sourceFallbacks)) sourceFallbacks.push(...res.sourceFallbacks);
       }
-      notifyInfo('FolderImportSummary', { added, updated, skipped, total: folderItems.length, name: folder.name });
+      notifyInfo('FolderImportSummary', { added, updated, skipped, total: itemUuids.length, name: folder.name });
       notifyBulkSourceFallback(sourceFallbacks);
       return;
     }
@@ -1605,6 +1620,94 @@ test('onDropItem integration — unresolvable Folder drop warns instead of silen
 
   assert.equal(addCalls.length, 0);
   assert.deepEqual(warnings, ['FolderNotResolved']);
+});
+
+test('onDropItem integration — compendium Folder drop imports items from pack index entries', async () => {
+  // Regression: dragging a folder out of a compendium pack previously no-opped. A compendium
+  // folder resolves via fromUuidSync (pack.folders is eager), but its `.contents` are pack index
+  // entries (uuid only, no documentName) and it carries a `pack` packId — so it must be walked
+  // with getSubfolders/contents, not collectFolderItems.
+  const compendiumFolder = {
+    id: 'cmp-folder',
+    name: 'Smithing Ingredients',
+    type: 'Item',
+    pack: 'world.simple-smithing',
+    getSubfolders: () => [],
+    contents: [
+      { _id: 'a', uuid: 'Compendium.world.simple-smithing.Item.a' },
+      { _id: 'b', uuid: 'Compendium.world.simple-smithing.Item.b' }
+    ]
+  };
+  globalThis.fromUuidSync = (uuid) =>
+    (uuid === 'Compendium.world.simple-smithing.Folder.cmp-folder' ? compendiumFolder : null);
+
+  // Empty world-folder map: resolution and enumeration must come from the compendium folder.
+  const { handler, addCalls, infos, warnings } = buildFolderDropProbe(new Map());
+  await handler({ type: 'Folder', uuid: 'Compendium.world.simple-smithing.Folder.cmp-folder' });
+
+  delete globalThis.fromUuidSync;
+
+  assert.deepEqual(addCalls, [
+    'Compendium.world.simple-smithing.Item.a',
+    'Compendium.world.simple-smithing.Item.b'
+  ]);
+  assert.equal(warnings.length, 0, 'a resolvable compendium folder must not warn');
+  assert.equal(infos[0].key, 'FolderImportSummary');
+  assert.equal(infos[0].params.total, 2);
+});
+
+test('onDropItem integration — compendium Folder drop includes nested subfolder items', async () => {
+  const nested = {
+    id: 'cmp-nested',
+    name: 'Ores',
+    type: 'Item',
+    pack: 'world.simple-smithing',
+    contents: [{ _id: 'c', uuid: 'Compendium.world.simple-smithing.Item.c' }]
+  };
+  const root = {
+    id: 'cmp-root',
+    name: 'Materials',
+    type: 'Item',
+    pack: 'world.simple-smithing',
+    getSubfolders: (recursive) => (recursive ? [nested] : []),
+    contents: [{ _id: 'a', uuid: 'Compendium.world.simple-smithing.Item.a' }]
+  };
+  globalThis.fromUuidSync = (uuid) =>
+    (uuid === 'Compendium.world.simple-smithing.Folder.cmp-root' ? root : null);
+
+  const { handler, addCalls, infos } = buildFolderDropProbe(new Map());
+  await handler({ type: 'Folder', uuid: 'Compendium.world.simple-smithing.Folder.cmp-root' });
+
+  delete globalThis.fromUuidSync;
+
+  assert.deepEqual(addCalls, [
+    'Compendium.world.simple-smithing.Item.a',
+    'Compendium.world.simple-smithing.Item.c'
+  ]);
+  assert.equal(infos[0].params.total, 2);
+});
+
+test('onDropItem integration — non-Item compendium Folder drop shows empty notification and skips import', async () => {
+  const actorFolder = {
+    id: 'cmp-actors',
+    name: 'Monsters',
+    type: 'Actor',
+    pack: 'world.bestiary',
+    getSubfolders: () => [],
+    contents: [{ _id: 'a', uuid: 'Compendium.world.bestiary.Actor.a' }]
+  };
+  globalThis.fromUuidSync = (uuid) =>
+    (uuid === 'Compendium.world.bestiary.Folder.cmp-actors' ? actorFolder : null);
+
+  const { handler, addCalls, infos, warnings } = buildFolderDropProbe(new Map());
+  await handler({ type: 'Folder', uuid: 'Compendium.world.bestiary.Folder.cmp-actors' });
+
+  delete globalThis.fromUuidSync;
+
+  assert.equal(addCalls.length, 0);
+  assert.equal(warnings.length, 0);
+  assert.equal(infos[0].key, 'FolderEmpty');
+  assert.equal(infos[0].params.name, 'Monsters');
 });
 
 test('onDropItem integration — Folder import summarizes source fallbacks once', async () => {
