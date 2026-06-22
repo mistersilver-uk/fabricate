@@ -113,6 +113,14 @@
     itemTags: selectedSystem?.itemTags?.length || 0,
     recipeCategories: selectedSystem?.categories?.length || 0
   });
+  // Per-type check counts drive the Checks right menu: zero shows the docs help
+  // card, non-zero swaps to the selected-check identity placeholder. The checks
+  // data model does not exist yet, so these resolve to 0 until it lands.
+  const checksCounts = $derived({
+    crafting: Array.isArray(selectedSystem?.checks?.crafting) ? selectedSystem.checks.crafting.length : 0,
+    salvage: Array.isArray(selectedSystem?.checks?.salvage) ? selectedSystem.checks.salvage.length : 0,
+    gathering: Array.isArray(selectedSystem?.checks?.gathering) ? selectedSystem.checks.gathering.length : 0
+  });
   const itemCards = $derived($viewState.itemCards || []);
   const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
   const toolsNormalizedComponentSearchTerm = $derived(toolsComponentSearchTerm.trim().toLowerCase());
@@ -3746,7 +3754,7 @@
     {:else if currentView === 'checks' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
         <section class="manager-environment-editor-shell">
-          <ChecksView activeTab={activeChecksTab} onSelectTab={(tab) => { activeChecksTab = tab; }} />
+          <ChecksView activeTab={activeChecksTab} counts={checksCounts} onSelectTab={(tab) => { activeChecksTab = tab; }} />
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}

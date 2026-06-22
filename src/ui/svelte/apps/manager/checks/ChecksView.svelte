@@ -18,7 +18,7 @@
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
 
-  let { activeTab = 'crafting', onSelectTab = () => {} } = $props();
+  let { activeTab = 'crafting', counts = {}, onSelectTab = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -62,6 +62,7 @@
 
   const panel = $derived(PANELS[activeTab] || PANELS.crafting);
   const hasMenu = $derived(activeTab !== 'validation');
+  const activeCount = $derived(Number(counts?.[activeTab]) || 0);
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
@@ -84,7 +85,7 @@
     </div>
 
     {#if hasMenu}
-      <ChecksRightMenu {activeTab} />
+      <ChecksRightMenu {activeTab} count={activeCount} />
     {/if}
   </div>
 </div>

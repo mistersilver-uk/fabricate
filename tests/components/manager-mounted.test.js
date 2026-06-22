@@ -22,6 +22,7 @@ const sharedComponentNames = [
 let tempRoot;
 let Component;
 let EnvironmentEditViewComponent;
+let ChecksRightMenuComponent;
 let mounted;
 let target;
 
@@ -1347,6 +1348,11 @@ describe('CraftingSystemManager mounted behavior', () => {
         pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte.js'))
       )
     ).default;
+    ChecksRightMenuComponent = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte.js'))
+      )
+    ).default;
   });
 
   afterEach(() => {
@@ -1535,9 +1541,23 @@ describe('CraftingSystemManager mounted behavior', () => {
       craftingPanel.querySelector('p').textContent.includes('crafting check'),
       'placeholder shows hint text below'
     );
+    // With no crafting checks, the context menu shows the docs help card.
+    const craftingSetup = target.querySelector('[data-checks-setup="crafting"]');
+    assert.ok(craftingSetup, 'empty crafting checks should show the setup help card');
     assert.ok(
-      target.querySelector('[data-checks-menu="crafting"]'),
-      'Crafting tab should show its context menu'
+      craftingSetup.classList.contains('manager-setup-card'),
+      'help card reuses the recipe setup-card format'
+    );
+    const craftingDocs = craftingSetup.querySelector(
+      'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
+    );
+    assert.ok(craftingDocs, 'crafting help card links to the crafting-checks docs page');
+    assert.equal(craftingDocs.getAttribute('target'), '_blank');
+    assert.equal(craftingDocs.getAttribute('rel'), 'noreferrer');
+    assert.equal(
+      target.querySelector('[data-checks-identity]'),
+      null,
+      'no identity placeholder while the check type is empty'
     );
     assert.equal(
       target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
@@ -1555,7 +1575,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const salvagePanel = target.querySelector('[data-checks-panel="salvage"]');
     assert.equal(salvagePanel.querySelector('h3').textContent.trim(), 'No salvage checks yet');
-    assert.ok(target.querySelector('[data-checks-menu="salvage"]'));
+    const salvageSetup = target.querySelector('[data-checks-setup="salvage"]');
+    assert.ok(salvageSetup, 'empty salvage checks should show the setup help card');
+    assert.ok(
+      salvageSetup.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/salvage"]'),
+      'salvage help card links to the salvage docs page'
+    );
     const salvageCreate = target.querySelector('.manager-header-actions [data-checks-create]');
     assert.equal(salvageCreate.dataset.checksCreate, 'salvage');
     assert.equal(salvageCreate.textContent.trim(), 'Create a Salvage Check');
@@ -1568,7 +1593,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(validationPanel);
     assert.equal(validationPanel.querySelector('h3').textContent.trim(), 'Nothing to validate yet');
     assert.equal(
-      target.querySelector('[data-checks-menu]'),
+      target.querySelector('[data-checks-setup]'),
       null,
       'Validation tab should not render a context menu'
     );
@@ -1587,6 +1612,47 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-body > .manager-inspector'),
       null,
       'Checks view owns its own context menu, so the shared inspector is skipped'
+    );
+  });
+
+  it('swaps the Checks help card for a selected-check identity placeholder once a check exists', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+
+    // No checks of this type: the docs help card shows.
+    mounted = mount(ChecksRightMenuComponent, {
+      target,
+      props: { activeTab: 'crafting', count: 0 },
+    });
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-setup="crafting"]'),
+      'empty type shows the help card'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-identity]'),
+      null,
+      'no identity placeholder while empty'
+    );
+
+    unmount(mounted);
+    target.remove();
+    target = document.createElement('div');
+    document.body.appendChild(target);
+
+    // At least one check of this type: the help card gives way to the identity placeholder.
+    mounted = mount(ChecksRightMenuComponent, {
+      target,
+      props: { activeTab: 'crafting', count: 1 },
+    });
+    flushSync();
+    const identity = target.querySelector('[data-checks-identity="crafting"]');
+    assert.ok(identity, 'a created check swaps in the identity placeholder');
+    assert.equal(identity.querySelector('.manager-kicker').textContent.trim(), 'Selected check');
+    assert.equal(
+      target.querySelector('[data-checks-setup]'),
+      null,
+      'the docs help card no longer shows once a check exists'
     );
   });
 
