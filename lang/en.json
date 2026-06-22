@@ -955,6 +955,7 @@
           "SetNamePlaceholder": "Set name",
           "SetEmptyHint": "Add a component or a tag requirement this set must satisfy.",
           "Or": "OR",
+          "And": "AND",
           "AddComponent": "Add component",
           "AddAlternativeComponent": "Add alternative component",
           "AddTagRequirement": "Add tag requirement",

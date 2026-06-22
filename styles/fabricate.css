@@ -4588,8 +4588,12 @@
   gap: var(--fab-space-2);
 }
 
+/* The set-level "OR", the within-requirement "OR", and the between-requirement
+   "AND" dividers share one label-flanked-by-rules treatment; only the label
+   differs. */
 .fabricate-manager .manager-recipe-ingredient-set-or,
-.fabricate-manager .manager-recipe-ingredient-or-separator {
+.fabricate-manager .manager-recipe-ingredient-or-separator,
+.fabricate-manager .manager-recipe-ingredient-and-separator {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4600,10 +4604,12 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Flank the "OR" label with a faint rule so each component/tag/cost alternative
-   reads as a visually separated row within the requirement. */
+/* Flank the label with a faint rule so each alternative ("OR") or each AND'd
+   requirement reads as a visually separated unit. */
 .fabricate-manager .manager-recipe-ingredient-or-separator::before,
-.fabricate-manager .manager-recipe-ingredient-or-separator::after {
+.fabricate-manager .manager-recipe-ingredient-or-separator::after,
+.fabricate-manager .manager-recipe-ingredient-and-separator::before,
+.fabricate-manager .manager-recipe-ingredient-and-separator::after {
   content: '';
   flex: 1 1 auto;
   height: 1px;
@@ -4673,18 +4679,6 @@
   background: var(--fab-overlay-light-03);
 }
 
-/* A faint divider between two consecutive single-alternative (bare) requirements
-   in a set, so the AND'd component/tag/cost rows read as separated. An OR-group
-   box already carries its own border, so requirements adjacent to one get no
-   extra divider. */
-.fabricate-manager
-  .manager-recipe-ingredient-set-groups
-  > .manager-recipe-ingredient-requirement:not(.has-alternatives)
-  + .manager-recipe-ingredient-requirement:not(.has-alternatives) {
-  border-top: 1px solid var(--fab-mv2-border);
-  padding-top: var(--fab-space-2);
-}
-
 .fabricate-manager .manager-recipe-ingredient-requirement-options {
   display: flex;
   flex-direction: column;
@@ -4695,6 +4689,7 @@
    quantity + per-row add/remove controls cluster on the right. */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
@@ -4831,9 +4826,12 @@
   min-width: 0;
 }
 
-/* The chosen tags sit in their own bordered area below the match controls;
-   when empty it shows a muted "No tags set". */
+/* The chosen tags sit in their own bordered area on a full-width line below the
+   match controls/quantity row; as a flex item with a 100% basis it always wraps
+   to its own line and fills the row. When empty it shows a muted "No tags set". */
 .fabricate-manager .manager-recipe-option-tags-list {
+  flex: 1 1 100%;
+  box-sizing: border-box;
   min-width: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
@@ -4848,14 +4846,28 @@
 .fabricate-manager .manager-recipe-tag-chips {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--fab-space-chip);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Chips are <li>s. `margin: 0` zeroes a host list rule that gives non-last items
+   a margin-bottom (which inflated the first chip's box, e.g. 34px vs 30px). The
+   min-width floors short tags ("rare") so they don't collapse to a near-square
+   pill next to longer tags ("reagent"); space-between overrides the base chip's
+   centring so the label sits left and the remove button right regardless of tag
+   length; and the pinned height keeps every chip the same box despite tag glyphs
+   or sub-pixel rounding. */
 .fabricate-manager .manager-recipe-tag-chip {
   gap: var(--fab-space-chip);
+  box-sizing: border-box;
+  margin: 0;
+  justify-content: space-between;
+  min-width: 4.5rem;
+  height: 28px;
+  min-height: 28px;
 }
 
 .fabricate-manager .manager-recipe-tag-remove {

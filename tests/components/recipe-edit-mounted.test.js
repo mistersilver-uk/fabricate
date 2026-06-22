@@ -684,6 +684,12 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(tagReq.querySelector('[data-recipe-tag="liquid"]'), 'the tag chip renders');
     assert.equal(tagReq.querySelector('[data-recipe-tag-match="any"]').getAttribute('aria-pressed'), 'true', 'tag match defaults to Any');
 
+    // The two AND'd requirements are separated by a labelled "AND" divider that
+    // mirrors the within-group "OR" divider (same casing/markup, different label).
+    const andSeparators = set.querySelectorAll('.manager-recipe-ingredient-and-separator');
+    assert.equal(andSeparators.length, 1, 'one AND divider sits between the two AND’d requirements');
+    assert.equal(andSeparators[0].querySelector('span').textContent.trim(), 'AND', 'the AND divider reads "AND"');
+
     // The per-set essence row renders.
     assert.ok(set.querySelector('[data-recipe-essence-id="ess-life"]'), 'the per-set essence row renders');
     assert.equal(set.querySelector('[data-recipe-essence-id="ess-life"] [data-recipe-essence-quantity]').value, '3', 'essence quantity shown');
