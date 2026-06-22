@@ -4317,6 +4317,15 @@
   cursor: pointer;
 }
 
+/* Foundry's core stylesheet draws the native radio's inner chrome via ::before/::after, which
+   appearance: none does NOT remove — so it bleeds through over our themed control. Hide those
+   pseudo-elements here so only the themed ring + inset-box-shadow dot shows. Load-bearing: do not
+   "clean up" this rule. Scoped to the resolution-mode radios only, never radios globally. */
+.fabricate-manager .manager-resolution-option input[type='radio']::before,
+.fabricate-manager .manager-resolution-option input[type='radio']::after {
+  display: none;
+}
+
 .fabricate-manager .manager-resolution-option input[type='radio']:checked {
   border-color: var(--fab-mv2-accent);
   box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
