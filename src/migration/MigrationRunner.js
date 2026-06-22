@@ -14,6 +14,7 @@ import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js'
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
+import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
@@ -169,6 +170,14 @@ const MIGRATIONS = [
       'Remove the dnd5e/pf2e/macro provider model from gathering gates, checks, tool requirements, and character modifiers (formula-only)',
     migrate(data) {
       return migrateRemoveSystemProvider(data);
+    },
+  },
+  {
+    version: '1.4.0',
+    label:
+      'Hard-migrate legacy mapped/tiered resolution modes to canonical routed + provider (ingredientSet/macroOutcome with tiered group-name reconciliation)',
+    migrate(data) {
+      return migrateLegacyResolutionModes(data);
     },
   },
   // Future migrations added here in version order
