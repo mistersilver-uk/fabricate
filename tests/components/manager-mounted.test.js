@@ -2197,8 +2197,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(howItWorksCard.textContent.includes('General'), 'How-it-works should explain reserved General');
     assert.ok(howItWorksCard.textContent.includes('tag'), 'How-it-works should mention item tags');
 
-    const examplesCard = target.querySelector('[data-tags-evidence="examples"]');
-    assert.ok(examplesCard, 'tags inspector should render an Examples evidence card');
+    // The Examples and General-category evidence cards were removed; only the
+    // How-it-works card and Vocabulary counts remain in the tags inspector.
+    assert.equal(target.querySelector('[data-tags-evidence="examples"]'), null, 'the Examples evidence card is removed');
 
     const categoryInput = target.querySelector('#manager-category-add');
     categoryInput.value = 'General';

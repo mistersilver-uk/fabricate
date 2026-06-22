@@ -133,16 +133,6 @@
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
   });
-  const topUsedCategoryExample = $derived(
-    categoryRows
-      .filter(row => row.id !== 'general' && (row.count || 0) > 0)
-      .sort((a, b) => (b.count || 0) - (a.count || 0))[0] || null
-  );
-  const topUsedTagExample = $derived(
-    tagRows
-      .filter(row => (row.count || 0) > 0)
-      .sort((a, b) => (b.count || 0) - (a.count || 0))[0] || null
-  );
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
   const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
@@ -3959,53 +3949,18 @@
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.Counts', 'Vocabulary counts')}</h3>
           <div class="manager-fact-grid">
             <div class="manager-fact" data-tags-category-fact="base-categories">
-              <strong>{tagCategoryCounts.baseCategories}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.BaseCategory', 'Base category')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.baseCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.BaseCategory', 'Base category')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="custom-categories">
-              <strong>{tagCategoryCounts.customCategories}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.CustomCategories', 'Custom categories')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.CustomCategories', 'Custom categories')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="item-tags">
-              <strong>{tagCategoryCounts.itemTags}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="references">
-              <strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.tagReferences}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.References', 'References')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.References', 'References')}</span></span>
             </div>
           </div>
-        </section>
-
-        <section class="manager-inspector-card" data-tags-evidence="examples">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ExamplesTitle', 'Examples')}</h3>
-          {#if topUsedCategoryExample || topUsedTagExample}
-            <ul class="manager-evidence-list">
-              {#if topUsedCategoryExample}
-                <li data-tags-example="category">
-                  {(topUsedCategoryExample.count === 1
-                    ? text('FABRICATE.Admin.Manager.TagsCategories.ExampleCategorySingular', '"{name}" is used by 1 recipe.')
-                    : text('FABRICATE.Admin.Manager.TagsCategories.ExampleCategory', '"{name}" is used by {count} recipes.')
-                  ).replace('{name}', topUsedCategoryExample.name).replace('{count}', topUsedCategoryExample.count)}
-                </li>
-              {/if}
-              {#if topUsedTagExample}
-                <li data-tags-example="tag">
-                  {(topUsedTagExample.count === 1
-                    ? text('FABRICATE.Admin.Manager.TagsCategories.ExampleTagSingular', '"{name}" appears on 1 component.')
-                    : text('FABRICATE.Admin.Manager.TagsCategories.ExampleTag', '"{name}" appears on {count} components.')
-                  ).replace('{name}', topUsedTagExample.name).replace('{count}', topUsedTagExample.count)}
-                </li>
-              {/if}
-            </ul>
-          {:else}
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ExamplesEmptyHint', 'Add a category or tag, then assign it to a recipe or component to see it appear here.')}</p>
-          {/if}
-        </section>
-
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralTitle', 'General category')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralInspectorHint', 'General is the built-in category for recipes without a custom category and cannot be removed.')}</p>
         </section>
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
