@@ -145,13 +145,17 @@
   // 2. SUPPORTING FOUNDRY DOCUMENTS
   // ===========================================================================
   const createSupport = async () => {
-    // One Item folder holds every world item this macro creates, so the seed does
-    // not clutter the root Items directory. Flagged so teardown removes it too.
-    const itemFolder = await Folder.create({
-      name: `${PREFIX} Seed Items`,
-      type: 'Item',
-      flags: { ...SEED_FLAG }
-    });
+    // One folder per document type so the seed groups its docs by kind instead of
+    // cluttering each directory root. All are flagged so teardown removes them too.
+    const mkFolder = (type, label) =>
+      Folder.create({ name: `${PREFIX} ${label}`, type, flags: { ...SEED_FLAG } });
+    const folders = {
+      Item: await mkFolder('Item', 'Items'),
+      Actor: await mkFolder('Actor', 'Actors'),
+      Macro: await mkFolder('Macro', 'Macros'),
+      RollTable: await mkFolder('RollTable', 'Tables'),
+      Scene: await mkFolder('Scene', 'Scenes')
+    };
 
     // World items. `Flame Shard` carries an Active Effect so the effect-transfer
     // demo (S4) has something to transfer onto crafted results.
@@ -188,7 +192,7 @@
       ...d,
       name: `${PREFIX} ${d.name}`,
       type: ITEM_TYPE,
-      folder: itemFolder.id,
+      folder: folders.Item.id,
       flags: { ...SEED_FLAG }
     }));
 
@@ -202,6 +206,7 @@
       name: `${PREFIX} Test Crafter`,
       type: ACTOR_TYPE,
       img: ICON.armor,
+      folder: folders.Actor.id,
       flags: { ...SEED_FLAG }
     });
     const copies = (name, qty) =>
@@ -223,7 +228,7 @@
 
     // Script macros: a crafting check, a routed-outcome provider, a salvage property macro.
     const mkMacro = (name, command, img) =>
-      Macro.create({ name: `${PREFIX} ${name}`, type: 'script', img, command, flags: { ...SEED_FLAG } });
+      Macro.create({ name: `${PREFIX} ${name}`, type: 'script', img, command, folder: folders.Macro.id, flags: { ...SEED_FLAG } });
     const checkMacro = await mkMacro(
       'Crafting Check',
       "// Demo crafting check. Return a named outcome for routed/named-outcome modes.\nreturn Math.random() < 0.5 ? 'high' : 'low';",
@@ -246,6 +251,7 @@
       name: `${PREFIX} Outcome Table`,
       img: ICON.scroll,
       formula: '1d2',
+      folder: folders.RollTable.id,
       flags: { ...SEED_FLAG },
       results: [
         { type: TEXT, text: 'high', range: [1, 1], weight: 1 },
@@ -257,11 +263,13 @@
     const grove = await Scene.create({
       name: `${PREFIX} Azure Grove`,
       background: { src: ICON.sceneBg },
+      folder: folders.Scene.id,
       flags: { ...SEED_FLAG }
     });
     const hollow = await Scene.create({
       name: `${PREFIX} Frostwood Hollow`,
       background: { src: ICON.ice },
+      folder: folders.Scene.id,
       flags: { ...SEED_FLAG }
     });
 
