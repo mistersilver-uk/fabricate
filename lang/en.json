@@ -2656,50 +2656,38 @@
           },
           "Quickstart": "Quickstart",
           "Resources": "Check resources",
-          "IdentityKicker": "Selected check",
-          "IdentityTitle": "Check identity",
+          "Configuration": "Configuration",
+          "PageKicker": "One per system",
           "Crafting": {
-            "Create": "Create a Crafting Check",
-            "EmptyTitle": "No crafting checks yet",
-            "EmptyHint": "Create a crafting check to gate crafting attempts behind a roll.",
-            "SetupKicker": "Crafting checks setup",
-            "SetupTitle": "Set up crafting checks",
-            "SetupHint": "Create the first crafting check to gate crafting attempts behind a roll.",
-            "SetupStep1": "Create a check and give it a name and roll formula.",
-            "SetupStep2": "Set the difficulty and the success and failure outcomes.",
-            "SetupStep3": "Enable the check so it applies to crafting attempts.",
-            "Docs": "Crafting checks docs",
-            "IdentityHint": "Identity details for the selected crafting check will appear here."
+            "PageTitle": "Crafting check",
+            "PageLead": "A system has a single crafting check. Its shape is determined by the system's resolution mode and preserved when you switch modes.",
+            "ConfigHint": "Roll, difficulty, and outcome settings for the crafting check will appear here.",
+            "HelpKicker": "Crafting checks",
+            "HelpTitle": "About crafting checks",
+            "HelpDesc": "The crafting check is shaped by the system resolution mode. Progressive mode requires it; simple and routed modes make it optional.",
+            "Docs": "Crafting checks docs"
           },
           "Salvage": {
-            "Create": "Create a Salvage Check",
-            "EmptyTitle": "No salvage checks yet",
-            "EmptyHint": "Create a salvage check to gate salvage attempts behind a roll.",
-            "SetupKicker": "Salvage checks setup",
-            "SetupTitle": "Set up salvage checks",
-            "SetupHint": "Create the first salvage check to gate salvage attempts behind a roll.",
-            "SetupStep1": "Create a check and give it a name and roll formula.",
-            "SetupStep2": "Set the difficulty and the success and failure outcomes.",
-            "SetupStep3": "Enable the check so it applies to salvage attempts.",
-            "Docs": "Salvage docs",
-            "IdentityHint": "Identity details for the selected salvage check will appear here."
+            "PageTitle": "Salvage check",
+            "PageLead": "A system has a single salvage check. Its shape is determined by the system's salvage resolution mode and preserved when you switch modes.",
+            "ConfigHint": "Roll, difficulty, and outcome settings for the salvage check will appear here.",
+            "HelpKicker": "Salvage checks",
+            "HelpTitle": "About salvage checks",
+            "HelpDesc": "The salvage check is shaped by the salvage resolution mode. Progressive mode requires it; simple and routed modes make it optional.",
+            "Docs": "Salvage docs"
           },
           "Gathering": {
-            "Create": "Create a Gathering Check",
-            "EmptyTitle": "No gathering checks yet",
-            "EmptyHint": "Create a gathering check to gate gathering attempts behind a roll.",
-            "SetupKicker": "Gathering checks setup",
-            "SetupTitle": "Set up gathering checks",
-            "SetupHint": "Create the first gathering check to gate gathering attempts behind a roll.",
-            "SetupStep1": "Create a check and give it a name and roll formula.",
-            "SetupStep2": "Set the difficulty and the success and failure outcomes.",
-            "SetupStep3": "Enable the check so it applies to gathering attempts.",
-            "Docs": "Gathering docs",
-            "IdentityHint": "Identity details for the selected gathering check will appear here."
+            "PageTitle": "Gathering check",
+            "PageLead": "A system has a single gathering check. In d100 mode it is the fixed d100 roll and is not editable; progressive and routed modes let you define it. Per-task tuning adjusts the difficulty, not the roll.",
+            "ConfigHint": "Roll, difficulty, and outcome settings for the gathering check will appear here.",
+            "HelpKicker": "Gathering checks",
+            "HelpTitle": "About gathering checks",
+            "HelpDesc": "The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.",
+            "Docs": "Gathering docs"
           },
           "Validation": {
             "EmptyTitle": "Nothing to validate yet",
-            "EmptyHint": "Issues across crafting, salvage, and gathering checks will be listed here."
+            "EmptyHint": "Issues across the crafting, salvage, and gathering checks will be listed here."
           }
         }
       },

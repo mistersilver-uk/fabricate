@@ -81,7 +81,6 @@
   let gatheringEventDraftBaseline = $state(null);
   let gatheringEventSaving = $state(false);
   let gatheringEventSaveError = $state('');
-  let activeChecksTab = $state('crafting');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
@@ -112,14 +111,6 @@
     essences: selectedSystem?.essenceDefinitions?.length || 0,
     itemTags: selectedSystem?.itemTags?.length || 0,
     recipeCategories: selectedSystem?.categories?.length || 0
-  });
-  // Per-type check counts drive the Checks right menu: zero shows the docs help
-  // card, non-zero swaps to the selected-check identity placeholder. The checks
-  // data model does not exist yet, so these resolve to 0 until it lands.
-  const checksCounts = $derived({
-    crafting: Array.isArray(selectedSystem?.checks?.crafting) ? selectedSystem.checks.crafting.length : 0,
-    salvage: Array.isArray(selectedSystem?.checks?.salvage) ? selectedSystem.checks.salvage.length : 0,
-    gathering: Array.isArray(selectedSystem?.checks?.gathering) ? selectedSystem.checks.gathering.length : 0
   });
   const itemCards = $derived($viewState.itemCards || []);
   const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
@@ -1406,19 +1397,6 @@
       activeView = view;
       if (view === 'tools') store?.enterToolsDraft?.(selectedSystemId);
     });
-  }
-
-  function checksCreateLabel(kind) {
-    if (kind === 'salvage') return text('FABRICATE.Admin.Manager.Checks.Salvage.Create', 'Create a Salvage Check');
-    if (kind === 'gathering') return text('FABRICATE.Admin.Manager.Checks.Gathering.Create', 'Create a Gathering Check');
-    return text('FABRICATE.Admin.Manager.Checks.Crafting.Create', 'Create a Crafting Check');
-  }
-
-  // The checks data model does not exist yet; this keeps the create affordance in
-  // place (mirroring the recipe browser) so it can be wired once checks are real.
-  function createCheck(kind) {
-    if (!selectedSystem || kind === 'validation') return;
-    store?.createCheckDraft?.(selectedSystemId, kind);
   }
 
   function selectSystem(systemId, nextView = 'systems') {
@@ -3357,12 +3335,7 @@
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
-        {#if activeChecksTab !== 'validation'}
-          <button type="button" class="manager-button is-primary" data-checks-create={activeChecksTab} onclick={() => createCheck(activeChecksTab)}>
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{checksCreateLabel(activeChecksTab)}</span>
-          </button>
-        {/if}
+        <!-- no header actions: each check is a singleton, not a created list item -->
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -3754,7 +3727,7 @@
     {:else if currentView === 'checks' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
         <section class="manager-environment-editor-shell">
-          <ChecksView activeTab={activeChecksTab} counts={checksCounts} onSelectTab={(tab) => { activeChecksTab = tab; }} />
+          <ChecksView />
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}

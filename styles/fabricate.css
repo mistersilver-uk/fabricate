@@ -1193,6 +1193,13 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
+.fabricate-manager .manager-checks-page {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }

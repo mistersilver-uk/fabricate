@@ -1528,64 +1528,84 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['Crafting', 'Salvage', 'Gathering', 'Validation']
     );
 
-    // Crafting is the default tab: its empty-state panel, right context menu, and
-    // the top-right tab-aware create action all render.
+    // Each check is a singleton: the Crafting tab is a single editor page (not a
+    // list with a create action), and its docs help card sits in the right menu.
     const craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
-    assert.ok(craftingPanel, 'Crafting panel should be the default');
+    assert.ok(craftingPanel, 'Crafting page should be the default');
     assert.ok(
-      craftingPanel.classList.contains('manager-empty'),
-      'empty checks tab uses the central placeholder'
+      craftingPanel.classList.contains('manager-checks-page'),
+      'a check tab renders a singleton editor page, not an empty list'
     );
-    assert.equal(craftingPanel.querySelector('h3').textContent.trim(), 'No crafting checks yet');
-    assert.ok(
-      craftingPanel.querySelector('p').textContent.includes('crafting check'),
-      'placeholder shows hint text below'
+    assert.equal(
+      craftingPanel.querySelector('.manager-card-title').textContent.trim(),
+      'Crafting check'
     );
-    // With no crafting checks, the context menu shows the docs help card.
-    const craftingSetup = target.querySelector('[data-checks-setup="crafting"]');
-    assert.ok(craftingSetup, 'empty crafting checks should show the setup help card');
     assert.ok(
-      craftingSetup.classList.contains('manager-setup-card'),
+      craftingPanel.textContent.includes('single crafting check'),
+      'the page explains there is one check per system'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions [data-checks-create]'),
+      null,
+      'a singleton check has no create action'
+    );
+    const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
+    assert.ok(craftingHelp, 'Crafting tab shows its docs help card');
+    assert.ok(
+      craftingHelp.classList.contains('manager-setup-card'),
       'help card reuses the recipe setup-card format'
     );
-    const craftingDocs = craftingSetup.querySelector(
+    const craftingDocs = craftingHelp.querySelector(
       'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
     );
     assert.ok(craftingDocs, 'crafting help card links to the crafting-checks docs page');
     assert.equal(craftingDocs.getAttribute('target'), '_blank');
     assert.equal(craftingDocs.getAttribute('rel'), 'noreferrer');
     assert.equal(
-      target.querySelector('[data-checks-identity]'),
-      null,
-      'no identity placeholder while the check type is empty'
-    );
-    assert.equal(
       target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
       null,
       'the context menu column should be visible on the Crafting tab'
     );
-    const craftingCreate = target.querySelector('.manager-header-actions [data-checks-create]');
-    assert.ok(craftingCreate, 'Crafting tab should show a create action in the top-right header');
-    assert.equal(craftingCreate.dataset.checksCreate, 'crafting');
-    assert.equal(craftingCreate.textContent.trim(), 'Create a Crafting Check');
 
-    // Salvage keeps a context menu and retargets the create action and placeholder.
+    // Salvage is its own singleton page with its own docs link.
     target.querySelector('[data-checks-tab-button="salvage"]').click();
     await tick();
     flushSync();
     const salvagePanel = target.querySelector('[data-checks-panel="salvage"]');
-    assert.equal(salvagePanel.querySelector('h3').textContent.trim(), 'No salvage checks yet');
-    const salvageSetup = target.querySelector('[data-checks-setup="salvage"]');
-    assert.ok(salvageSetup, 'empty salvage checks should show the setup help card');
+    assert.equal(
+      salvagePanel.querySelector('.manager-card-title').textContent.trim(),
+      'Salvage check'
+    );
     assert.ok(
-      salvageSetup.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/salvage"]'),
+      target
+        .querySelector('[data-checks-help="salvage"]')
+        ?.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/salvage"]'),
       'salvage help card links to the salvage docs page'
     );
-    const salvageCreate = target.querySelector('.manager-header-actions [data-checks-create]');
-    assert.equal(salvageCreate.dataset.checksCreate, 'salvage');
-    assert.equal(salvageCreate.textContent.trim(), 'Create a Salvage Check');
 
-    // Validation spans the full width with no context menu and no create action.
+    // Gathering page reflects the d100-is-the-roll framing and links to its docs.
+    target.querySelector('[data-checks-tab-button="gathering"]').click();
+    await tick();
+    flushSync();
+    const gatheringPanel = target.querySelector('[data-checks-panel="gathering"]');
+    assert.equal(
+      gatheringPanel.querySelector('.manager-card-title').textContent.trim(),
+      'Gathering check'
+    );
+    assert.ok(
+      gatheringPanel.textContent.includes('d100'),
+      'the gathering page explains the d100 roll is the check'
+    );
+    assert.ok(
+      target
+        .querySelector('[data-checks-help="gathering"]')
+        ?.querySelector(
+          'a[href="https://mistersilver-uk.github.io/fabricate/gathering-environments"]'
+        ),
+      'gathering help card links to the gathering docs page'
+    );
+
+    // Validation spans the full width with no context menu.
     target.querySelector('[data-checks-tab-button="validation"]').click();
     await tick();
     flushSync();
@@ -1593,14 +1613,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(validationPanel);
     assert.equal(validationPanel.querySelector('h3').textContent.trim(), 'Nothing to validate yet');
     assert.equal(
-      target.querySelector('[data-checks-setup]'),
+      target.querySelector('[data-checks-help]'),
       null,
       'Validation tab should not render a context menu'
-    );
-    assert.equal(
-      target.querySelector('.manager-header-actions [data-checks-create]'),
-      null,
-      'Validation tab should not offer a create action'
     );
     assert.ok(
       target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
@@ -1615,45 +1630,37 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('swaps the Checks help card for a selected-check identity placeholder once a check exists', () => {
-    target = document.createElement('div');
-    document.body.appendChild(target);
+  it('points each Checks help card at the matching documentation page', () => {
+    const cases = [
+      {
+        activeTab: 'crafting',
+        href: 'https://mistersilver-uk.github.io/fabricate/crafting-checks',
+      },
+      { activeTab: 'salvage', href: 'https://mistersilver-uk.github.io/fabricate/salvage' },
+      {
+        activeTab: 'gathering',
+        href: 'https://mistersilver-uk.github.io/fabricate/gathering-environments',
+      },
+    ];
+    for (const { activeTab, href } of cases) {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(ChecksRightMenuComponent, { target, props: { activeTab } });
+      flushSync();
 
-    // No checks of this type: the docs help card shows.
-    mounted = mount(ChecksRightMenuComponent, {
-      target,
-      props: { activeTab: 'crafting', count: 0 },
-    });
-    flushSync();
-    assert.ok(
-      target.querySelector('[data-checks-setup="crafting"]'),
-      'empty type shows the help card'
-    );
-    assert.equal(
-      target.querySelector('[data-checks-identity]'),
-      null,
-      'no identity placeholder while empty'
-    );
+      const card = target.querySelector(`[data-checks-help="${activeTab}"]`);
+      assert.ok(card, `${activeTab} menu renders a help card`);
+      assert.ok(
+        card.classList.contains('manager-setup-card'),
+        'help card uses the setup-card format'
+      );
+      assert.ok(card.querySelector(`a[href="${href}"]`), `${activeTab} help card links to ${href}`);
 
-    unmount(mounted);
-    target.remove();
-    target = document.createElement('div');
-    document.body.appendChild(target);
-
-    // At least one check of this type: the help card gives way to the identity placeholder.
-    mounted = mount(ChecksRightMenuComponent, {
-      target,
-      props: { activeTab: 'crafting', count: 1 },
-    });
-    flushSync();
-    const identity = target.querySelector('[data-checks-identity="crafting"]');
-    assert.ok(identity, 'a created check swaps in the identity placeholder');
-    assert.equal(identity.querySelector('.manager-kicker').textContent.trim(), 'Selected check');
-    assert.equal(
-      target.querySelector('[data-checks-setup]'),
-      null,
-      'the docs help card no longer shows once a check exists'
-    );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
