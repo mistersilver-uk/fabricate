@@ -66,6 +66,21 @@ function collectFolderItems(folder, folders, visited = new Set()) {
   return [...directItems, ...nestedItems];
 }
 
+// A Folder living inside a compendium pack does not expose live Item documents. Its `.contents`
+// are the pack's index entries (each carrying an authoritative `.uuid`, but no `.documentName`),
+// and its descendants live in `pack.folders` rather than `game.folders` — so collectFolderItems
+// cannot walk it. Enumerate the folder plus every descendant via getSubfolders(true) and read each
+// index entry's uuid. Gate on Item-typed folders to mirror the world-folder behaviour.
+function collectCompendiumFolderItemUuids(folder) {
+  if (!folder) return [];
+  if (folderDocumentType(folder) && folderDocumentType(folder) !== 'Item') return [];
+  const subfolders = typeof folder.getSubfolders === 'function' ? folder.getSubfolders(true) : [];
+  return [folder, ...subfolders]
+    .flatMap(current => current?.contents || [])
+    .map(entry => entry?.uuid)
+    .filter(Boolean);
+}
+
 export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
@@ -504,10 +519,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               ui.notifications.warn(localize('FABRICATE.Admin.Items.FolderNotResolved'));
               return;
             }
-            const folderItems = folderDocumentType(folder) && folderDocumentType(folder) !== 'Item'
-              ? []
-              : collectFolderItems(folder, game.folders);
-            if (folderItems.length === 0) {
+            // Compendium folders expose pack index entries (resolved here to uuids); world folders
+            // expose live Item documents traversed via collectFolderItems. `folder.pack` is the
+            // packId string for compendium folders and null/undefined for world folders.
+            const itemUuids = folder.pack
+              ? collectCompendiumFolderItemUuids(folder)
+              : collectFolderItems(folder, game.folders).map(folderItem => folderItem.uuid);
+            if (itemUuids.length === 0) {
               ui.notifications.info(localize('FABRICATE.Admin.Items.FolderEmpty', {
                 name: folder.name || data.id
               }));
@@ -517,8 +535,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             let updated = 0;
             let skipped = 0;
             const sourceFallbacks = [];
-            for (const folderItem of folderItems) {
-              const result = await systemManager.addItemFromUuid(systemId, folderItem.uuid);
+            for (const itemUuid of itemUuids) {
+              const result = await systemManager.addItemFromUuid(systemId, itemUuid);
               if (result.action === 'added') added++;
               else if (result.action === 'updated') updated++;
               else skipped++;
@@ -528,7 +546,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               added,
               updated,
               skipped,
-              total: folderItems.length,
+              total: itemUuids.length,
               name: folder.name || data.id
             }));
             notifyBulkSourceFallback(sourceFallbacks);

@@ -234,6 +234,10 @@ For actor-owned items, Fabricate may add item sheet header controls tied to reci
 Capabilities:
 
 - Add managed items from world or compendium.
+- Bulk-add managed items by dropping a Folder or a whole compendium onto the import zone. Folder
+  drops are accepted from both the world Items directory and a compendium directory, and expand to
+  every contained Item including nested subfolders; a compendium folder's items are resolved from
+  the pack index entries.
 - Remove managed items.
 - Edit managed item tags (if enabled).
 - Edit managed item essences (if enabled).
