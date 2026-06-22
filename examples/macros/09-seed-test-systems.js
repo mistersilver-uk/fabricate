@@ -559,6 +559,8 @@
     const herb = await addComponent(sid, sup.item['Mystic Herb'], { difficulty: 1 });
     const vial = await addComponent(sid, sup.item['Empty Vial'], {});
     const potion = await addComponent(sid, sup.item['Healing Potion'], {
+      // Progressive mode requires every result component to have difficulty >= 1; potion is this recipe's result.
+      difficulty: 1,
       salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [{ id: 'rg-reagents', name: 'Reagents', results: [{ componentId: herb, quantity: 1 }] }] }
     });
     const sickle = await addComponent(sid, sup.item['Herbalist Sickle'], {});
