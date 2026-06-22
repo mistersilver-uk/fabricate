@@ -79,8 +79,10 @@
     ].filter(Boolean)
   );
 
-  const onLabel = $derived(text('FABRICATE.Admin.Manager.StatusOn', 'On'));
-  const offLabel = $derived(text('FABRICATE.Admin.Manager.StatusOff', 'Off'));
+  const successOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success'));
+  const successOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure'));
+  const breakOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break'));
+  const breakOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break"));
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -243,7 +245,7 @@
               onclick={() => updateOutcome(outcome.id, { success: !(outcome.success === true) })}
             >
               <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-              <span class="manager-status-toggle-label">{outcome.success === true ? onLabel : offLabel}</span>
+              <span class="manager-status-toggle-label">{outcome.success === true ? successOnLabel : successOffLabel}</span>
             </button>
 
             <button
@@ -255,7 +257,7 @@
               onclick={() => updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
             >
               <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-              <span class="manager-status-toggle-label">{outcome.breakTools === true ? onLabel : offLabel}</span>
+              <span class="manager-status-toggle-label">{outcome.breakTools === true ? breakOnLabel : breakOffLabel}</span>
             </button>
 
             <button

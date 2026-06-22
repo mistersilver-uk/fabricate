@@ -1760,6 +1760,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(successToggle.tagName, 'BUTTON');
     assert.ok(successToggle.querySelector('.manager-status-toggle-track'));
     assert.equal(target.querySelector('[data-outcome-success] input'), null, 'no default checkbox');
+    assert.ok(
+      successToggle.textContent.includes('Failure'),
+      'the switch shows the state value (Failure), not Off'
+    );
+    assert.ok(
+      target.querySelector('[data-outcome-break]').textContent.includes('Break'),
+      "the break switch shows Break/Don't break, not On/Off"
+    );
     successToggle.click();
     assert.equal(emitted.at(-1).outcomes[0].success, true, 'toggling success emits the new state');
 

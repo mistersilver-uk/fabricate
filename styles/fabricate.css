@@ -1215,6 +1215,14 @@
   margin-bottom: var(--fab-space-2);
 }
 
+/* The crafting check type selector lays its two options side by side rather than
+   stacked (the shared resolution-mode card stacks them by default). */
+.fabricate-manager [data-check-type-card] .manager-resolution-mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--fab-space-2);
+}
+
 .fabricate-manager .manager-checks-dice {
   display: grid;
   gap: var(--fab-space-1);
@@ -1228,11 +1236,17 @@
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: minmax(140px, 1fr) 84px 76px 110px 40px;
+  grid-template-columns: minmax(140px, 1fr) 84px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: minmax(140px, 1fr) 76px 76px 76px 110px 40px;
+  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
+}
+
+/* Let the tier switches size to their state labels (Success/Failure,
+   Break/Don't break) instead of the default compact On/Off cap. */
+.fabricate-manager .manager-checks-outcome-row .manager-status-toggle {
+  max-width: none;
 }
 
 .fabricate-manager .manager-checks-outcome-head,
