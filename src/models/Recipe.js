@@ -301,10 +301,13 @@ export class Recipe {
   /**
    * Validate a routed `resultSelection` and its `ResultGroup` names.
    *
-   * Applies to the three first-class routed providers (`ingredientSet`,
-   * `macroOutcome`, `rollTableOutcome`); a recipe with no `resultSelection`
-   * (simple/progressive/legacy) is unaffected. `rollTableOutcome` additionally
-   * requires a roll-table UUID.
+   * Applies to the routed providers `ingredientSet` and `check` (and, until they
+   * are removed, the @deprecated legacy `macroOutcome`/`rollTableOutcome`); a
+   * recipe with no `resultSelection` (simple/progressive/legacy) is unaffected.
+   * `rollTableOutcome` additionally requires a roll-table UUID.
+   *
+   * @deprecated The `macroOutcome` and `rollTableOutcome` providers are legacy and
+   *   slated for removal; `check` (system crafting-check outcome) supersedes them.
    *
    * Under EVERY routed provider, `ResultGroup.name` must be unique under
    * trim+lowercase comparison and must not collide with a reserved routing
@@ -318,9 +321,11 @@ export class Recipe {
    */
   _validateRoutedResultSelection(resultSelection, resultGroups, errors) {
     const provider = resultSelection?.provider;
-    // Only the three routed providers route by ResultGroup.name / draw; a recipe
-    // with no resultSelection (simple/progressive/legacy) is unaffected.
-    if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) return;
+    // Only routed providers route by ResultGroup.name / draw; a recipe with no
+    // resultSelection (simple/progressive/legacy) is unaffected. `check` routes by
+    // the system crafting-check outcome (canonical successor to the legacy
+    // `macroOutcome`/`rollTableOutcome` providers, which are pending removal).
+    if (!['ingredientSet', 'check', 'macroOutcome', 'rollTableOutcome'].includes(provider)) return;
 
     if (provider === 'rollTableOutcome' && !resultSelection.rollTableUuid) {
       errors.push('rollTableOutcome provider requires a roll table UUID');
@@ -460,7 +465,10 @@ export class Recipe {
 
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
-    const VALID_PROVIDERS = ['ingredientSet', 'macroOutcome', 'rollTableOutcome'];
+    // `ingredientSet` and `check` are the canonical providers; `macroOutcome` and
+    // `rollTableOutcome` are @deprecated legacy providers kept only until a
+    // migration moves existing recipes onto `check`.
+    const VALID_PROVIDERS = ['ingredientSet', 'check', 'macroOutcome', 'rollTableOutcome'];
     const provider = String(resultSelection.provider || '').trim();
     if (!VALID_PROVIDERS.includes(provider)) return null;
     return {

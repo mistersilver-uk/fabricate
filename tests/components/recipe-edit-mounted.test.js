@@ -1682,26 +1682,41 @@ describe('RecipeItemInspector (mounted)', () => {
     inspectorHarness.remount();
   });
 
-  it('always renders the recipe-mode toggle with Simple selected by default', async () => {
+  it('renders the recipe-mode toggle with Simple selected when the system allows complex', async () => {
     const target = await inspectorHarness.mount(inspectorProps({
       recipe: { ...RECIPE, steps: [] },
-      multiStepEnabled: false
+      multiStepEnabled: false,
+      multiSetAllowed: true
     }));
     const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'recipe-mode card renders even without multi-step');
+    assert.ok(card, 'recipe-mode card renders when complex is an available choice');
     const simple = card.querySelector('[data-recipe-mode-option="simple"]');
     assert.ok(simple.classList.contains('is-selected'), 'Simple is selected when complex is false');
     inspectorHarness.remount();
   });
 
-  it('disables the Complex option when multiSetAllowed is false and the recipe is not already complex', async () => {
+  it('hides the recipe-mode section when the system forbids multiple sets and the recipe is not already complex', async () => {
     const target = await inspectorHarness.mount(inspectorProps({
       complex: false,
       multiSetAllowed: false
     }));
-    const complex = target.querySelector('[data-recipe-mode-option="complex"]');
-    assert.equal(complex.disabled, true, 'Complex is disabled when the system forbids multiple sets');
-    assert.ok(target.querySelector('[data-recipe-mode-hint="locked"]'), 'a locked hint is shown');
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-mode"]'),
+      null,
+      'a simple-resolution system does not show the recipe-mode toggle at all'
+    );
+    inspectorHarness.remount();
+  });
+
+  it('still shows the recipe-mode section for an already-complex recipe even when the system forbids multiple sets', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      complex: true,
+      multiSetAllowed: false
+    }));
+    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
+    assert.ok(card, 'an already-complex recipe keeps the recipe-mode toggle so it can be reverted');
+    const complex = card.querySelector('[data-recipe-mode-option="complex"]');
+    assert.ok(complex.classList.contains('is-selected'), 'Complex is selected for an already-complex recipe');
     inspectorHarness.remount();
   });
 
@@ -1734,6 +1749,66 @@ describe('RecipeItemInspector (mounted)', () => {
     }));
     target2.querySelector('[data-recipe-mode-option="simple"]').click();
     assert.deepEqual(calls, [true, false], 'clicking Simple requests simple mode');
+    inspectorHarness.remount();
+  });
+
+  it('shows the Check/Ingredient routing toggle only for routed systems', async () => {
+    const routedTarget = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'ingredientSet'
+    }));
+    const card = routedTarget.querySelector('[data-recipe-section="recipe-routing"]');
+    assert.ok(card, 'routed systems show the result-routing toggle');
+    assert.ok(card.querySelector('[data-recipe-routing-option="check"]'), 'a Check option renders');
+    assert.ok(
+      card.querySelector('[data-recipe-routing-option="ingredient"]').classList.contains('is-selected'),
+      'the ingredientSet provider selects the Ingredient option'
+    );
+    inspectorHarness.remount();
+
+    const simpleTarget = await inspectorHarness.mount(inspectorProps({ routed: false }));
+    assert.equal(
+      simpleTarget.querySelector('[data-recipe-section="recipe-routing"]'),
+      null,
+      'non-routed systems do not show the routing toggle'
+    );
+    inspectorHarness.remount();
+  });
+
+  it('selects Check for an outcome-driven provider and writes the provider on toggle', async () => {
+    const calls = [];
+    const target = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'check',
+      onSetRoutingProvider: (provider) => calls.push(provider)
+    }));
+    assert.ok(
+      target.querySelector('[data-recipe-routing-option="check"]').classList.contains('is-selected'),
+      'the check provider selects the Check option'
+    );
+    target.querySelector('[data-recipe-routing-option="ingredient"]').click();
+    assert.deepEqual(calls, ['ingredientSet'], 'clicking Ingredient requests the ingredientSet provider');
+
+    inspectorHarness.remount();
+    const target2 = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'ingredientSet',
+      onSetRoutingProvider: (provider) => calls.push(provider)
+    }));
+    target2.querySelector('[data-recipe-routing-option="check"]').click();
+    assert.deepEqual(calls, ['ingredientSet', 'check'], 'clicking Check requests the check provider');
+    inspectorHarness.remount();
+  });
+
+  it('reads a legacy macroOutcome provider back as Check routing', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({
+      routed: true,
+      routingProvider: 'macroOutcome'
+    }));
+    assert.ok(
+      target.querySelector('[data-recipe-routing-option="check"]').classList.contains('is-selected'),
+      'the legacy macroOutcome provider still reads as Check'
+    );
     inspectorHarness.remount();
   });
 });

@@ -142,6 +142,32 @@ describe('routed recipe resolution', () => {
     assert.equal(result.groups[0].name, 'Standard');
   });
 
+  it('routed check provider resolves by the crafting-check outcome name', () => {
+    const activeStep = step({ resultSelection: { provider: 'check' } });
+    const recipe = recipeWithStep(activeStep);
+    const service = buildService();
+
+    assert.equal(recipe.steps[0].resultSelection.provider, 'check', 'check is a valid provider');
+
+    const success = service.resolveResultGroups({
+      recipe,
+      step: recipe.steps[0],
+      ingredientSet: recipe.steps[0].ingredientSets[0],
+      checkResult: { outcome: 'mythic' }
+    });
+    assert.equal(success.meta.disposition, 'success');
+    assert.equal(success.groups[0].name, 'Mythic', 'check routes by outcome name like macroOutcome');
+
+    const failed = service.resolveResultGroups({
+      recipe,
+      step: recipe.steps[0],
+      ingredientSet: recipe.steps[0].ingredientSets[0],
+      checkResult: { outcome: 'fail' }
+    });
+    assert.equal(failed.meta.disposition, 'fail', 'check honors fail keywords');
+    assert.deepEqual(failed.groups, []);
+  });
+
   it('routed macroOutcome returns no output for fail keywords', () => {
     const activeStep = step({ resultSelection: { provider: 'macroOutcome' } });
     const recipe = recipeWithStep(activeStep);

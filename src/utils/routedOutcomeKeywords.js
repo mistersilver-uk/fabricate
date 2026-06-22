@@ -1,9 +1,10 @@
 /**
  * Canonical reserved routing keywords for routed-mode outcome matching.
  *
- * The routed `macroOutcome` and `rollTableOutcome` providers route a check
- * outcome / drawn name to a `ResultGroup` by NAME. Certain normalized names are
- * RESERVED for the failure path and never match (or name) a real result group:
+ * The routed `check` provider (and the @deprecated legacy `macroOutcome` /
+ * `rollTableOutcome` providers, pending removal) route a check outcome / drawn
+ * name to a `ResultGroup` by NAME. Certain normalized names are RESERVED for the
+ * failure path and never match (or name) a real result group:
  *
  *  - the FAIL family:  fail / failed / failure / f
  *  - the MISS family:  miss / missed / m / nothing / none / whiff / whiffed

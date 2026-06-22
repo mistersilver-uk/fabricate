@@ -97,6 +97,9 @@
   // Complex recipes need a resolution mode that allows multiple ingredient/result
   // sets; simple/progressive systems craft exactly one set into one result.
   const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
+  // Routed systems route a result group by check outcome or by ingredient set; the
+  // recipe inspector exposes that choice as a Check/Ingredient toggle.
+  const recipeRouted = $derived((selectedSystem?.resolutionMode || 'simple') === 'routed');
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
@@ -501,6 +504,7 @@
   // Recipe-edit deriveds read the live draft (not the persisted record) so the
   // editor, inspector, and header chip all track unsaved staged edits.
   const recipeComplex = $derived(recipeDraft?.complex === true);
+  const recipeRoutingProvider = $derived(recipeDraft?.resultSelection?.provider || null);
   const recipeEditDirty = $derived(Boolean(recipeDraft)
     && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
@@ -1657,6 +1661,18 @@
       patch.resultGroups = trimmed.resultGroups;
     }
     patchRecipeDraft(patch);
+    return true;
+  }
+
+  // Routed result routing: stage the chosen provider on the draft's
+  // resultSelection (persisted on save), preserving any existing selection fields.
+  function handleSetRoutingProvider(provider) {
+    if (!recipeDraft) return false;
+    if (!['check', 'ingredientSet'].includes(provider)) return false;
+    const current = recipeDraft.resultSelection && typeof recipeDraft.resultSelection === 'object'
+      ? recipeDraft.resultSelection
+      : {};
+    patchRecipeDraft({ resultSelection: { ...current, provider } });
     return true;
   }
 
@@ -5573,7 +5589,10 @@
           multiStepEnabled={recipeMultiStepEnabled}
           complex={recipeComplex}
           multiSetAllowed={recipeMultiSetAllowed}
+          routed={recipeRouted}
+          routingProvider={recipeRoutingProvider}
           onSetComplexity={handleSetRecipeComplexity}
+          onSetRoutingProvider={handleSetRoutingProvider}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}
           onSetCategory={handleSetRecipeCategory}
