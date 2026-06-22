@@ -196,6 +196,36 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(/\n[ \t]*confirmRecipeAction,/.test(storeSource), 'store exports confirmRecipeAction');
   });
 
+  it('sources the destructive recipe confirm titles + content from lang keys', () => {
+    // Keys exist with the expected English copy and HTML-preserving interpolation.
+    assert.equal(recipeLang.RevertToSingleStepTitle, 'Switch to single-step?');
+    assert.ok(recipeLang.RevertToSingleStepContent.includes('<strong>{name}</strong>'), 'revert content keeps the bold name placeholder');
+    assert.equal(recipeLang.SwitchToSimpleTitle, 'Switch to simple?');
+    assert.ok(recipeLang.SwitchToSimpleContent.includes('<strong>{name}</strong>'), 'switch-to-simple content keeps the bold name placeholder');
+    assert.ok(recipeLang.SwitchToSimpleContent.includes('result set{perStep}'), 'switch-to-simple content keeps the perStep placeholder');
+    assert.equal(recipeLang.SwitchToSimplePerStep, ' per step');
+    assert.equal(recipeLang.DeleteStepTitle, 'Delete step?');
+    assert.ok(recipeLang.DeleteStepContent.includes('<strong>{name}</strong>'), 'delete-step content keeps the bold name placeholder');
+    assert.ok(recipeLang.DeleteStepContent.includes('{alsoDeleted}'), 'delete-step content keeps the alsoDeleted placeholder');
+    for (const key of ['DeleteStepAlsoIngredients', 'DeleteStepAlsoResults', 'DeleteStepAlsoTools', 'DeleteStepAlsoAll']) {
+      assert.equal(typeof recipeLang[key], 'string', `${key} fragment defined`);
+    }
+    assert.equal(recipeLang.UnnamedStep, 'this step');
+
+    // The handlers localize these keys rather than embedding hardcoded English.
+    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle')"), 'revert title localized');
+    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name })"), 'revert content localized with name');
+    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleTitle')"), 'switch-to-simple title localized');
+    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleContent', { name, perStep })"), 'switch-to-simple content localized with name + perStep');
+    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle')"), 'delete-step title localized');
+    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted })"), 'delete-step content localized with name + alsoDeleted');
+
+    // No hardcoded English confirm copy lingers in the handlers.
+    assert.equal(rootSource.includes("title: 'Switch to single-step?'"), false, 'no hardcoded revert title');
+    assert.equal(rootSource.includes("title: 'Switch to simple?'"), false, 'no hardcoded switch-to-simple title');
+    assert.equal(rootSource.includes("title: 'Delete step?'"), false, 'no hardcoded delete-step title');
+  });
+
   it('wires the recipe-edit header chip + Back/Delete/Save and the controlled view props', () => {
     assert.ok(rootSource.includes('onclick={saveRecipeDraft}'), 'header Save commits via a plain onclick');
     assert.equal(rootSource.includes('form="manager-recipe-edit-form"'), false, 'header Save no longer submits a form');
