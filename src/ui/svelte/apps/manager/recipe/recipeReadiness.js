@@ -10,6 +10,8 @@
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', stepId?: string, stepName?: string }} ReadinessIssue
  */
 
+import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
+
 function trimmed(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -27,24 +29,7 @@ function asArray(value) {
  * @returns {string | null}
  */
 function optionSignature(option) {
-  const match = option?.match;
-  if (match?.type === 'component') {
-    const componentId = trimmed(match.componentId);
-    return componentId ? `component:${componentId}` : null;
-  }
-  if (match?.type === 'tags') {
-    const tags = asArray(match.tags).map(trimmed).filter(Boolean);
-    if (tags.length === 0) return null;
-    const tagMatch = match.tagMatch === 'all' ? 'all' : 'any';
-    return `tags:${[...tags].sort((a, b) => a.localeCompare(b)).join(',')}|${tagMatch}`;
-  }
-  if (match?.type === 'currency') {
-    const unit = trimmed(match.unit);
-    const amount = Number(match.amount) || 0;
-    if (!unit || amount <= 0) return null;
-    return `currency:${unit}:${amount}`;
-  }
-  return null;
+  return getMatchHandler(option?.match).signature(option?.match);
 }
 
 /**

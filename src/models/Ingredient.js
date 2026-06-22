@@ -4,6 +4,8 @@
  */
 import { getFabricateFlag } from '../config/flags.js';
 
+import { getMatchHandler, normalizeMatch } from './match/matchTypes.js';
+
 export class Ingredient {
   constructor(data = {}) {
     this.quantity = data.quantity || 1;
@@ -26,62 +28,7 @@ export class Ingredient {
   }
 
   _normalizeMatch(data = {}) {
-    const raw = data.match && typeof data.match === 'object' ? data.match : null;
-    if (raw) {
-      if (raw.type === 'tags') {
-        const tags = Array.isArray(raw.tags)
-          ? raw.tags.map((t) => String(t || '').trim()).filter(Boolean)
-          : [];
-        return {
-          type: 'tags',
-          tags,
-          tagMatch: raw.tagMatch === 'all' ? 'all' : 'any',
-        };
-      }
-
-      if (raw.type === 'currency') {
-        // A currency alternative ("100 gp") mirrors the legacy step-currency shape:
-        // a unit id string plus a non-negative amount. Authored cost only today —
-        // craft-time spending is a deferred follow-up.
-        return {
-          type: 'currency',
-          unit: String(raw.unit || '').trim(),
-          amount: Math.max(0, Number(raw.amount) || 0),
-        };
-      }
-
-      // Accept both 'component' (primary) and 'systemItem' (legacy fallback)
-      const componentId =
-        raw.componentId || raw.systemItemId || data.componentId || data.systemItemId || null;
-      return {
-        type: 'component',
-        componentId,
-      };
-    }
-
-    // Bare componentId or systemItemId field
-    const bareComponentId = data.componentId || data.systemItemId || null;
-    if (bareComponentId) {
-      return {
-        type: 'component',
-        componentId: bareComponentId,
-      };
-    }
-
-    const tags = Array.isArray(data.tags)
-      ? data.tags.map((t) => String(t || '').trim()).filter(Boolean)
-      : data.tag
-        ? [String(data.tag).trim()]
-        : [];
-    if (tags.length > 0) {
-      return {
-        type: 'tags',
-        tags,
-        tagMatch: data.tagMatch === 'all' ? 'all' : 'any',
-      };
-    }
-
-    return null;
+    return normalizeMatch(data);
   }
 
   /**
@@ -124,33 +71,19 @@ export class Ingredient {
    */
   validate({ requireComplete = true } = {}) {
     const errors = [];
-    const hasComponentMatch = this.match?.type === 'component' && !!this.match.componentId;
-    const hasTagMatch =
-      this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
-    const hasCurrencyMatch =
-      this.match?.type === 'currency' && !!this.match.unit && Number(this.match.amount) > 0;
 
-    if (
-      requireComplete &&
-      !hasComponentMatch &&
-      !hasTagMatch &&
-      !hasCurrencyMatch &&
-      !this.itemUuid
-    ) {
+    // Completeness is computed INDEPENDENTLY of the per-type validation: the
+    // shared "must include a match rule" error and the per-type tag/currency
+    // errors STACK for an incomplete tags/currency match (an empty-tags option
+    // yields BOTH messages). They are not mutually exclusive.
+    const handler = getMatchHandler(this.match);
+    const isComplete = handler.isComplete(this.match);
+
+    if (requireComplete && !isComplete && !this.itemUuid) {
       errors.push('Ingredient must include a match rule or specific item UUID');
     }
 
-    if (
-      requireComplete &&
-      this.match?.type === 'tags' &&
-      (!Array.isArray(this.match.tags) || this.match.tags.length === 0)
-    ) {
-      errors.push('Tag-based ingredient match requires at least one tag');
-    }
-
-    if (requireComplete && this.match?.type === 'currency' && !hasCurrencyMatch) {
-      errors.push('Currency ingredient match requires a unit and a positive amount');
-    }
+    errors.push(...handler.validate(this.match, { requireComplete }));
 
     // A currency option carries its amount on the match, not the option quantity,
     // so quantity stays the default 1 and never needs validating for currency.
@@ -177,22 +110,22 @@ export class Ingredient {
    * @returns {string}
    */
   getDescription() {
+    const quantity = this.quantity;
     if (this.match?.type === 'component' && this.match.componentId) {
-      return `${this.quantity}x component`;
+      return getMatchHandler(this.match).describe(this.match, { quantity });
     }
     if (this.itemUuid) {
-      return `${this.quantity}x specific item`;
+      return `${quantity}x specific item`;
     }
     if (
       this.match?.type === 'tags' &&
       Array.isArray(this.match.tags) &&
       this.match.tags.length > 0
     ) {
-      const joined = this.match.tags.join(this.match.tagMatch === 'all' ? ' & ' : ' | ');
-      return `${this.quantity}x ${joined}`;
+      return getMatchHandler(this.match).describe(this.match, { quantity });
     }
     if (this.alternatives.length > 0) {
-      return `${this.quantity}x (${this.alternatives.length} alternatives)`;
+      return `${quantity}x (${this.alternatives.length} alternatives)`;
     }
     return 'Unknown ingredient';
   }
