@@ -78,6 +78,8 @@ function compileManagerRoot() {
     'RecipeIngredientOption',
     'RecipeEssenceRequirements',
     'RecipeResultsSection',
+    'RecipeResultGroupCard',
+    'RecipeResultItemRow',
     'RecipeToolsSection'
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);

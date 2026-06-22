@@ -6,7 +6,11 @@
   set in Overview) but WITH the time/currency chips and a delete button in each
   header, each expanded step hosting its own result section (scoped via `idPrefix`).
   Deleting a step here removes the whole step (its ingredients and tools too), so
-  the parent confirms. The shell owns the add/remove patching; `stepId` is null for
+  the parent confirms.
+
+  Each result section emits the whole replacement groups array via a single
+  `onChange(nextGroups)`; the shell maps it to the right scope patch (recipe vs.
+  step) through `onUpdateResultGroups(stepId, nextGroups)`. `stepId` is null for
   the single-step (recipe) scope.
 -->
 <script>
@@ -18,8 +22,8 @@
     recipe = null,
     complex = true,
     isMultiStep = false,
-    onAddResultGroup = () => {},
-    onRemoveResultGroup = () => {},
+    componentOptions = [],
+    onUpdateResultGroups = () => {},
     onDeleteStep = () => {}
   } = $props();
 
@@ -47,8 +51,8 @@
             idPrefix={`step-${step.id}-`}
             resultGroups={stepResultGroups(step)}
             {complex}
-            onAddResultGroup={() => onAddResultGroup(step.id)}
-            onRemoveResultGroup={(groupId) => onRemoveResultGroup(step.id, groupId)}
+            {componentOptions}
+            onChange={(nextGroups) => onUpdateResultGroups(step.id, nextGroups)}
           />
         {/snippet}
       </RecipeStepAccordion>
@@ -57,8 +61,8 @@
     <RecipeResultsSection
       {resultGroups}
       {complex}
-      onAddResultGroup={() => onAddResultGroup(null)}
-      onRemoveResultGroup={(groupId) => onRemoveResultGroup(null, groupId)}
+      {componentOptions}
+      onChange={(nextGroups) => onUpdateResultGroups(null, nextGroups)}
     />
   {/if}
 </section>
