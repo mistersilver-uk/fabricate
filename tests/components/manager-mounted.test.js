@@ -36,6 +36,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -1200,7 +1203,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Recipes', 'Rules', 'Graph']
+      ['System settings', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Checks', 'Gathering', 'Recipes', 'Graph']
     );
     assert.equal(
       Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
@@ -1243,12 +1246,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const plannedButtons = ['Recipes', 'Rules', 'Graph'].map(label => navButton(label));
+    const plannedButtons = ['Recipes', 'Graph'].map(label => navButton(label));
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
-    assert.deepEqual(plannedButtons.map(button => button?.disabled === true), [true, true, true]);
+    assert.deepEqual(plannedButtons.map(button => button?.disabled === true), [true, true]);
     assert.deepEqual(
       plannedButtons.map(button => button?.querySelector('.manager-nav-count')?.textContent.trim()),
-      ['Soon', 'Soon', 'Soon']
+      ['Soon', 'Soon']
     );
 
     navButton('Recipes').click();
@@ -1258,6 +1261,68 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
     assert.equal(target.querySelector('.manager-recipes-table'), null);
     assert.deepEqual(calls, []);
+  });
+
+  it('routes the Checks nav to a four-tab view with a tab-aware context menu', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    const checksNav = navButton('Checks');
+    assert.ok(checksNav, 'a real Checks nav button should render');
+    assert.equal(checksNav.disabled, false, 'Checks should be an active route, not a Soon placeholder');
+    assert.ok(checksNav.querySelector('i.fa-dice-d20'), 'Checks nav should use the d20 die icon');
+
+    checksNav.click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks');
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map(button => button.textContent.trim()),
+      ['Crafting', 'Salvage', 'Gathering', 'Validation']
+    );
+
+    // Crafting is the default tab: its panel and right context menu both render.
+    assert.ok(target.querySelector('[data-checks-panel="crafting"]'), 'Crafting panel should be the default');
+    assert.ok(target.querySelector('[data-checks-menu="crafting"]'), 'Crafting tab should show its context menu');
+    assert.equal(
+      target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
+      null,
+      'the context menu column should be visible on the Crafting tab'
+    );
+
+    // Salvage keeps a context menu.
+    target.querySelector('[data-checks-tab-button="salvage"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-checks-panel="salvage"]'));
+    assert.ok(target.querySelector('[data-checks-menu="salvage"]'));
+
+    // Validation spans the full width with no context menu.
+    target.querySelector('[data-checks-tab-button="validation"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-checks-panel="validation"]'));
+    assert.equal(target.querySelector('[data-checks-menu]'), null, 'Validation tab should not render a context menu');
+    assert.ok(
+      target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
+      'Validation tab should collapse the context-menu column'
+    );
+
+    // The shared manager inspector is not rendered for the Checks view.
+    assert.equal(
+      target.querySelector('.manager-body > .manager-inspector'),
+      null,
+      'Checks view owns its own context menu, so the shared inspector is skipped'
+    );
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
@@ -1474,7 +1539,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Components', 'Tags & Categories', 'Tools', 'Recipes', 'Rules', 'Graph']
+      ['System settings', 'Components', 'Tags & Categories', 'Tools', 'Checks', 'Recipes', 'Graph']
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -1499,7 +1564,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const recipesNav = navButton('Recipes');
     assert.equal(recipesNav.disabled, false);
     assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
-    for (const label of ['Rules', 'Graph']) {
+    for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
       assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
@@ -1548,7 +1613,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Checks', 'Gathering', 'Graph']
     );
     assert.ok(target.textContent.includes('System library'));
   });
@@ -4961,7 +5026,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const recipesNav = navButton('Recipes');
     assert.equal(recipesNav.disabled, false);
     assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
-    for (const label of ['Rules', 'Graph']) {
+    for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
       assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');

@@ -873,6 +873,7 @@
           "Essences": "Essences",
           "Tools": "Tools",
           "TagsCategories": "Tags & Categories",
+          "Checks": "Checks",
           "Rules": "Rules",
           "Graph": "Graph"
         },
@@ -2638,6 +2639,45 @@
             "Cancel": "Keep Editing"
           },
           "SaveBlockedInvalid": "Can't save: assign a component to every tool first. The highlighted tool still needs one."
+        },
+        "Checks": {
+          "Title": "Checks",
+          "Subtitle": "Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.",
+          "Tabs": {
+            "Label": "Checks sections",
+            "Crafting": "Crafting",
+            "Salvage": "Salvage",
+            "Gathering": "Gathering",
+            "Validation": "Validation"
+          },
+          "Menu": {
+            "Label": "Checks context menu"
+          },
+          "Crafting": {
+            "Title": "Crafting checks",
+            "Body": "Configure how crafting attempts are checked. Content for this tab is coming soon.",
+            "MenuKicker": "Crafting checks",
+            "MenuTitle": "Crafting context",
+            "MenuHint": "Context actions for crafting checks will live here."
+          },
+          "Salvage": {
+            "Title": "Salvage checks",
+            "Body": "Configure how salvage attempts are checked. Content for this tab is coming soon.",
+            "MenuKicker": "Salvage checks",
+            "MenuTitle": "Salvage context",
+            "MenuHint": "Context actions for salvage checks will live here."
+          },
+          "Gathering": {
+            "Title": "Gathering checks",
+            "Body": "Configure how gathering attempts are checked. Content for this tab is coming soon.",
+            "MenuKicker": "Gathering checks",
+            "MenuTitle": "Gathering context",
+            "MenuHint": "Context actions for gathering checks will live here."
+          },
+          "Validation": {
+            "Title": "Validation",
+            "Body": "Review issues across crafting, salvage, and gathering checks. Content for this tab is coming soon."
+          }
         }
       },
       "Sidebar": {
