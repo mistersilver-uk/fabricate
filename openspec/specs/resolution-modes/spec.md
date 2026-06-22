@@ -10,7 +10,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - `CraftingSystem.resolutionMode` is system-wide.
 - Recipes cannot mix resolution modes inside one crafting system.
 - Mode changes are destructive and governed by `007-destructive-changes-and-migrations.md`.
-- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks (mapped invalid `resultGroupId`, routed invalid/missing provider, tiered outcome→group mapping) always apply.
+- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks (routed invalid/missing provider, routed invalid `resultGroupId` for the `ingredientSet` provider, routed reserved/duplicate `ResultGroup.name`) always apply. (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates them to `routed`.)
 
 ## Mode Matrix
 
