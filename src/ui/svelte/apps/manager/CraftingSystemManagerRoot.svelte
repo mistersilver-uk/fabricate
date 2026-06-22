@@ -3727,7 +3727,7 @@
     {:else if currentView === 'checks' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
         <section class="manager-environment-editor-shell">
-          <ChecksView />
+          <ChecksView resolutionMode={selectedSystem?.resolutionMode || 'simple'} />
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}

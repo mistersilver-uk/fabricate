@@ -23,6 +23,7 @@ let tempRoot;
 let Component;
 let EnvironmentEditViewComponent;
 let ChecksRightMenuComponent;
+let CraftingCheckEditorComponent;
 let mounted;
 let target;
 
@@ -40,6 +41,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -170,6 +172,7 @@ function compileManagerRoot() {
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
     'src/utils/routedOutcomeKeywords.js',
+    'src/utils/craftingCheckExpression.js',
     'src/config/flags.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
@@ -1353,6 +1356,13 @@ describe('CraftingSystemManager mounted behavior', () => {
         pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte.js'))
       )
     ).default;
+    CraftingCheckEditorComponent = (
+      await import(
+        pathToFileURL(
+          join(tempRoot, 'src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte.js')
+        )
+      )
+    ).default;
   });
 
   afterEach(() => {
@@ -1661,6 +1671,140 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.remove();
       target = null;
     }
+  });
+
+  it('renders the routed crafting check editor only when the system is in routed mode', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { alchemyResolutionMode: 'routed' }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks');
+    assert.ok(
+      target.querySelector('[data-crafting-check-editor]'),
+      'routed mode shows the crafting check editor'
+    );
+    assert.equal(
+      target.querySelector('.manager-checks-page'),
+      null,
+      'the singleton placeholder page is replaced by the editor'
+    );
+    assert.equal(target.querySelectorAll('[data-check-type-option]').length, 2);
+    assert.equal(
+      target.querySelectorAll('[data-outcome-row]').length,
+      2,
+      'the draft seeds a failure and a success tier'
+    );
+  });
+
+  it('crafting check editor (relative): lists dice groups, shows DC, and edits outcomes', () => {
+    const emitted = [];
+    const value = {
+      type: 'relative',
+      rollExpression: '2d6+1d4',
+      outcomes: [
+        {
+          id: 'a1b2c3d4ef',
+          name: 'Fail',
+          success: false,
+          breakTools: true,
+          dc: -2,
+          start: 1,
+          end: 5,
+        },
+      ],
+    };
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(CraftingCheckEditorComponent, {
+      target,
+      props: { value, onChange: (next) => emitted.push(next) },
+    });
+    flushSync();
+
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-dice-group]')].map((chip) => chip.textContent.trim()),
+      ['2d6', '1d4']
+    );
+    assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
+    assert.equal(
+      target.querySelector('[data-outcome-start]'),
+      null,
+      'relative tiers do not expose a fixed range'
+    );
+    assert.equal(
+      target.querySelector('[data-outcome-id]').textContent.trim(),
+      '#a1b2c3',
+      'the generated id is shown truncated as a secret reference'
+    );
+
+    target.querySelector('[data-check-type-option="fixed"]').click();
+    assert.equal(emitted.at(-1).type, 'fixed', 'switching type emits the new type');
+
+    target.querySelector('[data-add-outcome]').click();
+    assert.equal(emitted.at(-1).outcomes.length, 2, 'adding appends a tier');
+    assert.ok(emitted.at(-1).outcomes.at(-1).id, 'a new tier is given a generated id');
+
+    target.querySelector('[data-remove-outcome]').click();
+    assert.equal(emitted.at(-1).outcomes.length, 0, 'removing drops the tier');
+  });
+
+  it('crafting check editor (fixed): bounds the value range and flags overlapping tiers', () => {
+    const value = {
+      type: 'fixed',
+      rollExpression: '1d20',
+      outcomes: [
+        {
+          id: 'id00000001',
+          name: 'Low',
+          success: false,
+          breakTools: false,
+          dc: 0,
+          start: 1,
+          end: 12,
+        },
+        {
+          id: 'id00000002',
+          name: 'High',
+          success: true,
+          breakTools: false,
+          dc: 0,
+          start: 10,
+          end: 20,
+        },
+      ],
+    };
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(CraftingCheckEditorComponent, { target, props: { value, onChange: () => {} } });
+    flushSync();
+
+    assert.ok(target.querySelector('[data-outcome-start]'), 'fixed tiers expose a range');
+    assert.equal(target.querySelector('[data-outcome-dc]'), null, 'fixed tiers hide the DC field');
+    const rangeText = target.querySelector('[data-expression-range]').textContent;
+    assert.ok(
+      rangeText.includes('Value range') && rangeText.includes('20'),
+      'shows the 1d20 range'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-validation]'),
+      'overlapping ranges surface a validation message'
+    );
+    assert.equal(
+      target.querySelectorAll('.manager-checks-outcome-row.is-invalid').length,
+      2,
+      'both overlapping tiers are flagged'
+    );
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
