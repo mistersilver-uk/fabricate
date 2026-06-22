@@ -111,6 +111,20 @@ function collectMissingRequirementIssues(executionSteps, isMultiStep) {
 }
 
 /**
+ * Compute a requirement (group) signature: the sorted, `&&`-joined option
+ * signatures of the group. Two requirements with the same signature are exact
+ * duplicates. Returns null when the group has no usable option signature.
+ *
+ * @param {object} group One requirement (OR group) inside a set.
+ * @returns {string | null}
+ */
+function requirementSignature(group) {
+  const signatures = asArray(group?.options).map(optionSignature).filter(Boolean);
+  if (signatures.length === 0) return null;
+  return [...signatures].sort((a, b) => a.localeCompare(b)).join('&&');
+}
+
+/**
  * Duplicate-match issues for a single ingredient set: a `duplicateAlternative`
  * per OR group that repeats an option signature, plus one `duplicateRequirement`
  * when two requirements in the set share a requirement signature.
@@ -140,8 +154,9 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
       });
     }
 
-    if (signatures.length > 0) {
-      requirementSignatures.push([...signatures].sort((a, b) => a.localeCompare(b)).join('&&'));
+    const signature = requirementSignature(group);
+    if (signature !== null) {
+      requirementSignatures.push(signature);
     }
   }
 
@@ -157,6 +172,75 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
   }
 
   return issues;
+}
+
+/**
+ * Union of component ids the group's options expand to, against the system
+ * component catalogue. A component option expands to its own id; a tag option
+ * expands to the ids of components whose tags match; a currency option expands
+ * to nothing.
+ *
+ * @param {object} group One requirement (OR group) inside a set.
+ * @param {object[]} systemComponents `{ id, tags }` per managed component.
+ * @returns {Set<string>}
+ */
+function requirementComponentIds(group, systemComponents) {
+  const ids = new Set();
+  for (const option of asArray(group?.options)) {
+    const expanded = getMatchHandler(option?.match).expandToComponentIds(option?.match, systemComponents);
+    for (const id of expanded) ids.add(id);
+  }
+  return ids;
+}
+
+function setsIntersect(a, b) {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  for (const value of small) {
+    if (large.has(value)) return true;
+  }
+  return false;
+}
+
+/**
+ * Overlapping-requirement detection for a single ingredient set. Two DISTINCT
+ * requirements (different requirement signatures, so NOT an exact
+ * `duplicateRequirement`) whose options expand to intersecting component-id sets
+ * are ambiguous: a single component could satisfy both AND'd requirements. Emits
+ * at most one `requirementOverlap` warning per set.
+ *
+ * @param {object} set One ingredient set.
+ * @param {object} step Owning execution step.
+ * @param {boolean} isMultiStep
+ * @param {object[]} systemComponents `{ id, tags }` per managed component.
+ * @returns {ReadinessIssue[]}
+ */
+function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
+  if (systemComponents.length === 0) return [];
+
+  const groups = [];
+  for (const group of asArray(set?.ingredientGroups)) {
+    const ids = requirementComponentIds(group, systemComponents);
+    if (ids.size === 0) continue;
+    groups.push({ ids, signature: requirementSignature(group) });
+  }
+
+  for (let i = 0; i < groups.length; i += 1) {
+    for (let j = i + 1; j < groups.length; j += 1) {
+      // Skip exact duplicates — those are flagged as duplicateRequirement; don't
+      // double-flag them as an overlap.
+      if (groups[i].signature !== null && groups[i].signature === groups[j].signature) continue;
+      if (setsIntersect(groups[i].ids, groups[j].ids)) {
+        return [{
+          id: 'requirementOverlap',
+          severity: 'warning',
+          target: 'ingredients',
+          ...stepTag(step, isMultiStep)
+        }];
+      }
+    }
+  }
+
+  return [];
 }
 
 /**
@@ -179,10 +263,35 @@ function collectDuplicateMatchIssues(executionSteps, isMultiStep) {
 }
 
 /**
+ * Overlapping-requirement detection across every step/set. Requires the system
+ * component catalogue (`{ id, tags }`); with no catalogue (a one-arg evaluator
+ * call) tag-vs-component expansion can't be resolved, so it returns nothing.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @param {object[]} systemComponents
+ * @returns {ReadinessIssue[]}
+ */
+function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComponents) {
+  const issues = [];
+  for (const step of executionSteps) {
+    for (const set of asArray(step.ingredientSets)) {
+      issues.push(...collectSetOverlapIssues(set, step, isMultiStep, systemComponents));
+    }
+  }
+  return issues;
+}
+
+/**
  * @param {object} recipe Projected plain recipe.
+ * @param {object} [options]
+ * @param {object[]} [options.systemComponents] Managed components (`{ id, tags }`)
+ *   used to expand tag/component matches for overlap detection. Absent (the
+ *   one-arg call) → overlap detection no-ops.
  * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
  */
-export function evaluateRecipeReadiness(recipe = {}) {
+export function evaluateRecipeReadiness(recipe = {}, options = {}) {
+  const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
   const executionSteps = getExecutionSteps(recipe);
   const isMultiStep = executionSteps.length > 0 && executionSteps[0].explicit;
   const active = recipe?.enabled !== false;
@@ -212,6 +321,10 @@ export function evaluateRecipeReadiness(recipe = {}) {
   const duplicateIssues = collectDuplicateMatchIssues(executionSteps, isMultiStep);
   issues.push(...duplicateIssues);
   checks.push({ id: 'noDuplicateMatches', satisfied: duplicateIssues.length === 0 });
+
+  const overlapIssues = collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComponents);
+  issues.push(...overlapIssues);
+  checks.push({ id: 'noRequirementOverlap', satisfied: overlapIssues.length === 0 });
 
   // A disabled recipe still saves, but flag that it cannot be enabled until the
   // critical requirements above are met. The store/model projects `incomplete`;

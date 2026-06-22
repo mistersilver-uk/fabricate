@@ -3842,6 +3842,7 @@
         currencyUnits={selectedCurrencyUnits}
         toolsLibrary={selectedGatheringSystemTools}
         componentOptions={selectedSystem?.managedItemOptions || []}
+        componentTagOptions={selectedSystem?.componentTagOptions || []}
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
         itemTags={selectedSystem?.itemTags || []}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
