@@ -6,8 +6,8 @@
 // needed to manually explore EVERY Fabricate mode and feature.
 //
 // IDEMPOTENT: each run first completely tears down everything a previous run
-// created (matched by the `fabricate.seedMacro` flag, or the `FabSeed` name
-// prefix for crafting systems), then rebuilds from scratch. Run it as often as
+// created (supporting docs by the `fabricate.seedMacro` flag; the demo crafting
+// systems by their known names), then rebuilds from scratch. Run it as often as
 // you like — nothing accumulates.
 //
 // Every entity with an image field uses a path verified against Foundry core's
@@ -31,8 +31,18 @@
 // =============================================================================
 
 (async () => {
-  const PREFIX = 'FabSeed';
-  const SYS_PREFIX = `${PREFIX}: `;
+  // Shared support docs (items, actor, macros, table, scenes, environments, realms,
+  // parties, folders) live under one fantasy-realm umbrella name.
+  const PREFIX = 'Aldermere';
+  // The four demo crafting systems carry bespoke, feature-flavoured names (no shared
+  // prefix). Teardown matches them by this known set so re-runs stay idempotent.
+  const SYSTEM = {
+    simple: 'Ironheart Forge',
+    routed: 'Wyrdloom Workshop',
+    progressive: 'Verdant Apothecary',
+    alchemy: "The Philosopher's Alembic"
+  };
+  const SEED_SYSTEM_NAMES = new Set(Object.values(SYSTEM));
   const SEED_FLAG = { fabricate: { seedMacro: true } };
 
   if (!game.user?.isGM) {
@@ -107,7 +117,7 @@
     // Crafting systems — deleteSystem cascades recipes, components, environments,
     // this system's gatheringConfig entry and its realms.
     for (const s of csm.getSystems?.() ?? []) {
-      if (String(s?.name || '').startsWith(SYS_PREFIX)) {
+      if (SEED_SYSTEM_NAMES.has(String(s?.name || ''))) {
         try {
           await csm.deleteSystem(s.id);
         } catch (e) {
@@ -299,10 +309,10 @@
   // 3. SYSTEM BUILDERS
   // ===========================================================================
 
-  // --- S1: Simple Forge -----------------------------------------------------
+  // --- S1: Ironheart Forge (simple) -----------------------------------------
   const buildSimpleForge = async (sup) => {
     const system = await csm.createSystem({
-      name: `${SYS_PREFIX}Simple Forge`,
+      name: SYSTEM.simple,
       description: 'Simple crafting, built-in check, salvage, currency/tags and node-limited gathering.',
       resolutionMode: 'simple',
       features: { salvage: true, gathering: true, craftingChecks: true, itemTags: true },
@@ -449,10 +459,10 @@
     return system;
   };
 
-  // --- S2: Routed Atelier ---------------------------------------------------
+  // --- S2: Wyrdloom Workshop (routed) ---------------------------------------
   const buildRoutedAtelier = async (sup) => {
     const system = await csm.createSystem({
-      name: `${SYS_PREFIX}Routed Atelier`,
+      name: SYSTEM.routed,
       description: 'Routed result selection (ingredientSet / macroOutcome / rollTableOutcome), multi-step, teaser visibility.',
       resolutionMode: 'routed',
       features: { essences: true, multiStepRecipes: true, outcomeRouting: true, craftingChecks: true, itemTags: true, chatOutput: true },
@@ -556,10 +566,10 @@
     return system;
   };
 
-  // --- S3: Progressive Field ------------------------------------------------
+  // --- S3: Verdant Apothecary (progressive) ---------------------------------
   const buildProgressiveField = async (sup) => {
     const system = await csm.createSystem({
-      name: `${SYS_PREFIX}Progressive Field`,
+      name: SYSTEM.progressive,
       description: 'Progressive checks & salvage, stamina-limited blind gathering, realms and a travel party.',
       resolutionMode: 'progressive',
       features: { gathering: true, salvage: true, craftingChecks: true },
@@ -676,10 +686,10 @@
     return system;
   };
 
-  // --- S4: Alchemy Lab ------------------------------------------------------
+  // --- S4: The Philosopher's Alembic (alchemy) ------------------------------
   const buildAlchemyLab = async (sup) => {
     const system = await csm.createSystem({
-      name: `${SYS_PREFIX}Alchemy Lab`,
+      name: SYSTEM.alchemy,
       description: 'Alchemy resolution, essences + effect transfer, routed salvage with a property macro.',
       resolutionMode: 'alchemy',
       features: { essences: true, effectTransfer: true, salvage: true, propertyMacros: true },
