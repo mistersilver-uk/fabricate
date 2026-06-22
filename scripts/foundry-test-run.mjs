@@ -1069,7 +1069,7 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
   await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  await page.locator('.fabricate-manager #manager-system-resolution-mode').first().selectOption('mapped');
+  await page.locator('.fabricate-manager #manager-system-resolution-mode').first().selectOption('routed');
   // Changing resolution mode may raise a confirm dialog; its buttons differ
   // across manager revisions. Dismiss it resiliently and never leave a modal open.
   const cancelDialog = page.locator('.dialog button:has-text("No"), .dialog button:has-text("Cancel"), .dialog button:has-text("Keep")').first();

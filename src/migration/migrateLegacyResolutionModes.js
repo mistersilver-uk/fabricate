@@ -221,7 +221,9 @@ function _reconcileContainer(container, contextId) {
       if (index === 0) {
         target.name = outcome;
       } else {
-        clones.push({ ...target, id: _randomId(), name: outcome });
+        // Deep-copy so the clone does not share `results` (or any nested array)
+        // by reference with the original group, consistent with `_clone` usage.
+        clones.push({ ..._clone(target), id: _randomId(), name: outcome });
       }
     }
   }
