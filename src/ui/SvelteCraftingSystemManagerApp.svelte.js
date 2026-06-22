@@ -6,7 +6,7 @@ import { confirmDialog, renderDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
-import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
+import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
 import { localize, subscribeSceneChange, subscribeTravelMarkerMove } from './svelte/util/foundryBridge.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
@@ -28,6 +28,17 @@ function getFolderById(folders, id) {
   if (!folders || !id) return null;
   if (typeof folders.get === 'function') return folders.get(id) || null;
   return getFolderCollectionValues(folders).find(folder => folder?.id === id) || null;
+}
+
+function resolveDroppedFolder(data, folders) {
+  // Foundry v13 folder drags emit { type: 'Folder', uuid: 'Folder.<id>' }. Prefer the
+  // UUID resolver (handles world folders synchronously) and fall back to id lookup so
+  // legacy { type: 'Folder', id } drag data keeps working.
+  if (data?.uuid && typeof globalThis.fromUuidSync === 'function') {
+    const byUuid = globalThis.fromUuidSync(data.uuid);
+    if (byUuid) return byUuid;
+  }
+  return getFolderById(folders, folderIdFromDropData(data));
 }
 
 function folderDocumentType(folder) {
@@ -488,8 +499,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
               return;
             }
-            const folder = getFolderById(game.folders, data.id);
-            if (!folder) return;
+            const folder = resolveDroppedFolder(data, game.folders);
+            if (!folder) {
+              ui.notifications.warn(localize('FABRICATE.Admin.Items.FolderNotResolved'));
+              return;
+            }
             const folderItems = folderDocumentType(folder) && folderDocumentType(folder) !== 'Item'
               ? []
               : collectFolderItems(folder, game.folders);

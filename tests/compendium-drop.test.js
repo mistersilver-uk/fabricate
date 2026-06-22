@@ -84,7 +84,7 @@ globalThis.fromUuid = async () => null;
 // Module imports
 // ---------------------------------------------------------------------------
 
-const { resolveDropUuid, resolveDropData } = await import('../src/ui/svelte/util/dropUtils.js');
+const { resolveDropUuid, resolveDropData, folderIdFromDropData } = await import('../src/ui/svelte/util/dropUtils.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 // ---------------------------------------------------------------------------
@@ -1257,6 +1257,31 @@ test('resolveDropData — null input returns nulls', () => {
   assert.equal(result.type, null);
 });
 
+// Regression: Foundry v13 folder drags emit { type: 'Folder', uuid: 'Folder.<id>' }
+// with NO bare `id`. Previously the handler read data.id, got undefined, and the
+// folder drop silently no-opped.
+test('folderIdFromDropData — extracts id from a v13 Folder.<id> uuid', () => {
+  assert.equal(folderIdFromDropData({ type: 'Folder', uuid: 'Folder.abc123' }), 'abc123');
+});
+
+test('folderIdFromDropData — falls back to a legacy bare id', () => {
+  assert.equal(folderIdFromDropData({ type: 'Folder', id: 'legacy-id' }), 'legacy-id');
+});
+
+test('folderIdFromDropData — returns null when neither uuid nor id is present', () => {
+  assert.equal(folderIdFromDropData({ type: 'Folder' }), null);
+  assert.equal(folderIdFromDropData(null), null);
+});
+
+test('resolveDropData — v13 Folder uuid shape resolves folderId and folderUuid', () => {
+  const result = resolveDropData({ type: 'Folder', uuid: 'Folder.abc123', documentType: 'Item' });
+  assert.equal(result.type, 'Folder');
+  assert.equal(result.folderId, 'abc123');
+  assert.equal(result.folderUuid, 'Folder.abc123');
+  assert.equal(result.folderDocumentType, 'Item');
+  assert.equal(result.uuid, null);
+});
+
 // ---------------------------------------------------------------------------
 // Defect 2: onDropItem integration tests (inline simulation)
 // ---------------------------------------------------------------------------
@@ -1325,8 +1350,16 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
         notifyWarn('DropNoSystemSelected');
         return;
       }
-      const folder = folders?.get(data.id);
-      if (!folder) return;
+      // Mirror production resolveDroppedFolder: prefer the v13 uuid resolver, then id lookup.
+      let folder = null;
+      if (data?.uuid && typeof globalThis.fromUuidSync === 'function') {
+        folder = globalThis.fromUuidSync(data.uuid) || null;
+      }
+      if (!folder) folder = folders?.get(folderIdFromDropData(data)) ?? null;
+      if (!folder) {
+        notifyWarn('FolderNotResolved');
+        return;
+      }
       const folderItems = folder.documentType && folder.documentType !== 'Item'
         ? []
         : collectItems(folder);
@@ -1508,6 +1541,96 @@ test('onDropItem integration — Folder with Items imports each and shows summar
   assert.equal(infos[0].params.updated, 0);
   assert.equal(infos[0].params.skipped, 0);
   assert.equal(infos[0].params.total, 2);
+});
+
+test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync and imports each', async () => {
+  // Regression: real Foundry v13 drag data carries only { type: 'Folder', uuid }.
+  const addCalls = [];
+  const infos = [];
+  const warnings = [];
+
+  const folderDoc = {
+    id: 'folder1',
+    name: 'My Folder',
+    contents: [
+      { documentName: 'Item', uuid: 'Item.item-x' },
+      { documentName: 'Item', uuid: 'Item.item-y' }
+    ]
+  };
+  globalThis.fromUuidSync = (uuid) => (uuid === 'Folder.folder1' ? folderDoc : null);
+
+  const mgr = {
+    addItemFromUuid: async (_sysId, uuid) => { addCalls.push(uuid); return { item: { name: uuid }, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders: new Map() // intentionally empty: resolution must come from the uuid, not the id map
+  });
+
+  await handler({ type: 'Folder', uuid: 'Folder.folder1' });
+
+  delete globalThis.fromUuidSync;
+
+  assert.deepEqual(addCalls, ['Item.item-x', 'Item.item-y']);
+  assert.equal(warnings.length, 0, 'a resolvable folder must not warn');
+  assert.equal(infos[0].key, 'FolderImportSummary');
+  assert.equal(infos[0].params.total, 2);
+});
+
+test('onDropItem integration — v13 Folder uuid drop falls back to id lookup when fromUuidSync is unavailable', async () => {
+  const addCalls = [];
+  const infos = [];
+
+  const mgr = {
+    addItemFromUuid: async (_sysId, uuid) => { addCalls.push(uuid); return { item: { name: uuid }, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+
+  const folders = new Map([
+    ['folder1', { id: 'folder1', name: 'My Folder', contents: [{ documentName: 'Item', uuid: 'Item.item-x' }] }]
+  ]);
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: () => {},
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
+  });
+
+  // No globalThis.fromUuidSync defined — id is stripped from the uuid and looked up in the map.
+  await handler({ type: 'Folder', uuid: 'Folder.folder1' });
+
+  assert.deepEqual(addCalls, ['Item.item-x']);
+  assert.equal(infos[0].key, 'FolderImportSummary');
+});
+
+test('onDropItem integration — unresolvable Folder drop warns instead of silently no-opping', async () => {
+  const addCalls = [];
+  const warnings = [];
+
+  const mgr = {
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: () => {},
+    folders: new Map()
+  });
+
+  await handler({ type: 'Folder', uuid: 'Folder.does-not-exist' });
+
+  assert.equal(addCalls.length, 0);
+  assert.deepEqual(warnings, ['FolderNotResolved']);
 });
 
 test('onDropItem integration — Folder import summarizes source fallbacks once', async () => {
