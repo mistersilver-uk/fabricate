@@ -387,12 +387,12 @@ export class CraftingSystemManager {
     // The roll formula, default DC, comparison, per-die crits, and recipe tiers
     // mirror the simple check (so the editors share components). `rollExpression`
     // is the legacy field name, read for back-compat.
-    const rollFormula =
-      typeof source.rollFormula === 'string'
-        ? source.rollFormula
-        : typeof source.rollExpression === 'string'
-          ? source.rollExpression
-          : '';
+    let rollFormula = '';
+    if (typeof source.rollFormula === 'string') {
+      rollFormula = source.rollFormula;
+    } else if (typeof source.rollExpression === 'string') {
+      rollFormula = source.rollExpression;
+    }
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
       rollFormula,

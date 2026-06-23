@@ -649,10 +649,23 @@ function _seedGatheringConditionOptions(kind, raw, defaults) {
   return _normalizeGatheringConditionOptions(kind, defaults);
 }
 
-function _normalizeGatheringDropRow(
-  row = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+// Module-scope id fallback for the normalizer helpers (which run before the store
+// closure's services-aware _randomID exists). Prefers Foundry's randomID, then the
+// Web Crypto UUID; the last resort is a time + counter id (no PRNG) so we never
+// rely on Math.random for identity.
+let _fallbackIdCounter = 0;
+function _fallbackRandomID() {
+  if (typeof globalThis.foundry?.utils?.randomID === 'function') {
+    return globalThis.foundry.utils.randomID();
+  }
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+  }
+  _fallbackIdCounter += 1;
+  return `id-${Date.now().toString(36)}-${_fallbackIdCounter.toString(36)}`;
+}
+
+function _normalizeGatheringDropRow(row = {}, randomID = _fallbackRandomID) {
   return {
     id: row.id ? String(row.id) : randomID(),
     name: String(row.name || ''),
@@ -678,10 +691,7 @@ const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // modifier.
 const GATHERING_DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
 
-function _normalizeGatheringCharacterModifier(
-  entry = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringCharacterModifier(entry = {}, randomID = _fallbackRandomID) {
   if (!entry || typeof entry !== 'object') return null;
   const id = entry.id ? String(entry.id) : '';
   if (!id) return null;
@@ -694,21 +704,14 @@ function _normalizeGatheringCharacterModifier(
   };
 }
 
-function _normalizeGatheringCharacterModifierReferences(
-  refs,
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringCharacterModifierReferences(refs, randomID = _fallbackRandomID) {
   if (!Array.isArray(refs)) return [];
   return refs
     .map((ref, index) => _normalizeGatheringCharacterModifierReference(ref, index, randomID))
     .filter(Boolean);
 }
 
-function _normalizeGatheringCharacterModifierReference(
-  ref,
-  index,
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringCharacterModifierReference(ref, index, randomID = _fallbackRandomID) {
   if (!ref || typeof ref !== 'object') return null;
   const modifierId = String(ref.modifierId || '').trim();
   if (!modifierId) return null;
@@ -796,10 +799,7 @@ function _normalizeToolOnBreak(input) {
   return { mode };
 }
 
-function _normalizeGatheringLibraryTool(
-  tool = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID) {
   const id = String(tool.id || randomID());
   const rawLabel = typeof tool.label === 'string' ? tool.label.trim() : '';
   const componentId =
@@ -817,10 +817,7 @@ function _normalizeGatheringLibraryTool(
   };
 }
 
-function _normalizeGatheringTask(
-  task = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
   const id = String(task.id || randomID());
   return {
     id,
@@ -871,10 +868,7 @@ function _normalizeGatheringTask(
   };
 }
 
-function _normalizeGatheringEvent(
-  event = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringEvent(event = {}, randomID = _fallbackRandomID) {
   return {
     id: event.id ? String(event.id) : randomID(),
     name: String(event.name || 'Event'),
@@ -977,10 +971,7 @@ function _normalizeGatheringRules(rules = {}) {
   };
 }
 
-function _normalizeGatheringConfig(
-  raw = {},
-  randomID = () => Math.random().toString(36).slice(2, 10)
-) {
+function _normalizeGatheringConfig(raw = {}, randomID = _fallbackRandomID) {
   // Top-level vocabularies are normalised into the same { id, label, icon, colorToken }
   // shape that per-system vocabularies use, so the Svelte fallback path (which
   // reads top-level when a system has no per-system override) renders capitalised
@@ -1817,9 +1808,7 @@ function _buildSelectedSystemViewData(
     // browser and the gathering task editor's tool picker read the system's
     // tools rather than the gathering-config copy.
     tools: Array.isArray(selectedSystem.tools)
-      ? selectedSystem.tools.map((tool) =>
-          _normalizeGatheringLibraryTool(tool, () => Math.random().toString(36).slice(2, 10))
-        )
+      ? selectedSystem.tools.map((tool) => _normalizeGatheringLibraryTool(tool))
       : [],
 
     requirements: selectedSystem.requirements || {

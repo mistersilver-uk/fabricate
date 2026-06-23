@@ -1651,7 +1651,14 @@ export class CraftingEngine {
 
     const crit = this._resolveSimpleCheckCrit(simple.diceCrits, diceGroups);
     const comparison = simple.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    const success = crit ? crit.success : comparison === 'exceed' ? total > dc : total >= dc;
+    let success;
+    if (crit) {
+      success = crit.success;
+    } else if (comparison === 'exceed') {
+      success = total > dc;
+    } else {
+      success = total >= dc;
+    }
     const breakTools = crit ? crit.breakTools === true : false;
 
     return {
@@ -1716,12 +1723,13 @@ export class CraftingEngine {
       const count = Number(die?.number);
       const faces = Number(die?.faces);
       const dieTotal = Number(die?.total);
-      const sum = Number.isFinite(dieTotal)
-        ? dieTotal
-        : (Array.isArray(die?.results) ? die.results : []).reduce(
-            (acc, entry) => acc + (Number(entry?.result) || 0),
-            0
-          );
+      let sum;
+      if (Number.isFinite(dieTotal)) {
+        sum = dieTotal;
+      } else {
+        const results = Array.isArray(die?.results) ? die.results : [];
+        sum = results.reduce((acc, entry) => acc + (Number(entry?.result) || 0), 0);
+      }
       return {
         group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
         sum,
