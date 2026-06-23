@@ -1245,10 +1245,38 @@
   grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
 }
 
-/* Let the tier switches size to their state labels (Success/Failure,
-   Break/Don't break) instead of the default compact On/Off cap. */
-.fabricate-manager .manager-checks-outcome-row .manager-status-toggle {
-  max-width: none;
+/* Tier state controls are red/green pills that flip on click: the label shows
+   the current state (Success/Failure, Break/Don't break) and the colour reflects
+   its valence (green = success / keeps tools, red = failure / breaks tools). */
+.fabricate-manager .manager-checks-state-pill {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-state-pill.is-positive {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-state-pill.is-negative {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-checks-outcome-head,

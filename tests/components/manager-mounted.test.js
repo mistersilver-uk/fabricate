@@ -1755,23 +1755,35 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(row.getAttribute('data-outcome-id'), 'a1b2c3d4ef');
     assert.ok(!row.textContent.includes('a1b2c3'), 'the secret id is not displayed');
 
-    // Toggles are themed switches, not raw checkboxes.
+    // State controls are red/green pills, not raw checkboxes, and flip on click.
     const successToggle = target.querySelector('[data-outcome-success]');
     assert.equal(successToggle.tagName, 'BUTTON');
-    assert.ok(successToggle.querySelector('.manager-status-toggle-track'));
+    assert.ok(
+      successToggle.classList.contains('manager-checks-state-pill'),
+      'the state control is a coloured pill button'
+    );
     assert.equal(target.querySelector('[data-outcome-success] input'), null, 'no default checkbox');
     assert.ok(
       successToggle.textContent.includes('Failure'),
-      'the switch shows the state value (Failure), not Off'
+      'the pill shows the state value (Failure), not Off'
     );
     assert.ok(
-      target.querySelector('[data-outcome-break]').textContent.includes('Break'),
-      "the break switch shows Break/Don't break, not On/Off"
+      successToggle.classList.contains('is-negative'),
+      'the failure state is the red/negative pill'
+    );
+    const breakPill = target.querySelector('[data-outcome-break]');
+    assert.ok(
+      breakPill.textContent.includes('Break'),
+      "the break pill shows Break/Don't break, not On/Off"
+    );
+    assert.ok(
+      breakPill.classList.contains('is-negative'),
+      'breaking tools is the red/negative pill'
     );
     successToggle.click();
-    assert.equal(emitted.at(-1).outcomes[0].success, true, 'toggling success emits the new state');
+    assert.equal(emitted.at(-1).outcomes[0].success, true, 'clicking flips success state');
 
-    // The type selector is the shared resolution-mode radio card.
+    // The type selector reuses the resolution radio-option styling.
     target.querySelector('[data-check-type-option="fixed"] input').click();
     assert.equal(emitted.at(-1).type, 'fixed', 'switching type emits the new type');
 

@@ -250,26 +250,24 @@
 
             <button
               type="button"
-              class={`manager-status-toggle ${outcome.success === true ? 'is-on' : 'is-off'}`}
+              class={`manager-checks-state-pill ${outcome.success === true ? 'is-positive' : 'is-negative'}`}
               data-outcome-success
               aria-pressed={outcome.success === true}
               aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
               onclick={() => updateOutcome(outcome.id, { success: !(outcome.success === true) })}
             >
-              <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-              <span class="manager-status-toggle-label">{outcome.success === true ? successOnLabel : successOffLabel}</span>
+              {outcome.success === true ? successOnLabel : successOffLabel}
             </button>
 
             <button
               type="button"
-              class={`manager-status-toggle ${outcome.breakTools === true ? 'is-on' : 'is-off'}`}
+              class={`manager-checks-state-pill ${outcome.breakTools === true ? 'is-negative' : 'is-positive'}`}
               data-outcome-break
               aria-pressed={outcome.breakTools === true}
               aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
               onclick={() => updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
             >
-              <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-              <span class="manager-status-toggle-label">{outcome.breakTools === true ? breakOnLabel : breakOffLabel}</span>
+              {outcome.breakTools === true ? breakOnLabel : breakOffLabel}
             </button>
 
             <button
