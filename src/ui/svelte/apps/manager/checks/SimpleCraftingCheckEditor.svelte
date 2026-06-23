@@ -2,13 +2,13 @@
 <!--
   Simple pass/fail crafting check editor (simple and alchemy resolution modes).
 
-  A simple check rolls a FORMULA and succeeds when the total reaches a SUCCESS
-  THRESHOLD (meet-or-exceed or exceed). The threshold value is polymorphic:
-    - static:  the success threshold is the default, with optional named recipe
-               TIERS (each its own threshold) the recipe editor can pick from.
+  A simple check rolls a FORMULA and succeeds when the total reaches the DC
+  (meet-or-exceed or exceed). The DC value is polymorphic:
+    - static:  the DC is the default, with optional named recipe TIERS (each its
+               own DC) the recipe editor can pick from.
     - dynamic: a dropped macro is handed the ingredient set, recipe, and actor
-               and returns the threshold. Both sides persist so switching the DC
-               mode is non-destructive.
+               and returns the DC. Both sides persist so switching the DC mode is
+               non-destructive.
   Each die in the formula can also define a critical RAW roll that auto-fails or
   auto-succeeds the check regardless of the total.
 
@@ -38,14 +38,14 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStatic',
       fallback: 'Static',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStaticDesc',
-      descFallback: 'A fixed success threshold for every recipe, with optional named recipe tiers.',
+      descFallback: 'A fixed DC for every recipe, with optional named recipe tiers.',
     },
     {
       value: 'dynamic',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamic',
       fallback: 'Dynamic',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamicDesc',
-      descFallback: 'A macro computes the threshold from the ingredients, recipe, and actor.',
+      descFallback: 'A macro computes the DC from the ingredients, recipe, and actor.',
     },
   ];
 
@@ -114,7 +114,7 @@
   }
 
   function addTier() {
-    emit({ tiers: [...tiers, { id: newId(), name: '', dc: Number(value?.successThreshold) || 0 }] });
+    emit({ tiers: [...tiers, { id: newId(), name: '', dc: Number(value?.dc) || 0 }] });
   }
 
   function handleMacroDrop(data) {
@@ -168,12 +168,12 @@
         />
       </label>
       <label class="manager-field manager-checks-threshold-field">
-        <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.SuccessThreshold', 'Success threshold')}</span>
+        <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.Dc', 'DC')}</span>
         <input
           type="number"
-          data-success-threshold
-          value={value?.successThreshold ?? 15}
-          oninput={(event) => emit({ successThreshold: numeric(event.currentTarget.value) })}
+          data-check-dc
+          value={value?.dc ?? 15}
+          oninput={(event) => emit({ dc: numeric(event.currentTarget.value) })}
         />
       </label>
       <label class="manager-field manager-checks-threshold-mode">
@@ -262,8 +262,8 @@
   </section>
 
   <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'Threshold source')}</h3>
-    <div class="manager-checks-type-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'Threshold source')}>
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}</h3>
+    <div class="manager-checks-type-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}>
       {#each DC_MODE_OPTIONS as option (option.value)}
         <label
           class={`manager-resolution-option ${dcMode === option.value ? 'is-active' : ''}`}
@@ -296,7 +296,7 @@
       </div>
 
       {#if tiers.length === 0}
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoTiers', 'No tiers yet. Add named tiers a recipe can select to override the success threshold.')}</p>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoTiers', 'No tiers yet. Add named tiers a recipe can select to override the DC.')}</p>
       {:else}
         <div class="manager-checks-outcome-table is-tier" role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe tiers')}>
           <div class="manager-checks-outcome-head" role="row">
@@ -335,13 +335,13 @@
     </section>
   {:else}
     <section class="manager-inspector-card" data-dynamic-dc>
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'Threshold macro')}</h3>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroHint', 'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the success threshold.')}</p>
+      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}</h3>
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroHint', 'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.')}</p>
       <div
         class="manager-component-source-drop-zone manager-checks-macro-drop-zone"
         data-check-macro-dropzone
         role="group"
-        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'Threshold macro')}
+        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
         use:dragDrop={{ onDrop: handleMacroDrop, activeClass: 'is-drop-active' }}
       >
         <i class="fas fa-scroll" aria-hidden="true"></i>
@@ -361,7 +361,7 @@
             <i class="fas fa-times" aria-hidden="true"></i>
           </button>
         {:else}
-          <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint', 'Drag a macro here to compute the threshold.')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint', 'Drag a macro here to compute the DC.')}</span>
         {/if}
       </div>
     </section>

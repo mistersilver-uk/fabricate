@@ -104,7 +104,7 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.simple, {
     rollFormula: '',
-    successThreshold: 15,
+    dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
     tiers: [],
@@ -118,7 +118,7 @@ test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dic
   const result = mgr._normalizeCraftingCheck({
     simple: {
       rollFormula: '1d20+@abilities.int.mod',
-      successThreshold: '18.6',
+      dc: '18.6',
       thresholdMode: 'exceed',
       dcMode: 'dynamic',
       macroUuid: 'Macro.abc',
@@ -138,7 +138,7 @@ test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dic
     },
   });
   assert.equal(result.simple.dcMode, 'dynamic');
-  assert.equal(result.simple.successThreshold, 18, 'threshold is truncated to an integer');
+  assert.equal(result.simple.dc, 18, 'threshold is truncated to an integer');
   assert.equal(result.simple.thresholdMode, 'exceed');
   assert.equal(result.simple.macroUuid, 'Macro.abc');
   assert.equal(result.simple.tiers.length, 2, 'non-object tiers are dropped');

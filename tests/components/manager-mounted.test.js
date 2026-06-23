@@ -1940,7 +1940,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const emitted = [];
     const value = {
       rollFormula: '1d20+@abilities.int.mod',
-      successThreshold: 12,
+      dc: 12,
       thresholdMode: 'meet',
       dcMode: 'static',
       tiers: [{ id: 'tier1', name: 'Hard', dc: 18 }],
@@ -1960,8 +1960,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.ok(target.querySelector('[data-simple-check-editor]'));
-    // Success threshold + comparison sit on the formula line.
-    assert.equal(target.querySelector('[data-success-threshold]').value, '12');
+    // DC + comparison sit on the formula line.
+    assert.equal(target.querySelector('[data-check-dc]').value, '12');
     assert.equal(target.querySelector('[data-threshold-mode]').value, 'meet');
 
     // Dice chips are replaced by a per-die crit group that holds multiple rows.
@@ -2013,7 +2013,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Switching to dynamic keeps the static fields (non-destructive).
     target.querySelector('[data-dc-mode-option="dynamic"] input').click();
     assert.equal(emitted.at(-1).dcMode, 'dynamic');
-    assert.equal(emitted.at(-1).successThreshold, 12, 'shared fields are preserved');
+    assert.equal(emitted.at(-1).dc, 12, 'shared fields are preserved');
     assert.deepEqual(emitted.at(-1).tiers, value.tiers);
   });
 
@@ -2025,7 +2025,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         value: {
           rollFormula: '1d20',
-          successThreshold: 15,
+          dc: 15,
           thresholdMode: 'meet',
           dcMode: 'dynamic',
           tiers: [],
@@ -2040,7 +2040,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-check-macro-dropzone]'), 'shows the macro drop zone');
     assert.equal(target.querySelector('[data-tier-name]'), null, 'no tiers table in dynamic mode');
     // The threshold is shared, so it is shown in both modes.
-    assert.ok(target.querySelector('[data-success-threshold]'));
+    assert.ok(target.querySelector('[data-check-dc]'));
   });
 
   for (const mode of ['simple', 'alchemy']) {
@@ -2056,7 +2056,7 @@ describe('CraftingSystemManager mounted behavior', () => {
             craftingCheck: {
               simple: {
                 rollFormula: '1d20',
-                successThreshold: 12,
+                dc: 12,
                 thresholdMode: 'meet',
                 dcMode: 'static',
                 tiers: [],
@@ -2085,7 +2085,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       );
 
       // Seeded from the persisted config; no Save button until edited.
-      const dcInput = target.querySelector('[data-success-threshold]');
+      const dcInput = target.querySelector('[data-check-dc]');
       assert.equal(dcInput.value, '12');
       assert.equal(target.querySelector('[data-checks-save]'), null);
 
@@ -2102,7 +2102,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       flushSync();
       const saved = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
       assert.ok(saved, 'Save persists the simple config through the store');
-      assert.equal(saved[1].successThreshold, 17);
+      assert.equal(saved[1].dc, 17);
       assert.equal(
         target.querySelector('[data-checks-save]'),
         null,

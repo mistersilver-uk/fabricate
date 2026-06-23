@@ -323,19 +323,19 @@ export class CraftingSystemManager {
   }
 
   // Simple pass/fail crafting check authored in the Checks editor for simple and
-  // alchemy resolution modes: a roll formula and a success threshold (met or
-  // exceeded), whose value is polymorphic — either a static default with optional
-  // named recipe tiers, or a dynamic value computed by a dropped macro. Both the
-  // static and dynamic fields are kept so switching `dcMode` never destroys the
-  // other side's configuration. Per-die critical raw rolls auto-fail/auto-succeed.
+  // alchemy resolution modes: a roll formula and a DC (met or exceeded), whose
+  // value is polymorphic — either a static default with optional named recipe
+  // tiers, or a dynamic value computed by a dropped macro. Both the static and
+  // dynamic fields are kept so switching `dcMode` never destroys the other side's
+  // configuration. Per-die critical raw rolls auto-fail/auto-succeed.
   _normalizeSimpleCraftingCheck(simple = {}) {
     const source = !simple || typeof simple !== 'object' ? {} : simple;
-    const threshold = Number(source.successThreshold);
+    const dc = Number(source.dc);
     const tiers = Array.isArray(source.tiers) ? source.tiers : [];
     const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
     return {
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      successThreshold: Number.isFinite(threshold) ? Math.trunc(threshold) : 15,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),

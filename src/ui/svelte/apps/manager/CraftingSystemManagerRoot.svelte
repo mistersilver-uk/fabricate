@@ -117,10 +117,10 @@
   // and alchemy resolution modes.
   function cloneSimpleCheck(simple) {
     const source = simple && typeof simple === 'object' ? simple : {};
-    const threshold = Number(source.successThreshold);
+    const dc = Number(source.dc);
     return {
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      successThreshold: Number.isFinite(threshold) ? Math.trunc(threshold) : 15,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
