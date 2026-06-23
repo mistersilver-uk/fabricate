@@ -322,6 +322,7 @@ function createStore(calls = [], options = {}) {
       name: 'Alchemy',
       description: 'Potion and essence work',
       resolutionMode: options.alchemyResolutionMode || 'alchemy',
+      craftingCheck: options.craftingCheck,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
       // Tools are system-owned: the manager reads the library from
@@ -1679,7 +1680,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore([], { alchemyResolutionMode: 'routed' }),
+        store: createStore([], {
+          alchemyResolutionMode: 'routed',
+          craftingCheck: {
+            routed: {
+              type: 'fixed',
+              rollExpression: '2d6',
+              outcomes: [
+                {
+                  id: 'seed1',
+                  name: 'Hit',
+                  success: true,
+                  breakTools: false,
+                  dc: 0,
+                  start: 1,
+                  end: 6,
+                },
+              ],
+            },
+          },
+        }),
         services: { openCurrentAdmin: () => {} },
       },
     });
@@ -1700,11 +1720,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the singleton placeholder page is replaced by the editor'
     );
     assert.equal(target.querySelectorAll('[data-check-type-option]').length, 2);
-    assert.equal(
-      target.querySelectorAll('[data-outcome-row]').length,
-      2,
-      'the draft seeds a failure and a success tier'
-    );
+    // The editor is seeded from the selected system's persisted routed config.
+    assert.equal(target.querySelector('[data-check-roll-expression]').value, '2d6');
+    const rows = target.querySelectorAll('[data-outcome-row]');
+    assert.equal(rows.length, 1, 'the persisted tier is rendered');
+    assert.equal(rows[0].getAttribute('data-outcome-id'), 'seed1');
+    assert.equal(rows[0].querySelector('[data-outcome-name]').value, 'Hit');
   });
 
   it('crafting check editor (relative): lists dice groups, shows DC, and edits outcomes', () => {
@@ -1827,10 +1848,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.ok(target.querySelector('[data-outcome-start]'), 'fixed tiers expose a range');
     assert.equal(target.querySelector('[data-outcome-dc]'), null, 'fixed tiers hide the DC field');
-    const rangeText = target.querySelector('[data-expression-range]').textContent;
-    assert.ok(
-      rangeText.includes('Value range') && rangeText.includes('20'),
-      'shows the 1d20 range'
+    assert.equal(
+      target.querySelector('[data-expression-range]'),
+      null,
+      'no value range is computed (the roll may reference actor data)'
     );
     assert.ok(
       target.querySelector('[data-checks-validation]'),

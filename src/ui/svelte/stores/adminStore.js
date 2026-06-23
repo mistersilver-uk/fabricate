@@ -25,35 +25,39 @@
 import { writable, get } from 'svelte/store';
 import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
-import { TIME_OF_DAY_ICONS, WEATHER_ICONS, WEATHER_FALLBACK_ICON } from '../util/gatheringConditionIcons.js';
+import {
+  TIME_OF_DAY_ICONS,
+  WEATHER_ICONS,
+  WEATHER_FALLBACK_ICON,
+} from '../util/gatheringConditionIcons.js';
 import {
   buildExportPayload,
   validateImportData,
   prepareForImport,
-  makeExportFilename
+  makeExportFilename,
 } from '../../../systems/CraftingSystemExporter.js';
 import {
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
-  normalizeRecipeCategory
+  normalizeRecipeCategory,
 } from '../../../utils/recipeCategories.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
-  seedCharacterModifierPresets
+  seedCharacterModifierPresets,
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import {
   getCurrencyPresetsForFoundrySystem,
-  seedCurrencyPresets
+  seedCurrencyPresets,
 } from '../../../config/currencyPresets.js';
 import {
   getDefaultProviderId,
-  getProviderCanonicalUnits
+  getProviderCanonicalUnits,
 } from '../../../config/currencyProviders.js';
 import {
   canAddCurrencySubUnit,
   CURRENCY_MACRO_KEYS,
   normalizeCurrencyConfig,
-  normalizeCurrencyUnit
+  normalizeCurrencyUnit,
 } from '../../../systems/currencyProfile.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
@@ -76,14 +80,14 @@ const FEATURE_MAP = {
   outcomeRouting: 'outcomeRouting',
   effectTransfer: 'effectTransfer',
   gathering: 'gathering',
-  chatOutput: 'chatOutput'
+  chatOutput: 'chatOutput',
 };
 
 const RESOLUTION_MODE_LABEL_KEYS = {
   simple: 'FABRICATE.Admin.SystemSettings.ResolutionSimple',
   routed: 'FABRICATE.Admin.SystemSettings.ResolutionRouted',
   progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
-  alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy'
+  alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy',
 };
 
 const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
@@ -96,14 +100,34 @@ const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
 const GATHERING_CONFIG_SETTING = 'gatheringConfig';
 const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
-  biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
+  biomes: [
+    'forest',
+    'grassland',
+    'mountain',
+    'cave',
+    'coastal',
+    'swamp',
+    'desert',
+    'urban',
+    'ruins',
+    'wasteland',
+  ],
   danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
-  timeOfDay: ['dawn', 'day', 'dusk', 'night']
+  timeOfDay: ['dawn', 'day', 'dusk', 'night'],
 });
 const GATHERING_CONDITION_DIMENSIONS = new Set(['weather', 'timeOfDay']);
 const GATHERING_VOCABULARY_DIMENSIONS = new Set(['biomes']);
-const GATHERING_BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
+const GATHERING_BIOME_COLOR_TOKENS = new Set([
+  'sage',
+  'mist',
+  'lavender',
+  'rose',
+  'peach',
+  'butter',
+  'aqua',
+  'mauve',
+]);
 const DEFAULT_GATHERING_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({
   forest: Object.freeze({ label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }),
@@ -115,20 +139,24 @@ const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({
   desert: Object.freeze({ label: 'Desert', icon: 'fas fa-sun', colorToken: 'peach' }),
   urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
   ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
-  wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' })
+  wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' }),
 });
 const DEFAULT_GATHERING_CONDITION_ICONS = Object.freeze({
   weather: WEATHER_ICONS,
-  timeOfDay: TIME_OF_DAY_ICONS
+  timeOfDay: TIME_OF_DAY_ICONS,
 });
 const FALLBACK_GATHERING_CONDITION_ICONS = Object.freeze({
   weather: WEATHER_FALLBACK_ICON,
-  timeOfDay: 'fas fa-clock'
+  timeOfDay: 'fas fa-clock',
 });
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const GATHERING_EVENT_POLICIES = new Set(['successWithEvent', 'failureWithEvent']);
 const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
-const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
+const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set([
+  'cumulative',
+  'strongestOfEach',
+  'dominant',
+]);
 const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
@@ -137,7 +165,7 @@ const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
   'includedByMatch',
   'explicitlyIncluded',
   'forceIncluded',
-  'includedButUnavailable'
+  'includedButUnavailable',
 ]);
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
@@ -151,7 +179,7 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   revealPolicy: 'never',
   revealScope: 'actor',
   eventVisibility: 'encounterChance',
-  dropModifierMode: 'additive'
+  dropModifierMode: 'additive',
 });
 
 // ---------------------------------------------------------------------------
@@ -168,7 +196,7 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
 function _stripSubUnit(unit, subUnitId) {
   return {
     ...unit,
-    contains: (unit.contains || []).filter((entry) => entry.unitId !== subUnitId)
+    contains: (unit.contains || []).filter((entry) => entry.unitId !== subUnitId),
   };
 }
 
@@ -212,7 +240,7 @@ function _deleteSubUnitFromList(units, parentUnitId, subUnitId) {
 
 function _nextSystemName(systemManager) {
   const base = 'New Crafting System';
-  const names = new Set(systemManager.getSystems().map(s => s.name));
+  const names = new Set(systemManager.getSystems().map((s) => s.name));
   if (!names.has(base)) return base;
   let i = 2;
   while (names.has(`${base} ${i}`)) i++;
@@ -231,26 +259,28 @@ function _visibilitySummary(recipe) {
 }
 
 function _ingredientCountForSet(ingredientSet) {
-  const groups = Array.isArray(ingredientSet?.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
-    ? ingredientSet.ingredientGroups
-    : (ingredientSet?.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+  const groups =
+    Array.isArray(ingredientSet?.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+      ? ingredientSet.ingredientGroups
+      : (ingredientSet?.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
   return groups.reduce((sum, group) => sum + ((group.options || []).length || 0), 0);
 }
 
 function _getRecipeExecutionSteps(recipe) {
-  const methodSteps = typeof recipe?.getExecutionSteps === 'function'
-    ? recipe.getExecutionSteps()
-    : null;
+  const methodSteps =
+    typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : null;
   if (Array.isArray(methodSteps) && methodSteps.length > 0) return methodSteps;
   if (Array.isArray(recipe?.steps) && recipe.steps.length > 0) return recipe.steps;
 
-  return [{
-    id: 'implicit-step',
-    name: 'Step 1',
-    ingredientSets: Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [],
-    resultGroups: Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [],
-    toolIds: Array.isArray(recipe?.toolIds) ? recipe.toolIds : []
-  }];
+  return [
+    {
+      id: 'implicit-step',
+      name: 'Step 1',
+      ingredientSets: Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [],
+      resultGroups: Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [],
+      toolIds: Array.isArray(recipe?.toolIds) ? recipe.toolIds : [],
+    },
+  ];
 }
 
 function _usesExplicitRecipeSteps(recipe, executionSteps) {
@@ -263,15 +293,17 @@ function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
     id: set?.id || `set-${setIndex + 1}`,
     name: set?.name || `Set ${setIndex + 1}`,
     ingredientCount: _ingredientCountForSet(set),
-    toolCount: Array.isArray(set?.toolIds) ? set.toolIds.length : 0
+    toolCount: Array.isArray(set?.toolIds) ? set.toolIds.length : 0,
   }));
   const stepToolCount = Array.isArray(step?.toolIds) ? step.toolIds.length : 0;
-  const previewIngredientCount = ingredientSetSummaries.length > 0
-    ? Math.max(...ingredientSetSummaries.map(set => set.ingredientCount))
-    : 0;
-  const previewSetToolCount = ingredientSetSummaries.length > 0
-    ? Math.max(...ingredientSetSummaries.map(set => set.toolCount))
-    : 0;
+  const previewIngredientCount =
+    ingredientSetSummaries.length > 0
+      ? Math.max(...ingredientSetSummaries.map((set) => set.ingredientCount))
+      : 0;
+  const previewSetToolCount =
+    ingredientSetSummaries.length > 0
+      ? Math.max(...ingredientSetSummaries.map((set) => set.toolCount))
+      : 0;
 
   return {
     id: step?.id || `step-${index + 1}`,
@@ -281,7 +313,7 @@ function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
     toolCount: sharedRecipeToolIds.length + stepToolCount + previewSetToolCount,
     resultGroupCount: Array.isArray(step?.resultGroups) ? step.resultGroups.length : 0,
     hasAlternatives: ingredientSetSummaries.length > 1,
-    ingredientSetSummaries
+    ingredientSetSummaries,
   };
 }
 
@@ -307,7 +339,7 @@ function _isRecipeIncompleteByCounts(recipe) {
   const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
   if (steps.length > 0) {
     return steps.some(
-      step =>
+      (step) =>
         !Array.isArray(step?.ingredientSets) ||
         step.ingredientSets.length === 0 ||
         !Array.isArray(step?.resultGroups) ||
@@ -342,9 +374,10 @@ function _isRecipeIncomplete(recipe) {
 function _buildRecipeBrowserDisplay(recipe) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
   const isSimple = typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true;
-  const sharedRecipeToolIds = _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.toolIds)
-    ? recipe.toolIds
-    : [];
+  const sharedRecipeToolIds =
+    _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.toolIds)
+      ? recipe.toolIds
+      : [];
   const requirementsPreview = executionSteps.map((step, index) =>
     _buildRequirementPreviewStep(step, index, sharedRecipeToolIds)
   );
@@ -358,7 +391,7 @@ function _buildRecipeBrowserDisplay(recipe) {
     toolCount: requirementsPreview.reduce((sum, step) => sum + step.toolCount, 0),
     ...structure,
     requirementsPreview,
-    isSimple
+    isSimple,
   };
 }
 
@@ -369,14 +402,16 @@ function _getManagedItems(system) {
 }
 
 function _buildManagedItemOptions(managedItems = []) {
-  return managedItems.map(item => ({
+  return managedItems.map((item) => ({
     id: item.id,
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
     description: _plainTextDescription(item.description),
     ...(item.sourceItemUuid ? { sourceItemUuid: item.sourceItemUuid } : {}),
     ...(item.sourceUuid ? { sourceUuid: item.sourceUuid } : {}),
-    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
+    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty')
+      ? { difficulty: item.difficulty }
+      : {}),
   }));
 }
 
@@ -393,26 +428,27 @@ function _buildManagedItemOptions(managedItems = []) {
  * @returns {{ id: string, tags: string[] }[]}
  */
 function _buildComponentTagOptions(managedItems = []) {
-  return managedItems.map(item => ({
+  return managedItems.map((item) => ({
     id: item.id,
     tags: Array.isArray(item.tags)
-      ? item.tags.map(tag => String(tag ?? '').trim()).filter(Boolean)
-      : []
+      ? item.tags.map((tag) => String(tag ?? '').trim()).filter(Boolean)
+      : [],
   }));
 }
 
 function _resolutionModeLabel(mode, localizeFn) {
   const key = RESOLUTION_MODE_LABEL_KEYS[mode];
-  return key ? (localizeFn?.(key) || mode) : mode;
+  return key ? localizeFn?.(key) || mode : mode;
 }
 
 function _buildSalvageSummary(item, salvageEnabled) {
   if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
 
   const salvage = item.salvage || {};
-  const outcomeRouting = salvage.outcomeRouting && typeof salvage.outcomeRouting === 'object'
-    ? Object.keys(salvage.outcomeRouting).length
-    : 0;
+  const outcomeRouting =
+    salvage.outcomeRouting && typeof salvage.outcomeRouting === 'object'
+      ? Object.keys(salvage.outcomeRouting).length
+      : 0;
 
   return {
     quantityRequired: Number(salvage.ingredientQuantity) || 1,
@@ -420,7 +456,7 @@ function _buildSalvageSummary(item, salvageEnabled) {
     resultGroupCount: Array.isArray(salvage.resultGroups) ? salvage.resultGroups.length : 0,
     hasTimeRequirement: !!salvage.timeRequirement,
     hasCurrencyRequirement: !!salvage.currencyRequirement,
-    outcomeCount: outcomeRouting
+    outcomeCount: outcomeRouting,
   };
 }
 
@@ -430,7 +466,9 @@ function _clonePlain(value) {
 }
 
 function _normalizeGatheringTag(value) {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function _normalizeGatheringVocabularyId(value) {
@@ -452,12 +490,12 @@ function _normalizeGatheringConditionId(value) {
 }
 
 function _normalizeGatheringTagList(value) {
-  const values = Array.isArray(value) ? value : (value ? String(value).split(',') : []);
+  const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
   return Array.from(new Set(values.map(_normalizeGatheringTag).filter(Boolean)));
 }
 
 function _normalizeGatheringConditionIdList(value) {
-  const values = Array.isArray(value) ? value : (value ? String(value).split(',') : []);
+  const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
   return Array.from(new Set(values.map(_normalizeGatheringConditionId).filter(Boolean)));
 }
 
@@ -470,12 +508,16 @@ function _gatheringVocabularyLabelFromId(id) {
   return String(id || '')
     .split(/[\s-]+/)
     .filter(Boolean)
-    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .map((token) =>
+      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
+    )
     .join(' ');
 }
 
 function _normalizeBiomeColorToken(value) {
-  const token = String(value || '').trim().replace(/^--fab-tag-/, '');
+  const token = String(value || '')
+    .trim()
+    .replace(/^--fab-tag-/, '');
   return GATHERING_BIOME_COLOR_TOKENS.has(token) ? token : DEFAULT_GATHERING_BIOME_COLOR_TOKEN;
 }
 
@@ -486,7 +528,9 @@ function _normalizeCustomHex(value) {
 
 function _normalizeGatheringVocabularyOption(kind, value) {
   const isRecord = value && typeof value === 'object';
-  const id = _normalizeGatheringVocabularyId(isRecord ? (value.id ?? value.value ?? value.label) : value);
+  const id = _normalizeGatheringVocabularyId(
+    isRecord ? (value.id ?? value.value ?? value.label) : value
+  );
   if (!id) return null;
   const rawLabel = isRecord ? String(value.label ?? '').trim() : '';
   const defaultBiome = kind === 'biomes' ? DEFAULT_GATHERING_BIOME_METADATA[id] : null;
@@ -494,22 +538,30 @@ function _normalizeGatheringVocabularyOption(kind, value) {
   // the label would render an unwanted lowercase chip (e.g. "northreach"
   // instead of "Northreach"). Records keep their explicit label when present.
   const label = isRecord
-    ? (rawLabel || defaultBiome?.label || _gatheringVocabularyLabelFromId(id))
-    : (defaultBiome?.label || _gatheringVocabularyLabelFromId(id));
+    ? rawLabel || defaultBiome?.label || _gatheringVocabularyLabelFromId(id)
+    : defaultBiome?.label || _gatheringVocabularyLabelFromId(id);
   if (kind === 'biomes') {
     return {
       id,
       label,
-      icon: normalizeEssenceIcon(isRecord ? (value.icon || defaultBiome?.icon || 'fas fa-tree') : (defaultBiome?.icon || 'fas fa-tree')),
-      colorToken: _normalizeBiomeColorToken(isRecord ? (value.colorToken || defaultBiome?.colorToken || DEFAULT_GATHERING_BIOME_COLOR_TOKEN) : (defaultBiome?.colorToken || DEFAULT_GATHERING_BIOME_COLOR_TOKEN)),
-      customColor: _normalizeCustomHex(isRecord ? value.customColor : '')
+      icon: normalizeEssenceIcon(
+        isRecord
+          ? value.icon || defaultBiome?.icon || 'fas fa-tree'
+          : defaultBiome?.icon || 'fas fa-tree'
+      ),
+      colorToken: _normalizeBiomeColorToken(
+        isRecord
+          ? value.colorToken || defaultBiome?.colorToken || DEFAULT_GATHERING_BIOME_COLOR_TOKEN
+          : defaultBiome?.colorToken || DEFAULT_GATHERING_BIOME_COLOR_TOKEN
+      ),
+      customColor: _normalizeCustomHex(isRecord ? value.customColor : ''),
     };
   }
   return { id, label };
 }
 
 function _normalizeGatheringVocabularyOptions(kind, value) {
-  const values = Array.isArray(value) ? value : (value ? String(value).split(',') : []);
+  const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
   const options = [];
   const seen = new Set();
   for (const raw of values) {
@@ -532,9 +584,11 @@ function _normalizeGatheringSystemVocabularies(raw = {}, fallbackVocabularies = 
   for (const kind of GATHERING_VOCABULARY_DIMENSIONS) {
     const rawValues = Array.isArray(raw?.[kind]?.values)
       ? raw[kind].values
-      : (Array.isArray(raw?.[kind]) ? raw[kind] : fallbackVocabularies?.[kind]);
+      : Array.isArray(raw?.[kind])
+        ? raw[kind]
+        : fallbackVocabularies?.[kind];
     normalized[kind] = {
-      values: _normalizeGatheringVocabularyOptions(kind, rawValues)
+      values: _normalizeGatheringVocabularyOptions(kind, rawValues),
     };
   }
   return normalized;
@@ -544,28 +598,40 @@ function _conditionLabelFromId(id) {
   return String(id || '')
     .split('-')
     .filter(Boolean)
-    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .map((token) =>
+      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
+    )
     .join(' ');
 }
 
 function _defaultGatheringConditionIcon(kind, id) {
-  return DEFAULT_GATHERING_CONDITION_ICONS[kind]?.[id] || FALLBACK_GATHERING_CONDITION_ICONS[kind] || DEFAULT_ESSENCE_ICON;
+  return (
+    DEFAULT_GATHERING_CONDITION_ICONS[kind]?.[id] ||
+    FALLBACK_GATHERING_CONDITION_ICONS[kind] ||
+    DEFAULT_ESSENCE_ICON
+  );
 }
 
 function _normalizeGatheringConditionOption(kind, value) {
   const isRecord = value && typeof value === 'object';
-  const id = _normalizeGatheringConditionId(isRecord ? (value.id ?? value.value ?? value.label) : value);
+  const id = _normalizeGatheringConditionId(
+    isRecord ? (value.id ?? value.value ?? value.label) : value
+  );
   if (!id) return null;
   const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
   const label = isRecord
-    ? (rawLabel || _conditionLabelFromId(id))
-    : (/[A-Z]/.test(rawLabel) ? rawLabel : _conditionLabelFromId(id));
-  const icon = normalizeEssenceIcon(isRecord ? value.icon : _defaultGatheringConditionIcon(kind, id));
+    ? rawLabel || _conditionLabelFromId(id)
+    : /[A-Z]/.test(rawLabel)
+      ? rawLabel
+      : _conditionLabelFromId(id);
+  const icon = normalizeEssenceIcon(
+    isRecord ? value.icon : _defaultGatheringConditionIcon(kind, id)
+  );
   return { id, label, icon };
 }
 
 function _normalizeGatheringConditionOptions(kind, value) {
-  const values = Array.isArray(value) ? value : (value ? String(value).split(',') : []);
+  const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
   const options = [];
   const seen = new Set();
   for (const raw of values) {
@@ -583,17 +649,26 @@ function _seedGatheringConditionOptions(kind, raw, defaults) {
   return _normalizeGatheringConditionOptions(kind, defaults);
 }
 
-function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringDropRow(
+  row = {},
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   return {
     id: row.id ? String(row.id) : randomID(),
     name: String(row.name || ''),
     componentId: String(row.componentId || row.systemItemId || ''),
     itemUuid: String(row.itemUuid || ''),
-    quantity: Number.isFinite(Number(row.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
-    dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(0, Math.floor(Number(row.dropRate)))) : 1,
+    quantity:
+      Number.isFinite(Number(row.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
+    dropRate: Number.isFinite(Number(row.dropRate))
+      ? Math.min(100, Math.max(0, Math.floor(Number(row.dropRate))))
+      : 1,
     conditionModifiers: _normalizeGatheringDropConditionModifiers(row.conditionModifiers),
-    characterModifiers: _normalizeGatheringCharacterModifierReferences(row.characterModifiers, randomID),
-    enabled: row.enabled !== false
+    characterModifiers: _normalizeGatheringCharacterModifierReferences(
+      row.characterModifiers,
+      randomID
+    ),
+    enabled: row.enabled !== false,
   };
 }
 
@@ -603,7 +678,10 @@ const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // modifier.
 const GATHERING_DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
 
-function _normalizeGatheringCharacterModifier(entry = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringCharacterModifier(
+  entry = {},
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   if (!entry || typeof entry !== 'object') return null;
   const id = entry.id ? String(entry.id) : '';
   if (!id) return null;
@@ -612,30 +690,39 @@ function _normalizeGatheringCharacterModifier(entry = {}, randomID = () => Math.
     id,
     label: String(entry.label || id),
     icon: String(entry.icon || 'fa-solid fa-user'),
-    expression
+    expression,
   };
 }
 
-function _normalizeGatheringCharacterModifierReferences(refs, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringCharacterModifierReferences(
+  refs,
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   if (!Array.isArray(refs)) return [];
   return refs
     .map((ref, index) => _normalizeGatheringCharacterModifierReference(ref, index, randomID))
     .filter(Boolean);
 }
 
-function _normalizeGatheringCharacterModifierReference(ref, index, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringCharacterModifierReference(
+  ref,
+  index,
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   if (!ref || typeof ref !== 'object') return null;
   const modifierId = String(ref.modifierId || '').trim();
   if (!modifierId) return null;
-  const min = Number.isFinite(Number(ref.min)) && ref.min !== null && ref.min !== '' ? Number(ref.min) : null;
-  const max = Number.isFinite(Number(ref.max)) && ref.max !== null && ref.max !== '' ? Number(ref.max) : null;
+  const min =
+    Number.isFinite(Number(ref.min)) && ref.min !== null && ref.min !== '' ? Number(ref.min) : null;
+  const max =
+    Number.isFinite(Number(ref.max)) && ref.max !== null && ref.max !== '' ? Number(ref.max) : null;
   return {
     id: ref.id ? String(ref.id) : `char-mod-${modifierId}-${index + 1}`,
     modifierId,
     operator: GATHERING_CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
     min,
     max,
-    expressionOverride: String(ref.expressionOverride || '')
+    expressionOverride: String(ref.expressionOverride || ''),
   };
 }
 
@@ -643,26 +730,28 @@ function _normalizeGatheringDropConditionModifiers(modifiers = {}) {
   return {
     timeOfDay: _normalizeGatheringDropConditionModifierList(modifiers?.timeOfDay),
     weather: _normalizeGatheringDropConditionModifierList(modifiers?.weather),
-    biome: _normalizeGatheringDropConditionModifierList(modifiers?.biome, _normalizeGatheringTag)
+    biome: _normalizeGatheringDropConditionModifierList(modifiers?.biome, _normalizeGatheringTag),
   };
 }
 
-function _normalizeGatheringDropConditionModifierList(values = [], normalizeId = _normalizeGatheringConditionId) {
+function _normalizeGatheringDropConditionModifierList(
+  values = [],
+  normalizeId = _normalizeGatheringConditionId
+) {
   return (Array.isArray(values) ? values : [])
     .map((modifier, index) => {
       const conditionId = normalizeId(modifier?.conditionId ?? modifier?.id);
       const rawValue = Number(modifier?.value);
       if (!conditionId || !Number.isFinite(rawValue)) return null;
       const truncated = Math.trunc(rawValue);
-      const explicitOperator = modifier?.operator === '-' || modifier?.operator === '+'
-        ? modifier.operator
-        : null;
+      const explicitOperator =
+        modifier?.operator === '-' || modifier?.operator === '+' ? modifier.operator : null;
       const operator = explicitOperator ?? (truncated < 0 ? '-' : '+');
       return {
         id: String(modifier?.id || `${conditionId}-${index + 1}`),
         conditionId,
         operator,
-        value: Math.abs(truncated)
+        value: Math.abs(truncated),
       };
     })
     .filter(Boolean);
@@ -674,7 +763,7 @@ function _normalizeToolRequirement(input) {
   if (input === null || input === undefined) return null;
   if (typeof input !== 'object') return null;
   return {
-    formula: typeof input.formula === 'string' ? input.formula : ''
+    formula: typeof input.formula === 'string' ? input.formula : '',
   };
 }
 
@@ -691,7 +780,7 @@ function _normalizeToolBreakage(input) {
   return {
     mode,
     formula: typeof input?.formula === 'string' ? input.formula : '',
-    threshold: Number.isFinite(threshold) ? threshold : 0
+    threshold: Number.isFinite(threshold) ? threshold : 0,
   };
 }
 
@@ -700,20 +789,23 @@ function _normalizeToolOnBreak(input) {
   if (mode === 'replaceWith') {
     return {
       mode,
-      replacementComponentId: typeof input?.replacementComponentId === 'string'
-        ? input.replacementComponentId
-        : null
+      replacementComponentId:
+        typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null,
     };
   }
   return { mode };
 }
 
-function _normalizeGatheringLibraryTool(tool = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringLibraryTool(
+  tool = {},
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   const id = String(tool.id || randomID());
   const rawLabel = typeof tool.label === 'string' ? tool.label.trim() : '';
-  const componentId = typeof tool.componentId === 'string' && tool.componentId.trim()
-    ? tool.componentId.trim()
-    : null;
+  const componentId =
+    typeof tool.componentId === 'string' && tool.componentId.trim()
+      ? tool.componentId.trim()
+      : null;
   return {
     id,
     label: rawLabel,
@@ -721,11 +813,14 @@ function _normalizeGatheringLibraryTool(tool = {}, randomID = () => Math.random(
     componentId,
     requirement: _normalizeToolRequirement(tool.requirement),
     breakage: _normalizeToolBreakage(tool.breakage),
-    onBreak: _normalizeToolOnBreak(tool.onBreak)
+    onBreak: _normalizeToolOnBreak(tool.onBreak),
   };
 }
 
-function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringTask(
+  task = {},
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   const id = String(task.id || randomID());
   return {
     id,
@@ -737,31 +832,49 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     weather: _normalizeGatheringConditionIdList(task.weather),
     timeOfDay: _normalizeGatheringConditionIdList(task.timeOfDay),
     itemSelectionMode: task.itemSelectionMode === 'allDrops' ? 'allDrops' : 'highestRankedDrop',
-    dropRows: (Array.isArray(task.dropRows ?? task.itemDrops) ? (task.dropRows ?? task.itemDrops) : [])
-      .map(row => _normalizeGatheringDropRow(row, randomID)),
-    staminaCost: Number.isFinite(Number(task.staminaCost)) && Number(task.staminaCost) > 0 ? Number(task.staminaCost) : 0,
-    staminaCostModifiers: _normalizeGatheringCharacterModifierReferences(task.staminaCostModifiers, randomID),
-    gatheringModifier: task.gatheringModifier && typeof task.gatheringModifier === 'object' ? _clonePlain(task.gatheringModifier) : null,
-    timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null,
+    dropRows: (Array.isArray(task.dropRows ?? task.itemDrops)
+      ? (task.dropRows ?? task.itemDrops)
+      : []
+    ).map((row) => _normalizeGatheringDropRow(row, randomID)),
+    staminaCost:
+      Number.isFinite(Number(task.staminaCost)) && Number(task.staminaCost) > 0
+        ? Number(task.staminaCost)
+        : 0,
+    staminaCostModifiers: _normalizeGatheringCharacterModifierReferences(
+      task.staminaCostModifiers,
+      randomID
+    ),
+    gatheringModifier:
+      task.gatheringModifier && typeof task.gatheringModifier === 'object'
+        ? _clonePlain(task.gatheringModifier)
+        : null,
+    timeRequirement:
+      task.timeRequirement && typeof task.timeRequirement === 'object'
+        ? _clonePlain(task.timeRequirement)
+        : null,
     toolIds: Array.isArray(task.toolIds)
-      ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
+      ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
     // Optional task-default environment (new): the precedence MIDDLE tier for
     // on-drop canvas env resolution (region auto-detect → THIS → GM dialog).
     // Coerced to a trimmed string or null (empties dropped); a stale id falls
     // through to the GM dialog at drop time rather than throwing.
     defaultEnvironmentId: (() => {
-      const id = typeof task.defaultEnvironmentId === 'string' ? task.defaultEnvironmentId.trim() : '';
+      const id =
+        typeof task.defaultEnvironmentId === 'string' ? task.defaultEnvironmentId.trim() : '';
       return id || null;
     })(),
     // Preserve the resource-node config (count/depletion/respawn/depletedBehavior)
     // so authoring it on a task survives the save (the runtime reads it back to
     // seed per-env pools; canvas tokens snapshot it for per-token depletion).
-    ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {})
+    ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {}),
   };
 }
 
-function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringEvent(
+  event = {},
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   return {
     id: event.id ? String(event.id) : randomID(),
     name: String(event.name || 'Event'),
@@ -772,7 +885,9 @@ function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toS
     biomes: _normalizeGatheringTagList(event.biomes),
     weather: _normalizeGatheringConditionIdList(event.weather),
     timeOfDay: _normalizeGatheringConditionIdList(event.timeOfDay),
-    dropRate: Number.isFinite(Number(event.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(event.dropRate)))) : 1,
+    dropRate: Number.isFinite(Number(event.dropRate))
+      ? Math.min(100, Math.max(1, Math.floor(Number(event.dropRate))))
+      : 1,
     linkedSceneUuid: String(event.linkedSceneUuid || ''),
     // Accept the legacy `hazardModifier` field on read (imported or pre-1.0.0 data).
     eventModifier: (() => {
@@ -780,7 +895,10 @@ function _normalizeGatheringEvent(event = {}, randomID = () => Math.random().toS
       return modifier && typeof modifier === 'object' ? _clonePlain(modifier) : null;
     })(),
     conditionModifiers: _normalizeGatheringDropConditionModifiers(event.conditionModifiers),
-    characterModifiers: _normalizeGatheringCharacterModifierReferences(event.characterModifiers, randomID)
+    characterModifiers: _normalizeGatheringCharacterModifierReferences(
+      event.characterModifiers,
+      randomID
+    ),
   };
 }
 
@@ -813,7 +931,9 @@ function _normalizeGatheringRules(rules = {}) {
   const toolBreakagePolicy = GATHERING_TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
     ? rules.toolBreakagePolicy
     : DEFAULT_GATHERING_RULES.toolBreakagePolicy;
-  const biomeModifierAggregation = GATHERING_BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
+  const biomeModifierAggregation = GATHERING_BIOME_MODIFIER_AGGREGATIONS.has(
+    rules?.biomeModifierAggregation
+  )
     ? rules.biomeModifierAggregation
     : DEFAULT_GATHERING_RULES.biomeModifierAggregation;
   const blindCandidateGate = GATHERING_BLIND_CANDIDATE_GATES.has(rules?.blindCandidateGate)
@@ -842,7 +962,10 @@ function _normalizeGatheringRules(rules = {}) {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
     eventSelectionMode,
-    eventLimit: _normalizePositiveInteger(rules?.eventLimit ?? rules?.hazardLimit, DEFAULT_GATHERING_RULES.eventLimit),
+    eventLimit: _normalizePositiveInteger(
+      rules?.eventLimit ?? rules?.hazardLimit,
+      DEFAULT_GATHERING_RULES.eventLimit
+    ),
     eventPolicy,
     toolBreakagePolicy,
     biomeModifierAggregation,
@@ -850,11 +973,14 @@ function _normalizeGatheringRules(rules = {}) {
     revealPolicy,
     revealScope,
     eventVisibility,
-    dropModifierMode
+    dropModifierMode,
   };
 }
 
-function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+function _normalizeGatheringConfig(
+  raw = {},
+  randomID = () => Math.random().toString(36).slice(2, 10)
+) {
   // Top-level vocabularies are normalised into the same { id, label, icon, colorToken }
   // shape that per-system vocabularies use, so the Svelte fallback path (which
   // reads top-level when a system has no per-system override) renders capitalised
@@ -864,77 +990,121 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
   // safely. `danger` stays as a bare string list because no UI surface renders
   // it directly today.
   const vocabularies = {
-    biomes: _seedGatheringVocabularyOptions('biomes', raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
-    danger: _seedGatheringVocabulary(raw?.vocabularies?.danger, DEFAULT_GATHERING_VOCABULARIES.danger),
-    weather: _seedGatheringConditionOptions('weather', raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
-    timeOfDay: _seedGatheringConditionOptions('timeOfDay', raw?.vocabularies?.timeOfDay, DEFAULT_GATHERING_VOCABULARIES.timeOfDay)
+    biomes: _seedGatheringVocabularyOptions(
+      'biomes',
+      raw?.vocabularies?.biomes,
+      DEFAULT_GATHERING_VOCABULARIES.biomes
+    ),
+    danger: _seedGatheringVocabulary(
+      raw?.vocabularies?.danger,
+      DEFAULT_GATHERING_VOCABULARIES.danger
+    ),
+    weather: _seedGatheringConditionOptions(
+      'weather',
+      raw?.vocabularies?.weather,
+      DEFAULT_GATHERING_VOCABULARIES.weather
+    ),
+    timeOfDay: _seedGatheringConditionOptions(
+      'timeOfDay',
+      raw?.vocabularies?.timeOfDay,
+      DEFAULT_GATHERING_VOCABULARIES.timeOfDay
+    ),
   };
-  const weather = _normalizeGatheringConditionId(raw?.conditions?.weather) || DEFAULT_GATHERING_CONDITIONS.weather;
-  const timeOfDay = _normalizeGatheringConditionId(raw?.conditions?.timeOfDay) || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
+  const weather =
+    _normalizeGatheringConditionId(raw?.conditions?.weather) ||
+    DEFAULT_GATHERING_CONDITIONS.weather;
+  const timeOfDay =
+    _normalizeGatheringConditionId(raw?.conditions?.timeOfDay) ||
+    DEFAULT_GATHERING_CONDITIONS.timeOfDay;
   const systems = {};
   for (const [systemId, systemConfig] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
       rules: _normalizeGatheringRules(systemConfig?.rules),
-      conditions: _normalizeGatheringSystemConditions(systemConfig?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
+      conditions: _normalizeGatheringSystemConditions(systemConfig?.conditions, {
+        vocabularies,
+        conditions: { weather, timeOfDay },
+      }),
       vocabularies: _normalizeGatheringSystemVocabularies(systemConfig?.vocabularies, vocabularies),
-      tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
-      tools: (Array.isArray(systemConfig?.tools) ? systemConfig.tools : []).map(tool => _normalizeGatheringLibraryTool(tool, randomID)),
+      tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map((task) =>
+        _normalizeGatheringTask(task, randomID)
+      ),
+      tools: (Array.isArray(systemConfig?.tools) ? systemConfig.tools : []).map((tool) =>
+        _normalizeGatheringLibraryTool(tool, randomID)
+      ),
       // Accept the legacy `hazards` collection on read (imported or pre-1.0.0 config).
-      events: (Array.isArray(systemConfig?.events) ? systemConfig.events : (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : [])).map(event => _normalizeGatheringEvent(event, randomID)),
-      characterModifiers: (Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [])
-        .map(entry => _normalizeGatheringCharacterModifier(entry, randomID))
+      events: (Array.isArray(systemConfig?.events)
+        ? systemConfig.events
+        : Array.isArray(systemConfig?.hazards)
+          ? systemConfig.hazards
+          : []
+      ).map((event) => _normalizeGatheringEvent(event, randomID)),
+      characterModifiers: (Array.isArray(systemConfig?.characterModifiers)
+        ? systemConfig.characterModifiers
+        : []
+      )
+        .map((entry) => _normalizeGatheringCharacterModifier(entry, randomID))
         .filter(Boolean),
       // Preserve the economy block (stamina/nodes limitation flags + stamina
       // config) so views can read the active flags reactively. Owned/normalized
       // by the service.
-      ...(systemConfig?.economy ? { economy: _clonePlain(systemConfig.economy) } : {})
+      ...(systemConfig?.economy ? { economy: _clonePlain(systemConfig.economy) } : {}),
     };
   }
   return {
     vocabularies,
     conditions: {
       weather: weather || DEFAULT_GATHERING_CONDITIONS.weather,
-      timeOfDay: timeOfDay || DEFAULT_GATHERING_CONDITIONS.timeOfDay
+      timeOfDay: timeOfDay || DEFAULT_GATHERING_CONDITIONS.timeOfDay,
     },
-    systems
+    systems,
   };
 }
 
 function _normalizeGatheringConditionSetting(kind, raw = {}, fallback = {}) {
-  const fallbackValues = fallback?.vocabularies?.[kind] || DEFAULT_GATHERING_VOCABULARIES[kind] || [];
+  const fallbackValues =
+    fallback?.vocabularies?.[kind] || DEFAULT_GATHERING_VOCABULARIES[kind] || [];
   const enabled = raw?.enabled !== false;
   const explicitValues = Array.isArray(raw?.values);
   const normalizedValues = explicitValues
     ? _normalizeGatheringConditionOptions(kind, raw.values)
     : _seedGatheringConditionOptions(kind, raw?.values, fallbackValues);
-  const values = normalizedValues.length > 0 || !enabled
-    ? normalizedValues
-    : _normalizeGatheringConditionOptions(kind, fallbackValues);
-  const fallbackCurrent = _normalizeGatheringConditionId(fallback?.conditions?.[kind]) || DEFAULT_GATHERING_CONDITIONS[kind];
+  const values =
+    normalizedValues.length > 0 || !enabled
+      ? normalizedValues
+      : _normalizeGatheringConditionOptions(kind, fallbackValues);
+  const fallbackCurrent =
+    _normalizeGatheringConditionId(fallback?.conditions?.[kind]) ||
+    DEFAULT_GATHERING_CONDITIONS[kind];
   const requestedCurrent = _normalizeGatheringConditionId(raw?.current) || fallbackCurrent;
-  const valueIds = values.map(option => option.id);
+  const valueIds = values.map((option) => option.id);
   return {
     enabled,
-    current: valueIds.includes(requestedCurrent) ? requestedCurrent : values[0]?.id || DEFAULT_GATHERING_CONDITIONS[kind],
-    values
+    current: valueIds.includes(requestedCurrent)
+      ? requestedCurrent
+      : values[0]?.id || DEFAULT_GATHERING_CONDITIONS[kind],
+    values,
   };
 }
 
 function _normalizeGatheringSystemConditions(raw = {}, fallback = {}) {
   return {
     weather: _normalizeGatheringConditionSetting('weather', raw?.weather, fallback),
-    timeOfDay: _normalizeGatheringConditionSetting('timeOfDay', raw?.timeOfDay, fallback)
+    timeOfDay: _normalizeGatheringConditionSetting('timeOfDay', raw?.timeOfDay, fallback),
   };
 }
 
 function _escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, character => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[character]));
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character]
+  );
 }
 
 function _canShowEnvironmentsTab(selectedSystem) {
@@ -961,7 +1131,7 @@ function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
     environmentDraftIsNew: false,
     environmentSaving: false,
     environmentSaveError: null,
-    environmentValidationState: null
+    environmentValidationState: null,
   };
 }
 
@@ -973,7 +1143,7 @@ function _emptyTravelState() {
     travelError: null,
     travelFieldErrors: {},
     selectedSystemRealms: [],
-    actorOptions: []
+    actorOptions: [],
   };
 }
 
@@ -998,21 +1168,27 @@ function _travelErrorState(err, localizeFn = null, fieldContext = null) {
   const errors = Array.isArray(err?.errors) ? err.errors : [];
   const fieldErrors = {};
   if (fieldContext === 'travelActor' || fieldContext === 'members') {
-    const hasUniquenessViolation = errors.some(message =>
-      String(message).toLowerCase().includes('more than one enabled party'));
+    const hasUniquenessViolation = errors.some((message) =>
+      String(message).toLowerCase().includes('more than one enabled party')
+    );
     if (hasUniquenessViolation) {
       if (fieldContext === 'travelActor') {
-        fieldErrors.travelActor = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateTravelActor')
-          || 'This travel actor is already used by another enabled party.';
+        fieldErrors.travelActor =
+          localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateTravelActor') ||
+          'This travel actor is already used by another enabled party.';
       } else {
-        fieldErrors.members = localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateMember')
-          || 'This actor already belongs to another enabled party.';
+        fieldErrors.members =
+          localizeFn?.('FABRICATE.Admin.Manager.Travel.DuplicateMember') ||
+          'This actor already belongs to another enabled party.';
       }
     }
   }
-  const summary = errors.length > 0
-    ? errors.join('; ')
-    : (err?.message || (localizeFn?.('FABRICATE.Admin.Manager.Travel.Error') || 'Travel update failed.'));
+  const summary =
+    errors.length > 0
+      ? errors.join('; ')
+      : err?.message ||
+        localizeFn?.('FABRICATE.Admin.Manager.Travel.Error') ||
+        'Travel update failed.';
   return { travelError: summary, travelFieldErrors: fieldErrors };
 }
 
@@ -1027,7 +1203,9 @@ function _environmentErrorMessage(err) {
 function _environmentValidationMessages(err) {
   if (!err) return [];
   if (Array.isArray(err.errors)) {
-    return err.errors.map(error => typeof error === 'string' ? error : error?.message).filter(Boolean);
+    return err.errors
+      .map((error) => (typeof error === 'string' ? error : error?.message))
+      .filter(Boolean);
   }
   const message = _environmentErrorMessage(err);
   return message ? [message] : [];
@@ -1040,11 +1218,16 @@ function _fieldSelectorForPath(path) {
 }
 
 function _validationSummary(count, localizeFn) {
-  const key = count === 1
-    ? 'FABRICATE.Admin.Environments.ValidationSummaryOne'
-    : 'FABRICATE.Admin.Environments.ValidationSummary';
-  return localizeFn?.(key, { count })
-    || (count === 1 ? 'Resolve 1 validation issue before saving.' : `Resolve ${count} validation issues before saving.`);
+  const key =
+    count === 1
+      ? 'FABRICATE.Admin.Environments.ValidationSummaryOne'
+      : 'FABRICATE.Admin.Environments.ValidationSummary';
+  return (
+    localizeFn?.(key, { count }) ||
+    (count === 1
+      ? 'Resolve 1 validation issue before saving.'
+      : `Resolve ${count} validation issues before saving.`)
+  );
 }
 
 function _buildEnvironmentValidationState(err, draft, localizeFn, attempt) {
@@ -1056,7 +1239,8 @@ function _buildEnvironmentValidationState(err, draft, localizeFn, attempt) {
   const errors = messages.map((message, index) => {
     const structured = structuredErrors[index] || {};
     const inferred = _inferEnvironmentValidationTarget(message, draft, inferenceContext);
-    const path = structured.path || structured.fieldPath || structured.field || inferred?.path || null;
+    const path =
+      structured.path || structured.fieldPath || structured.field || inferred?.path || null;
     const taskId = structured.taskId || inferred?.taskId || null;
     const fieldSelector = structured.fieldSelector || _fieldSelectorForPath(path);
     return {
@@ -1064,25 +1248,31 @@ function _buildEnvironmentValidationState(err, draft, localizeFn, attempt) {
       path,
       taskId,
       fieldSelector,
-      id: path ? `environment-validation-${_domIdFromPath(path)}-${index}` : `environment-validation-${index}`
+      id: path
+        ? `environment-validation-${_domIdFromPath(path)}-${index}`
+        : `environment-validation-${index}`,
     };
   });
 
   return {
     summary: _validationSummary(errors.length, localizeFn),
     errors,
-    firstInvalidField: errors.find(error => error.fieldSelector) || errors[0] || null,
-    attempt
+    firstInvalidField: errors.find((error) => error.fieldSelector) || errors[0] || null,
+    attempt,
   };
 }
 
 function _createEnvironmentValidationInferenceContext() {
   return {
-    groupNameOccurrences: new Map()
+    groupNameOccurrences: new Map(),
   };
 }
 
-function _inferEnvironmentValidationTarget(message, draft, context = _createEnvironmentValidationInferenceContext()) {
+function _inferEnvironmentValidationTarget(
+  message,
+  draft,
+  context = _createEnvironmentValidationInferenceContext()
+) {
   const task = _findTaskForValidationMessage(message, draft);
   const lower = String(message || '').toLowerCase();
 
@@ -1103,7 +1293,10 @@ function _inferEnvironmentValidationTarget(message, draft, context = _createEnvi
     return { taskId: task.id, path: `${prefix}.resultSelection.rollTableUuid` };
   }
 
-  if (/progressive\.awardmode/.test(lower) || /progressive resolution requires progressive config/.test(lower)) {
+  if (
+    /progressive\.awardmode/.test(lower) ||
+    /progressive resolution requires progressive config/.test(lower)
+  ) {
     return { taskId: task.id, path: `${prefix}.progressive.awardMode` };
   }
   if (/progressive resolution requires check|gathering check requires formula/.test(lower)) {
@@ -1136,24 +1329,33 @@ function _inferEnvironmentValidationTarget(message, draft, context = _createEnvi
       task,
       groupName: resultGroupName,
       duplicate: / duplicates "/i.test(message),
-      context
+      context,
     });
-    return { taskId: task.id, path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups` };
+    return {
+      taskId: task.id,
+      path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups`,
+    };
   }
   if (/result groups require names/.test(lower)) {
     const group = _resolveResultGroupValidationTarget({
       task,
       groupName: '',
-      context
+      context,
     });
-    return { taskId: task.id, path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups` };
+    return {
+      taskId: task.id,
+      path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups`,
+    };
   }
   if (/requires at least one result group|exactly one result group/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.resultGroups` };
   }
   if (/progressive result group requires at least one result/.test(lower)) {
     const group = Array.isArray(task.resultGroups) ? task.resultGroups[0] : null;
-    return { taskId: task.id, path: group ? `${prefix}.resultGroups.${group.id}.results` : `${prefix}.resultGroups` };
+    return {
+      taskId: task.id,
+      path: group ? `${prefix}.resultGroups.${group.id}.results` : `${prefix}.resultGroups`,
+    };
   }
 
   const resultId = message.match(/progressive result "([^"]+)"/)?.[1];
@@ -1165,7 +1367,9 @@ function _inferEnvironmentValidationTarget(message, draft, context = _createEnvi
 function _resolveResultGroupValidationTarget({ task, groupName, duplicate = false, context }) {
   const groups = Array.isArray(task?.resultGroups) ? task.resultGroups : [];
   const normalizedName = _normalizeValidationGroupName(groupName);
-  const matches = groups.filter(group => _normalizeValidationGroupName(group?.name) === normalizedName);
+  const matches = groups.filter(
+    (group) => _normalizeValidationGroupName(group?.name) === normalizedName
+  );
   if (matches.length === 0) return null;
 
   const occurrenceKey = `${task?.id || 'task'}:${duplicate ? 'duplicate' : 'named'}:${normalizedName}`;
@@ -1177,14 +1381,16 @@ function _resolveResultGroupValidationTarget({ task, groupName, duplicate = fals
 }
 
 function _normalizeValidationGroupName(value) {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function _findTaskForValidationMessage(message, draft) {
   const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
   const taskName = String(message || '').match(/Task "([^"]+)"/)?.[1];
   if (taskName) {
-    return tasks.find(task => task?.name === taskName) || tasks[0] || null;
+    return tasks.find((task) => task?.name === taskName) || tasks[0] || null;
   }
   return tasks[0] || null;
 }
@@ -1195,8 +1401,10 @@ function _domIdFromPath(path) {
 
 function _taskCopyName(name, localizeFn) {
   const sourceName = String(name || '').trim() || 'Gather';
-  return localizeFn?.('FABRICATE.Admin.Environments.TaskCopySuffix', { name: sourceName })
-    || `${sourceName} Copy`;
+  return (
+    localizeFn?.('FABRICATE.Admin.Environments.TaskCopySuffix', { name: sourceName }) ||
+    `${sourceName} Copy`
+  );
 }
 
 function _normalizePositiveQuantity(value) {
@@ -1212,7 +1420,6 @@ function _normalizeNullablePositiveInteger(value) {
   return Math.max(1, Math.floor(numeric));
 }
 
-
 /**
  * Build the recipe list for the recipes tab.
  * Mirrors RecipeManagerApp._prepareRecipeContext().
@@ -1227,9 +1434,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
 
   if (recipeSearchTerm) {
     const lower = recipeSearchTerm.toLowerCase();
-    recipes = recipes.filter(r =>
-      r.name.toLowerCase().includes(lower) ||
-      (r.description || '').toLowerCase().includes(lower)
+    recipes = recipes.filter(
+      (r) =>
+        r.name.toLowerCase().includes(lower) || (r.description || '').toLowerCase().includes(lower)
     );
   }
 
@@ -1242,7 +1449,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const prepared = recipes.map(recipe => {
+  const prepared = recipes.map((recipe) => {
     const display = _buildRecipeBrowserDisplay(recipe);
     const recipeItemId = recipe.recipeItemId || '';
     const recipeItemDefinition = recipeItemId
@@ -1284,7 +1491,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       structureLabel: display.structureLabel,
       requirementsPreview: display.requirementsPreview,
       ingredients: new Array(display.ingredientCount),
-      tools: new Array(display.toolCount)
+      tools: new Array(display.toolCount),
     };
   });
 
@@ -1303,30 +1510,30 @@ function _sourceOriginForUuid(uuid, sourceMissing = false) {
   if (sourceMissing) {
     return {
       sourceOrigin: 'missing',
-      sourceOriginLabel: 'Missing'
+      sourceOriginLabel: 'Missing',
     };
   }
   if (!uuid) {
     return {
       sourceOrigin: 'unknown',
-      sourceOriginLabel: 'Unknown'
+      sourceOriginLabel: 'Unknown',
     };
   }
   if (uuid.startsWith('Compendium.')) {
     return {
       sourceOrigin: 'compendium',
-      sourceOriginLabel: 'Compendium'
+      sourceOriginLabel: 'Compendium',
     };
   }
   if (uuid.startsWith('Item.')) {
     return {
       sourceOrigin: 'world',
-      sourceOriginLabel: 'Items Directory'
+      sourceOriginLabel: 'Items Directory',
     };
   }
   return {
     sourceOrigin: 'unknown',
-    sourceOriginLabel: 'Unknown'
+    sourceOriginLabel: 'Unknown',
   };
 }
 
@@ -1339,38 +1546,47 @@ async function _sourceMissingForUuid(uuid) {
   }
 }
 
-async function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceDefinitionById) {
+async function _buildItemCards(
+  systemManager,
+  selectedSystem,
+  itemSearchTerm,
+  showTags,
+  showEssences,
+  essenceDefinitionById
+) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
-  return Promise.all(items.map(async item => {
-    const description = _plainTextDescription(item.description);
-    const sourceUuidDisplay = _sourceUuidForItemCard(item);
-    const sourceMissing = await _sourceMissingForUuid(sourceUuidDisplay);
-    const sourceOrigin = _sourceOriginForUuid(sourceUuidDisplay, sourceMissing);
-    return {
-      ...item,
-      img: item.img || 'icons/svg/item-bag.svg',
-      description,
-      hasDescription: description.length > 0,
-      tags: showTags ? (item.tags || []) : [],
-      essences: showEssences
-        ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
-          id,
-          name: essenceDefinitionById.get(id)?.name || id,
-          icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
-          quantity
-        }))
-        : [],
-      sourceUuidDisplay,
-      hasSourceUuid: Boolean(sourceUuidDisplay),
-      sourceMissing,
-      ...sourceOrigin,
-      salvageSummary: _buildSalvageSummary(item, showSalvage),
-      showTags,
-      showEssences
-    };
-  }));
+  return Promise.all(
+    items.map(async (item) => {
+      const description = _plainTextDescription(item.description);
+      const sourceUuidDisplay = _sourceUuidForItemCard(item);
+      const sourceMissing = await _sourceMissingForUuid(sourceUuidDisplay);
+      const sourceOrigin = _sourceOriginForUuid(sourceUuidDisplay, sourceMissing);
+      return {
+        ...item,
+        img: item.img || 'icons/svg/item-bag.svg',
+        description,
+        hasDescription: description.length > 0,
+        tags: showTags ? item.tags || [] : [],
+        essences: showEssences
+          ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
+              id,
+              name: essenceDefinitionById.get(id)?.name || id,
+              icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
+              quantity,
+            }))
+          : [],
+        sourceUuidDisplay,
+        hasSourceUuid: Boolean(sourceUuidDisplay),
+        sourceMissing,
+        ...sourceOrigin,
+        salvageSummary: _buildSalvageSummary(item, showSalvage),
+        showTags,
+        showEssences,
+      };
+    })
+  );
 }
 
 function _sourceComponentIdForEssence(def, managedItemById) {
@@ -1388,18 +1604,18 @@ function _essenceUsageCount(essenceId, managedItems) {
 function _itemUsesEssence(item, essenceId) {
   const essences = item?.essences;
   if (Array.isArray(essences)) {
-    return essences.some(entry => entry?.id === essenceId && Number(entry.quantity) > 0);
+    return essences.some((entry) => entry?.id === essenceId && Number(entry.quantity) > 0);
   }
   return Number(essences?.[essenceId]) > 0;
 }
 
 function _essenceUsageItems(essenceId, managedItems) {
   return managedItems
-    .filter(item => _itemUsesEssence(item, essenceId))
-    .map(item => ({
+    .filter((item) => _itemUsesEssence(item, essenceId))
+    .map((item) => ({
       id: item.id,
       name: item.name || item.id,
-      img: item.img || 'icons/svg/item-bag.svg'
+      img: item.img || 'icons/svg/item-bag.svg',
     }));
 }
 
@@ -1412,44 +1628,49 @@ function _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem
 
 function _sourceFieldsForEssenceSelection(system, sourceComponentId, sourceItemUuid = null) {
   const managedItemOptions = _buildManagedItemOptions(_getManagedItems(system));
-  const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
+  const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
   if (sourceComponentId) {
     const associatedItem = managedItemById.get(sourceComponentId) || null;
     return {
       sourceComponentId,
       sourceItemUuid: associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null,
-      associatedSystemItemId: sourceComponentId
+      associatedSystemItemId: sourceComponentId,
     };
   }
   if (sourceItemUuid) {
-    const associatedItem = managedItemOptions.find(item =>
-      item.sourceItemUuid === sourceItemUuid || item.sourceUuid === sourceItemUuid
+    const associatedItem = managedItemOptions.find(
+      (item) => item.sourceItemUuid === sourceItemUuid || item.sourceUuid === sourceItemUuid
     );
     return {
       sourceComponentId: associatedItem?.id || null,
       sourceItemUuid,
-      associatedSystemItemId: associatedItem?.id || null
+      associatedSystemItemId: associatedItem?.id || null,
     };
   }
   return {
     sourceComponentId: null,
     sourceItemUuid: null,
-    associatedSystemItemId: null
+    associatedSystemItemId: null,
   };
 }
 
 function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions) {
-  const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
-  return essenceDefinitions.map(def => {
+  const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
+  return essenceDefinitions.map((def) => {
     const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
     const sourceItem = managedItemById.get(sourceComponentId) || null;
     const associatedItem = sourceItem
       ? { id: sourceItem.id, name: sourceItem.name, img: sourceItem.img }
       : null;
-    const sourceItemUuid = def.sourceItemUuid || sourceItem?.sourceItemUuid || sourceItem?.sourceUuid || null;
+    const sourceItemUuid =
+      def.sourceItemUuid || sourceItem?.sourceItemUuid || sourceItem?.sourceUuid || null;
     const componentUsageCount = _essenceUsageCount(def.id, managedItems);
     const componentUsageItems = _essenceUsageItems(def.id, managedItems);
-    const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem: sourceItem });
+    const sourceState = _essenceSourceState({
+      sourceComponentId,
+      sourceItemUuid,
+      associatedItem: sourceItem,
+    });
     return {
       ...def,
       icon: normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON),
@@ -1458,11 +1679,13 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       associatedSystemItemId: sourceComponentId || null,
       associatedItem,
       associatedItemName: associatedItem?.name || null,
-      sourceName: associatedItem?.name || (sourceState === 'stale' ? (sourceComponentId || sourceItemUuid) : ''),
+      sourceName:
+        associatedItem?.name ||
+        (sourceState === 'stale' ? sourceComponentId || sourceItemUuid : ''),
       sourceState,
       componentUsageCount,
       componentUsageItems,
-      deleteBlocked: componentUsageCount > 0
+      deleteBlocked: componentUsageCount > 0,
     };
   });
 }
@@ -1489,7 +1712,7 @@ function _plainTextDescription(value) {
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, '\'')
+    .replace(/&#39;|&apos;/gi, "'")
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .trim();
@@ -1505,7 +1728,7 @@ function _descriptionTextCandidate(value, seen = new Set()) {
   }
   if (Array.isArray(value)) {
     return value
-      .map(entry => _descriptionTextCandidate(entry, seen))
+      .map((entry) => _descriptionTextCandidate(entry, seen))
       .filter(Boolean)
       .join(' ')
       .trim();
@@ -1514,7 +1737,17 @@ function _descriptionTextCandidate(value, seen = new Set()) {
   if (seen.has(value)) return '';
   seen.add(value);
 
-  for (const key of ['value', 'enriched', 'html', 'text', 'content', 'short', 'long', 'unidentified', 'chat']) {
+  for (const key of [
+    'value',
+    'enriched',
+    'html',
+    'text',
+    'content',
+    'short',
+    'long',
+    'unidentified',
+    'chat',
+  ]) {
     if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
     const candidate = _descriptionTextCandidate(value[key], seen);
     if (candidate) return candidate;
@@ -1561,7 +1794,7 @@ function _buildSelectedSystemViewData(
       craftingChecks: selectedSystem.features?.craftingChecks === true,
       outcomeRouting: selectedSystem.features?.outcomeRouting === true,
       effectTransfer: selectedSystem.features?.effectTransfer === true,
-      gathering: selectedSystem.features?.gathering === true
+      gathering: selectedSystem.features?.gathering === true,
     },
 
     categories: selectedSystem.categories || [],
@@ -1576,12 +1809,14 @@ function _buildSelectedSystemViewData(
     // browser and the gathering task editor's tool picker read the system's
     // tools rather than the gathering-config copy.
     tools: Array.isArray(selectedSystem.tools)
-      ? selectedSystem.tools.map(tool => _normalizeGatheringLibraryTool(tool, () => Math.random().toString(36).slice(2, 10)))
+      ? selectedSystem.tools.map((tool) =>
+          _normalizeGatheringLibraryTool(tool, () => Math.random().toString(36).slice(2, 10))
+        )
       : [],
 
     requirements: selectedSystem.requirements || {
       time: { enabled: false },
-      currency: { enabled: false, units: [] }
+      currency: { enabled: false, units: [] },
     },
 
     craftingCheck: {
@@ -1590,22 +1825,28 @@ function _buildSelectedSystemViewData(
       macroUuid: selectedSystem.craftingCheck?.macroUuid || '',
       outcomesText: Array.isArray(selectedSystem.craftingCheck?.outcomes)
         ? selectedSystem.craftingCheck.outcomes.join(', ')
-        : ''
+        : '',
     },
 
-    alchemy: selectedSystem.resolutionMode === 'alchemy'
-      ? {
-        learnOnCraft: selectedSystem.alchemy?.learnOnCraft === true,
-        consumeOnFail: selectedSystem.alchemy?.consumeOnFail !== false,
-        showAttemptHistoryToPlayers: selectedSystem.alchemy?.showAttemptHistoryToPlayers !== false
-      }
-      : null,
+    alchemy:
+      selectedSystem.resolutionMode === 'alchemy'
+        ? {
+            learnOnCraft: selectedSystem.alchemy?.learnOnCraft === true,
+            consumeOnFail: selectedSystem.alchemy?.consumeOnFail !== false,
+            showAttemptHistoryToPlayers:
+              selectedSystem.alchemy?.showAttemptHistoryToPlayers !== false,
+          }
+        : null,
 
     recipeVisibility: selectedSystem.recipeVisibility || {},
     recipeItemDefinitions: Array.isArray(selectedSystem.recipeItemDefinitions)
       ? selectedSystem.recipeItemDefinitions
       : [],
-    teaserConfig: selectedSystem.teaserConfig || { enabled: false, discoveryMode: 'threshold', fragments: [] },
+    teaserConfig: selectedSystem.teaserConfig || {
+      enabled: false,
+      discoveryMode: 'threshold',
+      fragments: [],
+    },
     showRecipeVisibilityKnowledgeOptions,
     showRecipeVisibilityPlayerNote,
 
@@ -1613,7 +1854,7 @@ function _buildSelectedSystemViewData(
     showEssences,
     availableScriptMacros,
     sceneOptions,
-    rollTableOptions
+    rollTableOptions,
   };
 }
 
@@ -1685,18 +1926,21 @@ export function createAdminStore(services) {
     graphData: { nodes: [], edges: [], width: 0, height: 0 },
     graphSearchTerm: '',
     experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
-    gatheringConfig: _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}),
-    foundrySystemId: typeof services.getFoundrySystemId === 'function' ? String(services.getFoundrySystemId() || '') : '',
+    gatheringConfig: _normalizeGatheringConfig(
+      services.getSetting?.(GATHERING_CONFIG_SETTING) || {}
+    ),
+    foundrySystemId:
+      typeof services.getFoundrySystemId === 'function'
+        ? String(services.getFoundrySystemId() || '')
+        : '',
     ..._emptyEnvironmentState(false),
-    ..._emptyTravelState()
+    ..._emptyTravelState(),
   });
 
-  function _setEnvironmentDraftState(draft, {
-    persistedDraft = draft,
-    dirty = false,
-    isNew = false,
-    saveError = null
-  } = {}) {
+  function _setEnvironmentDraftState(
+    draft,
+    { persistedDraft = draft, dirty = false, isNew = false, saveError = null } = {}
+  ) {
     const draftClone = _clonePlain(draft);
     environmentDraft.set(draftClone);
     persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
@@ -1712,7 +1956,7 @@ export function createAdminStore(services) {
       persistedDraft: null,
       dirty: false,
       isNew: false,
-      saveError: null
+      saveError: null,
     });
     return _emptyEnvironmentState(canShowEnvironmentsTab, error);
   }
@@ -1726,14 +1970,16 @@ export function createAdminStore(services) {
       environmentSaving: get(environmentSaving),
       environmentSaveError: get(environmentSaveError),
       environmentValidationState: _clonePlain(get(environmentValidationState)),
-      environmentComposition: _clonePlain(_buildEnvironmentCompositionViewModel(get(environmentDraft)))
+      environmentComposition: _clonePlain(
+        _buildEnvironmentCompositionViewModel(get(environmentDraft))
+      ),
     };
   }
 
   function _patchEnvironmentViewState() {
-    viewState.update(state => ({
+    viewState.update((state) => ({
       ...state,
-      ..._currentEnvironmentViewPatch()
+      ..._currentEnvironmentViewPatch(),
     }));
   }
 
@@ -1747,21 +1993,21 @@ export function createAdminStore(services) {
       toolsDraftSaving: get(toolsDraftSaving),
       toolsDraftSaveError: get(toolsDraftSaveError),
       toolsDraftSelectedToolId: get(toolsDraftSelectedToolId),
-      toolsDraftExpandedToolId: get(toolsDraftExpandedToolId)
+      toolsDraftExpandedToolId: get(toolsDraftExpandedToolId),
     };
   }
 
   function _patchToolsDraftViewState() {
-    viewState.update(state => ({
+    viewState.update((state) => ({
       ...state,
-      ..._currentToolsDraftViewPatch()
+      ..._currentToolsDraftViewPatch(),
     }));
   }
 
   function _recomputeToolsDraftDirty() {
     const current = get(toolsDraft) || [];
     const baseline = get(toolsDraftBaseline) || [];
-    const baselineById = new Map(baseline.map(tool => [String(tool.id), tool]));
+    const baselineById = new Map(baseline.map((tool) => [String(tool.id), tool]));
     const dirtyIds = [];
     for (const tool of current) {
       const id = String(tool?.id || '');
@@ -1792,7 +2038,7 @@ export function createAdminStore(services) {
     if (typeof mutator !== 'function') return false;
     const current = get(toolsDraft);
     if (!Array.isArray(current)) return false;
-    const next = mutator(current.map(tool => _clonePlain(tool)));
+    const next = mutator(current.map((tool) => _clonePlain(tool)));
     if (!Array.isArray(next)) return false;
     toolsDraft.set(next);
     _recomputeToolsDraftDirty();
@@ -1803,7 +2049,7 @@ export function createAdminStore(services) {
   function addToolToDraft(initialPatch = {}) {
     const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
     const created = _normalizeGatheringLibraryTool({ ...patch, id: _randomID() }, _randomID);
-    const success = updateToolsDraft(list => [...list, created]);
+    const success = updateToolsDraft((list) => [...list, created]);
     if (success) {
       toolsDraftSelectedToolId.set(created.id);
       toolsDraftExpandedToolId.set(created.id);
@@ -1814,9 +2060,11 @@ export function createAdminStore(services) {
 
   function updateToolInDraft(toolId, patch = {}) {
     if (!toolId || typeof patch !== 'object' || patch === null) return false;
-    return updateToolsDraft(list => list.map(tool => tool.id === toolId
-      ? _normalizeGatheringLibraryTool({ ...tool, ...patch }, _randomID)
-      : tool));
+    return updateToolsDraft((list) =>
+      list.map((tool) =>
+        tool.id === toolId ? _normalizeGatheringLibraryTool({ ...tool, ...patch }, _randomID) : tool
+      )
+    );
   }
 
   async function deleteToolFromDraft(toolId) {
@@ -1825,7 +2073,7 @@ export function createAdminStore(services) {
     const current = get(toolsDraft);
     if (!Array.isArray(current)) return false;
     const baseline = get(toolsDraftBaseline) || [];
-    const wasPersisted = baseline.some(tool => String(tool.id) === id);
+    const wasPersisted = baseline.some((tool) => String(tool.id) === id);
     if (wasPersisted) {
       const systemId = get(toolsDraftSystemId);
       if (!systemId) return false;
@@ -1833,15 +2081,15 @@ export function createAdminStore(services) {
       _patchToolsDraftViewState();
       try {
         const live = _systemTools(systemId);
-        const next = live.filter(tool => String(tool.id) !== id);
+        const next = live.filter((tool) => String(tool.id) !== id);
         const persisted = await _persistSystemTools(systemId, next);
         if (persisted === null) return false;
-        toolsDraftBaseline.set(baseline.filter(tool => String(tool.id) !== id));
+        toolsDraftBaseline.set(baseline.filter((tool) => String(tool.id) !== id));
       } finally {
         toolsDraftSaving.set(false);
       }
     }
-    toolsDraft.set(current.filter(tool => String(tool.id) !== id));
+    toolsDraft.set(current.filter((tool) => String(tool.id) !== id));
     _recomputeToolsDraftDirty();
     if (String(get(toolsDraftSelectedToolId)) === id) {
       const remaining = get(toolsDraft) || [];
@@ -1877,7 +2125,7 @@ export function createAdminStore(services) {
 
   function validateToolDraft(toolId) {
     const id = String(toolId || '');
-    const tool = (get(toolsDraft) || []).find(entry => String(entry.id) === id);
+    const tool = (get(toolsDraft) || []).find((entry) => String(entry.id) === id);
     if (!tool) return { valid: false, errors: ['missing'] };
     const result = Tool.fromJSON(tool).validate();
     return { valid: result.valid, errors: result.errors };
@@ -1895,7 +2143,7 @@ export function createAdminStore(services) {
     if (!id) return false;
     if (!isToolDraftDirty(id)) return true;
     const draft = get(toolsDraft) || [];
-    const tool = draft.find(entry => String(entry.id) === id);
+    const tool = draft.find((entry) => String(entry.id) === id);
     if (!tool) return false;
     const validation = validateToolDraft(id);
     if (!validation.valid) {
@@ -1907,25 +2155,34 @@ export function createAdminStore(services) {
     _patchToolsDraftViewState();
     try {
       const baseline = get(toolsDraftBaseline) || [];
-      const baselineTool = baseline.find(entry => String(entry.id) === id) || null;
+      const baselineTool = baseline.find((entry) => String(entry.id) === id) || null;
       const live = _systemTools(systemId);
-      const liveIndex = live.findIndex(entry => String(entry.id) === id);
-      const liveTool = liveIndex >= 0 ? _normalizeGatheringLibraryTool(live[liveIndex], _randomID) : null;
+      const liveIndex = live.findIndex((entry) => String(entry.id) === id);
+      const liveTool =
+        liveIndex >= 0 ? _normalizeGatheringLibraryTool(live[liveIndex], _randomID) : null;
       const hasConflict = baselineTool
         ? JSON.stringify(baselineTool) !== JSON.stringify(liveTool)
         : liveTool !== null;
       if (hasConflict) {
         const overwrite = await services.confirmDialog?.({
-          title: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Title') || 'Tools were modified elsewhere',
-          content: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Content') || 'The library has been modified outside this editor. Overwrite with your changes?',
+          title:
+            services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Title') ||
+            'Tools were modified elsewhere',
+          content:
+            services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Content') ||
+            'The library has been modified outside this editor. Overwrite with your changes?',
           yes: {
-            label: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Confirm') || 'Overwrite',
-            callback: () => true
+            label:
+              services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Confirm') ||
+              'Overwrite',
+            callback: () => true,
           },
           no: {
-            label: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Cancel') || 'Cancel',
-            callback: () => false
-          }
+            label:
+              services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Cancel') ||
+              'Cancel',
+            callback: () => false,
+          },
         });
         if (overwrite !== true) {
           toolsDraftSaving.set(false);
@@ -1934,21 +2191,29 @@ export function createAdminStore(services) {
         }
       }
       const normalizedTool = _normalizeGatheringLibraryTool(tool, _randomID);
-      const next = live.map(entry => _normalizeGatheringLibraryTool(entry, _randomID));
+      const next = live.map((entry) => _normalizeGatheringLibraryTool(entry, _randomID));
       if (liveIndex >= 0) {
         next[liveIndex] = normalizedTool;
       } else {
-        const draftIndex = draft.findIndex(entry => String(entry.id) === id);
+        const draftIndex = draft.findIndex((entry) => String(entry.id) === id);
         next.splice(Math.max(0, Math.min(draftIndex, next.length)), 0, normalizedTool);
       }
       const persisted = await _persistSystemTools(systemId, next);
       if (persisted === null) return false;
-      toolsDraft.set(draft.map(entry => String(entry.id) === id ? _clonePlain(normalizedTool) : entry));
-      const baselineById = new Map(baseline.map(entry => [String(entry.id), entry]));
+      toolsDraft.set(
+        draft.map((entry) => (String(entry.id) === id ? _clonePlain(normalizedTool) : entry))
+      );
+      const baselineById = new Map(baseline.map((entry) => [String(entry.id), entry]));
       baselineById.set(id, normalizedTool);
-      toolsDraftBaseline.set(draft
-        .filter(entry => String(entry.id) === id || baselineById.has(String(entry.id)))
-        .map(entry => String(entry.id) === id ? _clonePlain(normalizedTool) : _clonePlain(baselineById.get(String(entry.id)))));
+      toolsDraftBaseline.set(
+        draft
+          .filter((entry) => String(entry.id) === id || baselineById.has(String(entry.id)))
+          .map((entry) =>
+            String(entry.id) === id
+              ? _clonePlain(normalizedTool)
+              : _clonePlain(baselineById.get(String(entry.id)))
+          )
+      );
       _recomputeToolsDraftDirty();
       toolsDraftSaveError.set(null);
       _patchToolsDraftViewState();
@@ -1978,11 +2243,11 @@ export function createAdminStore(services) {
   function _discardBlankNewToolDrafts() {
     const current = get(toolsDraft);
     if (!Array.isArray(current)) return;
-    const baselineIds = new Set((get(toolsDraftBaseline) || []).map(entry => String(entry.id)));
-    const kept = current.filter(tool => !_isBlankNewToolDraft(tool, baselineIds));
+    const baselineIds = new Set((get(toolsDraftBaseline) || []).map((entry) => String(entry.id)));
+    const kept = current.filter((tool) => !_isBlankNewToolDraft(tool, baselineIds));
     if (kept.length === current.length) return;
     toolsDraft.set(kept);
-    const keptIds = new Set(kept.map(entry => String(entry.id)));
+    const keptIds = new Set(kept.map((entry) => String(entry.id)));
     if (!keptIds.has(String(get(toolsDraftSelectedToolId)))) {
       toolsDraftSelectedToolId.set(kept[0]?.id || '');
     }
@@ -2035,10 +2300,14 @@ export function createAdminStore(services) {
     if (dirtyToolsDraftDiscardConfirmation) return dirtyToolsDraftDiscardConfirmation;
     dirtyToolsDraftDiscardConfirmation = (async () => {
       const result = await services.confirmDialog?.({
-        title: services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Title') || 'Discard unsaved tool changes?',
-        content: services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Content') || 'The tools library has unsaved changes. Discard them and continue?',
+        title:
+          services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Title') ||
+          'Discard unsaved tool changes?',
+        content:
+          services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Content') ||
+          'The tools library has unsaved changes. Discard them and continue?',
         yes: () => true,
-        no: () => false
+        no: () => false,
       });
       return result === true;
     })();
@@ -2054,40 +2323,43 @@ export function createAdminStore(services) {
     if (typeof services.choiceDialog !== 'function') {
       // Fall back to the two-way confirm when no three-way dialog is available.
       const confirmed = await services.confirmDialog?.({
-        title: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
+        title:
+          localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
         content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
         yes: {
           label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
-          callback: () => true
+          callback: () => true,
         },
         no: {
           label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyCancel') || 'Keep Editing',
-          callback: () => false
-        }
+          callback: () => false,
+        },
       });
       return confirmed === true ? 'discard' : 'cancel';
     }
     const action = await services.choiceDialog({
-      title: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
+      title:
+        localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
       content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
       choices: [
         {
           action: 'save',
           label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Save') || 'Save',
-          icon: 'fas fa-save'
+          icon: 'fas fa-save',
         },
         {
           action: 'discard',
-          label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') || 'Discard Changes',
-          icon: 'fas fa-trash'
+          label:
+            localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') || 'Discard Changes',
+          icon: 'fas fa-trash',
         },
         {
           action: 'cancel',
           label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Cancel') || 'Keep Editing',
-          icon: 'fas fa-times'
-        }
+          icon: 'fas fa-times',
+        },
       ],
-      defaultAction: 'save'
+      defaultAction: 'save',
     });
     return action === 'save' || action === 'discard' ? action : 'cancel';
   }
@@ -2122,7 +2394,7 @@ export function createAdminStore(services) {
       title,
       content,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     return confirmed === true;
   }
@@ -2147,13 +2419,17 @@ export function createAdminStore(services) {
 
   function _randomID() {
     if (typeof services.randomID === 'function') return services.randomID();
-    if (typeof globalThis.foundry?.utils?.randomID === 'function') return globalThis.foundry.utils.randomID();
+    if (typeof globalThis.foundry?.utils?.randomID === 'function')
+      return globalThis.foundry.utils.randomID();
     if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
     return Math.random().toString(36).slice(2, 14);
   }
 
   function _currentGatheringConfig() {
-    return _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}, _randomID);
+    return _normalizeGatheringConfig(
+      services.getSetting?.(GATHERING_CONFIG_SETTING) || {},
+      _randomID
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -2185,7 +2461,11 @@ export function createAdminStore(services) {
     }
 
     function applyError(err, fieldContext = null) {
-      const { travelError: summary, travelFieldErrors: fieldErrors } = _travelErrorState(err, services.localize, fieldContext);
+      const { travelError: summary, travelFieldErrors: fieldErrors } = _travelErrorState(
+        err,
+        services.localize,
+        fieldContext
+      );
       travelError.set(summary);
       travelFieldErrors.set(fieldErrors);
     }
@@ -2196,17 +2476,18 @@ export function createAdminStore(services) {
       const systemId = get(selectedSystemId);
       const parties = partyStore?.list ? _clonePlain(partyStore.list() || []) : [];
       const actorOptions = getActorOptions();
-      const actorByUuid = new Map(actorOptions.map(actor => [actor.uuid, actor]));
+      const actorByUuid = new Map(actorOptions.map((actor) => [actor.uuid, actor]));
 
       let selectedId = get(travelSelectedPartyId);
-      if (selectedId && !parties.some(party => party.id === selectedId)) selectedId = '';
+      if (selectedId && !parties.some((party) => party.id === selectedId)) selectedId = '';
       if (!selectedId && parties.length > 0) selectedId = parties[0].id;
       if (selectedId !== get(travelSelectedPartyId)) travelSelectedPartyId.set(selectedId);
 
-      const realms = (systemId && realmStore?.listBySystem)
-        ? _clonePlain(realmStore.listBySystem(systemId) || [])
-        : [];
-      const realmById = new Map(realms.map(realm => [realm.id, realm]));
+      const realms =
+        systemId && realmStore?.listBySystem
+          ? _clonePlain(realmStore.listBySystem(systemId) || [])
+          : [];
+      const realmById = new Map(realms.map((realm) => [realm.id, realm]));
       const locationService = getLocationService();
 
       // Resolve each party's current realms ONCE (manual override OR live travel-
@@ -2215,50 +2496,74 @@ export function createAdminStore(services) {
       const partyEvidence = new Map();
       const partyResolvedRealmIds = new Map();
       for (const party of parties) {
-        const evidence = (systemId && locationService?.resolveCurrentRealms)
-          ? locationService.resolveCurrentRealms({ partyId: party.id, systemId })
-          : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
+        const evidence =
+          systemId && locationService?.resolveCurrentRealms
+            ? locationService.resolveCurrentRealms({ partyId: party.id, systemId })
+            : {
+                resolved: false,
+                source: 'unresolved',
+                realms: [],
+                realmIds: [],
+                staleRealmIds: [],
+              };
         partyEvidence.set(party.id, evidence);
-        partyResolvedRealmIds.set(party.id, new Set(Array.isArray(evidence.realmIds) ? evidence.realmIds : []));
+        partyResolvedRealmIds.set(
+          party.id,
+          new Set(Array.isArray(evidence.realmIds) ? evidence.realmIds : [])
+        );
       }
 
-      const travelParties = parties.map(party => {
-        const staleMembers = party.memberActorUuids.filter(uuid => !actorByUuid.has(uuid));
-        const staleTravelActor = party.travelActorUuid && !actorByUuid.has(party.travelActorUuid)
-          ? party.travelActorUuid
-          : null;
-        const evidence = partyEvidence.get(party.id)
-          || { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
-        const override = party.currentRealmOverrides?.[systemId] ?? party.currentRegionOverrides?.[systemId] ?? null;
-        const overrideRealmIds = override?.mode === 'manual' ? (override.realmIds ?? override.regionIds ?? []) : [];
-        const memberCards = party.memberActorUuids.map(uuid => ({
+      const travelParties = parties.map((party) => {
+        const staleMembers = party.memberActorUuids.filter((uuid) => !actorByUuid.has(uuid));
+        const staleTravelActor =
+          party.travelActorUuid && !actorByUuid.has(party.travelActorUuid)
+            ? party.travelActorUuid
+            : null;
+        const evidence = partyEvidence.get(party.id) || {
+          resolved: false,
+          source: 'unresolved',
+          realms: [],
+          realmIds: [],
+          staleRealmIds: [],
+        };
+        const override =
+          party.currentRealmOverrides?.[systemId] ??
+          party.currentRegionOverrides?.[systemId] ??
+          null;
+        const overrideRealmIds =
+          override?.mode === 'manual' ? (override.realmIds ?? override.regionIds ?? []) : [];
+        const memberCards = party.memberActorUuids.map((uuid) => ({
           uuid,
           name: actorByUuid.get(uuid)?.name || '',
           img: actorByUuid.get(uuid)?.img || '',
-          stale: !actorByUuid.has(uuid)
+          stale: !actorByUuid.has(uuid),
         }));
         return {
           ...party,
           memberCards,
           memberCount: party.memberActorUuids.length,
-          travelActor: party.travelActorUuid ? (actorByUuid.get(party.travelActorUuid) || null) : null,
+          travelActor: party.travelActorUuid
+            ? actorByUuid.get(party.travelActorUuid) || null
+            : null,
           staleMembers,
           staleTravelActor,
           staleRealmIds: Array.isArray(evidence.staleRealmIds) ? evidence.staleRealmIds : [],
-          hasStaleReference: staleMembers.length > 0 || !!staleTravelActor
-            || (Array.isArray(evidence.staleRealmIds) && evidence.staleRealmIds.length > 0),
+          hasStaleReference:
+            staleMembers.length > 0 ||
+            !!staleTravelActor ||
+            (Array.isArray(evidence.staleRealmIds) && evidence.staleRealmIds.length > 0),
           overrideMode: override?.mode || 'none',
           overrideRealmIds,
           currentRealmEvidence: {
             source: evidence.source,
             resolved: evidence.resolved === true,
-            realms: (evidence.realms || []).map(realm => ({
+            realms: (evidence.realms || []).map((realm) => ({
               id: realm.id,
               name: realmById.get(realm.id)?.name ?? realm.name ?? '',
-              enabled: realm.enabled !== false
+              enabled: realm.enabled !== false,
             })),
-            staleRealmIds: Array.isArray(evidence.staleRealmIds) ? evidence.staleRealmIds : []
-          }
+            staleRealmIds: Array.isArray(evidence.staleRealmIds) ? evidence.staleRealmIds : [],
+          },
         };
       });
 
@@ -2271,21 +2576,30 @@ export function createAdminStore(services) {
         if (!environmentStore) return [];
         // listBySystem may be async; prefer its synchronous array, else fall
         // back to a synchronous list() (realm ids are unique per system).
-        const bySystem = typeof environmentStore.listBySystem === 'function'
-          ? environmentStore.listBySystem(systemId)
-          : null;
+        const bySystem =
+          typeof environmentStore.listBySystem === 'function'
+            ? environmentStore.listBySystem(systemId)
+            : null;
         if (Array.isArray(bySystem)) return bySystem;
         const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
         return Array.isArray(all) ? all : [];
       })();
-      const realmEnvironments = (realmId) => realmEnvList
-        .filter(env => Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId))
-        .map(env => ({ id: env.id, name: env.name, img: env.img || '' }));
+      const realmEnvironments = (realmId) =>
+        realmEnvList
+          .filter(
+            (env) => Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId)
+          )
+          .map((env) => ({ id: env.id, name: env.name, img: env.img || '' }));
       // Parties whose RESOLVED current realm (manual or live auto) includes the
       // realm — reuses the precomputed buckets so auto-mode parties are included.
-      const realmParties = (realmId) => parties
-        .filter(party => partyResolvedRealmIds.get(party.id)?.has(realmId))
-        .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
+      const realmParties = (realmId) =>
+        parties
+          .filter((party) => partyResolvedRealmIds.get(party.id)?.has(realmId))
+          .map((party) => ({
+            id: party.id,
+            name: party.name,
+            img: actorByUuid.get(party.travelActorUuid)?.img || '',
+          }));
 
       // Map Region Links tab: the current scene's regions, each annotated with the
       // Fabricate realm (if any) whose sceneMappings already claim it on this
@@ -2297,7 +2611,8 @@ export function createAdminStore(services) {
         const mappings = Array.isArray(realm.sceneMappings) ? realm.sceneMappings : [];
         for (const mapping of mappings) {
           if (!mapping?.sceneRegionUuid) continue;
-          if (currentSceneUuid && mapping.sceneUuid && mapping.sceneUuid !== currentSceneUuid) continue;
+          if (currentSceneUuid && mapping.sceneUuid && mapping.sceneUuid !== currentSceneUuid)
+            continue;
           if (!linkBySceneRegionUuid.has(mapping.sceneRegionUuid)) {
             linkBySceneRegionUuid.set(mapping.sceneRegionUuid, realm.id);
           }
@@ -2305,22 +2620,30 @@ export function createAdminStore(services) {
       }
       // Parties whose travel-marker token can be tested for containment (those
       // that have a marker actor). Reused across scene regions below.
-      const partiesWithMarker = parties.filter(party => party?.travelActorUuid);
-      const markerUuids = partiesWithMarker.map(party => String(party.travelActorUuid));
-      const currentSceneRegions = (Array.isArray(sceneData.regions) ? sceneData.regions : [])
-        .map(sceneRegion => {
+      const partiesWithMarker = parties.filter((party) => party?.travelActorUuid);
+      const markerUuids = partiesWithMarker.map((party) => String(party.travelActorUuid));
+      const currentSceneRegions = (Array.isArray(sceneData.regions) ? sceneData.regions : []).map(
+        (sceneRegion) => {
           const linkedRegionId = linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || '';
           // Parties whose travel marker currently sits inside this Scene Region.
           const insideUuids = markerUuids.length
-            ? new Set(services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) || [])
+            ? new Set(
+                services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) ||
+                  []
+              )
             : new Set();
           const partiesInMapRegion = partiesWithMarker
-            .filter(party => insideUuids.has(String(party.travelActorUuid)))
-            .map(party => ({ id: party.id, name: party.name, img: actorByUuid.get(party.travelActorUuid)?.img || '' }));
+            .filter((party) => insideUuids.has(String(party.travelActorUuid)))
+            .map((party) => ({
+              id: party.id,
+              name: party.name,
+              img: actorByUuid.get(party.travelActorUuid)?.img || '',
+            }));
           // Parties whose current realm includes the linked Fabricate realm.
           const partiesInFabricateRealm = linkedRegionId ? realmParties(linkedRegionId) : [];
           return { ...sceneRegion, linkedRegionId, partiesInMapRegion, partiesInFabricateRealm };
-        });
+        }
+      );
 
       return {
         currentSceneUuid,
@@ -2330,7 +2653,7 @@ export function createAdminStore(services) {
         travelSaving: get(travelSaving),
         travelError: get(travelError),
         travelFieldErrors: _clonePlain(get(travelFieldErrors)),
-        selectedSystemRealms: realms.map(realm => {
+        selectedSystemRealms: realms.map((realm) => {
           const environments = realmEnvironments(realm.id);
           const partiesInRealm = realmParties(realm.id);
           return {
@@ -2344,18 +2667,19 @@ export function createAdminStore(services) {
             environmentCount: environments.length,
             partyCount: partiesInRealm.length,
             environments,
-            parties: partiesInRealm
+            parties: partiesInRealm,
           };
         }),
-        gatheringRealmSettings: (systemId && realmStore?.getRealmSettings)
-          ? realmStore.getRealmSettings(systemId)
-          : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
-        actorOptions
+        gatheringRealmSettings:
+          systemId && realmStore?.getRealmSettings
+            ? realmStore.getRealmSettings(systemId)
+            : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
+        actorOptions,
       };
     }
 
     function patch() {
-      viewState.update(state => ({ ...state, ...buildState() }));
+      viewState.update((state) => ({ ...state, ...buildState() }));
     }
 
     async function withSave(operation, fieldContext = null) {
@@ -2391,7 +2715,8 @@ export function createAdminStore(services) {
       async createParty() {
         const created = await withSave(async (partyStore) => {
           const party = await partyStore.create({
-            name: services.localize?.('FABRICATE.Admin.Manager.Travel.DefaultPartyName') || 'New party'
+            name:
+              services.localize?.('FABRICATE.Admin.Manager.Travel.DefaultPartyName') || 'New party',
           });
           if (party?.id) travelSelectedPartyId.set(party.id);
         });
@@ -2409,12 +2734,15 @@ export function createAdminStore(services) {
         const party = partyStore.get?.(partyId);
         const name = _escapeHtml(party?.name || partyId);
         const confirmed = await services.confirmDialog?.({
-          title: services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyTitle', { name })
-            || `Delete ${name}?`,
-          content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', { name })
-            || `Delete Fabricate party <strong>${name}</strong>?`}</p>`,
+          title:
+            services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyTitle', { name }) ||
+            `Delete ${name}?`,
+          content: `<p>${
+            services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', { name }) ||
+            `Delete Fabricate party <strong>${name}</strong>?`
+          }</p>`,
           yes: () => true,
-          no: () => false
+          no: () => false,
         });
         if (!confirmed) return false;
         return withSave(async (store) => {
@@ -2429,21 +2757,33 @@ export function createAdminStore(services) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const uuid = String(actorUuid ?? '');
-        const source = (partyStore.list?.() || []).find((party) =>
-          party.id !== targetPartyId
-          && Array.isArray(party.memberActorUuids)
-          && party.memberActorUuids.includes(uuid));
+        const source = (partyStore.list?.() || []).find(
+          (party) =>
+            party.id !== targetPartyId &&
+            Array.isArray(party.memberActorUuids) &&
+            party.memberActorUuids.includes(uuid)
+        );
         if (source) {
-          const actorName = _escapeHtml(getActorOptions().find((actor) => actor.uuid === uuid)?.name || uuid);
+          const actorName = _escapeHtml(
+            getActorOptions().find((actor) => actor.uuid === uuid)?.name || uuid
+          );
           const sourceName = _escapeHtml(source.name || source.id);
           const targetName = _escapeHtml(partyStore.get?.(targetPartyId)?.name || targetPartyId);
           const confirmed = await services.confirmDialog?.({
-            title: services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberTitle', { actor: actorName })
-              || `Move ${actorName}?`,
-            content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberContent', { actor: actorName, from: sourceName, to: targetName })
-              || `Move <strong>${actorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`}</p>`,
+            title:
+              services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberTitle', {
+                actor: actorName,
+              }) || `Move ${actorName}?`,
+            content: `<p>${
+              services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberContent', {
+                actor: actorName,
+                from: sourceName,
+                to: targetName,
+              }) ||
+              `Move <strong>${actorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`
+            }</p>`,
             yes: () => true,
-            no: () => false
+            no: () => false,
           });
           if (!confirmed) return false;
           return withSave((store) => store.moveMember(source.id, targetPartyId, uuid), 'members');
@@ -2454,16 +2794,24 @@ export function createAdminStore(services) {
         return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members');
       },
       async movePartyMember(fromPartyId, toPartyId, actorUuid) {
-        return withSave((partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid), 'members');
+        return withSave(
+          (partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid),
+          'members'
+        );
       },
       async setPartyTravelActor(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.setTravelActor(partyId, actorUuid), 'travelActor');
+        return withSave(
+          (partyStore) => partyStore.setTravelActor(partyId, actorUuid),
+          'travelActor'
+        );
       },
       async clearPartyTravelActor(partyId) {
         return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
       },
       async setPartyRealmOverride(partyId, systemId, realmIds) {
-        return withSave((partyStore) => partyStore.setCurrentRealmOverride(partyId, systemId, realmIds || []));
+        return withSave((partyStore) =>
+          partyStore.setCurrentRealmOverride(partyId, systemId, realmIds || [])
+        );
       },
       async clearPartyRealmOverride(partyId, systemId) {
         return withSave((partyStore) => partyStore.clearCurrentRealmOverride(partyId, systemId));
@@ -2478,10 +2826,11 @@ export function createAdminStore(services) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const party = partyStore.get?.(partyId);
-        const override = party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
+        const override =
+          party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
         const overrideIds = override?.realmIds ?? override?.regionIds;
         const nextIds = Array.isArray(overrideIds)
-          ? overrideIds.filter(id => id !== realmId)
+          ? overrideIds.filter((id) => id !== realmId)
           : [];
         return withSave((store) => store.setCurrentRealmOverride(partyId, systemId, nextIds));
       },
@@ -2529,8 +2878,9 @@ export function createAdminStore(services) {
         const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
         const sceneUuid = String(sceneData.sceneUuid || '');
         const nextRealmId = fabricateRealmId ? String(fabricateRealmId) : '';
-        const matchesTarget = (mapping) => mapping?.sceneRegionUuid === targetSceneRegionUuid
-          && (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
+        const matchesTarget = (mapping) =>
+          mapping?.sceneRegionUuid === targetSceneRegionUuid &&
+          (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
         clearErrors();
         travelSaving.set(true);
         patch();
@@ -2540,10 +2890,10 @@ export function createAdminStore(services) {
 
           for (const realm of realmList) {
             const mappings = Array.isArray(realm.sceneMappings) ? realm.sceneMappings : [];
-            const filtered = mappings.filter(mapping => !matchesTarget(mapping));
+            const filtered = mappings.filter((mapping) => !matchesTarget(mapping));
             if (nextRealmId && realm.id === nextRealmId) {
               await realmStore.update(systemId, realm.id, {
-                sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }]
+                sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }],
               });
             } else if (filtered.length !== mappings.length) {
               await realmStore.update(systemId, realm.id, { sceneMappings: filtered });
@@ -2588,19 +2938,26 @@ export function createAdminStore(services) {
         // returns it post-delete, but we surface it in the confirm copy beforehand by
         // probing the collaborators the store uses.
         const references = _collectRealmReferences(systemId, realmId);
-        const refLine = (references.environments.length > 0 || references.parties.length > 0)
-          ? `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteReferenced', {
-            environments: references.environments.length,
-            parties: references.parties.length
-          }) || `It is still referenced by ${references.environments.length} environment(s) and ${references.parties.length} party override(s).`}</p>`
-          : '';
+        const refLine =
+          references.environments.length > 0 || references.parties.length > 0
+            ? `<p>${
+                services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteReferenced', {
+                  environments: references.environments.length,
+                  parties: references.parties.length,
+                }) ||
+                `It is still referenced by ${references.environments.length} environment(s) and ${references.parties.length} party override(s).`
+              }</p>`
+            : '';
         const confirmed = await services.confirmDialog?.({
-          title: services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteTitle', { name })
-            || `Delete ${name}?`,
-          content: `<p>${services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', { name })
-            || `Delete realm <strong>${name}</strong>?`}</p>${refLine}`,
+          title:
+            services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteTitle', { name }) ||
+            `Delete ${name}?`,
+          content: `<p>${
+            services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', { name }) ||
+            `Delete realm <strong>${name}</strong>?`
+          }</p>${refLine}`,
           yes: () => true,
-          no: () => false
+          no: () => false,
         });
         if (!confirmed) return false;
         clearErrors();
@@ -2609,7 +2966,7 @@ export function createAdminStore(services) {
         try {
           await realmStore.delete(systemId, realmId, {
             environmentStore: _getEnvironmentStore(),
-            partyStore: getPartyStore()
+            partyStore: getPartyStore(),
           });
           return true;
         } catch (err) {
@@ -2619,28 +2976,34 @@ export function createAdminStore(services) {
           travelSaving.set(false);
           patch();
         }
-      }
+      },
     };
 
     function _collectRealmReferences(systemId, realmId) {
       const environments = [];
       const parties = [];
       const environmentStore = _getEnvironmentStore();
-      const envList = typeof environmentStore?.listBySystem === 'function'
-        ? environmentStore.listBySystem(systemId)
-        : (typeof environmentStore?.list === 'function' ? environmentStore.list() : []);
+      const envList =
+        typeof environmentStore?.listBySystem === 'function'
+          ? environmentStore.listBySystem(systemId)
+          : typeof environmentStore?.list === 'function'
+            ? environmentStore.list()
+            : [];
       // listBySystem may be async (environment store); only use synchronous arrays here.
       if (Array.isArray(envList)) {
         for (const env of envList) {
-          const included = Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);
-          const excluded = Array.isArray(env?.excludedRealmIds) && env.excludedRealmIds.includes(realmId);
+          const included =
+            Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);
+          const excluded =
+            Array.isArray(env?.excludedRealmIds) && env.excludedRealmIds.includes(realmId);
           if (included || excluded) environments.push({ id: env.id, name: env.name });
         }
       }
       const partyStore = getPartyStore();
       const partyList = typeof partyStore?.list === 'function' ? partyStore.list() : [];
       for (const party of Array.isArray(partyList) ? partyList : []) {
-        const override = party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
+        const override =
+          party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
         const overrideIds = override?.realmIds ?? override?.regionIds;
         if (override && Array.isArray(overrideIds) && overrideIds.includes(realmId)) {
           parties.push({ id: party.id, name: party.name });
@@ -2675,13 +3038,16 @@ export function createAdminStore(services) {
    * editor's economy mode — must update without reopening the app.
    */
   function refreshGatheringConfig() {
-    viewState.update(state => ({ ...state, gatheringConfig: _clonePlain(_currentGatheringConfig()) }));
+    viewState.update((state) => ({
+      ...state,
+      gatheringConfig: _clonePlain(_currentGatheringConfig()),
+    }));
   }
 
   async function _saveGatheringConfig(config) {
     const normalized = _normalizeGatheringConfig(config, _randomID);
     await services.setSetting?.(GATHERING_CONFIG_SETTING, normalized);
-    viewState.update(state => ({ ...state, gatheringConfig: _clonePlain(normalized) }));
+    viewState.update((state) => ({ ...state, gatheringConfig: _clonePlain(normalized) }));
     return normalized;
   }
 
@@ -2694,13 +3060,23 @@ export function createAdminStore(services) {
       conditions: _normalizeGatheringSystemConditions(null, config),
       vocabularies: _normalizeGatheringSystemVocabularies(null, config.vocabularies),
       tasks: [],
-      events: []
+      events: [],
     };
     config.systems[id].rules = _normalizeGatheringRules(config.systems[id].rules);
-    config.systems[id].conditions = _normalizeGatheringSystemConditions(config.systems[id].conditions, config);
-    config.systems[id].vocabularies = _normalizeGatheringSystemVocabularies(config.systems[id].vocabularies, config.vocabularies);
-    config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
-    config.systems[id].events = Array.isArray(config.systems[id].events) ? config.systems[id].events : [];
+    config.systems[id].conditions = _normalizeGatheringSystemConditions(
+      config.systems[id].conditions,
+      config
+    );
+    config.systems[id].vocabularies = _normalizeGatheringSystemVocabularies(
+      config.systems[id].vocabularies,
+      config.vocabularies
+    );
+    config.systems[id].tasks = Array.isArray(config.systems[id].tasks)
+      ? config.systems[id].tasks
+      : [];
+    config.systems[id].events = Array.isArray(config.systems[id].events)
+      ? config.systems[id].events
+      : [];
     return config.systems[id];
   }
 
@@ -2717,8 +3093,9 @@ export function createAdminStore(services) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id) return [];
     const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
-    return (Array.isArray(system?.tools) ? system.tools : [])
-      .map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+    return (Array.isArray(system?.tools) ? system.tools : []).map((tool) =>
+      _normalizeGatheringLibraryTool(tool, _randomID)
+    );
   }
 
   /**
@@ -2736,8 +3113,9 @@ export function createAdminStore(services) {
     if (!id) return null;
     const systemManager = services.getCraftingSystemManager?.();
     if (!systemManager?.updateSystem) return null;
-    const normalized = (Array.isArray(tools) ? tools : [])
-      .map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+    const normalized = (Array.isArray(tools) ? tools : []).map((tool) =>
+      _normalizeGatheringLibraryTool(tool, _randomID)
+    );
     const updated = await systemManager.updateSystem(id, { tools: normalized });
     return Array.isArray(updated?.tools) ? updated.tools : normalized;
   }
@@ -2748,15 +3126,28 @@ export function createAdminStore(services) {
     return Array.isArray(values) ? values.filter(Boolean) : [];
   }
 
-  function _gatheringLibraryRecordMatchesEnvironment(record, environment, conditions, includeDanger = false, conditionSettings = null) {
-    return evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings }).matches;
+  function _gatheringLibraryRecordMatchesEnvironment(
+    record,
+    environment,
+    conditions,
+    includeDanger = false,
+    conditionSettings = null
+  ) {
+    return evaluateEnvironmentMatch(record, environment, conditions, {
+      includeDanger,
+      conditionSettings,
+    }).matches;
   }
 
   function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
     const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
     const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    const enabled = Array.isArray(environment?.[enabledKey])
+      ? environment[enabledKey].map(String)
+      : [];
+    const disabled = Array.isArray(environment?.[disabledKey])
+      ? environment[disabledKey].map(String)
+      : [];
     if (disabled.includes(String(recordId))) return false;
     return enabled.length === 0 || enabled.includes(String(recordId));
   }
@@ -2768,7 +3159,13 @@ export function createAdminStore(services) {
    * (Overview / Tasks / Events / Validation / inspector) renders from.
    */
   function _buildEnvironmentCompositionViewModel(environment) {
-    const empty = { compositionMode: 'automatic', conditions: { ...DEFAULT_GATHERING_CONDITIONS }, tasks: [], events: [], counts: _emptyCompositionCounts() };
+    const empty = {
+      compositionMode: 'automatic',
+      conditions: { ...DEFAULT_GATHERING_CONDITIONS },
+      tasks: [],
+      events: [],
+      counts: _emptyCompositionCounts(),
+    };
     if (!environment || typeof environment !== 'object') return empty;
     const systemId = String(environment.craftingSystemId || get(selectedSystemId) || '');
     if (!systemId) return empty;
@@ -2776,39 +3173,83 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const system = config.systems?.[systemId] || {};
     const craftingSystem = services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
-    const managedItemById = new Map(_buildManagedItemOptions(_getManagedItems(craftingSystem)).map(item => [String(item.id || ''), item]));
+    const managedItemById = new Map(
+      _buildManagedItemOptions(_getManagedItems(craftingSystem)).map((item) => [
+        String(item.id || ''),
+        item,
+      ])
+    );
     const conditionSettings = system.conditions || null;
     const conditions = _gatheringCurrentConditions(conditionSettings);
     const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
 
     const tasks = _classifyCompositionRecords({
       records: Array.isArray(system.tasks) ? system.tasks : [],
-      environment, conditions, conditionSettings, compositionMode, kind: 'task', includeDanger: false,
+      environment,
+      conditions,
+      conditionSettings,
+      compositionMode,
+      kind: 'task',
+      includeDanger: false,
       order: environment.taskOrder,
-      managedItemById
+      managedItemById,
     });
     const events = _classifyCompositionRecords({
       records: Array.isArray(system.events) ? system.events : [],
-      environment, conditions, conditionSettings, compositionMode, kind: 'event', includeDanger: true,
-      order: environment.eventOrder
+      environment,
+      conditions,
+      conditionSettings,
+      compositionMode,
+      kind: 'event',
+      includeDanger: true,
+      order: environment.eventOrder,
     });
 
-    return { compositionMode, conditions, tasks, events, counts: _compositionCounts(tasks, events) };
+    return {
+      compositionMode,
+      conditions,
+      tasks,
+      events,
+      counts: _compositionCounts(tasks, events),
+    };
   }
 
-  function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order, managedItemById = new Map() }) {
+  function _classifyCompositionRecords({
+    records,
+    environment,
+    conditions,
+    conditionSettings,
+    compositionMode,
+    kind,
+    includeDanger,
+    order,
+    managedItemById = new Map(),
+  }) {
     const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
     const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
-    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
-    const orderIndex = new Map((Array.isArray(order) ? order : []).map((id, index) => [String(id), index]));
+    const enabled = Array.isArray(environment?.[enabledKey])
+      ? environment[enabledKey].map(String)
+      : [];
+    const disabled = Array.isArray(environment?.[disabledKey])
+      ? environment[disabledKey].map(String)
+      : [];
+    const forced = Array.isArray(environment?.[forcedKey])
+      ? environment[forcedKey].map(String)
+      : [];
+    const orderIndex = new Map(
+      (Array.isArray(order) ? order : []).map((id, index) => [String(id), index])
+    );
 
     const classified = (Array.isArray(records) ? records : []).map((record, index) => {
       const id = String(record?.id || '');
       const libraryEnabled = record?.enabled !== false;
-      const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
+      const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(
+        record,
+        environment,
+        conditions,
+        { includeDanger, conditionSettings }
+      );
       const excluded = compositionMode !== 'manual' && disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
       // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
@@ -2821,22 +3262,50 @@ export function createAdminStore(services) {
       // In automatic mode the enabled allow-list is ignored (matching the runtime composition
       // service), so a non-matching record is always "not matching" — never a stale
       // "included but unavailable". Only manual mode honors the explicit inclusion.
-      else if (!matches) compositionState = (compositionMode === 'manual' && explicitlyIncluded) ? 'includedButUnavailable' : 'notMatching';
-      else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
+      else if (!matches)
+        compositionState =
+          compositionMode === 'manual' && explicitlyIncluded
+            ? 'includedButUnavailable'
+            : 'notMatching';
+      else if (compositionMode === 'manual')
+        compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
       // A record is runtime-available only when its composition state would compose it AND
       // the current weather/time satisfy the record's required conditions.
-      const composed = compositionState === 'includedByMatch'
-        || compositionState === 'explicitlyIncluded'
-        || compositionState === 'forceIncluded';
-      const runtimeState = (composed && conditionsMet) ? 'available' : 'unavailable';
+      const composed =
+        compositionState === 'includedByMatch' ||
+        compositionState === 'explicitlyIncluded' ||
+        compositionState === 'forceIncluded';
+      const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
-      const dropRateAdjustment = _dropRateAdjustmentSummary({ kind, record, environment, managedItemById });
-      return { id, record, kind, libraryEnabled, matches, conditionsMet, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index, ...dropRateAdjustment };
+      const dropRateAdjustment = _dropRateAdjustmentSummary({
+        kind,
+        record,
+        environment,
+        managedItemById,
+      });
+      return {
+        id,
+        record,
+        kind,
+        libraryEnabled,
+        matches,
+        conditionsMet,
+        evidence,
+        excluded,
+        explicitlyIncluded,
+        compositionState,
+        runtimeState,
+        orderRank,
+        _index: index,
+        ...dropRateAdjustment,
+      };
     });
 
-    return classified.sort((a, b) => (a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank));
+    return classified.sort((a, b) =>
+      a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank
+    );
   }
 
   function _effectiveDropRate(baseDropRate, adjustment) {
@@ -2851,23 +3320,36 @@ export function createAdminStore(services) {
     const itemUuid = String(row?.itemUuid || '');
     const unresolvedKey = 'FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop';
     const unresolved = services.localize?.(unresolvedKey);
-    const fallbackName = unresolved && unresolved !== unresolvedKey ? unresolved : 'Unresolved drop';
+    const fallbackName =
+      unresolved && unresolved !== unresolvedKey ? unresolved : 'Unresolved drop';
     return {
       name: String(row?.name || item?.name || itemUuid || fallbackName),
-      img: String(row?.img || item?.img || 'icons/svg/item-bag.svg')
+      img: String(row?.img || item?.img || 'icons/svg/item-bag.svg'),
     };
   }
 
   function _dropRateAdjustmentSummary({ kind, record, environment, managedItemById = new Map() }) {
     const id = String(record?.id || '');
-    if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentsEnabled: true, dropRateAdjustmentRows: [] };
+    if (!id)
+      return {
+        hasDropRateAdjustment: false,
+        dropRateAdjustment: 0,
+        dropRateAdjustmentsEnabled: true,
+        dropRateAdjustmentRows: [],
+      };
     if (kind === 'event') {
-      const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.eventDropRateAdjustments);
+      const adjustments = _normalizeDraftDropRateAdjustmentMap(
+        environment?.eventDropRateAdjustments
+      );
       const adjustment = adjustments[id] || 0;
-      const eventEnabledMap = _normalizeDraftEventDropRateAdjustmentsEnabled(environment?.eventDropRateAdjustmentsEnabled);
+      const eventEnabledMap = _normalizeDraftEventDropRateAdjustmentsEnabled(
+        environment?.eventDropRateAdjustmentsEnabled
+      );
       const dropRateAdjustmentsEnabled = eventEnabledMap[id] !== false;
       const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
-      const baseDropRate = Number.isFinite(Number(record?.dropRate)) ? Math.floor(Number(record.dropRate)) : 1;
+      const baseDropRate = Number.isFinite(Number(record?.dropRate))
+        ? Math.floor(Number(record.dropRate))
+        : 1;
       return {
         hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
         hasStoredDropRateAdjustment: adjustment !== 0,
@@ -2875,67 +3357,100 @@ export function createAdminStore(services) {
         dropRateAdjustmentsEnabled,
         baseDropRate,
         effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
-        dropRateAdjustmentRows: []
+        dropRateAdjustmentRows: [],
       };
     }
 
-    const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(environment?.taskDropRateAdjustments);
-    const taskAdjustmentEnabledMap = _normalizeDraftTaskDropRateAdjustmentsEnabled(environment?.taskDropRateAdjustmentsEnabled);
+    const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(
+      environment?.taskDropRateAdjustments
+    );
+    const taskAdjustmentEnabledMap = _normalizeDraftTaskDropRateAdjustmentsEnabled(
+      environment?.taskDropRateAdjustmentsEnabled
+    );
     const dropRateAdjustmentsEnabled = taskAdjustmentEnabledMap[id] !== false;
     const rowAdjustments = taskAdjustments[id] || {};
-    const rows = (Array.isArray(record?.dropRows ?? record?.itemDrops) ? (record.dropRows ?? record.itemDrops) : [])
-      .map(row => {
-        const rowId = String(row?.id || '');
-        const adjustment = rowAdjustments[rowId] || 0;
-        const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
-        const baseDropRate = Number.isFinite(Number(row?.dropRate)) ? Math.floor(Number(row.dropRate)) : 1;
-        const display = _dropRowDisplay(row, managedItemById);
-        return {
-          id: rowId,
-          name: display.name,
-          img: display.img,
-          componentId: String(row?.componentId || row?.systemItemId || ''),
-          itemUuid: String(row?.itemUuid || ''),
-          quantity: Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
-          baseDropRate,
-          adjustment,
-          effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
-          hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
-          hasStoredDropRateAdjustment: adjustment !== 0
-        };
-      });
-    const hasStoredDropRateAdjustment = rows.some(row => row.hasStoredDropRateAdjustment);
+    const rows = (
+      Array.isArray(record?.dropRows ?? record?.itemDrops)
+        ? (record.dropRows ?? record.itemDrops)
+        : []
+    ).map((row) => {
+      const rowId = String(row?.id || '');
+      const adjustment = rowAdjustments[rowId] || 0;
+      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
+      const baseDropRate = Number.isFinite(Number(row?.dropRate))
+        ? Math.floor(Number(row.dropRate))
+        : 1;
+      const display = _dropRowDisplay(row, managedItemById);
+      return {
+        id: rowId,
+        name: display.name,
+        img: display.img,
+        componentId: String(row?.componentId || row?.systemItemId || ''),
+        itemUuid: String(row?.itemUuid || ''),
+        quantity:
+          Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0
+            ? Number(row.quantity)
+            : 1,
+        baseDropRate,
+        adjustment,
+        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
+        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
+        hasStoredDropRateAdjustment: adjustment !== 0,
+      };
+    });
+    const hasStoredDropRateAdjustment = rows.some((row) => row.hasStoredDropRateAdjustment);
     return {
       hasDropRateAdjustment: dropRateAdjustmentsEnabled && hasStoredDropRateAdjustment,
       hasStoredDropRateAdjustment,
       dropRateAdjustmentsEnabled,
-      dropRateAdjustment: dropRateAdjustmentsEnabled ? rows.reduce((sum, row) => sum + row.adjustment, 0) : 0,
-      dropRateAdjustmentRows: rows
+      dropRateAdjustment: dropRateAdjustmentsEnabled
+        ? rows.reduce((sum, row) => sum + row.adjustment, 0)
+        : 0,
+      dropRateAdjustmentRows: rows,
     };
   }
 
   function _emptyCompositionCounts() {
     return {
-      availableTasks: 0, excludedTasks: 0, candidateTasks: 0, unavailableTasks: 0,
-      availableEvents: 0, excludedEvents: 0, candidateEvents: 0, unavailableEvents: 0,
-      diagnosticTasks: 0, diagnosticEvents: 0
+      availableTasks: 0,
+      excludedTasks: 0,
+      candidateTasks: 0,
+      unavailableTasks: 0,
+      availableEvents: 0,
+      excludedEvents: 0,
+      candidateEvents: 0,
+      unavailableEvents: 0,
+      diagnosticTasks: 0,
+      diagnosticEvents: 0,
     };
   }
 
   function _compositionCounts(tasks, events) {
-    const tally = records => {
-      const available = records.filter(r => r.runtimeState === 'available').length;
-      const excluded = records.filter(r => r.compositionState === 'excluded').length;
-      const candidate = records.filter(r => r.compositionState === 'candidate').length;
-      const unavailable = records.filter(r => r.compositionState === 'includedButUnavailable').length;
-      const diagnostic = records.filter(r => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled').length;
+    const tally = (records) => {
+      const available = records.filter((r) => r.runtimeState === 'available').length;
+      const excluded = records.filter((r) => r.compositionState === 'excluded').length;
+      const candidate = records.filter((r) => r.compositionState === 'candidate').length;
+      const unavailable = records.filter(
+        (r) => r.compositionState === 'includedButUnavailable'
+      ).length;
+      const diagnostic = records.filter(
+        (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'
+      ).length;
       return { available, excluded, candidate, unavailable, diagnostic };
     };
     const t = tally(tasks);
     const h = tally(events);
     return {
-      availableTasks: t.available, excludedTasks: t.excluded, candidateTasks: t.candidate, unavailableTasks: t.unavailable, diagnosticTasks: t.diagnostic,
-      availableEvents: h.available, excludedEvents: h.excluded, candidateEvents: h.candidate, unavailableEvents: h.unavailable, diagnosticEvents: h.diagnostic
+      availableTasks: t.available,
+      excludedTasks: t.excluded,
+      candidateTasks: t.candidate,
+      unavailableTasks: t.unavailable,
+      diagnosticTasks: t.diagnostic,
+      availableEvents: h.available,
+      excludedEvents: h.excluded,
+      candidateEvents: h.candidate,
+      unavailableEvents: h.unavailable,
+      diagnosticEvents: h.diagnostic,
     };
   }
 
@@ -2954,16 +3469,38 @@ export function createAdminStore(services) {
     const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
     const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
-    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
+    const enabled = Array.isArray(environment?.[enabledKey])
+      ? environment[enabledKey].map(String)
+      : [];
+    const disabled = Array.isArray(environment?.[disabledKey])
+      ? environment[disabledKey].map(String)
+      : [];
+    const forced = Array.isArray(environment?.[forcedKey])
+      ? environment[forcedKey].map(String)
+      : [];
     if (mode === 'manual') {
       if (forced.includes(recordId)) return true;
-      return enabled.includes(recordId)
-        && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings);
+      return (
+        enabled.includes(recordId) &&
+        _gatheringLibraryRecordMatchesEnvironment(
+          record,
+          environment,
+          {},
+          includeDanger,
+          conditionSettings
+        )
+      );
     }
-    return !disabled.includes(recordId)
-      && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings);
+    return (
+      !disabled.includes(recordId) &&
+      _gatheringLibraryRecordMatchesEnvironment(
+        record,
+        environment,
+        {},
+        includeDanger,
+        conditionSettings
+      )
+    );
   }
 
   /**
@@ -2972,14 +3509,16 @@ export function createAdminStore(services) {
    */
   function _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind) {
     if (!record?.id) return [];
-    const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
+    const conditionSettings =
+      _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
     const usages = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      if (!_environmentComposesGatheringRecord(environment, record, kind, conditionSettings)) continue;
+      if (!_environmentComposesGatheringRecord(environment, record, kind, conditionSettings))
+        continue;
       usages.push({
         id: String(environment.id || ''),
-        name: String(environment.name || environment.id || 'Unnamed environment')
+        name: String(environment.name || environment.id || 'Unnamed environment'),
       });
     }
     return usages;
@@ -2997,28 +3536,30 @@ export function createAdminStore(services) {
   function _gatheringCurrentConditions(conditionSettings) {
     return {
       weather: conditionSettings?.weather?.current || DEFAULT_GATHERING_CONDITIONS.weather,
-      timeOfDay: conditionSettings?.timeOfDay?.current || DEFAULT_GATHERING_CONDITIONS.timeOfDay
+      timeOfDay: conditionSettings?.timeOfDay?.current || DEFAULT_GATHERING_CONDITIONS.timeOfDay,
     };
   }
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
-    const label = kind === 'event' ? 'event' : (kind === 'tool' ? 'tool' : 'task');
+    const label = kind === 'event' ? 'event' : kind === 'tool' ? 'tool' : 'task';
     const recordLabel = record?.label || record?.name || record?.id || label;
     const name = _escapeHtml(recordLabel);
     let content = `<p>Delete ${label} <strong>${name}</strong>? This cannot be undone.</p>`;
     if (usages.length > 0) {
-      const names = usages.slice(0, 6).map(usage => _escapeHtml(usage.name));
+      const names = usages.slice(0, 6).map((usage) => _escapeHtml(usage.name));
       if (usages.length > 6) names.push(_escapeHtml(`and ${usages.length - 6} more`));
       const plural = usages.length === 1 ? 'environment' : 'environments';
       content += `<p>Used by ${usages.length} ${plural}: ${names.join(', ')}.</p>`;
     }
-    return await services.confirmDialog?.({
-      title: `Delete ${label}?`,
-      content,
-      yes: () => true,
-      no: () => false
-    }) === true;
+    return (
+      (await services.confirmDialog?.({
+        title: `Delete ${label}?`,
+        content,
+        yes: () => true,
+        no: () => false,
+      })) === true
+    );
   }
 
   /**
@@ -3028,50 +3569,81 @@ export function createAdminStore(services) {
    * disabling the record outright (which drops it from every environment, including force-included
    * rows). Records that remain composed after the edit are excluded.
    */
-  function _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind) {
+  function _gatheringLibraryRecordCompositionLossEnvironments(
+    systemId,
+    oldRecord,
+    newRecord,
+    kind
+  ) {
     // A library-disabled record is not composed anywhere, so there is nothing to lose by editing it.
     if (!oldRecord?.id || oldRecord.enabled === false) return [];
-    const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
+    const conditionSettings =
+      _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
     const affected = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      const composedBefore = _environmentComposesGatheringRecord(environment, oldRecord, kind, conditionSettings);
-      const composedAfter = _environmentComposesGatheringRecord(environment, newRecord, kind, conditionSettings);
+      const composedBefore = _environmentComposesGatheringRecord(
+        environment,
+        oldRecord,
+        kind,
+        conditionSettings
+      );
+      const composedAfter = _environmentComposesGatheringRecord(
+        environment,
+        newRecord,
+        kind,
+        conditionSettings
+      );
       if (!(composedBefore && !composedAfter)) continue;
       affected.push({
         id: String(environment.id || ''),
         name: String(environment.name || environment.id || 'Unnamed environment'),
-        mode: environment?.compositionMode === 'manual' ? 'manual' : 'automatic'
+        mode: environment?.compositionMode === 'manual' ? 'manual' : 'automatic',
       });
     }
     return affected;
   }
 
-  async function _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord, newRecord, kind }) {
-    const affected = _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind);
+  async function _confirmGatheringLibraryRecordCompositionLoss({
+    systemId,
+    oldRecord,
+    newRecord,
+    kind,
+  }) {
+    const affected = _gatheringLibraryRecordCompositionLossEnvironments(
+      systemId,
+      oldRecord,
+      newRecord,
+      kind
+    );
     if (affected.length === 0) return true;
     const localizeFn = services.localize;
-    const base = kind === 'event'
-      ? 'FABRICATE.Admin.Manager.Environment.Events.CompositionLossWarning'
-      : 'FABRICATE.Admin.Manager.Environment.Tasks.CompositionLossWarning';
+    const base =
+      kind === 'event'
+        ? 'FABRICATE.Admin.Manager.Environment.Events.CompositionLossWarning'
+        : 'FABRICATE.Admin.Manager.Environment.Tasks.CompositionLossWarning';
     const recordWord = kind === 'event' ? 'event' : 'task';
-    const title = localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
-    const body = localizeFn?.(`${base}.Body`) || `Saving removes this ${recordWord} from these environments:`;
-    const names = affected.slice(0, 6).map(usage => _escapeHtml(usage.name));
+    const title =
+      localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
+    const body =
+      localizeFn?.(`${base}.Body`) || `Saving removes this ${recordWord} from these environments:`;
+    const names = affected.slice(0, 6).map((usage) => _escapeHtml(usage.name));
     if (affected.length > 6) names.push(_escapeHtml(`and ${affected.length - 6} more`));
     const content = `<p>${_escapeHtml(body)} ${names.join(', ')}.</p>`;
-    return await services.confirmDialog?.({
-      title,
-      content,
-      yes: {
-        label: localizeFn?.(`${base}.Confirm`) || 'Save Anyway',
-        callback: () => true
-      },
-      no: {
-        label: localizeFn?.(`${base}.Cancel`) || 'Keep Editing',
-        callback: () => false
-      }
-    }) === true;
+    return (
+      (await services.confirmDialog?.({
+        title,
+        content,
+        yes: {
+          label: localizeFn?.(`${base}.Confirm`) || 'Save Anyway',
+          callback: () => true,
+        },
+        no: {
+          label: localizeFn?.(`${base}.Cancel`) || 'Keep Editing',
+          callback: () => false,
+        },
+      })) === true
+    );
   }
 
   /**
@@ -3084,36 +3656,56 @@ export function createAdminStore(services) {
     if (!(oldRecord?.enabled !== false && nextRecord?.enabled === false)) return;
     const affected = _gatheringLibraryRecordSurfacingEnvironments(systemId, oldRecord, kind);
     if (affected.length === 0) return;
-    const names = affected.slice(0, 6).map(usage => usage.name);
+    const names = affected.slice(0, 6).map((usage) => usage.name);
     if (affected.length > 6) names.push(`and ${affected.length - 6} more`);
-    const name = oldRecord?.label || oldRecord?.name || oldRecord?.id || (kind === 'event' ? 'event' : 'task');
-    const key = kind === 'event'
-      ? 'FABRICATE.Admin.Manager.Environment.Events.DisabledNotice'
-      : 'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice';
+    const name =
+      oldRecord?.label || oldRecord?.name || oldRecord?.id || (kind === 'event' ? 'event' : 'task');
+    const key =
+      kind === 'event'
+        ? 'FABRICATE.Admin.Manager.Environment.Events.DisabledNotice'
+        : 'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice';
     const data = { name, count: affected.length, environments: names.join(', ') };
     const fallback = `Disabled ${kind === 'event' ? 'event' : 'task'} “${name}” — no longer available in ${affected.length} environment(s): ${data.environments}.`;
     const message = services.localize?.(key, data) || fallback;
     services.notify?.warn?.(message);
   }
 
-  async function confirmGatheringLibraryTaskCompositionLoss(systemId = get(selectedSystemId), taskId, draft = {}) {
+  async function confirmGatheringLibraryTaskCompositionLoss(
+    systemId = get(selectedSystemId),
+    taskId,
+    draft = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    const existing = systemConfig?.tasks?.find(task => task.id === taskId);
+    const existing = systemConfig?.tasks?.find((task) => task.id === taskId);
     if (!existing) return true;
     const newRecord = _normalizeGatheringTask({ ...existing, ...draft }, _randomID);
     if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
-    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
+    return _confirmGatheringLibraryRecordCompositionLoss({
+      systemId,
+      oldRecord: existing,
+      newRecord,
+      kind: 'task',
+    });
   }
 
-  async function confirmGatheringLibraryEventCompositionLoss(systemId = get(selectedSystemId), eventId, draft = {}) {
+  async function confirmGatheringLibraryEventCompositionLoss(
+    systemId = get(selectedSystemId),
+    eventId,
+    draft = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
-    const existing = systemConfig?.events?.find(event => event.id === eventId);
+    const existing = systemConfig?.events?.find((event) => event.id === eventId);
     if (!existing) return true;
     const newRecord = _normalizeGatheringEvent({ ...existing, ...draft }, _randomID);
     if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
-    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'event' });
+    return _confirmGatheringLibraryRecordCompositionLoss({
+      systemId,
+      oldRecord: existing,
+      newRecord,
+      kind: 'event',
+    });
   }
 
   function _selectedManagedItemOptions() {
@@ -3134,7 +3726,7 @@ export function createAdminStore(services) {
   }
 
   function _publishSystemsLoading() {
-    viewState.update(prev => ({
+    viewState.update((prev) => ({
       ...prev,
       systemsLoading: true,
       hasSystem: prev.systems.length > 0 ? prev.hasSystem : false,
@@ -3146,7 +3738,7 @@ export function createAdminStore(services) {
       recipeCategories: [],
       showVisibilitySummary: false,
       recipeSearchTerm: get(recipeSearch),
-      itemSearchTerm: get(itemSearch)
+      itemSearchTerm: get(itemSearch),
     }));
   }
 
@@ -3164,9 +3756,10 @@ export function createAdminStore(services) {
   function _scheduleExternalRefresh() {
     if (destroyed || externalRefreshScheduled) return;
     externalRefreshScheduled = true;
-    const schedule = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (callback) => Promise.resolve().then(callback);
+    const schedule =
+      typeof queueMicrotask === 'function'
+        ? queueMicrotask
+        : (callback) => Promise.resolve().then(callback);
     schedule(async () => {
       externalRefreshScheduled = false;
       if (destroyed) return;
@@ -3182,10 +3775,17 @@ export function createAdminStore(services) {
   }
 
   function _newEnvironmentResultGroup(existingGroups = []) {
-    const baseName = services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results';
-    const existingNames = new Set((Array.isArray(existingGroups) ? existingGroups : [])
-      .map(group => String(group?.name || '').trim().toLowerCase())
-      .filter(Boolean));
+    const baseName =
+      services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results';
+    const existingNames = new Set(
+      (Array.isArray(existingGroups) ? existingGroups : [])
+        .map((group) =>
+          String(group?.name || '')
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    );
     let name = baseName;
     let suffix = 2;
     while (existingNames.has(name.trim().toLowerCase())) {
@@ -3195,7 +3795,7 @@ export function createAdminStore(services) {
     return {
       id: _randomID(),
       name,
-      results: []
+      results: [],
     };
   }
 
@@ -3205,19 +3805,21 @@ export function createAdminStore(services) {
       id: _randomID(),
       componentId: firstComponent?.id || null,
       quantity: 1,
-      propertyMacroUuid: null
+      propertyMacroUuid: null,
     };
   }
 
   function _newEnvironmentDraft(systemId) {
     return {
       craftingSystemId: systemId,
-      name: services.localize?.('FABRICATE.Admin.Environments.NewEnvironmentName') || 'New Gathering Environment',
+      name:
+        services.localize?.('FABRICATE.Admin.Environments.NewEnvironmentName') ||
+        'New Gathering Environment',
       description: '',
       enabled: false,
       selectionMode: 'targeted',
       dangerLevel: 'safe',
-      sceneUuid: null
+      sceneUuid: null,
     };
   }
 
@@ -3233,47 +3835,56 @@ export function createAdminStore(services) {
     dirtyEnvironmentDiscardConfirmation = (async () => {
       try {
         const content = `<p>${
-          localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyContent')
-            || 'The current gathering environment has unsaved changes. Save them and continue?'
+          localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyContent') ||
+          'The current gathering environment has unsaved changes. Save them and continue?'
         }</p>`;
         if (typeof services.choiceDialog !== 'function') {
           // Fall back to the two-way confirm when no three-way dialog is available.
           const confirmed = await services.confirmDialog?.({
-            title: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyTitle')
-              || 'Discard unsaved environment changes?',
+            title:
+              localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyTitle') ||
+              'Discard unsaved environment changes?',
             content,
             yes: {
-              label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyConfirm') || 'Discard Changes',
-              callback: () => true
+              label:
+                localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyConfirm') ||
+                'Discard Changes',
+              callback: () => true,
             },
             no: {
-              label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyCancel') || 'Keep Editing',
-              callback: () => false
-            }
+              label:
+                localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyCancel') || 'Keep Editing',
+              callback: () => false,
+            },
           });
           return confirmed === true ? 'discard' : 'cancel';
         }
         const action = await services.choiceDialog({
-          title: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
+          title:
+            localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') ||
+            'Save unsaved changes?',
           content,
           choices: [
             {
               action: 'save',
               label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Save') || 'Save',
-              icon: 'fas fa-save'
+              icon: 'fas fa-save',
             },
             {
               action: 'discard',
-              label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') || 'Discard Changes',
-              icon: 'fas fa-trash'
+              label:
+                localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') ||
+                'Discard Changes',
+              icon: 'fas fa-trash',
             },
             {
               action: 'cancel',
-              label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Cancel') || 'Keep Editing',
-              icon: 'fas fa-times'
-            }
+              label:
+                localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Cancel') || 'Keep Editing',
+              icon: 'fas fa-times',
+            },
           ],
-          defaultAction: 'save'
+          defaultAction: 'save',
         });
         return action === 'save' || action === 'discard' ? action : 'cancel';
       } finally {
@@ -3327,8 +3938,8 @@ export function createAdminStore(services) {
       return _clearEnvironmentDraftState({
         canShowEnvironmentsTab: true,
         error:
-        services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable')
-          || 'Gathering environment store is not available.'
+          services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable') ||
+          'Gathering environment store is not available.',
       });
     }
 
@@ -3340,35 +3951,39 @@ export function createAdminStore(services) {
         const counts = _buildEnvironmentCompositionViewModel(environment)?.counts || {};
         environmentTaskCounts[String(environment.id)] = {
           availableTaskCount: counts.availableTasks || 0,
-          availableEventCount: counts.availableEvents || 0
+          availableEventCount: counts.availableEvents || 0,
         };
       }
       let environmentId = get(selectedEnvironmentId);
-      const canKeepNewDraft = get(environmentDraftIsNew)
-        && get(environmentDraftDirty)
-        && get(environmentDraft)?.craftingSystemId === selectedSystem.id;
+      const canKeepNewDraft =
+        get(environmentDraftIsNew) &&
+        get(environmentDraftDirty) &&
+        get(environmentDraft)?.craftingSystemId === selectedSystem.id;
 
       if (canKeepNewDraft) {
         environmentId = '';
-      } else if (!environments.some(environment => environment.id === environmentId)) {
+      } else if (!environments.some((environment) => environment.id === environmentId)) {
         environmentId = environments[0]?.id || '';
         selectedEnvironmentId.set(environmentId);
       }
 
       if (!canKeepNewDraft) {
         const persistedDraft = environmentId
-          ? _clonePlain(environments.find(environment => environment.id === environmentId) || null)
+          ? _clonePlain(
+              environments.find((environment) => environment.id === environmentId) || null
+            )
           : null;
-        const canPreserveDirtyDraft = get(environmentDraftDirty)
-          && get(environmentDraft)?.id === environmentId
-          && get(environmentDraft)?.craftingSystemId === selectedSystem.id;
+        const canPreserveDirtyDraft =
+          get(environmentDraftDirty) &&
+          get(environmentDraft)?.id === environmentId &&
+          get(environmentDraft)?.craftingSystemId === selectedSystem.id;
 
         if (!canPreserveDirtyDraft) {
           _setEnvironmentDraftState(persistedDraft, {
             persistedDraft,
             dirty: false,
             isNew: false,
-            saveError: null
+            saveError: null,
           });
         } else {
           persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
@@ -3381,12 +3996,12 @@ export function createAdminStore(services) {
         environmentsError: null,
         environments,
         environmentTaskCounts,
-        ..._currentEnvironmentViewPatch()
+        ..._currentEnvironmentViewPatch(),
       };
     } catch (err) {
       return _clearEnvironmentDraftState({
         canShowEnvironmentsTab: true,
-        error: _environmentErrorMessage(err)
+        error: _environmentErrorMessage(err),
       });
     }
   }
@@ -3405,26 +4020,26 @@ export function createAdminStore(services) {
     const currentSystemId = get(selectedSystemId);
     const fallbackSystemId = allSystems[0]?.id || '';
     let resolvedSystemId = currentSystemId;
-    if (!currentSystemId || !allSystems.find(s => s.id === currentSystemId)) {
+    if (!currentSystemId || !allSystems.find((s) => s.id === currentSystemId)) {
       resolvedSystemId = fallbackSystemId;
       if (resolvedSystemId !== currentSystemId) selectedSystemId.set(resolvedSystemId);
     }
 
     // Build system list after resolving selection so the library row highlight matches view state.
-    const systemList = allSystems.map(s => ({
+    const systemList = allSystems.map((s) => ({
       id: s.id,
       name: s.name,
       description: s.description,
       enabled: s.enabled !== false,
       resolutionMode: s.resolutionMode || 'simple',
-      featureCount: Object.values(s.features || {}).filter(value => value === true).length,
+      featureCount: Object.values(s.features || {}).filter((value) => value === true).length,
       componentCount: _getManagedItems(s).length,
       recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
-      selected: s.id === resolvedSystemId
+      selected: s.id === resolvedSystemId,
     }));
 
     const selectedSystem = resolvedSystemId
-      ? allSystems.find(s => s.id === resolvedSystemId) || null
+      ? allSystems.find((s) => s.id === resolvedSystemId) || null
       : null;
 
     const availableScriptMacros = services.getScriptMacros?.() || [];
@@ -3439,12 +4054,12 @@ export function createAdminStore(services) {
       const managedItems = _getManagedItems(selectedSystem);
       const managedItemOptions = _buildManagedItemOptions(managedItems);
       const componentTagOptions = _buildComponentTagOptions(managedItems);
-      const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
+      const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
 
       const rawEssenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
         ? selectedSystem.essenceDefinitions
         : [];
-      const essenceDefinitions = rawEssenceDefinitions.map(def => {
+      const essenceDefinitions = rawEssenceDefinitions.map((def) => {
         const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
         const sourceItem = managedItemById.get(sourceComponentId) || null;
         const associatedItem = sourceItem
@@ -3455,7 +4070,7 @@ export function createAdminStore(services) {
           sourceComponentId,
           associatedSystemItemId: sourceComponentId || null,
           associatedItem,
-          associatedItemName: associatedItem?.name || null
+          associatedItemName: associatedItem?.name || null,
         };
       });
       essenceCards = _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions);
@@ -3486,7 +4101,7 @@ export function createAdminStore(services) {
     // Phase 1: publish all synchronous selected-system context immediately so
     // manager can paint its selected rail, menu, and inspector before slower
     // item/environment work finishes.
-    viewState.update(prev => ({
+    viewState.update((prev) => ({
       ...prev,
       systems: systemList,
       systemsLoading: false,
@@ -3500,7 +4115,7 @@ export function createAdminStore(services) {
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       recipeSearchTerm: get(recipeSearch),
-      itemSearchTerm: get(itemSearch)
+      itemSearchTerm: get(itemSearch),
     }));
     await Promise.resolve();
 
@@ -3508,7 +4123,9 @@ export function createAdminStore(services) {
     if (selectedSystem) {
       const showTags = true;
       const showEssences = selectedSystem.features?.essences === true;
-      const essenceDefinitionById = new Map((selectedSystemData?.essenceDefinitions || []).map(def => [def.id, def]));
+      const essenceDefinitionById = new Map(
+        (selectedSystemData?.essenceDefinitions || []).map((def) => [def.id, def])
+      );
 
       itemCards = await _buildItemCards(
         systemManager,
@@ -3532,7 +4149,7 @@ export function createAdminStore(services) {
       graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
     }
 
-    viewState.update(prev => ({
+    viewState.update((prev) => ({
       ...prev,
       systems: systemList,
       systemsLoading: false,
@@ -3551,7 +4168,7 @@ export function createAdminStore(services) {
       graphData,
       graphSearchTerm: get(graphSearch),
       ...environmentState,
-      ...travel.buildState()
+      ...travel.buildState(),
     }));
   }
 
@@ -3566,7 +4183,7 @@ export function createAdminStore(services) {
       await refresh();
       return true;
     }
-    if (!await _proceedAfterDirtyEnvironmentConfirm()) return false;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     selectedSystemId.set(systemId);
     selectedEnvironmentId.set('');
@@ -3578,11 +4195,12 @@ export function createAdminStore(services) {
   }
 
   async function createSystem() {
-    if (!await _proceedAfterDirtyEnvironmentConfirm()) return null;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
 
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
-    const description = 'Configure categories, item tags, essences, and crafting behaviour for this system.';
+    const description =
+      'Configure categories, item tags, essences, and crafting behaviour for this system.';
     const system = await systemManager.createSystem({ name, description });
     selectedSystemId.set(system.id);
     activeTab.set('systems');
@@ -3599,7 +4217,7 @@ export function createAdminStore(services) {
       title: `Delete ${system.name}?`,
       content: `<p>Delete crafting system <strong>${system.name}</strong>?</p><p>Linked recipes, gathering environments, gathering tools and tasks, and any in-progress or historical crafting, salvage, and gathering runs for this system will be removed.</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return;
 
@@ -3638,17 +4256,19 @@ export function createAdminStore(services) {
     const recipeCount = recipeManager?.getRecipes?.({ craftingSystemId: sysId })?.length || 0;
     const localizeFn = services.localize;
     const confirmed = await services.confirmDialog({
-      title: localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle')
-        || 'Change Resolution Mode?',
+      title:
+        localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle') ||
+        'Change Resolution Mode?',
       content: `<p>${
         localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContent', {
           count: recipeCount,
           name: system.name,
-          mode: _resolutionModeLabel(nextMode, localizeFn)
-        }) || `Changing resolution mode to ${_resolutionModeLabel(nextMode, localizeFn)} will delete ${recipeCount} recipe(s) in this crafting system and clean up related runs and learned recipes.`
+          mode: _resolutionModeLabel(nextMode, localizeFn),
+        }) ||
+        `Changing resolution mode to ${_resolutionModeLabel(nextMode, localizeFn)} will delete ${recipeCount} recipe(s) in this crafting system and clean up related runs and learned recipes.`
       }</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return false;
 
@@ -3675,16 +4295,18 @@ export function createAdminStore(services) {
 
     const localizeFn = services.localize;
     const confirmed = await services.confirmDialog({
-      title: localizeFn?.('FABRICATE.Admin.SystemSettings.SalvageResolutionModeChangeTitle')
-        || 'Change Salvage Resolution Mode?',
+      title:
+        localizeFn?.('FABRICATE.Admin.SystemSettings.SalvageResolutionModeChangeTitle') ||
+        'Change Salvage Resolution Mode?',
       content: `<p>${
         localizeFn?.('FABRICATE.Admin.SystemSettings.SalvageResolutionModeChangeContent', {
           name: system.name,
-          mode: nextMode
-        }) || `Changing the salvage resolution mode for ${system.name}: components incompatible with the new salvage mode will have salvage disabled.`
+          mode: nextMode,
+        }) ||
+        `Changing the salvage resolution mode for ${system.name}: components incompatible with the new salvage mode will have salvage disabled.`
       }</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return false;
 
@@ -3701,7 +4323,7 @@ export function createAdminStore(services) {
     const nextTab = _resolveVisibleTab(tabName, selectedSystem);
     if (nextTab === get(activeTab)) return true;
     if (get(activeTab) === ENVIRONMENTS_TAB && nextTab !== ENVIRONMENTS_TAB) {
-      if (!await _discardDirtyEnvironmentDraftForNavigation()) return false;
+      if (!(await _discardDirtyEnvironmentDraftForNavigation())) return false;
     }
     activeTab.set(nextTab);
     await refresh();
@@ -3711,7 +4333,7 @@ export function createAdminStore(services) {
   async function selectEnvironment(environmentId) {
     const nextEnvironmentId = environmentId || '';
     if (nextEnvironmentId === get(selectedEnvironmentId)) return true;
-    if (!await _proceedAfterDirtyEnvironmentConfirm()) return false;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     selectedEnvironmentId.set(nextEnvironmentId);
     environmentDraftDirty.set(false);
@@ -3726,14 +4348,14 @@ export function createAdminStore(services) {
     const systemManager = services.getCraftingSystemManager();
     const system = systemManager?.getSystem?.(get(selectedSystemId)) || null;
     if (!_canShowEnvironmentsTab(system)) return null;
-    if (!await _proceedAfterDirtyEnvironmentConfirm()) return null;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
 
     selectedEnvironmentId.set('');
     _setEnvironmentDraftState(_newEnvironmentDraft(system.id), {
       persistedDraft: null,
       dirty: true,
       isNew: true,
-      saveError: null
+      saveError: null,
     });
     _patchEnvironmentViewState();
     return _clonePlain(get(environmentDraft));
@@ -3741,11 +4363,14 @@ export function createAdminStore(services) {
 
   function _normalizeDraftBlindSelection(value) {
     if (!value || typeof value !== 'object') return null;
-    const weights = value.weights && typeof value.weights === 'object'
-      ? Object.fromEntries(Object.entries(value.weights)
-          .map(([key, weight]) => [String(key), Number(weight)])
-          .filter(([, weight]) => Number.isFinite(weight)))
-      : {};
+    const weights =
+      value.weights && typeof value.weights === 'object'
+        ? Object.fromEntries(
+            Object.entries(value.weights)
+              .map(([key, weight]) => [String(key), Number(weight)])
+              .filter(([, weight]) => Number.isFinite(weight))
+          )
+        : {};
     if (Object.keys(weights).length === 0) return null;
     return { weights };
   }
@@ -3758,30 +4383,44 @@ export function createAdminStore(services) {
 
   function _normalizeDraftDropRateAdjustmentMap(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(Object.entries(value)
-      .map(([id, adjustment]) => [String(id || '').trim(), _normalizeDraftDropRateAdjustmentValue(adjustment)])
-      .filter(([id, adjustment]) => id && adjustment !== null));
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([id, adjustment]) => [
+          String(id || '').trim(),
+          _normalizeDraftDropRateAdjustmentValue(adjustment),
+        ])
+        .filter(([id, adjustment]) => id && adjustment !== null)
+    );
   }
 
   function _normalizeDraftTaskDropRateAdjustments(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(Object.entries(value)
-      .map(([taskId, rowAdjustments]) => [String(taskId || '').trim(), _normalizeDraftDropRateAdjustmentMap(rowAdjustments)])
-      .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([taskId, rowAdjustments]) => [
+          String(taskId || '').trim(),
+          _normalizeDraftDropRateAdjustmentMap(rowAdjustments),
+        ])
+        .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0)
+    );
   }
 
   function _normalizeDraftTaskDropRateAdjustmentsEnabled(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(Object.entries(value)
-      .map(([taskId, enabled]) => [String(taskId || '').trim(), enabled])
-      .filter(([taskId, enabled]) => taskId && enabled === false));
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([taskId, enabled]) => [String(taskId || '').trim(), enabled])
+        .filter(([taskId, enabled]) => taskId && enabled === false)
+    );
   }
 
   function _normalizeDraftEventDropRateAdjustmentsEnabled(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(Object.entries(value)
-      .map(([eventId, enabled]) => [String(eventId || '').trim(), enabled])
-      .filter(([eventId, enabled]) => eventId && enabled === false));
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([eventId, enabled]) => [String(eventId || '').trim(), enabled])
+        .filter(([eventId, enabled]) => eventId && enabled === false)
+    );
   }
 
   function updateEnvironmentDraft(updates = {}) {
@@ -3815,7 +4454,7 @@ export function createAdminStore(services) {
       'eventDropRateAdjustments',
       'eventDropRateAdjustmentsEnabled',
       'blindSelection',
-      'nodeRuntime'
+      'nodeRuntime',
     ]);
     const next = _clonePlain(current);
     for (const [field, value] of Object.entries(updates)) {
@@ -3832,14 +4471,31 @@ export function createAdminStore(services) {
         next.img = normalized || null;
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['includedRealmIds', 'enabledTaskIds', 'disabledTaskIds', 'enabledEventIds', 'disabledEventIds', 'forcedTaskIds', 'forcedEventIds', 'taskOrder', 'eventOrder'].includes(field)) {
-        next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
-          .map(entry => String(entry || '').trim())
-          .filter(Boolean)));
+      } else if (
+        [
+          'includedRealmIds',
+          'enabledTaskIds',
+          'disabledTaskIds',
+          'enabledEventIds',
+          'disabledEventIds',
+          'forcedTaskIds',
+          'forcedEventIds',
+          'taskOrder',
+          'eventOrder',
+        ].includes(field)
+      ) {
+        next[field] = Array.from(
+          new Set(
+            (Array.isArray(value) ? value : [])
+              .map((entry) => String(entry || '').trim())
+              .filter(Boolean)
+          )
+        );
       } else if (field === 'eventDropRateAdjustments') {
         next.eventDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
       } else if (field === 'eventDropRateAdjustmentsEnabled') {
-        next.eventDropRateAdjustmentsEnabled = _normalizeDraftEventDropRateAdjustmentsEnabled(value);
+        next.eventDropRateAdjustmentsEnabled =
+          _normalizeDraftEventDropRateAdjustmentsEnabled(value);
       } else if (field === 'taskDropRateAdjustments') {
         next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
       } else if (field === 'taskDropRateAdjustmentsEnabled') {
@@ -3863,12 +4519,24 @@ export function createAdminStore(services) {
 
   function _compositionFieldKeys(kind) {
     return kind === 'event'
-      ? { enabledKey: 'enabledEventIds', disabledKey: 'disabledEventIds', orderKey: 'eventOrder', forcedKey: 'forcedEventIds' }
-      : { enabledKey: 'enabledTaskIds', disabledKey: 'disabledTaskIds', orderKey: 'taskOrder', forcedKey: 'forcedTaskIds' };
+      ? {
+          enabledKey: 'enabledEventIds',
+          disabledKey: 'disabledEventIds',
+          orderKey: 'eventOrder',
+          forcedKey: 'forcedEventIds',
+        }
+      : {
+          enabledKey: 'enabledTaskIds',
+          disabledKey: 'disabledTaskIds',
+          orderKey: 'taskOrder',
+          forcedKey: 'forcedTaskIds',
+        };
   }
 
   function _compositionIdArray(value) {
-    return Array.isArray(value) ? value.map(entry => String(entry || '').trim()).filter(Boolean) : [];
+    return Array.isArray(value)
+      ? value.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
   }
 
   function setEnvironmentCompositionMode(mode) {
@@ -3882,11 +4550,15 @@ export function createAdminStore(services) {
     if (!id) return false;
     const { enabledKey, disabledKey, orderKey } = _compositionFieldKeys(kind);
     const enabled = _compositionIdArray(current[enabledKey]);
-    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
     const order = _compositionIdArray(current[orderKey]);
     if (!enabled.includes(id)) enabled.push(id);
     if (!order.includes(id)) order.push(id);
-    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [orderKey]: order });
+    return updateEnvironmentDraft({
+      [enabledKey]: enabled,
+      [disabledKey]: disabled,
+      [orderKey]: order,
+    });
   }
 
   function forceIncludeEnvironmentRecord(kind, recordId) {
@@ -3895,12 +4567,16 @@ export function createAdminStore(services) {
     const id = String(recordId || '').trim();
     if (!id) return false;
     const { disabledKey, orderKey, forcedKey } = _compositionFieldKeys(kind);
-    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
     const order = _compositionIdArray(current[orderKey]);
     const forced = _compositionIdArray(current[forcedKey]);
     if (!forced.includes(id)) forced.push(id);
     if (!order.includes(id)) order.push(id);
-    return updateEnvironmentDraft({ [forcedKey]: forced, [disabledKey]: disabled, [orderKey]: order });
+    return updateEnvironmentDraft({
+      [forcedKey]: forced,
+      [disabledKey]: disabled,
+      [orderKey]: order,
+    });
   }
 
   function excludeEnvironmentRecord(kind, recordId) {
@@ -3909,11 +4585,15 @@ export function createAdminStore(services) {
     const id = String(recordId || '').trim();
     if (!id) return false;
     const { enabledKey, disabledKey, forcedKey } = _compositionFieldKeys(kind);
-    const enabled = _compositionIdArray(current[enabledKey]).filter(entry => entry !== id);
-    const forced = _compositionIdArray(current[forcedKey]).filter(entry => entry !== id);
-    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const enabled = _compositionIdArray(current[enabledKey]).filter((entry) => entry !== id);
+    const forced = _compositionIdArray(current[forcedKey]).filter((entry) => entry !== id);
+    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
     if (current.compositionMode !== 'manual') disabled.push(id);
-    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [forcedKey]: forced });
+    return updateEnvironmentDraft({
+      [enabledKey]: enabled,
+      [disabledKey]: disabled,
+      [forcedKey]: forced,
+    });
   }
 
   function restoreEnvironmentRecord(kind, recordId) {
@@ -3922,7 +4602,7 @@ export function createAdminStore(services) {
     const id = String(recordId || '').trim();
     if (!id) return false;
     const { disabledKey } = _compositionFieldKeys(kind);
-    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
     return updateEnvironmentDraft({ [disabledKey]: disabled });
   }
 
@@ -3932,10 +4612,13 @@ export function createAdminStore(services) {
     const viewModel = _buildEnvironmentCompositionViewModel(current);
     const records = kind === 'event' ? viewModel.events : viewModel.tasks;
     const ids = records
-      .filter(entry => kind === 'event'
-        ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
-        : entry.runtimeState === 'available' || entry.compositionState === 'includedButUnavailable')
-      .map(entry => entry.id);
+      .filter((entry) =>
+        kind === 'event'
+          ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
+          : entry.runtimeState === 'available' ||
+            entry.compositionState === 'includedButUnavailable'
+      )
+      .map((entry) => entry.id);
     const from = Number(fromIndex);
     const to = Number(toIndex);
     if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
@@ -3954,7 +4637,7 @@ export function createAdminStore(services) {
         persistedDraft,
         dirty: false,
         isNew: false,
-        saveError: null
+        saveError: null,
       });
     } else {
       const environments = get(viewState).environments || [];
@@ -3964,7 +4647,7 @@ export function createAdminStore(services) {
         persistedDraft: fallback,
         dirty: false,
         isNew: false,
-        saveError: null
+        saveError: null,
       });
     }
     _patchEnvironmentViewState();
@@ -3977,8 +4660,9 @@ export function createAdminStore(services) {
 
     const environmentStore = _getEnvironmentStore();
     if (!environmentStore) {
-      const message = services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable')
-        || 'Gathering environment data is not available.';
+      const message =
+        services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable') ||
+        'Gathering environment data is not available.';
       environmentSaveError.set(message);
       environmentValidationState.set(null);
       _patchEnvironmentViewState();
@@ -4012,7 +4696,7 @@ export function createAdminStore(services) {
         persistedDraft: savedDraft,
         dirty: false,
         isNew: false,
-        saveError: null
+        saveError: null,
       });
       environmentSaving.set(false);
       await refresh();
@@ -4036,7 +4720,7 @@ export function createAdminStore(services) {
   async function duplicateEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
     const sourceId = environmentId || get(environmentDraft)?.id || '';
     if (!sourceId) return null;
-    if (!await _proceedAfterDirtyEnvironmentConfirm()) return null;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
 
     const environmentStore = _getEnvironmentStore();
     if (!environmentStore?.duplicate) return null;
@@ -4049,7 +4733,7 @@ export function createAdminStore(services) {
         persistedDraft: duplicate,
         dirty: false,
         isNew: false,
-        saveError: null
+        saveError: null,
       });
       await refresh();
       return _clonePlain(get(environmentDraft));
@@ -4064,7 +4748,7 @@ export function createAdminStore(services) {
   async function deleteEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
     const targetId = environmentId || get(environmentDraft)?.id || '';
     if (!targetId) {
-      if (!await _proceedAfterDirtyEnvironmentConfirm()) return false;
+      if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
       await cancelEnvironmentDraft();
       return false;
     }
@@ -4074,36 +4758,43 @@ export function createAdminStore(services) {
 
     const currentEnvironments = get(viewState).environments || [];
     const selectedIdBeforeDelete = get(selectedEnvironmentId);
-    const deletingSelectedDraft = targetId === selectedIdBeforeDelete || targetId === get(environmentDraft)?.id;
-    const targetIndex = currentEnvironments.findIndex(environment => environment.id === targetId);
-    const targetEnvironment = currentEnvironments.find(environment => environment.id === targetId)
-      || get(environmentDraft);
+    const deletingSelectedDraft =
+      targetId === selectedIdBeforeDelete || targetId === get(environmentDraft)?.id;
+    const targetIndex = currentEnvironments.findIndex((environment) => environment.id === targetId);
+    const targetEnvironment =
+      currentEnvironments.find((environment) => environment.id === targetId) ||
+      get(environmentDraft);
     const environmentName = targetEnvironment?.name || targetId;
     const escapedEnvironmentName = _escapeHtml(environmentName);
     const confirmed = await services.confirmDialog?.({
-      title: services.localize?.('FABRICATE.Admin.Environments.DeleteTitle', { name: escapedEnvironmentName })
-        || `Delete ${escapedEnvironmentName}?`,
+      title:
+        services.localize?.('FABRICATE.Admin.Environments.DeleteTitle', {
+          name: escapedEnvironmentName,
+        }) || `Delete ${escapedEnvironmentName}?`,
       content: `<p>${
-        services.localize?.('FABRICATE.Admin.Environments.DeleteContent', { name: escapedEnvironmentName })
-          || `Delete gathering environment <strong>${escapedEnvironmentName}</strong>? This also cleans active and historical gathering runs that reference it.`
+        services.localize?.('FABRICATE.Admin.Environments.DeleteContent', {
+          name: escapedEnvironmentName,
+        }) ||
+        `Delete gathering environment <strong>${escapedEnvironmentName}</strong>? This also cleans active and historical gathering runs that reference it.`
       }</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return false;
 
     try {
       const deleted = await environmentStore.delete(targetId);
       if (!deleted) return false;
-      const remaining = currentEnvironments.filter(environment => environment.id !== targetId);
+      const remaining = currentEnvironments.filter((environment) => environment.id !== targetId);
       if (deletingSelectedDraft) {
-        const next = remaining[Math.min(Math.max(targetIndex, 0), Math.max(remaining.length - 1, 0))] || null;
+        const next =
+          remaining[Math.min(Math.max(targetIndex, 0), Math.max(remaining.length - 1, 0))] || null;
         selectedEnvironmentId.set(next?.id || '');
         _setEnvironmentDraftState(next, {
           persistedDraft: next,
           dirty: false,
           isNew: false,
-          saveError: null
+          saveError: null,
         });
       } else {
         selectedEnvironmentId.set(selectedIdBeforeDelete);
@@ -4129,7 +4820,7 @@ export function createAdminStore(services) {
       const reordered = await environmentStore.reorder(systemId, orderedEnvironmentIds);
       const environments = Array.isArray(reordered) ? reordered : [];
       const selectedId = get(selectedEnvironmentId);
-      if (selectedId && !environments.some(environment => environment.id === selectedId)) {
+      if (selectedId && !environments.some((environment) => environment.id === selectedId)) {
         selectedEnvironmentId.set(environments[0]?.id || '');
         environmentDraftDirty.set(false);
         environmentDraftIsNew.set(false);
@@ -4148,13 +4839,13 @@ export function createAdminStore(services) {
 
   async function moveEnvironmentDraft(environmentId, direction) {
     const environments = get(viewState).environments || [];
-    const index = environments.findIndex(environment => environment.id === environmentId);
+    const index = environments.findIndex((environment) => environment.id === environmentId);
     if (index < 0) return [];
 
     const nextIndex = direction === 'up' ? index - 1 : index + 1;
     if (nextIndex < 0 || nextIndex >= environments.length) return environments;
 
-    const ordered = environments.map(environment => environment.id);
+    const ordered = environments.map((environment) => environment.id);
     const [moved] = ordered.splice(index, 1);
     ordered.splice(nextIndex, 0, moved);
     return reorderEnvironments(ordered);
@@ -4168,24 +4859,24 @@ export function createAdminStore(services) {
     if (!environmentStore?.update) return false;
 
     const environments = get(viewState).environments || [];
-    const target = environments.find(environment => environment.id === targetId);
+    const target = environments.find((environment) => environment.id === targetId);
     if (!target) return false;
 
     const nextEnabled = typeof enabled === 'boolean' ? enabled : target.enabled !== true;
     const payload = {
       ..._clonePlain(target),
-      enabled: nextEnabled
+      enabled: nextEnabled,
     };
 
     try {
-      const saved = _clonePlain(await environmentStore.update(targetId, payload) || payload);
+      const saved = _clonePlain((await environmentStore.update(targetId, payload)) || payload);
       if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
         if (get(environmentDraftDirty)) {
           const currentDraft = _clonePlain(get(environmentDraft));
           if (currentDraft?.id === targetId) {
             environmentDraft.set({
               ...currentDraft,
-              enabled: saved.enabled === true
+              enabled: saved.enabled === true,
             });
             persistedEnvironmentDraft.set(saved);
           }
@@ -4194,7 +4885,7 @@ export function createAdminStore(services) {
             persistedDraft: saved,
             dirty: false,
             isNew: false,
-            saveError: null
+            saveError: null,
           });
         }
       }
@@ -4222,27 +4913,29 @@ export function createAdminStore(services) {
     if (!environmentStore?.update) return false;
 
     const environments = get(viewState).environments || [];
-    const target = environments.find(environment => environment.id === targetId);
+    const target = environments.find((environment) => environment.id === targetId);
     if (!target) return false;
 
     const current = Array.isArray(target.includedRealmIds) ? target.includedRealmIds : [];
     const has = current.includes(realm);
     if (included === has) return true; // already in the desired state
-    const nextIds = included ? [...current, realm] : current.filter(id => id !== realm);
+    const nextIds = included ? [...current, realm] : current.filter((id) => id !== realm);
     const payload = {
       ..._clonePlain(target),
-      includedRealmIds: nextIds
+      includedRealmIds: nextIds,
     };
 
     try {
-      const saved = _clonePlain(await environmentStore.update(targetId, payload) || payload);
+      const saved = _clonePlain((await environmentStore.update(targetId, payload)) || payload);
       if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
         if (get(environmentDraftDirty)) {
           const currentDraft = _clonePlain(get(environmentDraft));
           if (currentDraft?.id === targetId) {
             environmentDraft.set({
               ...currentDraft,
-              includedRealmIds: Array.isArray(saved.includedRealmIds) ? saved.includedRealmIds : nextIds
+              includedRealmIds: Array.isArray(saved.includedRealmIds)
+                ? saved.includedRealmIds
+                : nextIds,
             });
             persistedEnvironmentDraft.set(saved);
           }
@@ -4251,7 +4944,7 @@ export function createAdminStore(services) {
             persistedDraft: saved,
             dirty: false,
             isNew: false,
-            saveError: null
+            saveError: null,
           });
         }
       }
@@ -4275,7 +4968,8 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const key = FEATURE_MAP[feature];
     if (!key) return;
-    if (key === 'gathering' && enabled !== true && !await _proceedAfterDirtyEnvironmentConfirm()) return false;
+    if (key === 'gathering' && enabled !== true && !(await _proceedAfterDirtyEnvironmentConfirm()))
+      return false;
     await systemManager.updateSystem(sysId, { features: { [key]: enabled } });
     await refresh();
     return true;
@@ -4298,14 +4992,20 @@ export function createAdminStore(services) {
     const system = systemManager.getSystem(sysId);
     if (!system) return;
 
-    const requirements = JSON.parse(JSON.stringify(system.requirements || {
-      time: { enabled: false },
-      currency: { enabled: false, units: [] }
-    }));
+    const requirements = JSON.parse(
+      JSON.stringify(
+        system.requirements || {
+          time: { enabled: false },
+          currency: { enabled: false, units: [] },
+        }
+      )
+    );
     requirements[requirement] = requirements[requirement] || {};
     requirements[requirement].enabled = enabled;
     if (requirement === 'currency') {
-      requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
+      requirements.currency = normalizeCurrencyConfig(requirements.currency, {
+        randomID: _randomID,
+      });
     }
 
     await systemManager.updateSystem(sysId, { requirements });
@@ -4322,7 +5022,10 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = normalizeCustomRecipeCategories([...(system.categories || []), value.trim()]);
+    const categories = normalizeCustomRecipeCategories([
+      ...(system.categories || []),
+      value.trim(),
+    ]);
     await systemManager.updateSystem(sysId, { categories });
     await refresh();
   }
@@ -4334,7 +5037,9 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = normalizeCustomRecipeCategories((system.categories || []).filter(c => c !== category));
+    const categories = normalizeCustomRecipeCategories(
+      (system.categories || []).filter((c) => c !== category)
+    );
     await systemManager.updateSystem(sysId, { categories });
     await refresh();
   }
@@ -4360,7 +5065,7 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const tags = (system.itemTags || system.tags || []).filter(t => t !== tag);
+    const tags = (system.itemTags || system.tags || []).filter((t) => t !== tag);
     await systemManager.updateSystem(sysId, { itemTags: tags });
     await refresh();
   }
@@ -4378,7 +5083,7 @@ export function createAdminStore(services) {
 
     const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const duplicate = existing.some(
-      def => String(def.name || '').toLowerCase() === normalizedName.toLowerCase()
+      (def) => String(def.name || '').toLowerCase() === normalizedName.toLowerCase()
     );
     if (duplicate) {
       services.notify.warn(`Essence "${normalizedName}" already exists in this system.`);
@@ -4393,8 +5098,8 @@ export function createAdminStore(services) {
         name: normalizedName,
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
-        ...sourceFields
-      }
+        ...sourceFields,
+      },
     ];
     await systemManager.updateSystem(sysId, { essenceDefinitions });
     await refresh();
@@ -4410,7 +5115,7 @@ export function createAdminStore(services) {
     if (!system) return false;
 
     const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const current = existing.find(def => def.id === essenceId);
+    const current = existing.find((def) => def.id === essenceId);
     if (!current) return false;
 
     const nextName = Object.prototype.hasOwnProperty.call(updates, 'name')
@@ -4418,9 +5123,12 @@ export function createAdminStore(services) {
       : String(current.name || '').trim();
     if (!nextName) return false;
 
-    const duplicate = existing.some(def =>
-      def.id !== essenceId &&
-      String(def.name || '').trim().toLowerCase() === nextName.toLowerCase()
+    const duplicate = existing.some(
+      (def) =>
+        def.id !== essenceId &&
+        String(def.name || '')
+          .trim()
+          .toLowerCase() === nextName.toLowerCase()
     );
     if (duplicate) {
       services.notify.warn(`Essence "${nextName}" already exists in this system.`);
@@ -4433,28 +5141,33 @@ export function createAdminStore(services) {
     const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
       ? normalizeEssenceIcon(updates.icon)
       : normalizeEssenceIcon(current.icon);
-    const hasSourceUpdate = Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId')
-      || Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid');
+    const hasSourceUpdate =
+      Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId') ||
+      Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid');
     const nextSourceFields = hasSourceUpdate
       ? _sourceFieldsForEssenceSelection(
-        system,
-        Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId') ? updates.sourceComponentId || null : null,
-        Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid') ? updates.sourceItemUuid || null : null
-      )
+          system,
+          Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId')
+            ? updates.sourceComponentId || null
+            : null,
+          Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid')
+            ? updates.sourceItemUuid || null
+            : null
+        )
       : null;
 
-    const essenceDefinitions = existing.map(def => {
+    const essenceDefinitions = existing.map((def) => {
       if (def.id !== essenceId) return def;
       const nextDefinition = {
         ...def,
         name: nextName,
         description: nextDescription,
-        icon: nextIcon
+        icon: nextIcon,
       };
       if (!hasSourceUpdate) return nextDefinition;
       return {
         ...nextDefinition,
-        ...nextSourceFields
+        ...nextSourceFields,
       };
     });
 
@@ -4469,14 +5182,14 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const essence = (system.essenceDefinitions || []).find(def => def.id === essenceId);
+    const essence = (system.essenceDefinitions || []).find((def) => def.id === essenceId);
     if (!essence) return;
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${essence.name}?`,
       content: `<p>Delete essence <strong>${essence.name}</strong> and remove it from recipes in this system?</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return;
 
@@ -4491,11 +5204,13 @@ export function createAdminStore(services) {
     const nextConditions = systemConfig.conditions;
     if (updates.weather !== undefined) {
       const weather = _normalizeGatheringConditionId(updates.weather);
-      if (nextConditions.weather.values.some(option => option.id === weather)) nextConditions.weather.current = weather;
+      if (nextConditions.weather.values.some((option) => option.id === weather))
+        nextConditions.weather.current = weather;
     }
     if (updates.timeOfDay !== undefined) {
       const timeOfDay = _normalizeGatheringConditionId(updates.timeOfDay);
-      if (nextConditions.timeOfDay.values.some(option => option.id === timeOfDay)) nextConditions.timeOfDay.current = timeOfDay;
+      if (nextConditions.timeOfDay.values.some((option) => option.id === timeOfDay))
+        nextConditions.timeOfDay.current = timeOfDay;
     }
     config.conditions = _gatheringCurrentConditions(nextConditions);
     await _saveGatheringConfig(config);
@@ -4507,12 +5222,18 @@ export function createAdminStore(services) {
     if (!Object.prototype.hasOwnProperty.call(DEFAULT_GATHERING_VOCABULARIES, kind)) return false;
     const config = _currentGatheringConfig();
     const nextValues = _normalizeGatheringTagList(values);
-    config.vocabularies[kind] = nextValues.length > 0 ? nextValues : [...DEFAULT_GATHERING_VOCABULARIES[kind]];
+    config.vocabularies[kind] =
+      nextValues.length > 0 ? nextValues : [...DEFAULT_GATHERING_VOCABULARIES[kind]];
     if (kind === 'weather' && !config.vocabularies.weather.includes(config.conditions.weather)) {
-      config.conditions.weather = config.vocabularies.weather[0] || DEFAULT_GATHERING_CONDITIONS.weather;
+      config.conditions.weather =
+        config.vocabularies.weather[0] || DEFAULT_GATHERING_CONDITIONS.weather;
     }
-    if (kind === 'timeOfDay' && !config.vocabularies.timeOfDay.includes(config.conditions.timeOfDay)) {
-      config.conditions.timeOfDay = config.vocabularies.timeOfDay[0] || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
+    if (
+      kind === 'timeOfDay' &&
+      !config.vocabularies.timeOfDay.includes(config.conditions.timeOfDay)
+    ) {
+      config.conditions.timeOfDay =
+        config.vocabularies.timeOfDay[0] || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
     }
     await _saveGatheringConfig(config);
     await refresh();
@@ -4538,7 +5259,8 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return false;
     const setting = systemConfig.conditions[kind];
-    if (!setting.values.some(existing => existing.id === option.id)) setting.values = [...setting.values, option];
+    if (!setting.values.some((existing) => existing.id === option.id))
+      setting.values = [...setting.values, option];
     if (!setting.current) setting.current = option.id;
     config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
     await _saveGatheringConfig(config);
@@ -4546,7 +5268,12 @@ export function createAdminStore(services) {
     return true;
   }
 
-  async function updateGatheringConditionValue(kind, valueId, updates = {}, systemId = get(selectedSystemId)) {
+  async function updateGatheringConditionValue(
+    kind,
+    valueId,
+    updates = {},
+    systemId = get(selectedSystemId)
+  ) {
     if (!GATHERING_CONDITION_DIMENSIONS.has(kind)) return false;
     const id = _normalizeGatheringConditionId(valueId);
     if (!id || !updates || typeof updates !== 'object') return false;
@@ -4555,13 +5282,16 @@ export function createAdminStore(services) {
     if (!systemConfig) return false;
     const setting = systemConfig.conditions[kind];
     let changed = false;
-    setting.values = setting.values.map(option => {
+    setting.values = setting.values.map((option) => {
       if (option.id !== id) return option;
       changed = true;
       return {
         ...option,
-        label: updates.label !== undefined ? (String(updates.label || '').trim() || option.label) : option.label,
-        icon: updates.icon !== undefined ? normalizeEssenceIcon(updates.icon) : option.icon
+        label:
+          updates.label !== undefined
+            ? String(updates.label || '').trim() || option.label
+            : option.label,
+        icon: updates.icon !== undefined ? normalizeEssenceIcon(updates.icon) : option.icon,
       };
     });
     if (!changed) return false;
@@ -4578,20 +5308,29 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return false;
     const setting = systemConfig.conditions[kind];
-    if (setting.enabled !== false && setting.values.length <= 1 && setting.values.some(option => option.id === tag)) return false;
-    const nextValues = setting.values.filter(existing => existing.id !== tag);
+    if (
+      setting.enabled !== false &&
+      setting.values.length <= 1 &&
+      setting.values.some((option) => option.id === tag)
+    )
+      return false;
+    const nextValues = setting.values.filter((existing) => existing.id !== tag);
     if (nextValues.length === setting.values.length) return true;
     setting.values = nextValues;
-    if (!setting.values.some(option => option.id === setting.current)) {
+    if (!setting.values.some((option) => option.id === setting.current)) {
       setting.current = setting.values[0]?.id || DEFAULT_GATHERING_CONDITIONS[kind];
     }
-    systemConfig.tasks = systemConfig.tasks.map(task => ({
+    systemConfig.tasks = systemConfig.tasks.map((task) => ({
       ...task,
-      [kind]: _normalizeGatheringConditionIdList(task?.[kind]).filter(existing => existing !== tag)
+      [kind]: _normalizeGatheringConditionIdList(task?.[kind]).filter(
+        (existing) => existing !== tag
+      ),
     }));
-    systemConfig.events = systemConfig.events.map(event => ({
+    systemConfig.events = systemConfig.events.map((event) => ({
       ...event,
-      [kind]: _normalizeGatheringConditionIdList(event?.[kind]).filter(existing => existing !== tag)
+      [kind]: _normalizeGatheringConditionIdList(event?.[kind]).filter(
+        (existing) => existing !== tag
+      ),
     }));
     config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
     await _saveGatheringConfig(config);
@@ -4607,7 +5346,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return false;
     const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
-    if (!vocabulary.values.some(existing => existing.id === option.id)) {
+    if (!vocabulary.values.some((existing) => existing.id === option.id)) {
       vocabulary.values = [...vocabulary.values, option];
     }
     systemConfig.vocabularies[kind] = vocabulary;
@@ -4616,7 +5355,12 @@ export function createAdminStore(services) {
     return true;
   }
 
-  async function updateGatheringVocabularyValue(kind, valueId, updates = {}, systemId = get(selectedSystemId)) {
+  async function updateGatheringVocabularyValue(
+    kind,
+    valueId,
+    updates = {},
+    systemId = get(selectedSystemId)
+  ) {
     if (!GATHERING_VOCABULARY_DIMENSIONS.has(kind)) return false;
     const id = _normalizeGatheringVocabularyId(valueId);
     if (!id || !updates || typeof updates !== 'object') return false;
@@ -4625,17 +5369,26 @@ export function createAdminStore(services) {
     if (!systemConfig) return false;
     const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
     let changed = false;
-    vocabulary.values = vocabulary.values.map(option => {
+    vocabulary.values = vocabulary.values.map((option) => {
       if (option.id !== id) return option;
       changed = true;
       const next = {
         ...option,
-        label: updates.label !== undefined ? (String(updates.label || '').trim() || option.label) : option.label
+        label:
+          updates.label !== undefined
+            ? String(updates.label || '').trim() || option.label
+            : option.label,
       };
       if (kind === 'biomes') {
         next.icon = updates.icon !== undefined ? normalizeEssenceIcon(updates.icon) : option.icon;
-        next.colorToken = updates.colorToken !== undefined ? _normalizeBiomeColorToken(updates.colorToken) : option.colorToken;
-        next.customColor = updates.customColor !== undefined ? _normalizeCustomHex(updates.customColor) : option.customColor;
+        next.colorToken =
+          updates.colorToken !== undefined
+            ? _normalizeBiomeColorToken(updates.colorToken)
+            : option.colorToken;
+        next.customColor =
+          updates.customColor !== undefined
+            ? _normalizeCustomHex(updates.customColor)
+            : option.customColor;
       }
       return next;
     });
@@ -4654,9 +5407,13 @@ export function createAdminStore(services) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
       let payload = null;
       if (kind === 'biomes') {
-        const nextBiomes = _normalizeGatheringTagList(environment.biomes ?? environment.biome)
-          .filter(existing => _normalizeGatheringVocabularyId(existing) !== id);
-        if (nextBiomes.length !== _normalizeGatheringTagList(environment.biomes ?? environment.biome).length) {
+        const nextBiomes = _normalizeGatheringTagList(
+          environment.biomes ?? environment.biome
+        ).filter((existing) => _normalizeGatheringVocabularyId(existing) !== id);
+        if (
+          nextBiomes.length !==
+          _normalizeGatheringTagList(environment.biomes ?? environment.biome).length
+        ) {
           payload = { ..._clonePlain(environment), biomes: nextBiomes, biome: nextBiomes[0] || '' };
         }
       }
@@ -4672,17 +5429,21 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return false;
     const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
-    const nextValues = vocabulary.values.filter(option => option.id !== id);
+    const nextValues = vocabulary.values.filter((option) => option.id !== id);
     if (nextValues.length === vocabulary.values.length) return true;
     systemConfig.vocabularies[kind] = { values: nextValues };
     if (kind === 'biomes') {
-      systemConfig.tasks = systemConfig.tasks.map(task => ({
+      systemConfig.tasks = systemConfig.tasks.map((task) => ({
         ...task,
-        biomes: _normalizeGatheringTagList(task.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
+        biomes: _normalizeGatheringTagList(task.biomes).filter(
+          (existing) => _normalizeGatheringVocabularyId(existing) !== id
+        ),
       }));
-      systemConfig.events = systemConfig.events.map(event => ({
+      systemConfig.events = systemConfig.events.map((event) => ({
         ...event,
-        biomes: _normalizeGatheringTagList(event.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
+        biomes: _normalizeGatheringTagList(event.biomes).filter(
+          (existing) => _normalizeGatheringVocabularyId(existing) !== id
+        ),
       }));
     }
     await _pruneGatheringVocabularyFromEnvironments(systemId, kind, id);
@@ -4697,7 +5458,7 @@ export function createAdminStore(services) {
     if (!systemConfig || !updates || typeof updates !== 'object') return false;
     systemConfig.rules = _normalizeGatheringRules({
       ...systemConfig.rules,
-      ...updates
+      ...updates,
     });
     await _saveGatheringConfig(config);
     await refresh();
@@ -4708,11 +5469,16 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return null;
-    const task = _normalizeGatheringTask({
-      id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryTask') || 'New Gathering Task',
-      dropRows: []
-    }, _randomID);
+    const task = _normalizeGatheringTask(
+      {
+        id: _randomID(),
+        name:
+          services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryTask') ||
+          'New Gathering Task',
+        dropRows: [],
+      },
+      _randomID
+    );
     systemConfig.tasks = [...systemConfig.tasks, task];
     await _saveGatheringConfig(config);
     await refresh();
@@ -4735,11 +5501,13 @@ export function createAdminStore(services) {
     }
     const label = `Task "${name || task.id || 'unnamed'}"`;
     const system = _selectedGatheringSystem(systemId);
-    errors.push(...validateDropRows(task.dropRows, label, {
-      system,
-      systemId,
-      validateDisabledRows: true
-    }));
+    errors.push(
+      ...validateDropRows(task.dropRows, label, {
+        system,
+        systemId,
+        validateDisabledRows: true,
+      })
+    );
     if (Array.isArray(task.dropRows)) {
       for (const row of task.dropRows) {
         if (row?.enabled === false && !row?.componentId && !row?.itemUuid) {
@@ -4756,43 +5524,51 @@ export function createAdminStore(services) {
 
   function _gatheringTaskIsAtDefaults(task) {
     if (!task) return false;
-    const localizedDefault = services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryTask');
-    const isDefaultName = task.name === localizedDefault
-      || task.name === 'New Gathering Task'
-      || task.name === 'Gather';
+    const localizedDefault = services.localize?.(
+      'FABRICATE.Admin.Manager.Environment.NewLibraryTask'
+    );
+    const isDefaultName =
+      task.name === localizedDefault ||
+      task.name === 'New Gathering Task' ||
+      task.name === 'Gather';
     const isDefaultImg = task.img === DEFAULT_GATHERING_TASK_IMG;
     return isDefaultName && isDefaultImg;
   }
 
   function _firstDropAutopopulatePatch(existingTask, nextDropRows, managedItemById) {
     if (!_gatheringTaskIsAtDefaults(existingTask)) return null;
-    const hadComponentBefore = (existingTask?.dropRows || []).some(row => row?.componentId);
+    const hadComponentBefore = (existingTask?.dropRows || []).some((row) => row?.componentId);
     if (hadComponentBefore) return null;
-    const firstRowWithComponent = (nextDropRows || []).find(row => row?.componentId);
+    const firstRowWithComponent = (nextDropRows || []).find((row) => row?.componentId);
     if (!firstRowWithComponent) return null;
     const component = managedItemById?.get?.(String(firstRowWithComponent.componentId));
     const componentName = String(component?.name || '').trim();
     if (!componentName) return null;
-    const template = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
-      || 'Gather {component}';
+    const template =
+      services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') ||
+      'Gather {component}';
     return {
       name: template.replace('{component}', componentName),
-      img: component.img || DEFAULT_GATHERING_TASK_IMG
+      img: component.img || DEFAULT_GATHERING_TASK_IMG,
     };
   }
 
   function gatheringTaskAutopopulateFromComponent(systemId, existingTask, nextDropRows) {
     const system = services.getCraftingSystemManager?.()?.getSystem?.(systemId);
     const options = _buildManagedItemOptions(_getManagedItems(system));
-    const managedItemById = new Map(options.map(item => [String(item.id), item]));
+    const managedItemById = new Map(options.map((item) => [String(item.id), item]));
     return _firstDropAutopopulatePatch(existingTask, nextDropRows, managedItemById) || {};
   }
 
-  async function updateGatheringLibraryTask(systemId = get(selectedSystemId), taskId, updates = {}) {
+  async function updateGatheringLibraryTask(
+    systemId = get(selectedSystemId),
+    taskId,
+    updates = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return false;
-    const existing = systemConfig.tasks.find(task => task.id === taskId);
+    const existing = systemConfig.tasks.find((task) => task.id === taskId);
     let mergedUpdates = updates;
     if (existing && Array.isArray(updates.dropRows)) {
       const patch = gatheringTaskAutopopulateFromComponent(systemId, existing, updates.dropRows);
@@ -4800,11 +5576,11 @@ export function createAdminStore(services) {
         mergedUpdates = { ...patch, ...updates };
       }
     }
-    systemConfig.tasks = systemConfig.tasks.map(task => task.id === taskId
-      ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID)
-      : task);
+    systemConfig.tasks = systemConfig.tasks.map((task) =>
+      task.id === taskId ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID) : task
+    );
     if (Array.isArray(updates.dropRows)) {
-      const nextTask = systemConfig.tasks.find(task => task.id === taskId);
+      const nextTask = systemConfig.tasks.find((task) => task.id === taskId);
       const validation = _validateGatheringLibraryTaskForSystem(nextTask, systemId);
       if (!validation.valid) {
         services.notify?.error?.(validation.errors[0] || 'Gathering task validation failed.');
@@ -4812,7 +5588,12 @@ export function createAdminStore(services) {
       }
     }
     await _saveGatheringConfig(config);
-    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.tasks.find(task => task.id === taskId), kind: 'task' });
+    _notifyGatheringLibraryRecordDisabled({
+      systemId,
+      oldRecord: existing,
+      nextRecord: systemConfig.tasks.find((task) => task.id === taskId),
+      kind: 'task',
+    });
     await refresh();
     return true;
   }
@@ -4821,9 +5602,13 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return false;
-    const task = systemConfig.tasks.find(task => task.id === taskId);
-    if (task && !await _confirmGatheringLibraryRecordDelete({ systemId, record: task, kind: 'task' })) return false;
-    systemConfig.tasks = systemConfig.tasks.filter(task => task.id !== taskId);
+    const task = systemConfig.tasks.find((task) => task.id === taskId);
+    if (
+      task &&
+      !(await _confirmGatheringLibraryRecordDelete({ systemId, record: task, kind: 'task' }))
+    )
+      return false;
+    systemConfig.tasks = systemConfig.tasks.filter((task) => task.id !== taskId);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -4839,12 +5624,16 @@ export function createAdminStore(services) {
     return tool;
   }
 
-  async function updateGatheringLibraryTool(systemId = get(selectedSystemId), toolId, updates = {}) {
+  async function updateGatheringLibraryTool(
+    systemId = get(selectedSystemId),
+    toolId,
+    updates = {}
+  ) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id || !toolId) return false;
-    const next = _systemTools(id).map(tool => tool.id === toolId
-      ? _normalizeGatheringLibraryTool({ ...tool, ...updates }, _randomID)
-      : tool);
+    const next = _systemTools(id).map((tool) =>
+      tool.id === toolId ? _normalizeGatheringLibraryTool({ ...tool, ...updates }, _randomID) : tool
+    );
     const persisted = await _persistSystemTools(id, next);
     if (persisted === null) return false;
     await refresh();
@@ -4855,9 +5644,16 @@ export function createAdminStore(services) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id || !toolId) return false;
     const tools = _systemTools(id);
-    const tool = tools.find(t => t.id === toolId);
-    if (tool && !await _confirmGatheringLibraryRecordDelete({ systemId: id, record: tool, kind: 'tool' })) return false;
-    const persisted = await _persistSystemTools(id, tools.filter(t => t.id !== toolId));
+    const tool = tools.find((t) => t.id === toolId);
+    if (
+      tool &&
+      !(await _confirmGatheringLibraryRecordDelete({ systemId: id, record: tool, kind: 'tool' }))
+    )
+      return false;
+    const persisted = await _persistSystemTools(
+      id,
+      tools.filter((t) => t.id !== toolId)
+    );
     if (persisted === null) return false;
     await refresh();
     return true;
@@ -4872,16 +5668,22 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return null;
-    const task = systemConfig.tasks.find(task => task.id === taskId);
+    const task = systemConfig.tasks.find((task) => task.id === taskId);
     if (!task) return null;
-    const copySuffix = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
-    const duplicate = _normalizeGatheringTask({
-      ..._clonePlain(task),
-      id: _randomID(),
-      name: `${task.name || 'Gather'} (${copySuffix})`,
-      dropRows: (Array.isArray(task.dropRows) ? task.dropRows : [])
-        .map(row => ({ ..._clonePlain(row), id: _randomID() }))
-    }, _randomID);
+    const copySuffix =
+      services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
+    const duplicate = _normalizeGatheringTask(
+      {
+        ..._clonePlain(task),
+        id: _randomID(),
+        name: `${task.name || 'Gather'} (${copySuffix})`,
+        dropRows: (Array.isArray(task.dropRows) ? task.dropRows : []).map((row) => ({
+          ..._clonePlain(row),
+          id: _randomID(),
+        })),
+      },
+      _randomID
+    );
     systemConfig.tasks = [...systemConfig.tasks, duplicate];
     await _saveGatheringConfig(config);
     await refresh();
@@ -4892,28 +5694,42 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return null;
-    const event = _normalizeGatheringEvent({
-      id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryEvent') || 'Reusable event',
-      dangerTags: ['hazardous'],
-      dropRate: 25
-    }, _randomID);
+    const event = _normalizeGatheringEvent(
+      {
+        id: _randomID(),
+        name:
+          services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryEvent') ||
+          'Reusable event',
+        dangerTags: ['hazardous'],
+        dropRate: 25,
+      },
+      _randomID
+    );
     systemConfig.events = [...systemConfig.events, event];
     await _saveGatheringConfig(config);
     await refresh();
     return event;
   }
 
-  async function updateGatheringLibraryEvent(systemId = get(selectedSystemId), eventId, updates = {}) {
+  async function updateGatheringLibraryEvent(
+    systemId = get(selectedSystemId),
+    eventId,
+    updates = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return false;
-    const existing = systemConfig.events.find(event => event.id === eventId);
-    systemConfig.events = systemConfig.events.map(event => event.id === eventId
-      ? _normalizeGatheringEvent({ ...event, ...updates }, _randomID)
-      : event);
+    const existing = systemConfig.events.find((event) => event.id === eventId);
+    systemConfig.events = systemConfig.events.map((event) =>
+      event.id === eventId ? _normalizeGatheringEvent({ ...event, ...updates }, _randomID) : event
+    );
     await _saveGatheringConfig(config);
-    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.events.find(event => event.id === eventId), kind: 'event' });
+    _notifyGatheringLibraryRecordDisabled({
+      systemId,
+      oldRecord: existing,
+      nextRecord: systemConfig.events.find((event) => event.id === eventId),
+      kind: 'event',
+    });
     await refresh();
     return true;
   }
@@ -4922,9 +5738,13 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return false;
-    const event = systemConfig.events.find(event => event.id === eventId);
-    if (event && !await _confirmGatheringLibraryRecordDelete({ systemId, record: event, kind: 'event' })) return false;
-    systemConfig.events = systemConfig.events.filter(event => event.id !== eventId);
+    const event = systemConfig.events.find((event) => event.id === eventId);
+    if (
+      event &&
+      !(await _confirmGatheringLibraryRecordDelete({ systemId, record: event, kind: 'event' }))
+    )
+      return false;
+    systemConfig.events = systemConfig.events.filter((event) => event.id !== eventId);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -4934,14 +5754,18 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return null;
-    const event = systemConfig.events.find(event => event.id === eventId);
+    const event = systemConfig.events.find((event) => event.id === eventId);
     if (!event) return null;
-    const copySuffix = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
-    const duplicate = _normalizeGatheringEvent({
-      ..._clonePlain(event),
-      id: _randomID(),
-      name: `${event.name || 'Event'} (${copySuffix})`
-    }, _randomID);
+    const copySuffix =
+      services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
+    const duplicate = _normalizeGatheringEvent(
+      {
+        ..._clonePlain(event),
+        id: _randomID(),
+        name: `${event.name || 'Event'} (${copySuffix})`,
+      },
+      _randomID
+    );
     systemConfig.events = [...systemConfig.events, duplicate];
     await _saveGatheringConfig(config);
     await refresh();
@@ -4962,13 +5786,19 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return null;
     const id = String(partial?.id || _randomID());
-    if ((systemConfig.characterModifiers || []).some(entry => entry.id === id)) return null;
-    const entry = _normalizeGatheringCharacterModifier({
-      id,
-      label: partial?.label || services.localize?.('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.NewLabel') || 'Character modifier',
-      icon: partial?.icon || 'fa-solid fa-user',
-      expression: partial?.expression || ''
-    }, _randomID);
+    if ((systemConfig.characterModifiers || []).some((entry) => entry.id === id)) return null;
+    const entry = _normalizeGatheringCharacterModifier(
+      {
+        id,
+        label:
+          partial?.label ||
+          services.localize?.('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.NewLabel') ||
+          'Character modifier',
+        icon: partial?.icon || 'fa-solid fa-user',
+        expression: partial?.expression || '',
+      },
+      _randomID
+    );
     if (!entry) return null;
     systemConfig.characterModifiers = [...(systemConfig.characterModifiers || []), entry];
     await _saveGatheringConfig(config);
@@ -4986,15 +5816,22 @@ export function createAdminStore(services) {
    * @param {object} [updates] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateGatheringCharacterModifier(systemId = get(selectedSystemId), modifierId, updates = {}) {
+  async function updateGatheringCharacterModifier(
+    systemId = get(selectedSystemId),
+    modifierId,
+    updates = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !modifierId) return false;
     const list = systemConfig.characterModifiers || [];
-    const next = list.map(entry => entry.id === modifierId
-      ? _normalizeGatheringCharacterModifier({ ...entry, ...updates }, _randomID) || entry
-      : entry);
-    if (next.length === list.length && next.every((entry, index) => entry === list[index])) return false;
+    const next = list.map((entry) =>
+      entry.id === modifierId
+        ? _normalizeGatheringCharacterModifier({ ...entry, ...updates }, _randomID) || entry
+        : entry
+    );
+    if (next.length === list.length && next.every((entry, index) => entry === list[index]))
+      return false;
     systemConfig.characterModifiers = next;
     await _saveGatheringConfig(config);
     await refresh();
@@ -5015,7 +5852,7 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !modifierId) return false;
-    const next = (systemConfig.characterModifiers || []).filter(entry => entry.id !== modifierId);
+    const next = (systemConfig.characterModifiers || []).filter((entry) => entry.id !== modifierId);
     if (next.length === (systemConfig.characterModifiers || []).length) return false;
     systemConfig.characterModifiers = next;
     await _saveGatheringConfig(config);
@@ -5036,42 +5873,49 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return { added: [], skipped: [], unsupported: true };
-    const foundrySystemId = typeof services.getFoundrySystemId === 'function'
-      ? String(services.getFoundrySystemId() || '')
-      : '';
+    const foundrySystemId =
+      typeof services.getFoundrySystemId === 'function'
+        ? String(services.getFoundrySystemId() || '')
+        : '';
     const presets = getCharacterModifierPresetsForFoundrySystem(foundrySystemId);
     if (!presets || presets.length === 0) {
       return { added: [], skipped: [], unsupported: true, foundrySystemId };
     }
     const result = seedCharacterModifierPresets({
       presets,
-      currentLibrary: systemConfig.characterModifiers || []
+      currentLibrary: systemConfig.characterModifiers || [],
     });
-    systemConfig.characterModifiers = result.next.map(entry => _normalizeGatheringCharacterModifier(entry, _randomID)).filter(Boolean);
+    systemConfig.characterModifiers = result.next
+      .map((entry) => _normalizeGatheringCharacterModifier(entry, _randomID))
+      .filter(Boolean);
     await _saveGatheringConfig(config);
     await refresh();
     return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
   }
 
   function _firstCharacterModifierId(systemConfig) {
-    const list = Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [];
+    const list = Array.isArray(systemConfig?.characterModifiers)
+      ? systemConfig.characterModifiers
+      : [];
     return list[0]?.id || '';
   }
 
   function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
-    const taskIndex = systemConfig.tasks.findIndex(task => task.id === taskId);
+    const taskIndex = systemConfig.tasks.findIndex((task) => task.id === taskId);
     if (taskIndex < 0) return false;
     const task = systemConfig.tasks[taskIndex];
     const rows = Array.isArray(task.dropRows) ? task.dropRows : [];
-    const rowIndex = rows.findIndex(row => row.id === rowId);
+    const rowIndex = rows.findIndex((row) => row.id === rowId);
     if (rowIndex < 0) return false;
     const nextRow = mutate({ ...rows[rowIndex] });
     if (!nextRow) return false;
     const nextRows = [...rows];
     nextRows[rowIndex] = nextRow;
-    systemConfig.tasks = systemConfig.tasks.map((existing, index) => index === taskIndex
-      ? _normalizeGatheringTask({ ...existing, dropRows: nextRows }, _randomID)
-      : existing);
+    systemConfig.tasks = systemConfig.tasks.map((existing, index) =>
+      index === taskIndex
+        ? _normalizeGatheringTask({ ...existing, dropRows: nextRows }, _randomID)
+        : existing
+    );
     return true;
   }
 
@@ -5088,24 +5932,35 @@ export function createAdminStore(services) {
    * @param {object} [partial] Reference fields (modifierId, operator, min, max, overrides).
    * @returns {Promise<object|null>}
    */
-  async function addGatheringDropRowCharacterModifier(systemId = get(selectedSystemId), taskId, rowId, partial = {}) {
+  async function addGatheringDropRowCharacterModifier(
+    systemId = get(selectedSystemId),
+    taskId,
+    rowId,
+    partial = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId) return null;
-    const modifierId = String(partial?.modifierId || _firstCharacterModifierId(systemConfig) || '').trim();
+    const modifierId = String(
+      partial?.modifierId || _firstCharacterModifierId(systemConfig) || ''
+    ).trim();
     if (!modifierId) return null;
     let created = null;
     const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
       const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
       const id = String(partial?.id || _randomID());
-      const ref = _normalizeGatheringCharacterModifierReference({
-        id,
-        modifierId,
-        operator: partial?.operator || '+',
-        min: partial?.min ?? null,
-        max: partial?.max ?? null,
-        expressionOverride: partial?.expressionOverride || ''
-      }, refs.length, _randomID);
+      const ref = _normalizeGatheringCharacterModifierReference(
+        {
+          id,
+          modifierId,
+          operator: partial?.operator || '+',
+          min: partial?.min ?? null,
+          max: partial?.max ?? null,
+          expressionOverride: partial?.expressionOverride || '',
+        },
+        refs.length,
+        _randomID
+      );
       if (!ref) return null;
       created = ref;
       row.characterModifiers = [...refs, ref];
@@ -5128,18 +5983,24 @@ export function createAdminStore(services) {
    * @param {object} [patch] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateGatheringDropRowCharacterModifier(systemId = get(selectedSystemId), taskId, rowId, refId, patch = {}) {
+  async function updateGatheringDropRowCharacterModifier(
+    systemId = get(selectedSystemId),
+    taskId,
+    rowId,
+    refId,
+    patch = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId || !refId) return false;
     const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
       const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-      const index = refs.findIndex(ref => ref.id === refId);
+      const index = refs.findIndex((ref) => ref.id === refId);
       if (index < 0) return null;
       const merged = { ...refs[index], ...patch };
       const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
       if (!normalized) return null;
-      row.characterModifiers = refs.map((ref, refIndex) => refIndex === index ? normalized : ref);
+      row.characterModifiers = refs.map((ref, refIndex) => (refIndex === index ? normalized : ref));
       return row;
     });
     if (!changed) return false;
@@ -5157,13 +6018,18 @@ export function createAdminStore(services) {
    * @param {string} refId Reference id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteGatheringDropRowCharacterModifier(systemId = get(selectedSystemId), taskId, rowId, refId) {
+  async function deleteGatheringDropRowCharacterModifier(
+    systemId = get(selectedSystemId),
+    taskId,
+    rowId,
+    refId
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId || !refId) return false;
     const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
       const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-      const next = refs.filter(ref => ref.id !== refId);
+      const next = refs.filter((ref) => ref.id !== refId);
       if (next.length === refs.length) return null;
       row.characterModifiers = next;
       return row;
@@ -5185,28 +6051,43 @@ export function createAdminStore(services) {
    * @param {object} [partial] Reference fields.
    * @returns {Promise<object|null>}
    */
-  async function addGatheringEventCharacterModifier(systemId = get(selectedSystemId), eventId, partial = {}) {
+  async function addGatheringEventCharacterModifier(
+    systemId = get(selectedSystemId),
+    eventId,
+    partial = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return null;
-    const modifierId = String(partial?.modifierId || _firstCharacterModifierId(systemConfig) || '').trim();
+    const modifierId = String(
+      partial?.modifierId || _firstCharacterModifierId(systemConfig) || ''
+    ).trim();
     if (!modifierId) return null;
-    const eventIndex = systemConfig.events.findIndex(event => event.id === eventId);
+    const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
     if (eventIndex < 0) return null;
     const event = systemConfig.events[eventIndex];
     const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const id = String(partial?.id || _randomID());
-    const ref = _normalizeGatheringCharacterModifierReference({
-      id,
-      modifierId,
-      operator: partial?.operator || '+',
-      min: partial?.min ?? null,
-      max: partial?.max ?? null,
-      expressionOverride: partial?.expressionOverride || ''
-    }, refs.length, _randomID);
+    const ref = _normalizeGatheringCharacterModifierReference(
+      {
+        id,
+        modifierId,
+        operator: partial?.operator || '+',
+        min: partial?.min ?? null,
+        max: partial?.max ?? null,
+        expressionOverride: partial?.expressionOverride || '',
+      },
+      refs.length,
+      _randomID
+    );
     if (!ref) return null;
-    const nextEvent = _normalizeGatheringEvent({ ...event, characterModifiers: [...refs, ref] }, _randomID);
-    systemConfig.events = systemConfig.events.map((existing, index) => index === eventIndex ? nextEvent : existing);
+    const nextEvent = _normalizeGatheringEvent(
+      { ...event, characterModifiers: [...refs, ref] },
+      _randomID
+    );
+    systemConfig.events = systemConfig.events.map((existing, index) =>
+      index === eventIndex ? nextEvent : existing
+    );
     await _saveGatheringConfig(config);
     await refresh();
     return ref;
@@ -5221,22 +6102,32 @@ export function createAdminStore(services) {
    * @param {object} [patch] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateGatheringEventCharacterModifier(systemId = get(selectedSystemId), eventId, refId, patch = {}) {
+  async function updateGatheringEventCharacterModifier(
+    systemId = get(selectedSystemId),
+    eventId,
+    refId,
+    patch = {}
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId || !refId) return false;
-    const eventIndex = systemConfig.events.findIndex(event => event.id === eventId);
+    const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
     if (eventIndex < 0) return false;
     const event = systemConfig.events[eventIndex];
     const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
-    const index = refs.findIndex(ref => ref.id === refId);
+    const index = refs.findIndex((ref) => ref.id === refId);
     if (index < 0) return false;
     const merged = { ...refs[index], ...patch };
     const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
     if (!normalized) return false;
-    const nextRefs = refs.map((ref, refIndex) => refIndex === index ? normalized : ref);
-    const nextEvent = _normalizeGatheringEvent({ ...event, characterModifiers: nextRefs }, _randomID);
-    systemConfig.events = systemConfig.events.map((existing, hIndex) => hIndex === eventIndex ? nextEvent : existing);
+    const nextRefs = refs.map((ref, refIndex) => (refIndex === index ? normalized : ref));
+    const nextEvent = _normalizeGatheringEvent(
+      { ...event, characterModifiers: nextRefs },
+      _randomID
+    );
+    systemConfig.events = systemConfig.events.map((existing, hIndex) =>
+      hIndex === eventIndex ? nextEvent : existing
+    );
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -5250,18 +6141,27 @@ export function createAdminStore(services) {
    * @param {string} refId Reference id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteGatheringEventCharacterModifier(systemId = get(selectedSystemId), eventId, refId) {
+  async function deleteGatheringEventCharacterModifier(
+    systemId = get(selectedSystemId),
+    eventId,
+    refId
+  ) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId || !refId) return false;
-    const eventIndex = systemConfig.events.findIndex(event => event.id === eventId);
+    const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
     if (eventIndex < 0) return false;
     const event = systemConfig.events[eventIndex];
     const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
-    const nextRefs = refs.filter(ref => ref.id !== refId);
+    const nextRefs = refs.filter((ref) => ref.id !== refId);
     if (nextRefs.length === refs.length) return false;
-    const nextEvent = _normalizeGatheringEvent({ ...event, characterModifiers: nextRefs }, _randomID);
-    systemConfig.events = systemConfig.events.map((existing, hIndex) => hIndex === eventIndex ? nextEvent : existing);
+    const nextEvent = _normalizeGatheringEvent(
+      { ...event, characterModifiers: nextRefs },
+      _randomID
+    );
+    systemConfig.events = systemConfig.events.map((existing, hIndex) =>
+      hIndex === eventIndex ? nextEvent : existing
+    );
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -5277,26 +6177,43 @@ export function createAdminStore(services) {
     if (!system) return;
 
     const existing = system.craftingCheck || {};
-    const normalizedConfig = typeof configOrMode === 'object' && configOrMode !== null
-      ? configOrMode
-      : {
-        mode: configOrMode,
-        macroUuid,
-        outcomesText
-      };
+    const normalizedConfig =
+      typeof configOrMode === 'object' && configOrMode !== null
+        ? configOrMode
+        : {
+            mode: configOrMode,
+            macroUuid,
+            outcomesText,
+          };
     const mode = normalizedConfig.mode === 'namedOutcomes' ? 'namedOutcomes' : 'passFail';
     const resolvedMacroUuid = normalizedConfig.macroUuid || null;
     const outcomes = String(normalizedConfig.outcomesText || '')
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
     await systemManager.updateSystem(sysId, {
       craftingCheck: {
         ...existing,
         mode,
         macroUuid: resolvedMacroUuid,
-        outcomes
-      }
+        outcomes,
+      },
+    });
+    await refresh();
+  }
+
+  // Persist the structured routed crafting check (type + roll expression +
+  // outcome tiers) authored in the Checks editor, preserving the rest of the
+  // craftingCheck config. The manager normalizes the routed payload on write.
+  async function saveCraftingCheckRouted(routed) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: { ...existing, routed },
     });
     await refresh();
   }
@@ -5308,10 +6225,14 @@ export function createAdminStore(services) {
     const system = systemManager.getSystem(sysId);
     if (!system) return;
 
-    const requirements = JSON.parse(JSON.stringify(system.requirements || {
-      time: { enabled: false },
-      currency: { enabled: false, units: [] }
-    }));
+    const requirements = JSON.parse(
+      JSON.stringify(
+        system.requirements || {
+          time: { enabled: false },
+          currency: { enabled: false, units: [] },
+        }
+      )
+    );
     requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
     const result = await mutate(requirements.currency, system);
     if (result === false) return false;
@@ -5324,15 +6245,21 @@ export function createAdminStore(services) {
   async function addCurrencyUnit(systemId, partial = {}) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       const id = String(partial?.id || _randomID()).trim();
-      if (!id || currency.units.some(unit => unit.id === id)) return null;
-      const unit = normalizeCurrencyUnit({
-        id,
-        label: partial?.label || services.localize?.('FABRICATE.Admin.Manager.CurrencyUnits.NewLabel') || 'Currency unit',
-        abbreviation: partial?.abbreviation || '',
-        icon: partial?.icon || 'fa-solid fa-coins',
-        actorPath: partial?.actorPath || '',
-        contains: partial?.contains || []
-      }, _randomID);
+      if (!id || currency.units.some((unit) => unit.id === id)) return null;
+      const unit = normalizeCurrencyUnit(
+        {
+          id,
+          label:
+            partial?.label ||
+            services.localize?.('FABRICATE.Admin.Manager.CurrencyUnits.NewLabel') ||
+            'Currency unit',
+          abbreviation: partial?.abbreviation || '',
+          icon: partial?.icon || 'fa-solid fa-coins',
+          actorPath: partial?.actorPath || '',
+          contains: partial?.contains || [],
+        },
+        _randomID
+      );
       if (!unit) return null;
       currency.units = [...currency.units, unit];
       return unit;
@@ -5343,7 +6270,7 @@ export function createAdminStore(services) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       if (!unitId) return false;
       let changed = false;
-      currency.units = currency.units.map(unit => {
+      currency.units = currency.units.map((unit) => {
         if (unit.id !== unitId) return unit;
         changed = true;
         return normalizeCurrencyUnit({ ...unit, ...updates, id: unit.id }, _randomID) || unit;
@@ -5365,12 +6292,14 @@ export function createAdminStore(services) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
       const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
-      currency.units = currency.units.map(unit => unit.id === parentUnitId
-        ? {
-          ...unit,
-          contains: [...(unit.contains || []), { unitId: subUnitId, amount: numericAmount }]
-        }
-        : unit);
+      currency.units = currency.units.map((unit) =>
+        unit.id === parentUnitId
+          ? {
+              ...unit,
+              contains: [...(unit.contains || []), { unitId: subUnitId, amount: numericAmount }],
+            }
+          : unit
+      );
       return true;
     });
   }
@@ -5469,9 +6398,10 @@ export function createAdminStore(services) {
   }
 
   async function seedCurrencyUnitPresets(systemId = get(selectedSystemId)) {
-    const foundrySystemId = typeof services.getFoundrySystemId === 'function'
-      ? String(services.getFoundrySystemId() || '')
-      : '';
+    const foundrySystemId =
+      typeof services.getFoundrySystemId === 'function'
+        ? String(services.getFoundrySystemId() || '')
+        : '';
     const presets = getCurrencyPresetsForFoundrySystem(foundrySystemId);
     if (!presets || presets.length === 0) {
       return { added: [], skipped: [], unsupported: true, foundrySystemId };
@@ -5479,9 +6409,11 @@ export function createAdminStore(services) {
     return await _updateCurrencyConfig(systemId, (currency) => {
       const result = seedCurrencyPresets({
         presets,
-        currentUnits: currency.units || []
+        currentUnits: currency.units || [],
       });
-      currency.units = result.next.map(unit => normalizeCurrencyUnit(unit, _randomID)).filter(Boolean);
+      currency.units = result.next
+        .map((unit) => normalizeCurrencyUnit(unit, _randomID))
+        .filter(Boolean);
       // pf2e coins live in the actor inventory (read/spent via actor.inventory.removeCoins),
       // not at a flat actor property, so the pf2e preset selects the actorInventory spend
       // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
@@ -5512,13 +6444,18 @@ export function createAdminStore(services) {
         ...existing,
         learnOnCraft: config.learnOnCraft === true,
         consumeOnFail: config.consumeOnFail !== false,
-        showAttemptHistoryToPlayers: config.showAttemptHistoryToPlayers !== false
-      }
+        showAttemptHistoryToPlayers: config.showAttemptHistoryToPlayers !== false,
+      },
     });
     await refresh();
   }
 
-  async function saveVisibilityConfig(configOrListMode, knowledgeMode, consumeOnLearn, extras = {}) {
+  async function saveVisibilityConfig(
+    configOrListMode,
+    knowledgeMode,
+    consumeOnLearn,
+    extras = {}
+  ) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
@@ -5529,36 +6466,41 @@ export function createAdminStore(services) {
     const currentKnowledge = existing.knowledge || {};
     const currentItem = currentKnowledge.item || {};
     const currentLearn = currentKnowledge.learn || {};
-    const normalizedConfig = typeof configOrListMode === 'object' && configOrListMode !== null
-      ? configOrListMode
-      : {
-        listMode: configOrListMode,
-        knowledgeMode,
-        consumeOnLearn,
-        ...extras
-      };
+    const normalizedConfig =
+      typeof configOrListMode === 'object' && configOrListMode !== null
+        ? configOrListMode
+        : {
+            listMode: configOrListMode,
+            knowledgeMode,
+            consumeOnLearn,
+            ...extras,
+          };
     const nextListMode = normalizedConfig.listMode || existing.listMode || 'global';
-    const nextKnowledgeMode = normalizedConfig.knowledgeMode || currentKnowledge.mode || 'itemOrLearned';
-    const nextLimitUses = normalizedConfig.limitUses !== undefined
-      ? normalizedConfig.limitUses === true
-      : currentItem.limitUses === true;
-    const rawMaxUses = normalizedConfig.maxUses !== undefined
-      ? normalizedConfig.maxUses
-      : currentItem.maxUses;
-    const nextMaxUses = nextLimitUses && Number.isFinite(Number(rawMaxUses)) && Number(rawMaxUses) > 0
-      ? Number(rawMaxUses)
-      : undefined;
+    const nextKnowledgeMode =
+      normalizedConfig.knowledgeMode || currentKnowledge.mode || 'itemOrLearned';
+    const nextLimitUses =
+      normalizedConfig.limitUses !== undefined
+        ? normalizedConfig.limitUses === true
+        : currentItem.limitUses === true;
+    const rawMaxUses =
+      normalizedConfig.maxUses !== undefined ? normalizedConfig.maxUses : currentItem.maxUses;
+    const nextMaxUses =
+      nextLimitUses && Number.isFinite(Number(rawMaxUses)) && Number(rawMaxUses) > 0
+        ? Number(rawMaxUses)
+        : undefined;
     const nextDestroyWhenExhausted = nextLimitUses
-      ? (normalizedConfig.destroyWhenExhausted !== undefined
+      ? normalizedConfig.destroyWhenExhausted !== undefined
         ? normalizedConfig.destroyWhenExhausted === true
-        : currentItem.destroyWhenExhausted === true)
+        : currentItem.destroyWhenExhausted === true
       : false;
-    const nextConsumeOnLearn = normalizedConfig.consumeOnLearn !== undefined
-      ? normalizedConfig.consumeOnLearn !== false
-      : currentLearn.consumeOnLearn !== false;
-    const nextDragDropEnabled = normalizedConfig.dragDropEnabled !== undefined
-      ? normalizedConfig.dragDropEnabled !== false
-      : currentLearn.dragDropEnabled !== false;
+    const nextConsumeOnLearn =
+      normalizedConfig.consumeOnLearn !== undefined
+        ? normalizedConfig.consumeOnLearn !== false
+        : currentLearn.consumeOnLearn !== false;
+    const nextDragDropEnabled =
+      normalizedConfig.dragDropEnabled !== undefined
+        ? normalizedConfig.dragDropEnabled !== false
+        : currentLearn.dragDropEnabled !== false;
     const recipeVisibility = {
       ...existing,
       listMode: nextListMode,
@@ -5569,14 +6511,14 @@ export function createAdminStore(services) {
           ...currentItem,
           limitUses: nextLimitUses,
           maxUses: nextMaxUses,
-          destroyWhenExhausted: nextDestroyWhenExhausted
+          destroyWhenExhausted: nextDestroyWhenExhausted,
         },
         learn: {
           ...currentLearn,
           consumeOnLearn: nextConsumeOnLearn,
-          dragDropEnabled: nextDragDropEnabled
-        }
-      }
+          dragDropEnabled: nextDragDropEnabled,
+        },
+      },
     };
 
     await systemManager.updateSystem(sysId, { recipeVisibility });
@@ -5623,7 +6565,7 @@ export function createAdminStore(services) {
       title: `Delete ${recipe.name}?`,
       content: `<p>Delete recipe <strong>${recipe.name}</strong>?</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return false;
 
@@ -5688,7 +6630,7 @@ export function createAdminStore(services) {
       // per keystroke-committed edit / reorder.
       await recipeManager.updateRecipe(recipeId, updates, {
         allowIncomplete: true,
-        notify: options.notify !== false
+        notify: options.notify !== false,
       });
       await refresh();
       return true;
@@ -5723,7 +6665,7 @@ export function createAdminStore(services) {
     const recipeManager = services.getRecipeManager();
     const sysId = get(selectedSystemId);
     const recipes = sysId
-      ? recipeManager.getRecipes({ craftingSystemId: sysId }).map(r => r.toJSON())
+      ? recipeManager.getRecipes({ craftingSystemId: sysId }).map((r) => r.toJSON())
       : recipeManager.exportRecipes();
     const json = JSON.stringify(recipes, null, 2);
     await services.copyToClipboard(json);
@@ -5745,7 +6687,7 @@ export function createAdminStore(services) {
       services.notify.error('Crafting system not found.');
       return;
     }
-    const recipes = recipeManager.getRecipes({ craftingSystemId: targetId }).map(r => r.toJSON());
+    const recipes = recipeManager.getRecipes({ craftingSystemId: targetId }).map((r) => r.toJSON());
     const version = services.getModuleVersion ? services.getModuleVersion() : '0.0.0';
     const payload = buildExportPayload(system, recipes, version);
     const filename = makeExportFilename(system.name);
@@ -5765,14 +6707,14 @@ export function createAdminStore(services) {
     const sysId = get(selectedSystemId);
     if (!itemId || !sysId) return;
     const system = systemManager.getSystem(sysId);
-    const item = _getManagedItems(system).find(i => i.id === itemId);
+    const item = _getManagedItems(system).find((i) => i.id === itemId);
     if (!item) return;
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${item.name}?`,
       content: `<p>Delete component <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
       yes: () => true,
-      no: () => false
+      no: () => false,
     });
     if (!confirmed) return;
 
@@ -5832,22 +6774,28 @@ export function createAdminStore(services) {
   unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
 
   // Refresh the Map Region Links list when the GM activates a different scene.
-  unsubscribeSceneChange = services.subscribeSceneChange?.(() => {
-    if (destroyed) return;
-    travel.patch();
-  }) || null;
+  unsubscribeSceneChange =
+    services.subscribeSceneChange?.(() => {
+      if (destroyed) return;
+      travel.patch();
+    }) || null;
 
   // Refresh the live current-realm view when a party's travel marker token moves
   // (or is added/removed). Only re-patch for tokens that are actually a party's
   // travel marker, so unrelated token moves don't churn the Travel view.
-  unsubscribeTravelMarkerMove = services.subscribeTravelMarkerMove?.((actorUuid) => {
-    if (destroyed) return;
-    if (!actorUuid) { travel.patch(); return; }
-    const parties = services.getGatheringPartyStore?.()?.list?.() || [];
-    const isMarker = (Array.isArray(parties) ? parties : [])
-      .some(party => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid));
-    if (isMarker) travel.patch();
-  }) || null;
+  unsubscribeTravelMarkerMove =
+    services.subscribeTravelMarkerMove?.((actorUuid) => {
+      if (destroyed) return;
+      if (!actorUuid) {
+        travel.patch();
+        return;
+      }
+      const parties = services.getGatheringPartyStore?.()?.list?.() || [];
+      const isMarker = (Array.isArray(parties) ? parties : []).some(
+        (party) => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid)
+      );
+      if (isMarker) travel.patch();
+    }) || null;
 
   // Trigger initial computation
   refresh();
@@ -5956,6 +6904,7 @@ export function createAdminStore(services) {
     updateGatheringEventCharacterModifier,
     deleteGatheringEventCharacterModifier,
     saveCraftingCheckConfig,
+    saveCraftingCheckRouted,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,
@@ -6012,6 +6961,6 @@ export function createAdminStore(services) {
     setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
     refresh,
     refreshGatheringConfig,
-    destroy
+    destroy,
   };
 }

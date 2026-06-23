@@ -22,7 +22,6 @@
   import { localize } from '../../../util/foundryBridge.js';
   import {
     parseDiceGroups,
-    expressionRange,
     findRangeConflicts,
   } from '../../../../../utils/craftingCheckExpression.js';
 
@@ -58,7 +57,6 @@
   const type = $derived(value?.type === 'fixed' ? 'fixed' : 'relative');
   const outcomes = $derived(Array.isArray(value?.outcomes) ? value.outcomes : []);
   const diceGroups = $derived(parseDiceGroups(value?.rollExpression));
-  const range = $derived(expressionRange(value?.rollExpression));
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
   const validationMessages = $derived(
@@ -104,7 +102,7 @@
 
   function addOutcome() {
     const last = outcomes[outcomes.length - 1];
-    const nextStart = type === 'fixed' && last ? Number(last.end) + 1 : range.valid ? range.min : 1;
+    const nextStart = type === 'fixed' && last ? Number(last.end) + 1 : 1;
     emit({
       outcomes: [
         ...outcomes,
@@ -172,15 +170,6 @@
         <p class="manager-muted" data-dice-empty>{text('FABRICATE.Admin.Manager.Checks.Crafting.NoDice', 'No dice detected in this expression.')}</p>
       {/if}
     </div>
-    {#if type === 'fixed'}
-      <p class="manager-muted" data-expression-range>
-        {#if range.valid}
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.ValueRange', 'Value range')} {range.min}–{range.max}
-        {:else}
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.ValueRangeUnknown', 'Enter a valid expression to bound the value range.')}
-        {/if}
-      </p>
-    {/if}
   </section>
 
   <section class="manager-inspector-card">

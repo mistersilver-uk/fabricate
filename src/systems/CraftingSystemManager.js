@@ -317,6 +317,37 @@ export class CraftingSystemManager {
           : mode === 'namedOutcomes'
             ? ['low', 'high']
             : ['fail', 'pass'],
+      routed: this._normalizeRoutedCraftingCheck(check?.routed),
+    };
+  }
+
+  // Structured routed-mode crafting check authored in the Checks editor: a check
+  // type (relative DC offsets or fixed value ranges), a roll expression, and the
+  // outcome tiers. Kept alongside the legacy `outcomes` string list rather than
+  // replacing it, so the existing routing engine is untouched.
+  _normalizeRoutedCraftingCheck(routed = {}) {
+    const source = !routed || typeof routed !== 'object' ? {} : routed;
+    const outcomes = Array.isArray(source.outcomes) ? source.outcomes : [];
+    return {
+      type: source.type === 'fixed' ? 'fixed' : 'relative',
+      rollExpression: typeof source.rollExpression === 'string' ? source.rollExpression : '',
+      outcomes: outcomes.map((outcome) => this._normalizeRoutedOutcome(outcome)).filter(Boolean),
+    };
+  }
+
+  _normalizeRoutedOutcome(outcome) {
+    if (!outcome || typeof outcome !== 'object') return null;
+    const dc = Number(outcome.dc);
+    const start = Number(outcome.start);
+    const end = Number(outcome.end);
+    return {
+      id: outcome.id || foundry.utils.randomID(),
+      name: String(outcome.name || '').trim(),
+      success: outcome.success === true,
+      breakTools: outcome.breakTools === true,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
+      start: Number.isFinite(start) ? Math.trunc(start) : 0,
+      end: Number.isFinite(end) ? Math.trunc(end) : 0,
     };
   }
 

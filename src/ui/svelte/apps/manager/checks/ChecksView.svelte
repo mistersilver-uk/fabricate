@@ -22,31 +22,21 @@
 
   // `resolutionMode` is the selected system's recipe resolution mode. The full
   // crafting check editor is built for routed mode; other modes keep the
-  // singleton placeholder page until their editors are built.
-  let { resolutionMode = 'simple' } = $props();
+  // singleton placeholder page until their editors are built. `craftingCheck` is
+  // the routed config draft (owned by the manager root, which persists it), and
+  // `onUpdateCraftingCheck` reports edits back.
+  let {
+    resolutionMode = 'simple',
+    craftingCheck = null,
+    onUpdateCraftingCheck = () => {}
+  } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
-
   let activeTab = $state('crafting');
-
-  // Local draft for the routed crafting check. Persistence to the system model
-  // is a follow-up; for now the draft lives for the lifetime of the view.
-  let craftingCheckDraft = $state({
-    type: 'relative',
-    rollExpression: '1d20',
-    outcomes: [
-      { id: newId(), name: 'Failure', success: false, breakTools: true, dc: 0, start: 1, end: 10 },
-      { id: newId(), name: 'Success', success: true, breakTools: false, dc: 0, start: 11, end: 20 }
-    ]
-  });
 
   const craftingRouted = $derived(resolutionMode === 'routed');
 
@@ -120,7 +110,7 @@
         </div>
       {:else if activeTab === 'crafting' && craftingRouted}
         <div data-checks-panel="crafting">
-          <CraftingCheckEditor value={craftingCheckDraft} onChange={(next) => { craftingCheckDraft = next; }} />
+          <CraftingCheckEditor value={craftingCheck} onChange={onUpdateCraftingCheck} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

@@ -2,7 +2,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseDiceGroups,
-  expressionRange,
   rangesOverlap,
   findRangeConflicts,
 } from '../src/utils/craftingCheckExpression.js';
@@ -24,31 +23,12 @@ describe('parseDiceGroups', () => {
     assert.deepEqual(parseDiceGroups(''), []);
     assert.deepEqual(parseDiceGroups(null), []);
   });
-});
 
-describe('expressionRange', () => {
-  it('bounds a single die', () => {
-    assert.deepEqual(expressionRange('1d20'), { min: 1, max: 20, valid: true });
-  });
-
-  it('adds flat modifiers to both bounds', () => {
-    assert.deepEqual(expressionRange('2d6+3'), { min: 5, max: 15, valid: true });
-  });
-
-  it('handles subtraction of a constant and of dice', () => {
-    assert.deepEqual(expressionRange('d20-2'), { min: -1, max: 18, valid: true });
-    assert.deepEqual(expressionRange('2d6-1d4'), { min: -2, max: 11, valid: true });
-  });
-
-  it('sums multiple dice groups', () => {
-    assert.deepEqual(expressionRange('2d6+1d4'), { min: 3, max: 16, valid: true });
-  });
-
-  it('flags unparseable or empty expressions as invalid', () => {
-    assert.equal(expressionRange('abc').valid, false);
-    assert.equal(expressionRange('1d20 oops').valid, false);
-    assert.equal(expressionRange('1d20+').valid, false);
-    assert.equal(expressionRange('').valid, false);
+  it('ignores actor references that cannot be resolved ahead of time', () => {
+    assert.deepEqual(
+      parseDiceGroups('1d20+@attributes.con.mod').map((g) => g.raw),
+      ['1d20']
+    );
   });
 });
 

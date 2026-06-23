@@ -2675,8 +2675,6 @@
             "ExpressionLabel": "Expression",
             "DiceGroups": "Dice groups",
             "NoDice": "No dice detected in this expression.",
-            "ValueRange": "Value range",
-            "ValueRangeUnknown": "Enter a valid expression to bound the value range.",
             "OutcomesTitle": "Outcome tiers",
             "AddOutcome": "Add outcome",
             "NoOutcomes": "No outcome tiers yet. Add the tiers this check routes results into.",

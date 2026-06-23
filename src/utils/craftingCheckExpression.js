@@ -5,12 +5,10 @@
  * source of truth.
  */
 
-const DICE_TOKEN = /^(\d*)d(\d+)$/i;
-
 /**
  * Extract the dice groups (e.g. `2d6`, `d20`) from a roll expression, in order
- * of appearance. Flat modifiers and operators are ignored. A bare `dN` counts
- * as a single die.
+ * of appearance. Flat modifiers, operators, and actor references (e.g.
+ * `@attributes.con.mod`) are ignored. A bare `dN` counts as a single die.
  * @param {string} expression
  * @returns {{ raw: string, count: number, sides: number }[]}
  */
@@ -25,50 +23,6 @@ export function parseDiceGroups(expression) {
     if (count >= 1 && sides >= 1) groups.push({ raw: `${count}d${sides}`, count, sides });
   }
   return groups;
-}
-
-/**
- * Compute the inclusive min/max total a roll expression can produce, and whether
- * the whole expression parsed cleanly (no unrecognised characters left over).
- * Supports dice terms and integer constants joined by `+`/`-`.
- * @param {string} expression
- * @returns {{ min: number, max: number, valid: boolean }}
- */
-export function expressionRange(expression) {
-  const text = String(expression ?? '').trim();
-  if (!text) return { min: 0, max: 0, valid: false };
-
-  const scanner = /([+-]?)\s*(\d*d\d+|\d+)/gi;
-  let min = 0;
-  let max = 0;
-  let matched = false;
-  let clean = true;
-  let cursor = 0;
-  let match;
-  while ((match = scanner.exec(text)) !== null) {
-    if (text.slice(cursor, match.index).replaceAll(/\s+/g, '') !== '') clean = false;
-    cursor = scanner.lastIndex;
-    const sign = match[1] === '-' ? -1 : 1;
-    const dice = DICE_TOKEN.exec(match[2]);
-    if (dice) {
-      const count = dice[1] === '' ? 1 : Number(dice[1]);
-      const sides = Number(dice[2]);
-      if (sign > 0) {
-        min += count;
-        max += count * sides;
-      } else {
-        min -= count * sides;
-        max -= count;
-      }
-    } else {
-      const value = Number(match[2]) * sign;
-      min += value;
-      max += value;
-    }
-    matched = true;
-  }
-  if (text.slice(cursor).replaceAll(/\s+/g, '') !== '') clean = false;
-  return { min, max, valid: matched && clean };
 }
 
 /**

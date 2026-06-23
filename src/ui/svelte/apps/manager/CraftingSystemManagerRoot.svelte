@@ -84,6 +84,23 @@
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
+
+  // Routed crafting check editor draft. Seeded from the selected system's
+  // craftingCheck.routed, reset when the selection changes, and persisted (debounced)
+  // through the store so keystrokes don't hammer Foundry settings.
+  function cloneRoutedCheck(routed) {
+    const source = routed && typeof routed === 'object' ? routed : {};
+    return {
+      type: source.type === 'fixed' ? 'fixed' : 'relative',
+      rollExpression: typeof source.rollExpression === 'string' ? source.rollExpression : '',
+      outcomes: Array.isArray(source.outcomes) ? source.outcomes.map((outcome) => ({ ...outcome })) : []
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
+  // svelte-ignore state_referenced_locally
+  let lastChecksSystemId = $viewState.selectedSystem?.id || '';
+  let checksSaveTimer = null;
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
@@ -104,6 +121,23 @@
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
+
+  // Reseed the routed-check draft when the selected system changes (not on every
+  // refresh of the same system, so our own debounced save never clobbers the draft).
+  $effect(() => {
+    if (selectedSystemId === lastChecksSystemId) return;
+    lastChecksSystemId = selectedSystemId;
+    checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+  });
+
+  function onUpdateCraftingCheck(next) {
+    checkRoutedDraft = next;
+    if (checksSaveTimer) clearTimeout(checksSaveTimer);
+    checksSaveTimer = setTimeout(() => {
+      checksSaveTimer = null;
+      store?.saveCraftingCheckRouted?.(checkRoutedDraft);
+    }, 400);
+  }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
@@ -3727,7 +3761,11 @@
     {:else if currentView === 'checks' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
         <section class="manager-environment-editor-shell">
-          <ChecksView resolutionMode={selectedSystem?.resolutionMode || 'simple'} />
+          <ChecksView
+            resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+            craftingCheck={checkRoutedDraft}
+            {onUpdateCraftingCheck}
+          />
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
