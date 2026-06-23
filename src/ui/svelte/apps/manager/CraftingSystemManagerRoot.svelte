@@ -94,7 +94,12 @@
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
       rollExpression: typeof source.rollExpression === 'string' ? source.rollExpression : '',
-      outcomes: Array.isArray(source.outcomes) ? source.outcomes.map((outcome) => ({ ...outcome })) : []
+      relativeOutcomes: Array.isArray(source.relativeOutcomes)
+        ? source.relativeOutcomes.map((outcome) => ({ ...outcome }))
+        : [],
+      fixedOutcomes: Array.isArray(source.fixedOutcomes)
+        ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
+        : []
     };
   }
   // svelte-ignore state_referenced_locally

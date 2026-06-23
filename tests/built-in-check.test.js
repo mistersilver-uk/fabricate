@@ -50,36 +50,47 @@ test('_normalizeCraftingCheck with missing checkSource defaults to macro', () =>
 test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({});
-  assert.deepEqual(result.routed, { type: 'relative', rollExpression: '', outcomes: [] });
+  assert.deepEqual(result.routed, {
+    type: 'relative',
+    rollExpression: '',
+    relativeOutcomes: [],
+    fixedOutcomes: [],
+  });
 });
 
-test('_normalizeCraftingCheck normalizes routed outcomes (ids, types, truncation)', () => {
+test('_normalizeCraftingCheck normalizes relative and fixed tiers independently', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     routed: {
       type: 'fixed',
       rollExpression: '1d20+@attributes.con.mod',
-      outcomes: [
-        { name: '  Hit  ', success: true, breakTools: true, dc: '3', start: '1', end: '20' },
-        { id: 'keep', name: 'Miss', success: false, breakTools: false, dc: -2.7, start: 0, end: 0 },
+      relativeOutcomes: [
+        { name: '  Botch  ', success: false, breakTools: true, dc: -2.7, start: 99, end: 99 },
         'not-an-object',
+      ],
+      fixedOutcomes: [
+        { id: 'keep', name: 'Hit', success: true, breakTools: false, dc: 9, start: '1', end: '20' },
         null,
       ],
     },
   });
   assert.equal(result.routed.type, 'fixed');
   assert.equal(result.routed.rollExpression, '1d20+@attributes.con.mod');
-  assert.equal(result.routed.outcomes.length, 2);
-  const [first, second] = result.routed.outcomes;
-  assert.ok(first.id, 'a missing id is generated');
-  assert.equal(first.name, 'Hit');
-  assert.equal(first.success, true);
-  assert.equal(first.breakTools, true);
-  assert.equal(first.dc, 3);
-  assert.equal(first.start, 1);
-  assert.equal(first.end, 20);
-  assert.equal(second.id, 'keep', 'an existing id is preserved');
-  assert.equal(second.dc, -2, 'dc is truncated to an integer');
+
+  assert.equal(result.routed.relativeOutcomes.length, 1, 'non-object entries are dropped');
+  const relative = result.routed.relativeOutcomes[0];
+  assert.ok(relative.id, 'a missing id is generated');
+  assert.equal(relative.name, 'Botch');
+  assert.equal(relative.dc, -2, 'dc is truncated to an integer');
+  assert.equal(relative.start, undefined, 'relative tiers carry no range fields');
+  assert.equal(relative.end, undefined);
+
+  assert.equal(result.routed.fixedOutcomes.length, 1);
+  const fixed = result.routed.fixedOutcomes[0];
+  assert.equal(fixed.id, 'keep', 'an existing id is preserved');
+  assert.equal(fixed.start, 1);
+  assert.equal(fixed.end, 20);
+  assert.equal(fixed.dc, undefined, 'fixed tiers carry no dc field');
 });
 
 test('_normalizeCraftingCheck coerces an invalid routed type to relative', () => {

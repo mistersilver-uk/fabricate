@@ -1696,16 +1696,9 @@ describe('CraftingSystemManager mounted behavior', () => {
             routed: {
               type: 'fixed',
               rollExpression: '2d6',
-              outcomes: [
-                {
-                  id: 'seed1',
-                  name: 'Hit',
-                  success: true,
-                  breakTools: false,
-                  dc: 0,
-                  start: 1,
-                  end: 6,
-                },
+              relativeOutcomes: [],
+              fixedOutcomes: [
+                { id: 'seed1', name: 'Hit', success: true, breakTools: false, start: 1, end: 6 },
               ],
             },
           },
@@ -1814,16 +1807,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const value = {
       type: 'relative',
       rollExpression: '2d6+1d4',
-      outcomes: [
-        {
-          id: 'a1b2c3d4ef',
-          name: 'Fail',
-          success: false,
-          breakTools: true,
-          dc: -2,
-          start: 1,
-          end: 5,
-        },
+      relativeOutcomes: [
+        { id: 'a1b2c3d4ef', name: 'Fail', success: false, breakTools: true, dc: -2 },
+      ],
+      fixedOutcomes: [
+        { id: 'fx1', name: 'Range', success: true, breakTools: false, start: 1, end: 6 },
       ],
     };
     target = document.createElement('div');
@@ -1843,7 +1831,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       [...target.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
         .map((cell) => cell.textContent.trim())
         .filter(Boolean),
-      ['Name', 'DC ±', 'Success', 'Break tools']
+      ['Name', 'DC ±', 'Outcome', 'Break tools']
     );
     assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
     assert.equal(
@@ -1883,43 +1871,33 @@ describe('CraftingSystemManager mounted behavior', () => {
       'breaking tools is the red/negative pill'
     );
     successToggle.click();
-    assert.equal(emitted.at(-1).outcomes[0].success, true, 'clicking flips success state');
+    assert.equal(emitted.at(-1).relativeOutcomes[0].success, true, 'clicking flips success state');
 
     // The type selector reuses the resolution radio-option styling.
     target.querySelector('[data-check-type-option="fixed"] input').click();
     assert.equal(emitted.at(-1).type, 'fixed', 'switching type emits the new type');
 
     target.querySelector('[data-add-outcome]').click();
-    assert.equal(emitted.at(-1).outcomes.length, 2, 'adding appends a tier');
-    assert.ok(emitted.at(-1).outcomes.at(-1).id, 'a new tier is given a generated id');
+    assert.equal(emitted.at(-1).relativeOutcomes.length, 2, 'adding appends a relative tier');
+    assert.ok(emitted.at(-1).relativeOutcomes.at(-1).id, 'a new tier is given a generated id');
 
     target.querySelector('[data-remove-outcome]').click();
-    assert.equal(emitted.at(-1).outcomes.length, 0, 'removing drops the tier');
+    assert.equal(emitted.at(-1).relativeOutcomes.length, 0, 'removing drops the relative tier');
+    assert.equal(
+      emitted.at(-1).fixedOutcomes.length,
+      1,
+      'editing relative tiers never touches the independent fixed tiers'
+    );
   });
 
   it('crafting check editor (fixed): bounds the value range and flags overlapping tiers', () => {
     const value = {
       type: 'fixed',
       rollExpression: '1d20',
-      outcomes: [
-        {
-          id: 'id00000001',
-          name: 'Low',
-          success: false,
-          breakTools: false,
-          dc: 0,
-          start: 1,
-          end: 12,
-        },
-        {
-          id: 'id00000002',
-          name: 'High',
-          success: true,
-          breakTools: false,
-          dc: 0,
-          start: 10,
-          end: 20,
-        },
+      relativeOutcomes: [],
+      fixedOutcomes: [
+        { id: 'id00000001', name: 'Low', success: false, breakTools: false, start: 1, end: 12 },
+        { id: 'id00000002', name: 'High', success: true, breakTools: false, start: 10, end: 20 },
       ],
     };
     target = document.createElement('div');

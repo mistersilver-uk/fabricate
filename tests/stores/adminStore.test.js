@@ -2129,9 +2129,8 @@ describe('createAdminStore', () => {
       const routed = {
         type: 'relative',
         rollExpression: '1d20+@attributes.con.mod',
-        outcomes: [
-          { id: 'o1', name: 'Botch', success: false, breakTools: true, dc: -5, start: 0, end: 0 },
-        ],
+        relativeOutcomes: [{ id: 'o1', name: 'Botch', success: false, breakTools: true, dc: -5 }],
+        fixedOutcomes: [],
       };
       await store.saveCraftingCheckRouted(routed);
       assert.ok(updateArgs !== null);
@@ -2151,8 +2150,9 @@ describe('createAdminStore', () => {
           routed: {
             type: 'fixed',
             rollExpression: '1d20',
-            outcomes: [
-              { id: 'o1', name: 'Hit', success: true, breakTools: false, dc: 0, start: 1, end: 20 },
+            relativeOutcomes: [],
+            fixedOutcomes: [
+              { id: 'o1', name: 'Hit', success: true, breakTools: false, start: 1, end: 20 },
             ],
           },
         };
@@ -2165,7 +2165,7 @@ describe('createAdminStore', () => {
         'routed config is projected into view state'
       );
       assert.equal(vs.selectedSystem.craftingCheck.routed.rollExpression, '1d20');
-      assert.equal(vs.selectedSystem.craftingCheck.routed.outcomes[0].name, 'Hit');
+      assert.equal(vs.selectedSystem.craftingCheck.routed.fixedOutcomes[0].name, 'Hit');
     });
 
     it('saveCraftingCheckActive toggles enabled and preserves the rest of the check', async () => {
@@ -2178,7 +2178,12 @@ describe('createAdminStore', () => {
           enabled: false,
           mode: 'passFail',
           outcomes: ['fail', 'pass'],
-          routed: { type: 'relative', rollExpression: '1d20', outcomes: [] },
+          routed: {
+            type: 'relative',
+            rollExpression: '1d20',
+            relativeOutcomes: [],
+            fixedOutcomes: [],
+          },
         };
       }
       services.getCraftingSystemManager = () => ({

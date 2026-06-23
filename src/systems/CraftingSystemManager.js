@@ -322,33 +322,46 @@ export class CraftingSystemManager {
   }
 
   // Structured routed-mode crafting check authored in the Checks editor: a check
-  // type (relative DC offsets or fixed value ranges), a roll expression, and the
-  // outcome tiers. Kept alongside the legacy `outcomes` string list rather than
-  // replacing it, so the existing routing engine is untouched.
+  // type (relative DC offsets or fixed value ranges), a shared roll expression,
+  // and TWO independent outcome-tier lists — one per type — so editing or
+  // deleting a tier in one mode never affects the other. Kept alongside the
+  // legacy `outcomes` string list rather than replacing it, so the existing
+  // routing engine is untouched.
   _normalizeRoutedCraftingCheck(routed = {}) {
     const source = !routed || typeof routed !== 'object' ? {} : routed;
-    const outcomes = Array.isArray(source.outcomes) ? source.outcomes : [];
+    const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
+    const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
       rollExpression: typeof source.rollExpression === 'string' ? source.rollExpression : '',
-      outcomes: outcomes.map((outcome) => this._normalizeRoutedOutcome(outcome)).filter(Boolean),
+      relativeOutcomes: relative
+        .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
+        .filter(Boolean),
+      fixedOutcomes: fixed
+        .map((outcome) => this._normalizeRoutedOutcome(outcome, 'fixed'))
+        .filter(Boolean),
     };
   }
 
-  _normalizeRoutedOutcome(outcome) {
+  _normalizeRoutedOutcome(outcome, kind) {
     if (!outcome || typeof outcome !== 'object') return null;
-    const dc = Number(outcome.dc);
-    const start = Number(outcome.start);
-    const end = Number(outcome.end);
-    return {
+    const base = {
       id: outcome.id || foundry.utils.randomID(),
       name: String(outcome.name || '').trim(),
       success: outcome.success === true,
       breakTools: outcome.breakTools === true,
-      dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
-      start: Number.isFinite(start) ? Math.trunc(start) : 0,
-      end: Number.isFinite(end) ? Math.trunc(end) : 0,
     };
+    if (kind === 'fixed') {
+      const start = Number(outcome.start);
+      const end = Number(outcome.end);
+      return {
+        ...base,
+        start: Number.isFinite(start) ? Math.trunc(start) : 0,
+        end: Number.isFinite(end) ? Math.trunc(end) : 0,
+      };
+    }
+    const dc = Number(outcome.dc);
+    return { ...base, dc: Number.isFinite(dc) ? Math.trunc(dc) : 0 };
   }
 
   _normalizeBuiltInCheck(config = {}) {

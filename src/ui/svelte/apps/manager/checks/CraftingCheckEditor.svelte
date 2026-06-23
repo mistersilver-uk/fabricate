@@ -55,7 +55,10 @@
   ];
 
   const type = $derived(value?.type === 'fixed' ? 'fixed' : 'relative');
-  const outcomes = $derived(Array.isArray(value?.outcomes) ? value.outcomes : []);
+  // Relative and fixed tiers are independent lists; the editor only ever reads
+  // and writes the active type's list, so changes in one mode never touch the other.
+  const outcomesKey = $derived(type === 'fixed' ? 'fixedOutcomes' : 'relativeOutcomes');
+  const outcomes = $derived(Array.isArray(value?.[outcomesKey]) ? value[outcomesKey] : []);
   const diceGroups = $derived(parseDiceGroups(value?.rollExpression));
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
@@ -92,23 +95,27 @@
 
   function updateOutcome(id, patch) {
     emit({
-      outcomes: outcomes.map((outcome) => (outcome.id === id ? { ...outcome, ...patch } : outcome)),
+      [outcomesKey]: outcomes.map((outcome) =>
+        outcome.id === id ? { ...outcome, ...patch } : outcome
+      ),
     });
   }
 
   function removeOutcome(id) {
-    emit({ outcomes: outcomes.filter((outcome) => outcome.id !== id) });
+    emit({ [outcomesKey]: outcomes.filter((outcome) => outcome.id !== id) });
   }
 
   function addOutcome() {
-    const last = outcomes[outcomes.length - 1];
-    const nextStart = type === 'fixed' && last ? Number(last.end) + 1 : 1;
-    emit({
-      outcomes: [
-        ...outcomes,
-        { id: newId(), name: '', success: false, breakTools: false, dc: 0, start: nextStart, end: nextStart },
-      ],
-    });
+    const base = { id: newId(), name: '', success: false, breakTools: false };
+    let next;
+    if (type === 'fixed') {
+      const last = outcomes[outcomes.length - 1];
+      const nextStart = last ? Number(last.end) + 1 : 1;
+      next = { ...base, start: nextStart, end: nextStart };
+    } else {
+      next = { ...base, dc: 0 };
+    }
+    emit({ [outcomesKey]: [...outcomes, next] });
   }
 
   function numeric(rawValue) {
@@ -193,7 +200,7 @@
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}</span>
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span>
           {/if}
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
           <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
         </div>
