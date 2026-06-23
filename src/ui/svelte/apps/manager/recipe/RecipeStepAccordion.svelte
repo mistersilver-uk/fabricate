@@ -76,7 +76,9 @@
       ondrop={reorderable ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
     >
       <!-- Overview only: the header is the drag handle, so a grab inside the expanded
-           body inputs selects text instead of starting a drag. -->
+           body inputs selects text instead of starting a drag. Drag is a mouse-only
+           enhancement; the keyboard-accessible control is the nested role="button". -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="manager-recipe-steps-row-head"
         draggable={reorderable ? 'true' : undefined}
