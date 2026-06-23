@@ -66,6 +66,13 @@ export class Recipe {
         ? { ...data.outcomeRouting }
         : null;
     this.resultSelection = this._normalizeResultSelection(data.resultSelection);
+    // Optional reference to a simple-check recipe tier (its id). When set, the
+    // recipe uses that tier's DC instead of the system default; null/unknown ids
+    // fall back to the default at resolution time.
+    this.checkTierId =
+      typeof data.checkTierId === 'string' && data.checkTierId.trim()
+        ? data.checkTierId.trim()
+        : null;
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
@@ -393,6 +400,7 @@ export class Recipe {
       transferEffects: this.transferEffects,
       outcomeRouting: this.outcomeRouting,
       resultSelection: this.resultSelection,
+      checkTierId: this.checkTierId,
       currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,

@@ -99,6 +99,52 @@ test('_normalizeCraftingCheck coerces an invalid routed type to relative', () =>
   assert.equal(result.routed.type, 'relative');
 });
 
+test('_normalizeCraftingCheck defaults the simple config when absent', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({});
+  assert.deepEqual(result.simple, {
+    rollFormula: '',
+    dcMode: 'static',
+    defaultDc: 15,
+    tiers: [],
+    macroUuid: null,
+  });
+});
+
+test('_normalizeCraftingCheck normalizes the simple check (dcMode, tiers, macro)', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    simple: {
+      rollFormula: '1d20+@abilities.int.mod',
+      dcMode: 'dynamic',
+      defaultDc: '18.6',
+      macroUuid: 'Macro.abc',
+      tiers: [
+        { name: '  Hard  ', dc: '20' },
+        { id: 'keep', name: 'Easy', dc: 10.9 },
+        'not-an-object',
+        null,
+      ],
+    },
+  });
+  assert.equal(result.simple.dcMode, 'dynamic');
+  assert.equal(result.simple.rollFormula, '1d20+@abilities.int.mod');
+  assert.equal(result.simple.defaultDc, 18, 'default DC is truncated to an integer');
+  assert.equal(result.simple.macroUuid, 'Macro.abc');
+  assert.equal(result.simple.tiers.length, 2, 'non-object tiers are dropped');
+  assert.ok(result.simple.tiers[0].id, 'a missing tier id is generated');
+  assert.equal(result.simple.tiers[0].name, 'Hard');
+  assert.equal(result.simple.tiers[0].dc, 20);
+  assert.equal(result.simple.tiers[1].id, 'keep', 'an existing tier id is preserved');
+  assert.equal(result.simple.tiers[1].dc, 10, 'tier DC is truncated to an integer');
+});
+
+test('_normalizeCraftingCheck coerces an invalid simple dcMode to static', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({ simple: { dcMode: 'bogus' } });
+  assert.equal(result.simple.dcMode, 'static');
+});
+
 test('_normalizeBuiltInCheck with invalid dc defaults to 15', () => {
   const mgr = makeManager();
   const result = mgr._normalizeBuiltInCheck({ dc: 'not-a-number' });

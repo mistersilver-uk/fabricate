@@ -30,6 +30,7 @@
     onToggleEnabled = () => {},
     onChooseImage = () => {},
     isMultiStep = false,
+    checkTierOptions = [],
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -106,6 +107,22 @@
           <span>{text('FABRICATE.Admin.Manager.Recipe.Description', 'Description')}</span>
           <textarea id="manager-recipe-edit-description" data-recipe-field="description" value={description} oninput={(event) => onDescriptionInput(event.currentTarget.value)} disabled={saving}></textarea>
         </label>
+        {#if checkTierOptions.length > 0}
+          <label class="manager-field" data-recipe-check-tier>
+            <span>{text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}</span>
+            <select
+              data-recipe-field="checkTierId"
+              value={recipe?.checkTierId || ''}
+              onchange={(event) => onUpdateRecipe({ checkTierId: event.currentTarget.value || null })}
+              disabled={saving}
+            >
+              <option value="">{text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC')}</option>
+              {#each checkTierOptions as tier (tier.id)}
+                <option value={tier.id}>{(tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')) + ` (DC ${tier.dc})`}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
       </div>
     </div>
     {#if saveFailed}

@@ -36,6 +36,7 @@
     componentTagOptions = [],
     essenceOptions = [],
     itemTags = [],
+    checkTierOptions = [],
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
     onAddStep = () => {},
@@ -197,6 +198,7 @@
             {onToggleEnabled}
             onChooseImage={chooseImage}
             {isMultiStep}
+            {checkTierOptions}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}

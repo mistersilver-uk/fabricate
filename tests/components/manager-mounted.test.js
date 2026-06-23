@@ -24,6 +24,8 @@ let Component;
 let EnvironmentEditViewComponent;
 let ChecksRightMenuComponent;
 let CraftingCheckEditorComponent;
+let SimpleCraftingCheckEditorComponent;
+let RecipeOverviewTabComponent;
 let mounted;
 let target;
 
@@ -42,6 +44,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -1106,6 +1109,9 @@ function createStore(calls = [], options = {}) {
     saveCraftingCheckRouted: (routed) => {
       calls.push(['saveCraftingCheckRouted', routed]);
     },
+    saveCraftingCheckSimple: (simple) => {
+      calls.push(['saveCraftingCheckSimple', simple]);
+    },
     saveCraftingCheckActive: (enabled) => {
       calls.push(['saveCraftingCheckActive', enabled]);
     },
@@ -1373,6 +1379,20 @@ describe('CraftingSystemManager mounted behavior', () => {
         )
       )
     ).default;
+    SimpleCraftingCheckEditorComponent = (
+      await import(
+        pathToFileURL(
+          join(tempRoot, 'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte.js')
+        )
+      )
+    ).default;
+    RecipeOverviewTabComponent = (
+      await import(
+        pathToFileURL(
+          join(tempRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte.js')
+        )
+      )
+    ).default;
   });
 
   afterEach(() => {
@@ -1548,21 +1568,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['Crafting', 'Salvage', 'Gathering', 'Validation']
     );
 
-    // Each check is a singleton: the Crafting tab is a single editor page (not a
-    // list with a create action), and its docs help card sits in the right menu.
+    // The Crafting tab renders a single editor (the default fixture is alchemy mode,
+    // which authors a simple pass/fail check) — not a create-a-list surface — and its
+    // docs help card sits in the right menu.
     const craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
-    assert.ok(craftingPanel, 'Crafting page should be the default');
+    assert.ok(craftingPanel, 'Crafting panel should be the default');
     assert.ok(
-      craftingPanel.classList.contains('manager-checks-page'),
-      'a check tab renders a singleton editor page, not an empty list'
-    );
-    assert.equal(
-      craftingPanel.querySelector('.manager-card-title').textContent.trim(),
-      'Crafting check'
-    );
-    assert.ok(
-      craftingPanel.textContent.includes('single crafting check'),
-      'the page explains there is one check per system'
+      craftingPanel.querySelector('[data-simple-check-editor]'),
+      'alchemy crafting shows the simple check editor'
     );
     assert.equal(
       target.querySelector('.manager-header-actions [data-checks-create]'),
@@ -1921,6 +1934,187 @@ describe('CraftingSystemManager mounted behavior', () => {
       2,
       'both overlapping tiers are flagged'
     );
+  });
+
+  it('simple check editor: static shows default DC + tiers, dynamic shows the macro drop zone', () => {
+    const emitted = [];
+    const value = {
+      rollFormula: '1d20+@abilities.int.mod',
+      dcMode: 'static',
+      defaultDc: 12,
+      tiers: [{ id: 'tier1', name: 'Hard', dc: 18 }],
+      macroUuid: null,
+    };
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(SimpleCraftingCheckEditorComponent, {
+      target,
+      props: { value, onChange: (next) => emitted.push(next) },
+    });
+    flushSync();
+
+    assert.ok(target.querySelector('[data-simple-check-editor]'));
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-dice-group]')].map((c) => c.textContent.trim()),
+      ['1d20']
+    );
+    // Static mode: default DC field + a tiers table (no macro drop zone).
+    assert.equal(target.querySelector('[data-default-dc]').value, '12');
+    assert.equal(target.querySelector('[data-tier-row]').getAttribute('data-tier-row'), 'tier1');
+    assert.equal(target.querySelector('[data-tier-name]').value, 'Hard');
+    assert.equal(target.querySelector('[data-check-macro-dropzone]'), null);
+
+    // Add / remove a tier edits only the tiers list.
+    target.querySelector('[data-add-tier]').click();
+    assert.equal(emitted.at(-1).tiers.length, 2);
+    target.querySelector('[data-remove-tier]').click();
+    assert.equal(emitted.at(-1).tiers.length, 0);
+
+    // Switching to dynamic emits the mode but keeps the static fields (non-destructive).
+    target.querySelector('[data-dc-mode-option="dynamic"] input').click();
+    assert.equal(emitted.at(-1).dcMode, 'dynamic');
+    assert.equal(emitted.at(-1).defaultDc, 12, 'static fields are preserved when switching mode');
+    assert.deepEqual(emitted.at(-1).tiers, value.tiers);
+  });
+
+  it('simple check editor: dynamic mode renders a macro drop zone', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(SimpleCraftingCheckEditorComponent, {
+      target,
+      props: {
+        value: {
+          rollFormula: '1d20',
+          dcMode: 'dynamic',
+          defaultDc: 15,
+          tiers: [],
+          macroUuid: null,
+        },
+        onChange: () => {},
+      },
+    });
+    flushSync();
+    assert.ok(target.querySelector('[data-dynamic-dc]'));
+    assert.ok(target.querySelector('[data-check-macro-dropzone]'), 'shows the macro drop zone');
+    assert.equal(
+      target.querySelector('[data-default-dc]'),
+      null,
+      'no static DC field in dynamic mode'
+    );
+  });
+
+  for (const mode of ['simple', 'alchemy']) {
+    it(`renders the simple crafting check editor and saves it in ${mode} mode`, async () => {
+      const calls = [];
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: {
+          store: createStore(calls, {
+            alchemyResolutionMode: mode,
+            craftingCheck: {
+              simple: {
+                rollFormula: '1d20',
+                dcMode: 'static',
+                defaultDc: 12,
+                tiers: [],
+                macroUuid: null,
+              },
+            },
+          }),
+          services: { openCurrentAdmin: () => {} },
+        },
+      });
+      flushSync();
+
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+
+      assert.ok(
+        target.querySelector('[data-simple-check-editor]'),
+        `${mode} mode shows the simple check editor`
+      );
+      assert.equal(
+        target.querySelector('[data-crafting-check-editor]'),
+        null,
+        'not the routed editor'
+      );
+
+      // Seeded from the persisted config; no Save button until edited.
+      const dcInput = target.querySelector('[data-default-dc]');
+      assert.equal(dcInput.value, '12');
+      assert.equal(target.querySelector('[data-checks-save]'), null);
+
+      dcInput.value = '17';
+      dcInput.dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+      flushSync();
+      const saveButton = target.querySelector('[data-checks-save]');
+      assert.ok(saveButton, 'editing reveals the Save button');
+
+      saveButton.click();
+      await tick();
+      await Promise.resolve();
+      flushSync();
+      const saved = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
+      assert.ok(saved, 'Save persists the simple config through the store');
+      assert.equal(saved[1].defaultDc, 17);
+      assert.equal(
+        target.querySelector('[data-checks-save]'),
+        null,
+        'saving clears the unsaved state'
+      );
+    });
+  }
+
+  it('recipe overview shows the check-tier dropdown only when tiers exist and emits checkTierId', () => {
+    const emitted = [];
+    // No tiers ⇒ no dropdown.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(RecipeOverviewTabComponent, {
+      target,
+      props: {
+        recipe: { id: 'r1', checkTierId: null },
+        checkTierOptions: [],
+        onUpdateRecipe: () => {},
+      },
+    });
+    flushSync();
+    assert.equal(target.querySelector('[data-recipe-check-tier]'), null);
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // Tiers present ⇒ dropdown with the recipe's current selection.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(RecipeOverviewTabComponent, {
+      target,
+      props: {
+        recipe: { id: 'r1', checkTierId: 'tier1' },
+        checkTierOptions: [
+          { id: 'tier1', name: 'Hard', dc: 18 },
+          { id: 'tier2', name: 'Easy', dc: 8 },
+        ],
+        onUpdateRecipe: (patch) => emitted.push(patch),
+      },
+    });
+    flushSync();
+    const select = target.querySelector('[data-recipe-check-tier] select');
+    assert.ok(select, 'dropdown renders when tiers exist');
+    assert.equal(select.value, 'tier1', 'reflects the recipe selection');
+    assert.equal(select.querySelectorAll('option').length, 3, 'Default + two tiers');
+
+    select.value = 'tier2';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(emitted.at(-1), { checkTierId: 'tier2' });
+
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(emitted.at(-1), { checkTierId: null }, 'Default clears the tier');
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {

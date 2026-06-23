@@ -19,17 +19,20 @@
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
+  import SimpleCraftingCheckEditor from './SimpleCraftingCheckEditor.svelte';
 
-  // `resolutionMode` is the selected system's recipe resolution mode. The full
-  // crafting check editor is built for routed mode; other modes keep the
-  // singleton placeholder page until their editors are built. `craftingCheck` is
-  // the routed config draft (owned by the manager root, which persists it), and
-  // `onUpdateCraftingCheck` reports edits back.
+  // `resolutionMode` is the selected system's recipe resolution mode and selects
+  // which crafting check editor renders: routed → the outcome-tier editor;
+  // simple/alchemy → the simple pass/fail editor; progressive → the placeholder.
+  // `craftingCheck` is the routed draft and `craftingCheckSimple` the simple
+  // draft (both owned/persisted by the manager root), with matching update callbacks.
   let {
     resolutionMode = 'simple',
     craftingCheck = null,
+    craftingCheckSimple = null,
     activation = {},
     onUpdateCraftingCheck = () => {},
+    onUpdateCraftingCheckSimple = () => {},
     onToggleCheckActive = () => {}
   } = $props();
 
@@ -41,6 +44,7 @@
   let activeTab = $state('crafting');
 
   const craftingRouted = $derived(resolutionMode === 'routed');
+  const craftingSimple = $derived(resolutionMode === 'simple' || resolutionMode === 'alchemy');
 
   const PAGES = {
     crafting: {
@@ -113,6 +117,10 @@
       {:else if activeTab === 'crafting' && craftingRouted}
         <div data-checks-panel="crafting">
           <CraftingCheckEditor value={craftingCheck} onChange={onUpdateCraftingCheck} />
+        </div>
+      {:else if activeTab === 'crafting' && craftingSimple}
+        <div data-checks-panel="crafting">
+          <SimpleCraftingCheckEditor value={craftingCheckSimple} onChange={onUpdateCraftingCheckSimple} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

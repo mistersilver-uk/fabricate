@@ -112,6 +112,28 @@
   const checkRoutedDirty = $derived(
     JSON.stringify(checkRoutedDraft) !== JSON.stringify(checkRoutedBaseline)
   );
+
+  // Simple (pass/fail) crafting check draft — same staged pattern, used for simple
+  // and alchemy resolution modes.
+  function cloneSimpleCheck(simple) {
+    const source = simple && typeof simple === 'object' ? simple : {};
+    const defaultDc = Number(source.defaultDc);
+    return {
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      defaultDc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15,
+      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
+      macroUuid: source.macroUuid || null
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  // svelte-ignore state_referenced_locally
+  let checkSimpleBaseline = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  let checkSimpleSaving = $state(false);
+  const checkSimpleDirty = $derived(
+    JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
+  );
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
@@ -151,27 +173,64 @@
     gathering: { mode: 'perTask', optional: false, enabled: false }
   });
 
-  // Reseed the routed-check draft + baseline when the selected system changes (not
-  // on every refresh of the same system, so a save never clobbers an open draft).
+  // Which crafting check editor is active for the selected system, and whether it
+  // has unsaved staged edits — drives the single top-right Save button.
+  const craftingCheckMode = $derived(
+    recipeRouted ? 'routed' : ['simple', 'alchemy'].includes(selectedSystem?.resolutionMode || 'simple') ? 'simple' : null
+  );
+  const craftingCheckDirty = $derived(
+    (craftingCheckMode === 'routed' && checkRoutedDirty) ||
+      (craftingCheckMode === 'simple' && checkSimpleDirty)
+  );
+  const craftingCheckSaving = $derived(checkRoutedSaving || checkSimpleSaving);
+
+  // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
+  // system uses a simple static check that actually defines tiers.
+  const recipeCheckTierOptions = $derived(
+    craftingCheckMode === 'simple' &&
+      (selectedSystem?.craftingCheck?.simple?.dcMode || 'static') === 'static'
+      ? selectedSystem?.craftingCheck?.simple?.tiers || []
+      : []
+  );
+
+  // Reseed the routed + simple check drafts and baselines when the selected system
+  // changes (not on every refresh of the same system, so a save never clobbers an
+  // open draft).
   $effect(() => {
     if (selectedSystemId === lastChecksSystemId) return;
     lastChecksSystemId = selectedSystemId;
     checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
     checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+    checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+    checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
   });
 
   function onUpdateCraftingCheck(next) {
     checkRoutedDraft = next;
   }
 
+  function onUpdateCraftingCheckSimple(next) {
+    checkSimpleDraft = next;
+  }
+
   async function saveCraftingCheck() {
-    if (!selectedSystemId || checkRoutedSaving || !checkRoutedDirty) return;
-    checkRoutedSaving = true;
-    try {
-      await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
-      checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
-    } finally {
-      checkRoutedSaving = false;
+    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
+    if (craftingCheckMode === 'routed') {
+      checkRoutedSaving = true;
+      try {
+        await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
+        checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+      } finally {
+        checkRoutedSaving = false;
+      }
+    } else if (craftingCheckMode === 'simple') {
+      checkSimpleSaving = true;
+      try {
+        await store?.saveCraftingCheckSimple?.(checkSimpleDraft);
+        checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+      } finally {
+        checkSimpleSaving = false;
+      }
     }
   }
 
@@ -3410,10 +3469,10 @@
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
-        {#if recipeRouted && (checkRoutedDirty || checkRoutedSaving)}
+        {#if craftingCheckDirty || craftingCheckSaving}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
-          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveCraftingCheck} disabled={!checkRoutedDirty || checkRoutedSaving}>
-            <i class={checkRoutedSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveCraftingCheck} disabled={!craftingCheckDirty || craftingCheckSaving}>
+            <i class={craftingCheckSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
           </button>
         {/if}
@@ -3811,8 +3870,10 @@
           <ChecksView
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             craftingCheck={checkRoutedDraft}
+            craftingCheckSimple={checkSimpleDraft}
             activation={checkActivation}
             {onUpdateCraftingCheck}
+            {onUpdateCraftingCheckSimple}
             {onToggleCheckActive}
           />
         </section>
@@ -3955,6 +4016,7 @@
         componentTagOptions={selectedSystem?.componentTagOptions || []}
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
         itemTags={selectedSystem?.itemTags || []}
+        checkTierOptions={recipeCheckTierOptions}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}

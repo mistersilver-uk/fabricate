@@ -1832,6 +1832,11 @@ function _buildSelectedSystemViewData(
       routed: selectedSystem.craftingCheck?.routed
         ? _clonePlain(selectedSystem.craftingCheck.routed)
         : null,
+      // Same rationale as `routed`: surface the simple pass/fail config so the
+      // simple-mode editor (and the recipe tier dropdown) can read it back.
+      simple: selectedSystem.craftingCheck?.simple
+        ? _clonePlain(selectedSystem.craftingCheck.simple)
+        : null,
     },
     salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
     salvageCraftingCheck: {
@@ -6228,6 +6233,22 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the simple pass/fail crafting check (roll formula + static/dynamic DC)
+  // authored for simple and alchemy resolution modes, preserving the rest of the
+  // craftingCheck config. The manager normalizes the simple payload on write.
+  async function saveCraftingCheckSimple(simple) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: { ...existing, simple },
+    });
+    await refresh();
+  }
+
   // Enable/disable a system-level check (the right-menu "Active" toggle, shown
   // only when the resolution mode makes the check optional).
   async function saveCraftingCheckActive(enabled) {
@@ -6943,6 +6964,7 @@ export function createAdminStore(services) {
     deleteGatheringEventCharacterModifier,
     saveCraftingCheckConfig,
     saveCraftingCheckRouted,
+    saveCraftingCheckSimple,
     saveCraftingCheckActive,
     saveSalvageCheckActive,
     addCurrencyUnit,

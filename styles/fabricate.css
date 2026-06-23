@@ -1245,6 +1245,36 @@
   grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
 }
 
+/* Simple-check recipe tiers: Name + DC + remove. */
+.fabricate-manager .manager-checks-outcome-table.is-tier {
+  grid-template-columns: minmax(140px, 1fr) 96px 40px;
+}
+
+.fabricate-manager .manager-checks-default-dc {
+  max-width: 160px;
+}
+
+/* Dynamic-DC macro drop zone: reuse the dashed component-source drop look with a
+   compact inline layout for the linked-macro name + unlink control. */
+.fabricate-manager .manager-checks-macro-drop-zone {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-macro-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-macro-name.is-missing {
+  color: var(--fab-danger-text);
+}
+
 /* Tier state controls are red/green pills that flip on click: the label shows
    the current state (Success/Failure, Break/Don't break) and the colour reflects
    its valence (green = success / keeps tools, red = failure / breaks tools). */

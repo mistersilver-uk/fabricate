@@ -2140,6 +2140,63 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.craftingCheck.mode, 'passFail');
     });
 
+    it('saveCraftingCheckSimple persists the simple config and preserves other check fields', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = { enabled: true, mode: 'passFail', outcomes: ['fail', 'pass'] };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const simple = {
+        rollFormula: '1d20',
+        dcMode: 'static',
+        defaultDc: 12,
+        tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
+        macroUuid: null,
+      };
+      await store.saveCraftingCheckSimple(simple);
+      assert.ok(updateArgs !== null);
+      assert.deepEqual(updateArgs.updates.craftingCheck.simple, simple);
+      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
+    });
+
+    it('surfaces the simple crafting check config in the selected-system view state', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: true,
+          simple: {
+            rollFormula: '1d20',
+            dcMode: 'static',
+            defaultDc: 14,
+            tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
+            macroUuid: null,
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.ok(
+        vs.selectedSystem.craftingCheck.simple,
+        'simple config is projected into view state'
+      );
+      assert.equal(vs.selectedSystem.craftingCheck.simple.defaultDc, 14);
+      assert.equal(vs.selectedSystem.craftingCheck.simple.tiers[0].name, 'Hard');
+    });
+
     it('surfaces the routed crafting check config in the selected-system view state', async () => {
       const services = createMockServices();
       const manager = services.getCraftingSystemManager();

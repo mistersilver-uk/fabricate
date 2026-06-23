@@ -49,7 +49,7 @@
       title: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpTitle', 'About crafting checks'),
       desc: text(
         'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
-        'The crafting check is shaped by the system resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
+        'The crafting check is shaped by the system resolution mode: simple and alchemy author a pass/fail check, routed authors outcome tiers, and progressive requires a check.'
       ),
       docsHref: `${DOCS_BASE}/crafting-checks`,
       docsLabel: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs')

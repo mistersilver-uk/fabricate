@@ -318,6 +318,35 @@ export class CraftingSystemManager {
             ? ['low', 'high']
             : ['fail', 'pass'],
       routed: this._normalizeRoutedCraftingCheck(check?.routed),
+      simple: this._normalizeSimpleCraftingCheck(check?.simple),
+    };
+  }
+
+  // Simple pass/fail crafting check authored in the Checks editor for simple and
+  // alchemy resolution modes: a shared roll formula plus a polymorphic DC — either
+  // a static default DC with optional named recipe tiers, or a dynamic DC computed
+  // by a dropped macro. Both the static and dynamic fields are kept so switching
+  // `dcMode` never destroys the other side's configuration.
+  _normalizeSimpleCraftingCheck(simple = {}) {
+    const source = !simple || typeof simple !== 'object' ? {} : simple;
+    const defaultDc = Number(source.defaultDc);
+    const tiers = Array.isArray(source.tiers) ? source.tiers : [];
+    return {
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      defaultDc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15,
+      tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
+      macroUuid: source.macroUuid || null,
+    };
+  }
+
+  _normalizeSimpleTier(tier) {
+    if (!tier || typeof tier !== 'object') return null;
+    const dc = Number(tier.dc);
+    return {
+      id: tier.id || foundry.utils.randomID(),
+      name: String(tier.name || '').trim(),
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
     };
   }
 
