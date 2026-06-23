@@ -209,40 +209,41 @@ test('dynamic DC: no macro linked falls back to the default DC', async () => {
 
 // ── Critical raw rolls ──────────────────────────────────────────────────────
 
-test('critical auto-succeed forces success below the DC', async () => {
+test('a critical forces success below the DC (and can break tools)', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, effect: 'succeed' }],
+      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true, breakTools: true }],
     }),
   });
   stubRoll(5, [{ number: 1, faces: 20, total: 20 }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  assert.equal(result.data.crit, 'succeed');
+  assert.equal(result.data.crit.success, true);
+  assert.equal(result.data.breakTools, true, 'the crit surfaces breakTools');
 });
 
-test('critical auto-fail forces failure above the DC', async () => {
+test('a critical forces failure above the DC', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 1, effect: 'fail' }],
+      diceCrits: [{ id: 'c1', die: '1d20', raw: 1, success: false }],
     }),
   });
   stubRoll(30, [{ number: 1, faces: 20, total: 1 }]);
   const result = await run(engine);
   assert.equal(result.success, false);
-  assert.equal(result.data.crit, 'fail');
+  assert.equal(result.data.crit.success, false);
 });
 
-test('a matching auto-fail takes precedence over a matching auto-succeed', async () => {
+test('a matching forced failure takes precedence over a matching forced success', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       rollFormula: '1d20+1d6',
       dc: 15,
       diceCrits: [
-        { id: 'c1', die: '1d20', raw: 20, effect: 'succeed' },
-        { id: 'c2', die: '1d6', raw: 1, effect: 'fail' },
+        { id: 'c1', die: '1d20', raw: 20, success: true },
+        { id: 'c2', die: '1d6', raw: 1, success: false },
       ],
     }),
   });
@@ -251,15 +252,15 @@ test('a matching auto-fail takes precedence over a matching auto-succeed', async
     { number: 1, faces: 6, total: 1 },
   ]);
   const result = await run(engine);
-  assert.equal(result.success, false, 'fail wins');
-  assert.equal(result.data.crit, 'fail');
+  assert.equal(result.success, false, 'forced failure wins');
+  assert.equal(result.data.crit.success, false);
 });
 
 test('a non-matching critical raw roll leaves the comparison in charge', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, effect: 'succeed' }],
+      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true }],
     }),
   });
   stubRoll(13, [{ number: 1, faces: 20, total: 13 }]);
@@ -326,12 +327,12 @@ test('dice-group sums (not single die faces) drive multi-die crits', async () =>
     simple: defaultSimple({
       rollFormula: '2d6',
       dc: 99,
-      diceCrits: [{ id: 'c1', die: '2d6', raw: 12, effect: 'succeed' }],
+      diceCrits: [{ id: 'c1', die: '2d6', raw: 12, success: true }],
     }),
   });
   // 2d6 summing to 12 matches the crit configured on the "2d6" group.
   stubRoll(12, [{ number: 2, faces: 6, total: 12 }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  assert.equal(result.data.crit, 'succeed');
+  assert.equal(result.data.crit.success, true);
 });

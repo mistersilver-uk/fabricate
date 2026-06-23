@@ -91,9 +91,22 @@
   // explicit and never raced by navigation.
   function cloneRoutedCheck(routed) {
     const source = routed && typeof routed === 'object' ? routed : {};
+    const dc = Number(source.dc);
+    const rollFormula =
+      typeof source.rollFormula === 'string'
+        ? source.rollFormula
+        : typeof source.rollExpression === 'string'
+          ? source.rollExpression
+          : '';
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
-      rollExpression: typeof source.rollExpression === 'string' ? source.rollExpression : '',
+      rollFormula,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
+      diceCrits: Array.isArray(source.diceCrits)
+        ? source.diceCrits.map((crit) => ({ ...crit }))
+        : [],
       relativeOutcomes: Array.isArray(source.relativeOutcomes)
         ? source.relativeOutcomes.map((outcome) => ({ ...outcome }))
         : [],
@@ -196,13 +209,14 @@
   );
 
   // Routed-check outcome tiers (active type) offered to the recipe editor's
-  // check-mode result-set assignment control as {id, name}.
+  // check-mode result-set assignment control as {id, name}. Failure tiers are
+  // excluded — a failed check produces no result set to route to.
   const recipeRoutedOutcomeTierOptions = $derived.by(() => {
     const routed = selectedSystem?.craftingCheck?.routed;
     if (!routed) return [];
     const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
     return (Array.isArray(tiers) ? tiers : [])
-      .filter((tier) => tier && tier.id)
+      .filter((tier) => tier && tier.id && tier.success === true)
       .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
   });
 

@@ -52,10 +52,37 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.routed, {
     type: 'relative',
-    rollExpression: '',
+    rollFormula: '',
+    dc: 15,
+    thresholdMode: 'meet',
+    tiers: [],
+    diceCrits: [],
     relativeOutcomes: [],
     fixedOutcomes: [],
   });
+});
+
+test('_normalizeCraftingCheck routed mirrors the simple formula/DC/tiers/crits', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    routed: {
+      rollExpression: '1d20', // legacy field still read for back-compat
+      dc: '12.7',
+      thresholdMode: 'exceed',
+      tiers: [{ name: ' Hard ', dc: '18' }],
+      diceCrits: [{ die: '1d20', raw: '20', success: true, breakTools: true }],
+    },
+  });
+  assert.equal(result.routed.rollFormula, '1d20', 'rollExpression migrates to rollFormula');
+  assert.equal(result.routed.dc, 12, 'dc is truncated');
+  assert.equal(result.routed.thresholdMode, 'exceed');
+  assert.equal(result.routed.tiers[0].name, 'Hard');
+  assert.equal(result.routed.tiers[0].dc, 18);
+  assert.ok(result.routed.tiers[0].id, 'a tier id is generated');
+  assert.deepEqual(
+    { ...result.routed.diceCrits[0], id: undefined },
+    { id: undefined, die: '1d20', raw: 20, success: true, breakTools: true }
+  );
 });
 
 test('_normalizeCraftingCheck normalizes relative and fixed tiers independently', () => {
@@ -75,7 +102,7 @@ test('_normalizeCraftingCheck normalizes relative and fixed tiers independently'
     },
   });
   assert.equal(result.routed.type, 'fixed');
-  assert.equal(result.routed.rollExpression, '1d20+@attributes.con.mod');
+  assert.equal(result.routed.rollFormula, '1d20+@attributes.con.mod');
 
   assert.equal(result.routed.relativeOutcomes.length, 1, 'non-object entries are dropped');
   const relative = result.routed.relativeOutcomes[0];
@@ -129,10 +156,9 @@ test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dic
         null,
       ],
       diceCrits: [
-        { id: 'c1', die: '1d20', raw: '20', effect: 'succeed' },
-        { die: '1d20', raw: 1, effect: 'fail' },
-        { die: '1d20', raw: 5, effect: 'bogus' },
-        { die: '', raw: 3, effect: 'fail' },
+        { id: 'c1', die: '1d20', raw: '20', success: true, breakTools: true },
+        { die: '1d20', raw: 1, success: false },
+        { die: '', raw: 3, success: false },
         'not-an-object',
       ],
     },
@@ -145,12 +171,16 @@ test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dic
   assert.equal(result.simple.tiers[0].name, 'Hard');
   assert.equal(result.simple.tiers[1].id, 'keep', 'an existing tier id is preserved');
   assert.equal(result.simple.tiers[1].dc, 10, 'tier DC is truncated to an integer');
-  // Multiple crits per die persist; bogus-effect and die-less entries are dropped.
+  // Multiple crits per die persist; only die-less / non-object entries are dropped
+  // (a crit always forces an outcome — no off state).
   assert.equal(result.simple.diceCrits.length, 2);
   assert.equal(result.simple.diceCrits[0].id, 'c1', 'an existing crit id is preserved');
   assert.equal(result.simple.diceCrits[0].raw, 20, 'raw is truncated to an integer');
+  assert.equal(result.simple.diceCrits[0].success, true);
+  assert.equal(result.simple.diceCrits[0].breakTools, true);
   assert.ok(result.simple.diceCrits[1].id, 'a missing crit id is generated');
-  assert.equal(result.simple.diceCrits[1].effect, 'fail');
+  assert.equal(result.simple.diceCrits[1].success, false);
+  assert.equal(result.simple.diceCrits[1].breakTools, false, 'breakTools defaults to false');
 });
 
 test('_normalizeCraftingCheck coerces invalid simple dcMode/thresholdMode to defaults', () => {

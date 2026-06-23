@@ -28,6 +28,9 @@
     // Routed check-mode recipes route by the check outcome, not by a named
     // ingredient set, so the set name is hidden there (showSetName = false).
     showSetName = true,
+    // The default display name for an unnamed set ("Set 1"): shown in the editable
+    // field when the set has no explicit name, and read-only in check mode.
+    defaultName = '',
     onChange = () => {},
     onRemove = () => {}
   } = $props();
@@ -36,6 +39,15 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
+
+  // The editable name field shows the explicit name, or the default when unset, so
+  // a usable unnamed set is not hidden behind a placeholder.
+  const displayName = $derived(set?.name?.trim() ? set.name : defaultName);
 
   const groups = $derived(Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []);
   const essences = $derived(set?.essences && typeof set.essences === 'object' ? set.essences : {});
@@ -81,14 +93,14 @@
     }
     onChange({
       ...set,
-      ingredientGroups: [...groups, { options: [{ quantity: 1, match: { type: 'component', componentId: id } }] }]
+      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'component', componentId: id } }] }]
     });
   }
 
   function addTagRequirement() {
     onChange({
       ...set,
-      ingredientGroups: [...groups, { options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }]
+      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }]
     });
   }
 
@@ -98,7 +110,7 @@
     const firstUnit = (currencyUnits || [])[0]?.id || '';
     onChange({
       ...set,
-      ingredientGroups: [...groups, { options: [{ quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }] }]
+      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }] }]
     });
   }
 
@@ -116,12 +128,16 @@
           class="manager-recipe-ingredient-set-name"
           data-recipe-set-field="name"
           placeholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
-          value={set?.name || ''}
+          value={displayName}
           onchange={(e) => setName(e.target.value)}
           aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
         />
       {:else}
-        <span class="manager-recipe-ingredient-set-name-spacer" aria-hidden="true"></span>
+        <!-- Check mode: the set name is irrelevant to routing, so show the neutral
+             default name read-only rather than a user-set value. -->
+        <span class="manager-recipe-ingredient-set-name is-readonly" data-recipe-set-default-name
+          >{defaultName}</span
+        >
       {/if}
       <button
         type="button"

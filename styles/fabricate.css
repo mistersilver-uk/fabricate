@@ -1253,7 +1253,7 @@
 /* Simple-check per-die critical rolls: Raw roll + a "Force Outcome" cell holding
    the auto-fail/auto-succeed pills on one line + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-crit {
-  grid-template-columns: 110px minmax(200px, 1fr) 40px;
+  grid-template-columns: 92px minmax(110px, 1fr) minmax(110px, 1fr) 40px;
 }
 
 .fabricate-manager .manager-checks-force-outcome {
@@ -4993,6 +4993,15 @@
    right-aligned when the ingredient-set name is hidden (check mode). */
 .fabricate-manager .manager-recipe-ingredient-set-name-spacer {
   flex: 1 1 auto;
+}
+
+/* Read-only default set name shown in routed check mode (no editable input). */
+.fabricate-manager .manager-recipe-ingredient-set-name.is-readonly {
+  display: flex;
+  align-items: center;
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.7;
 }
 
 .fabricate-manager .manager-recipe-routing-assignment {

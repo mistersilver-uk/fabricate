@@ -520,9 +520,12 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(
       checkTarget.querySelector('[data-recipe-set-field="name"]'),
       null,
-      'ingredient-set name hidden in check mode'
+      'no editable ingredient-set name input in check mode'
     );
-    assert.ok(checkTarget.querySelector('.manager-recipe-ingredient-set-name-spacer'));
+    // The set still shows a read-only DEFAULT name (not the stored 'Alpha').
+    const readonlyName = checkTarget.querySelector('[data-recipe-set-default-name]');
+    assert.ok(readonlyName, 'check mode shows the read-only default name');
+    assert.equal(readonlyName.textContent.trim(), 'Set 1');
     editHarness.remount();
 
     const ingredientTarget = await editHarness.mount(
@@ -535,9 +538,37 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(ingredientTarget, 'ingredients');
     await flushRender();
-    assert.ok(
-      ingredientTarget.querySelector('[data-recipe-set-field="name"]'),
-      'ingredient-set name shown in ingredient mode'
+    const nameInput = ingredientTarget.querySelector('[data-recipe-set-field="name"]');
+    assert.ok(nameInput, 'ingredient-set name shown in ingredient mode');
+    assert.equal(nameInput.value, 'Alpha', 'shows the explicit name');
+    editHarness.remount();
+  });
+
+  it('shows the default set name in the editable field when a set is unnamed', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        complex: true,
+        componentOptions: COMPONENT_OPTIONS,
+        routingProvider: 'ingredientSet',
+        recipe: {
+          ...RECIPE,
+          complex: true,
+          ingredientSets: [
+            { id: 'iset-1', name: '', ingredientGroups: [] },
+            { id: 'iset-2', name: '', ingredientGroups: [] },
+          ],
+        },
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const names = [...target.querySelectorAll('[data-recipe-set-field="name"]')].map(
+      (i) => i.value
+    );
+    assert.deepEqual(
+      names,
+      ['Set 1', 'Set 2'],
+      'unnamed sets show their default name, not a blank field'
     );
     editHarness.remount();
   });
@@ -961,10 +992,9 @@ describe('RecipeEditView (mounted)', () => {
     target.querySelector('[data-recipe-add="ingredient-set"]').click();
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     assert.equal(patches[0].ingredientSets.length, 2, 'the ingredient set array grew by one');
-    assert.equal(
-      'id' in patches[0].ingredientSets[1],
-      false,
-      'the appended set carries no id (store assigns one)'
+    assert.ok(
+      patches[0].ingredientSets[1].id,
+      'the appended set carries an eager id (assigned at add time)'
     );
     editHarness.remount();
   });
@@ -994,10 +1024,9 @@ describe('RecipeEditView (mounted)', () => {
       'Primary',
       'the existing group survives with its name'
     );
-    assert.equal(
-      'id' in patches[0].resultGroups[1],
-      false,
-      'the appended group carries no id (store assigns one)'
+    assert.ok(
+      patches[0].resultGroups[1].id,
+      'the appended group carries an eager id (so it is immediately routable)'
     );
     editHarness.remount();
   });
@@ -1234,7 +1263,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(patches.length, 1, 'choosing a component patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a requirement is appended to the set');
-    assert.equal('id' in groups[0], false, 'the appended requirement carries no id');
+    assert.ok(groups[0].id, 'the appended requirement carries an eager id');
     assert.deepEqual(
       groups[0].options[0].match,
       { type: 'component', componentId: 'cmp-herb' },
@@ -1255,7 +1284,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a tag requirement is appended');
-    assert.equal('id' in groups[0], false, 'the appended requirement carries no id');
+    assert.ok(groups[0].id, 'the appended requirement carries an eager id');
     assert.deepEqual(
       groups[0].options[0].match,
       { type: 'tags', tags: [], tagMatch: 'any' },
@@ -1737,7 +1766,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a currency requirement is appended');
-    assert.equal('id' in groups[0], false, 'the appended requirement carries no id');
+    assert.ok(groups[0].id, 'the appended requirement carries an eager id');
     assert.deepEqual(
       groups[0].options[0].match,
       { type: 'currency', unit: 'gp', amount: 1 },
@@ -2103,10 +2132,9 @@ describe('RecipeEditView (mounted)', () => {
       1,
       'a single group is appended to the empty step scope'
     );
-    assert.equal(
-      'id' in updates[0][1].resultGroups[0],
-      false,
-      'the appended group carries no id (store assigns one)'
+    assert.ok(
+      updates[0][1].resultGroups[0].id,
+      'the appended group carries an eager id (assigned at add time)'
     );
     editHarness.remount();
   });
@@ -2139,7 +2167,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('adds a result item id-less to a group via the Add item popover', async () => {
+  it('adds a result item to a group via the Add item popover (with an eager id)', async () => {
     const { target, patches } = await mountResultGroups([
       { id: 'grp-1', name: 'Primary', results: [] },
     ]);
@@ -2151,11 +2179,9 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(patches.length, 1, 'adding an item patches the recipe');
     const items = patches[0].resultGroups[0].results;
     assert.equal(items.length, 1, 'the group has one result item');
-    assert.deepEqual(
-      items[0],
-      { componentId: 'cmp-herb', quantity: 1 },
-      'the item is id-less with quantity 1'
-    );
+    assert.ok(items[0].id, 'the item carries an eager id');
+    assert.equal(items[0].componentId, 'cmp-herb');
+    assert.equal(items[0].quantity, 1, 'the item defaults to quantity 1');
     editHarness.remount();
   });
 
@@ -2319,11 +2345,10 @@ describe('RecipeEditView (mounted)', () => {
     await pickPopoverOption(target, '.manager-recipe-add-component-trigger', /Mountain Herb/);
     assert.equal(patches.length, 1, 'the first edit writes the single-element groups array');
     assert.equal(patches[0].resultGroups.length, 1, 'a single group materializes');
-    assert.deepEqual(
-      patches[0].resultGroups[0].results,
-      [{ componentId: 'cmp-herb', quantity: 1 }],
-      'the group holds the added item'
-    );
+    const addedItem = patches[0].resultGroups[0].results[0];
+    assert.equal(addedItem.componentId, 'cmp-herb', 'the group holds the added item');
+    assert.equal(addedItem.quantity, 1);
+    assert.ok(addedItem.id, 'the added item carries an eager id');
     editHarness.remount();
   });
 

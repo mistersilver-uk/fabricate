@@ -49,18 +49,20 @@ function getExecutionSteps(recipe) {
       ingredientSets: asArray(step?.ingredientSets),
       resultGroups: asArray(step?.resultGroups),
       toolIds: asArray(step?.toolIds),
-      explicit: true
+      explicit: true,
     }));
   }
 
-  return [{
-    id: 'implicit-step',
-    name: '',
-    ingredientSets: asArray(recipe?.ingredientSets),
-    resultGroups: asArray(recipe?.resultGroups),
-    toolIds: asArray(recipe?.toolIds),
-    explicit: false
-  }];
+  return [
+    {
+      id: 'implicit-step',
+      name: '',
+      ingredientSets: asArray(recipe?.ingredientSets),
+      resultGroups: asArray(recipe?.resultGroups),
+      toolIds: asArray(recipe?.toolIds),
+      explicit: false,
+    },
+  ];
 }
 
 /**
@@ -92,7 +94,7 @@ function collectMissingRequirementIssues(executionSteps, isMultiStep) {
         severity: 'critical',
         blocks: 'enable',
         target: 'ingredients',
-        ...stepTag(step, isMultiStep)
+        ...stepTag(step, isMultiStep),
       });
     }
   }
@@ -103,7 +105,7 @@ function collectMissingRequirementIssues(executionSteps, isMultiStep) {
         severity: 'critical',
         blocks: 'enable',
         target: 'results',
-        ...stepTag(step, isMultiStep)
+        ...stepTag(step, isMultiStep),
       });
     }
   }
@@ -139,9 +141,7 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
   const requirementSignatures = [];
 
   for (const group of asArray(set?.ingredientGroups)) {
-    const signatures = asArray(group?.options)
-      .map(optionSignature)
-      .filter(Boolean);
+    const signatures = asArray(group?.options).map(optionSignature).filter(Boolean);
 
     // Within an OR group: any repeated option signature is a duplicate.
     if (new Set(signatures).size !== signatures.length) {
@@ -150,7 +150,7 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
         severity: 'critical',
         blocks: 'enable',
         target: 'ingredients',
-        ...stepTag(step, isMultiStep)
+        ...stepTag(step, isMultiStep),
       });
     }
 
@@ -167,7 +167,7 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
       severity: 'critical',
       blocks: 'enable',
       target: 'ingredients',
-      ...stepTag(step, isMultiStep)
+      ...stepTag(step, isMultiStep),
     });
   }
 
@@ -187,7 +187,10 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
 function requirementComponentIds(group, systemComponents) {
   const ids = new Set();
   for (const option of asArray(group?.options)) {
-    const expanded = getMatchHandler(option?.match).expandToComponentIds(option?.match, systemComponents);
+    const expanded = getMatchHandler(option?.match).expandToComponentIds(
+      option?.match,
+      systemComponents
+    );
     for (const id of expanded) ids.add(id);
   }
   return ids;
@@ -230,12 +233,14 @@ function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
       // double-flag them as an overlap.
       if (groups[i].signature !== null && groups[i].signature === groups[j].signature) continue;
       if (setsIntersect(groups[i].ids, groups[j].ids)) {
-        return [{
-          id: 'requirementOverlap',
-          severity: 'warning',
-          target: 'ingredients',
-          ...stepTag(step, isMultiStep)
-        }];
+        return [
+          {
+            id: 'requirementOverlap',
+            severity: 'warning',
+            target: 'ingredients',
+            ...stepTag(step, isMultiStep),
+          },
+        ];
       }
     }
   }
@@ -297,14 +302,14 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const active = recipe?.enabled !== false;
 
   const hasName = Boolean(trimmed(recipe?.name));
-  const hasIngredientSet = executionSteps.every(step => step.ingredientSets.length > 0);
-  const hasResultGroup = executionSteps.every(step => step.resultGroups.length > 0);
-  const stepsNamed = executionSteps.every(step => Boolean(step.name));
+  const hasIngredientSet = executionSteps.every((step) => step.ingredientSets.length > 0);
+  const hasResultGroup = executionSteps.every((step) => step.resultGroups.length > 0);
+  const stepsNamed = executionSteps.every((step) => Boolean(step.name));
 
   const checks = [
     { id: 'hasName', satisfied: hasName },
     { id: 'hasIngredientSet', satisfied: hasIngredientSet },
-    { id: 'hasResultGroup', satisfied: hasResultGroup }
+    { id: 'hasResultGroup', satisfied: hasResultGroup },
   ];
   if (isMultiStep) {
     checks.push({ id: 'stepsNamed', satisfied: stepsNamed });
@@ -322,16 +327,21 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   issues.push(...duplicateIssues);
   checks.push({ id: 'noDuplicateMatches', satisfied: duplicateIssues.length === 0 });
 
-  const overlapIssues = collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComponents);
+  const overlapIssues = collectRequirementOverlapIssues(
+    executionSteps,
+    isMultiStep,
+    systemComponents
+  );
   issues.push(...overlapIssues);
   checks.push({ id: 'noRequirementOverlap', satisfied: overlapIssues.length === 0 });
 
   // A disabled recipe still saves, but flag that it cannot be enabled until the
   // critical requirements above are met. The store/model projects `incomplete`;
   // fall back to the locally computed gaps when the flag is absent.
-  const incomplete = typeof recipe?.incomplete === 'boolean'
-    ? recipe.incomplete
-    : (!hasName || !hasIngredientSet || !hasResultGroup);
+  const incomplete =
+    typeof recipe?.incomplete === 'boolean'
+      ? recipe.incomplete
+      : !hasName || !hasIngredientSet || !hasResultGroup;
   if (!active && incomplete) {
     issues.push({ id: 'disabledIncomplete', severity: 'warning', target: 'overview' });
   }
@@ -340,9 +350,9 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
 }
 
 export function countIssues(severity, issues = []) {
-  return issues.filter(issue => issue.severity === severity).length;
+  return issues.filter((issue) => issue.severity === severity).length;
 }
 
 export function blocksEnable(issues = []) {
-  return issues.some(issue => issue.blocks === 'enable');
+  return issues.some((issue) => issue.blocks === 'enable');
 }

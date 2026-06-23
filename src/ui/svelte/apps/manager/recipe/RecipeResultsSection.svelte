@@ -45,6 +45,13 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // Generate an id eagerly at add time (rather than relying on the store's
+  // normalization at save) so a brand-new result set is immediately routable.
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
+
   const groups = $derived(Array.isArray(resultGroups) ? resultGroups : []);
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
   const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
@@ -109,7 +116,7 @@
   }
 
   function addGroup() {
-    onChange([...groups, { name: '', results: [] }]);
+    onChange([...groups, { id: newId(), name: '', checkOutcomeIds: [], results: [] }]);
   }
 
   function removeGroup(index) {

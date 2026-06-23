@@ -66,6 +66,11 @@
     (componentOptions || []).map(option => ({ id: option.id, label: option.name, img: option.img }))
   );
 
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
+
   // Spread the existing group so its id/name (referenced by routing) survive.
   function setName(name) {
     onChange({ ...group, name });
@@ -93,7 +98,7 @@
       });
       return;
     }
-    onChange({ ...group, results: [...results, { componentId: id, quantity: 1 }] });
+    onChange({ ...group, results: [...results, { id: newId(), componentId: id, quantity: 1 }] });
   }
 </script>
 

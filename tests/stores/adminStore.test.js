@@ -2164,7 +2164,7 @@ describe('createAdminStore', () => {
         dcMode: 'static',
         tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
         macroUuid: null,
-        diceCrits: [{ die: '1d20', raw: 20, effect: 'succeed' }],
+        diceCrits: [{ id: 'cr1', die: '1d20', raw: 20, success: true, breakTools: false }],
       };
       await store.saveCraftingCheckSimple(simple);
       assert.ok(updateArgs !== null);

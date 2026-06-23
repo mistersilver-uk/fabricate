@@ -2,28 +2,30 @@
 <!--
   Routed-mode crafting check editor.
 
-  A routed crafting check has a TYPE (relative or fixed), a roll EXPRESSION, and
-  a table of OUTCOME TIERS:
-    - relative: each tier's threshold is expressed relative to a recipe's DC
-                (DC -5, DC +10, …).
-    - fixed:    each tier owns a start/end segment of the expression's value
-                range; segments must not overlap.
+  A routed crafting check has a TYPE (relative or fixed), a roll FORMULA with a
+  default DC and comparison (shared with the simple check), per-die critical raw
+  rolls, and a table of OUTCOME TIERS:
+    - relative: each tier's threshold is expressed relative to the recipe's DC
+                (DC -5, DC +10, …); relative checks may also define recipe TIERS
+                that override the default DC.
+    - fixed:    each tier owns a start/end segment of the formula's value range;
+                segments must not overlap.
   Every outcome has a name, a generated secret id (kept in data, never shown), a
   success toggle, and a break-tools toggle. Both the relative DC and the fixed
   start/end are kept on each outcome so switching type never destroys the other
   mode's values.
 
-  Reuses the shared GM-UI primitives: ResolutionModeCard for the type selector
-  and manager-status-toggle for the per-tier switches. Controlled component:
-  renders `value`, emits the next value through `onChange`. Parsing/validation
-  lives in utils/craftingCheckExpression.js.
+  Reuses the shared check sub-components (formula/DC/comparison, crit table, recipe
+  tiers) so routed and simple stay structurally identical. Controlled component:
+  renders `value`, emits the next value through `onChange`. Range parsing lives in
+  utils/craftingCheckExpression.js.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import {
-    parseDiceGroups,
-    findRangeConflicts,
-  } from '../../../../../utils/craftingCheckExpression.js';
+  import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
+  import CheckFormulaFields from './CheckFormulaFields.svelte';
+  import CheckDiceCrits from './CheckDiceCrits.svelte';
+  import CheckRecipeTiers from './CheckRecipeTiers.svelte';
 
   let { value = null, onChange = () => {} } = $props();
 
@@ -59,7 +61,6 @@
   // and writes the active type's list, so changes in one mode never touch the other.
   const outcomesKey = $derived(type === 'fixed' ? 'fixedOutcomes' : 'relativeOutcomes');
   const outcomes = $derived(Array.isArray(value?.[outcomesKey]) ? value[outcomesKey] : []);
-  const diceGroups = $derived(parseDiceGroups(value?.rollExpression));
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
   const validationMessages = $derived(
@@ -155,29 +156,30 @@
   </section>
 
   <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.ExpressionTitle', 'Roll expression')}</h3>
-    <label class="manager-field">
-      <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.ExpressionLabel', 'Expression')}</span>
-      <input
-        data-check-roll-expression
-        value={value?.rollExpression || ''}
-        placeholder="1d20"
-        oninput={(event) => emit({ rollExpression: event.currentTarget.value })}
-      />
-    </label>
-    <div class="manager-checks-dice">
-      <span class="manager-field-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.DiceGroups', 'Dice groups')}</span>
-      {#if diceGroups.length > 0}
-        <div class="manager-chip-row">
-          {#each diceGroups as group, index (`${group.raw}-${index}`)}
-            <span class="manager-chip" data-dice-group>{group.raw}</span>
-          {/each}
-        </div>
-      {:else}
-        <p class="manager-muted" data-dice-empty>{text('FABRICATE.Admin.Manager.Checks.Crafting.NoDice', 'No dice detected in this expression.')}</p>
-      {/if}
-    </div>
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}</h3>
+    <CheckFormulaFields
+      rollFormula={value?.rollFormula || ''}
+      dc={value?.dc ?? 15}
+      thresholdMode={value?.thresholdMode || 'meet'}
+      placeholder="1d20"
+      onChange={emit}
+    />
+    <CheckDiceCrits
+      rollFormula={value?.rollFormula || ''}
+      diceCrits={value?.diceCrits || []}
+      onChange={(diceCrits) => emit({ diceCrits })}
+    />
   </section>
+
+  {#if type === 'relative'}
+    <section class="manager-inspector-card" data-routed-tiers>
+      <CheckRecipeTiers
+        tiers={value?.tiers || []}
+        defaultDc={value?.dc ?? 0}
+        onChange={(tiers) => emit({ tiers })}
+      />
+    </section>
+  {/if}
 
   <section class="manager-inspector-card">
     <div class="manager-checks-card-head">

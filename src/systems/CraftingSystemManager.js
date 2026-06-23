@@ -356,17 +356,18 @@ export class CraftingSystemManager {
 
   _normalizeSimpleDiceCrit(crit) {
     if (!crit || typeof crit !== 'object') return null;
-    const effect = crit.effect === 'fail' || crit.effect === 'succeed' ? crit.effect : null;
     const die = String(crit.die || '').trim();
-    // A die may carry several crits (e.g. 1 auto-fails and 20 auto-succeeds), so
-    // each is its own keyed row. Only persist crits that actually force an outcome.
-    if (!effect || !die) return null;
+    // A die may carry several crits (e.g. raw 1 forces failure, raw 20 forces
+    // success), so each is its own keyed row. A crit always forces an outcome —
+    // there is no off state — so only a missing die drops it.
+    if (!die) return null;
     const raw = Number(crit.raw);
     return {
       id: crit.id || foundry.utils.randomID(),
       die,
       raw: Number.isFinite(raw) ? Math.trunc(raw) : 0,
-      effect,
+      success: crit.success === true,
+      breakTools: crit.breakTools === true,
     };
   }
 
@@ -380,9 +381,25 @@ export class CraftingSystemManager {
     const source = !routed || typeof routed !== 'object' ? {} : routed;
     const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
     const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
+    const tiers = Array.isArray(source.tiers) ? source.tiers : [];
+    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
+    const dc = Number(source.dc);
+    // The roll formula, default DC, comparison, per-die crits, and recipe tiers
+    // mirror the simple check (so the editors share components). `rollExpression`
+    // is the legacy field name, read for back-compat.
+    const rollFormula =
+      typeof source.rollFormula === 'string'
+        ? source.rollFormula
+        : typeof source.rollExpression === 'string'
+          ? source.rollExpression
+          : '';
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
-      rollExpression: typeof source.rollExpression === 'string' ? source.rollExpression : '',
+      rollFormula,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
+      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
       relativeOutcomes: relative
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
         .filter(Boolean),

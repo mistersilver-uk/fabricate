@@ -1651,16 +1651,21 @@ export class CraftingEngine {
 
     const crit = this._resolveSimpleCheckCrit(simple.diceCrits, diceGroups);
     const comparison = simple.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    let success;
-    if (crit === 'fail') success = false;
-    else if (crit === 'succeed') success = true;
-    else success = comparison === 'exceed' ? total > dc : total >= dc;
+    const success = crit ? crit.success : comparison === 'exceed' ? total > dc : total >= dc;
+    const breakTools = crit ? crit.breakTools === true : false;
 
     return {
       success,
       outcome: success ? 'pass' : 'fail',
       value: total,
-      data: { dc, formula, total, comparison, crit: crit || null },
+      data: {
+        dc,
+        formula,
+        total,
+        comparison,
+        crit: crit ? { success: crit.success, breakTools } : null,
+        breakTools,
+      },
       message: success ? null : 'Crafting check failed',
     };
   }
@@ -1726,20 +1731,23 @@ export class CraftingEngine {
 
   /**
    * Resolve any forced outcome from the configured per-die critical raw rolls.
-   * A matching auto-fail takes precedence over an auto-succeed. Returns
-   * 'fail' | 'succeed' | null.
+   * Each crit forces success or failure (and may break tools) when its die's
+   * rolled total matches its raw value. A matching forced FAILURE takes
+   * precedence over a forced success. Returns the matched crit
+   * `{ success, breakTools }`, or null when none match.
    */
   _resolveSimpleCheckCrit(diceCrits, diceGroups) {
     const crits = Array.isArray(diceCrits) ? diceCrits : [];
     let triggered = null;
     for (const crit of crits) {
-      if (crit?.effect !== 'fail' && crit?.effect !== 'succeed') continue;
+      if (!crit || typeof crit !== 'object' || !crit.die) continue;
       const matches = diceGroups.some(
         (group) => group.group === crit.die && group.sum === Number(crit.raw)
       );
       if (!matches) continue;
-      if (crit.effect === 'fail') return 'fail';
-      triggered = 'succeed';
+      const resolved = { success: crit.success === true, breakTools: crit.breakTools === true };
+      if (!resolved.success) return resolved; // forced failure wins
+      triggered = resolved;
     }
     return triggered;
   }

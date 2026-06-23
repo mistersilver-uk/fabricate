@@ -43,6 +43,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDiceCrits.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
@@ -1737,8 +1740,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the singleton placeholder page is replaced by the editor'
     );
     assert.equal(target.querySelectorAll('[data-check-type-option]').length, 2);
-    // The editor is seeded from the selected system's persisted routed config.
-    const expressionInput = target.querySelector('[data-check-roll-expression]');
+    // The editor is seeded from the selected system's persisted routed config
+    // (legacy `rollExpression` migrates to the shared `rollFormula` field).
+    const expressionInput = target.querySelector('[data-check-roll-formula]');
     assert.equal(expressionInput.value, '2d6');
     const rows = target.querySelectorAll('[data-outcome-row]');
     assert.equal(rows.length, 1, 'the persisted tier is rendered');
@@ -1771,7 +1775,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
     assert.ok(saved, 'Save persists the routed config through the store');
-    assert.equal(saved[1].rollExpression, '2d6+1d4');
+    assert.equal(saved[1].rollFormula, '2d6+1d4');
     assert.equal(
       target.querySelector('[data-checks-save]'),
       null,
@@ -1816,11 +1820,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(toggled[1], true, 'enabling the check sends true');
   });
 
-  it('crafting check editor (relative): lists dice groups, shows DC, and edits outcomes', () => {
+  it('crafting check editor (relative): formula/DC/comparison, per-die crits, recipe tiers, and outcomes', () => {
     const emitted = [];
     const value = {
       type: 'relative',
-      rollExpression: '2d6+1d4',
+      rollFormula: '2d6+1d4',
+      dc: 14,
+      thresholdMode: 'meet',
+      tiers: [],
+      diceCrits: [],
       relativeOutcomes: [
         { id: 'a1b2c3d4ef', name: 'Fail', success: false, breakTools: true, dc: -2 },
       ],
@@ -1836,10 +1844,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
+    // Routed mirrors simple: a formula/DC/comparison row and a per-die crit table
+    // (one group per detected die), not display-only chips.
+    assert.equal(target.querySelector('[data-check-roll-formula]').value, '2d6+1d4');
+    assert.equal(target.querySelector('[data-check-dc]').value, '14');
+    assert.ok(target.querySelector('[data-threshold-mode]'), 'comparison select renders');
     assert.deepEqual(
-      [...target.querySelectorAll('[data-dice-group]')].map((chip) => chip.textContent.trim()),
+      [...target.querySelectorAll('[data-crit-group]')].map((g) =>
+        g.getAttribute('data-crit-group')
+      ),
       ['2d6', '1d4']
     );
+    // Relative checks expose recipe tiers (DC overrides); fixed checks do not.
+    assert.ok(
+      target.querySelector('[data-routed-tiers]'),
+      'relative mode shows the recipe tiers card'
+    );
+
     // Column labels live in the table header, not on every row.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
@@ -1946,10 +1967,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       dcMode: 'static',
       tiers: [{ id: 'tier1', name: 'Hard', dc: 18 }],
       macroUuid: null,
-      // Two crits on the same die: raw 1 auto-fails, raw 20 auto-succeeds.
+      // Two crits on the same die: raw 1 forces failure, raw 20 forces success.
       diceCrits: [
-        { id: 'c1', die: '1d20', raw: 1, effect: 'fail' },
-        { id: 'c2', die: '1d20', raw: 20, effect: 'succeed' },
+        { id: 'c1', die: '1d20', raw: 1, success: false, breakTools: false },
+        { id: 'c2', die: '1d20', raw: 20, success: true, breakTools: false },
       ],
     };
     target = document.createElement('div');
@@ -1979,17 +2000,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(rawInput.getAttribute('max'), '20');
     assert.equal(rawInput.value, '20');
 
-    // The fail/succeed buttons collapse into one "Force Outcome" column.
+    // Columns: Raw roll | Force Outcome (success/failure toggle) | Break tools.
     assert.deepEqual(
       [...group.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
         .map((cell) => cell.textContent.trim())
         .filter(Boolean),
-      ['Raw roll', 'Force Outcome']
+      ['Raw roll', 'Force Outcome', 'Break tools']
     );
-    const forceCell = group.querySelector('[data-crit-row="c2"] .manager-checks-force-outcome');
-    assert.ok(
-      forceCell.querySelector('[data-crit-fail]') && forceCell.querySelector('[data-crit-succeed]')
-    );
+    const c2 = group.querySelector('[data-crit-row="c2"]');
+    const force = c2.querySelector('[data-crit-success]');
+    assert.ok(force.classList.contains('is-positive'), 'success crit shows the green pill');
+    assert.ok(force.textContent.includes('Success'));
+    const breakPill = c2.querySelector('[data-crit-break]');
+    assert.ok(breakPill.textContent.includes("Don't break"), 'break toggle defaults to off');
+    // Toggling Force Outcome flips success; no off state.
+    force.click();
+    assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c2').success, false);
+    breakPill.click();
+    assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c2').breakTools, true);
 
     // Add appends a new crit row to the same die; remove drops one.
     group.querySelector('[data-add-crit]').click();
