@@ -1452,8 +1452,22 @@ export class CraftingEngine {
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
-    if (!checksEnabled && !checkRequired) {
+
+    // Simple pass/fail check (Checks editor) for simple and alchemy modes: used
+    // when a roll formula is configured. Optional in simple mode (honours the
+    // enabled toggle) and always-on in alchemy mode, where the check is required.
+    const simpleConfig = system?.craftingCheck?.simple;
+    const useSimpleCheck =
+      ['simple', 'alchemy'].includes(mode) &&
+      !!simpleConfig?.rollFormula &&
+      (mode === 'alchemy' || checksEnabled);
+
+    if (!checksEnabled && !checkRequired && !useSimpleCheck) {
       return { success: true, outcome: null, data: {} };
+    }
+
+    if (useSimpleCheck) {
+      return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor);
     }
 
     const config = system.craftingCheck || {};
@@ -1582,6 +1596,152 @@ export class CraftingEngine {
       data: result.data || {},
       message: success ? null : result.message || 'Crafting check failed',
     };
+  }
+
+  /**
+   * Evaluate the simple pass/fail crafting check: roll the formula, resolve the
+   * DC (static default, the recipe's selected tier, or a dynamic macro), and
+   * compare (meet-or-exceed / exceed). A configured critical raw roll on any die
+   * in the formula auto-fails or auto-succeeds, overriding the comparison.
+   *
+   * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
+   */
+  async _runSimpleCheck(system, recipe, ingredientSet, craftingActor) {
+    const simple = system?.craftingCheck?.simple || {};
+    const formula = String(simple.rollFormula || '').trim();
+    const dc = await this._resolveSimpleCheckDc(
+      system,
+      simple,
+      recipe,
+      ingredientSet,
+      craftingActor
+    );
+
+    let total = 0;
+    let diceGroups = [];
+    if (formula) {
+      if (typeof globalThis.Roll !== 'function') {
+        // No dice engine available (headless/non-Foundry): cannot evaluate, so do
+        // not block the craft.
+        return {
+          success: true,
+          outcome: 'pass',
+          value: null,
+          data: { dc, formula },
+          message: null,
+        };
+      }
+      try {
+        const rollData = craftingActor?.getRollData?.() ?? craftingActor?.system ?? {};
+        const roll = await new globalThis.Roll(formula, rollData).evaluate();
+        const rolledTotal = Number(roll?.total);
+        total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
+        diceGroups = this._rolledDiceGroups(roll);
+      } catch (error) {
+        console.error(`Fabricate | Simple crafting check roll failed (${formula})`, error);
+        return {
+          success: false,
+          outcome: 'fail',
+          value: null,
+          data: { dc, formula },
+          message: `Crafting check roll failed: ${error.message}`,
+        };
+      }
+    }
+
+    const crit = this._resolveSimpleCheckCrit(simple.diceCrits, diceGroups);
+    const comparison = simple.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    let success;
+    if (crit === 'fail') success = false;
+    else if (crit === 'succeed') success = true;
+    else success = comparison === 'exceed' ? total > dc : total >= dc;
+
+    return {
+      success,
+      outcome: success ? 'pass' : 'fail',
+      value: total,
+      data: { dc, formula, total, comparison, crit: crit || null },
+      message: success ? null : 'Crafting check failed',
+    };
+  }
+
+  /**
+   * Resolve the simple check's DC: a dynamic macro's returned number, the recipe's
+   * selected static tier, or the static default. Any failure falls back to the
+   * default DC so a misconfiguration never throws mid-craft.
+   */
+  async _resolveSimpleCheckDc(system, simple, recipe, ingredientSet, craftingActor) {
+    const fallback = Number.isFinite(Number(simple.dc)) ? Math.trunc(Number(simple.dc)) : 15;
+    if (simple.dcMode === 'dynamic') {
+      if (!simple.macroUuid) return fallback;
+      try {
+        const value = await MacroExecutor.run(simple.macroUuid, {
+          recipe: recipe?.toJSON?.() || recipe,
+          craftingSystem: system,
+          craftingActor,
+          candidateIngredientSet: ingredientSet,
+        });
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? Math.trunc(numeric) : fallback;
+      } catch (error) {
+        console.error(
+          `Fabricate | Simple crafting check DC macro failed (${simple.macroUuid})`,
+          error
+        );
+        return fallback;
+      }
+    }
+    const tierId = recipe?.checkTierId;
+    if (tierId) {
+      const tiers = Array.isArray(simple.tiers) ? simple.tiers : [];
+      const tier = tiers.find((entry) => entry.id === tierId);
+      const tierDc = Number(tier?.dc);
+      if (tier && Number.isFinite(tierDc)) return Math.trunc(tierDc);
+    }
+    return fallback;
+  }
+
+  /**
+   * Summarise an evaluated Roll's dice as `{ group: "NdS", sum }` entries, where
+   * `sum` is the die term total — the value compared against a critical raw roll.
+   */
+  _rolledDiceGroups(roll) {
+    const dice = Array.isArray(roll?.dice) ? roll.dice : [];
+    return dice.map((die) => {
+      const count = Number(die?.number);
+      const faces = Number(die?.faces);
+      const dieTotal = Number(die?.total);
+      const sum = Number.isFinite(dieTotal)
+        ? dieTotal
+        : (Array.isArray(die?.results) ? die.results : []).reduce(
+            (acc, entry) => acc + (Number(entry?.result) || 0),
+            0
+          );
+      return {
+        group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
+        sum,
+      };
+    });
+  }
+
+  /**
+   * Resolve any forced outcome from the configured per-die critical raw rolls.
+   * A matching auto-fail takes precedence over an auto-succeed. Returns
+   * 'fail' | 'succeed' | null.
+   */
+  _resolveSimpleCheckCrit(diceCrits, diceGroups) {
+    const crits = Array.isArray(diceCrits) ? diceCrits : [];
+    let triggered = null;
+    for (const crit of crits) {
+      if (crit?.effect !== 'fail' && crit?.effect !== 'succeed') continue;
+      const matches = diceGroups.some(
+        (group) => group.group === crit.die && group.sum === Number(crit.raw)
+      );
+      if (!matches) continue;
+      if (crit.effect === 'fail') return 'fail';
+      triggered = 'succeed';
+    }
+    return triggered;
   }
 
   /**
