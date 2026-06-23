@@ -1469,6 +1469,14 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       steps: Array.isArray(raw.steps) ? raw.steps : [],
       ingredientSets: Array.isArray(raw.ingredientSets) ? raw.ingredientSets : [],
       resultGroups: Array.isArray(raw.resultGroups) ? raw.resultGroups : [],
+      // Result routing: the per-recipe routing mode (provider) and check-tier
+      // reference live at the top level and MUST be projected, or the editor
+      // seeds them empty and they revert on reload (the routing-mode persistence
+      // bug). The resultGroups/ingredientSets arrays above already carry their
+      // own routing fields (checkOutcomeIds / resultGroupId).
+      resultSelection: raw.resultSelection || null,
+      outcomeRouting: raw.outcomeRouting || null,
+      checkTierId: raw.checkTierId ?? null,
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),

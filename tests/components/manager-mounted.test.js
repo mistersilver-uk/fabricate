@@ -88,6 +88,7 @@ function compileManagerRoot() {
     'RecipeEssenceRequirements',
     'RecipeResultsSection',
     'RecipeResultGroupCard',
+    'RecipeRoutingAssignment',
     'RecipeResultItemRow',
     'RecipeToolsSection',
   ]) {

@@ -4988,6 +4988,63 @@
   margin: 0;
 }
 
+/* Routed result-set routing: ingredient-set / outcome-tier chip multi-select that
+   replaces the result-set name input, plus the spacer that keeps the remove button
+   right-aligned when the ingredient-set name is hidden (check mode). */
+.fabricate-manager .manager-recipe-ingredient-set-name-spacer {
+  flex: 1 1 auto;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fab-mv2-text);
+  opacity: 0.7;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment-empty {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-routing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-recipe-routing-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.fabricate-manager .manager-recipe-routing-chip-remove:hover {
+  opacity: 1;
+}
+
 .fabricate-manager .manager-recipe-ingredient-set-groups {
   display: flex;
   flex-direction: column;

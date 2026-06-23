@@ -26,6 +26,8 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Hidden in routed check-mode recipes (routing is by check outcome, not set name).
+    showSetName = true,
     onUpdateIngredientSets = () => {},
     onDeleteStep = () => {}
   } = $props();
@@ -58,6 +60,7 @@
             {essenceOptions}
             {itemTags}
             {currencyUnits}
+            {showSetName}
             onChange={(nextSets) => onUpdateIngredientSets(step.id, nextSets)}
           />
         {/snippet}
@@ -71,6 +74,7 @@
       {essenceOptions}
       {itemTags}
       {currencyUnits}
+      {showSetName}
       onChange={(nextSets) => onUpdateIngredientSets(null, nextSets)}
     />
   {/if}

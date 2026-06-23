@@ -195,6 +195,17 @@
       : []
   );
 
+  // Routed-check outcome tiers (active type) offered to the recipe editor's
+  // check-mode result-set assignment control as {id, name}.
+  const recipeRoutedOutcomeTierOptions = $derived.by(() => {
+    const routed = selectedSystem?.craftingCheck?.routed;
+    if (!routed) return [];
+    const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+    return (Array.isArray(tiers) ? tiers : [])
+      .filter((tier) => tier && tier.id)
+      .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+  });
+
   // Reseed the routed + simple check drafts and baselines when the selected system
   // changes (not on every refresh of the same system, so a save never clobbers an
   // open draft).
@@ -4019,6 +4030,8 @@
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
+        routingProvider={recipeRoutingProvider}
+        routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}

@@ -22,6 +22,7 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
+    showSetName = true,
     onChange = () => {},
     idPrefix = ''
   } = $props();
@@ -103,6 +104,7 @@
             {essenceOptions}
             {itemTags}
             {currencyUnits}
+            {showSetName}
             onChange={(nextSet) => updateSet(index, nextSet)}
             onRemove={() => removeSet(index)}
           />

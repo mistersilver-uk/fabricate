@@ -25,6 +25,9 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // Routed check-mode recipes route by the check outcome, not by a named
+    // ingredient set, so the set name is hidden there (showSetName = false).
+    showSetName = true,
     onChange = () => {},
     onRemove = () => {}
   } = $props();
@@ -107,15 +110,19 @@
 <div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-set-id={set?.id || ''}>
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">
-      <input
-        type="text"
-        class="manager-recipe-ingredient-set-name"
-        data-recipe-set-field="name"
-        placeholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
-        value={set?.name || ''}
-        onchange={(e) => setName(e.target.value)}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
-      />
+      {#if showSetName}
+        <input
+          type="text"
+          class="manager-recipe-ingredient-set-name"
+          data-recipe-set-field="name"
+          placeholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
+          value={set?.name || ''}
+          onchange={(e) => setName(e.target.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
+        />
+      {:else}
+        <span class="manager-recipe-ingredient-set-name-spacer" aria-hidden="true"></span>
+      {/if}
       <button
         type="button"
         class="manager-icon-button is-danger"

@@ -5395,6 +5395,46 @@ describe('createAdminStore', () => {
       ]);
     });
 
+    it('surfaces recipe routing fields (resultSelection, checkTierId, checkOutcomeIds) in the view state', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const routedRecipe = makeRecipe({
+        id: 'r-routed',
+        craftingSystemId: 'sys1',
+        // The routing mode and check-tier live at the top level; the projection
+        // must carry them through or the editor loses them on reload.
+        toJSON: () => ({
+          id: 'r-routed',
+          name: 'Routed',
+          craftingSystemId: 'sys1',
+          resultSelection: { provider: 'check', macroUuid: null, rollTableUuid: null },
+          checkTierId: 'tier-x',
+          resultGroups: [{ id: 'g1', name: 'G1', checkOutcomeIds: ['t-a'], results: [] }],
+          ingredientSets: [],
+        }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [routedRecipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const recipe = get(store.viewState).recipes.find((r) => r.id === 'r-routed');
+      assert.ok(recipe, 'routed recipe should be present');
+      assert.equal(
+        recipe.resultSelection.provider,
+        'check',
+        'routing mode survives the projection'
+      );
+      assert.equal(recipe.checkTierId, 'tier-x');
+      assert.deepEqual(recipe.resultGroups[0].checkOutcomeIds, ['t-a']);
+    });
+
     it('viewState.recipeCategories groups recipes by category with counts', async () => {
       const services = createMockServices();
       const origManager = services.getRecipeManager();
