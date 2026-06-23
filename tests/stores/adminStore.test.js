@@ -2159,10 +2159,12 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const simple = {
         rollFormula: '1d20',
+        successThreshold: 12,
+        thresholdMode: 'meet',
         dcMode: 'static',
-        defaultDc: 12,
         tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
         macroUuid: null,
+        diceCrits: [{ die: '1d20', raw: 20, effect: 'succeed' }],
       };
       await store.saveCraftingCheckSimple(simple);
       assert.ok(updateArgs !== null);
@@ -2179,8 +2181,9 @@ describe('createAdminStore', () => {
           enabled: true,
           simple: {
             rollFormula: '1d20',
+            successThreshold: 14,
+            thresholdMode: 'meet',
             dcMode: 'static',
-            defaultDc: 14,
             tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
             macroUuid: null,
           },
@@ -2193,7 +2196,7 @@ describe('createAdminStore', () => {
         vs.selectedSystem.craftingCheck.simple,
         'simple config is projected into view state'
       );
-      assert.equal(vs.selectedSystem.craftingCheck.simple.defaultDc, 14);
+      assert.equal(vs.selectedSystem.craftingCheck.simple.successThreshold, 14);
       assert.equal(vs.selectedSystem.craftingCheck.simple.tiers[0].name, 'Hard');
     });
 

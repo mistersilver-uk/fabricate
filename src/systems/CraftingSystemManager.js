@@ -323,20 +323,24 @@ export class CraftingSystemManager {
   }
 
   // Simple pass/fail crafting check authored in the Checks editor for simple and
-  // alchemy resolution modes: a shared roll formula plus a polymorphic DC — either
-  // a static default DC with optional named recipe tiers, or a dynamic DC computed
-  // by a dropped macro. Both the static and dynamic fields are kept so switching
-  // `dcMode` never destroys the other side's configuration.
+  // alchemy resolution modes: a roll formula and a success threshold (met or
+  // exceeded), whose value is polymorphic — either a static default with optional
+  // named recipe tiers, or a dynamic value computed by a dropped macro. Both the
+  // static and dynamic fields are kept so switching `dcMode` never destroys the
+  // other side's configuration. Per-die critical raw rolls auto-fail/auto-succeed.
   _normalizeSimpleCraftingCheck(simple = {}) {
     const source = !simple || typeof simple !== 'object' ? {} : simple;
-    const defaultDc = Number(source.defaultDc);
+    const threshold = Number(source.successThreshold);
     const tiers = Array.isArray(source.tiers) ? source.tiers : [];
+    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
     return {
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      successThreshold: Number.isFinite(threshold) ? Math.trunc(threshold) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
-      defaultDc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15,
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       macroUuid: source.macroUuid || null,
+      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
     };
   }
 
@@ -347,6 +351,22 @@ export class CraftingSystemManager {
       id: tier.id || foundry.utils.randomID(),
       name: String(tier.name || '').trim(),
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
+    };
+  }
+
+  _normalizeSimpleDiceCrit(crit) {
+    if (!crit || typeof crit !== 'object') return null;
+    const effect = crit.effect === 'fail' || crit.effect === 'succeed' ? crit.effect : null;
+    const die = String(crit.die || '').trim();
+    // A die may carry several crits (e.g. 1 auto-fails and 20 auto-succeeds), so
+    // each is its own keyed row. Only persist crits that actually force an outcome.
+    if (!effect || !die) return null;
+    const raw = Number(crit.raw);
+    return {
+      id: crit.id || foundry.utils.randomID(),
+      die,
+      raw: Number.isFinite(raw) ? Math.trunc(raw) : 0,
+      effect,
     };
   }
 

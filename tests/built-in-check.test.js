@@ -104,20 +104,23 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.simple, {
     rollFormula: '',
+    successThreshold: 15,
+    thresholdMode: 'meet',
     dcMode: 'static',
-    defaultDc: 15,
     tiers: [],
     macroUuid: null,
+    diceCrits: [],
   });
 });
 
-test('_normalizeCraftingCheck normalizes the simple check (dcMode, tiers, macro)', () => {
+test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dice crits)', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     simple: {
       rollFormula: '1d20+@abilities.int.mod',
+      successThreshold: '18.6',
+      thresholdMode: 'exceed',
       dcMode: 'dynamic',
-      defaultDc: '18.6',
       macroUuid: 'Macro.abc',
       tiers: [
         { name: '  Hard  ', dc: '20' },
@@ -125,24 +128,38 @@ test('_normalizeCraftingCheck normalizes the simple check (dcMode, tiers, macro)
         'not-an-object',
         null,
       ],
+      diceCrits: [
+        { id: 'c1', die: '1d20', raw: '20', effect: 'succeed' },
+        { die: '1d20', raw: 1, effect: 'fail' },
+        { die: '1d20', raw: 5, effect: 'bogus' },
+        { die: '', raw: 3, effect: 'fail' },
+        'not-an-object',
+      ],
     },
   });
   assert.equal(result.simple.dcMode, 'dynamic');
-  assert.equal(result.simple.rollFormula, '1d20+@abilities.int.mod');
-  assert.equal(result.simple.defaultDc, 18, 'default DC is truncated to an integer');
+  assert.equal(result.simple.successThreshold, 18, 'threshold is truncated to an integer');
+  assert.equal(result.simple.thresholdMode, 'exceed');
   assert.equal(result.simple.macroUuid, 'Macro.abc');
   assert.equal(result.simple.tiers.length, 2, 'non-object tiers are dropped');
-  assert.ok(result.simple.tiers[0].id, 'a missing tier id is generated');
   assert.equal(result.simple.tiers[0].name, 'Hard');
-  assert.equal(result.simple.tiers[0].dc, 20);
   assert.equal(result.simple.tiers[1].id, 'keep', 'an existing tier id is preserved');
   assert.equal(result.simple.tiers[1].dc, 10, 'tier DC is truncated to an integer');
+  // Multiple crits per die persist; bogus-effect and die-less entries are dropped.
+  assert.equal(result.simple.diceCrits.length, 2);
+  assert.equal(result.simple.diceCrits[0].id, 'c1', 'an existing crit id is preserved');
+  assert.equal(result.simple.diceCrits[0].raw, 20, 'raw is truncated to an integer');
+  assert.ok(result.simple.diceCrits[1].id, 'a missing crit id is generated');
+  assert.equal(result.simple.diceCrits[1].effect, 'fail');
 });
 
-test('_normalizeCraftingCheck coerces an invalid simple dcMode to static', () => {
+test('_normalizeCraftingCheck coerces invalid simple dcMode/thresholdMode to defaults', () => {
   const mgr = makeManager();
-  const result = mgr._normalizeCraftingCheck({ simple: { dcMode: 'bogus' } });
+  const result = mgr._normalizeCraftingCheck({
+    simple: { dcMode: 'bogus', thresholdMode: 'nope' },
+  });
   assert.equal(result.simple.dcMode, 'static');
+  assert.equal(result.simple.thresholdMode, 'meet');
 });
 
 test('_normalizeBuiltInCheck with invalid dc defaults to 15', () => {

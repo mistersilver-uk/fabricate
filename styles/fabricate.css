@@ -1250,8 +1250,54 @@
   grid-template-columns: minmax(140px, 1fr) 96px 40px;
 }
 
-.fabricate-manager .manager-checks-default-dc {
-  max-width: 160px;
+/* Simple-check per-die critical rolls: Raw roll + a "Force Outcome" cell holding
+   the auto-fail/auto-succeed pills on one line + remove. */
+.fabricate-manager .manager-checks-outcome-table.is-crit {
+  grid-template-columns: 110px minmax(200px, 1fr) 40px;
+}
+
+.fabricate-manager .manager-checks-force-outcome {
+  display: flex;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-force-outcome .manager-checks-state-pill {
+  flex: 1 1 0;
+  width: auto;
+}
+
+.fabricate-manager .manager-checks-crit-group {
+  display: grid;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-crit-group-head {
+  margin-bottom: 0;
+}
+
+.fabricate-manager .manager-checks-crit-die {
+  font-weight: 700;
+}
+
+/* Formula + success threshold + comparison on one line. */
+.fabricate-manager .manager-checks-formula-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-formula-field {
+  flex: 1 1 220px;
+}
+
+.fabricate-manager .manager-checks-threshold-field {
+  flex: 0 0 120px;
+}
+
+.fabricate-manager .manager-checks-threshold-mode {
+  flex: 0 0 150px;
 }
 
 /* Dynamic-DC macro drop zone: reuse the dashed component-source drop look with a

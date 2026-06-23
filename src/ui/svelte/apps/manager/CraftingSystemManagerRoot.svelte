@@ -117,13 +117,15 @@
   // and alchemy resolution modes.
   function cloneSimpleCheck(simple) {
     const source = simple && typeof simple === 'object' ? simple : {};
-    const defaultDc = Number(source.defaultDc);
+    const threshold = Number(source.successThreshold);
     return {
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      successThreshold: Number.isFinite(threshold) ? Math.trunc(threshold) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
-      defaultDc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15,
       tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
-      macroUuid: source.macroUuid || null
+      macroUuid: source.macroUuid || null,
+      diceCrits: Array.isArray(source.diceCrits) ? source.diceCrits.map((crit) => ({ ...crit })) : []
     };
   }
   // svelte-ignore state_referenced_locally

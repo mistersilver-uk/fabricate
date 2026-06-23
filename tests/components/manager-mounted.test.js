@@ -1936,14 +1936,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('simple check editor: static shows default DC + tiers, dynamic shows the macro drop zone', () => {
+  it('simple check editor: threshold + comparison, crit table, tiers, and macro modes', () => {
     const emitted = [];
     const value = {
       rollFormula: '1d20+@abilities.int.mod',
+      successThreshold: 12,
+      thresholdMode: 'meet',
       dcMode: 'static',
-      defaultDc: 12,
       tiers: [{ id: 'tier1', name: 'Hard', dc: 18 }],
       macroUuid: null,
+      // Two crits on the same die: raw 1 auto-fails, raw 20 auto-succeeds.
+      diceCrits: [
+        { id: 'c1', die: '1d20', raw: 1, effect: 'fail' },
+        { id: 'c2', die: '1d20', raw: 20, effect: 'succeed' },
+      ],
     };
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -1954,30 +1960,64 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.ok(target.querySelector('[data-simple-check-editor]'));
-    assert.deepEqual(
-      [...target.querySelectorAll('[data-dice-group]')].map((c) => c.textContent.trim()),
-      ['1d20']
+    // Success threshold + comparison sit on the formula line.
+    assert.equal(target.querySelector('[data-success-threshold]').value, '12');
+    assert.equal(target.querySelector('[data-threshold-mode]').value, 'meet');
+
+    // Dice chips are replaced by a per-die crit group that holds multiple rows.
+    assert.equal(target.querySelector('[data-dice-group]'), null, 'chips are replaced');
+    const group = target.querySelector('[data-crit-group="1d20"]');
+    assert.ok(group, 'one crit group per die');
+    assert.equal(
+      group.querySelectorAll('[data-crit-row]').length,
+      2,
+      'both crits on the die render'
     );
-    // Static mode: default DC field + a tiers table (no macro drop zone).
-    assert.equal(target.querySelector('[data-default-dc]').value, '12');
-    assert.equal(target.querySelector('[data-tier-row]').getAttribute('data-tier-row'), 'tier1');
+    const rawInput = group.querySelector('[data-crit-row="c2"] [data-crit-raw]');
+    assert.equal(rawInput.getAttribute('min'), '1');
+    assert.equal(rawInput.getAttribute('max'), '20');
+    assert.equal(rawInput.value, '20');
+
+    // The fail/succeed buttons collapse into one "Force Outcome" column.
+    assert.deepEqual(
+      [...group.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
+        .map((cell) => cell.textContent.trim())
+        .filter(Boolean),
+      ['Raw roll', 'Force Outcome']
+    );
+    const forceCell = group.querySelector('[data-crit-row="c2"] .manager-checks-force-outcome');
+    assert.ok(
+      forceCell.querySelector('[data-crit-fail]') && forceCell.querySelector('[data-crit-succeed]')
+    );
+
+    // Add appends a new crit row to the same die; remove drops one.
+    group.querySelector('[data-add-crit]').click();
+    assert.equal(emitted.at(-1).diceCrits.length, 3, 'add appends a crit for the die');
+    assert.equal(emitted.at(-1).diceCrits.at(-1).die, '1d20');
+    group.querySelector('[data-crit-row="c1"] [data-remove-crit]').click();
+    assert.deepEqual(
+      emitted.at(-1).diceCrits.map((crit) => crit.id),
+      ['c2'],
+      'remove drops just that row'
+    );
+
+    // Static mode shows the tiers table (no macro drop zone).
     assert.equal(target.querySelector('[data-tier-name]').value, 'Hard');
     assert.equal(target.querySelector('[data-check-macro-dropzone]'), null);
 
-    // Add / remove a tier edits only the tiers list.
     target.querySelector('[data-add-tier]').click();
     assert.equal(emitted.at(-1).tiers.length, 2);
     target.querySelector('[data-remove-tier]').click();
     assert.equal(emitted.at(-1).tiers.length, 0);
 
-    // Switching to dynamic emits the mode but keeps the static fields (non-destructive).
+    // Switching to dynamic keeps the static fields (non-destructive).
     target.querySelector('[data-dc-mode-option="dynamic"] input').click();
     assert.equal(emitted.at(-1).dcMode, 'dynamic');
-    assert.equal(emitted.at(-1).defaultDc, 12, 'static fields are preserved when switching mode');
+    assert.equal(emitted.at(-1).successThreshold, 12, 'shared fields are preserved');
     assert.deepEqual(emitted.at(-1).tiers, value.tiers);
   });
 
-  it('simple check editor: dynamic mode renders a macro drop zone', () => {
+  it('simple check editor: dynamic mode renders a macro drop zone (threshold stays on the formula line)', () => {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(SimpleCraftingCheckEditorComponent, {
@@ -1985,10 +2025,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         value: {
           rollFormula: '1d20',
+          successThreshold: 15,
+          thresholdMode: 'meet',
           dcMode: 'dynamic',
-          defaultDc: 15,
           tiers: [],
           macroUuid: null,
+          diceCrits: [],
         },
         onChange: () => {},
       },
@@ -1996,11 +2038,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(target.querySelector('[data-dynamic-dc]'));
     assert.ok(target.querySelector('[data-check-macro-dropzone]'), 'shows the macro drop zone');
-    assert.equal(
-      target.querySelector('[data-default-dc]'),
-      null,
-      'no static DC field in dynamic mode'
-    );
+    assert.equal(target.querySelector('[data-tier-name]'), null, 'no tiers table in dynamic mode');
+    // The threshold is shared, so it is shown in both modes.
+    assert.ok(target.querySelector('[data-success-threshold]'));
   });
 
   for (const mode of ['simple', 'alchemy']) {
@@ -2016,10 +2056,12 @@ describe('CraftingSystemManager mounted behavior', () => {
             craftingCheck: {
               simple: {
                 rollFormula: '1d20',
+                successThreshold: 12,
+                thresholdMode: 'meet',
                 dcMode: 'static',
-                defaultDc: 12,
                 tiers: [],
                 macroUuid: null,
+                diceCrits: [],
               },
             },
           }),
@@ -2043,7 +2085,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       );
 
       // Seeded from the persisted config; no Save button until edited.
-      const dcInput = target.querySelector('[data-default-dc]');
+      const dcInput = target.querySelector('[data-success-threshold]');
       assert.equal(dcInput.value, '12');
       assert.equal(target.querySelector('[data-checks-save]'), null);
 
@@ -2060,7 +2102,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       flushSync();
       const saved = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
       assert.ok(saved, 'Save persists the simple config through the store');
-      assert.equal(saved[1].defaultDc, 17);
+      assert.equal(saved[1].successThreshold, 17);
       assert.equal(
         target.querySelector('[data-checks-save]'),
         null,
