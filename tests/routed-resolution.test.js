@@ -248,6 +248,46 @@ describe('routed recipe resolution', () => {
     );
   });
 
+  it('check mode: a success:false tier in checkOutcomeIds does NOT route as success', () => {
+    const system = buildSystem({
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          type: 'relative',
+          rollExpression: '1d20',
+          relativeOutcomes: [
+            // A FAILURE tier (success: false) — must not produce a success result
+            // even when a result group lists its id in checkOutcomeIds.
+            { id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -5 },
+          ],
+          fixedOutcomes: [],
+        },
+      },
+    });
+    const service = buildService(system);
+    // Assign the failure tier to a result group; there is NO 'Botch'-named group,
+    // and 'botch' is not a fail keyword, so name fallback misconfigures.
+    const assigned = groups();
+    assigned[1].checkOutcomeIds = ['t-botch'];
+    const recipe = recipeWithStep(
+      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
+    );
+
+    const result = service.resolveResultGroups({
+      recipe,
+      step: recipe.steps[0],
+      ingredientSet: recipe.steps[0].ingredientSets[0],
+      checkResult: { outcome: 'Botch' },
+    });
+
+    assert.notEqual(
+      result.meta.disposition,
+      'success',
+      'a failure tier must not route via the assignment as success'
+    );
+    assert.deepEqual(result.groups, [], 'no result group is produced for the failure tier');
+  });
+
   it('check mode falls back to outcome-name matching when no tier is assigned', () => {
     const system = buildSystem({
       craftingCheck: {

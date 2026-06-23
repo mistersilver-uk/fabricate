@@ -183,6 +183,29 @@ test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dic
   assert.equal(result.simple.diceCrits[1].breakTools, false, 'breakTools defaults to false');
 });
 
+test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    simple: {
+      diceCrits: [
+        // Above max (1d20 max is 20) clamps down to 20.
+        { id: 'hi', die: '1d20', raw: 99, success: true },
+        // Below min (2d6 min is 2) clamps up to 2.
+        { id: 'lo', die: '2d6', raw: 1, success: false },
+        // In range is untouched.
+        { id: 'ok', die: '2d6', raw: 7, success: true },
+        // Unparseable die leaves raw as-is.
+        { id: 'weird', die: '2d20kh1', raw: 50, success: true },
+      ],
+    },
+  });
+  const byId = Object.fromEntries(result.simple.diceCrits.map((c) => [c.id, c]));
+  assert.equal(byId.hi.raw, 20, 'raw above N*S clamps to the max');
+  assert.equal(byId.lo.raw, 2, 'raw below N clamps to the min');
+  assert.equal(byId.ok.raw, 7, 'an in-range raw is unchanged');
+  assert.equal(byId.weird.raw, 50, 'an unparseable die leaves raw as-is');
+});
+
 test('_normalizeCraftingCheck coerces invalid simple dcMode/thresholdMode to defaults', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({

@@ -320,7 +320,11 @@ export class CraftingEngine {
         }
         if (failurePolicy.consumeCatalystsOnFail) {
           usedToolPairs = toolValidation.tools;
-          usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
+          // A simple-check crit with `breakTools` forces breakage on the
+          // check-failure path too.
+          usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+            forceBreak: checkResult?.data?.breakTools === true,
+          });
         }
       } catch (consumptionError) {
         console.error('Fabricate | Error during failure-path consumption:', consumptionError);
@@ -485,8 +489,11 @@ export class CraftingEngine {
     // like the Item-Piles deduct error below — not refunded.
     await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
-    // Apply tool usage/breakage for the recipe's resolved library Tools.
-    const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
+    // Apply tool usage/breakage for the recipe's resolved library Tools. A
+    // simple-check crit with `breakTools` forces every matched tool to break.
+    const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+      forceBreak: checkResult?.data?.breakTools === true,
+    });
 
     // Deduct Item Piles currency cost after ingredients are consumed to avoid
     // losing currency if ingredient consumption throws.
@@ -986,12 +993,19 @@ export class CraftingEngine {
    * gathering tool breakage uses). Returns `usedTools` evidence in the
    * run-record item-ref shape.
    *
+   * When `forceBreak` is true (a simple-check crit with `breakTools`), every
+   * matched tool is broken regardless of its own per-tool breakage chance: a
+   * `planned: { mode: 'forced', broken: true, evidence: {} }` override is passed
+   * to {@link applyToolUsageAndBreakage}, which uses it verbatim instead of
+   * evaluating the tool's own breakage.
+   *
    * @private
    * @param {Recipe} recipe
    * @param {Array<{tool: object, item: Item}>} toolItems
+   * @param {{ forceBreak?: boolean }} [options]
    * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
    */
-  async _applyToolBreakage(recipe, toolItems = []) {
+  async _applyToolBreakage(recipe, toolItems = [], { forceBreak = false } = {}) {
     const evidence = [];
     for (const { tool: toolData, item, virtual } of toolItems) {
       // Virtual-present (canvas-tool) matches have no owned item to use/break,
@@ -1003,6 +1017,7 @@ export class CraftingEngine {
         tool,
         actor,
         item,
+        planned: forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined,
         buildItemRef: (_actor, breakItem) => ({
           actorUuid: breakItem?.parent?.uuid || null,
           itemUuid: breakItem?.uuid || null,
@@ -1457,6 +1472,11 @@ export class CraftingEngine {
     // when a roll formula is configured. Optional in simple mode (honours the
     // enabled toggle) and always-on in alchemy mode, where the check is required.
     const simpleConfig = system?.craftingCheck?.simple;
+    // An EMPTY `simple.rollFormula` intentionally defers to the legacy
+    // checkSource path below (macro / builtIn): the simple pass/fail check only
+    // takes precedence when a roll formula is actually configured. With no
+    // formula, `useSimpleCheck` is false so a configured macro/builtIn check
+    // still runs.
     const useSimpleCheck =
       ['simple', 'alchemy'].includes(mode) &&
       !!simpleConfig?.rollFormula &&
@@ -1716,6 +1736,12 @@ export class CraftingEngine {
   /**
    * Summarise an evaluated Roll's dice as `{ group: "NdS", sum }` entries, where
    * `sum` is the die term total — the value compared against a critical raw roll.
+   *
+   * `sum` is the DiceTerm#total, which is the POST-MODIFIER, active-only sum: a
+   * keep/drop/explode pool (e.g. `2d20kh1`) reports its modified total, not the
+   * raw per-die faces. Per-die crits therefore match the die-term total, so
+   * dice-pool modifiers are out of scope for crit matching (see
+   * {@link _resolveSimpleCheckCrit}).
    */
   _rolledDiceGroups(roll) {
     const dice = Array.isArray(roll?.dice) ? roll.dice : [];
@@ -1743,6 +1769,11 @@ export class CraftingEngine {
    * rolled total matches its raw value. A matching forced FAILURE takes
    * precedence over a forced success. Returns the matched crit
    * `{ success, breakTools }`, or null when none match.
+   *
+   * Matching compares `crit.raw` against the die-term POST-MODIFIER total
+   * (`group.sum`, the DiceTerm#total surfaced by {@link _rolledDiceGroups}), so
+   * keep/drop/explode dice-pool modifiers (e.g. `2d20kh1`) are out of scope for
+   * per-die crits — a crit sees the modified total, not the individual faces.
    */
   _resolveSimpleCheckCrit(diceCrits, diceGroups) {
     const crits = Array.isArray(diceCrits) ? diceCrits : [];

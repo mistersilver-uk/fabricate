@@ -12,6 +12,7 @@ globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () =>
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
+const { Tool } = await import('../src/models/Tool.js');
 
 function defaultSimple(overrides = {}) {
   return {
@@ -26,12 +27,18 @@ function defaultSimple(overrides = {}) {
   };
 }
 
-function makeEngine({ simple, resolutionMode = 'simple', enabled = true, features = {} } = {}) {
+function makeEngine({
+  simple,
+  resolutionMode = 'simple',
+  enabled = true,
+  features = {},
+  craftingCheck = {},
+} = {}) {
   const system = {
     id: 'sys-1',
     resolutionMode,
     features,
-    craftingCheck: { enabled, simple },
+    craftingCheck: { enabled, simple, ...craftingCheck },
   };
   const systemManager = { getSystem: () => system };
   const resolutionService = { getMode: () => system.resolutionMode };
@@ -335,4 +342,150 @@ test('dice-group sums (not single die faces) drive multi-die crits', async () =>
   const result = await run(engine);
   assert.equal(result.success, true);
   assert.equal(result.data.crit.success, true);
+});
+
+test('duplicate dice terms: a 1d20 crit fires when EITHER d20 term totals 20', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({
+      rollFormula: '1d20+1d20',
+      dc: 99,
+      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true }],
+    }),
+  });
+  // Two separate 1d20 terms; only the SECOND totals 20. `.some` semantics in
+  // _resolveSimpleCheckCrit mean the crit still fires.
+  stubRoll(33, [
+    { number: 1, faces: 20, total: 13 },
+    { number: 1, faces: 20, total: 20 },
+  ]);
+  const result = await run(engine);
+  assert.equal(result.success, true, 'crit fires when either matching d20 term totals 20');
+  assert.equal(result.data.crit.success, true);
+});
+
+// ── Simple-vs-legacy precedence ─────────────────────────────────────────────
+
+test('an empty simple roll formula defers to the legacy macro checkSource', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({ rollFormula: '' }),
+    resolutionMode: 'simple',
+    enabled: true,
+    craftingCheck: { checkSource: 'macro', macroUuid: 'Macro.legacy' },
+  });
+  // If the simple check ran, it would auto-succeed without touching the macro.
+  // With no formula, useSimpleCheck is false, so the macro check runs instead.
+  const orig = MacroExecutor.run;
+  let macroCalled = false;
+  MacroExecutor.run = async () => {
+    macroCalled = true;
+    return { outcome: 'pass', value: 17 };
+  };
+  try {
+    const result = await run(engine);
+    assert.equal(macroCalled, true, 'the legacy macro check ran, not the simple check');
+    assert.equal(result.success, true);
+    assert.equal(result.value, 17, 'the macro result value is surfaced (not a simple-check total)');
+  } finally {
+    MacroExecutor.run = orig;
+  }
+});
+
+// ── Crit breakTools forces tool breakage ────────────────────────────────────
+
+// Build an owned tool item whose Foundry flag set is tracked in a plain map, so
+// flagBroken on-break writes are observable without a Foundry runtime.
+function makeToolItem(componentId = 'hammer') {
+  const flags = {};
+  const item = {
+    uuid: `Item.${componentId}`,
+    parent: { uuid: `Actor.owner`, id: 'owner' },
+    getFlag(ns, key) {
+      return flags[`${ns}.${key}`];
+    },
+    async setFlag(ns, key, value) {
+      flags[`${ns}.${key}`] = value;
+      return value;
+    },
+  };
+  return { item, flags };
+}
+
+function neverBreakTool(componentId = 'hammer') {
+  // breakageChance 0 never breaks on its own; flagBroken records breakage via a flag.
+  return new Tool({
+    componentId,
+    breakage: { mode: 'breakageChance', breakageChance: 0 },
+    onBreak: { mode: 'flagBroken' },
+  });
+}
+
+test('_applyToolBreakage forceBreak: a never-breaking tool is forced to break', async () => {
+  const { engine } = makeEngine({ simple: defaultSimple() });
+  const { item, flags } = makeToolItem();
+  const tool = neverBreakTool();
+  const evidence = await engine._applyToolBreakage(
+    { craftingSystemId: 'sys-1' },
+    [{ tool, item }],
+    { forceBreak: true }
+  );
+  assert.equal(evidence.length, 1);
+  assert.equal(evidence[0].broken, true, 'forceBreak breaks the tool regardless of chance');
+  assert.equal(flags['fabricate.fabricate.toolBroken'], true, 'flagBroken on-break ran');
+});
+
+test('_applyToolBreakage without forceBreak: a never-breaking tool follows normal behavior', async () => {
+  const { engine } = makeEngine({ simple: defaultSimple() });
+  const { item, flags } = makeToolItem();
+  const tool = neverBreakTool();
+  const evidence = await engine._applyToolBreakage(
+    { craftingSystemId: 'sys-1' },
+    [{ tool, item }],
+    { forceBreak: false }
+  );
+  assert.equal(evidence.length, 1);
+  assert.equal(evidence[0].broken, false, 'breakageChance 0 does not break without force');
+  assert.equal(flags['fabricate.fabricate.toolBroken'], undefined, 'no on-break ran');
+});
+
+test('_applyToolBreakage default (no options) does not force breakage', async () => {
+  const { engine } = makeEngine({ simple: defaultSimple() });
+  const { item } = makeToolItem();
+  const tool = neverBreakTool();
+  const evidence = await engine._applyToolBreakage({ craftingSystemId: 'sys-1' }, [{ tool, item }]);
+  assert.equal(evidence[0].broken, false, 'the default path follows per-tool behavior');
+});
+
+test('_runSimpleCheck sets data.breakTools from a forced-success crit', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({
+      dc: 15,
+      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true, breakTools: true }],
+    }),
+  });
+  stubRoll(5, [{ number: 1, faces: 20, total: 20 }]);
+  const result = await run(engine);
+  assert.equal(result.success, true);
+  assert.equal(result.data.breakTools, true, 'a forced-success breakTools crit surfaces the flag');
+});
+
+test('a forced-success crit with breakTools:false does not surface breakTools', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({
+      dc: 15,
+      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true, breakTools: false }],
+    }),
+  });
+  stubRoll(5, [{ number: 1, faces: 20, total: 20 }]);
+  const result = await run(engine);
+  assert.equal(result.success, true);
+  assert.equal(result.data.breakTools, false);
+});
+
+test('a non-crit success path does not surface breakTools', async () => {
+  const { engine } = makeEngine({ simple: defaultSimple({ dc: 15 }) });
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  const result = await run(engine);
+  assert.equal(result.success, true);
+  assert.equal(result.data.crit, null);
+  assert.equal(result.data.breakTools, false);
 });

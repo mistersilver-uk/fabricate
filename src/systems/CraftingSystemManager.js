@@ -361,14 +361,34 @@ export class CraftingSystemManager {
     // success), so each is its own keyed row. A crit always forces an outcome —
     // there is no off state — so only a missing die drops it.
     if (!die) return null;
-    const raw = Number(crit.raw);
+    const raw = Number.isFinite(Number(crit.raw)) ? Math.trunc(Number(crit.raw)) : 0;
     return {
       id: crit.id || foundry.utils.randomID(),
       die,
-      raw: Number.isFinite(raw) ? Math.trunc(raw) : 0,
+      // Clamp `raw` to the die's producible range [N, N*S] parsed from the `NdS`
+      // die string (the crit matches the die-term total, so an out-of-range raw
+      // could never fire). If the die can't be parsed, leave `raw` as-is.
+      raw: this._clampCritRaw(die, raw),
       success: crit.success === true,
       breakTools: crit.breakTools === true,
     };
+  }
+
+  /**
+   * Clamp a critical raw value to the producible total range of an `NdS` die
+   * term: minimum `N` (all dice show 1), maximum `N*S` (all dice show their max
+   * face). When the die string does not parse, the value is returned unchanged.
+   * @private
+   */
+  _clampCritRaw(die, raw) {
+    const match = /^(\d+)d(\d+)$/i.exec(String(die).trim());
+    if (!match) return raw;
+    const count = Number(match[1]);
+    const faces = Number(match[2]);
+    if (!Number.isFinite(count) || !Number.isFinite(faces) || count < 1 || faces < 1) return raw;
+    const min = count;
+    const max = count * faces;
+    return Math.min(Math.max(raw, min), max);
   }
 
   // Structured routed-mode crafting check authored in the Checks editor: a check

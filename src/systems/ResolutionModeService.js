@@ -436,6 +436,10 @@ export class ResolutionModeService {
    * outcome tier on the system (active type's tier list), or null when there is
    * no routed config or no name match. Used to route by explicit tier→result-set
    * assignments (`ResultGroup.checkOutcomeIds`).
+   *
+   * Only `success === true` tiers route via the assignment: a `success: false`
+   * tier must never produce a `disposition: 'success'` result, so it returns
+   * null here and falls through to the fail/keyword/name handling below.
    * @param {object} system
    * @param {string|null} outcome
    * @returns {string|null}
@@ -446,7 +450,9 @@ export class ResolutionModeService {
     const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
     if (!Array.isArray(tiers)) return null;
     const normalized = this._normalizeName(outcome);
-    const tier = tiers.find((entry) => this._normalizeName(entry?.name) === normalized);
+    const tier = tiers.find(
+      (entry) => entry?.success === true && this._normalizeName(entry?.name) === normalized
+    );
     return tier?.id || null;
   }
 
