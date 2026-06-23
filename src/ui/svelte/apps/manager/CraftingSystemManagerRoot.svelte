@@ -85,9 +85,10 @@
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
 
-  // Routed crafting check editor draft. Seeded from the selected system's
-  // craftingCheck.routed, reset when the selection changes, and persisted (debounced)
-  // through the store so keystrokes don't hammer Foundry settings.
+  // Routed crafting check editor: a staged draft is seeded from the selected
+  // system's craftingCheck.routed and committed only via the top-right Save
+  // button (the same staged pattern the other editors use), so persistence is
+  // explicit and never raced by navigation.
   function cloneRoutedCheck(routed) {
     const source = routed && typeof routed === 'object' ? routed : {};
     return {
@@ -99,8 +100,13 @@
   // svelte-ignore state_referenced_locally
   let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
   // svelte-ignore state_referenced_locally
+  let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
+  // svelte-ignore state_referenced_locally
   let lastChecksSystemId = $viewState.selectedSystem?.id || '';
-  let checksSaveTimer = null;
+  let checkRoutedSaving = $state(false);
+  const checkRoutedDirty = $derived(
+    JSON.stringify(checkRoutedDraft) !== JSON.stringify(checkRoutedBaseline)
+  );
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
@@ -122,21 +128,51 @@
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
 
-  // Reseed the routed-check draft when the selected system changes (not on every
-  // refresh of the same system, so our own debounced save never clobbers the draft).
+  // Per-check activation state for the right-menu "Active" card. A check is only
+  // toggleable when its resolution mode makes it optional (Simple); otherwise the
+  // mode requires it and the card explains that.
+  const checkActivation = $derived({
+    crafting: {
+      mode: selectedSystem?.resolutionMode || 'simple',
+      optional: (selectedSystem?.resolutionMode || 'simple') === 'simple',
+      enabled: selectedSystem?.craftingCheck?.enabled === true
+    },
+    salvage: {
+      mode: selectedSystem?.salvageResolutionMode || 'simple',
+      optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
+      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true
+    },
+    // Gathering checks are authored per task, not as a single system-level switch.
+    gathering: { mode: 'perTask', optional: false, enabled: false }
+  });
+
+  // Reseed the routed-check draft + baseline when the selected system changes (not
+  // on every refresh of the same system, so a save never clobbers an open draft).
   $effect(() => {
     if (selectedSystemId === lastChecksSystemId) return;
     lastChecksSystemId = selectedSystemId;
     checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+    checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
   });
 
   function onUpdateCraftingCheck(next) {
     checkRoutedDraft = next;
-    if (checksSaveTimer) clearTimeout(checksSaveTimer);
-    checksSaveTimer = setTimeout(() => {
-      checksSaveTimer = null;
-      store?.saveCraftingCheckRouted?.(checkRoutedDraft);
-    }, 400);
+  }
+
+  async function saveCraftingCheck() {
+    if (!selectedSystemId || checkRoutedSaving || !checkRoutedDirty) return;
+    checkRoutedSaving = true;
+    try {
+      await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
+      checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+    } finally {
+      checkRoutedSaving = false;
+    }
+  }
+
+  function onToggleCheckActive(kind, enabled) {
+    if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
+    else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
   }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
@@ -3369,7 +3405,13 @@
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
-        <!-- no header actions: each check is a singleton, not a created list item -->
+        {#if recipeRouted && (checkRoutedDirty || checkRoutedSaving)}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
+          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveCraftingCheck} disabled={!checkRoutedDirty || checkRoutedSaving}>
+            <i class={checkRoutedSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+          </button>
+        {/if}
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -3764,7 +3806,9 @@
           <ChecksView
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             craftingCheck={checkRoutedDraft}
+            activation={checkActivation}
             {onUpdateCraftingCheck}
+            {onToggleCheckActive}
           />
         </section>
       </main>

@@ -2658,13 +2658,21 @@
           "Resources": "Check resources",
           "Configuration": "Configuration",
           "PageKicker": "One per system",
+          "Dirty": "Unsaved",
+          "Save": "Save check",
+          "Active": {
+            "Title": "Active",
+            "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
+            "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
+            "GatheringHint": "Gathering checks are configured per task, not as one system-wide switch."
+          },
           "Crafting": {
             "PageTitle": "Crafting check",
             "PageLead": "A system has a single crafting check. Its shape is determined by the system's resolution mode and preserved when you switch modes.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the crafting check will appear here.",
             "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
-            "HelpDesc": "The crafting check is shaped by the system resolution mode. Progressive mode requires it; simple and routed modes make it optional.",
+            "HelpDesc": "The crafting check is shaped by the system resolution mode. Simple mode makes it optional; routed and progressive modes require it.",
             "Docs": "Crafting checks docs",
             "TypeTitle": "Check type",
             "TypeRelative": "Relative",
@@ -2699,7 +2707,7 @@
             "ConfigHint": "Roll, difficulty, and outcome settings for the salvage check will appear here.",
             "HelpKicker": "Salvage checks",
             "HelpTitle": "About salvage checks",
-            "HelpDesc": "The salvage check is shaped by the salvage resolution mode. Progressive mode requires it; simple and routed modes make it optional.",
+            "HelpDesc": "The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.",
             "Docs": "Salvage docs"
           },
           "Gathering": {

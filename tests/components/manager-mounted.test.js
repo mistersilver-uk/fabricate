@@ -1103,6 +1103,15 @@ function createStore(calls = [], options = {}) {
       }));
       return true;
     },
+    saveCraftingCheckRouted: (routed) => {
+      calls.push(['saveCraftingCheckRouted', routed]);
+    },
+    saveCraftingCheckActive: (enabled) => {
+      calls.push(['saveCraftingCheckActive', enabled]);
+    },
+    saveSalvageCheckActive: (enabled) => {
+      calls.push(['saveSalvageCheckActive', enabled]);
+    },
     updateEnvironmentDraft: (updates) => {
       calls.push(['updateEnvironmentDraft', updates]);
       viewState.update((state) => ({
@@ -1675,12 +1684,13 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the routed crafting check editor only when the system is in routed mode', async () => {
+    const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore([], {
+        store: createStore(calls, {
           alchemyResolutionMode: 'routed',
           craftingCheck: {
             routed: {
@@ -1721,11 +1731,82 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelectorAll('[data-check-type-option]').length, 2);
     // The editor is seeded from the selected system's persisted routed config.
-    assert.equal(target.querySelector('[data-check-roll-expression]').value, '2d6');
+    const expressionInput = target.querySelector('[data-check-roll-expression]');
+    assert.equal(expressionInput.value, '2d6');
     const rows = target.querySelectorAll('[data-outcome-row]');
     assert.equal(rows.length, 1, 'the persisted tier is rendered');
     assert.equal(rows[0].getAttribute('data-outcome-id'), 'seed1');
     assert.equal(rows[0].querySelector('[data-outcome-name]').value, 'Hit');
+
+    // Routed mode requires the check, so the Active card shows the required hint
+    // (no on/off toggle).
+    assert.ok(
+      target.querySelector('[data-checks-active="crafting"] [data-checks-active-required]'),
+      'routed crafting check shows the required hint'
+    );
+    assert.equal(target.querySelector('[data-checks-active-toggle]'), null);
+
+    // No Save button until there are unsaved edits.
+    assert.equal(target.querySelector('[data-checks-save]'), null);
+
+    // Editing stages a change: the Save button appears and persists via the store
+    // seam (not auto-saved), then the unsaved state clears.
+    expressionInput.value = '2d6+1d4';
+    expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    const saveButton = target.querySelector('[data-checks-save]');
+    assert.ok(saveButton, 'editing reveals the Save button');
+
+    saveButton.click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
+    assert.ok(saved, 'Save persists the routed config through the store');
+    assert.equal(saved[1].rollExpression, '2d6+1d4');
+    assert.equal(
+      target.querySelector('[data-checks-save]'),
+      null,
+      'saving clears the unsaved state'
+    );
+  });
+
+  it('offers an Active on/off toggle for the crafting check when resolution is simple', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          alchemyResolutionMode: 'simple',
+          craftingCheck: { enabled: false },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // Simple mode: the check is optional, so the Active card offers an on/off toggle
+    // and the central column is the singleton page (not the routed editor).
+    const toggle = target.querySelector(
+      '[data-checks-active="crafting"] [data-checks-active-toggle]'
+    );
+    assert.ok(toggle, 'optional crafting check shows the Active toggle');
+    assert.equal(target.querySelector('[data-checks-active-required]'), null);
+    assert.equal(target.querySelector('[data-crafting-check-editor]'), null);
+
+    toggle.click();
+    await tick();
+    flushSync();
+    const toggled = calls.find((call) => call[0] === 'saveCraftingCheckActive');
+    assert.ok(toggled, 'toggling Active persists through the store');
+    assert.equal(toggled[1], true, 'enabling the check sends true');
   });
 
   it('crafting check editor (relative): lists dice groups, shows DC, and edits outcomes', () => {

@@ -13,12 +13,32 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'crafting' } = $props();
+  let { activeTab = 'crafting', activation = null, onToggleActive = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  const activeOn = $derived(activation?.enabled === true);
+  const activeTitle = text('FABRICATE.Admin.Manager.Checks.Active.Title', 'Active');
+  const onLabel = text('FABRICATE.Admin.Manager.StatusOn', 'On');
+  const offLabel = text('FABRICATE.Admin.Manager.StatusOff', 'Off');
+  const optionalHint = text(
+    'FABRICATE.Admin.Manager.Checks.Active.OptionalHint',
+    'Turn this check on to require a roll for the activity, or off to resolve it without one.'
+  );
+  const requiredHint = $derived(
+    activeTab === 'gathering'
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
+          'Gathering checks are configured per task, not as one system-wide switch.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
+          'The current resolution mode requires this check, so it cannot be turned off here.'
+        )
+  );
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
@@ -29,7 +49,7 @@
       title: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpTitle', 'About crafting checks'),
       desc: text(
         'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
-        'The crafting check is shaped by the system resolution mode. Progressive mode requires it; simple and routed modes make it optional.'
+        'The crafting check is shaped by the system resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
       ),
       docsHref: `${DOCS_BASE}/crafting-checks`,
       docsLabel: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs')
@@ -40,7 +60,7 @@
       title: text('FABRICATE.Admin.Manager.Checks.Salvage.HelpTitle', 'About salvage checks'),
       desc: text(
         'FABRICATE.Admin.Manager.Checks.Salvage.HelpDesc',
-        'The salvage check is shaped by the salvage resolution mode. Progressive mode requires it; simple and routed modes make it optional.'
+        'The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
       ),
       docsHref: `${DOCS_BASE}/salvage`,
       docsLabel: text('FABRICATE.Admin.Manager.Checks.Salvage.Docs', 'Salvage docs')
@@ -64,6 +84,27 @@
 </script>
 
 <aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.Checks.Menu.Label', 'Checks context menu')}>
+  {#if activation}
+    <section class="manager-inspector-card" data-checks-active={activeTab}>
+      <p class="manager-kicker">{activeTitle}</p>
+      {#if activation.optional}
+        <button
+          type="button"
+          class={`manager-status-toggle ${activeOn ? 'is-on' : 'is-off'}`}
+          data-checks-active-toggle
+          aria-pressed={activeOn}
+          onclick={() => onToggleActive(!activeOn)}
+        >
+          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+          <span class="manager-status-toggle-label">{activeOn ? onLabel : offLabel}</span>
+        </button>
+        <p class="manager-muted">{optionalHint}</p>
+      {:else}
+        <p class="manager-muted" data-checks-active-required>{requiredHint}</p>
+      {/if}
+    </section>
+  {/if}
+
   <section class="manager-setup-card" data-checks-help={activeTab} aria-label={menu.title}>
     <div class="manager-setup-card-header">
       <i class={menu.icon} aria-hidden="true"></i>

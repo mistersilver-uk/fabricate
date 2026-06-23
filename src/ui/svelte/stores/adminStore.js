@@ -1826,6 +1826,16 @@ function _buildSelectedSystemViewData(
       outcomesText: Array.isArray(selectedSystem.craftingCheck?.outcomes)
         ? selectedSystem.craftingCheck.outcomes.join(', ')
         : '',
+      // The structured routed config edited in the Checks editor must be surfaced
+      // so the editor can read back what was persisted (otherwise it always seeds
+      // empty and edits look like they never saved).
+      routed: selectedSystem.craftingCheck?.routed
+        ? _clonePlain(selectedSystem.craftingCheck.routed)
+        : null,
+    },
+    salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
+    salvageCraftingCheck: {
+      enabled: selectedSystem.salvageCraftingCheck?.enabled === true,
     },
 
     alchemy:
@@ -6218,6 +6228,34 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Enable/disable a system-level check (the right-menu "Active" toggle, shown
+  // only when the resolution mode makes the check optional).
+  async function saveCraftingCheckActive(enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: { ...existing, enabled: enabled === true },
+    });
+    await refresh();
+  }
+
+  async function saveSalvageCheckActive(enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: { ...existing, enabled: enabled === true },
+    });
+    await refresh();
+  }
+
   async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
@@ -6905,6 +6943,8 @@ export function createAdminStore(services) {
     deleteGatheringEventCharacterModifier,
     saveCraftingCheckConfig,
     saveCraftingCheckRouted,
+    saveCraftingCheckActive,
+    saveSalvageCheckActive,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,

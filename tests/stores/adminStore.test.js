@@ -2141,6 +2141,82 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.craftingCheck.mode, 'passFail');
     });
 
+    it('surfaces the routed crafting check config in the selected-system view state', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: true,
+          routed: {
+            type: 'fixed',
+            rollExpression: '1d20',
+            outcomes: [
+              { id: 'o1', name: 'Hit', success: true, breakTools: false, dc: 0, start: 1, end: 20 },
+            ],
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.ok(
+        vs.selectedSystem.craftingCheck.routed,
+        'routed config is projected into view state'
+      );
+      assert.equal(vs.selectedSystem.craftingCheck.routed.rollExpression, '1d20');
+      assert.equal(vs.selectedSystem.craftingCheck.routed.outcomes[0].name, 'Hit');
+    });
+
+    it('saveCraftingCheckActive toggles enabled and preserves the rest of the check', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: false,
+          mode: 'passFail',
+          outcomes: ['fail', 'pass'],
+          routed: { type: 'relative', rollExpression: '1d20', outcomes: [] },
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveCraftingCheckActive(true);
+      assert.equal(updateArgs.updates.craftingCheck.enabled, true);
+      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
+      assert.equal(updateArgs.updates.craftingCheck.routed.rollExpression, '1d20');
+    });
+
+    it('saveSalvageCheckActive toggles the salvage check enabled flag', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.salvageCraftingCheck = { enabled: true, outcomes: ['fail', 'pass'] };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveSalvageCheckActive(false);
+      assert.equal(updateArgs.updates.salvageCraftingCheck.enabled, false);
+    });
+
     it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
       const { store, currency, updateArgs } = await setupCurrencyStore();
       const created = await store.addCurrencyUnit('sys1', {

@@ -28,7 +28,9 @@
   let {
     resolutionMode = 'simple',
     craftingCheck = null,
-    onUpdateCraftingCheck = () => {}
+    activation = {},
+    onUpdateCraftingCheck = () => {},
+    onToggleCheckActive = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -128,7 +130,11 @@
     </div>
 
     {#if hasMenu}
-      <ChecksRightMenu {activeTab} />
+      <ChecksRightMenu
+        {activeTab}
+        activation={activation?.[activeTab]}
+        onToggleActive={(enabled) => onToggleCheckActive(activeTab, enabled)}
+      />
     {/if}
   </div>
 </div>
