@@ -469,6 +469,7 @@ GatheringTaskDefinition = {
   itemSelectionMode: "highestRankedDrop" | "allDrops", // legacy compatibility-read only
   staminaCost?: number,
   gatheringModifier?: ModifierProvider,
+  dcOverride: number | null,        // default null; per-task override of the system-level gatheringCraftingCheck default DC at gather time
 }
 ```
 
