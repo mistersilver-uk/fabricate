@@ -76,6 +76,12 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    id: 'manager-component-edit-salvage',
+    label: 'Manager component editor — salvage authoring (result groups, routing, DC override)',
+    smokeLabels: ['manager-component-edit-salvage'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  },
+  {
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],

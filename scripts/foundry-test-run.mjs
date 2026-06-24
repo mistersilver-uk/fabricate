@@ -1950,6 +1950,23 @@ async function main() {
             itemTags: true,
             recipeCategories: true
           },
+          // Salvage is always on; pick routed mode + named outcome tiers so the
+          // component editor's salvage section shows populated outcome routing (#436).
+          salvageResolutionMode: 'routed',
+          salvageCraftingCheck: {
+            enabled: true,
+            routed: {
+              type: 'relative',
+              rollFormula: '1d20',
+              dc: 12,
+              thresholdMode: 'meet',
+              relativeOutcomes: [
+                { id: 'salvage-clean', name: 'Clean Salvage', success: true, breakTools: false, dc: 6 },
+                { id: 'salvage-partial', name: 'Partial Salvage', success: true, breakTools: false, dc: 0 },
+                { id: 'salvage-botched', name: 'Botched', success: false, breakTools: true, dc: -6 }
+              ]
+            }
+          },
           // Two currency units so the currency-cost requirement row can target a unit.
           itemTags: ['rare', 'reagent', 'metallic'],
           requirements: {
@@ -1999,6 +2016,20 @@ async function main() {
               sourceItemUuid: null
             }
           ]
+        });
+
+        // Give Iron Ore a routed salvage configuration so the component editor's
+        // salvage section renders populated result groups + outcome routing (#436).
+        await csm.updateItem(systemId, componentMap['Iron Ore'], {
+          salvage: {
+            enabled: true,
+            ingredientQuantity: 1,
+            resultGroups: [
+              { id: 'scrap', name: 'Scrap', results: [{ id: 'scrap-result', componentId: componentMap['Iron Ore'], quantity: 1 }] },
+              { id: 'intact', name: 'Intact Parts', results: [{ id: 'intact-result', componentId: componentMap['Iron Sword'], quantity: 1 }] }
+            ],
+            outcomeRouting: { 'Clean Salvage': 'intact', 'Partial Salvage': 'scrap' }
+          }
         });
 
         // Create 3 recipes
@@ -2920,6 +2951,21 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-component-edit-normal');
         process.stdout.write('  D0: component edit normal screenshotted\n');
+
+        // Component editor → salvage authoring section (per-component result
+        // groups, routed outcome routing, and DC override). Salvage is always on,
+        // and this system is in routed salvage mode, so the section renders with a
+        // populated outcome-routing table; scroll it into view to frame it (#436).
+        const salvageSection = page
+          .locator('.fabricate-manager [data-component-edit-section="salvage"]')
+          .first();
+        await salvageSection.waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-salvage-routing]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await salvageSection.scrollIntoViewIfNeeded();
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-salvage');
+        process.stdout.write('  D0: component edit salvage screenshotted\n');
+
         // Return to the components browser for the remaining navigation.
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });

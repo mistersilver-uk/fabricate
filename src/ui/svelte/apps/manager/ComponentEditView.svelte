@@ -13,6 +13,10 @@
     essenceOptions = [],
     showTags = false,
     showEssences = false,
+    showSalvage = false,
+    salvageResolutionMode = 'simple',
+    salvageOutcomeNames = [],
+    componentOptions = [],
     saving = false,
     onSave = () => {},
     onDirtyChange = () => {},
@@ -21,6 +25,11 @@
 
   let tagDraft = $state([]);
   let essenceDraft = $state([]);
+  // Deep clone of component.salvage so edits never mutate the upstream card. Only
+  // the authoring fields (resultGroups, outcomeRouting, dcOverride) are edited
+  // here; the remaining salvage fields (enabled, ingredientQuantity, toolIds, …)
+  // are preserved and spread back through buildUpdates so a save never drops them.
+  let salvageDraft = $state(cloneSalvage(null));
   let tagMenuOpen = $state(false);
   let saveFailed = $state(false);
   let lastComponentKey = $state(null);
@@ -34,6 +43,7 @@
     component?.id || '',
     tagDraft.filter(opt => opt.checked).map(opt => opt.tag).sort().join(','),
     essenceDraft.map(opt => `${opt.id}:${opt.quantity}`).sort().join(','),
+    showSalvage ? salvageSignature() : '',
     dirty ? 'dirty' : 'clean'
   ].join(''));
 
@@ -41,6 +51,7 @@
     if (componentKey === lastComponentKey) return;
     tagDraft = cloneTagOptions(tagOptions);
     essenceDraft = cloneEssenceOptions(essenceOptions);
+    salvageDraft = cloneSalvage(component?.salvage);
     tagMenuOpen = false;
     saveFailed = false;
     lastComponentKey = componentKey;
@@ -83,6 +94,50 @@
     }));
   }
 
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
+
+  // Deep clone the persisted salvage shape into an editable draft. Authoring only
+  // touches resultGroups/outcomeRouting/dcOverride, but the remaining fields are
+  // kept verbatim so buildUpdates can spread them back and never drop them.
+  function cloneSalvage(salvage) {
+    const source = salvage && typeof salvage === 'object' ? salvage : {};
+    return {
+      ...source,
+      dcOverride: source.dcOverride ?? null,
+      outcomeRouting:
+        source.outcomeRouting && typeof source.outcomeRouting === 'object'
+          ? { ...source.outcomeRouting }
+          : {},
+      resultGroups: (Array.isArray(source.resultGroups) ? source.resultGroups : []).map(group => ({
+        ...group,
+        id: group?.id || newId(),
+        name: group?.name || '',
+        results: (Array.isArray(group?.results) ? group.results : []).map(result => ({
+          ...result,
+          id: result?.id || newId(),
+          componentId: result?.componentId || '',
+          quantity: clampSalvageQuantity(result?.quantity)
+        }))
+      }))
+    };
+  }
+
+  function clampSalvageQuantity(value) {
+    const numeric = Math.trunc(Number(value));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+  }
+
+  function salvageSignature() {
+    return JSON.stringify({
+      resultGroups: salvageDraft.resultGroups,
+      outcomeRouting: salvageDraft.outcomeRouting,
+      dcOverride: salvageDraft.dcOverride
+    });
+  }
+
   function tagsAreEqual(left, right) {
     if (!Array.isArray(left) || !Array.isArray(right)) return false;
     if (left.length !== right.length) return false;
@@ -107,6 +162,11 @@
     if (!component) return false;
     if (showTags && !tagsAreEqual(tagDraft, tagOptions)) return true;
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
+    if (showSalvage && salvageSignature() !== JSON.stringify({
+      resultGroups: cloneSalvage(component?.salvage).resultGroups,
+      outcomeRouting: cloneSalvage(component?.salvage).outcomeRouting,
+      dcOverride: cloneSalvage(component?.salvage).dcOverride
+    })) return true;
     return false;
   }
 
@@ -123,6 +183,16 @@
       }
       updates.essences = essences;
     }
+    if (showSalvage) {
+      // Spread the preserved (unedited) salvage fields first, then overwrite the
+      // three authored fields so enabled/ingredientQuantity/toolIds survive a save.
+      updates.salvage = {
+        ...salvageDraft,
+        resultGroups: salvageDraft.resultGroups,
+        outcomeRouting: salvageDraft.outcomeRouting,
+        dcOverride: salvageDraft.dcOverride
+      };
+    }
     return updates;
   }
 
@@ -132,6 +202,7 @@
       name: component?.name || '',
       tagCount: tagDraft.filter(opt => opt.checked).length,
       essenceCount: essenceDraft.filter(opt => clampComponentEssenceQuantity(opt.quantity) > 0).length,
+      salvageGroupCount: showSalvage ? salvageDraft.resultGroups.length : 0,
       updates: buildUpdates(),
       dirty
     };
@@ -149,6 +220,82 @@
       return { ...entry, quantity: adjustComponentEssenceQuantity(entry.quantity, delta) };
     });
     essenceDraft = next;
+  }
+
+  // Salvage authoring mutators. Each writes a fresh salvageDraft (preserving the
+  // untouched fields) so the draftSignature effect re-emits onDraftChange.
+  const salvageShowDcOverride = $derived(
+    salvageResolutionMode === 'simple' || salvageResolutionMode === 'routed'
+  );
+
+  function setSalvage(next) {
+    salvageDraft = { ...salvageDraft, ...next };
+  }
+
+  function addSalvageGroup() {
+    setSalvage({
+      resultGroups: [...salvageDraft.resultGroups, { id: newId(), name: '', results: [] }]
+    });
+  }
+
+  function removeSalvageGroup(groupId) {
+    setSalvage({
+      resultGroups: salvageDraft.resultGroups.filter(group => group.id !== groupId)
+    });
+  }
+
+  function updateSalvageGroup(groupId, patch) {
+    setSalvage({
+      resultGroups: salvageDraft.resultGroups.map(group =>
+        group.id === groupId ? { ...group, ...patch } : group
+      )
+    });
+  }
+
+  function addSalvageResult(groupId) {
+    updateSalvageGroupResults(groupId, results => [
+      ...results,
+      { id: newId(), componentId: componentOptions[0]?.id || '', quantity: 1 }
+    ]);
+  }
+
+  function removeSalvageResult(groupId, resultId) {
+    updateSalvageGroupResults(groupId, results => results.filter(result => result.id !== resultId));
+  }
+
+  function updateSalvageResult(groupId, resultId, patch) {
+    updateSalvageGroupResults(groupId, results =>
+      results.map(result => (result.id === resultId ? { ...result, ...patch } : result))
+    );
+  }
+
+  function updateSalvageGroupResults(groupId, mutate) {
+    setSalvage({
+      resultGroups: salvageDraft.resultGroups.map(group =>
+        group.id === groupId ? { ...group, results: mutate(group.results || []) } : group
+      )
+    });
+  }
+
+  function setSalvageRoute(outcomeName, groupId) {
+    const next = { ...salvageDraft.outcomeRouting };
+    if (groupId) next[outcomeName] = groupId;
+    else delete next[outcomeName];
+    setSalvage({ outcomeRouting: next });
+  }
+
+  function setSalvageDcOverride(rawValue) {
+    const trimmed = String(rawValue ?? '').trim();
+    if (trimmed === '') {
+      setSalvage({ dcOverride: null });
+      return;
+    }
+    const numeric = Number(trimmed);
+    setSalvage({ dcOverride: Number.isFinite(numeric) ? numeric : null });
+  }
+
+  function salvageComponentName(componentId) {
+    return componentOptions.find(option => option.id === componentId)?.name || '';
   }
 
   function toggleTag(tag, checked) {
@@ -379,6 +526,171 @@
           {/if}
         </section>
       {/if}
+
+    {#if showSalvage}
+      <section class="manager-task-core-card" data-component-edit-section="salvage" data-salvage-section>
+        <div class="manager-task-card-heading">
+          <div>
+            <h3>{text('FABRICATE.Admin.Manager.Component.Salvage.Title', 'Salvage')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.Hint', 'Configure what this component yields when it is salvaged.')}</p>
+          </div>
+        </div>
+
+        <div class="manager-field" data-salvage-result-groups>
+          <span class="manager-component-readonly-label">
+            <span>{text('FABRICATE.Admin.Manager.Component.Salvage.ResultGroups', 'Result groups')}</span>
+          </span>
+          {#if salvageDraft.resultGroups.length > 0}
+            <ul class="manager-recipe-ingredient-sets">
+              {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
+                <li class="manager-recipe-ingredient-set-item" data-salvage-group={group.id}>
+                  <div class="manager-salvage-group-header">
+                    <input
+                      type="text"
+                      class="manager-input"
+                      value={group.name}
+                      placeholder={text('FABRICATE.Admin.Manager.Component.Salvage.GroupNamePlaceholder', 'Group {n}').replace('{n}', String(groupIndex + 1))}
+                      aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.GroupName', 'Result group name')}
+                      data-salvage-group-name
+                      oninput={(event) => updateSalvageGroup(group.id, { name: event.currentTarget.value })}
+                      disabled={saving}
+                    />
+                    <button
+                      type="button"
+                      class="manager-icon-button is-danger"
+                      aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.RemoveGroup', 'Remove result group')}
+                      data-remove-salvage-group
+                      onclick={() => removeSalvageGroup(group.id)}
+                      disabled={saving}
+                    >
+                      <i class="fas fa-xmark" aria-hidden="true"></i>
+                    </button>
+                  </div>
+
+                  {#if (group.results || []).length > 0}
+                    <ul class="manager-salvage-result-list">
+                      {#each group.results as result (result.id)}
+                        <li class="manager-salvage-result-row" data-salvage-result={result.id}>
+                          <select
+                            class="manager-input"
+                            value={result.componentId}
+                            aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.ResultComponent', 'Result component')}
+                            data-salvage-result-component
+                            onchange={(event) => updateSalvageResult(group.id, result.id, { componentId: event.currentTarget.value })}
+                            disabled={saving}
+                          >
+                            <option value="">{text('FABRICATE.Admin.Manager.Component.Salvage.SelectComponent', 'Select a component')}</option>
+                            {#each componentOptions as option (option.id)}
+                              <option value={option.id}>{option.name}</option>
+                            {/each}
+                          </select>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            class="manager-input manager-salvage-result-quantity"
+                            value={result.quantity}
+                            aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
+                            data-salvage-result-quantity
+                            oninput={(event) => updateSalvageResult(group.id, result.id, { quantity: clampSalvageQuantity(event.currentTarget.value) })}
+                            disabled={saving}
+                          />
+                          <button
+                            type="button"
+                            class="manager-icon-button is-danger"
+                            aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.RemoveResult', 'Remove result')}
+                            data-remove-salvage-result
+                            onclick={() => removeSalvageResult(group.id, result.id)}
+                            disabled={saving}
+                          >
+                            <i class="fas fa-xmark" aria-hidden="true"></i>
+                          </button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else}
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoResults', 'No results in this group yet.')}</p>
+                  {/if}
+
+                  <button
+                    type="button"
+                    class="manager-button"
+                    data-add-salvage-result
+                    onclick={() => addSalvageResult(group.id)}
+                    disabled={saving}
+                  >
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.Component.Salvage.AddResult', 'Add result')}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoGroups', 'No result groups yet.')}</p>
+          {/if}
+          <button
+            type="button"
+            class="manager-button"
+            data-add-salvage-group
+            onclick={() => addSalvageGroup()}
+            disabled={saving}
+          >
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Component.Salvage.AddGroup', 'Add group')}</span>
+          </button>
+        </div>
+
+        {#if salvageResolutionMode === 'routed'}
+          <div class="manager-field" data-salvage-routing>
+            <span class="manager-component-readonly-label">
+              <span>{text('FABRICATE.Admin.Manager.Component.Salvage.Routing', 'Outcome routing')}</span>
+            </span>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.RoutingHint', 'Map each check outcome to the result group it awards.')}</p>
+            {#if salvageOutcomeNames.length > 0}
+              <div class="manager-salvage-routing-list">
+                {#each salvageOutcomeNames as outcomeName (outcomeName)}
+                  <label class="manager-salvage-routing-row">
+                    <span>{outcomeName}</span>
+                    <select
+                      class="manager-input"
+                      value={salvageDraft.outcomeRouting[outcomeName] || ''}
+                      data-salvage-route={outcomeName}
+                      onchange={(event) => setSalvageRoute(outcomeName, event.currentTarget.value)}
+                      disabled={saving}
+                    >
+                      <option value="">{text('FABRICATE.Admin.Manager.Component.Salvage.Unrouted', 'Unrouted')}</option>
+                      {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
+                        <option value={group.id}>{group.name || text('FABRICATE.Admin.Manager.Component.Salvage.GroupNamePlaceholder', 'Group {n}').replace('{n}', String(groupIndex + 1))}</option>
+                      {/each}
+                    </select>
+                  </label>
+                {/each}
+              </div>
+            {:else}
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoOutcomes', 'The routed salvage check has no outcome tiers to route yet.')}</p>
+            {/if}
+          </div>
+        {/if}
+
+        {#if salvageShowDcOverride}
+          <label class="manager-field" data-salvage-dc-override>
+            <span class="manager-component-readonly-label">
+              <span>{text('FABRICATE.Admin.Manager.Component.Salvage.DcOverride', 'DC override')}</span>
+            </span>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.DcOverrideHint', 'Leave blank to use the system salvage check default.')}</p>
+            <input
+              type="number"
+              step="1"
+              class="manager-input"
+              value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined ? '' : salvageDraft.dcOverride}
+              aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.DcOverride', 'DC override')}
+              oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
+              disabled={saving}
+            />
+          </label>
+        {/if}
+      </section>
+    {/if}
 
     {#if saveFailed}
       <p class="manager-muted manager-form-warning">{text('FABRICATE.Admin.Manager.Component.SaveFailed', 'Save failed. Try again or refresh the manager.')}</p>

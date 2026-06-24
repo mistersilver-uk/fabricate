@@ -140,21 +140,125 @@ test('salvage progressive: no Roll engine awards nothing without blocking', asyn
   assert.equal(r.value, 0);
 });
 
-// ── Routed not yet engine-evaluated (authoring-only until gathering routed) ──
+// ── Salvage routed ──────────────────────────────────────────────────────────
 
-test('salvage routed does not evaluate its formula yet (falls through to the macro path)', async () => {
+const ROUTED_RELATIVE = [
+  { id: 'crit', name: 'Critical', success: true, breakTools: false, dc: 10 },
+  { id: 'ok', name: 'Success', success: true, breakTools: false, dc: 0 },
+  { id: 'miss', name: 'Failure', success: false, breakTools: false, dc: -5 },
+];
+
+test('salvage routed: a formula whose total matches a tier surfaces that tier name as the outcome', async () => {
   const engine = makeEngine();
-  // Would throw if the routed formula were actually rolled.
-  stubThrowingRoll();
+  // base dc 15: thresholds 25/15/10. total 16 → highest match is "Success" (15).
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
   const r = await run(
     engine,
-    sys({ routed: { type: 'relative', rollFormula: '1d20', dc: 12, relativeOutcomes: [] } }, 'routed')
+    sys(
+      {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          dc: 15,
+          thresholdMode: 'meet',
+          relativeOutcomes: ROUTED_RELATIVE,
+        },
+      },
+      'routed'
+    )
   );
-  // Routed salvage is dispatched to the (absent) macro path, not the formula check:
-  // success with no outcome and no value, and the throwing roll is never reached.
+  assert.equal(r.outcome, 'Success');
   assert.equal(r.success, true);
-  assert.equal(r.outcome, null);
-  assert.equal(r.value, null);
+  assert.equal(r.value, 16);
+});
+
+test('salvage routed: the matched outcome name routes to a result group via outcomeRouting', async () => {
+  const engine = makeEngine();
+  const component = {
+    salvage: {
+      resultGroups: [
+        { id: 'g-crit', results: [] },
+        { id: 'g-success', results: [] },
+      ],
+      outcomeRouting: { Critical: 'g-crit', Success: 'g-success' },
+    },
+  };
+  const checkResult = { outcome: 'Success', value: 16 };
+  const groups = engine._resolveSalvageResultGroups(
+    component,
+    { salvageResolutionMode: 'routed' },
+    checkResult
+  );
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].id, 'g-success', 'routed outcome name maps to its result group');
+});
+
+test('salvage routed: an outcome with no outcomeRouting entry yields no result groups', async () => {
+  const engine = makeEngine();
+  const component = {
+    salvage: {
+      resultGroups: [{ id: 'g-crit', results: [] }],
+      outcomeRouting: { Critical: 'g-crit' }, // "Success" is intentionally unrouted
+    },
+  };
+  const groups = engine._resolveSalvageResultGroups(
+    component,
+    { salvageResolutionMode: 'routed' },
+    { outcome: 'Success', value: 16 }
+  );
+  assert.deepEqual(groups, [], 'an unrouted outcome degrades to nothing, not a crash');
+});
+
+test('salvage routed: a per-component dcOverride shifts the relative thresholds', async () => {
+  const engine = makeEngine();
+  // total 16: with the default dc 15, "Success" (threshold 15) matches; with the
+  // override dc 20 the only matching tier becomes "Failure" (threshold 15 = 20-5).
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  const r = await run(
+    engine,
+    sys(
+      {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          dc: 15,
+          thresholdMode: 'meet',
+          relativeOutcomes: ROUTED_RELATIVE,
+        },
+      },
+      'routed'
+    ),
+    { salvage: { dcOverride: 20 } }
+  );
+  assert.equal(r.data.dc, 20);
+  assert.equal(r.outcome, 'Failure', '20 - 5 = 15 is the only tier 16 still meets');
+  assert.equal(r.success, false);
+});
+
+test('salvage routed WITHOUT a formula still falls through to the legacy macro path', async () => {
+  const engine = makeEngine();
+  // Would throw if the routed formula were actually rolled — proves no roll happens.
+  stubThrowingRoll();
+  const orig = MacroExecutor.run;
+  let called = false;
+  MacroExecutor.run = async () => {
+    called = true;
+    return { success: true, outcome: 'Success', value: 3 };
+  };
+  try {
+    const r = await run(
+      engine,
+      sys(
+        { enabled: true, macroUuid: 'Macro.r', routed: { type: 'relative', rollFormula: '', dc: 12 } },
+        'routed'
+      )
+    );
+    assert.equal(called, true, 'the macro ran, not the formula check');
+    assert.equal(r.outcome, 'Success');
+    assert.equal(r.value, 3);
+  } finally {
+    MacroExecutor.run = orig;
+  }
 });
 
 // ── dcOverride = 0 edge (0 is a valid, finite DC) ───────────────────────────

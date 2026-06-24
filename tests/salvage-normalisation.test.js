@@ -27,17 +27,17 @@ function makeManager() {
 // Group 1: System-level salvage normalisation (4 tests)
 // ---------------------------------------------------------------------------
 
-test('features.salvage defaults to false when not provided', () => {
+test('features.salvage is always true (salvage is always on)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 'sys-1' });
-  assert.equal(system.features.salvage, false);
+  assert.equal(system.features.salvage, true);
 });
 
-test('features.salvage is true when explicitly set to true', () => {
+test('features.salvage stays true even when explicitly set to false', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
-    features: { salvage: true }
+    features: { salvage: false }
   });
   assert.equal(system.features.salvage, true);
 });
@@ -128,15 +128,17 @@ test('salvageCraftingCheck.outcomes defaults to ["fail", "pass"]', () => {
 // Group 3: Component-level salvage normalisation (6 tests)
 // ---------------------------------------------------------------------------
 
-test('when features.salvage is false, normalised component does NOT have a salvage key', () => {
+test('salvage is always on, so every normalised component has a salvage key', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
+    // Even an explicit salvage:false is forced on, so the component is salvageable.
     features: { salvage: false },
     components: [{ id: 'comp-1', name: 'Iron Ore' }]
   });
   const component = system.components[0];
-  assert.equal(Object.prototype.hasOwnProperty.call(component, 'salvage'), false);
+  assert.equal(system.features.salvage, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(component, 'salvage'), true);
 });
 
 test('when features.salvage is true and component has no salvage data, defaults are applied', () => {

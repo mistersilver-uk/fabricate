@@ -416,6 +416,9 @@ function createStore(calls = [], options = {}) {
         showTags: true,
         showEssences: true,
         difficulty: 2,
+        // Raw per-component salvage shape the in-manager editor reads/edits. Only
+        // present when a test opts in via options.componentSalvage.
+        salvage: options.componentSalvage,
         salvageSummary: {
           quantityRequired: 1,
           toolCount: 1,
@@ -3618,6 +3621,200 @@ describe('CraftingSystemManager mounted behavior', () => {
       'components',
       'successful save should return to the components browser'
     );
+  });
+
+  // Mount the manager with salvage authoring enabled and open c1's component-edit
+  // route. Hoisted so the salvage-section tests stay DRY (Sonar new-code gate).
+  async function openComponentSalvageEditor(calls, storeOptions = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          selectedFeatures: {
+            essences: true,
+            effectTransfer: true,
+            itemTags: true,
+            gathering: true,
+            recipeCategories: true,
+            salvage: true,
+          },
+          ...storeOptions,
+        }),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  const ROUTED_SALVAGE_CHECK = {
+    enabled: true,
+    routed: {
+      type: 'relative',
+      relativeOutcomes: [
+        { id: 'o-fail', name: 'Failure', success: false },
+        { id: 'o-pass', name: 'Success', success: true },
+        { id: 'o-crit', name: 'Critical Success', success: true },
+      ],
+    },
+  };
+
+  it('renders the salvage authoring section with result-group add, routing selects, and DC override for a routed system', async () => {
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: ROUTED_SALVAGE_CHECK,
+    });
+
+    const section = target.querySelector('[data-salvage-section]');
+    assert.ok(section, 'salvage authoring section should render when showSalvage is true');
+
+    // Adding a result group reveals the group name input and an add-result button.
+    assert.equal(
+      section.querySelector('[data-salvage-group-name]'),
+      null,
+      'no result group should exist before adding one'
+    );
+    section.querySelector('[data-add-salvage-group]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-salvage-section] [data-salvage-group-name]'),
+      'add group should render an editable result group'
+    );
+
+    // One routing select per non-empty outcome name on the routed salvage check.
+    const routes = target.querySelectorAll('[data-salvage-routing] [data-salvage-route]');
+    assert.equal(routes.length, 3, 'one routing select per routed outcome tier name');
+    assert.deepEqual(
+      Array.from(routes).map((select) => select.dataset.salvageRoute),
+      ['Failure', 'Success', 'Critical Success'],
+      'routing selects should be keyed by outcome tier name'
+    );
+
+    assert.ok(
+      target.querySelector('[data-salvage-section] [data-salvage-dc-override] input'),
+      'routed mode should render the DC-override field'
+    );
+  });
+
+  it('hides the salvage authoring section when the system does not enable salvage', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          selectedFeatures: {
+            essences: true,
+            effectTransfer: true,
+            itemTags: true,
+            gathering: true,
+            recipeCategories: true,
+            salvage: false,
+          },
+        }),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-salvage-section]'),
+      null,
+      'salvage section should not render when showSalvage is false'
+    );
+  });
+
+  it('shows salvage result groups but hides routing and DC override in progressive mode', async () => {
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      salvageResolutionMode: 'progressive',
+      salvageCraftingCheck: { enabled: true, progressive: { awardMode: 'equal' } },
+    });
+
+    assert.ok(
+      target.querySelector('[data-salvage-section] [data-add-salvage-group]'),
+      'progressive mode should still allow authoring result groups'
+    );
+    assert.equal(
+      target.querySelector('[data-salvage-routing]'),
+      null,
+      'progressive mode has no routing'
+    );
+    assert.equal(
+      target.querySelector('[data-salvage-dc-override]'),
+      null,
+      'progressive mode has no DC override'
+    );
+  });
+
+  it('emits onDraftChange with updates.salvage carrying authored result-group edits', async () => {
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: {} },
+      componentSalvage: {
+        enabled: true,
+        ingredientQuantity: 2,
+        toolIds: ['anvil'],
+        dcOverride: null,
+        resultGroups: [],
+        outcomeRouting: {},
+      },
+    });
+
+    const section = target.querySelector('[data-salvage-section]');
+    section.querySelector('[data-add-salvage-group]').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-salvage-section] [data-add-salvage-result]').click();
+    await tick();
+    flushSync();
+
+    // The component header Save submits the edit form and routes through
+    // store.updateComponent with the authored salvage payload.
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
+    assert.ok(saveButton, 'salvage edits should reveal the header Save button');
+    assert.equal(saveButton.disabled, false, 'save should be enabled after a salvage edit');
+    saveButton.click();
+    flushSync();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+
+    const updateCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(updateCall, 'salvage save should call store.updateComponent');
+    assert.equal(updateCall[1], 'c1');
+    const salvage = updateCall[2].salvage;
+    assert.ok(salvage, 'updates should carry a salvage payload');
+    assert.equal(salvage.resultGroups.length, 1, 'one authored result group');
+    assert.equal(salvage.resultGroups[0].results.length, 1, 'one authored result in the group');
+    // Untouched salvage fields must survive the round-trip (not be dropped).
+    assert.equal(salvage.enabled, true, 'enabled should be preserved');
+    assert.equal(salvage.ingredientQuantity, 2, 'ingredientQuantity should be preserved');
+    assert.deepEqual(salvage.toolIds, ['anvil'], 'toolIds should be preserved');
   });
 
   it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {

@@ -2857,9 +2857,43 @@ describe('createAdminStore', () => {
         'outcomeRouting',
         'effectTransfer',
         'gathering',
+        'salvage',
       ]) {
         assert.ok(key in features, `features should have key: ${key}`);
       }
+    });
+
+    it('viewState.selectedSystem.features.salvage is always true (salvage is always on)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      // Even an explicit salvage:false projects as on.
+      if (sys) sys.features = { salvage: false };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.equal(vs.selectedSystem?.features.salvage, true);
+    });
+
+    it('viewState.selectedSystem.salvageCraftingCheck surfaces the routed config so editors read it back', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.salvageResolutionMode = 'routed';
+        sys.salvageCraftingCheck = {
+          enabled: true,
+          routed: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'o1', name: 'Clean Salvage', success: true, dc: 5 }],
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const routed = vs.selectedSystem?.salvageCraftingCheck?.routed;
+      assert.ok(routed, 'routed salvage config should be surfaced, not dropped');
+      assert.equal(routed.relativeOutcomes?.[0]?.name, 'Clean Salvage');
     });
 
     it('viewState.selectedSystem.features preserves gathering when enabled', async () => {

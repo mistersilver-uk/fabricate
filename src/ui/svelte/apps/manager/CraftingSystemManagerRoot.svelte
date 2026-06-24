@@ -310,6 +310,23 @@
       .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
   });
 
+  // Salvage feature gate + the inputs the per-component salvage editor needs.
+  const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
+  // Routed-salvage outcome tier NAMES (active type), used by the per-component
+  // outcome-routing selects. Names map to result-group ids in component.salvage.
+  const salvageOutcomeNames = $derived.by(() => {
+    const routed = selectedSystem?.salvageCraftingCheck?.routed;
+    if (!routed) return [];
+    const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+    return (Array.isArray(tiers) ? tiers : [])
+      .map((tier) => String(tier?.name || '').trim())
+      .filter((name) => name.length > 0);
+  });
+  // System components offered to the salvage result picker ({id, name, img}).
+  const salvageComponentOptions = $derived(
+    itemCards.map((item) => ({ id: item.id, name: item.name, img: item.img }))
+  );
+
   // Reseed the routed + simple check drafts and baselines when the selected system
   // changes (not on every refresh of the same system, so a save never clobbers an
   // open draft).
@@ -4164,6 +4181,10 @@
         essenceOptions={componentEditEssenceOptions}
         showTags={componentEditShowTags}
         showEssences={componentEditShowEssences}
+        showSalvage={componentSalvageEnabled}
+        salvageResolutionMode={salvageResolutionMode}
+        salvageOutcomeNames={salvageOutcomeNames}
+        componentOptions={salvageComponentOptions}
         saving={componentEditSaving}
         onSave={saveComponentEdit}
         onDirtyChange={(dirty) => { componentEditDirty = dirty; }}

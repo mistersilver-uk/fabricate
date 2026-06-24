@@ -4927,6 +4927,69 @@
   gap: var(--fab-space-2);
 }
 
+/* Per-component salvage authoring (component editor). A result group reuses the
+   ingredient-set-item shell; its rows lay a component picker, a fixed-width
+   quantity, and a remove button onto one line, and the outcome-routing rows pair
+   an outcome name with its target-group select. */
+.fabricate-manager .manager-salvage-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-group-header .manager-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-salvage-result-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-result-row .manager-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-result-quantity {
+  flex: 0 0 5rem;
+  width: 5rem;
+}
+
+.fabricate-manager .manager-salvage-routing-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-routing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-routing-row > span {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-salvage-routing-row .manager-input {
+  flex: 0 1 14rem;
+  min-width: 0;
+}
+
 /* The set-level "OR", the within-requirement "OR", and the between-requirement
    "AND" dividers share one label-flanked-by-rules treatment; only the label
    differs. */

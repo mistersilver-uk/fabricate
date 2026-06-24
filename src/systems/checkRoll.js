@@ -197,3 +197,193 @@ export async function runFormulaProgressive({
     },
   };
 }
+
+/**
+ * Match a rolled total against a routed check's outcome tiers, returning the
+ * matched tier (or null). Outcome tiers come from
+ * {@link CraftingSystemManager#_normalizeRoutedCraftingCheck}:
+ *
+ * - `relative` outcomes carry a `dc` DELTA relative to the base DC; the effective
+ *   threshold is `dc (base param) + outcome.dc`. The match honours `comparison`
+ *   ('exceed' → `total > threshold`, else 'meet' → `total >= threshold`) and,
+ *   among all matching tiers, picks the one with the HIGHEST effective threshold
+ *   (best tier).
+ * - `fixed` outcomes carry a non-overlapping `[start, end]` segment of the roll
+ *   range; a tier matches when `start <= total <= end`. Ranges are validated
+ *   non-overlapping, but should several match the one with the highest `start`
+ *   wins.
+ */
+function matchRoutedOutcome({ type, total, dc, comparison, relativeOutcomes, fixedOutcomes }) {
+  if (type === 'fixed') {
+    const outcomes = Array.isArray(fixedOutcomes) ? fixedOutcomes : [];
+    let best = null;
+    for (const outcome of outcomes) {
+      if (!outcome) continue;
+      const start = Number(outcome.start);
+      const end = Number(outcome.end);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+      if (total < start || total > end) continue;
+      if (!best || start > Number(best.start)) best = outcome;
+    }
+    return best;
+  }
+  const outcomes = Array.isArray(relativeOutcomes) ? relativeOutcomes : [];
+  let best = null;
+  let bestThreshold = null;
+  for (const outcome of outcomes) {
+    if (!outcome) continue;
+    const delta = Number(outcome.dc);
+    if (!Number.isFinite(delta)) continue;
+    const threshold = dc + delta;
+    const matches = comparison === 'exceed' ? total > threshold : total >= threshold;
+    if (!matches) continue;
+    if (best === null || threshold > bestThreshold) {
+      best = outcome;
+      bestThreshold = threshold;
+    }
+  }
+  return best;
+}
+
+/**
+ * Route a forced-crit disposition to a tier of the matching success flag. A forced
+ * FAILURE (`forcedSuccess === false`) routes to the LOWEST-threshold failing tier
+ * (relative: smallest `dc`; fixed: smallest `start`); a forced SUCCESS routes to
+ * the HIGHEST-threshold succeeding tier. Returns the chosen tier, or null when no
+ * tier of that disposition exists.
+ */
+function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes }) {
+  const wantSuccess = forcedSuccess === true;
+  const key = type === 'fixed' ? 'start' : 'dc';
+  const outcomes =
+    type === 'fixed'
+      ? Array.isArray(fixedOutcomes)
+        ? fixedOutcomes
+        : []
+      : Array.isArray(relativeOutcomes)
+        ? relativeOutcomes
+        : [];
+  let chosen = null;
+  let chosenRank = null;
+  for (const outcome of outcomes) {
+    if (!outcome || (outcome.success === true) !== wantSuccess) continue;
+    const rank = Number(outcome[key]);
+    if (!Number.isFinite(rank)) continue;
+    // Forced success → highest-threshold tier; forced failure → lowest-threshold.
+    const better = chosen === null || (wantSuccess ? rank > chosenRank : rank < chosenRank);
+    if (better) {
+      chosen = outcome;
+      chosenRank = rank;
+    }
+  }
+  return chosen;
+}
+
+/**
+ * Run a routed formula check: roll the formula and map the total onto one of the
+ * configured outcome tiers (relative DC deltas or fixed value ranges), returning
+ * the matched tier's NAME as `outcome` for the activity's outcome→result-group
+ * routing. Per-die crits override the disposition: a forced SUCCESS routes to the
+ * best succeeding tier, a forced FAILURE to the worst failing tier, and the crit's
+ * `breakTools` takes precedence for the surfaced flag. When no tier matches (and no
+ * crit reroutes), `outcome` is null and `success` reflects the crit (when any) or
+ * `false`.
+ *
+ * HEADLESS: with no dice engine the routed check cannot simulate a tier, so it
+ * returns a non-blocking `{ success: true, outcome: null, value: null }` rather
+ * than fabricating a route.
+ *
+ * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
+ */
+export async function runFormulaRouted({
+  formula: rawFormula,
+  dc,
+  thresholdMode,
+  type,
+  relativeOutcomes,
+  fixedOutcomes,
+  diceCrits,
+  actor,
+  label = 'Crafting',
+}) {
+  const formula = String(rawFormula || '').trim();
+  let total = 0;
+  let diceGroups = [];
+  if (formula) {
+    let rolled;
+    try {
+      rolled = await evaluateCheckRoll(formula, actor);
+    } catch (error) {
+      console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
+      return {
+        success: false,
+        outcome: null,
+        value: null,
+        data: { dc, formula, type },
+        message: `${label} check roll failed: ${error.message}`,
+      };
+    }
+    if (!rolled.engine) {
+      // No dice engine: a routed check cannot simulate a tier, so do not block
+      // and do not fabricate a route.
+      return {
+        success: true,
+        outcome: null,
+        value: null,
+        data: { dc, formula, type },
+        message: null,
+      };
+    }
+    total = rolled.total;
+    diceGroups = rolled.diceGroups;
+  }
+
+  const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const crit = resolveCheckCrit(diceCrits, diceGroups);
+
+  let matched = matchRoutedOutcome({
+    type,
+    total,
+    dc,
+    comparison,
+    relativeOutcomes,
+    fixedOutcomes,
+  });
+
+  if (crit) {
+    const rerouted = routeCritOutcome({
+      type,
+      forcedSuccess: crit.success,
+      relativeOutcomes,
+      fixedOutcomes,
+    });
+    // A crit forces the disposition: route to the best (success) / worst (failure)
+    // tier of that flag. If none exists, drop the tier-derived match entirely.
+    matched = rerouted;
+  }
+
+  const success = crit ? crit.success : matched ? matched.success === true : false;
+  const breakTools = crit
+    ? crit.breakTools === true
+    : matched
+      ? matched.breakTools === true
+      : false;
+
+  return {
+    success,
+    outcome: matched ? matched.name : null,
+    value: total,
+    data: {
+      dc,
+      formula,
+      total,
+      type,
+      comparison,
+      outcomeId: matched?.id ?? null,
+      success,
+      breakTools,
+      crit: crit ? { success: crit.success, breakTools: crit.breakTools === true } : null,
+    },
+    message: success ? null : `${label} check failed`,
+  };
+}
