@@ -3039,6 +3039,26 @@ describe('createAdminStore', () => {
       );
     });
 
+    it('persists a per-task gathering DC override (finite truncates, else null)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      // A fresh task defaults to null (use the system-level default DC).
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dcOverride, null);
+
+      // A finite override round-trips, truncated to an integer.
+      await store.updateGatheringLibraryTask('sys1', task.id, { dcOverride: '17.9' });
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dcOverride, 17);
+
+      // A non-numeric override normalizes back to null.
+      await store.updateGatheringLibraryTask('sys1', task.id, { dcOverride: 'nope' });
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dcOverride, null);
+    });
+
     it('persists depletedBehavior swap-image on the node config (legacy deleteToken dropped)', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
