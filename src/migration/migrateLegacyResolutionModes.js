@@ -17,15 +17,18 @@
  *  - former `mapped` → seed `resultSelection.provider = 'ingredientSet'`
  *    (the mapped routing is byte-identical to the canonical `ingredientSet`
  *    contract — no data reshaping beyond provider seeding).
- *  - former `tiered` → seed `resultSelection.provider = 'macroOutcome'` and run
- *    the GROUP-NAME RECONCILIATION below so canonical name-matching reproduces the
- *    legacy `outcomeRouting` behavior, then DELETE `outcomeRouting`.
+ *  - former `tiered` → seed `resultSelection.provider = 'check'` (the canonical
+ *    routed provider) and run the GROUP-NAME RECONCILIATION below so canonical
+ *    name-matching reproduces the legacy `outcomeRouting` behavior, then DELETE
+ *    `outcomeRouting`. (Originally seeded the now-removed `macroOutcome` alias; the
+ *    1.6.0 migration folded that alias into `check`, so this seed targets `check`
+ *    directly and an upgrading world's persisted `macroOutcome` is caught up by 1.6.0.)
  *
  * Tiered group-name reconciliation (recipe-level and per-step, deterministic):
  *  For each `outcomeRouting[outcome] → groupId`, rename the target
  *  `ResultGroup.name` to the `outcome` string. Edge cases:
  *   1. Orphan outcome (no resolvable group): logged, recipe still migratable (the
- *      outcome resolves to a craft-time misconfiguration under `macroOutcome`,
+ *      outcome resolves to a craft-time misconfiguration under `check`,
  *      matching the old empty-routing result). NOT a deletion cause.
  *   2. Fan-in (multiple outcomes → one group): split — the lowest-sorted outcome
  *      keeps the original group; each other outcome gets a clone (new unique id,
@@ -88,7 +91,7 @@ function _migrateSystems(systems) {
     if (LEGACY_MODES.has(legacyMode)) {
       providerBySystemId.set(
         String(system.id),
-        legacyMode === 'mapped' ? 'ingredientSet' : 'macroOutcome'
+        legacyMode === 'mapped' ? 'ingredientSet' : 'check'
       );
       system.resolutionMode = 'routed';
     }
@@ -123,9 +126,10 @@ function _migrateRecipes(recipes, providerBySystemId) {
       continue;
     }
 
-    // Former tiered → macroOutcome with group-name reconciliation across the
-    // recipe-level container and every step container.
-    _seedProvider(recipe, 'macroOutcome');
+    // Former tiered → check with group-name reconciliation across the recipe-level
+    // container and every step container. (`check` is the canonical routed provider;
+    // the legacy `macroOutcome` alias this once seeded was removed in 1.6.0.)
+    _seedProvider(recipe, 'check');
     if (_reconcileTieredRecipe(recipe)) {
       survivors.push(recipe);
     } else {
@@ -144,8 +148,8 @@ function _seedProvider(recipe, provider) {
 }
 
 /**
- * Reconcile a former-tiered recipe's `outcomeRouting` into canonical
- * `macroOutcome` group names across the recipe container and each step, then
+ * Reconcile a former-tiered recipe's `outcomeRouting` into canonical `check`
+ * group names across the recipe container and each step, then
  * drop every `outcomeRouting` map. Returns false if any container is
  * unmigratable (post-rename normalized-name collision).
  * @param {object} recipe
@@ -241,8 +245,9 @@ function _groupOutcomesByGroupId(routing, groupsById, contextId) {
 }
 
 function _logOrphanOutcome(outcome, groupId, contextId) {
-  // Orphan: no resolvable group. Log and leave it; under macroOutcome the outcome
-  // resolves to a craft-time misconfiguration, matching old behavior.
+  // Orphan: no resolvable group. Log and leave it; under the canonical `check`
+  // provider the outcome resolves to a craft-time misconfiguration, matching old
+  // behavior.
   console.log(
     `Fabricate | migrateLegacyResolutionModes: orphan tiered outcome "${outcome}" → "${groupId}" in ${contextId} (no matching result group; left as craft-time misconfiguration)`
   );

@@ -372,14 +372,14 @@ describe('routed recipe resolution', () => {
     assert.equal(mapped.groups[0].name, 'Standard');
   });
 
-  it('legacy tiered token normalizes to routed and resolves by macroOutcome name matching', async () => {
+  it('legacy tiered token normalizes to routed and resolves by check name matching', async () => {
     const manager = new CraftingSystemManager(null);
     const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'tiered' });
     assert.equal(system.resolutionMode, 'routed');
 
     // The 1.4.0 migration renames the routed group to the outcome ('pass') and
-    // seeds macroOutcome, so canonical name-matching reproduces the legacy
-    // outcomeRouting { pass: 'mythic' } behavior.
+    // seeds the canonical `check` provider, so canonical name-matching reproduces
+    // the legacy outcomeRouting { pass: 'mythic' } behavior.
     const { migrateLegacyResolutionModes } =
       await import('../src/migration/migrateLegacyResolutionModes.js');
     const migrated = migrateLegacyResolutionModes({
@@ -394,7 +394,7 @@ describe('routed recipe resolution', () => {
       ],
     });
     const migratedRecipe = migrated.recipes[0];
-    assert.equal(migratedRecipe.resultSelection.provider, 'macroOutcome');
+    assert.equal(migratedRecipe.resultSelection.provider, 'check');
     const passGroup = migratedRecipe.resultGroups.find((g) => g.id === 'mythic');
     assert.equal(passGroup.name, 'pass');
 

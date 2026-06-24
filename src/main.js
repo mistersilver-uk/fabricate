@@ -763,6 +763,30 @@ class Fabricate {
         || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
       ui.notifications?.info?.(message);
     }
+
+    // One-time GM-facing notice: when the 1.6.0 migration removed the legacy routed
+    // result-selection providers, dropping roll-table references (the draw mechanism
+    // is gone) and stripping gathering-task result selections. Name the affected
+    // recipes/tasks so the GM can reconfigure them; routed gathering tasks now resolve
+    // via the system gathering check, so the GM must populate
+    // `gatheringCraftingCheck.routed.rollFormula` for any stripped task. GM-only; only
+    // when something was actually dropped or stripped.
+    const removedProviders = summary?.removedResultSelectionProviders ?? null;
+    const droppedRollTableRecipes = Array.isArray(removedProviders?.droppedRollTableRecipes)
+      ? removedProviders.droppedRollTableRecipes : [];
+    const strippedGatheringTasks = Array.isArray(removedProviders?.strippedGatheringTasks)
+      ? removedProviders.strippedGatheringTasks : [];
+    if ((droppedRollTableRecipes.length > 0 || strippedGatheringTasks.length > 0) && game.user?.isGM) {
+      // Console recovery log naming the affected recipes/tasks. Routed gathering tasks now
+      // resolve via the system gathering check, so the GM must populate
+      // `gatheringCraftingCheck.routed.rollFormula` for any stripped task. The localized GM
+      // toast + lang key ride PR-2 of #424 (the UI PR that carries screenshot evidence).
+      console.warn(
+        'Fabricate | 1.6.0 migration removed legacy result-selection providers. ' +
+          'Populate gatheringCraftingCheck.routed.rollFormula for any stripped gathering task. Affected items:',
+        { droppedRollTableRecipes, strippedGatheringTasks }
+      );
+    }
   }
 
   /**

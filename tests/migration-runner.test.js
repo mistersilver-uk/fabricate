@@ -283,7 +283,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '1.5.0');
+  assert.equal(versionCall.value, '1.6.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall?.value, '1.5.0');
+  assert.equal(versionCall?.value, '1.6.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -465,7 +465,7 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   assert.equal(config.systems['sys-1'].economy.stamina.enabled, false);
   assert.equal(config.systems['sys-1'].economy.nodes.enabled, true);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.5.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
 });
 
 test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
@@ -494,7 +494,7 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
   assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
-  assert.equal(settings.store.get('migrationVersion'), '1.5.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
@@ -566,7 +566,7 @@ test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', 
   assert.equal(systems['sys-none'].economy.stamina.enabled, false);
   assert.equal(systems['sys-none'].economy.nodes.enabled, false);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.5.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
 });
 
 test('0.8.0 is idempotent and leaves already-migrated economies untouched', async () => {
@@ -610,7 +610,7 @@ test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', asyn
   assert.equal('mode' in economy, false, '0.8.0 drops the mode 0.3.0 seeded');
   assert.equal(economy.stamina.enabled, true);
   assert.equal(economy.nodes.enabled, false);
-  assert.equal(settings.store.get('migrationVersion'), '1.5.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -637,7 +637,7 @@ test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', asy
   assert.equal(stamina.regen.unit, 'days');
   assert.equal(stamina.regen.amount, 5);
   assert.equal(stamina.max, '20');
-  assert.equal(settings.store.get('migrationVersion'), '1.5.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
 });
 
 test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re-persist)', async () => {
@@ -1011,4 +1011,58 @@ test('successful injected run reports aborted:false and preserves the summary sh
   assert.equal(summary.ran, 1);
   assert.equal(summary.migratedCatalystCount, 0);
   assert.deepEqual(summary.unifiedRegionSystems, []);
+});
+
+test('1.6.0 recovery-warning payload is surfaced in the summary and never persisted', async () => {
+  // Start at 1.5.0 so only the real 1.6.0 migration runs over persisted legacy data.
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.5.0',
+      recipes: [
+        {
+          id: 'recipe-rt',
+          name: 'Roll Table Recipe',
+          craftingSystemId: 'sys-1',
+          resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'RollTable.a' }
+        }
+      ],
+      craftingSystems: [],
+      gatheringConfig: {
+        systems: {
+          'sys-1': {
+            tasks: [
+              { id: 'task-1', name: 'Task 1', resolutionMode: 'routed', resultSelection: { provider: 'macroOutcome' } }
+            ]
+          }
+        }
+      }
+    }
+  });
+
+  const summary = await runner.run();
+
+  // Surfaced in the summary for the GM notice.
+  assert.deepEqual(
+    summary.removedResultSelectionProviders.droppedRollTableRecipes.map(r => r.recipeId),
+    ['recipe-rt']
+  );
+  assert.equal(summary.removedResultSelectionProviders.strippedGatheringTasks.length, 1);
+  assert.equal(summary.removedResultSelectionProviders.strippedGatheringTasks[0].taskId, 'task-1');
+
+  // Stripped from every persisted setting payload (never written to disk).
+  const persistedRecipes = settings.store.get('recipes');
+  assert.equal(persistedRecipes[0].resultSelection.provider, 'check');
+  assert.equal('rollTableUuid' in persistedRecipes[0].resultSelection, false);
+  assert.equal('_removedResultSelectionProviders' in persistedRecipes, false);
+
+  const persistedGathering = settings.store.get('gatheringConfig');
+  assert.equal('_removedResultSelectionProviders' in persistedGathering, false);
+  assert.equal('resultSelection' in persistedGathering.systems['sys-1'].tasks[0], false);
+
+  // Confirm no persisted setting value carries the transient field.
+  for (const { value } of settings.calls.set) {
+    if (value && typeof value === 'object') {
+      assert.equal('_removedResultSelectionProviders' in value, false);
+    }
+  }
 });
