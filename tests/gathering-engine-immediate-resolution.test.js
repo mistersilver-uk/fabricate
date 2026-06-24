@@ -318,25 +318,30 @@ test('progressive success awards expected results from numeric check value', asy
     { actorUuid: actor.uuid, itemUuid: 'Item.ore-a', quantity: 1 },
     { actorUuid: actor.uuid, itemUuid: 'Item.ore-b', quantity: 1 }
   ];
-  const engine = makeEngine({
-    task,
-    checkResult: { success: null, status: null, value: 8, reasonCode: 'CHECK_VALUE' },
-    createdResults,
-    calls
-  });
+  stubRoll(8); // system gathering check rolls 8 → drives the numeric award value
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' } },
+      createdResults,
+      calls
+    });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
-  assert.equal(result.accepted, true);
-  assert.equal(result.state, 'succeeded');
-  assert.equal(calls.evaluateCheck.length, 1);
-  assert.equal(calls.resolveProgressive.length, 1);
-  assert.equal(calls.resolveProgressive[0].checkResult.value, 8);
-  assert.deepEqual(
-    calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
-    ['result-a', 'result-b']
-  );
-  assert.deepEqual(result.createdResults, createdResults);
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'succeeded');
+    assert.deepEqual(calls.evaluateCheck, []);
+    assert.equal(calls.resolveProgressive.length, 1);
+    assert.equal(calls.resolveProgressive[0].checkResult.value, 8);
+    assert.deepEqual(
+      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      ['result-a', 'result-b']
+    );
+    assert.deepEqual(result.createdResults, createdResults);
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('progressive fallback uses component difficulty and ignores inline result difficulty', async () => {
@@ -350,51 +355,61 @@ test('progressive fallback uses component difficulty and ignores inline result d
       ]
     }]
   });
-  const engine = makeEngine({
-    task,
-    checkResult: { success: null, status: null, value: 2, reasonCode: 'CHECK_VALUE' },
-    includeProgressiveResolver: false,
-    calls
-  });
+  stubRoll(2); // value 2 < comp-a difficulty (3) → awards nothing → terminal failure
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: { progressive: { rollFormula: '1d8', awardMode: 'equal' } },
+      includeProgressiveResolver: false,
+      calls
+    });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
-  assert.equal(result.accepted, true);
-  assert.equal(result.state, 'failed');
-  assert.deepEqual(calls.resolveProgressive, []);
-  assert.deepEqual(calls.createResults, []);
-  assert.equal(calls.failureFeedback.length, 1);
-  assert.equal(calls.createTerminalRun.length, 1);
-  assert.equal(calls.createTerminalRun[0][2], 'failed');
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'failed');
+    assert.deepEqual(calls.resolveProgressive, []);
+    assert.deepEqual(calls.createResults, []);
+    assert.equal(calls.failureFeedback.length, 1);
+    assert.equal(calls.createTerminalRun.length, 1);
+    assert.equal(calls.createTerminalRun[0][2], 'failed');
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('progressive neutral zero-award path writes terminal failure when no explicit check success exists', async () => {
   const calls = {};
   const task = progressiveTask();
-  const engine = makeEngine({
-    task,
-    checkResult: { success: null, status: null, value: 0, reasonCode: 'CHECK_VALUE' },
-    resolver: {
-      progressive: {
-        status: 'failed',
-        resultGroups: [{ ...task.resultGroups[0], results: [] }],
-        checkResult: { value: 0, reasonCode: 'CHECK_VALUE' }
-      }
-    },
-    calls
-  });
+  stubRoll(0); // system gathering check rolls 0 → neutral, no award
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: { progressive: { rollFormula: '1d8', awardMode: 'equal' } },
+      resolver: {
+        progressive: {
+          status: 'failed',
+          resultGroups: [{ ...task.resultGroups[0], results: [] }],
+          checkResult: { value: 0, reasonCode: 'CHECK_VALUE' }
+        }
+      },
+      calls
+    });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
-  assert.equal(result.accepted, true);
-  assert.equal(result.state, 'failed');
-  assert.deepEqual(result.createdResults, []);
-  assert.deepEqual(calls.createResults, []);
-  assert.equal(calls.failureFeedback.length, 1);
-  assert.equal(calls.failureFeedback[0].failureOutcome, null);
-  assert.equal(calls.failureFeedback[0].checkResult.value, 0);
-  assert.equal(calls.createTerminalRun.length, 1);
-  assert.equal(calls.createTerminalRun[0][2], 'failed');
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'failed');
+    assert.deepEqual(result.createdResults, []);
+    assert.deepEqual(calls.createResults, []);
+    assert.equal(calls.failureFeedback.length, 1);
+    assert.equal(calls.failureFeedback[0].failureOutcome, null);
+    assert.equal(calls.failureFeedback[0].checkResult.value, 0);
+    assert.equal(calls.createTerminalRun.length, 1);
+    assert.equal(calls.createTerminalRun[0][2], 'failed');
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('invalid failureOutcome aborts before resolver or terminal side effects', async () => {
@@ -715,7 +730,8 @@ test('GM blind terminal response may include task and result details for inspect
 // ---------------------------------------------------------------------------
 // System-level gathering check (Checks editor) formula consumption (issue 437):
 // the engine rolls the system `gatheringCraftingCheck` formula via the shared
-// checkRoll resolvers, with dual-read fallback to the legacy `task.check` path.
+// checkRoll resolvers. The legacy per-task `task.check` fallback has been
+// retired; without a system roll formula progressive resolution is misconfigured.
 // ---------------------------------------------------------------------------
 
 function stubRoll(total, dice = []) {
@@ -726,7 +742,7 @@ function stubRoll(total, dice = []) {
   };
 }
 
-test('progressive: system gathering check formula drives the numeric award value (legacy task.check unused)', async () => {
+test('progressive: system gathering check formula drives the numeric award value', async () => {
   const calls = {};
   const task = progressiveTask();
   stubRoll(8); // total 8 → awards comp-a (3) + comp-b (5), stops before comp-c (7)
@@ -754,29 +770,47 @@ test('progressive: system gathering check formula drives the numeric award value
   }
 });
 
-test('progressive: with no system formula the engine still uses the legacy task.check evaluator path', async () => {
+test('progressive: with no system formula the check is misconfigured (no legacy task.check fallback)', async () => {
   const calls = {};
   const task = progressiveTask();
   const engine = makeEngine({
     task,
-    checkResult: { success: null, status: null, value: 8, reasonCode: 'CHECK_VALUE' },
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
     calls
   });
 
+  // Directly exercise the check evaluation: no system progressive roll formula
+  // means a MISSING_GATHERING_CHECK diagnostic, never the retired task.check path.
+  const checkResult = await engine._evaluateGatheringCheck({
+    actor,
+    viewer,
+    system: {},
+    environment: {},
+    task
+  });
+  assert.equal(checkResult.success, null);
+  assert.equal(checkResult.status, null);
+  assert.equal(checkResult.value, null);
+  assert.equal(checkResult.reasonCode, 'MISCONFIGURED_PROVIDER');
+  assert.equal(checkResult.diagnostic.code, 'MISSING_GATHERING_CHECK');
+  assert.match(checkResult.diagnostic.message, /system-level gathering check roll formula/);
+
+  // End to end: the attempt is rejected as a task misconfiguration and the
+  // legacy evaluator is never consulted or even able to award results.
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
-  assert.equal(result.accepted, true);
-  assert.equal(result.state, 'succeeded');
-  assert.equal(calls.evaluateCheck.length, 1);
-  assert.equal(calls.resolveProgressive[0].checkResult.value, 8);
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+  assert.deepEqual(calls.evaluateCheck, []);
+  assert.deepEqual(calls.resolveProgressive, []);
+  assert.deepEqual(calls.createResults, []);
 });
 
-test('progressive: system awardMode takes precedence over the per-task award mode', async () => {
+test('progressive: system awardMode drives the award (per-task award mode is ignored)', async () => {
   const calls = {};
   // value 4 covers comp-a (3) with 1 left over (< comp-b 5). 'equal' would stop
   // after comp-a; 'partial' awards comp-b too with a remainder. The system mode
-  // ('partial') must win over the task mode ('equal').
+  // ('partial') drives the award; the stale per-task 'equal' is ignored.
   const task = progressiveTask({ progressive: { awardMode: 'equal' } });
   stubRoll(4);
   try {

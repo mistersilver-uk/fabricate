@@ -21,8 +21,9 @@
  * tasks resolve via providers (macro/roll-table outcome), and seeding a
  * `routed.rollFormula` with no outcome tiers would make every routed gather fail
  * (the formula would match no tier). Routed therefore keeps its provider-based
- * back-compat, and the gathering engine reads the system progressive formula
- * only when one is configured, falling back to the per-task `check` otherwise.
+ * back-compat. The gathering engine reads the system progressive formula; the
+ * per-task `check` is retained only as this migration's source, not a runtime
+ * fallback.
  *
  * Per-task fields (`check`/`progressive`/`resolutionMode`/`dcOverride`) are KEPT
  * untouched for back-compat — this migration only WRITES the system-level copy.

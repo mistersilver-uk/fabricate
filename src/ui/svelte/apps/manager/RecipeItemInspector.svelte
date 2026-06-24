@@ -304,10 +304,11 @@
   </section>
   {/if}
 
-  {#if routed}
+  {#if routed && complex}
   <!-- Routed systems pick how a result group is selected: by the chosen
        ingredient set, or by the system-level crafting-check outcome. The toggle
-       only appears for routed resolution. -->
+       only appears for routed resolution AND Complex recipes — a Simple recipe
+       crafts one set into one result, so there is no result group to route. -->
   <section class="manager-inspector-card" data-recipe-section="recipe-routing">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Routing', 'Result routing')}</h3>
     <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.Routing', 'Result routing')}>

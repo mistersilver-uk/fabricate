@@ -2477,13 +2477,11 @@ export class GatheringEngine {
     return outcome;
   }
 
-  async _evaluateGatheringCheck({ actor, viewer, system, environment, task }) {
-    // System-level gathering check (Checks editor) takes precedence when a
-    // progressive roll formula is configured: roll the formula and map its
-    // numeric total onto the check-result shape the progressive resolver expects
-    // (`{ success, status, value }`). Progressive has no DC, so `task.dcOverride`
-    // never applies here. Falls back to the legacy per-task `task.check`
-    // expression-evaluator path when no system formula is set.
+  async _evaluateGatheringCheck({ actor, system }) {
+    // System-level gathering check (Checks editor) drives progressive
+    // resolution: roll the configured formula and map its numeric total onto the
+    // check-result shape the progressive resolver expects (`{ success, status,
+    // value }`). Progressive has no DC, so `task.dcOverride` never applies here.
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     if (rollFormula) {
@@ -2505,27 +2503,17 @@ export class GatheringEngine {
       };
     }
 
-    if (typeof this.evaluator?.evaluateCheck !== 'function') {
-      return {
-        success: null,
-        status: null,
-        value: null,
-        reasonCode: 'MISCONFIGURED_PROVIDER',
-        diagnostic: {
-          code: 'MISSING_CHECK_EVALUATOR',
-          message: 'Progressive gathering resolution requires a check evaluator',
-        },
-      };
-    }
-
-    return this.evaluator.evaluateCheck({
-      check: task.check ?? null,
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-    });
+    return {
+      success: null,
+      status: null,
+      value: null,
+      reasonCode: 'MISCONFIGURED_PROVIDER',
+      diagnostic: {
+        code: 'MISSING_GATHERING_CHECK',
+        message:
+          'Progressive gathering resolution requires a system-level gathering check roll formula',
+      },
+    };
   }
 
   async _createGatheredResults({ viewer, actor, system, environment, task, outcome }) {
@@ -3268,12 +3256,8 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     });
   }
 
-  // Prefer the system-level gathering check award mode; fall back to the legacy
-  // per-task award mode, then to 'equal'.
-  const requestedAwardMode =
-    system?.gatheringCraftingCheck?.progressive?.awardMode ??
-    task?.progressive?.awardMode ??
-    'equal';
+  // Award mode comes from the system-level gathering check, defaulting to 'equal'.
+  const requestedAwardMode = system?.gatheringCraftingCheck?.progressive?.awardMode ?? 'equal';
   const awardMode = ['partial', 'equal', 'exceed'].includes(requestedAwardMode)
     ? requestedAwardMode
     : 'equal';
@@ -3416,12 +3400,6 @@ function validateTaskConfiguration(task) {
   }
 
   if (resolutionMode === 'progressive') {
-    if (!task?.check || typeof task.check !== 'object') {
-      errors.push('Progressive gathering task requires a check');
-    }
-    if (!task?.progressive || typeof task.progressive !== 'object') {
-      errors.push('Progressive gathering task requires progressive configuration');
-    }
     if (resultGroups.length !== 1) {
       errors.push('Progressive gathering task requires exactly one result group');
     }

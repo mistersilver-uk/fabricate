@@ -1294,16 +1294,6 @@ function _inferEnvironmentValidationTarget(
     return { taskId: task.id, path: `${prefix}.resultSelection.rollTableUuid` };
   }
 
-  if (
-    /progressive\.awardmode/.test(lower) ||
-    /progressive resolution requires progressive config/.test(lower)
-  ) {
-    return { taskId: task.id, path: `${prefix}.progressive.awardMode` };
-  }
-  if (/progressive resolution requires check|gathering check requires formula/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.check.formula` };
-  }
-
   if (/visibility gate requires formula and threshold/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.visibility.formula` };
   }

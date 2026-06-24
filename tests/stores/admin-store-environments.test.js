@@ -119,12 +119,8 @@ function validateEnvironmentForFakeCreate(environment) {
       }
     }
     if (task.resolutionMode === 'progressive') {
-      if (!task.progressive?.awardMode || !['partial', 'equal', 'exceed'].includes(task.progressive.awardMode)) {
-        errors.push(`Task "${task.name}" progressive.awardMode must be partial, equal, or exceed`);
-      }
-      if (!task.check || !task.check.formula) {
-        errors.push(`Task "${task.name}" gathering check requires formula`);
-      }
+      // The gathering check is system-level now, so a progressive task no longer
+      // requires a per-task check or award mode (mirrors the production validator).
       if (!Array.isArray(task.resultGroups) || task.resultGroups.length !== 1) {
         errors.push(`Task "${task.name}" progressive resolution requires exactly one result group`);
       } else if (!Array.isArray(task.resultGroups[0]?.results) || task.resultGroups[0].results.length < 1) {

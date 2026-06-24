@@ -82,66 +82,6 @@ test('visibility accepts boolean threshold comparison outcomes', async () => {
   assert.equal(result.reasonCode, 'HIDDEN');
 });
 
-test('checks preserve numeric values when threshold derives success or failure', async () => {
-  const { evaluator, expressionCalls } = makeEvaluator({
-    expressionResults: new Map([
-      ['1d20 + @skills.nat.mod', 11],
-      ['15', 15]
-    ])
-  });
-
-  const result = await evaluator.evaluateCheck({
-    check: { formula: '1d20 + @skills.nat.mod', threshold: '15' },
-    actor,
-    environment,
-    task
-  });
-
-  assert.equal(result.success, false);
-  assert.equal(result.status, 'failure');
-  assert.equal(result.value, 11);
-  assert.equal(result.reasonCode, 'CHECK_FAILURE');
-  assert.equal(expressionCalls[0].kind, 'checkFormula');
-  assert.equal(expressionCalls[0].actor, actor);
-  assert.equal(expressionCalls[0].environment, environment);
-  assert.equal(expressionCalls[0].task, task);
-  assert.equal(expressionCalls[1].kind, 'checkThreshold');
-  assert.equal(expressionCalls[1].formulaValue, 11);
-});
-
-test('checks tolerate absent threshold', async () => {
-  const { evaluator } = makeEvaluator({
-    expressionResults: new Map([['@attributes.perception.total', 7]])
-  });
-
-  const result = await evaluator.evaluateCheck({
-    check: { formula: '@attributes.perception.total' },
-    actor,
-    environment,
-    task
-  });
-
-  assert.equal(result.success, null);
-  assert.equal(result.status, null);
-  assert.equal(result.value, 7);
-  assert.equal(result.reasonCode, 'CHECK_VALUE');
-});
-
-test('misconfigured check without formula returns a provider-free diagnostic', async () => {
-  const { evaluator } = makeEvaluator();
-
-  const misconfiguredCheck = await evaluator.evaluateCheck({
-    check: { threshold: '12' },
-    actor,
-    environment,
-    task
-  });
-  assert.equal(misconfiguredCheck.success, null);
-  assert.equal(misconfiguredCheck.status, null);
-  assert.equal(misconfiguredCheck.reasonCode, 'MISCONFIGURED_PROVIDER');
-  assert.equal(misconfiguredCheck.diagnostic.provider, null);
-});
-
 test('thrown expression errors return diagnostics without raw throws', async () => {
   const { evaluator: expressionEvaluator } = makeEvaluator({
     expressionResults: new Map([
@@ -160,17 +100,6 @@ test('thrown expression errors return diagnostics without raw throws', async () 
   assert.equal(expressionVisibility.reasonCode, 'PROVIDER_ERROR');
   assert.equal(expressionVisibility.diagnostic.message, 'expression exploded');
   assert.equal(expressionVisibility.diagnostic.provider, null);
-
-  const expressionCheck = await expressionEvaluator.evaluateCheck({
-    check: { formula: '@skills.sur.mod', threshold: '12' },
-    actor,
-    environment,
-    task
-  });
-  assert.equal(expressionCheck.success, null);
-  assert.equal(expressionCheck.status, null);
-  assert.equal(expressionCheck.reasonCode, 'PROVIDER_ERROR');
-  assert.equal(expressionCheck.diagnostic.message, 'expression exploded');
 });
 
 // ---------------------------------------------------------------------------
