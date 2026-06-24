@@ -335,6 +335,8 @@ function createStore(calls = [], options = {}) {
       description: 'Potion and essence work',
       resolutionMode: options.alchemyResolutionMode || 'alchemy',
       craftingCheck: options.craftingCheck,
+      salvageResolutionMode: options.salvageResolutionMode || 'simple',
+      salvageCraftingCheck: options.salvageCraftingCheck,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
       // Tools are system-owned: the manager reads the library from
@@ -1124,6 +1126,9 @@ function createStore(calls = [], options = {}) {
     saveCraftingCheckActive: (enabled) => {
       calls.push(['saveCraftingCheckActive', enabled]);
     },
+    saveSalvageCheckProgressive: (progressive) => {
+      calls.push(['saveSalvageCheckProgressive', progressive]);
+    },
     saveSalvageCheckActive: (enabled) => {
       calls.push(['saveSalvageCheckActive', enabled]);
     },
@@ -1801,6 +1806,76 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
     assert.ok(saved, 'Save persists the routed config through the store');
     assert.equal(saved[1].rollFormula, '2d6+1d4');
+    assert.equal(
+      target.querySelector('[data-checks-save]'),
+      null,
+      'saving clears the unsaved state'
+    );
+  });
+
+  it('Checks Save is tab-aware: edits and persists the salvage progressive award mode', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          salvageResolutionMode: 'progressive',
+          salvageCraftingCheck: {
+            enabled: true,
+            progressive: { awardMode: 'equal', allowPlayerReorder: true },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // Switch to the Salvage sub-tab; progressive salvage shows the award-mode editor.
+    target.querySelector('[data-checks-tab-button="salvage"]').click();
+    await tick();
+    flushSync();
+
+    const salvageEditor = target.querySelector('[data-salvage-progressive-editor]');
+    assert.ok(salvageEditor, 'progressive salvage shows the award-mode editor');
+    assert.ok(
+      salvageEditor
+        .querySelector('[data-award-mode-option="equal"]')
+        .classList.contains('is-active'),
+      'the selector is seeded from the persisted award mode'
+    );
+
+    // No Save button until an edit stages a change.
+    assert.equal(target.querySelector('[data-checks-save]'), null);
+
+    // Change the award mode; the shared (tab-aware) Save button appears.
+    salvageEditor.querySelector('[data-award-mode-option="exceed"] input').click();
+    await tick();
+    flushSync();
+    const saveButton = target.querySelector('[data-checks-save]');
+    assert.ok(saveButton, 'editing the salvage award mode reveals the Save button');
+
+    saveButton.click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+
+    // The header Save routes to the SALVAGE seam (not crafting) because the salvage
+    // sub-tab is active, and carries the preserved allowPlayerReorder.
+    const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
+    assert.ok(saved, 'Save persists the salvage progressive config through the store');
+    assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
+    assert.equal(saved[1].allowPlayerReorder, true, 'allowPlayerReorder is preserved');
+    assert.equal(
+      calls.find((call) => call[0] === 'saveCraftingCheckProgressive'),
+      undefined,
+      'the salvage tab does not call the crafting save seam'
+    );
     assert.equal(
       target.querySelector('[data-checks-save]'),
       null,
